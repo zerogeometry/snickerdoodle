@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snickerdoodle — Mobile</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.31.0/iconfont/tabler-icons.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Mulish:wght@400;500;600;700;800&family=Caveat:wght@600&display=swap');
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{margin:0;background:radial-gradient(circle at 50% 0%,#F3EAD8,#E2D6BF);font-family:'Mulish',system-ui,sans-serif;color:#2E2723;display:flex;flex-wrap:wrap;justify-content:center;gap:42px 34px;padding:40px 20px 60px;}
+.unit{display:flex;flex-direction:column;align-items:center;gap:12px;}
+.lab{font-family:'Fraunces',serif;font-size:14px;font-weight:600;color:#7A6A58;}
+.phone{width:338px;background:#171310;border-radius:44px;padding:9px;box-shadow:0 22px 44px rgba(46,39,35,.26);}
+.scr{position:relative;border-radius:36px;overflow:hidden;background:#FBF5E9;height:712px;display:flex;flex-direction:column;}
+.sb{display:flex;align-items:center;justify-content:space-between;padding:11px 22px 5px;font-size:13px;font-weight:800;flex:0 0 auto;z-index:6;}
+.sb .isl{width:74px;height:19px;background:#171310;border-radius:11px;}
+.sb .ri{display:flex;gap:5px;align-items:center;font-size:13px;}
+.body{flex:1;overflow-y:auto;}
+.body::-webkit-scrollbar{width:0;}
+.hi{position:absolute;bottom:7px;left:50%;transform:translateX(-50%);width:120px;height:4px;background:#2E2723;opacity:.32;border-radius:3px;z-index:7;}
+.cta{width:100%;background:#D2691E;color:#FFF6E9;font-weight:800;font-size:16px;border:none;border-radius:26px;padding:15px;font-family:'Mulish',sans-serif;}
+.ctabar{padding:11px 16px 22px;background:#FBF5E9;border-top:1px solid #EFE6D6;flex:0 0 auto;}
+.tabbar{display:flex;justify-content:space-around;align-items:center;padding:9px 0 20px;background:#FFF;border-top:1px solid #EFE6D6;flex:0 0 auto;}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:600;color:#B3A491;}
+.tab.on{color:#C8623A;}
+.tab i{font-size:21px;}
+.tnav{display:flex;align-items:center;justify-content:space-between;padding:8px 18px;flex:0 0 auto;}
+.logo{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
+/* chips */
+.chiprow{display:flex;gap:7px;padding:10px 16px;overflow-x:auto;flex:0 0 auto;}
+.chiprow::-webkit-scrollbar{height:0;}
+.chip{flex:0 0 auto;font-size:12px;font-weight:700;border:1.5px solid #E0C7A8;color:#7A6A58;background:none;border-radius:16px;padding:7px 15px;}
+.chip.on{background:#C8623A;color:#FFF6E9;border-color:#C8623A;}
+/* product grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:11px;padding:4px 16px 16px;}
+.pcard{background:#FFF;border-radius:14px;overflow:hidden;box-shadow:0 2px 7px rgba(46,39,35,.07);position:relative;}
+.ppic{height:104px;display:flex;align-items:center;justify-content:center;}
+.pmeta{padding:8px 11px;display:flex;justify-content:space-between;align-items:center;}
+.pn{font-size:12px;font-weight:700;}
+.pp{font-size:12px;color:#6F6358;}
+.heart{position:absolute;top:8px;right:9px;color:#D9B79A;font-size:15px;}
+</style>
+</head>
+<body>
+
+<!-- ============ LANDING ============ -->
+<div class="unit"><span class="lab">Landing</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="body">
+<div class="tnav"><span class="logo">snickerdoodle</span><i class="ti ti-menu-2" style="font-size:22px;color:#7A6A58"></i></div>
+<div style="text-align:center;padding:14px 22px 0">
+<p style="font-family:'Caveat',cursive;font-size:22px;color:#C8623A;margin:0">they're only little once</p>
+<h1 style="font-family:'Fraunces',serif;font-size:40px;line-height:1.02;font-weight:600;margin:4px 0 12px;letter-spacing:-.5px">Keep the <span style="color:#C8623A">magic</span>.</h1>
+<p style="font-size:14px;line-height:1.55;color:#5F564C;margin:0 auto;max-width:250px">Turn your little one's drawings into beautiful things you'll treasure forever.</p>
+</div>
+<div style="position:relative;display:flex;justify-content:center;padding:18px 0 8px">
+<div style="position:absolute;top:10px;left:42px"><svg width="26" height="26" viewBox="0 0 30 30"><polygon points="15,2 18,11 28,11 20,17 23,28 15,21 7,28 10,17 2,11 12,11" fill="#E8786E"/></svg></div>
+<div style="position:absolute;top:30px;right:40px"><svg width="22" height="22" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#F2A640"/><g stroke="#F2A640" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/></g></svg></div>
+<div style="text-align:center">
+<div style="background:#FFFDF8;border:9px solid #F2A640;border-radius:7px;padding:14px;display:inline-block"><svg viewBox="0 0 130 118" width="150" height="136"><rect x="22" y="50" width="56" height="46" fill="none" stroke="#C8623A" stroke-width="4"/><path d="M14 52 L50 24 L86 52" fill="none" stroke="#E8786E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="42" y="70" width="16" height="26" fill="none" stroke="#84BBD0" stroke-width="3.5"/><circle cx="104" cy="26" r="10" fill="#F2A640"/><g stroke="#F2A640" stroke-width="3" stroke-linecap="round"><line x1="104" y1="9" x2="104" y2="15"/><line x1="122" y1="26" x2="128" y2="26"/></g><path d="M8 108 q14 -8 28 0 t28 0 t28 0 t26 0" fill="none" stroke="#93B97C" stroke-width="3.5" stroke-linecap="round"/></svg></div>
+<p style="font-family:'Caveat',cursive;font-size:17px;color:#6F6358;margin:7px 0 0">by Olivia, age 5</p>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:9px;color:#9C8E7E;font-size:12px;padding:6px 0 18px">on 40+ products
+<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#E8786E"/></svg>
+<svg width="17" height="17" viewBox="0 0 24 24"><rect x="6" y="9" width="12" height="9" rx="1" fill="none" stroke="#84BBD0" stroke-width="2"/></svg>
+<svg width="17" height="17" viewBox="0 0 24 24"><polygon points="12,3 14,9 20,9 15,13 17,19 12,15 7,19 9,13 4,9 10,9" fill="#F2A640"/></svg></div>
+</div>
+<div class="ctabar"><button class="cta">start creating</button><p style="text-align:center;font-size:11px;color:#6F6358;margin:9px 0 0"><i class="ti ti-lock" style="color:#5C8A3F;vertical-align:-1px"></i> everything you make is yours</p></div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ START CREATING ============ -->
+<div class="unit"><span class="lab">Start Creating</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="tnav"><i class="ti ti-arrow-left" style="font-size:21px;color:#7A6A58"></i><span style="font-size:12px;color:#A89B8C">upload · <b style="color:#C8623A">your range</b> · save</span><span style="width:21px"></span></div>
+<div class="body">
+<div style="padding:6px 18px 0;text-align:center">
+<div style="display:inline-flex;align-items:center;gap:10px;background:#FFFDF8;border:1px solid #EADFC9;border-radius:14px;padding:9px 13px">
+<div style="background:#FFFDF8;border:4px solid #F2A640;border-radius:4px;padding:5px"><svg viewBox="0 0 80 70" width="44" height="38"><rect x="14" y="30" width="34" height="26" fill="none" stroke="#C8623A" stroke-width="3"/><path d="M9 32 L31 15 L53 32" fill="none" stroke="#E8786E" stroke-width="3" stroke-linecap="round"/><circle cx="66" cy="16" r="6" fill="#F2A640"/></svg></div>
+<div style="text-align:left"><div style="font-size:11px;color:#9C8772;font-weight:600">you uploaded</div><div style="font-family:'Caveat',cursive;font-size:16px;color:#6F6358">Olivia, age 5</div></div>
+</div>
+<div style="display:flex;gap:8px;background:#EAF1E4;border-radius:12px;padding:10px 12px;margin:12px 0 4px;text-align:left"><i class="ti ti-lock" style="color:#5C8A3F;font-size:15px"></i><p style="margin:0;font-size:11.5px;line-height:1.45;color:#46402F"><b>This stays yours.</b> We use it to make your bits, then it's gone — unless you keep it.</p></div>
+</div>
+<h2 style="font-family:'Fraunces',serif;font-size:21px;font-weight:600;margin:14px 0 2px;padding:0 18px">Olivia's masterpiece, made real.</h2>
+<p style="font-size:12px;color:#6F6358;margin:0 0 6px;padding:0 18px">The same drawing, on everything you love.</p>
+<div class="g2">
+<div class="pcard"><div class="ppic" style="height:88px;background:#FDF0DC"><svg viewBox="0 0 60 60" width="48" height="48"><rect x="14" y="20" width="32" height="26" fill="#FFFDF8" stroke="#F2A640" stroke-width="5"/><rect x="22" y="28" width="16" height="13" fill="none" stroke="#C8623A" stroke-width="2"/><path d="M20 29 L30 22 L40 29" fill="none" stroke="#E8786E" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">framed print</span><span class="pp">£22</span></div></div>
+<div class="pcard"><div class="ppic" style="height:88px;background:#FBE4E1"><svg viewBox="0 0 60 60" width="42" height="42"><rect x="16" y="18" width="24" height="30" rx="3" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.5"/><path d="M40 24 C50 24 50 38 40 38" fill="none" stroke="#C8623A" stroke-width="2.5"/><rect x="22" y="26" width="12" height="10" fill="none" stroke="#84BBD0" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">mug</span><span class="pp">£14</span></div></div>
+<div class="pcard"><div class="ppic" style="height:88px;background:#E8F0DF"><svg viewBox="0 0 60 60" width="44" height="44"><path d="M18 18 L26 12 Q30 10 34 12 L42 18 L38 26 L34 23 L34 48 L26 48 L26 23 L22 26 Z" fill="#FFFDF8" stroke="#93B97C" stroke-width="2.5" stroke-linejoin="round"/></svg></div><div class="pmeta"><span class="pn">kids tee</span><span class="pp">£18</span></div></div>
+<div class="pcard" style="border:2px solid #F2A640"><div class="ppic" style="height:88px;background:#F6E2D6"><svg viewBox="0 0 60 60" width="44" height="44"><rect x="16" y="16" width="30" height="34" rx="2" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.5"/><line x1="22" y1="16" x2="22" y2="50" stroke="#C8623A" stroke-width="2"/><rect x="28" y="24" width="12" height="10" fill="none" stroke="#E8786E" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">storybook ✦</span><span class="pp">£24</span></div></div>
+</div>
+</div>
+<div class="ctabar"><button class="cta">see the full range →</button></div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ CATALOGUE ============ -->
+<div class="unit"><span class="lab">Catalogue</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="tnav"><span class="logo">snickerdoodle</span><span style="display:flex;align-items:center;gap:5px;font-size:11px;color:#6F6358">your art <span style="width:26px;height:26px;border-radius:6px;border:2px solid #F2A640;background:#FFFDF8;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 30 30" width="17" height="17"><rect x="6" y="13" width="13" height="10" fill="none" stroke="#C8623A" stroke-width="2"/><path d="M4 14 L12 7 L20 14" fill="none" stroke="#E8786E" stroke-width="2"/></svg></span></span></div>
+<div style="padding:2px 18px 0"><h2 style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin:0">On <span style="color:#C8623A">40+ products</span></h2><p style="font-size:11.5px;color:#6F6358;margin:2px 0 0">One drawing. A whole family range.</p></div>
+<div class="chiprow"><button class="chip on">all</button><button class="chip">cards</button><button class="chip">home</button><button class="chip">wear</button><button class="chip">books</button><button class="chip">gifts</button></div>
+<div class="body">
+<div class="g2" style="padding-top:0">
+<div class="pcard"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#FDF0DC"><svg viewBox="0 0 70 60" width="50" height="44"><rect x="20" y="12" width="30" height="38" fill="#FFFDF8" stroke="#C8623A" stroke-width="2"/><line x1="35" y1="12" x2="35" y2="50" stroke="#C8623A" stroke-width="1.5"/><rect x="39" y="22" width="9" height="8" fill="none" stroke="#E8786E" stroke-width="1.6"/></svg></div><div class="pmeta"><span class="pn">card</span><span class="pp">£4</span></div></div>
+<div class="pcard"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#FBE4E1"><svg viewBox="0 0 70 60" width="50" height="44"><rect x="16" y="12" width="38" height="36" fill="#FFFDF8" stroke="#F2A640" stroke-width="5"/><rect x="26" y="22" width="18" height="14" fill="none" stroke="#C8623A" stroke-width="2"/><path d="M24 23 L35 16 L46 23" fill="none" stroke="#E8786E" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">framed print</span><span class="pp">£22</span></div></div>
+<div class="pcard"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#F6E2D6"><svg viewBox="0 0 70 60" width="46" height="44"><rect x="22" y="14" width="24" height="30" rx="3" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.2"/><path d="M46 20 C56 20 56 34 46 34" fill="none" stroke="#C8623A" stroke-width="2.2"/><rect x="28" y="22" width="12" height="9" fill="none" stroke="#84BBD0" stroke-width="1.8"/></svg></div><div class="pmeta"><span class="pn">mug</span><span class="pp">£14</span></div></div>
+<div class="pcard"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#E2F0F4"><svg viewBox="0 0 70 60" width="48" height="44"><rect x="18" y="18" width="34" height="30" rx="9" fill="#FFFDF8" stroke="#84BBD0" stroke-width="2.2"/><rect x="29" y="26" width="12" height="12" fill="none" stroke="#C8623A" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">cushion</span><span class="pp">£28</span></div></div>
+<div class="pcard"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#FBE4E1"><svg viewBox="0 0 70 60" width="48" height="44"><path d="M22 16 L30 10 Q35 8 40 10 L48 16 L43 25 L39 22 L39 50 L31 50 L31 22 L27 25 Z" fill="#FFFDF8" stroke="#93B97C" stroke-width="2.2" stroke-linejoin="round"/></svg></div><div class="pmeta"><span class="pn">kids tee</span><span class="pp">£18</span></div></div>
+<div class="pcard" style="border:2px solid #F2A640"><i class="ti ti-heart heart"></i><div class="ppic" style="background:#F6E2D6"><svg viewBox="0 0 70 60" width="44" height="44"><rect x="22" y="10" width="28" height="36" rx="2" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.2"/><line x1="28" y1="10" x2="28" y2="46" stroke="#C8623A" stroke-width="2"/><rect x="33" y="20" width="12" height="10" fill="none" stroke="#E8786E" stroke-width="1.8"/></svg></div><div class="pmeta"><span class="pn">storybook</span><span class="pp">£24</span></div></div>
+</div>
+</div>
+<div class="tabbar"><div class="tab on"><i class="ti ti-cards"></i>Range</div><div class="tab"><i class="ti ti-wand"></i>Create</div><div class="tab"><i class="ti ti-users"></i>Family</div><div class="tab"><i class="ti ti-shopping-bag"></i>Basket</div></div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ STUDIO ============ -->
+<div class="unit"><span class="lab">Studio</span>
+<div class="phone"><div class="scr" style="background:#FFFDF8">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 16px;flex:0 0 auto;border-bottom:1px solid #F0E7D6">
+<i class="ti ti-arrow-left" style="font-size:20px;color:#7A6A58"></i>
+<span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#6F6358;background:#F6F0E4;border:1px solid #E6D8BE;border-radius:14px;padding:5px 11px">A4 print <i class="ti ti-chevron-down" style="font-size:12px"></i></span>
+<button style="background:#D2691E;color:#FFF6E9;font-weight:700;font-size:12px;border:none;border-radius:16px;padding:7px 13px;font-family:'Mulish'">save</button>
+</div>
+<!-- canvas -->
+<div style="flex:1;position:relative;background:#FBF5E9;display:flex;align-items:center;justify-content:center;overflow:hidden">
+<div style="position:absolute;top:11px;right:12px;font-size:11px;font-weight:700;color:#5C8A3F;background:#EAF1E4;border-radius:12px;padding:4px 9px"><i class="ti ti-circle-check" style="vertical-align:-1px"></i> 300 dpi · print-ready</div>
+<div style="position:relative">
+<div style="position:absolute;border:1.5px dashed #C8623A;inset:-13px;border-radius:2px"></div>
+<div style="position:absolute;width:10px;height:10px;background:#FFF;border:2px solid #C8623A;left:-18px;top:-18px"></div><div style="position:absolute;width:10px;height:10px;background:#FFF;border:2px solid #C8623A;right:-18px;top:-18px"></div><div style="position:absolute;width:10px;height:10px;background:#FFF;border:2px solid #C8623A;left:-18px;bottom:-18px"></div><div style="position:absolute;width:10px;height:10px;background:#FFF;border:2px solid #C8623A;right:-18px;bottom:-18px"></div>
+<svg viewBox="0 0 170 150" width="180" height="158"><rect x="32" y="60" width="74" height="56" fill="none" stroke="#C8623A" stroke-width="4"/><path d="M24 62 L69 32 L114 62" fill="none" stroke="#E8786E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><rect x="58" y="84" width="22" height="32" fill="none" stroke="#84BBD0" stroke-width="3.5"/><circle cx="134" cy="32" r="11" fill="#F2A640"/><g stroke="#F2A640" stroke-width="3" stroke-linecap="round"><line x1="134" y1="13" x2="134" y2="18"/><line x1="155" y1="32" x2="160" y2="32"/></g><path d="M12 126 q16 -9 32 0 t32 0 t32 0 t30 0" fill="none" stroke="#93B97C" stroke-width="3.5" stroke-linecap="round"/></svg>
+</div>
+<!-- floating brush HUD -->
+<div style="position:absolute;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px;align-items:center;background:#FFFFFFEE;border:1px solid #EADFC9;border-radius:22px;padding:9px 7px;box-shadow:0 4px 12px rgba(46,39,35,.12)">
+<span style="width:22px;height:22px;border-radius:50%;background:#C8623A;border:2px solid #FFF;box-shadow:0 0 0 1px #E0C7A8"></span>
+<span style="width:14px;height:14px;border-radius:50%;background:#2E2723"></span>
+<i class="ti ti-plus" style="font-size:15px;color:#9C8E7E"></i>
+</div>
+</div>
+<!-- bottom sheet: active tool (brush) -->
+<div style="background:#FFF;border-radius:20px 20px 0 0;box-shadow:0 -4px 16px rgba(46,39,35,.08);padding:8px 18px 12px;flex:0 0 auto">
+<div style="width:38px;height:4px;background:#E0D4BD;border-radius:3px;margin:0 auto 11px"></div>
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:11px"><span style="font-family:'Fraunces',serif;font-size:14px;font-weight:600"><i class="ti ti-brush" style="color:#C8623A;vertical-align:-2px"></i> Brush</span><span style="font-size:11px;color:#9C8E7E">tap a colour</span></div>
+<div style="display:flex;align-items:center;gap:9px;margin-bottom:9px"><span style="font-size:11px;color:#6F6358;width:74px">Size</span><div style="flex:1;height:6px;background:#EAD9BE;border-radius:3px;position:relative"><div style="position:absolute;left:0;height:6px;width:42%;background:#C8623A;border-radius:3px"></div><div style="position:absolute;left:42%;top:50%;width:16px;height:16px;background:#FFF;border:2px solid #C8623A;border-radius:50%;transform:translate(-50%,-50%)"></div></div></div>
+<div style="display:flex;align-items:center;gap:9px;margin-bottom:11px"><span style="font-size:11px;color:#6F6358;width:74px">Smoothness</span><div style="flex:1;height:6px;background:#EAD9BE;border-radius:3px;position:relative"><div style="position:absolute;left:0;height:6px;width:70%;background:#C8623A;border-radius:3px"></div><div style="position:absolute;left:70%;top:50%;width:16px;height:16px;background:#FFF;border:2px solid #C8623A;border-radius:50%;transform:translate(-50%,-50%)"></div></div></div>
+<div style="display:flex;gap:9px">
+<span style="width:26px;height:26px;border-radius:50%;background:#C8623A;box-shadow:0 0 0 2px #FFF,0 0 0 3.5px #C8623A"></span>
+<span style="width:26px;height:26px;border-radius:50%;background:#F2A640"></span><span style="width:26px;height:26px;border-radius:50%;background:#E8786E"></span><span style="width:26px;height:26px;border-radius:50%;background:#84BBD0"></span><span style="width:26px;height:26px;border-radius:50%;background:#93B97C"></span><span style="width:26px;height:26px;border-radius:50%;background:#2E2723"></span>
+</div>
+</div>
+<!-- tool bar -->
+<div style="display:flex;gap:6px;padding:9px 12px 20px;overflow-x:auto;background:#FBF5E9;border-top:1px solid #EFE6D6;flex:0 0 auto">
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;background:#F4E3CC;color:#C8623A;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-brush"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#7A6A58;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-eraser"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#7A6A58;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-typography"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#7A6A58;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-sticker"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#7A6A58;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-stack-2"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;color:#7A6A58;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-adjustments"></i></span>
+<span style="flex:0 0 auto;width:42px;height:42px;border-radius:11px;background:#FBEFE0;color:#C8623A;display:flex;align-items:center;justify-content:center;font-size:19px"><i class="ti ti-sparkles"></i></span>
+</div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ CHECKOUT ============ -->
+<div class="unit"><span class="lab">Checkout</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="tnav"><i class="ti ti-arrow-left" style="font-size:21px;color:#7A6A58"></i><span style="font-size:12px;color:#6F6358"><i class="ti ti-lock" style="color:#5C8A3F;vertical-align:-1px"></i> secure checkout</span><span style="width:21px"></span></div>
+<div class="body" style="padding:0 16px">
+<h2 style="font-family:'Fraunces',serif;font-size:19px;font-weight:600;margin:6px 0 10px">Olivia's basket</h2>
+<div style="display:flex;align-items:center;gap:11px;background:#FFF;border:1px solid #EADFC9;border-radius:12px;padding:9px 11px;margin-bottom:8px"><div style="width:42px;height:42px;border-radius:8px;background:#FBF5E9;border:1px solid #EADFC9;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 40 40" width="26" height="26"><rect x="12" y="9" width="18" height="24" fill="none" stroke="#C8623A" stroke-width="2"/><line x1="17" y1="9" x2="17" y2="33" stroke="#C8623A" stroke-width="1.5"/></svg></div><div style="flex:1"><div style="font-size:13px;font-weight:700">storybook</div><div style="font-size:11px;color:#9C8E7E">"Olivia's big adventure"</div></div><span style="font-weight:700;font-size:13px">£24</span></div>
+<div style="display:flex;align-items:center;gap:11px;background:#FFF;border:1px solid #EADFC9;border-radius:12px;padding:9px 11px;margin-bottom:10px"><div style="width:42px;height:42px;border-radius:8px;background:#FBF5E9;border:1px solid #EADFC9;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 40 40" width="26" height="26"><rect x="9" y="10" width="22" height="20" fill="#FFFDF8" stroke="#F2A640" stroke-width="4"/></svg></div><div style="flex:1"><div style="font-size:13px;font-weight:700">framed print</div><div style="font-size:11px;color:#9C8E7E">A4 · oak frame</div></div><span style="font-weight:700;font-size:13px">£22</span></div>
+<div style="background:#FBEFE0;border:1px dashed #E2A86C;border-radius:12px;padding:11px 13px;margin-bottom:10px">
+<div style="display:flex;align-items:center;justify-content:space-between"><span style="font-size:13px;font-weight:700"><i class="ti ti-gift" style="color:#C8623A;vertical-align:-2px"></i> Sending as a gift?</span><span style="width:38px;height:22px;background:#C8623A;border-radius:13px;position:relative"><span style="position:absolute;top:2px;right:2px;width:18px;height:18px;background:#FFF;border-radius:50%"></span></span></div>
+<p style="font-size:11px;color:#8A6F52;margin:7px 0 0;line-height:1.4">Wrapped with a handwritten-style note, prices hidden.</p>
+</div>
+<p style="font-size:11px;font-weight:700;color:#7A6A58;margin:0 0 8px">ADD A LITTLE SOMETHING</p>
+<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:12px">
+<div style="flex:0 0 auto;width:84px;background:#FFF;border:1px solid #EFE6D6;border-radius:10px;padding:8px;text-align:center"><svg viewBox="0 0 40 30" width="34" height="26"><rect x="13" y="3" width="14" height="22" fill="#FFFDF8" stroke="#C8623A" stroke-width="1.6"/><line x1="20" y1="3" x2="20" y2="25" stroke="#C8623A" stroke-width="1.2"/></svg><div style="font-size:11px;font-weight:600">card</div><div style="font-size:11px;color:#9C8E7E">£4</div></div>
+<div style="flex:0 0 auto;width:84px;background:#FFF;border:1px solid #EFE6D6;border-radius:10px;padding:8px;text-align:center"><svg viewBox="0 0 40 30" width="34" height="26"><rect x="9" y="7" width="22" height="16" rx="1" fill="#F6E2D6" stroke="#C8623A" stroke-width="1.4"/><path d="M9 13 h22 M16 7 v15" stroke="#E8786E" stroke-width="1.2"/></svg><div style="font-size:11px;font-weight:600">gift wrap</div><div style="font-size:11px;color:#9C8E7E">£3</div></div>
+<div style="flex:0 0 auto;width:84px;background:#FFF;border:1px solid #EFE6D6;border-radius:10px;padding:8px;text-align:center"><svg viewBox="0 0 40 30" width="34" height="26"><rect x="11" y="3" width="18" height="22" fill="#FFFDF8" stroke="#F2A640" stroke-width="2.5"/></svg><div style="font-size:11px;font-weight:600">mini print</div><div style="font-size:11px;color:#9C8E7E">£8</div></div>
+</div>
+</div>
+<div class="ctabar">
+<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:9px"><span style="color:#6F6358">Total <span style="color:#9C8E7E;font-size:11px">incl. delivery</span></span><span style="font-weight:800;font-size:16px">£49.99</span></div>
+<button class="cta">checkout</button>
+<p style="text-align:center;font-size:11px;color:#7A6A58;margin:9px 0 0"><b>No account needed</b> — guest checkout, perfect for grandparents</p>
+</div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ FAMILY HOME ============ -->
+<div class="unit"><span class="lab">Family Keepsake Home</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="body">
+<div style="background:#FBEEDB;padding:14px 18px 16px;text-align:center">
+<p style="font-family:'Caveat',cursive;font-size:17px;color:#C8623A;margin:0">welcome back, Sam</p>
+<h1 style="font-family:'Fraunces',serif;font-size:22px;font-weight:600;margin:2px 0 3px;line-height:1.1">The Hartley Family<br>Keepsake Home</h1>
+<p style="font-size:11px;color:#9C8772;margin:0">your private keepsake box · 41 kept together</p>
+</div>
+<div style="padding:14px 0 6px 16px">
+<p style="font-size:11px;font-weight:800;letter-spacing:.3px;color:#A2937F;margin:0 0 10px;text-transform:uppercase"><i class="ti ti-users" style="color:#C8623A;vertical-align:-2px"></i> Your family circle</p>
+<div style="display:flex;gap:14px;overflow-x:auto;padding-bottom:6px">
+<div style="flex:0 0 auto;text-align:center"><div style="width:46px;height:46px;border-radius:50%;background:#C8623A;color:#FFF6E9;display:flex;align-items:center;justify-content:center;font-family:'Fraunces';font-weight:700;font-size:18px;margin:0 auto 4px">O</div><div style="font-size:11px;font-weight:700">Olivia</div></div>
+<div style="flex:0 0 auto;text-align:center"><div style="width:46px;height:46px;border-radius:50%;background:#84BBD0;color:#FFF6E9;display:flex;align-items:center;justify-content:center;font-family:'Fraunces';font-weight:700;font-size:18px;margin:0 auto 4px">M</div><div style="font-size:11px;font-weight:700">Max</div></div>
+<div style="flex:0 0 auto;text-align:center"><div style="width:46px;height:46px;border-radius:50%;background:#93B97C;color:#FFF6E9;display:flex;align-items:center;justify-content:center;font-family:'Fraunces';font-weight:700;font-size:18px;margin:0 auto 4px">J</div><div style="font-size:11px;font-weight:700">Jo</div></div>
+<div style="flex:0 0 auto;text-align:center"><div style="width:46px;height:46px;border-radius:50%;background:#F2A640;color:#3A2E1E;display:flex;align-items:center;justify-content:center;font-family:'Fraunces';font-weight:700;font-size:18px;margin:0 auto 4px">R</div><div style="font-size:11px;font-weight:700">Rosie</div></div>
+<div style="flex:0 0 auto;text-align:center"><div style="width:46px;height:46px;border-radius:50%;border:1.5px dashed #C99B6E;color:#C8623A;display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto 4px"><i class="ti ti-plus"></i></div><div style="font-size:11px;font-weight:700;color:#C8623A">invite</div></div>
+</div>
+</div>
+<div class="chiprow" style="padding-top:4px"><button class="chip on">Olivia</button><button class="chip">Max</button><button class="chip">Family</button></div>
+<div style="padding:0 16px"><p style="font-size:11px;font-weight:800;letter-spacing:.3px;color:#A2937F;margin:8px 0 9px;text-transform:uppercase"><i class="ti ti-heart" style="color:#C8623A;vertical-align:-2px"></i> Olivia's keepsakes</p></div>
+<div class="g2" style="padding-top:0">
+<div class="pcard"><div class="ppic" style="height:84px;background:#FDF0DC"><svg viewBox="0 0 70 56" width="48" height="40"><rect x="16" y="6" width="38" height="40" fill="#FFFDF8" stroke="#F2A640" stroke-width="5"/><rect x="26" y="18" width="18" height="12" fill="none" stroke="#C8623A" stroke-width="2"/><path d="M24 19 L35 11 L46 19" fill="none" stroke="#E8786E" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">Our house</span><span class="pp">Mar</span></div></div>
+<div class="pcard"><div class="ppic" style="height:84px;background:#E2F0F4"><svg viewBox="0 0 70 56" width="34" height="40"><path d="M35 5 C44 13 44 28 40 36 L29 36 C25 28 25 13 35 5 Z" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.5"/><circle cx="35" cy="18" r="4" fill="none" stroke="#84BBD0" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">Rocket</span><span class="pp">Apr</span></div></div>
+<div class="pcard"><div class="ppic" style="height:84px;background:#F6E2D6"><svg viewBox="0 0 70 56" width="34" height="40"><rect x="22" y="8" width="28" height="40" rx="2" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.2"/><line x1="28" y1="8" x2="28" y2="48" stroke="#C8623A" stroke-width="2"/></svg></div><div class="pmeta"><span class="pn">Storybook</span><span class="pp">✦</span></div></div>
+<div class="pcard" style="border:1.5px dashed #E0A268;background:#FCF1E3;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:118px;color:#C8623A"><i class="ti ti-plus" style="font-size:22px"></i><span style="font-size:11px;font-weight:700;margin-top:4px">create new</span></div>
+</div>
+<div style="padding:0 16px 14px">
+<div style="background:#FBF8F1;border:1px solid #EFE6D6;border-radius:14px;padding:13px">
+<p style="font-size:13px;font-weight:700;margin:0 0 3px"><i class="ti ti-gift" style="color:#C8623A;vertical-align:-2px"></i> Olivia's gift list</p>
+<p style="font-size:11px;color:#7A6A58;margin:0 0 10px;line-height:1.45">Share one link — family pick guest or join, then just pay.</p>
+<button style="width:100%;background:#FBEFE0;border:1px solid #E2A86C;color:#C8623A;font-weight:700;font-size:12px;border-radius:10px;padding:10px;font-family:'Mulish'"><i class="ti ti-link" style="vertical-align:-1px"></i> share a ready-to-buy link</button>
+</div>
+</div>
+</div>
+<div class="tabbar"><div class="tab on"><i class="ti ti-home"></i>Home</div><div class="tab"><i class="ti ti-wand"></i>Create</div><div class="tab"><i class="ti ti-users"></i>Family</div><div class="tab"><i class="ti ti-package"></i>Orders</div></div>
+<div class="hi"></div>
+</div></div></div>
+
+<!-- ============ GIFT LINK ============ -->
+<div class="unit"><span class="lab">Gift link (what family receives)</span>
+<div class="phone"><div class="scr">
+<div class="sb"><span>9:41</span><span class="isl"></span><span class="ri"><i class="ti ti-signal-4g"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+<div class="tnav"><span class="logo" style="font-size:18px">snickerdoodle</span><span style="font-size:11px;color:#6F6358"><i class="ti ti-lock" style="color:#5C8A3F;vertical-align:-1px"></i> secure</span></div>
+<div class="body">
+<div style="background:#FBEEDB;padding:13px 18px;text-align:center">
+<div style="width:50px;height:50px;border-radius:11px;background:#FFFDF8;border:2px solid #F2A640;display:flex;align-items:center;justify-content:center;margin:0 auto 8px"><svg viewBox="0 0 50 50" width="34" height="34"><rect x="12" y="22" width="22" height="18" fill="none" stroke="#C8623A" stroke-width="2.5"/><path d="M8 24 L23 12 L38 24" fill="none" stroke="#E8786E" stroke-width="2.5" stroke-linecap="round"/><circle cx="40" cy="13" r="4" fill="#F2A640"/></svg></div>
+<h1 style="font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin:0 0 3px;line-height:1.15">A gift list for Olivia's 6th birthday</h1>
+<p style="font-size:11px;color:#8A6F52;margin:0 0 4px">Sam set up a cart for you — just check out.</p>
+<p style="font-family:'Caveat',cursive;font-size:15px;color:#C8623A;margin:0">"Anything here would make her year! — Sam x"</p>
+</div>
+<div style="padding:13px 16px 0">
+<p style="font-size:11px;font-weight:800;letter-spacing:.3px;color:#A2937F;margin:0 0 8px;text-transform:uppercase">Ready to give</p>
+<div style="display:flex;align-items:center;gap:10px;background:#FFF;border:1px solid #EADFC9;border-radius:11px;padding:8px 11px;margin-bottom:7px"><div style="width:38px;height:38px;border-radius:8px;background:#FBF5E9;border:1px solid #EADFC9;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 40 40" width="22" height="22"><rect x="12" y="9" width="18" height="24" fill="none" stroke="#C8623A" stroke-width="2"/><line x1="17" y1="9" x2="17" y2="33" stroke="#C8623A" stroke-width="1.5"/></svg></div><div style="flex:1"><div style="font-size:12.5px;font-weight:700">Olivia's storybook</div><div style="font-size:11px;color:#9C8E7E">"Olivia's big adventure"</div></div><span style="font-weight:700;font-size:12.5px">£24</span></div>
+<div style="display:flex;align-items:center;gap:10px;background:#FFF;border:1px solid #EADFC9;border-radius:11px;padding:8px 11px;margin-bottom:12px"><div style="width:38px;height:38px;border-radius:8px;background:#FBF5E9;border:1px solid #EADFC9;display:flex;align-items:center;justify-content:center"><svg viewBox="0 0 40 40" width="22" height="22"><rect x="9" y="10" width="22" height="20" fill="#FFFDF8" stroke="#F2A640" stroke-width="4"/></svg></div><div style="flex:1"><div style="font-size:12.5px;font-weight:700">Framed "Our house" print</div><div style="font-size:11px;color:#9C8E7E">A4 · oak frame</div></div><span style="font-weight:700;font-size:12.5px">£22</span></div>
+
+<div style="background:#FBEEDB;border:1px solid #F0CF9C;border-radius:13px;padding:12px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:9px"><span style="font-size:12px;font-weight:700;color:#7A5B33;line-height:1.3"><i class="ti ti-users-plus" style="color:#C8623A;vertical-align:-2px"></i> Sam invited you to join the Hartley family</span><span style="background:#5C8A3F;color:#FBF5E9;font-weight:800;font-size:11px;border-radius:11px;padding:4px 9px;white-space:nowrap;flex:0 0 auto">save 5% · £2.40</span></div>
+<input value="your email" style="width:100%;border:1px solid #E0C7A8;border-radius:9px;padding:11px;font-size:13px;color:#A89B8C;background:#FFFDF8;font-family:'Mulish';margin-bottom:9px">
+<button class="cta" style="font-size:15px;padding:13px">join family &amp; checkout</button>
+<p style="font-size:11px;color:#9C8772;text-align:center;margin:8px 0 0"><i class="ti ti-mail" style="vertical-align:-1px"></i> We'll email a quick link to verify it's you.</p>
+</div>
+<div style="text-align:center;font-size:11px;color:#B3A491;margin:11px 0">— or —</div>
+<button style="width:100%;background:none;border:1.5px solid #E0C7A8;color:#46402F;font-weight:700;font-size:14px;border-radius:24px;padding:12px;font-family:'Mulish';margin-bottom:14px">checkout as guest</button>
+</div>
+</div>
+<div style="display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;background:#F1E7D4;font-size:11px;color:#5C8A3F;flex:0 0 auto"><i class="ti ti-shield-check"></i> Secure. Your details are yours — never shared, never sold.</div>
+<div class="hi"></div>
+</div></div></div>
+
+</body>
+</html>

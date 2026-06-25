@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Snickerdoodle — Visibility & Family Circles</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tabler-icons/3.31.0/iconfont/tabler-icons.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Mulish:wght@400;500;700;800&family=Caveat:wght@600&display=swap');
+*{box-sizing:border-box;}
+body{margin:0;background:#EFE6D6;font-family:'Mulish',system-ui,sans-serif;color:#2E2723;display:flex;flex-direction:column;align-items:center;gap:30px;padding:34px 18px;}
+.cap{font-family:'Fraunces',serif;font-size:15px;font-weight:600;color:#7A6A58;width:100%;max-width:640px;margin:0 0 -16px;}
+.frame{width:100%;max-width:640px;border-radius:14px;overflow:hidden;border:1px solid #E3D9C5;box-shadow:0 6px 22px rgba(46,39,35,.12);}
+.bar{background:#F1E7D4;padding:8px 14px;display:flex;align-items:center;gap:7px;}
+.dot{width:9px;height:9px;border-radius:50%;}
+.url{margin-left:10px;background:#FBF5E9;border-radius:20px;font-size:11px;color:#6F6358;padding:3px 14px;flex:1;}
+.back{padding:24px 20px;display:flex;align-items:center;justify-content:center;background-image:radial-gradient(circle at 30% 20%,#F1E7D4,#DFD3BC);}
+.modal{background:#FFFDF8;border-radius:16px;box-shadow:0 20px 50px rgba(46,39,35,.28);width:100%;max-width:440px;overflow:hidden;}
+
+/* asset visibility */
+.av-mh{display:flex;align-items:center;gap:12px;padding:15px 18px 12px;border-bottom:1px solid #F2EADB;}
+.av-thumb{width:46px;height:46px;border-radius:9px;background:#E2F0F4;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.av-mt{font-family:'Fraunces',serif;font-size:16px;font-weight:600;margin:0;}
+.av-ms{font-size:12px;color:#9C8E7E;margin:1px 0 0;}
+.av-x{color:#B3A491;font-size:18px;margin-left:auto;}
+.av-body{padding:14px 18px 6px;}
+.lt{font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#A2937F;margin:0 0 10px;}
+.av-opt{display:flex;align-items:center;gap:11px;border:1.5px solid #EFE6D6;border-radius:11px;padding:11px 12px;margin-bottom:9px;}
+.av-opt.on{border-color:#C8623A;background:#FBEFE0;}
+.av-radio{width:18px;height:18px;border-radius:50%;border:2px solid #D7C4A6;flex:0 0 auto;display:flex;align-items:center;justify-content:center;}
+.av-opt.on .av-radio{border-color:#C8623A;}
+.av-radio span{width:9px;height:9px;border-radius:50%;background:#C8623A;display:none;}
+.av-opt.on .av-radio span{display:block;}
+.av-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex:0 0 auto;}
+.av-txt{flex:1;}
+.av-on{font-size:13px;font-weight:700;}
+.av-od{font-size:11px;color:#8A7A66;}
+.av-who{display:flex;align-items:center;}
+.av-w{width:24px;height:24px;border-radius:50%;margin-left:-6px;border:2px solid #FFFDF8;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#FFF6E9;font-family:'Fraunces',serif;}
+.av-w:first-child{margin-left:0;}
+.av-lock{width:24px;height:24px;border-radius:50%;background:#EFE6D6;color:#9C8E7E;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.note{font-size:11px;color:#9C8E7E;line-height:1.45;display:flex;gap:6px;margin:4px 0 0;}
+.note i{color:#5C8A3F;font-size:14px;flex:0 0 auto;}
+.foot{padding:12px 18px 16px;}
+.btn{width:100%;background:#D2691E;color:#FFF6E9;font-weight:800;font-size:14px;border:none;border-radius:24px;padding:13px;cursor:pointer;font-family:'Mulish',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px;}
+
+/* invite modal */
+.in-mh{display:flex;align-items:flex-start;justify-content:space-between;padding:16px 18px 6px;}
+.in-mt{font-family:'Fraunces',serif;font-size:18px;font-weight:600;margin:0;}
+.in-ms{font-size:12px;color:#9C8E7E;margin:2px 0 0;}
+.in-body{padding:6px 18px;}
+.in-photo{display:flex;align-items:center;gap:13px;margin-bottom:15px;}
+.in-drop{width:62px;height:62px;border-radius:50%;border:2px dashed #D7B894;background:#FCF6EC;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#C8623A;flex:0 0 auto;}
+.in-drop i{font-size:20px;}
+.in-drop span{font-size:11px;font-weight:700;margin-top:1px;}
+.in-photot{font-size:12px;color:#7A6A58;line-height:1.5;}
+.in-photot b{display:block;font-size:13px;color:#2E2723;}
+.field{margin-bottom:13px;}
+.inp{width:100%;border:1px solid #E0C7A8;border-radius:9px;padding:10px 12px;font-size:13px;color:#46402F;background:#FFFDF8;font-family:'Mulish',sans-serif;}
+.inp.ph{color:#A89B8C;}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px;}
+.chip{font-size:12px;font-weight:600;border:1.5px solid #E0C7A8;color:#7A6A58;background:none;border-radius:16px;padding:6px 13px;cursor:pointer;font-family:'Mulish',sans-serif;}
+.chip.on{background:#C8623A;color:#FFF6E9;border-color:#C8623A;}
+.circle{display:flex;align-items:center;gap:8px;background:#E8F0DF;border:1px solid #BFD6A8;border-radius:9px;padding:9px 11px;}
+.circle i{color:#5C8A3F;font-size:16px;flex:0 0 auto;}
+.circle .ct{font-size:12px;color:#46402F;line-height:1.4;}
+.circle .ct b{color:#3F6E29;}
+.date{display:flex;align-items:center;gap:9px;border:1px solid #E0C7A8;border-radius:9px;padding:10px 12px;background:#FFFDF8;}
+.date i{color:#9C8E7E;font-size:15px;}
+.date span{font-size:13px;color:#46402F;flex:1;}
+.date small{font-size:11px;color:#9C8E7E;}
+.inv{background:#FBEEDB;border:1px solid #F0CF9C;border-radius:11px;padding:11px 12px;margin:5px 0 13px;}
+.invh{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;}
+.invt{font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px;}
+.invt i{color:#C8623A;}
+.toggle{width:38px;height:22px;background:#C8623A;border-radius:13px;position:relative;flex:0 0 auto;}
+.toggle span{position:absolute;top:2px;right:2px;width:18px;height:18px;background:#FFF;border-radius:50%;}
+.einp{width:100%;border:1px solid #E6CCA6;border-radius:8px;padding:9px 11px;font-size:12px;color:#A89B8C;background:#FFFDF8;margin-bottom:8px;font-family:'Mulish',sans-serif;}
+.acc{display:flex;align-items:center;justify-content:space-between;background:#FFF;border:1px solid #EAD9BE;border-radius:8px;padding:8px 11px;font-size:12px;}
+.acc b{font-weight:700;}
+.invd{font-size:11px;color:#8A6F52;margin:8px 0 0;line-height:1.45;}
+.trust{font-size:11px;color:#9C8E7E;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.trust i{color:#5C8A3F;font-size:14px;}
+.lbl-rel{font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:#A2937F;margin:0 0 6px;}
+.lbl-rel span{text-transform:none;font-weight:400;color:#B3A491;}
+</style>
+</head>
+<body>
+
+<p class="cap">Per-asset visibility — on every keepsake</p>
+<div class="frame">
+  <div class="bar"><span class="dot" style="background:#E8786E"></span><span class="dot" style="background:#F2A640"></span><span class="dot" style="background:#93B97C"></span><span class="url">snickerdoodle.co.uk/home</span></div>
+  <div class="back">
+    <div class="modal">
+      <div class="av-mh">
+        <div class="av-thumb"><svg viewBox="0 0 50 50" width="32" height="32" aria-hidden="true"><path d="M25 7 C34 16 34 33 30 42 L20 42 C16 33 16 16 25 7 Z" fill="#FFFDF8" stroke="#C8623A" stroke-width="2.5"/><circle cx="25" cy="22" r="4" fill="none" stroke="#84BBD0" stroke-width="2"/><path d="M20 42 L14 48 L18 42 M30 42 L36 48 L32 42" fill="none" stroke="#93B97C" stroke-width="2"/></svg></div>
+        <div><h2 class="av-mt">Rocket</h2><p class="av-ms">by Olivia · kept Apr 2026</p></div>
+        <i class="ti ti-x av-x" aria-hidden="true"></i>
+      </div>
+      <div class="av-body">
+        <p class="lt">Who can see this keepsake?</p>
+        <div class="av-opt"><span class="av-radio"><span></span></span><span class="av-ico" style="background:#EFE6D6;color:#7A6A58"><i class="ti ti-lock" aria-hidden="true"></i></span><div class="av-txt"><div class="av-on">Only me</div><div class="av-od">Private to you — no one else sees it</div></div><div class="av-who"><span class="av-lock"><i class="ti ti-user" aria-hidden="true"></i></span></div></div>
+        <div class="av-opt on"><span class="av-radio"><span></span></span><span class="av-ico" style="background:#FBE4DA;color:#C8623A"><i class="ti ti-home-heart" aria-hidden="true"></i></span><div class="av-txt"><div class="av-on">Family</div><div class="av-od">Your core household</div></div><div class="av-who"><span class="av-w" style="background:#93B97C">J</span><span class="av-w" style="background:#84BBD0">M</span></div></div>
+        <div class="av-opt"><span class="av-radio"><span></span></span><span class="av-ico" style="background:#E8F0DF;color:#5C8A3F"><i class="ti ti-users" aria-hidden="true"></i></span><div class="av-txt"><div class="av-on">Extended family</div><div class="av-od">Everyone in your circle, incl. grandparents</div></div><div class="av-who"><span class="av-w" style="background:#93B97C">J</span><span class="av-w" style="background:#84BBD0">M</span><span class="av-w" style="background:#F2A640;color:#3A2E1E">R</span><span class="av-w" style="background:#E8786E">+1</span></div></div>
+        <p class="note"><i class="ti ti-shield-check" aria-hidden="true"></i> New keepsakes start as <b>Family</b>. Widen to Extended any time — nothing is ever public.</p>
+      </div>
+      <div class="foot"><button class="btn">done</button></div>
+    </div>
+  </div>
+</div>
+
+<p class="cap">Adding a family member — relationship sets their circle</p>
+<div class="frame">
+  <div class="bar"><span class="dot" style="background:#E8786E"></span><span class="dot" style="background:#F2A640"></span><span class="dot" style="background:#93B97C"></span><span class="url">snickerdoodle.co.uk/home</span></div>
+  <div class="back">
+    <div class="modal">
+      <div class="in-mh"><div><h2 class="in-mt">Add a family member</h2><p class="in-ms">Grow your family circle</p></div><i class="ti ti-x av-x" aria-hidden="true"></i></div>
+      <div class="in-body">
+        <div class="in-photo">
+          <div class="in-drop"><i class="ti ti-camera-plus" aria-hidden="true"></i><span>add photo</span></div>
+          <div class="in-photot"><b>Add a photo</b>So everyone knows who's who in the circle. Change it any time.</div>
+        </div>
+        <div class="field"><p class="lt">Name</p><input class="inp ph" value="First name"></div>
+        <div class="field">
+          <p class="lbl-rel">Relationship <span>· sets which keepsakes they'll see</span></p>
+          <div class="chips">
+            <button class="chip">Child</button>
+            <button class="chip">Parent</button>
+            <button class="chip on">Grandparent</button>
+            <button class="chip">Aunt / uncle</button>
+            <button class="chip">Close friend</button>
+            <button class="chip">Other</button>
+          </div>
+          <div class="circle"><i class="ti ti-users" aria-hidden="true"></i><div class="ct">Joins your <b>Extended family</b> — they'll see keepsakes you share with Extended family, never your Family-only or private ones.</div></div>
+        </div>
+        <div class="field">
+          <p class="lbl-rel">Birthday <span>· optional</span></p>
+          <div class="date"><i class="ti ti-cake" aria-hidden="true"></i><span>DD / MM / YYYY</span><small>we'll remind the family</small></div>
+        </div>
+        <div class="inv">
+          <div class="invh"><span class="invt"><i class="ti ti-mail-share" aria-hidden="true"></i> Invite to the family workspace</span><span class="toggle"><span></span></span></div>
+          <input class="einp" value="their email">
+          <div class="acc"><span>They can</span><b>view &amp; buy <i class="ti ti-chevron-down" style="font-size:12px;vertical-align:-1px" aria-hidden="true"></i></b></div>
+          <p class="invd">We'll email them a link to join. Once they verify it's them, they'll see your family workspace at the level you set.</p>
+        </div>
+        <p class="trust"><i class="ti ti-lock" aria-hidden="true"></i> You're always in control — change a relationship, access, or remove anyone, any time.</p>
+      </div>
+      <div class="foot"><button class="btn"><i class="ti ti-user-plus" aria-hidden="true"></i> send invite &amp; add to family</button></div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
