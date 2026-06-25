@@ -26,6 +26,9 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@fontsource-variable/caveat": "^5.2.8",
+    "@fontsource-variable/fraunces": "^5.2.9",
+    "@fontsource-variable/mulish": "^5.2.8",
     "@tabler/icons-react": "^3.44.0",
     "drizzle-orm": "^0.45.2",
     "next": "^15.5.19",

@@ -18,10 +18,10 @@
   --color-green-save: #5c8a3f;
   --color-honey-band: #fbeedb;
 
-  /* Fonts — wired to the next/font CSS variables set on <html>. */
-  --font-sans: var(--font-mulish), system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, serif;
-  --font-hand: var(--font-caveat), ui-rounded, cursive;
+  /* Fonts — self-hosted via @fontsource (imported in layout.tsx). */
+  --font-sans: 'Mulish Variable', system-ui, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, serif;
+  --font-hand: 'Caveat Variable', ui-rounded, cursive;
 
   /* Generous radii. */
   --radius-pill: 999px;
@@ -56,16 +56,108 @@ body {
   }
 }
 
-/* The gentle CTA wobble (restrained; reduced-motion-safe via the rule above). */
+/* CTA wobble — a quick attention nudge roughly every 3s, still the rest of the time. */
 @keyframes cta-wobble {
   0%,
+  86%,
   100% {
     transform: rotate(0deg);
   }
-  40% {
+  89% {
+    transform: rotate(-3deg);
+  }
+  92% {
+    transform: rotate(2.4deg);
+  }
+  95% {
     transform: rotate(-1.4deg);
   }
-  70% {
-    transform: rotate(1deg);
+  98% {
+    transform: rotate(0.6deg);
+  }
+}
+.cta-attention {
+  animation: cta-wobble 3s ease-in-out infinite;
+}
+.cta-attention:hover {
+  animation-play-state: paused;
+}
+
+/* Product-morph — the hero drawing crossfades through products and back.
+   Pure CSS (compositor-driven): no JS timer, so it can't be throttled, and it
+   freezes on the drawing under reduced motion. Each frame is staggered by its
+   --morph-i index across the 13s loop (13s / 5 frames = 2.6s per frame). */
+@keyframes product-morph {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  3% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  18% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  21% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.morph-frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  animation: product-morph 13s ease-in-out infinite;
+  animation-delay: calc(var(--morph-i, 0) * 2.6s);
+}
+
+/* Gentle bob so the hero product-morph reads as floating freely on the page. */
+@keyframes hero-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+.hero-bob {
+  animation: hero-bob 6s ease-in-out infinite;
+}
+
+/* Floating background doodles — subtle drift; tuned per-doodle via custom props. */
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(var(--float-rot, 0deg));
+  }
+  50% {
+    transform: translate(var(--float-x, 0px), var(--float-dist, -16px))
+      rotate(calc(var(--float-rot, 0deg) + var(--float-spin, 5deg)));
+  }
+}
+.doodle {
+  position: absolute;
+  animation: floaty var(--float-dur, 10s) ease-in-out infinite;
+  animation-delay: var(--float-delay, 0s);
+  will-change: transform;
+}
+
+/* Reduced motion: freeze the morph on the drawing; doodles rest at base position. */
+@media (prefers-reduced-motion: reduce) {
+  .morph-frame {
+    animation: none !important;
+    opacity: 0;
+  }
+  .morph-frame:first-child {
+    opacity: 1 !important;
   }
 }

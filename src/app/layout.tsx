@@ -1,29 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
-import { Caveat, Fraunces, Mulish } from 'next/font/google';
+// Self-hosted brand fonts, bundled via @fontsource (no build-time or runtime fetch
+// to Google — GDPR-clean and works offline). Families: "Fraunces Variable",
+// "Mulish Variable", "Caveat Variable" — wired into the tokens in globals.css.
+import '@fontsource-variable/fraunces';
+import '@fontsource-variable/mulish';
+import '@fontsource-variable/caveat';
 import './globals.css';
-
-// Self-hosted at build time by next/font (no runtime call to Google — GDPR-clean,
-// no FOUT). Axes match the mockups: Fraunces 500/600 + italic, Mulish 400–800, Caveat 600.
-const fraunces = Fraunces({
-  subsets: ['latin'],
-  weight: ['500', '600'],
-  style: ['normal', 'italic'],
-  variable: '--font-fraunces',
-  display: 'swap',
-});
-const mulish = Mulish({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  variable: '--font-mulish',
-  display: 'swap',
-});
-const caveat = Caveat({
-  subsets: ['latin'],
-  weight: ['600'],
-  variable: '--font-caveat',
-  display: 'swap',
-});
 
 export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
@@ -37,7 +20,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${fraunces.variable} ${mulish.variable} ${caveat.variable}`}>
+    <html lang="en">
       <body className="min-h-dvh font-sans">
         <a
           href="#main"

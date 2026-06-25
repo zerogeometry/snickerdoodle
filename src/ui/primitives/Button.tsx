@@ -25,6 +25,8 @@ const variants: Record<Variant, string> = {
 type BaseProps = {
   variant?: Variant;
   size?: Size;
+  /** Adds the periodic ~3s attention wobble (reduced-motion-safe). */
+  attention?: boolean;
   className?: string;
   children: ReactNode;
 };
@@ -33,11 +35,12 @@ export function Button({
   href,
   variant = 'primary',
   size = 'md',
+  attention = false,
   className,
   children,
   ...rest
 }: BaseProps & { href?: string } & ButtonHTMLAttributes<HTMLButtonElement>) {
-  const classes = cn(base, sizes[size], variants[variant], className);
+  const classes = cn(base, sizes[size], variants[variant], attention && 'cta-attention', className);
   if (href) {
     return (
       <Link href={href} className={classes}>
