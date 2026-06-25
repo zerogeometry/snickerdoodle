@@ -15,7 +15,8 @@ export type ProductKey =
   | 'toteBag'
   | 'blanket'
   | 'storybook'
-  | 'jigsaw';
+  | 'jigsaw'
+  | 'giftWrap';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -92,6 +93,14 @@ const ART: Record<ProductKey, ReactNode> = {
       <rect x="18" y="18" width="60" height="60" rx="3" fill="#FFFDF8" stroke="#C8623A" strokeWidth="3.5" />
       <path d="M48 18 v10 M18 48 h10 M68 48 h-10 M48 78 v-10" stroke="#E0C9A8" strokeWidth="2" />
       <House transform="translate(30,32) scale(0.86)" />
+    </>
+  ),
+  giftWrap: (
+    <>
+      <rect x="22" y="40" width="52" height="40" rx="3" fill="#F6E2D6" stroke="#C8623A" strokeWidth="3.5" />
+      <rect x="22" y="40" width="52" height="13" fill="#FBE4E1" stroke="#C8623A" strokeWidth="3.5" />
+      <line x1="48" y1="40" x2="48" y2="80" stroke="#C8623A" strokeWidth="3" />
+      <path d="M48 40 C40 26 28 30 38 40 M48 40 C56 26 68 30 58 40" fill="none" stroke="#E8786E" strokeWidth="3" strokeLinecap="round" />
     </>
   ),
 };
