@@ -1,0 +1,71 @@
+@import 'tailwindcss';
+
+/*
+ * Brand tokens — the "good crayon box" (docs/02). These drive Tailwind utilities:
+ * --color-oat -> bg-oat/text-oat, --font-display -> font-display, etc.
+ * CTAs are the cinnamon orange #D2691E with cream text.
+ */
+@theme {
+  --color-oat: #fbf5e9;
+  --color-cocoa: #2e2723;
+  --color-honey: #f2a640;
+  --color-cinnamon: #c8623a;
+  --color-cta: #d2691e;
+  --color-cta-text: #fff6e9;
+  --color-sky: #84bbd0;
+  --color-berry: #e8786e;
+  --color-meadow: #93b97c;
+  --color-green-save: #5c8a3f;
+  --color-honey-band: #fbeedb;
+
+  /* Fonts — wired to the next/font CSS variables set on <html>. */
+  --font-sans: var(--font-mulish), system-ui, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-hand: var(--font-caveat), ui-rounded, cursive;
+
+  /* Generous radii. */
+  --radius-pill: 999px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background-color: var(--color-oat);
+  color: var(--color-cocoa);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Accessibility: visible focus, and honour reduced motion everywhere (NN7). */
+:focus-visible {
+  outline: 2px solid var(--color-cinnamon);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* The gentle CTA wobble (restrained; reduced-motion-safe via the rule above). */
+@keyframes cta-wobble {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  40% {
+    transform: rotate(-1.4deg);
+  }
+  70% {
+    transform: rotate(1deg);
+  }
+}
