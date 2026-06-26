@@ -8,6 +8,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -322,3 +323,25 @@ export const subProcessors = pgTable('sub_processors', {
   notes: text('notes'),
   createdAt,
 });
+
+// ── Auth.js (passwordless magic-link) — DATABASE sessions so a session is
+// revocable (a removed/closed account's sessions can be invalidated server-side).
+// The "user" is our own `accounts` row; the adapter maps between the two. No OAuth
+// account table — email magic-link only.
+export const sessions = pgTable('sessions', {
+  sessionToken: text('session_token').primaryKey(),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  expires: timestamp('expires', { withTimezone: true }).notNull(),
+});
+
+export const verificationTokens = pgTable(
+  'verification_tokens',
+  {
+    identifier: text('identifier').notNull(),
+    token: text('token').notNull(),
+    expires: timestamp('expires', { withTimezone: true }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);

@@ -8,6 +8,13 @@
       "when": 1782408943019,
       "tag": "0000_phase0_trust_spine",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782477233090,
+      "tag": "0001_auth_sessions",
+      "breakpoints": true
     }
   ]
 }

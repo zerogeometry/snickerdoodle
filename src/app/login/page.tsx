@@ -2,6 +2,7 @@
 
 import { IconArrowLeft, IconMail, IconShieldCheck, IconSparkles } from '@tabler/icons-react';
 import Link from 'next/link';
+import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
@@ -10,11 +11,24 @@ import { Icon } from '@/ui/primitives/Icon';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    setSent(true);
+    if (!email.trim() || busy) return;
+    setBusy(true);
+    setError(false);
+    try {
+      // Auth.js emails (here: logs) a one-tap magic link; identity is verified
+      // when they open it. We stay on the page and show the "check your email" state.
+      await signIn('email', { email: email.trim(), redirect: false, callbackUrl: '/home' });
+      setSent(true);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -68,9 +82,12 @@ export default function LoginPage() {
                   placeholder="you@example.com"
                   className="w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-3 text-sm text-cocoa placeholder:text-[#A89B8C]"
                 />
-                <Button type="submit" size="lg" className="mt-3 w-full">
-                  <Icon icon={IconSparkles} size={16} /> email me a magic link
+                <Button type="submit" size="lg" className="mt-3 w-full" disabled={busy}>
+                  <Icon icon={IconSparkles} size={16} /> {busy ? 'sending…' : 'email me a magic link'}
                 </Button>
+                {error ? (
+                  <p className="mt-2 text-center text-xs text-berry">Something went wrong — please try again.</p>
+                ) : null}
               </form>
               <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-green-save">
                 <Icon icon={IconShieldCheck} size={13} /> Your data is yours. We never sell it, ever.
