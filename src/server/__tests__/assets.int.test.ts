@@ -93,9 +93,10 @@ describe.skipIf(!URL)('asset data layer (authz-gated) — integration', () => {
   });
 
   describe('signed-url grant is gated by the same policy', () => {
-    it('allows the controller', async () => {
+    it('allows the controller (url null — these seed assets have no stored bytes)', async () => {
       const grant = await getAssetDownloadGrant(db, ids.assetOnlyMe, await sam());
-      expect(grant.url).toContain(ids.assetOnlyMe);
+      expect(grant.assetId).toBe(ids.assetOnlyMe);
+      expect(grant.url).toBeNull();
     });
     it('denies an Extended member for a FAMILY asset', async () => {
       await expect(getAssetDownloadGrant(db, ids.assetFamily, await rosie())).rejects.toBeInstanceOf(AuthzError);

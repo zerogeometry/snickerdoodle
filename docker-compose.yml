@@ -22,5 +22,21 @@ services:
       timeout: 3s
       retries: 20
 
+  # Private S3-compatible object store — stands in for the UK/EU private bucket.
+  # No public policy is ever set; access is via short-lived signed URLs only.
+  minio:
+    image: minio/minio:latest
+    container_name: snickerdoodle-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - '9000:9000' # S3 API
+      - '9001:9001' # web console
+    volumes:
+      - snickerdoodle-minio:/data
+
 volumes:
   snickerdoodle-pgdata:
+  snickerdoodle-minio:

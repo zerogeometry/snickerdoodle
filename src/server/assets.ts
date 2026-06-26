@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
-import { assets, auditRecords, memberships } from '@/db/schema';
+import { assets, auditRecords, memberships, storageObjects } from '@/db/schema';
+import { presignDownload } from '@/storage';
 import {
   AuthzError,
   assertCanViewAsset,
@@ -90,17 +91,25 @@ export async function getViewableAssetOrThrow(
 }
 
 /**
- * The authz gate that MUST front any signed-URL mint. Storage isn't wired yet, so
- * the grant is a placeholder — but the point stands: no bytes are ever addressed
- * without an ALLOW from the policy first.
+ * Mint a short-lived signed URL for an asset's stored ORIGINAL — but ONLY after
+ * the authz policy says ALLOW. No bytes are ever addressable without that gate.
+ * `url` is null when the asset has no stored original yet (a metadata-only/demo
+ * asset); a denied viewer never reaches this point (getViewableAssetOrThrow throws).
  */
 export async function getAssetDownloadGrant(
   db: DbHandle,
   assetId: string,
   viewer: ViewerContext,
-): Promise<{ assetId: string; url: string }> {
-  const ref = await getViewableAssetOrThrow(db, assetId, viewer);
-  return { assetId: ref.id, url: `signed-url://pending-storage/${ref.id}` };
+  ttlSeconds = 120,
+): Promise<{ assetId: string; url: string | null }> {
+  const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const [object] = await db
+    .select()
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!object) return { assetId: ref.id, url: null };
+  const url = await presignDownload(object.key, ttlSeconds);
+  return { assetId: ref.id, url };
 }
 
 /**

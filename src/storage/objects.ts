@@ -1,0 +1,61 @@
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { getS3 } from './client';
+
+let bucketReady = false;
+
+/** Create the private bucket if it doesn't exist (MinIO/dev). No public policy is
+ * ever set — the bucket is private and reachable only via signed URLs. */
+export async function ensureBucket(): Promise<void> {
+  if (bucketReady) return;
+  const { client, bucket } = getS3();
+  try {
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
+  } catch {
+    try {
+      await client.send(new CreateBucketCommand({ Bucket: bucket }));
+    } catch {
+      /* already exists / created concurrently */
+    }
+  }
+  bucketReady = true;
+}
+
+/** The deterministic key for an asset's preserved ORIGINAL. */
+export function originalKey(assetId: string): string {
+  return `assets/${assetId}/original`;
+}
+
+export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  const { client, bucket } = getS3();
+  await ensureBucket();
+  const kmsKeyAlias = process.env.S3_KMS_KEY_ALIAS;
+  await client.send(
+    new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      // At-rest KMS encryption in production (separate key for originals); MinIO
+      // dev has no KMS, so this is only set when an alias is configured.
+      ...(kmsKeyAlias ? { ServerSideEncryption: 'aws:kms' as const, SSEKMSKeyId: kmsKeyAlias } : {}),
+    }),
+  );
+}
+
+/** A short-lived, scoped GET URL. Callers MUST authz-check before minting one. */
+export async function presignDownload(key: string, ttlSeconds = 120): Promise<string> {
+  const { client, bucket } = getS3();
+  return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttlSeconds });
+}
+
+export async function deleteObject(key: string): Promise<void> {
+  const { client, bucket } = getS3();
+  await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
