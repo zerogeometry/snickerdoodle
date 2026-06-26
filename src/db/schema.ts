@@ -5,6 +5,7 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -171,6 +172,8 @@ export const memberships = pgTable(
     inviteId: uuid('invite_id').references(() => invites.id),
     joinedAt: timestamp('joined_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    // When the one-time join saving was spent on an order (null = still available).
+    joinSavingConsumedAt: timestamp('join_saving_consumed_at', { withTimezone: true }),
     createdAt,
   },
   (t) => [
@@ -322,6 +325,48 @@ export const subProcessors = pgTable('sub_processors', {
   noTrainingAttested: boolean('no_training_attested').notNull().default(false),
   notes: text('notes'),
   createdAt,
+});
+
+// ── order — a placed order (server-priced; the client never sets totals). ────
+export const orderStatus = pgEnum('order_status', ['PENDING', 'PAID', 'FULFILLING', 'SHIPPED', 'CANCELLED']);
+
+export const orders = pgTable(
+  'orders',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ref: text('ref').notNull().unique(),
+    accountId: uuid('account_id').references(() => accounts.id), // null for a guest
+    familyId: uuid('family_id').references(() => families.id),
+    status: orderStatus('status').notNull().default('PENDING'),
+    subtotalPence: integer('subtotal_pence').notNull(),
+    deliveryPence: integer('delivery_pence').notNull(),
+    joinSavingPence: integer('join_saving_pence').notNull().default(0),
+    totalPence: integer('total_pence').notNull(),
+    currency: text('currency').notNull().default('GBP'),
+    isGift: boolean('is_gift').notNull().default(false),
+    stripeSessionId: text('stripe_session_id'),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('order_account_idx').on(t.accountId, t.createdAt)],
+);
+
+export const orderItems = pgTable('order_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  orderId: uuid('order_id')
+    .notNull()
+    .references(() => orders.id, { onDelete: 'cascade' }),
+  productKey: text('product_key').notNull(),
+  qty: integer('qty').notNull(),
+  unitPricePence: integer('unit_price_pence').notNull(),
+  linePence: integer('line_pence').notNull(),
+});
+
+// ── webhook_events — idempotency ledger for payment webhooks. ─────────────────
+export const webhookEvents = pgTable('webhook_events', {
+  id: text('id').primaryKey(), // the provider's event id
+  type: text('type').notNull(),
+  processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 // ── Auth.js (passwordless magic-link) — DATABASE sessions so a session is

@@ -38,6 +38,8 @@ export interface JoinProvenance {
     status: MembershipStatus;
     inviteId: string | null;
     isOwner: boolean;
+    /** The one-time saving was already spent on an order. */
+    savingConsumed: boolean;
   } | null;
   /** Epoch ms — pass an explicit clock so this stays pure/testable. */
   now: number;
@@ -54,6 +56,7 @@ export function resolveJoinContext(p: JoinProvenance): JoinContext | null {
   if (invite.revoked) return null; // parent revoked the link
   if (invite.expiresAt <= now) return null; // link expired
   if (membership.status !== 'ACTIVE') return null; // removed / left ⇒ no saving
+  if (membership.savingConsumed) return null; // one-time: already spent
   if (membership.isOwner) return null; // owner isn't "joining" via an invite
   if (membership.inviteId !== invite.id) return null; // membership must come from THIS invite
   if (membership.familyId !== invite.familyId) return null; // cross-family guard

@@ -131,7 +131,7 @@ function provenance(over: {
   const membership =
     over.membership === null
       ? null
-      : { familyId: 'fam-A', status: 'ACTIVE' as MembershipStatus, inviteId: 'inv-1', isOwner: false, ...over.membership };
+      : { familyId: 'fam-A', status: 'ACTIVE' as MembershipStatus, inviteId: 'inv-1', isOwner: false, savingConsumed: false, ...over.membership };
   return { invite, membership, now: NOW };
 }
 
@@ -150,6 +150,7 @@ describe('resolveJoinContext — only a genuine verified join earns the saving',
     ['invite revoked', provenance({ invite: { revoked: true } })],
     ['invite expired', provenance({ invite: { expiresAt: NOW - 1 } })],
     ['membership REMOVED', provenance({ membership: { status: 'REMOVED' } })],
+    ['join saving already consumed (one-time)', provenance({ membership: { savingConsumed: true } })],
     ['membership LEFT', provenance({ membership: { status: 'LEFT' } })],
     ['owner is not joining via invite', provenance({ membership: { isOwner: true } })],
     ['membership not from THIS invite', provenance({ membership: { inviteId: 'other-invite' } })],

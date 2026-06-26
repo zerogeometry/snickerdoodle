@@ -9,8 +9,9 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { CartLineItem } from '@/ui/components/CartLineItem';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
-import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket, useOrders } from '@/lib/store';
+import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
+import { placeOrderAction } from '@/app/actions/order';
 import type { Quote } from '@/pricing';
 
 const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
@@ -24,12 +25,12 @@ export default function CheckoutPage() {
   const add = useBasket((s) => s.add);
   const remove = useBasket((s) => s.remove);
   const clear = useBasket((s) => s.clear);
-  const addOrder = useOrders((s) => s.add);
   const router = useRouter();
 
   const [gift, setGift] = useState(false);
   const [email, setEmail] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [placing, setPlacing] = useState(false);
 
   const empty = items.length === 0;
 
@@ -55,12 +56,27 @@ export default function CheckoutPage() {
   const savingPence = quote?.joinSavingPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
 
-  const placeOrder = () => {
-    if (empty) return;
-    const ref = `SNK-${Math.floor(100000 + (Date.now() % 900000))}`;
-    addOrder({ id: ref, ref, items: [...items], totalPence: total });
-    clear();
-    router.push(`/checkout/confirmation?ref=${ref}`);
+  // Place a REAL order: the server re-prices and persists it. With Stripe
+  // configured we redirect to Checkout; in local dev it's marked paid and we go
+  // straight to the confirmation.
+  const placeOrder = async () => {
+    if (empty || placing) return;
+    setPlacing(true);
+    try {
+      const res = await placeOrderAction({ items: items.map((i) => ({ productKey: i.product, qty: i.qty })), gift });
+      if (!res.ok) {
+        toast('hmm, that didn’t go through — try again');
+        return;
+      }
+      clear();
+      if (res.checkoutUrl) {
+        window.location.href = res.checkoutUrl; // → Stripe Checkout
+        return;
+      }
+      router.push(`/checkout/confirmation?ref=${res.ref}`);
+    } finally {
+      setPlacing(false);
+    }
   };
 
   const summaryRows = (
@@ -193,8 +209,8 @@ export default function CheckoutPage() {
                   placeholder="you@example.com"
                   className="mt-1 w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2.5 text-xs text-cocoa placeholder:text-[#A89B8C]"
                 />
-                <Button size="lg" className="mt-3 w-full" onClick={placeOrder}>
-                  checkout
+                <Button size="lg" className="mt-3 w-full" onClick={placeOrder} disabled={placing}>
+                  {placing ? 'placing your order…' : 'checkout'}
                 </Button>
                 <p className="mt-3 text-center text-[11px] text-[#7A6A58]">
                   <b>No account needed.</b> Checkout as a guest — or{' '}
@@ -221,8 +237,8 @@ export default function CheckoutPage() {
             </span>
             <span className="text-base font-extrabold text-cocoa">{gbp(total)}</span>
           </div>
-          <Button size="lg" className="w-full" onClick={placeOrder}>
-            checkout
+          <Button size="lg" className="w-full" onClick={placeOrder} disabled={placing}>
+            {placing ? 'placing…' : 'checkout'}
           </Button>
           <p className="mt-2 text-center text-[11px] text-[#7A6A58]">
             <b>No account needed</b> — guest checkout, perfect for grandparents

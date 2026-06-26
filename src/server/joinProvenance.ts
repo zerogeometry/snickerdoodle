@@ -50,6 +50,7 @@ export async function resolveSessionJoinProvenance(): Promise<JoinProvenance | n
       status: row.m.status,
       inviteId: row.m.inviteId,
       isOwner: row.m.isOwner,
+      savingConsumed: row.m.joinSavingConsumedAt !== null,
     },
     now: Date.now(),
   };
