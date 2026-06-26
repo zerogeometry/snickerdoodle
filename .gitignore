@@ -11,3 +11,5 @@ coverage/
 .DS_Store
 .turbo/
 *.tsbuildinfo
+# Vitest writes a transient compiled config next to vitest.config.ts
+vitest.config.ts.timestamp-*.mjs

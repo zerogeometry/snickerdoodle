@@ -2,7 +2,7 @@ CREATE TYPE "public"."access_level" AS ENUM('VIEW', 'VIEW_BUY', 'CONTRIBUTE');--
 CREATE TYPE "public"."actor_type" AS ENUM('MEMBER', 'GUEST', 'ANON', 'ADMIN', 'SYSTEM');--> statement-breakpoint
 CREATE TYPE "public"."asset_kind" AS ENUM('DRAWING', 'PHOTO');--> statement-breakpoint
 CREATE TYPE "public"."audit_event" AS ENUM('INVITE_SENT', 'INVITE_ACCEPTED', 'INVITE_REVOKED', 'MEMBERSHIP_CREATED', 'MEMBERSHIP_ACCESS_CHANGED', 'MEMBERSHIP_CIRCLE_CHANGED', 'MEMBER_REMOVED', 'MEMBER_LEFT', 'ASSET_VISIBILITY_CHANGED', 'ASSET_DELETED', 'ACCOUNT_CLOSED', 'GIFT_LINK_CREATED', 'GIFT_LINK_REVOKED', 'GIFT_LINK_EXPIRED', 'CONSENT_CHANGED', 'PROVIDER_DELETION_REQUESTED', 'PROVIDER_DELETION_CONFIRMED', 'PURGE_EXECUTED', 'RIGHTS_REQUEST_RECEIVED', 'RIGHTS_REQUEST_COMPLETED');--> statement-breakpoint
-CREATE TYPE "public"."circle" AS ENUM('FAMILY', 'EXTENDED');--> statement-breakpoint
+CREATE TYPE "public"."family_circle" AS ENUM('FAMILY', 'EXTENDED');--> statement-breakpoint
 CREATE TYPE "public"."consent_basis" AS ENUM('CONSENT', 'SOFT_OPT_IN');--> statement-breakpoint
 CREATE TYPE "public"."consent_channel" AS ENUM('EMAIL', 'SMS');--> statement-breakpoint
 CREATE TYPE "public"."consent_purpose" AS ENUM('MARKETING', 'REMINDERS');--> statement-breakpoint
@@ -88,7 +88,7 @@ CREATE TABLE "invites" (
 	"created_by_account_id" uuid NOT NULL,
 	"email" text NOT NULL,
 	"relationship" "relationship" NOT NULL,
-	"circle" "circle" NOT NULL,
+	"circle" "family_circle" NOT NULL,
 	"access_level" "access_level" NOT NULL,
 	"token" text NOT NULL,
 	"status" "invite_status" DEFAULT 'PENDING' NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE "memberships" (
 	"family_id" uuid NOT NULL,
 	"account_id" uuid NOT NULL,
 	"relationship" "relationship" NOT NULL,
-	"circle" "circle" NOT NULL,
+	"circle" "family_circle" NOT NULL,
 	"access_level" "access_level" NOT NULL,
 	"status" "membership_status" DEFAULT 'ACTIVE' NOT NULL,
 	"is_owner" boolean DEFAULT false NOT NULL,

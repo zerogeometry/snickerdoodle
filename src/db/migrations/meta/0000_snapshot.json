@@ -680,7 +680,7 @@
         },
         "circle": {
           "name": "circle",
-          "type": "circle",
+          "type": "family_circle",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -801,7 +801,7 @@
         },
         "circle": {
           "name": "circle",
-          "type": "circle",
+          "type": "family_circle",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -1338,8 +1338,8 @@
         "RIGHTS_REQUEST_COMPLETED"
       ]
     },
-    "public.circle": {
-      "name": "circle",
+    "public.family_circle": {
+      "name": "family_circle",
       "schema": "public",
       "values": [
         "FAMILY",

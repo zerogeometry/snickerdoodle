@@ -27,7 +27,10 @@ import {
 
 // ── Enums ────────────────────────────────────────────────────────────────────
 export const visibilityTier = pgEnum('visibility_tier', ['ONLY_ME', 'FAMILY', 'EXTENDED']);
-export const circle = pgEnum('circle', ['FAMILY', 'EXTENDED']);
+// NB: the Postgres type is named `family_circle`, not `circle` — `circle` is a
+// built-in geometric type, so a custom enum of that name collides at parameter
+// binding (every insert of a circle value fails). The TS export stays `circle`.
+export const circle = pgEnum('family_circle', ['FAMILY', 'EXTENDED']);
 export const accessLevel = pgEnum('access_level', ['VIEW', 'VIEW_BUY', 'CONTRIBUTE']);
 export const relationship = pgEnum('relationship', [
   'CHILD',
