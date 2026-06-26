@@ -107,7 +107,6 @@ export default function StartCreatingPage() {
   };
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
-  const featured = products?.filter((p) => p.category !== 'ADDON').slice(0, 6) ?? [];
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
@@ -183,7 +182,7 @@ export default function StartCreatingPage() {
               <p className="mt-1 text-sm text-[#6F6358]">The same drawing, on a whole family range. Tap + to add, or customize.</p>
               <div className="mt-4">
                 {products ? (
-                  <FlowCatalogue products={featured} compact />
+                  <FlowCatalogue products={products} compact scrollable />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }).map((_, i) => (
@@ -192,9 +191,8 @@ export default function StartCreatingPage() {
                   </div>
                 )}
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <Link href="/catalogue" className="font-bold text-cinnamon">see the full range →</Link>
-                <button type="button" onClick={keep} disabled={keeping} className="font-bold text-[#7A6A58] hover:text-cinnamon disabled:opacity-60">
+              <div className="mt-3 text-center sm:text-left">
+                <button type="button" onClick={keep} disabled={keeping} className="text-sm font-bold text-[#7A6A58] hover:text-cinnamon disabled:opacity-60">
                   {keeping ? 'keeping…' : 'keep this in my keepsake box'}
                 </button>
               </div>

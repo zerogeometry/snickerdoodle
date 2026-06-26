@@ -8,7 +8,7 @@ import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
-import { basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
+import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -29,11 +29,13 @@ export function FlowCatalogue({
   products,
   showCategories = false,
   compact = false,
+  scrollable = false,
   className,
 }: {
   products: CatalogueProduct[];
   showCategories?: boolean;
   compact?: boolean; // denser grid for the narrower uploaded-page column
+  scrollable?: boolean; // scroll the full range inside a fixed-height container
   className?: string;
 }) {
   const router = useRouter();
@@ -51,6 +53,7 @@ export function FlowCatalogue({
   const categories = useMemo(() => ['all', ...new Set(products.map((p) => p.category.toLowerCase()))], [products]);
   const shown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || p.category.toLowerCase() === category));
   const subtotal = basketSubtotal(items);
+  const count = basketCount(items);
   const mockImg = upload?.cutout?.url ?? upload?.dataUrl ?? null; // bg-removed cutout wins
 
   // Ingest the upload server-side once, so add-to-basket + render have a real asset.
@@ -143,6 +146,7 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
+      <div className={scrollable ? 'max-h-[30rem] overflow-y-auto pr-1' : undefined}>
       <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);
@@ -184,19 +188,25 @@ export function FlowCatalogue({
             </div>
           );
         })}
+        </div>
       </div>
 
-      {/* Footer: running total + Create Another / Checkout Now */}
-      <div className="mt-6 flex flex-col items-stretch gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4 sm:flex-row sm:items-center sm:justify-end">
-        <div className="text-right">
-          <div className="font-display text-xl font-semibold text-cocoa">{gbp(subtotal)}</div>
-          <div className="text-[11px] text-[#9C8E7E]">{items.length ? 'incl. your basket' : 'nothing added yet'} · shipping TBC</div>
+      {/* Footer: basket count (so "Create another" clearly keeps the basket) + total + actions */}
+      <div className="mt-5 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-[13px] font-bold text-cocoa">
+            {count > 0 ? `${count} item${count === 1 ? '' : 's'} added to your basket` : 'nothing added yet'}
+          </span>
+          <div className="text-right">
+            <div className="font-display text-xl font-semibold text-cocoa">{gbp(subtotal)}</div>
+            <div className="text-[11px] text-[#9C8E7E]">shipping TBC</div>
+          </div>
         </div>
-        <div className="flex gap-2.5 sm:ml-4">
-          <Button variant="secondary" size="lg" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
+        <div className="mt-3 flex gap-2.5">
+          <Button variant="secondary" size="lg" className="flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
             create another
           </Button>
-          <Button size="lg" onClick={() => router.push('/checkout')} disabled={items.length === 0}>
+          <Button size="lg" className="flex-1" onClick={() => router.push('/checkout')} disabled={items.length === 0}>
             checkout now <Icon icon={IconSparkles} size={15} />
           </Button>
         </div>
