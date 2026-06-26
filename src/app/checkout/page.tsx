@@ -1,13 +1,12 @@
 'use client';
 
-import { IconArrowLeft, IconGift, IconHeart, IconLock, IconShieldCheck } from '@tabler/icons-react';
+import { IconArrowLeft, IconGift, IconHeart, IconLock, IconMinus, IconPlus, IconShieldCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
-import { CartLineItem } from '@/ui/components/CartLineItem';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
@@ -25,6 +24,7 @@ export default function CheckoutPage() {
   const items = useBasket((s) => s.items);
   const add = useBasket((s) => s.add);
   const remove = useBasket((s) => s.remove);
+  const setQty = useBasket((s) => s.setQty);
   const clear = useBasket((s) => s.clear);
   const router = useRouter();
 
@@ -180,14 +180,33 @@ export default function CheckoutPage() {
               <h1 className="font-display text-xl font-semibold text-cocoa">Your basket</h1>
               <div className="mt-3 space-y-2.5">
                 {items.map((item) => (
-                  <CartLineItem
-                    key={item.id}
-                    product={item.product}
-                    name={item.name}
-                    sub={item.qty > 1 ? `qty ${item.qty}` : item.sub}
-                    price={gift ? 'gift' : gbp(item.pricePence * item.qty)}
-                    onRemove={() => remove(item.id)}
-                  />
+                  <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#FBF5E9]">
+                      <ProductArt product={item.product} size={44} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
+                      {item.sub ? <div className="text-[11px] text-[#9C8E7E]">{item.sub}</div> : null}
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="flex items-center rounded-full border border-[#E6D8BE] bg-white">
+                          <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-[#7A6A58]">
+                            <Icon icon={IconMinus} size={12} />
+                          </button>
+                          <span className="min-w-4 text-center text-xs font-bold text-cocoa">{item.qty}</span>
+                          <button type="button" aria-label="one more" onClick={() => setQty(item.id, item.qty + 1)} className="px-2 py-0.5 text-cinnamon">
+                            <Icon icon={IconPlus} size={12} />
+                          </button>
+                        </div>
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}`)} className="rounded-full border border-[#E6D8BE] bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                          customize
+                        </button>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(item.pricePence * item.qty)}</div>
+                      <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-[#B3A491] hover:text-berry">remove</button>
+                    </div>
+                  </div>
                 ))}
               </div>
 
