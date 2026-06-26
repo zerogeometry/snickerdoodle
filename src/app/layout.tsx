@@ -7,6 +7,7 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/mulish';
 import '@fontsource-variable/caveat';
 import './globals.css';
+import { Toaster } from '@/ui/components/Toaster';
 
 export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to content
         </a>
         {children}
+        <Toaster />
       </body>
     </html>
   );

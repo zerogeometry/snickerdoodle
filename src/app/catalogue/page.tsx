@@ -4,13 +4,16 @@ import { IconCards, IconShoppingBag, IconUsers, IconWand } from '@tabler/icons-r
 import Link from 'next/link';
 import { useState } from 'react';
 import { Chip } from '@/ui/primitives/Chip';
+import { Icon } from '@/ui/primitives/Icon';
 import { ProductCard } from '@/ui/components/ProductCard';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { BottomTabBar, type Tab } from '@/ui/components/BottomTabBar';
+import { basketCount, toast, useBasket, useUpload } from '@/lib/store';
 
 type CatalogueItem = {
   name: string;
   price: string;
+  pricePence: number;
   product: ProductKey;
   category: string;
   tint: string;
@@ -18,28 +21,37 @@ type CatalogueItem = {
 };
 
 const PRODUCTS: CatalogueItem[] = [
-  { name: 'card', price: '£4', product: 'card', category: 'cards & prints', tint: '#FDF0DC' },
-  { name: 'framed print', price: '£22', product: 'framedPrint', category: 'cards & prints', tint: '#FBE4E1' },
-  { name: 'mug', price: '£14', product: 'mug', category: 'home', tint: '#F6E2D6' },
-  { name: 'kids tee', price: '£18', product: 'kidsTee', category: 'wear', tint: '#FBE4E1' },
-  { name: 'cushion', price: '£28', product: 'cushion', category: 'home', tint: '#E2F0F4' },
-  { name: 'blanket', price: '£45', product: 'blanket', category: 'home', tint: '#E8F0DF' },
-  { name: 'storybook', price: '£24', product: 'storybook', category: 'books', tint: '#F6E2D6', featured: true },
-  { name: 'jigsaw', price: '£20', product: 'jigsaw', category: 'gifts', tint: '#E2F0F4' },
+  { name: 'card', price: '£4', pricePence: 400, product: 'card', category: 'cards & prints', tint: '#FDF0DC' },
+  { name: 'framed print', price: '£22', pricePence: 2200, product: 'framedPrint', category: 'cards & prints', tint: '#FBE4E1' },
+  { name: 'mug', price: '£14', pricePence: 1400, product: 'mug', category: 'home', tint: '#F6E2D6' },
+  { name: 'kids tee', price: '£18', pricePence: 1800, product: 'kidsTee', category: 'wear', tint: '#FBE4E1' },
+  { name: 'cushion', price: '£28', pricePence: 2800, product: 'cushion', category: 'home', tint: '#E2F0F4' },
+  { name: 'blanket', price: '£45', pricePence: 4500, product: 'blanket', category: 'home', tint: '#E8F0DF' },
+  { name: 'storybook', price: '£24', pricePence: 2400, product: 'storybook', category: 'books', tint: '#F6E2D6', featured: true },
+  { name: 'jigsaw', price: '£20', pricePence: 2000, product: 'jigsaw', category: 'gifts', tint: '#E2F0F4' },
 ];
 
 const CATEGORIES = ['all', 'cards & prints', 'home', 'wear', 'books', 'gifts'];
 
 const TABS: Tab[] = [
   { label: 'Range', href: '/catalogue', icon: IconCards },
-  { label: 'Create', href: '/studio', icon: IconWand },
+  { label: 'Create', href: '/studio/new', icon: IconWand },
   { label: 'Family', href: '/home', icon: IconUsers },
   { label: 'Basket', href: '/checkout', icon: IconShoppingBag },
 ];
 
 export default function CataloguePage() {
   const [category, setCategory] = useState('all');
+  const items = useBasket((s) => s.items);
+  const add = useBasket((s) => s.add);
+  const upload = useUpload((s) => s.upload);
+  const count = basketCount(items);
   const shown = PRODUCTS.filter((p) => category === 'all' || p.category === category);
+
+  const addToBasket = (p: CatalogueItem) => {
+    add({ id: p.product, name: p.name, product: p.product, pricePence: p.pricePence });
+    toast(`${p.name} added to basket`);
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
@@ -47,17 +59,27 @@ export default function CataloguePage() {
         <Link href="/" className="font-display text-xl font-semibold text-cocoa">
           snickerdoodle
         </Link>
-        <span className="text-xs text-[#6F6358]">
-          your artwork: <b className="font-semibold text-cocoa">Olivia&apos;s house</b>
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="hidden text-xs text-[#6F6358] sm:inline">
+            your artwork: <b className="font-semibold text-cocoa">{upload ? 'your drawing' : "Olivia's house"}</b>
+          </span>
+          <Link href="/checkout" aria-label={`Basket, ${count} items`} className="relative text-[#7A6A58] hover:text-cinnamon">
+            <Icon icon={IconShoppingBag} size={22} />
+            {count > 0 ? (
+              <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-cinnamon px-1 text-[10px] font-bold text-cta-text">
+                {count}
+              </span>
+            ) : null}
+          </Link>
+        </div>
       </header>
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
         <h1 className="font-display text-2xl font-semibold md:text-3xl">
-          Olivia&apos;s artwork, on <span className="text-cinnamon">40+ products</span>.
+          {upload ? 'Your' : 'Olivia’s'} artwork, on <span className="text-cinnamon">40+ products</span>.
         </h1>
         <p className="mt-1 text-sm text-[#6F6358]">
-          One drawing. A whole family range. Preview is on the house.
+          One drawing. A whole family range. Preview is on the house — tap to add to your basket.
         </p>
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
@@ -75,8 +97,10 @@ export default function CataloguePage() {
               name={p.name}
               price={p.price}
               product={p.product}
+              image={upload?.dataUrl}
               tint={p.tint}
               featured={p.featured}
+              onClick={() => addToBasket(p)}
             />
           ))}
         </div>
