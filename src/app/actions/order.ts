@@ -14,13 +14,15 @@ import type { RawTransform } from '@/server/print/geometry';
  * configured, otherwise a placed-order ref (dev).
  */
 export async function placeOrderAction(input: {
-  items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform } }[];
+  items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string } }[];
   gift?: boolean;
 }): Promise<{ ok: boolean; ref?: string; checkoutUrl?: string }> {
   const items: PlaceLine[] = (input.items ?? []).map((i) => ({
     productKey: String(i.productKey),
     qty: Number(i.qty),
-    ...(i.artwork ? { artwork: { assetId: String(i.artwork.assetId), transform: i.artwork.transform } } : {}),
+    ...(i.artwork
+      ? { artwork: { assetId: String(i.artwork.assetId), transform: i.artwork.transform, sourceObjectId: i.artwork.sourceObjectId } }
+      : {}),
   }));
   const account = await getCurrentAccount();
   const joinProvenance = account ? await resolveSessionJoinProvenance() : null;

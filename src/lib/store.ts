@@ -32,9 +32,10 @@ export type BasketItem = {
   qty: number;
   sub?: string;
   /** Set for a personalised line placed in the studio: the chosen variant + the
-   * keepsake + its placement. The server re-clamps + freezes this at order time. */
+   * keepsake + its placement (+ an optional bg-removed cutout to render from). The
+   * server re-clamps + freezes this at order time. */
   variantId?: string;
-  artwork?: { assetId: string; transform: PlacementTransform };
+  artwork?: { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
 };
 type BasketState = {
   items: BasketItem[];

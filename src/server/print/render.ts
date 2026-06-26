@@ -29,18 +29,29 @@ export interface RenderResult {
 export async function renderPrintFile(
   db: DbHandle,
   viewer: ViewerContext,
-  input: { assetId: string; variantId: string; transform: RawTransform; sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE' },
+  input: {
+    assetId: string;
+    variantId: string;
+    transform: RawTransform;
+    sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE';
+    /** Render from a SPECIFIC stored object (e.g. a bg-removed cutout) — must belong to the asset. */
+    sourceObjectId?: string;
+  },
 ): Promise<RenderResult> {
   await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
 
   const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
   if (!tpl) throw new Error('no print template for this variant');
 
-  const cls = input.sourceObjectClass ?? 'ORIGINAL';
-  const [srcObj] = await db
-    .select()
-    .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, cls)));
+  const [srcObj] = input.sourceObjectId
+    ? await db
+        .select()
+        .from(storageObjects)
+        .where(and(eq(storageObjects.id, input.sourceObjectId), eq(storageObjects.assetId, input.assetId)))
+    : await db
+        .select()
+        .from(storageObjects)
+        .where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, input.sourceObjectClass ?? 'ORIGINAL')));
   if (!srcObj) throw new Error('no source object to render from');
 
   const srcBuf = await getObjectBytes(srcObj.key);

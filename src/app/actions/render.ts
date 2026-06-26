@@ -22,6 +22,7 @@ export async function renderPreviewAction(input: {
   assetId: string;
   variantId: string;
   transform: RawTransform;
+  sourceObjectId?: string;
 }): Promise<RenderPreviewResult> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
@@ -32,7 +33,12 @@ export async function renderPreviewAction(input: {
   const viewer = await resolveViewerContext(db, account.id, asset.familyId);
 
   try {
-    const res = await renderPrintFile(db, viewer, { assetId: input.assetId, variantId: input.variantId, transform: input.transform });
+    const res = await renderPrintFile(db, viewer, {
+      assetId: input.assetId,
+      variantId: input.variantId,
+      transform: input.transform,
+      sourceObjectId: input.sourceObjectId,
+    });
     const grant = await getStorageObjectGrant(db, res.printObjectId, viewer, 600);
     return {
       ok: true,

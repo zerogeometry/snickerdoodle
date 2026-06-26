@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariants } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -20,7 +20,7 @@ function newRef(): string {
 export interface PlaceLine {
   productKey: string;
   qty: number;
-  artwork?: { assetId: string; transform: RawTransform };
+  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string };
 }
 
 export interface PlaceOrderResult {
@@ -68,7 +68,7 @@ export async function placeOrder(
   // template snapshot + a server-clamped transform). A bad placement fails here,
   // not half-way through inserting an order.
   const artworkByIndex = new Map<number, {
-    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform;
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null;
   }>();
   for (let i = 0; i < valid.length; i++) {
     const art = valid[i]!.artwork;
@@ -85,10 +85,20 @@ export async function placeOrder(
     ); // ← the gate; throws on deny
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     if (!tpl) continue;
+    // validate the source object (a bg-removed cutout) belongs to THIS asset
+    let sourceObjectId: string | null = null;
+    if (art.sourceObjectId) {
+      const [so] = await db
+        .select({ id: storageObjects.id })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.id, art.sourceObjectId), eq(storageObjects.assetId, art.assetId)));
+      if (so) sourceObjectId = so.id;
+    }
     artworkByIndex.set(i, {
       assetId: art.assetId,
       variantId,
       controllerAccountId: asset.controllerAccountId,
+      sourceObjectId,
       templateSnapshot: {
         printWidthMm: tpl.printWidthMm,
         printHeightMm: tpl.printHeightMm,
@@ -133,6 +143,7 @@ export async function placeOrder(
         controllerAccountId: art.controllerAccountId,
         templateSnapshot: art.templateSnapshot,
         transform: art.transform,
+        sourceObjectId: art.sourceObjectId,
         status: 'PENDING',
       });
     }

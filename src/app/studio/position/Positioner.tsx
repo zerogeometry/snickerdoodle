@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
@@ -9,6 +9,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { gbp, toast, useBasket } from '@/lib/store';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
+import { removeBackgroundAction } from '@/app/actions/magic';
 import {
   assessResolution,
   canvasSizePx,
@@ -29,6 +30,8 @@ export function Positioner({ data }: { data: StudioData }) {
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
+  const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
@@ -75,10 +78,30 @@ export function Positioner({ data }: { data: StudioData }) {
     if (rendering) return;
     setRendering(true);
     try {
-      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf });
+      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId });
       setResult(res);
     } finally {
       setRendering(false);
+    }
+  };
+
+  // Self-hosted magic edit — remove the background (in-region, never a third party).
+  const removeBg = async () => {
+    if (removing) return;
+    setRemoving(true);
+    try {
+      const res = await removeBackgroundAction({ assetId: keepsake.id });
+      if (res.ok) {
+        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
+        setResult(null);
+        toast('background removed ✨');
+      } else if (res.reason === 'budget') {
+        toast('that’s all your magic edits for now');
+      } else {
+        toast('couldn’t do that — try again');
+      }
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -90,7 +113,7 @@ export function Positioner({ data }: { data: StudioData }) {
       product: variant.productKey as ProductKey,
       pricePence: variant.pricePence,
       variantId: variant.id,
-      artwork: { assetId: keepsake.id, transform: { ...tf } },
+      artwork: { assetId: keepsake.id, transform: { ...tf }, sourceObjectId: cutout?.sourceObjectId },
     });
     toast('added to basket ✓');
     router.push('/checkout');
@@ -127,7 +150,7 @@ export function Positioner({ data }: { data: StudioData }) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               ref={imgRef}
-              src={keepsake.imageUrl}
+              src={cutout?.url ?? keepsake.imageUrl}
               alt="your keepsake"
               style={imgStyle}
               onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
@@ -184,7 +207,7 @@ export function Positioner({ data }: { data: StudioData }) {
                   <button
                     key={k.id}
                     type="button"
-                    onClick={() => { setAssetIdx(i); setNatural(null); setResult(null); }}
+                    onClick={() => { setAssetIdx(i); setNatural(null); setResult(null); setCutout(null); }}
                     className={`h-12 w-12 overflow-hidden rounded-lg border-2 ${i === assetIdx ? 'border-cinnamon' : 'border-[#EFE6D6]'}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -207,6 +230,30 @@ export function Positioner({ data }: { data: StudioData }) {
             >
               <Icon icon={IconRotateClockwise} size={14} /> rotate ({tf.rotationDeg}°)
             </button>
+          </div>
+
+          <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Magic</p>
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={removeBg}
+              disabled={removing}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${
+                cutout ? 'border-meadow bg-[#EAF1E4] text-green-save' : 'border-[#E6D8BE] bg-white text-cocoa hover:border-honey'
+              }`}
+            >
+              <Icon icon={cutout ? IconCircleCheck : IconSparkles} size={14} className={cutout ? '' : 'text-cinnamon'} />
+              {removing ? 'removing…' : cutout ? 'background removed' : 'remove background'}
+            </button>
+            {cutout ? (
+              <button
+                type="button"
+                onClick={() => { setCutout(null); setResult(null); }}
+                className="inline-flex items-center gap-1 text-xs font-bold text-[#9C8772] hover:text-cinnamon"
+              >
+                <Icon icon={IconX} size={13} /> undo
+              </button>
+            ) : null}
           </div>
 
           <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>

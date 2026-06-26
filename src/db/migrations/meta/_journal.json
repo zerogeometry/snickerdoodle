@@ -43,6 +43,13 @@
       "when": 1782490007987,
       "tag": "0005_artwork_asset_setnull",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1782498000985,
+      "tag": "0006_ml_operations",
+      "breakpoints": true
     }
   ]
 }

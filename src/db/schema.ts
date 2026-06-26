@@ -372,6 +372,24 @@ export const webhookEvents = pgTable('webhook_events', {
   processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── ml_operations — ledger for the per-account budget cap on the self-hosted
+// image ops (background removal / upscale). Keeps the (already small, CPU-only)
+// bill bounded and abuse out.
+export const mlOp = pgEnum('ml_op', ['BG_REMOVE', 'UPSCALE']);
+export const mlOperations = pgTable(
+  'ml_operations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    op: mlOp('op').notNull(),
+    assetId: uuid('asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    createdAt,
+  },
+  (t) => [index('ml_op_account_time_idx').on(t.accountId, t.createdAt)],
+);
+
 // ── POD catalogue (proposal/04) — products → variants (PRICE lives here) → print
 // templates, with a PROVIDER-AGNOSTIC sku mapping (a second POD is a new row, not
 // a schema change). Seeded from src/pricing; pricing reads the variant price from
