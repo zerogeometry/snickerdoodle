@@ -55,6 +55,14 @@ export async function putObject(key: string, body: Buffer, contentType: string):
   );
 }
 
+/** Read an object's bytes server-side (e.g. to render a print file from it). */
+export async function getObjectBytes(key: string): Promise<Buffer> {
+  const { client, bucket } = getS3();
+  const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  const bytes = await res.Body!.transformToByteArray();
+  return Buffer.from(bytes);
+}
+
 /** A short-lived, scoped GET URL. Callers MUST authz-check before minting one. */
 export async function presignDownload(key: string, ttlSeconds = 120): Promise<string> {
   const { client, bucket } = getS3();

@@ -5,6 +5,7 @@ export {
   originalKey,
   derivativeKey,
   putObject,
+  getObjectBytes,
   presignDownload,
   deleteObject,
   deleteObjectConfirmed,
