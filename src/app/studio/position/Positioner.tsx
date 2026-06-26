@@ -1,12 +1,12 @@
 'use client';
 
-import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowBackUp, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
-import { gbp, toast, useBasket } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements } from '@/lib/store';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -23,7 +23,7 @@ import type { StudioData, StudioVariant } from '@/server/studio';
 
 const PREVIEW_W = 360; // on-screen canvas width in CSS px
 
-export function Positioner({ data, draft = false }: { data: StudioData; draft?: boolean }) {
+export function Positioner({ data, draft = false, returnTo }: { data: StudioData; draft?: boolean; returnTo?: string }) {
   const [assetIdx, setAssetIdx] = useState(0);
   const [variantId, setVariantId] = useState(data.variants[0]?.id ?? '');
   const [tf, setTf] = useState<Transform>({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
@@ -35,13 +35,14 @@ export function Positioner({ data, draft = false }: { data: StudioData; draft?: 
   const imgRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
+  const setPlacement = usePlacements((s) => s.setPlacement);
 
   const keepsake = data.keepsakes[assetIdx];
   const variant = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
 
   if (!keepsake || !variant) {
     return (
-      <Shell back={draft ? '/start-creating' : '/home'}>
+      <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
         <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-8 text-center text-sm text-[#6F6358]">
           Keep a drawing in your keepsake home first — then you can place it on a product here.
           <div className="mt-4">
@@ -128,6 +129,14 @@ export function Positioner({ data, draft = false }: { data: StudioData; draft?: 
     });
     toast('added to basket ✓');
     router.push('/checkout');
+  };
+
+  // Came from Customize/Checkout: save the placement and go back; the variant +
+  // add-to-basket are finalised there (so the chosen size/colour can't be lost).
+  const saveReturn = () => {
+    setPlacement(`${keepsake.id}-${variant.productKey}`, { ...tf });
+    toast('placement saved ✓');
+    if (returnTo) router.push(returnTo);
   };
 
   // image placement inside the (clipped) preview canvas
@@ -267,10 +276,16 @@ export function Positioner({ data, draft = false }: { data: StudioData; draft?: 
             ) : null}
           </div>
 
-          <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
-            <Icon icon={IconShoppingBag} size={16} />{' '}
-            {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
-          </Button>
+          {returnTo ? (
+            <Button size="lg" className="mt-5 w-full" onClick={saveReturn} disabled={assess?.decision === 'BLOCK'}>
+              <Icon icon={IconArrowBackUp} size={16} /> save &amp; return
+            </Button>
+          ) : (
+            <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
+              <Icon icon={IconShoppingBag} size={16} />{' '}
+              {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
+            </Button>
+          )}
           <button
             type="button"
             onClick={generate}

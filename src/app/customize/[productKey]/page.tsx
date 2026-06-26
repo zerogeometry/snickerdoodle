@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
-import { gbp, toast, useBasket, useUpload } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -22,6 +22,7 @@ export default function CustomizePage() {
   const upload = useUpload((s) => s.upload);
   const setStoreCutout = useUpload((s) => s.setCutout);
   const add = useBasket((s) => s.add);
+  const placements = usePlacements((s) => s.placements);
 
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [size, setSize] = useState<string | null>(null);
@@ -98,6 +99,8 @@ export default function CustomizePage() {
       return;
     }
     const sub = [variant.attributes.size, variant.attributes.colour].filter(Boolean).join(' · ') || undefined;
+    // Use the placement saved in the studio if they edited it, else the default.
+    const transform = placements[`${upload.assetId}-${product.key}`] ?? DEFAULT_TF;
     add({
       id: `cat-${variant.sku}`,
       name: product.label,
@@ -106,7 +109,7 @@ export default function CustomizePage() {
       variantId: variant.id,
       pricePence: variant.pricePence,
       sub,
-      artwork: { assetId: upload.assetId, transform: DEFAULT_TF, sourceObjectId: cutout?.sourceObjectId ?? upload.cutout?.sourceObjectId },
+      artwork: { assetId: upload.assetId, transform, sourceObjectId: cutout?.sourceObjectId ?? upload.cutout?.sourceObjectId },
     });
     toast('added to basket ✓');
     router.push('/catalogue');

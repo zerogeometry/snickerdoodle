@@ -90,6 +90,16 @@ export const useBasket = create<BasketState>()(
 export const basketCount = (items: BasketItem[]) => items.reduce((n, i) => n + i.qty, 0);
 export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n + i.pricePence * i.qty, 0);
 
+// ── studio placements (Save & Return carries a placement back to Customize) ──
+// Keyed by `${assetId}-${productKey}`.
+export const usePlacements = create<{
+  placements: Record<string, PlacementTransform>;
+  setPlacement: (key: string, tf: PlacementTransform) => void;
+}>((set) => ({
+  placements: {},
+  setPlacement: (key, tf) => set((s) => ({ placements: { ...s.placements, [key]: tf } })),
+}));
+
 // ── kept creations (the Keepsake Home) ───────────────────────────────────────
 export type Kept = {
   id: string;

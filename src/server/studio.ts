@@ -76,7 +76,9 @@ async function loadPrintableVariants(db: DbHandle): Promise<StudioVariant[]> {
     .from(productVariants)
     .innerJoin(products, eq(products.id, productVariants.productId))
     .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
-    .where(and(eq(products.active, true), eq(productVariants.active, true)));
+    // One representative (the default) per product — the studio places at product
+    // level; size/colour are chosen in Customize.
+    .where(and(eq(products.active, true), eq(productVariants.active, true), eq(productVariants.isDefault, true)));
 
   return vrows.map(({ v, p, t }) => ({
     id: v.id,
