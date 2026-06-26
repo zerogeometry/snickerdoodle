@@ -87,6 +87,8 @@ export async function getViewableAssetOrThrow(
   if (!row) throw denied('not found');
   const ref = toAssetRef(row);
   assertCanViewAsset(ref, viewer); // ← the gate
+  // CSAM-blocked content is never viewable/renderable by anyone (D8 runbook).
+  if (row.moderationStatus === 'BLOCKED') throw denied('unavailable');
   return ref;
 }
 

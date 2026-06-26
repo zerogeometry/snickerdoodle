@@ -131,7 +131,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('a personalised line freezes a SERVER-CLAMPED spec into order_item_artwork', async () => {
     const [asset] = await db
       .insert(assets)
-      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true })
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
       .returning();
     const [variant] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
 
@@ -167,5 +167,19 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
         joinProvenance: null,
       }),
     ).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('refuses to fulfil a personalised line whose keepsake is not content-cleared (D8)', async () => {
+    const [flagged] = await db
+      .insert(assets)
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'FLAGGED' })
+      .returning();
+    await expect(
+      placeOrder(db, {
+        items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: flagged!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
+        account: { id: ids.samId },
+        joinProvenance: null,
+      }),
+    ).rejects.toThrow(/cleared for printing/);
   });
 });

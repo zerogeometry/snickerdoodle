@@ -4,6 +4,7 @@ import { AuthzError, canContributeCreations, type ViewerContext } from '@/authz'
 import { assets, children, storageObjects } from '@/db/schema';
 import { getS3, originalKey, putObject, stripExif } from '@/storage';
 import type { DbHandle } from './db';
+import { moderateAndRecord, type ModerationState } from './moderation';
 import { RETENTION_DAYS } from './retention';
 
 /** Matches the `asset_kind` enum in the schema. */
@@ -25,6 +26,8 @@ export interface IngestResult {
   sha256: string;
   byteSize: number;
   contentType: string;
+  /** Result of the content-safety gate run on ingest (D8). */
+  moderationStatus: ModerationState;
 }
 
 /**
@@ -96,5 +99,10 @@ export async function ingestOriginalAsset(
     kmsKeyAlias: process.env.S3_KMS_KEY_ALIAS ?? null,
   });
 
-  return { assetId, key, sha256: sanitised.sha256, byteSize: sanitised.byteSize, contentType: sanitised.contentType };
+  // Content-safety gate (D8): run BEFORE this asset can ever reach a print order.
+  // The bytes are already stored (BLOCKED content is preserved for the runbook);
+  // the verdict gates ordering + viewing downstream.
+  const verdict = await moderateAndRecord(db, { assetId, familyId: input.familyId, buffer: sanitised.buffer, sha256: sanitised.sha256 });
+
+  return { assetId, key, sha256: sanitised.sha256, byteSize: sanitised.byteSize, contentType: sanitised.contentType, moderationStatus: verdict.status };
 }

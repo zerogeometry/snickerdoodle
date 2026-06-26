@@ -83,6 +83,10 @@ export async function placeOrder(
       { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
       viewer,
     ); // ← the gate; throws on deny
+    // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
+    if (asset.moderationStatus !== 'CLEAR') {
+      throw new Error('keepsake is not cleared for printing');
+    }
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     if (!tpl) continue;
     // validate the source object (a bg-removed cutout) belongs to THIS asset

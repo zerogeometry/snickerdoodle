@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, lte, notExists } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte, ne, notExists } from 'drizzle-orm';
 import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { deleteObjectConfirmed } from '@/storage';
 import type { DbHandle } from './db';
@@ -52,6 +52,8 @@ export async function purgeExpiredAssets(
         isNotNull(assets.purgeAfter),
         lte(assets.purgeAfter, now),
         notExists(referencedByLiveOrder),
+        // CSAM-blocked content is preserved for the runbook/report — never auto-purged.
+        ne(assets.moderationStatus, 'BLOCKED'),
       ),
     )
     .limit(opts?.limit ?? 500);

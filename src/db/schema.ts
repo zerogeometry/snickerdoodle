@@ -44,6 +44,10 @@ export const relationship = pgEnum('relationship', [
 ]);
 export const membershipStatus = pgEnum('membership_status', ['ACTIVE', 'REMOVED', 'LEFT']);
 export const assetKind = pgEnum('asset_kind', ['DRAWING', 'PHOTO']);
+// Content-safety state (decision D8). PENDING until the automated gate runs;
+// CLEAR may be ordered/printed; FLAGGED waits in the review queue (never
+// auto-rejected); BLOCKED = a CSAM hash match — preserved, never viewed/printed.
+export const moderationStatus = pgEnum('moderation_status', ['PENDING', 'CLEAR', 'FLAGGED', 'BLOCKED']);
 export const objectClass = pgEnum('object_class', ['ORIGINAL', 'DERIVATIVE', 'CREATION_LAYER']);
 export const inviteStatus = pgEnum('invite_status', ['PENDING', 'VERIFIED', 'EXPIRED', 'REVOKED']);
 export const consentChannel = pgEnum('consent_channel', ['EMAIL', 'SMS']);
@@ -88,6 +92,8 @@ export const auditEvent = pgEnum('audit_event', [
   'MEMBER_LEFT',
   'ASSET_VISIBILITY_CHANGED',
   'ASSET_DELETED',
+  'CONTENT_FLAGGED',
+  'CONTENT_BLOCKED',
   'ACCOUNT_CLOSED',
   'GIFT_LINK_CREATED',
   'GIFT_LINK_REVOKED',
@@ -220,6 +226,10 @@ export const assets = pgTable(
       .references(() => accounts.id),
     // Privacy-by-default at the DB level: no insert path can default wider.
     visibility: visibilityTier('visibility').notNull().default('FAMILY'),
+    // Content-safety gate (D8). An asset cannot reach a print order unless CLEAR.
+    moderationStatus: moderationStatus('moderation_status').notNull().default('PENDING'),
+    moderatedAt: timestamp('moderated_at', { withTimezone: true }),
+    moderationDetail: jsonb('moderation_detail'),
     // The single source of truth for retention (the purge job JOINs the DB).
     keptInHome: boolean('kept_in_home').notNull().default(false),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
