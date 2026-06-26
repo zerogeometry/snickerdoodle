@@ -4,6 +4,7 @@ import { AuthzError, canContributeCreations, type ViewerContext } from '@/authz'
 import { assets, children, storageObjects } from '@/db/schema';
 import { getS3, originalKey, putObject, stripExif } from '@/storage';
 import type { DbHandle } from './db';
+import { RETENTION_DAYS } from './retention';
 
 /** Matches the `asset_kind` enum in the schema. */
 export type AssetKind = 'DRAWING' | 'PHOTO';
@@ -64,6 +65,11 @@ export async function ingestOriginalAsset(
   const key = originalKey(assetId);
   await putObject(key, sanitised.buffer, sanitised.contentType);
 
+  const kept = input.keptInHome ?? false;
+  // Retention (CLAUDE.md): a kept keepsake lives until the parent deletes it; an
+  // un-kept upload is scheduled for purge so a child's image never lingers.
+  const purgeAfter = kept ? null : new Date(Date.now() + RETENTION_DAYS * 86_400_000);
+
   await db.insert(assets).values({
     id: assetId,
     familyId: input.familyId,
@@ -72,7 +78,8 @@ export async function ingestOriginalAsset(
     childSubjectId: input.childSubjectId ?? null,
     controllerAccountId,
     visibility: 'FAMILY', // privacy by default
-    keptInHome: input.keptInHome ?? false,
+    keptInHome: kept,
+    purgeAfter,
   });
 
   const { bucket } = getS3();

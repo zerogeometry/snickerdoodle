@@ -3,6 +3,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  HeadObjectCommand,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -58,4 +59,23 @@ export async function presignDownload(key: string, ttlSeconds = 120): Promise<st
 export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = getS3();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+/**
+ * Delete an object and CONFIRM it's gone, retrying a few times. Used by the
+ * retention purge so a child's original is provably removed from the provider
+ * (not just best-effort) before the DB record is dropped.
+ */
+export async function deleteObjectConfirmed(key: string, attempts = 3): Promise<void> {
+  const { client, bucket } = getS3();
+  for (let i = 0; i < attempts; i++) {
+    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+    try {
+      await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+      // still present — loop and try again
+    } catch {
+      return; // HEAD failed ⇒ confirmed gone
+    }
+  }
+  throw new Error(`could not confirm deletion of ${key}`);
 }
