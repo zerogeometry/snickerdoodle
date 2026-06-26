@@ -83,7 +83,7 @@ export default function CheckoutPage() {
       setQuote(null);
       return;
     }
-    quoteBasket({ items: items.map((i) => ({ productKey: i.product, qty: i.qty })), gift }).then((q) => {
+    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty })), gift }).then((q) => {
       if (live) setQuote(q);
     });
     return () => {
@@ -105,7 +105,7 @@ export default function CheckoutPage() {
     setPlacing(true);
     try {
       const res = await placeOrderAction({
-        items: items.map((i) => ({ productKey: i.product, qty: i.qty, ...(i.artwork ? { artwork: i.artwork } : {}) })),
+        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: i.artwork } : {}) })),
         gift,
       });
       if (!res.ok) {

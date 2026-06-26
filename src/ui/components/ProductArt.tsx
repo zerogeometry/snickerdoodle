@@ -112,3 +112,59 @@ export function ProductArt({ product, size = 96 }: { product: ProductKey; size?:
     </svg>
   );
 }
+
+// The print area of each product within the 96×96 motif — where the real artwork sits.
+const PRINT_RECT: Record<ProductKey, { x: number; y: number; w: number; h: number } | null> = {
+  card: { x: 52, y: 22, w: 16, h: 52 },
+  framedPrint: { x: 23, y: 23, w: 50, h: 50 },
+  mug: { x: 28, y: 30, w: 34, h: 40 },
+  kidsTee: { x: 40, y: 44, w: 20, h: 26 },
+  cushion: { x: 24, y: 30, w: 48, h: 42 },
+  toteBag: { x: 30, y: 44, w: 36, h: 34 },
+  blanket: { x: 24, y: 28, w: 48, h: 44 },
+  storybook: { x: 40, y: 24, w: 28, h: 48 },
+  jigsaw: { x: 24, y: 24, w: 48, h: 48 },
+  giftWrap: null,
+};
+
+/**
+ * The product with the customer's real artwork composited into its print area —
+ * a "made real" preview. Falls back to the placeholder motif with no image.
+ */
+export function ProductMockup({
+  product,
+  image,
+  size = 96,
+  uid,
+}: {
+  product: ProductKey;
+  image?: string | null;
+  size?: number;
+  uid?: string;
+}) {
+  const rect = PRINT_RECT[product];
+  const clipId = `pm-${product}-${uid ?? 'a'}`;
+  return (
+    <svg viewBox="0 0 96 96" width={size} height={size} role="img" aria-label={`your drawing on a ${product}`}>
+      {ART[product]}
+      {image && rect ? (
+        <>
+          <defs>
+            <clipPath id={clipId}>
+              <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx="1" />
+            </clipPath>
+          </defs>
+          <image
+            href={image}
+            x={rect.x}
+            y={rect.y}
+            width={rect.w}
+            height={rect.h}
+            preserveAspectRatio="xMidYMid slice"
+            clipPath={`url(#${clipId})`}
+          />
+        </>
+      ) : null}
+    </svg>
+  );
+}

@@ -17,10 +17,25 @@ export { DELIVERY_PENCE };
 export const gbp = formatPence;
 
 // ── the uploaded drawing (from Start Creating / camera) ──────────────────────
-export type Upload = { dataUrl: string; name: string } | null;
-export const useUpload = create<{ upload: Upload; setUpload: (u: Upload) => void }>((set) => ({
+// `assetId` is set once the upload is ingested server-side (an ephemeral draft);
+// `termsAccepted` gates that ingest and persists across the flow.
+export type Upload = { dataUrl: string; name: string; assetId?: string; cutout?: { url: string; sourceObjectId: string } } | null;
+export const useUpload = create<{
+  upload: Upload;
+  termsAccepted: boolean;
+  setUpload: (u: Upload) => void;
+  setAssetId: (id: string) => void;
+  setCutout: (c: { url: string; sourceObjectId: string }) => void;
+  setTermsAccepted: (v: boolean) => void;
+  resetUpload: () => void; // "Create Another" — new drawing, keep the basket + consent
+}>((set) => ({
   upload: null,
+  termsAccepted: false,
   setUpload: (upload) => set({ upload }),
+  setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
+  setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
+  setTermsAccepted: (termsAccepted) => set({ termsAccepted }),
+  resetUpload: () => set({ upload: null }),
 }));
 
 // ── basket ───────────────────────────────────────────────────────────────────
@@ -31,16 +46,20 @@ export type BasketItem = {
   product: ProductKey;
   pricePence: number;
   qty: number;
-  sub?: string;
-  /** Set for a personalised line placed in the studio: the chosen variant + the
-   * keepsake + its placement (+ an optional bg-removed cutout to render from). The
-   * server re-clamps + freezes this at order time. */
+  sub?: string; // the size/colour line shown under the name
+  /** The chosen variant. `sku` is the SERVER PRICING KEY — when set the server
+   * prices this exact variant; otherwise it falls back to the product's default. */
   variantId?: string;
+  sku?: string;
+  /** Set for a personalised line placed in the studio: the keepsake + its placement
+   * (+ an optional bg-removed cutout to render from). The server re-clamps + freezes
+   * this at order time. */
   artwork?: { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
 };
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
+  setQty: (id: string, qty: number) => void;
   remove: (id: string) => void;
   clear: () => void;
   seed: (items: Omit<BasketItem, 'qty'>[]) => void;
@@ -55,6 +74,10 @@ export const useBasket = create<BasketState>()(
           if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
           return { items: [...s.items, { ...item, qty: 1 }] };
         }),
+      setQty: (id, qty) =>
+        set((s) => ({
+          items: qty <= 0 ? s.items.filter((x) => x.id !== id) : s.items.map((x) => (x.id === id ? { ...x, qty } : x)),
+        })),
       remove: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
       clear: () => set({ items: [] }),
       seed: (items) => set({ items: items.map((i) => ({ ...i, qty: 1 })) }),
