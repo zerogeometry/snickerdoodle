@@ -1,7 +1,11 @@
-import { and, eq, isNotNull, lte } from 'drizzle-orm';
-import { assets, auditRecords, storageObjects } from '@/db/schema';
+import { and, eq, inArray, isNotNull, lte, notExists } from 'drizzle-orm';
+import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { deleteObjectConfirmed } from '@/storage';
 import type { DbHandle } from './db';
+
+// An order in one of these states still needs its source art (render is pending
+// or in production). Once SHIPPED/CANCELLED the source follows normal retention.
+const IN_FLIGHT_ORDER_STATES = ['PENDING', 'PAID', 'FULFILLING'] as const;
 
 /** Days an un-kept upload is retained before the purge removes it (CLAUDE.md). */
 export const RETENTION_DAYS = 30;
@@ -30,10 +34,26 @@ export async function purgeExpiredAssets(
   opts?: { now?: Date; limit?: number },
 ): Promise<PurgeSummary> {
   const now = opts?.now ?? new Date();
+  // Exclude any asset still referenced by an in-flight order — purging it would
+  // strand a paid order with no source to render.
+  const referencedByLiveOrder = db
+    .select({ one: orderItemArtwork.id })
+    .from(orderItemArtwork)
+    .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(and(eq(orderItemArtwork.assetId, assets.id), inArray(orders.status, IN_FLIGHT_ORDER_STATES)));
+
   const due = await db
     .select()
     .from(assets)
-    .where(and(eq(assets.keptInHome, false), isNotNull(assets.purgeAfter), lte(assets.purgeAfter, now)))
+    .where(
+      and(
+        eq(assets.keptInHome, false),
+        isNotNull(assets.purgeAfter),
+        lte(assets.purgeAfter, now),
+        notExists(referencedByLiveOrder),
+      ),
+    )
     .limit(opts?.limit ?? 500);
 
   let purged = 0;

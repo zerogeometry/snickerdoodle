@@ -33,6 +33,11 @@ export function originalKey(assetId: string): string {
   return `assets/${assetId}/original`;
 }
 
+/** Key for a derived render of an asset (cutout / upscaled / printfile). */
+export function derivativeKey(assetId: string, kind: string): string {
+  return `assets/${assetId}/derivatives/${kind}`;
+}
+
 export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
   const { client, bucket } = getS3();
   await ensureBucket();

@@ -4,6 +4,7 @@ import { memberships, orderItems, orders } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { quote, type JoinProvenance, type RequestedLine } from '@/pricing';
 import type { DbHandle } from './db';
+import { getCatalogue } from './catalogue';
 
 function newRef(): string {
   const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
@@ -36,7 +37,8 @@ export async function placeOrder(
   },
 ): Promise<PlaceOrderResult> {
   const { account, joinProvenance } = input;
-  const q = quote(input.items, { gift: input.gift, joinProvenance });
+  const catalogue = await getCatalogue(db);
+  const q = quote(input.items, { gift: input.gift, joinProvenance, catalogue });
   if (q.lines.length === 0) return { ok: false, reason: 'empty' };
 
   const ref = newRef();

@@ -1,6 +1,8 @@
 'use server';
 
 import { quote, type Quote, type RequestedLine } from '@/pricing';
+import { getDb } from '@/db/client';
+import { getCatalogue } from '@/server/catalogue';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 
 /**
@@ -22,7 +24,8 @@ export async function quoteBasket(req: QuoteRequest): Promise<Quote> {
     qty: Number(i.qty),
   }));
   const joinProvenance = await resolveJoinProvenance();
-  return quote(items, { gift: req.gift ?? false, joinProvenance });
+  const catalogue = await getCatalogue(getDb());
+  return quote(items, { gift: req.gift ?? false, joinProvenance, catalogue });
 }
 
 /** The real, server-resolved join provenance (a joined member within their

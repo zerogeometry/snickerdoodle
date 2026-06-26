@@ -1,4 +1,4 @@
-import { CATALOGUE, DELIVERY_PENCE, isCatalogueKey, priceOf, type CatalogueKey } from './catalogue';
+import { CATALOGUE, DELIVERY_PENCE, type PricedCatalogue } from './catalogue';
 import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
 
@@ -9,11 +9,16 @@ export interface RequestedLine {
 }
 
 export interface PricedLine {
-  productKey: CatalogueKey;
+  productKey: string;
   label: string;
   unitPricePence: number;
   qty: number;
   linePence: number;
+}
+
+/** hasOwnProperty guard so prototype-shaped keys ("__proto__") never resolve a price. */
+function inCatalogue(catalogue: PricedCatalogue, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(catalogue, key);
 }
 
 export interface Quote {
@@ -48,6 +53,9 @@ export interface PriceOpts {
   joinContext?: JoinContext | null;
   /** Override delivery (e.g. a future free-over-threshold rule). Defaults to standard. */
   deliveryPence?: number;
+  /** The price list to price against — the server passes the DB-loaded one; defaults
+   * to the static catalogue. The client never supplies it. */
+  catalogue?: PricedCatalogue;
 }
 
 /**
@@ -58,20 +66,22 @@ export interface PriceOpts {
  */
 export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts = {}): Quote {
   const gift = opts.gift ?? false;
+  const catalogue: PricedCatalogue = opts.catalogue ?? CATALOGUE;
   const lines: PricedLine[] = [];
   const rejectedKeys: string[] = [];
 
   for (const r of requested) {
-    if (!isCatalogueKey(r.productKey)) {
+    if (!inCatalogue(catalogue, r.productKey)) {
       rejectedKeys.push(r.productKey);
       continue;
     }
     const qty = clampQty(r.qty);
     if (qty <= 0) continue;
-    const unit = priceOf(r.productKey); // SERVER price — request price (if any) ignored
+    const entry = catalogue[r.productKey]!;
+    const unit = entry.pricePence; // SERVER price — request price (if any) ignored
     lines.push({
       productKey: r.productKey,
-      label: CATALOGUE[r.productKey].label,
+      label: entry.label,
       unitPricePence: unit,
       qty,
       linePence: unit * qty,
@@ -108,10 +118,10 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
  */
 export function quote(
   requested: readonly RequestedLine[],
-  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null } = {},
+  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue } = {},
 ): Quote {
   const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
-  return priceBasket(requested, { gift: opts.gift, joinContext });
+  return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue });
 }
 
 /**

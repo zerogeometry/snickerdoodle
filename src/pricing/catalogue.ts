@@ -34,6 +34,13 @@ export const CATALOGUE = {
 
 export type CatalogueKey = keyof typeof CATALOGUE;
 
+/**
+ * The shape the pricing engine prices against: productKey → price + label. The
+ * static {@link CATALOGUE} is one (the default / seed / fallback); the server can
+ * pass a DB-loaded one instead. Either way the CLIENT never supplies prices.
+ */
+export type PricedCatalogue = Record<string, { pricePence: number; label: string }>;
+
 /** Narrowing guard — is this client-supplied string something we actually sell? */
 export function isCatalogueKey(key: string): key is CatalogueKey {
   return Object.prototype.hasOwnProperty.call(CATALOGUE, key);

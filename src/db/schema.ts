@@ -357,6 +357,9 @@ export const orderItems = pgTable('order_items', {
     .notNull()
     .references(() => orders.id, { onDelete: 'cascade' }),
   productKey: text('product_key').notNull(),
+  // The catalogue variant (nullable during migration; the printed line carries an
+  // order_item_artwork row with the server-authoritative spec).
+  variantId: uuid('variant_id').references(() => productVariants.id),
   qty: integer('qty').notNull(),
   unitPricePence: integer('unit_price_pence').notNull(),
   linePence: integer('line_pence').notNull(),
@@ -368,6 +371,145 @@ export const webhookEvents = pgTable('webhook_events', {
   type: text('type').notNull(),
   processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ── POD catalogue (proposal/04) — products → variants (PRICE lives here) → print
+// templates, with a PROVIDER-AGNOSTIC sku mapping (a second POD is a new row, not
+// a schema change). Seeded from src/pricing; pricing reads the variant price from
+// here, falling back to the static catalogue while unseeded. Print geometry is
+// SERVER-AUTHORITATIVE; the values are placeholders until the Prodigi sync lands.
+export const productCategory = pgEnum('product_category', [
+  'PRINT',
+  'MUG',
+  'APPAREL',
+  'CUSHION',
+  'BLANKET',
+  'BOOK',
+  'PUZZLE',
+  'BAG',
+  'CARD',
+  'ADDON',
+]);
+export const orientation = pgEnum('orientation', ['PORTRAIT', 'LANDSCAPE', 'SQUARE']);
+export const fitMode = pgEnum('fit_mode', ['CONTAIN', 'COVER']);
+export const providerSlug = pgEnum('provider_slug', ['PRODIGI', 'MANUAL']);
+// Per-item fulfilment state (per the locked decision: per-item, item A ships while B retries).
+export const fulfillmentState = pgEnum('fulfillment_state', [
+  'PENDING',
+  'RENDERING',
+  'RENDER_FAILED',
+  'READY',
+  'SUBMITTED',
+  'IN_PRODUCTION',
+  'SHIPPED',
+  'DELIVERED',
+  'CANCELLED',
+  'BLOCKED_GATE',
+  'ERROR',
+]);
+
+export const products = pgTable('products', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  key: text('key').notNull().unique(), // matches today's productKey, e.g. 'framedPrint'
+  category: productCategory('category').notNull(),
+  label: text('label').notNull(),
+  blurb: text('blurb'),
+  active: boolean('active').notNull().default(true),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdAt,
+});
+
+export const productVariants = pgTable(
+  'product_variants',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    sku: text('sku').notNull().unique(), // internal sku, e.g. 'PRINT-A4-FRAME'
+    label: text('label').notNull(),
+    pricePence: integer('price_pence').notNull(), // PRICE lives here — pricing reads this
+    currency: text('currency').notNull().default('GBP'),
+    active: boolean('active').notNull().default(true),
+    createdAt,
+  },
+  (t) => [index('variant_product_idx').on(t.productId)],
+);
+
+export const printTemplates = pgTable('print_templates', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  variantId: uuid('variant_id')
+    .notNull()
+    .references(() => productVariants.id, { onDelete: 'cascade' })
+    .unique(),
+  orientation: orientation('orientation').notNull(),
+  printWidthMm: integer('print_width_mm').notNull(),
+  printHeightMm: integer('print_height_mm').notNull(),
+  bleedMm: integer('bleed_mm').notNull().default(3),
+  safeInsetMm: integer('safe_inset_mm').notNull().default(5),
+  requiredDpi: integer('required_dpi').notNull().default(300),
+  printWidthPx: integer('print_width_px').notNull(),
+  printHeightPx: integer('print_height_px').notNull(),
+  aspectMilli: integer('aspect_milli').notNull(), // w/h * 1000
+  fitMode: fitMode('fit_mode').notNull().default('CONTAIN'),
+  minSourceWidthPx: integer('min_source_width_px').notNull(),
+  minSourceHeightPx: integer('min_source_height_px').notNull(),
+});
+
+export const productVariantProviders = pgTable(
+  'product_variant_providers',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => productVariants.id, { onDelete: 'cascade' }),
+    provider: providerSlug('provider').notNull(),
+    providerSku: text('provider_sku').notNull(), // the POD's sku, e.g. Prodigi 'GLOBAL-FAP-A4'
+    providerConfig: jsonb('provider_config'),
+    isDefault: boolean('is_default').notNull().default(false),
+    active: boolean('active').notNull().default(true),
+  },
+  (t) => [
+    uniqueIndex('variant_provider_unique').on(t.variantId, t.provider),
+    uniqueIndex('variant_default_provider').on(t.variantId).where(sql`${t.isDefault}`),
+  ],
+);
+
+// ── order_item_artwork — the SERVER-AUTHORITATIVE print spec for a printed line.
+// The frozen template snapshot + clamped normalised transform are the ONLY
+// geometry the renderer trusts; the print file is a DERIVATIVE under the existing
+// asset → storage_objects cascade (so authz + retention already cover it).
+export const orderItemArtwork = pgTable(
+  'order_item_artwork',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    orderItemId: uuid('order_item_id')
+      .notNull()
+      .references(() => orderItems.id, { onDelete: 'cascade' })
+      .unique(),
+    // Nullable + SET NULL: once a source asset is purged (post-fulfilment, past
+    // retention), the link drops but the FROZEN spec (templateSnapshot) survives
+    // for the historical order line. The in-flight-order guard prevents purging a
+    // source that's still needed to render.
+    assetId: uuid('asset_id').references(() => assets.id, { onDelete: 'set null' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => productVariants.id),
+    controllerAccountId: uuid('controller_account_id')
+      .notNull()
+      .references(() => accounts.id),
+    templateSnapshot: jsonb('template_snapshot').notNull(), // {printWidthMm,…,requiredDpi} FROZEN at order time
+    transform: jsonb('transform').notNull(), // {scale,offsetX,offsetY,rotationDeg} normalised, server-clamped
+    sourceObjectId: uuid('source_object_id').references(() => storageObjects.id),
+    printObjectId: uuid('print_object_id').references(() => storageObjects.id),
+    renderedDpi: integer('rendered_dpi'),
+    upscaled: boolean('upscaled').notNull().default(false),
+    status: fulfillmentState('status').notNull().default('PENDING'),
+    renderError: text('render_error'),
+    providerItemId: text('provider_item_id'),
+    createdAt,
+  },
+  (t) => [index('artwork_asset_idx').on(t.assetId), index('artwork_status_idx').on(t.status)],
+);
 
 // ── gift_link — a shareable, ready-to-buy cart. The item snapshot is FROZEN at
 // creation (immutable jsonb); if a source keepsake is later deleted the link is

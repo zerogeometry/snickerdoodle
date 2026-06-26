@@ -90,26 +90,47 @@ export async function getViewableAssetOrThrow(
   return ref;
 }
 
+type ObjectClass = (typeof storageObjects.$inferSelect)['objectClass'];
+
 /**
- * Mint a short-lived signed URL for an asset's stored ORIGINAL — but ONLY after
- * the authz policy says ALLOW. No bytes are ever addressable without that gate.
- * `url` is null when the asset has no stored original yet (a metadata-only/demo
- * asset); a denied viewer never reaches this point (getViewableAssetOrThrow throws).
+ * Mint a short-lived signed URL for one of an asset's stored objects (ORIGINAL by
+ * default; DERIVATIVE/CREATION_LAYER for cutouts, upscales, print files) — but
+ * ONLY after the authz policy says ALLOW. No bytes are ever addressable without
+ * that gate. `url` is null when no such object exists yet; a denied viewer never
+ * reaches this point (getViewableAssetOrThrow throws).
  */
 export async function getAssetDownloadGrant(
   db: DbHandle,
   assetId: string,
   viewer: ViewerContext,
-  ttlSeconds = 120,
+  opts: { objectClass?: ObjectClass; ttlSeconds?: number } = {},
 ): Promise<{ assetId: string; url: string | null }> {
   const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const [object] = await db
     .select()
     .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, opts.objectClass ?? 'ORIGINAL')));
   if (!object) return { assetId: ref.id, url: null };
-  const url = await presignDownload(object.key, ttlSeconds);
+  const url = await presignDownload(object.key, opts.ttlSeconds ?? 120);
   return { assetId: ref.id, url };
+}
+
+/**
+ * Mint a signed URL for a SPECIFIC stored object (e.g. a print-file derivative
+ * referenced by id) — gated by the same policy via the object's owning asset. The
+ * ONLY sanctioned way to address a derivative's bytes; jobs must never call
+ * presignDownload directly.
+ */
+export async function getStorageObjectGrant(
+  db: DbHandle,
+  storageObjectId: string,
+  viewer: ViewerContext,
+  ttlSeconds = 120,
+): Promise<{ url: string }> {
+  const [object] = await db.select().from(storageObjects).where(eq(storageObjects.id, storageObjectId));
+  if (!object) throw denied('not found');
+  await getViewableAssetOrThrow(db, object.assetId, viewer); // ← the gate, via the owning asset
+  return { url: await presignDownload(object.key, ttlSeconds) };
 }
 
 /**

@@ -6,6 +6,7 @@ export {
   priceOf,
   type CatalogueEntry,
   type CatalogueKey,
+  type PricedCatalogue,
 } from './catalogue';
 export { formatPence } from './format';
 export { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';

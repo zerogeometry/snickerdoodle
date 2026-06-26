@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { CATALOGUE, isCatalogueKey, type PricedLine } from '@/pricing';
+import type { PricedLine } from '@/pricing';
 
 /**
  * Stripe is OPTIONAL locally: with no STRIPE_SECRET_KEY the order flow uses a dev
@@ -36,16 +36,14 @@ export async function createCheckoutSession(args: {
   joinSavingPence: number;
 }): Promise<{ id: string; url: string | null }> {
   const stripe = getStripe();
-  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = args.lines
-    .filter((l) => isCatalogueKey(l.productKey))
-    .map((l) => ({
-      quantity: l.qty,
-      price_data: {
-        currency: 'gbp',
-        unit_amount: l.unitPricePence,
-        product_data: { name: CATALOGUE[l.productKey].label },
-      },
-    }));
+  const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = args.lines.map((l) => ({
+    quantity: l.qty,
+    price_data: {
+      currency: 'gbp',
+      unit_amount: l.unitPricePence, // already server-priced
+      product_data: { name: l.label },
+    },
+  }));
 
   if (args.deliveryPence > 0) {
     lineItems.push({
