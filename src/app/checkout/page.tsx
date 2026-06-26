@@ -63,7 +63,10 @@ export default function CheckoutPage() {
     if (empty || placing) return;
     setPlacing(true);
     try {
-      const res = await placeOrderAction({ items: items.map((i) => ({ productKey: i.product, qty: i.qty })), gift });
+      const res = await placeOrderAction({
+        items: items.map((i) => ({ productKey: i.product, qty: i.qty, ...(i.artwork ? { artwork: i.artwork } : {}) })),
+        gift,
+      });
       if (!res.ok) {
         toast('hmm, that didn’t go through — try again');
         return;

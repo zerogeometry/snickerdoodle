@@ -23,7 +23,19 @@ export const useUpload = create<{ upload: Upload; setUpload: (u: Upload) => void
 }));
 
 // ── basket ───────────────────────────────────────────────────────────────────
-export type BasketItem = { id: string; name: string; product: ProductKey; pricePence: number; qty: number; sub?: string };
+export type PlacementTransform = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
+export type BasketItem = {
+  id: string;
+  name: string;
+  product: ProductKey;
+  pricePence: number;
+  qty: number;
+  sub?: string;
+  /** Set for a personalised line placed in the studio: the chosen variant + the
+   * keepsake + its placement. The server re-clamps + freezes this at order time. */
+  variantId?: string;
+  artwork?: { assetId: string; transform: PlacementTransform };
+};
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;

@@ -1,14 +1,26 @@
 import { randomBytes } from 'node:crypto';
-import { and, desc, eq, isNull } from 'drizzle-orm';
-import { memberships, orderItems, orders } from '@/db/schema';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { assertCanViewAsset } from '@/authz';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariants } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
-import { quote, type JoinProvenance, type RequestedLine } from '@/pricing';
+import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
+import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import type { DbHandle } from './db';
+import { resolveViewerContext } from './assets';
 import { getCatalogue } from './catalogue';
 
 function newRef(): string {
   const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
   return `SNK-${n.toString().padStart(6, '0')}`;
+}
+
+/** A basket line as it reaches the server: a product key + qty, optionally a
+ * personalised placement (a kept keepsake + its transform). Prices + variant +
+ * print geometry are all resolved server-side; the client supplies none of them. */
+export interface PlaceLine {
+  productKey: string;
+  qty: number;
+  artwork?: { assetId: string; transform: RawTransform };
 }
 
 export interface PlaceOrderResult {
@@ -28,7 +40,7 @@ export interface PlaceOrderResult {
 export async function placeOrder(
   db: DbHandle,
   input: {
-    items: RequestedLine[];
+    items: PlaceLine[];
     gift?: boolean;
     /** The buyer (null for a guest) and their server-resolved join provenance —
      * resolved by the caller (the action) from the session, never the request. */
@@ -38,8 +50,57 @@ export async function placeOrder(
 ): Promise<PlaceOrderResult> {
   const { account, joinProvenance } = input;
   const catalogue = await getCatalogue(db);
-  const q = quote(input.items, { gift: input.gift, joinProvenance, catalogue });
+  const q = quote(
+    input.items.map((l) => ({ productKey: l.productKey, qty: l.qty })),
+    { gift: input.gift, joinProvenance, catalogue },
+  );
   if (q.lines.length === 0) return { ok: false, reason: 'empty' };
+
+  // The valid input lines align 1:1 (same order) with the priced lines.
+  const valid = input.items.filter((l) => inCatalogue(catalogue, l.productKey) && clampQty(l.qty) > 0);
+  const keys = [...new Set(valid.map((l) => l.productKey))];
+  const variantRows = keys.length
+    ? await db.select({ id: productVariants.id, sku: productVariants.sku }).from(productVariants).where(inArray(productVariants.sku, keys))
+    : [];
+  const variantByKey = new Map(variantRows.map((r) => [r.sku, r.id]));
+
+  // Pre-validate every personalised line BEFORE writing anything (authz + a frozen
+  // template snapshot + a server-clamped transform). A bad placement fails here,
+  // not half-way through inserting an order.
+  const artworkByIndex = new Map<number, {
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform;
+  }>();
+  for (let i = 0; i < valid.length; i++) {
+    const art = valid[i]!.artwork;
+    if (!art) continue;
+    if (!account) throw new Error('must be signed in to order a personalised item');
+    const variantId = variantByKey.get(valid[i]!.productKey);
+    if (!variantId) continue; // not a printable product
+    const [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
+    if (!asset) throw new Error('keepsake not found');
+    const viewer = await resolveViewerContext(db, account.id, asset.familyId);
+    assertCanViewAsset(
+      { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
+      viewer,
+    ); // ← the gate; throws on deny
+    const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
+    if (!tpl) continue;
+    artworkByIndex.set(i, {
+      assetId: art.assetId,
+      variantId,
+      controllerAccountId: asset.controllerAccountId,
+      templateSnapshot: {
+        printWidthMm: tpl.printWidthMm,
+        printHeightMm: tpl.printHeightMm,
+        bleedMm: tpl.bleedMm,
+        safeInsetMm: tpl.safeInsetMm,
+        requiredDpi: tpl.requiredDpi,
+        printWidthPx: tpl.printWidthPx,
+        printHeightPx: tpl.printHeightPx,
+      },
+      transform: clampTransform(art.transform), // server-authoritative
+    });
+  }
 
   const ref = newRef();
   const [order] = await db
@@ -55,15 +116,27 @@ export async function placeOrder(
       isGift: q.gift,
     })
     .returning();
-  await db.insert(orderItems).values(
-    q.lines.map((l) => ({
-      orderId: order!.id,
-      productKey: l.productKey,
-      qty: l.qty,
-      unitPricePence: l.unitPricePence,
-      linePence: l.linePence,
-    })),
-  );
+
+  for (let i = 0; i < q.lines.length; i++) {
+    const l = q.lines[i]!;
+    const variantId = variantByKey.get(l.productKey) ?? null;
+    const [oi] = await db
+      .insert(orderItems)
+      .values({ orderId: order!.id, productKey: l.productKey, variantId, qty: l.qty, unitPricePence: l.unitPricePence, linePence: l.linePence })
+      .returning();
+    const art = artworkByIndex.get(i);
+    if (art) {
+      await db.insert(orderItemArtwork).values({
+        orderItemId: oi!.id,
+        assetId: art.assetId,
+        variantId: art.variantId,
+        controllerAccountId: art.controllerAccountId,
+        templateSnapshot: art.templateSnapshot,
+        transform: art.transform,
+        status: 'PENDING',
+      });
+    }
+  }
 
   if (isStripeConfigured()) {
     const session = await createCheckoutSession({

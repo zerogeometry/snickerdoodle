@@ -1,11 +1,13 @@
 'use client';
 
-import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconSparkles } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag } from '@tabler/icons-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
-import { gbp } from '@/lib/store';
+import { gbp, toast, useBasket } from '@/lib/store';
+import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
 import {
   assessResolution,
@@ -28,6 +30,8 @@ export function Positioner({ data }: { data: StudioData }) {
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const router = useRouter();
+  const addToBasket = useBasket((s) => s.add);
 
   const keepsake = data.keepsakes[assetIdx];
   const variant = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
@@ -76,6 +80,20 @@ export function Positioner({ data }: { data: StudioData }) {
     } finally {
       setRendering(false);
     }
+  };
+
+  // Capture the placement onto the basket line. The server re-clamps + freezes it.
+  const add = () => {
+    addToBasket({
+      id: `pos-${keepsake.id}-${variant.id}`,
+      name: variant.label,
+      product: variant.productKey as ProductKey,
+      pricePence: variant.pricePence,
+      variantId: variant.id,
+      artwork: { assetId: keepsake.id, transform: { ...tf } },
+    });
+    toast('added to basket ✓');
+    router.push('/checkout');
   };
 
   // image placement inside the (clipped) preview canvas
@@ -191,9 +209,17 @@ export function Positioner({ data }: { data: StudioData }) {
             </button>
           </div>
 
-          <Button size="lg" className="mt-5 w-full" onClick={generate} disabled={rendering || assess?.decision === 'BLOCK'}>
-            <Icon icon={IconSparkles} size={16} /> {rendering ? 'making your print…' : 'make the print-ready file'}
+          <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
+            <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant.pricePence)}
           </Button>
+          <button
+            type="button"
+            onClick={generate}
+            disabled={rendering || assess?.decision === 'BLOCK'}
+            className="mt-2 w-full text-center text-xs font-bold text-cinnamon disabled:opacity-50"
+          >
+            {rendering ? 'rendering…' : 'preview the exact print file'}
+          </button>
 
           {result && result.ok ? (
             <div className="mt-4 rounded-2xl border border-[#EADFC9] bg-white p-3">

@@ -4,9 +4,11 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import type Stripe from 'stripe';
 import * as schema from '@/db/schema';
-import { invites, memberships, orders, webhookEvents } from '@/db/schema';
+import { assets, invites, memberships, orderItemArtwork, orderItems, orders, productVariants, webhookEvents } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
+import { AuthzError } from '@/authz';
 import { getOrdersForAccount, placeOrder } from '@/server/orders';
+import { seedCatalogue } from '@/server/catalogue';
 import { handleStripeEvent } from '@/payments';
 import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
@@ -24,6 +26,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     client = postgres(URL!, { prepare: false });
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
+    await seedCatalogue(db); // needed for variant + print template on personalised lines
   });
 
   afterAll(async () => {
@@ -123,5 +126,46 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(paid!.status).toBe('PAID');
     const events = await db.select().from(webhookEvents).where(eq(webhookEvents.id, eventId));
     expect(events).toHaveLength(1); // recorded exactly once
+  });
+
+  it('a personalised line freezes a SERVER-CLAMPED spec into order_item_artwork', async () => {
+    const [asset] = await db
+      .insert(assets)
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true })
+      .returning();
+    const [variant] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
+
+    const res = await placeOrder(db, {
+      items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 99, offsetX: 5, offsetY: -5, rotationDeg: 44 } } }],
+      account: { id: ids.samId },
+      joinProvenance: null,
+    });
+    await track(res);
+
+    const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+    const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
+    expect(oi!.variantId).toBe(variant!.id); // variant resolved server-side
+
+    const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
+    expect(art!.assetId).toBe(asset!.id);
+    expect(art!.controllerAccountId).toBe(ids.samId);
+    // the client's wild transform was CLAMPED server-side (scale 99→4, offset 5→1, rotation 44→0)
+    expect(art!.transform).toMatchObject({ scale: 4, offsetX: 1, offsetY: -1, rotationDeg: 0 });
+    expect((art!.templateSnapshot as { requiredDpi: number }).requiredDpi).toBe(300); // template frozen
+  });
+
+  it('refuses a personalised line for a keepsake the buyer cannot see', async () => {
+    const [bloomAsset] = await db
+      .insert(assets)
+      .values({ familyId: ids.bloomId, kind: 'DRAWING', uploaderAccountId: ids.blakeId, controllerAccountId: ids.blakeId, visibility: 'FAMILY', keptInHome: true })
+      .returning();
+    // Sam (Hartley) tries to order the Blooms' keepsake → gated, nothing written
+    await expect(
+      placeOrder(db, {
+        items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: bloomAsset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
+        account: { id: ids.samId },
+        joinProvenance: null,
+      }),
+    ).rejects.toBeInstanceOf(AuthzError);
   });
 });

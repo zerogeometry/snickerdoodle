@@ -13,6 +13,8 @@ export { resolveJoinContext, type JoinContext, type JoinProvenance } from './joi
 export {
   priceBasket,
   quote,
+  clampQty,
+  inCatalogue,
   recipientLineLabel,
   type PriceOpts,
   type PricedLine,

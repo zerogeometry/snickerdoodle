@@ -16,10 +16,6 @@ export interface PricedLine {
   linePence: number;
 }
 
-/** hasOwnProperty guard so prototype-shaped keys ("__proto__") never resolve a price. */
-function inCatalogue(catalogue: PricedCatalogue, key: string): boolean {
-  return Object.prototype.hasOwnProperty.call(catalogue, key);
-}
 
 export interface Quote {
   lines: PricedLine[];
@@ -35,11 +31,16 @@ export interface Quote {
 
 const MAX_QTY = 99;
 
-function clampQty(qty: number): number {
+export function clampQty(qty: number): number {
   if (!Number.isFinite(qty)) return 0;
   const n = Math.floor(qty);
   if (n <= 0) return 0;
   return Math.min(n, MAX_QTY);
+}
+
+/** Is this client-supplied key something the given catalogue sells? */
+export function inCatalogue(catalogue: PricedCatalogue, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(catalogue, key);
 }
 
 /** Basis-points of an amount, rounded to the nearest penny. */
