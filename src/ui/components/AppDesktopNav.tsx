@@ -1,6 +1,6 @@
 'use client';
 
-import { IconShoppingBag } from '@tabler/icons-react';
+import { IconShoppingBag, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { Icon } from '../primitives/Icon';
 import { APP_NAV } from './appTabs';
@@ -41,9 +41,9 @@ export function AppDesktopNav({ active }: { active: string }) {
         <Link
           href="/account"
           aria-label="Your account"
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-cinnamon font-display text-xs font-bold text-cta-text"
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-cinnamon text-cta-text"
         >
-          S
+          <Icon icon={IconUser} size={15} />
         </Link>
       </nav>
     </header>

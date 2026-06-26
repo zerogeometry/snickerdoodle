@@ -14,6 +14,8 @@ export interface IngestInput {
   /** When set, the asset is OF this child; its controlling parent becomes controller. */
   childSubjectId?: string | null;
   buffer: Buffer;
+  /** Keep it in the family keepsake home (exempt from the retention purge). */
+  keptInHome?: boolean;
 }
 
 export interface IngestResult {
@@ -70,6 +72,7 @@ export async function ingestOriginalAsset(
     childSubjectId: input.childSubjectId ?? null,
     controllerAccountId,
     visibility: 'FAMILY', // privacy by default
+    keptInHome: input.keptInHome ?? false,
   });
 
   const { bucket } = getS3();

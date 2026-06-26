@@ -3,13 +3,14 @@
 import { IconArrowLeft, IconCamera, IconLock, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, type ChangeEvent } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { PlaceholderDoodle } from '@/ui/components/PlaceholderDoodle';
 import { ProductCard } from '@/ui/components/ProductCard';
 import type { ProductKey } from '@/ui/components/ProductArt';
-import { toast, useKept, useUpload } from '@/lib/store';
+import { toast, useUpload } from '@/lib/store';
+import { keepCreation } from '@/app/actions/keep';
 
 const RANGE: { name: string; price: string; product: ProductKey; featured?: boolean }[] = [
   { name: 'framed print', price: '£22', product: 'framedPrint' },
@@ -26,6 +27,7 @@ export default function StartCreatingPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
+  const [keeping, setKeeping] = useState(false);
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,17 +37,30 @@ export default function StartCreatingPage() {
     reader.readAsDataURL(file);
   };
 
-  const keep = () => {
-    if (!upload) return;
-    useKept.getState().add({
-      id: `k-${Date.now()}`,
-      name: 'Your drawing',
-      image: upload.dataUrl,
-      meta: 'just now',
-      visibility: 'FAMILY',
-    });
-    toast('Kept to your keepsake box ✓');
-    router.push('/home');
+  // Keep for real: the bytes go to the server, get EXIF-stripped, and are stored
+  // privately in your family keepsake home. Guests are sent to log in first.
+  const keep = async () => {
+    if (!upload || keeping) return;
+    setKeeping(true);
+    try {
+      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+      const fd = new FormData();
+      fd.append('image', blob, upload.name || 'drawing.png');
+      const res = await keepCreation(fd);
+      if (res.needsAuth) {
+        toast('log in to keep this safely');
+        router.push('/login');
+        return;
+      }
+      if (!res.ok) {
+        toast('hmm, that didn’t save — try again');
+        return;
+      }
+      toast('kept to your keepsake box ✓');
+      router.push('/home');
+    } finally {
+      setKeeping(false);
+    }
   };
 
   return (
@@ -143,8 +158,8 @@ export default function StartCreatingPage() {
                 <Button href="/studio/new" variant="secondary" size="lg">
                   open in studio
                 </Button>
-                <Button variant="ghost" size="lg" onClick={keep}>
-                  keep this
+                <Button variant="ghost" size="lg" onClick={keep} disabled={keeping}>
+                  {keeping ? 'keeping…' : 'keep this'}
                 </Button>
               </div>
             </div>
@@ -159,8 +174,8 @@ export default function StartCreatingPage() {
               <Link href="/studio/new" className="font-bold text-cinnamon">
                 open in studio
               </Link>
-              <button type="button" onClick={keep} className="font-bold text-cinnamon">
-                keep this
+              <button type="button" onClick={keep} disabled={keeping} className="font-bold text-cinnamon disabled:opacity-60">
+                {keeping ? 'keeping…' : 'keep this'}
               </button>
             </div>
           </div>
