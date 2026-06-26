@@ -12,6 +12,7 @@ import type { ProductKey } from '@/ui/components/ProductArt';
 import { toast, useUpload } from '@/lib/store';
 import { keepCreation } from '@/app/actions/keep';
 import { startGuestUpload } from '@/app/actions/guestUpload';
+import { CameraCapture } from '@/ui/components/CameraCapture';
 
 const RANGE: { name: string; price: string; product: ProductKey; featured?: boolean }[] = [
   { name: 'framed print', price: '£22', product: 'framedPrint' },
@@ -27,10 +28,10 @@ export default function StartCreatingPage() {
   const setUpload = useUpload((s) => s.setUpload);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const camRef = useRef<HTMLInputElement>(null);
   const [keeping, setKeeping] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,7 +87,7 @@ export default function StartCreatingPage() {
         toast('hmm, that didn’t save — try again');
         return;
       }
-      toast('kept to your keepsake box ✓');
+      toast('Added to your Keepsake ✓');
       router.push('/home');
     } finally {
       setKeeping(false);
@@ -96,7 +97,12 @@ export default function StartCreatingPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
-      <input ref={camRef} type="file" accept="image/*" capture="environment" onChange={onFile} className="hidden" />
+      <CameraCapture
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(dataUrl, name) => setUpload({ dataUrl, name })}
+        onUploadInstead={() => fileRef.current?.click()}
+      />
 
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
         <div className="flex items-center gap-2.5">
@@ -130,7 +136,7 @@ export default function StartCreatingPage() {
             <Button size="lg" onClick={() => fileRef.current?.click()}>
               <Icon icon={IconUpload} size={18} /> upload a drawing
             </Button>
-            <Button variant="secondary" size="lg" onClick={() => camRef.current?.click()}>
+            <Button variant="secondary" size="lg" onClick={() => setCameraOpen(true)}>
               <Icon icon={IconCamera} size={18} /> use camera
             </Button>
           </div>
