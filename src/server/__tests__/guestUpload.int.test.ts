@@ -4,10 +4,10 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { assets, mlOperations, storageObjects } from '@/db/schema';
+import { assets, mlOperations, orders, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
-import { getViewableAssetOrThrow, resolveAssetViewer } from '@/server/assets';
+import { adoptEphemeralDraft, getViewableAssetOrThrow, resolveAssetViewer } from '@/server/assets';
 import { ingestEphemeralUpload } from '@/server/ingest';
 import { removeBackgroundForAsset } from '@/server/magic';
 import { placeOrder } from '@/server/orders';
@@ -107,5 +107,32 @@ describe.skipIf(!DB || !S3)('guest ephemeral upload + claim authz (integration)'
         joinProvenance: null,
       }),
     ).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('only the holder of the claim can adopt (keep) a draft', async () => {
+    const r = await draft();
+    await expect(adoptEphemeralDraft(db, ids.samId, ids.hartleyId, r.assetId, [])).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('adoption turns the draft into a real, kept, orderable family asset', async () => {
+    const r = await draft();
+    await adoptEphemeralDraft(db, ids.samId, ids.hartleyId, r.assetId, [r.claimId]);
+
+    const [a] = await db.select().from(assets).where(eq(assets.id, r.assetId));
+    expect(a!.familyId).toBe(ids.hartleyId); // filed into the family
+    expect(a!.controllerAccountId).toBe(ids.samId); // controller resolved
+    expect(a!.ephemeralClaimId).toBeNull(); // claim retired (single-use)
+    expect(a!.keptInHome).toBe(true);
+    expect(a!.purgeAfter).toBeNull(); // off the retention clock
+
+    // it was refused while ephemeral — now it orders
+    const res = await placeOrder(db, {
+      items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: r.assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
+      account: { id: ids.samId },
+      joinProvenance: null,
+    });
+    expect(res.ok).toBe(true);
+    const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+    if (o) await db.delete(orders).where(eq(orders.id, o.id)); // cascades items + artwork
   });
 });

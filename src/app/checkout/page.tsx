@@ -3,7 +3,7 @@
 import { IconArrowLeft, IconGift, IconHeart, IconLock, IconShieldCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
@@ -12,6 +12,7 @@ import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
+import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { Quote } from '@/pricing';
 
 const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
@@ -33,6 +34,44 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
 
   const empty = items.length === 0;
+
+  // Returning from the guest "keep it & check out" flow: a placement was stashed
+  // before sign-in. Now that they're (hopefully) signed in, adopt the draft into
+  // their family and seed the basket with the server-priced line.
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (consumedRef.current || typeof window === 'undefined') return;
+    const raw = sessionStorage.getItem('sd_pending_place');
+    if (!raw) return;
+    consumedRef.current = true;
+    let pending: { assetId: string; variantId: string; transform: unknown; sourceObjectId?: string | null };
+    try {
+      pending = JSON.parse(raw);
+    } catch {
+      sessionStorage.removeItem('sd_pending_place');
+      return;
+    }
+    void (async () => {
+      const res = await adoptPendingPlacement({
+        assetId: pending.assetId,
+        variantId: pending.variantId,
+        transform: pending.transform as never,
+        sourceObjectId: pending.sourceObjectId ?? undefined,
+      });
+      if (!res.ok) {
+        if (res.needsAuth) {
+          consumedRef.current = false; // keep the pending placement for after login
+          router.push('/login?next=/checkout');
+          return;
+        }
+        sessionStorage.removeItem('sd_pending_place');
+        return;
+      }
+      sessionStorage.removeItem('sd_pending_place');
+      add({ ...res.line, product: res.line.product as ProductKey });
+      toast('kept to your keepsake box ✓');
+    })();
+  }, [add, router]);
 
   // The authoritative total comes from the server — it re-prices every line from
   // the trusted catalogue, so the client can't influence what's charged.

@@ -95,6 +95,43 @@ export async function resolveAssetViewer(
   return resolveViewerContext(db, accountId, a.familyId);
 }
 
+/**
+ * Adopt a guest's ephemeral draft into a signed-in account's family — the "keep"
+ * moment. Only the holder of the draft's upload claim may adopt it (verified
+ * through the same gate). Adoption resolves the controller (the account), files it
+ * in the family keepsake home, and retires the claim + the retention schedule. An
+ * already-adopted asset is a no-op for its owner and a denial for anyone else.
+ */
+export async function adoptEphemeralDraft(
+  db: DbHandle,
+  accountId: string,
+  familyId: string,
+  assetId: string,
+  uploadClaims: string[],
+): Promise<void> {
+  const viewer = await resolveAssetViewer(db, assetId, accountId, uploadClaims);
+  await getViewableAssetOrThrow(db, assetId, viewer); // gate: claim holder (draft) or owner
+  const [row] = await db.select().from(assets).where(eq(assets.id, assetId));
+  if (!row) throw denied('not found');
+
+  if (row.ephemeralClaimId) {
+    // The claim was verified by the gate → file the draft into the family home.
+    await db
+      .update(assets)
+      .set({
+        familyId,
+        uploaderAccountId: accountId,
+        controllerAccountId: accountId,
+        ephemeralClaimId: null, // retire the claim — single-use
+        keptInHome: true,
+        purgeAfter: null, // kept: no longer on the retention clock
+      })
+      .where(and(eq(assets.id, assetId), eq(assets.ephemeralClaimId, row.ephemeralClaimId))); // race guard
+  } else if (row.controllerAccountId !== accountId) {
+    throw denied('not yours to keep'); // a real asset that isn't theirs
+  }
+}
+
 /** Every asset in a family this viewer is allowed to SEE (filtered via authz). */
 export async function listViewableAssets(
   db: DbHandle,
