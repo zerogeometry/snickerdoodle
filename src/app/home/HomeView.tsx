@@ -171,7 +171,11 @@ export function HomeView({ data }: { data: HomeData }) {
         onSave={saveVisibility}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
-      <CreateGiftLinkModal open={giftOpen} onClose={() => setGiftOpen(false)} />
+      <CreateGiftLinkModal
+        open={giftOpen}
+        onClose={() => setGiftOpen(false)}
+        keepsakes={data.keepsakes.map((k) => ({ id: k.id, imageUrl: k.imageUrl }))}
+      />
     </div>
   );
 }

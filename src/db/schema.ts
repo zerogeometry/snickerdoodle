@@ -369,6 +369,34 @@ export const webhookEvents = pgTable('webhook_events', {
   processedAt: timestamp('processed_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── gift_link — a shareable, ready-to-buy cart. The item snapshot is FROZEN at
+// creation (immutable jsonb); if a source keepsake is later deleted the link is
+// served as "gone". Unguessable token, expirable, revocable, never indexed.
+export const giftLinkStatus = pgEnum('gift_link_status', ['ACTIVE', 'REVOKED', 'EXPIRED']);
+
+export const giftLinks = pgTable(
+  'gift_links',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id),
+    createdByAccountId: uuid('created_by_account_id')
+      .notNull()
+      .references(() => accounts.id),
+    token: text('token').notNull().unique(),
+    title: text('title'),
+    /** Frozen [{ assetId, productKey, label, unitPricePence }] — never mutated. */
+    items: jsonb('items').notNull(),
+    inviteId: uuid('invite_id').references(() => invites.id), // optional embedded family invite
+    status: giftLinkStatus('status').notNull().default('ACTIVE'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('gift_link_family_idx').on(t.familyId)],
+);
+
 // ── Auth.js (passwordless magic-link) — DATABASE sessions so a session is
 // revocable (a removed/closed account's sessions can be invalidated server-side).
 // The "user" is our own `accounts` row; the adapter maps between the two. No OAuth
