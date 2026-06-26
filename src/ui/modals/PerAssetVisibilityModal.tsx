@@ -1,7 +1,7 @@
 'use client';
 
 import { IconHomeHeart, IconLock, IconShieldCheck, IconUser, IconUsers } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
@@ -60,10 +60,31 @@ function WhoStack({ who }: { who: Who[] | 'lock' }) {
   );
 }
 
-export function PerAssetVisibilityModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [tier, setTier] = useState<Tier>('FAMILY');
+export function PerAssetVisibilityModal({
+  open,
+  name,
+  image,
+  tier: initialTier,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  name: string;
+  image?: string;
+  tier: Tier;
+  onClose: () => void;
+  onSave: (tier: Tier) => void;
+}) {
+  const [tier, setTier] = useState<Tier>(initialTier);
 
-  const thumb = (
+  // Reflect the keepsake that was actually tapped each time the modal opens.
+  useEffect(() => {
+    if (open) setTier(initialTier);
+  }, [open, initialTier, name]);
+
+  const thumb = image ? (
+    <img src={image} alt="" className="h-[46px] w-[46px] rounded-lg border border-[#EADFC9] object-cover" />
+  ) : (
     <span className="flex h-[46px] w-[46px] items-center justify-center rounded-lg bg-[#E2F0F4]">
       <svg viewBox="0 0 50 50" width="30" height="30" aria-hidden>
         <path d="M25 7 C34 16 34 33 30 42 L20 42 C16 33 16 16 25 7 Z" fill="#FFFDF8" stroke="#C8623A" strokeWidth="2.5" />
@@ -77,11 +98,11 @@ export function PerAssetVisibilityModal({ open, onClose }: { open: boolean; onCl
     <Modal
       open={open}
       onClose={onClose}
-      title="Rocket"
-      subtitle="by Olivia · kept Apr 2026"
+      title={name || 'Keepsake'}
+      subtitle="choose who can see it"
       headerLeading={thumb}
       footer={
-        <Button size="lg" className="w-full" onClick={onClose}>
+        <Button size="lg" className="w-full" onClick={() => onSave(tier)}>
           done
         </Button>
       }

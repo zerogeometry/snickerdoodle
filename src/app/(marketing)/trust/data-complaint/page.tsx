@@ -1,7 +1,7 @@
 import { IconClockHour4 } from '@tabler/icons-react';
 import type { Metadata } from 'next';
-import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
+import { ComplaintForm } from './ComplaintForm';
 
 export const metadata: Metadata = {
   title: 'make a data-protection complaint',
@@ -29,40 +29,7 @@ export default function DataComplaintPage() {
           posted on progress and the outcome.
         </div>
 
-        <form className="mt-8 space-y-4">
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-cocoa">Your name</span>
-            <input
-              type="text"
-              name="name"
-              autoComplete="name"
-              className="w-full rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3.5 py-2.5 text-sm text-cocoa placeholder:text-[#A89B8C]"
-              placeholder="First and last name"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-cocoa">Your email</span>
-            <input
-              type="email"
-              name="email"
-              autoComplete="email"
-              className="w-full rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3.5 py-2.5 text-sm text-cocoa placeholder:text-[#A89B8C]"
-              placeholder="so we can reply"
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1.5 block text-[13px] font-semibold text-cocoa">What&apos;s your complaint about?</span>
-            <textarea
-              name="message"
-              rows={6}
-              className="w-full rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3.5 py-2.5 text-sm text-cocoa placeholder:text-[#A89B8C]"
-              placeholder="Tell us what happened, in your own words."
-            />
-          </label>
-          <Button size="lg" className="w-full sm:w-auto">
-            send complaint
-          </Button>
-        </form>
+        <ComplaintForm />
 
         <p className="mt-6 text-[13px] leading-relaxed text-[#9C8E7E]">
           Prefer email? Reach us at <a className="text-cinnamon underline" href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a>.

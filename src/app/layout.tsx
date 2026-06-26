@@ -8,6 +8,7 @@ import '@fontsource-variable/mulish';
 import '@fontsource-variable/caveat';
 import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
+import { CookieBanner } from '@/ui/components/CookieBanner';
 
 export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         </a>
         {children}
         <Toaster />
+        <CookieBanner />
       </body>
     </html>
   );

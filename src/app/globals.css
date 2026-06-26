@@ -151,6 +151,32 @@ body {
   will-change: transform;
 }
 
+/* Mobile menu / banner entrances. */
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes slidein {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes slideup {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 /* Reduced motion: freeze the morph on the drawing; doodles rest at base position. */
 @media (prefers-reduced-motion: reduce) {
   .morph-frame {

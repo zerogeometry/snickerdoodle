@@ -1,28 +1,21 @@
 'use client';
 
-import {
-  IconGift,
-  IconHeart,
-  IconHome,
-  IconLink,
-  IconLock,
-  IconPackage,
-  IconPlus,
-  IconUsers,
-  IconWand,
-} from '@tabler/icons-react';
+import { IconCalendarHeart, IconGift, IconHeart, IconLink, IconLock, IconPlus, IconUsers } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
-import { BottomTabBar, type Tab } from '@/ui/components/BottomTabBar';
+import { BottomTabBar } from '@/ui/components/BottomTabBar';
+import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
+import { APP_TABS } from '@/ui/components/appTabs';
 import { KeepsakeTile } from '@/ui/components/KeepsakeTile';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
 import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
+import { toast, useFamily, useKept, type VisibilityTier } from '@/lib/store';
 
 // ── keepsake doodle thumbnails ───────────────────────────────────────────────
 const HouseArt = (
@@ -103,13 +96,6 @@ const KEPT_COUNT: Record<Selector, string> = {
   Family: '41 kept together — every one still yours.',
 };
 
-const TABS: Tab[] = [
-  { label: 'Home', href: '/home', icon: IconHome },
-  { label: 'Create', href: '/catalogue', icon: IconWand },
-  { label: 'Family', href: '/family', icon: IconUsers },
-  { label: 'Orders', href: '/orders', icon: IconPackage },
-];
-
 function SectionLabel({ icon, children }: { icon: typeof IconHeart; children: ReactNode }) {
   return (
     <p className="flex items-center gap-2 font-display text-lg font-semibold text-cocoa">
@@ -119,37 +105,36 @@ function SectionLabel({ icon, children }: { icon: typeof IconHeart; children: Re
   );
 }
 
+const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', FAMILY: 'Family', EXTENDED: 'Extended' };
+
+type ActiveKeepsake = { keptId?: string; name: string; image?: string; tier: VisibilityTier };
+
 export default function FamilyHomePage() {
   const [selected, setSelected] = useState<Selector>('Olivia');
-  const [visibilityOpen, setVisibilityOpen] = useState(false);
   const [addMemberOpen, setAddMemberOpen] = useState(false);
   const [giftLinkOpen, setGiftLinkOpen] = useState(false);
+  const [active, setActive] = useState<ActiveKeepsake | null>(null);
+  const [staticVis, setStaticVis] = useState<Record<string, VisibilityTier>>({});
+
+  const kept = useKept((s) => s.items);
+  const setKeptVis = useKept((s) => s.setVisibility);
+  const addedMembers = useFamily((s) => s.members);
+
+  const members = [...MEMBERS, ...addedMembers];
   const keepsakes = KEEPSAKES[selected];
   const possessive = selected === 'Family' ? 'Family' : `${selected}'s`;
 
+  const saveVisibility = (tier: VisibilityTier) => {
+    if (!active) return;
+    if (active.keptId) setKeptVis(active.keptId, tier);
+    else setStaticVis((v) => ({ ...v, [active.name]: tier }));
+    toast(`visibility set to ${VIS_LABEL[tier].toLowerCase()}`);
+    setActive(null);
+  };
+
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
-      {/* Top nav (desktop) */}
-      <header className="hidden items-center justify-between border-b border-[#EDE2CD] bg-oat px-6 py-3.5 md:flex">
-        <Link href="/" className="font-display text-xl font-semibold text-cocoa">
-          snickerdoodle
-        </Link>
-        <nav className="flex items-center gap-5 text-sm text-[#7A6A58]">
-          <span className="font-bold text-cinnamon">Home</span>
-          <Link href="/catalogue" className="hover:text-cinnamon">
-            Create
-          </Link>
-          <Link href="/family" className="hover:text-cinnamon">
-            Family
-          </Link>
-          <Link href="/orders" className="hover:text-cinnamon">
-            Orders
-          </Link>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-cinnamon font-display text-xs font-bold text-cta-text">
-            S
-          </span>
-        </nav>
-      </header>
+      <AppDesktopNav active="Home" />
 
       <main id="main" className="flex-1">
         {/* Family-branded header */}
@@ -169,7 +154,7 @@ export default function FamilyHomePage() {
               Invite the whole family — even the extended bunch — to share keepsakes and never miss a birthday.
             </p>
             <div className="mt-4 flex gap-5 overflow-x-auto pb-1 sm:grid sm:grid-cols-6 sm:gap-3">
-              {MEMBERS.map((m) => (
+              {members.map((m) => (
                 <div key={m.name} className="flex-none">
                   <MemberAvatar
                     initial={m.initial}
@@ -207,19 +192,55 @@ export default function FamilyHomePage() {
             <SectionLabel icon={IconHeart}>{possessive} keepsakes</SectionLabel>
             <p className="mt-1 text-xs text-[#9C8E7E]">{KEPT_COUNT[selected]}</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-              {keepsakes.map((k) => (
-                <button key={k.name} type="button" onClick={() => setVisibilityOpen(true)} className="block text-left">
-                  <KeepsakeTile name={k.name} meta={k.meta} art={k.art} tint={k.tint} />
+              {kept.map((k) => (
+                <button
+                  key={k.id}
+                  type="button"
+                  onClick={() => setActive({ keptId: k.id, name: k.name, image: k.image, tier: k.visibility })}
+                  className="block text-left"
+                >
+                  <KeepsakeTile name={k.name} meta={k.meta} image={k.image} badge={VIS_LABEL[k.visibility]} />
                 </button>
               ))}
+              {keepsakes.map((k) => {
+                const tier = staticVis[k.name] ?? 'FAMILY';
+                return (
+                  <button
+                    key={k.name}
+                    type="button"
+                    onClick={() => setActive({ name: k.name, tier })}
+                    className="block text-left"
+                  >
+                    <KeepsakeTile name={k.name} meta={k.meta} art={k.art} tint={k.tint} badge={VIS_LABEL[tier]} />
+                  </button>
+                );
+              })}
               <Link
-                href="/studio"
+                href="/studio/new"
                 className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[#E0A268] bg-[#FCF1E3] text-cinnamon"
               >
                 <Icon icon={IconPlus} size={22} />
                 <span className="text-xs font-bold">create new</span>
               </Link>
             </div>
+          </section>
+
+          {/* Coming up */}
+          <section className="px-6 pb-2">
+            <SectionLabel icon={IconCalendarHeart}>Coming up</SectionLabel>
+            <Link
+              href="/catalogue"
+              className="mt-3 flex items-center gap-3.5 rounded-2xl border border-[#F0CF9C] bg-honey-band p-4 transition-transform hover:-translate-y-0.5"
+            >
+              <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-honey bg-[#FFFDF8] leading-none">
+                <span className="text-[10px] font-bold text-cinnamon">JUL</span>
+                <span className="font-display text-base font-semibold text-cocoa">14</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-display text-[15px] font-semibold text-cocoa">Olivia&apos;s birthday — in 3 weeks</h3>
+                <p className="mt-0.5 text-xs text-[#8A6F52]">Turn a recent drawing into something for the big day →</p>
+              </div>
+            </Link>
           </section>
 
           {/* Gift list */}
@@ -249,9 +270,16 @@ export default function FamilyHomePage() {
         </div>
       </main>
 
-      <BottomTabBar tabs={TABS} active="Home" />
+      <BottomTabBar tabs={APP_TABS} active="Home" />
 
-      <PerAssetVisibilityModal open={visibilityOpen} onClose={() => setVisibilityOpen(false)} />
+      <PerAssetVisibilityModal
+        open={!!active}
+        name={active?.name ?? ''}
+        image={active?.image}
+        tier={active?.tier ?? 'FAMILY'}
+        onClose={() => setActive(null)}
+        onSave={saveVisibility}
+      />
       <AddFamilyMemberModal open={addMemberOpen} onClose={() => setAddMemberOpen(false)} />
       <CreateGiftLinkModal open={giftLinkOpen} onClose={() => setGiftLinkOpen(false)} />
     </div>

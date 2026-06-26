@@ -1,13 +1,14 @@
 'use client';
 
-import { IconCards, IconShoppingBag, IconUsers, IconWand } from '@tabler/icons-react';
+import { IconShoppingBag } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { ProductCard } from '@/ui/components/ProductCard';
 import type { ProductKey } from '@/ui/components/ProductArt';
-import { BottomTabBar, type Tab } from '@/ui/components/BottomTabBar';
+import { BottomTabBar } from '@/ui/components/BottomTabBar';
+import { APP_TABS } from '@/ui/components/appTabs';
 import { basketCount, toast, useBasket, useUpload } from '@/lib/store';
 
 type CatalogueItem = {
@@ -32,13 +33,6 @@ const PRODUCTS: CatalogueItem[] = [
 ];
 
 const CATEGORIES = ['all', 'cards & prints', 'home', 'wear', 'books', 'gifts'];
-
-const TABS: Tab[] = [
-  { label: 'Range', href: '/catalogue', icon: IconCards },
-  { label: 'Create', href: '/studio/new', icon: IconWand },
-  { label: 'Family', href: '/home', icon: IconUsers },
-  { label: 'Basket', href: '/checkout', icon: IconShoppingBag },
-];
 
 export default function CataloguePage() {
   const [category, setCategory] = useState('all');
@@ -106,7 +100,7 @@ export default function CataloguePage() {
         </div>
       </main>
 
-      <BottomTabBar tabs={TABS} active="Range" />
+      <BottomTabBar tabs={APP_TABS} active="Create" />
     </div>
   );
 }

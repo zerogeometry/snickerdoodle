@@ -1,8 +1,7 @@
-import { IconMenu2 } from '@tabler/icons-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { Icon } from '@/ui/primitives/Icon';
 import { Button } from '@/ui/primitives/Button';
+import { MarketingMobileMenu } from '@/ui/components/MarketingMobileMenu';
 
 /** Marketing surface (logged-out): nav + footer, goal is "start creating". */
 export default function MarketingLayout({ children }: { children: ReactNode }) {
@@ -30,9 +29,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
               start creating
             </Button>
           </div>
-          <button type="button" aria-label="Open menu" className="md:hidden">
-            <Icon icon={IconMenu2} size={26} className="text-[#7A6A58]" />
-          </button>
+          <MarketingMobileMenu />
         </nav>
       </header>
 
@@ -52,6 +49,9 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             </Link>
             <Link href="/trust/cookies" className="hover:text-cinnamon">
               cookies
+            </Link>
+            <Link href="/trust/data-complaint" className="hover:text-cinnamon">
+              data complaint
             </Link>
           </nav>
           <Button href="/start-creating" size="sm" className="text-xs">
