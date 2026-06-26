@@ -106,3 +106,62 @@ export async function ingestOriginalAsset(
 
   return { assetId, key, sha256: sanitised.sha256, byteSize: sanitised.byteSize, contentType: sanitised.contentType, moderationStatus: verdict.status };
 }
+
+export interface EphemeralIngestResult {
+  assetId: string;
+  claimId: string;
+  key: string;
+  moderationStatus: ModerationState;
+}
+
+/**
+ * Ingest a PRE-ACCOUNT guest upload as an ephemeral, unkept, claim-scoped asset
+ * (the buy-flow "wow" without an account wall). No family, no controller — it's
+ * owned by a single-use claim the caller hands back in a signed cookie. EXIF is
+ * stripped, the content-safety gate runs, and the upload is retention-scheduled
+ * so a child's image never lingers if it's never kept. On keep/sign-in it is
+ * adopted into the new family (②c). The terms accepted at upload are recorded as
+ * the lawful basis for processing it.
+ */
+export async function ingestEphemeralUpload(
+  db: DbHandle,
+  input: { buffer: Buffer; kind: AssetKind; termsVersion: string; now?: Date },
+): Promise<EphemeralIngestResult> {
+  const sanitised = await stripExif(input.buffer); // EXIF/GPS gone before storage
+  const assetId = randomUUID();
+  const claimId = randomUUID();
+  const key = originalKey(assetId);
+  await putObject(key, sanitised.buffer, sanitised.contentType);
+
+  const now = input.now ?? new Date();
+  await db.insert(assets).values({
+    id: assetId,
+    familyId: null, // no family yet — gated by the claim, adopted on keep
+    kind: input.kind,
+    uploaderAccountId: null,
+    controllerAccountId: null,
+    ephemeralClaimId: claimId,
+    visibility: 'FAMILY', // privacy by default (moot until adopted)
+    keptInHome: false,
+    purgeAfter: new Date(now.getTime() + RETENTION_DAYS * 86_400_000),
+    termsAcceptedAt: now,
+    termsVersion: input.termsVersion,
+  });
+
+  const { bucket } = getS3();
+  await db.insert(storageObjects).values({
+    assetId,
+    objectClass: 'ORIGINAL',
+    bucket,
+    key,
+    contentType: sanitised.contentType,
+    byteSize: sanitised.byteSize,
+    sha256: sanitised.sha256,
+    writeOnce: true,
+    exifStripped: true,
+    kmsKeyAlias: process.env.S3_KMS_KEY_ALIAS ?? null,
+  });
+
+  const verdict = await moderateAndRecord(db, { assetId, familyId: null, buffer: sanitised.buffer, sha256: sanitised.sha256 });
+  return { assetId, claimId, key, moderationStatus: verdict.status };
+}

@@ -1,7 +1,9 @@
+import { cookies } from 'next/headers';
 import { auth } from '@/auth';
 import { getDb } from '@/db/client';
 import type { ViewerContext } from '@/authz';
 import { resolveViewerContext } from './assets';
+import { UPLOAD_CLAIM_COOKIE, verifyClaims } from './uploadClaims';
 
 export interface CurrentAccount {
   id: string;
@@ -15,6 +17,13 @@ export async function getCurrentAccount(): Promise<CurrentAccount | null> {
   const user = session?.user;
   if (!user?.id || !user.email) return null;
   return { id: user.id, email: user.email, name: user.name ?? null };
+}
+
+/** The upload claims a guest holds (from the signed cookie) — for their own
+ * ephemeral drafts. Empty for a fresh visitor or a tampered cookie. */
+export async function getUploadClaims(): Promise<string[]> {
+  const jar = await cookies();
+  return verifyClaims(jar.get(UPLOAD_CLAIM_COOKIE)?.value);
 }
 
 /**

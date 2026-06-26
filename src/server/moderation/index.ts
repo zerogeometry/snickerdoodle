@@ -35,7 +35,7 @@ export async function moderateImage(
  */
 export async function moderateAndRecord(
   db: DbHandle,
-  input: { assetId: string; familyId: string; buffer: Buffer; sha256: string; now?: Date },
+  input: { assetId: string; familyId: string | null; buffer: Buffer; sha256: string; now?: Date },
   providers?: ModerationProviders,
 ): Promise<ModerationVerdict> {
   const verdict = await moderateImage({ buffer: input.buffer, sha256: input.sha256 }, providers);

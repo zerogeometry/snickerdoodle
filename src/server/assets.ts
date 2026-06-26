@@ -70,6 +70,31 @@ export async function resolveViewerContext(
   return { accountId, membership };
 }
 
+/**
+ * Resolve the authz viewer for a SPECIFIC asset, honouring EITHER a signed-in
+ * member (their membership in the asset's family) OR a held upload claim (for an
+ * ephemeral pre-account draft). This is the single bridge the guest + member
+ * buy-flow actions use, so the same canViewAsset chokepoint governs both paths.
+ */
+export async function resolveAssetViewer(
+  db: DbHandle,
+  assetId: string,
+  accountId: string | null,
+  uploadClaims: string[],
+): Promise<ViewerContext> {
+  const [a] = await db
+    .select({ familyId: assets.familyId, ephemeralClaimId: assets.ephemeralClaimId })
+    .from(assets)
+    .where(eq(assets.id, assetId));
+  if (!a) return { accountId, membership: null };
+  // an ephemeral draft → the viewer must hold its matching claim
+  if (a.ephemeralClaimId && uploadClaims.includes(a.ephemeralClaimId)) {
+    return { accountId, membership: null, uploadClaim: a.ephemeralClaimId };
+  }
+  // a real asset → resolve the member's family membership (claims never apply)
+  return resolveViewerContext(db, accountId, a.familyId);
+}
+
 /** Every asset in a family this viewer is allowed to SEE (filtered via authz). */
 export async function listViewableAssets(
   db: DbHandle,

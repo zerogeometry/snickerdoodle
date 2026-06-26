@@ -10,10 +10,13 @@ const PER_CREATION = Number(process.env.ML_BUDGET_PER_CREATION ?? 20);
 const PER_ACCOUNT_30D = Number(process.env.ML_BUDGET_PER_ACCOUNT ?? 500);
 const MS_30D = 30 * 86_400_000;
 
-/** Per-creation and per-account budget caps on the self-hosted image ops. */
-export async function assertMlBudget(db: DbHandle, accountId: string, assetId: string): Promise<void> {
+/** Per-creation and per-account budget caps on the self-hosted image ops. The
+ * per-account cap applies only to a signed-in account; a guest op is bounded by
+ * the per-creation cap alone (keyed on the asset). */
+export async function assertMlBudget(db: DbHandle, accountId: string | null, assetId: string): Promise<void> {
   const perAsset = await db.select({ id: mlOperations.id }).from(mlOperations).where(eq(mlOperations.assetId, assetId));
   if (perAsset.length >= PER_CREATION) throw new Error('ml budget exceeded for this creation');
+  if (accountId === null) return; // guest: per-creation cap only
   const since = new Date(Date.now() - MS_30D);
   const perAccount = await db
     .select({ id: mlOperations.id })
@@ -34,8 +37,7 @@ export interface MagicResult {
  * never touched.
  */
 export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<MagicResult> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
-  if (!viewer.accountId) throw new Error('must be signed in');
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate (member OR upload-claim holder)
   await assertMlBudget(db, viewer.accountId, assetId);
 
   const [orig] = await db

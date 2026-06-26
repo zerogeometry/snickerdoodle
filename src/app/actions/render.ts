@@ -1,11 +1,9 @@
 'use server';
 
-import { eq } from 'drizzle-orm';
-import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
+import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { renderPrintFile } from '@/server/print/render';
-import { getCurrentAccount } from '@/server/session';
+import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 
 export type RenderPreviewResult =
@@ -15,8 +13,9 @@ export type RenderPreviewResult =
 /**
  * Render the REAL print-ready file for the current placement and hand back a
  * signed URL so the editor can show the actual output (bleed + DPI), not a CSS
- * approximation. Authz-gated end to end; a too-low-res placement is reported as
- * blocked rather than rendered.
+ * approximation. Gated end to end — for a signed-in member via their family
+ * membership, for a guest via the upload claim on their own ephemeral draft. A
+ * too-low-res placement is reported as blocked rather than rendered.
  */
 export async function renderPreviewAction(input: {
   assetId: string;
@@ -25,12 +24,9 @@ export async function renderPreviewAction(input: {
   sourceObjectId?: string;
 }): Promise<RenderPreviewResult> {
   const account = await getCurrentAccount();
-  if (!account) return { ok: false, needsAuth: true };
-
+  const claims = await getUploadClaims();
   const db = getDb();
-  const [asset] = await db.select({ familyId: assets.familyId }).from(assets).where(eq(assets.id, input.assetId));
-  if (!asset) return { ok: false };
-  const viewer = await resolveViewerContext(db, account.id, asset.familyId);
+  const viewer = await resolveAssetViewer(db, input.assetId, account?.id ?? null, claims);
 
   try {
     const res = await renderPrintFile(db, viewer, {
@@ -50,6 +46,7 @@ export async function renderPreviewAction(input: {
       upscaled: res.upscaled,
     };
   } catch (e) {
-    return { ok: false, blocked: String(e).includes('low-res') };
+    const msg = String(e);
+    return { ok: false, blocked: msg.includes('low-res'), needsAuth: account === null && viewer.uploadClaim == null };
   }
 }

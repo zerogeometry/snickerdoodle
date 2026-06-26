@@ -224,6 +224,10 @@ export const assets = pgTable(
     // Single-use claim for a pre-account ephemeral upload (the signed cookie the
     // guest holds). Authz grants access to THIS asset alone when the claim matches.
     ephemeralClaimId: uuid('ephemeral_claim_id').unique(),
+    // Lawful-basis record for a guest upload: the terms accepted at the upload
+    // moment (the processing info lives in the terms). Travels with the asset.
+    termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+    termsVersion: text('terms_version'),
     // Privacy-by-default at the DB level: no insert path can default wider.
     visibility: visibilityTier('visibility').notNull().default('FAMILY'),
     // Content-safety gate (D8). An asset cannot reach a print order unless CLEAR.
@@ -397,9 +401,8 @@ export const mlOperations = pgTable(
   'ml_operations',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    accountId: uuid('account_id')
-      .notNull()
-      .references(() => accounts.id, { onDelete: 'cascade' }),
+    // NULL for a pre-account guest magic edit — budgeted per-creation (assetId) instead.
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }),
     op: mlOp('op').notNull(),
     assetId: uuid('asset_id').references(() => assets.id, { onDelete: 'set null' }),
     createdAt,
