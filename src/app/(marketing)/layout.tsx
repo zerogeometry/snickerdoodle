@@ -40,11 +40,24 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <footer className="relative z-10 flex items-center justify-between gap-4 bg-[#F1E7D4] px-6 py-5 text-xs text-[#6F6358]">
-        <span>snickerdoodle · made with care in the UK</span>
-        <Button href="/start-creating" size="sm" className="text-xs">
-          start creating
-        </Button>
+      <footer className="relative z-10 bg-[#F1E7D4] px-6 py-5 text-xs text-[#6F6358]">
+        <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
+          <span>snickerdoodle · made with care in the UK</span>
+          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link href="/trust/family-promise" className="hover:text-cinnamon">
+              our promise
+            </Link>
+            <Link href="/trust/privacy" className="hover:text-cinnamon">
+              privacy
+            </Link>
+            <Link href="/trust/cookies" className="hover:text-cinnamon">
+              cookies
+            </Link>
+          </nav>
+          <Button href="/start-creating" size="sm" className="text-xs">
+            start creating
+          </Button>
+        </div>
       </footer>
     </div>
   );
