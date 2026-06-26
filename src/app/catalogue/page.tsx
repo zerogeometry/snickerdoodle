@@ -1,6 +1,6 @@
 'use client';
 
-import { IconShoppingBag } from '@tabler/icons-react';
+import { IconArrowLeft, IconShoppingBag } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Chip } from '@/ui/primitives/Chip';
@@ -50,13 +50,20 @@ export default function CataloguePage() {
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/" className="font-display text-xl font-semibold text-cocoa">
-          snickerdoodle
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Link href="/start-creating" aria-label="Back to your drawing">
+            <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
+          </Link>
+          <Link href="/" className="font-display text-xl font-semibold text-cocoa">
+            snickerdoodle
+          </Link>
+        </div>
         <div className="flex items-center gap-4">
-          <span className="hidden text-xs text-[#6F6358] sm:inline">
-            your artwork: <b className="font-semibold text-cocoa">{upload ? 'your drawing' : "Olivia's house"}</b>
-          </span>
+          {upload ? (
+            <span className="hidden text-xs text-[#6F6358] sm:inline">
+              your artwork: <b className="font-semibold text-cocoa">your drawing</b>
+            </span>
+          ) : null}
           <Link href="/checkout" aria-label={`Basket, ${count} items`} className="relative text-[#7A6A58] hover:text-cinnamon">
             <Icon icon={IconShoppingBag} size={22} />
             {count > 0 ? (
@@ -70,10 +77,12 @@ export default function CataloguePage() {
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
         <h1 className="font-display text-2xl font-semibold md:text-3xl">
-          {upload ? 'Your' : 'Olivia’s'} artwork, on <span className="text-cinnamon">40+ products</span>.
+          {upload ? 'Your artwork' : 'Any drawing'}, on a <span className="text-cinnamon">whole family range</span>.
         </h1>
         <p className="mt-1 text-sm text-[#6F6358]">
-          One drawing. A whole family range. Preview is on the house — tap to add to your basket.
+          {upload
+            ? 'One drawing. A whole family range — tap a product to add it to your basket.'
+            : 'Upload a drawing and watch it land on everything. Tap a product to start.'}
         </p>
 
         <div className="mt-4 flex gap-2 overflow-x-auto pb-1">

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 
@@ -44,18 +45,25 @@ type BasketState = {
   clear: () => void;
   seed: (items: Omit<BasketItem, 'qty'>[]) => void;
 };
-export const useBasket = create<BasketState>((set) => ({
-  items: [],
-  add: (item) =>
-    set((s) => {
-      const existing = s.items.find((x) => x.id === item.id);
-      if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
-      return { items: [...s.items, { ...item, qty: 1 }] };
+export const useBasket = create<BasketState>()(
+  persist(
+    (set) => ({
+      items: [],
+      add: (item) =>
+        set((s) => {
+          const existing = s.items.find((x) => x.id === item.id);
+          if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
+          return { items: [...s.items, { ...item, qty: 1 }] };
+        }),
+      remove: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
+      clear: () => set({ items: [] }),
+      seed: (items) => set({ items: items.map((i) => ({ ...i, qty: 1 })) }),
     }),
-  remove: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
-  clear: () => set({ items: [] }),
-  seed: (items) => set({ items: items.map((i) => ({ ...i, qty: 1 })) }),
-}));
+    // Survive a reload — incl. the full reload the magic-link login triggers — so
+    // the basket isn't emptied mid-flow. Per-tab (sessionStorage); only the items.
+    { name: 'sd_basket', storage: createJSONStorage(() => sessionStorage), partialize: (s) => ({ items: s.items }) },
+  ),
+);
 export const basketCount = (items: BasketItem[]) => items.reduce((n, i) => n + i.qty, 0);
 export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n + i.pricePence * i.qty, 0);
 

@@ -20,9 +20,13 @@ export default function LoginPage() {
     setBusy(true);
     setError(false);
     try {
+      // Land them back where they were headed (?next), e.g. the guest
+      // place→keep→checkout flow. Only internal paths — never an open redirect.
+      const raw = new URLSearchParams(window.location.search).get('next');
+      const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/home';
       // Auth.js emails (here: logs) a one-tap magic link; identity is verified
       // when they open it. We stay on the page and show the "check your email" state.
-      await signIn('email', { email: email.trim(), redirect: false, callbackUrl: '/home' });
+      await signIn('email', { email: email.trim(), redirect: false, callbackUrl: next });
       setSent(true);
     } catch {
       setError(true);

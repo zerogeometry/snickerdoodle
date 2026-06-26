@@ -79,7 +79,7 @@ export default function StartCreatingPage() {
       const res = await keepCreation(fd);
       if (res.needsAuth) {
         toast('log in to keep this safely');
-        router.push('/login');
+        router.push('/login?next=/start-creating');
         return;
       }
       if (!res.ok) {

@@ -61,9 +61,11 @@ export default function CheckoutPage() {
       if (!res.ok) {
         if (res.needsAuth) {
           consumedRef.current = false; // keep the pending placement for after login
+          toast('one quick sign-in to finish keeping this');
           router.push('/login?next=/checkout');
           return;
         }
+        toast('hmm — couldn’t add that, try again');
         sessionStorage.removeItem('sd_pending_place');
         return;
       }
