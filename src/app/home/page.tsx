@@ -20,6 +20,9 @@ import { Icon } from '@/ui/primitives/Icon';
 import { BottomTabBar, type Tab } from '@/ui/components/BottomTabBar';
 import { KeepsakeTile } from '@/ui/components/KeepsakeTile';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
+import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
+import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
+import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 
 // ── keepsake doodle thumbnails ───────────────────────────────────────────────
 const HouseArt = (
@@ -118,6 +121,9 @@ function SectionLabel({ icon, children }: { icon: typeof IconHeart; children: Re
 
 export default function FamilyHomePage() {
   const [selected, setSelected] = useState<Selector>('Olivia');
+  const [visibilityOpen, setVisibilityOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
+  const [giftLinkOpen, setGiftLinkOpen] = useState(false);
   const keepsakes = KEEPSAKES[selected];
   const possessive = selected === 'Family' ? 'Family' : `${selected}'s`;
 
@@ -174,7 +180,11 @@ export default function FamilyHomePage() {
                   />
                 </div>
               ))}
-              <button type="button" className="flex flex-none flex-col items-center text-center">
+              <button
+                type="button"
+                onClick={() => setAddMemberOpen(true)}
+                className="flex flex-none flex-col items-center text-center"
+              >
                 <span className="flex h-[46px] w-[46px] items-center justify-center rounded-full border-[1.5px] border-dashed border-[#C99B6E] text-cinnamon">
                   <Icon icon={IconPlus} size={20} />
                 </span>
@@ -198,7 +208,9 @@ export default function FamilyHomePage() {
             <p className="mt-1 text-xs text-[#9C8E7E]">{KEPT_COUNT[selected]}</p>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
               {keepsakes.map((k) => (
-                <KeepsakeTile key={k.name} name={k.name} meta={k.meta} art={k.art} tint={k.tint} />
+                <button key={k.name} type="button" onClick={() => setVisibilityOpen(true)} className="block text-left">
+                  <KeepsakeTile name={k.name} meta={k.meta} art={k.art} tint={k.tint} />
+                </button>
               ))}
               <Link
                 href="/studio"
@@ -223,7 +235,7 @@ export default function FamilyHomePage() {
                   They tap your link, the cart&apos;s already filled — checkout in under a minute.
                 </p>
               </div>
-              <Button size="md" className="shrink-0 whitespace-nowrap">
+              <Button size="md" className="shrink-0 whitespace-nowrap" onClick={() => setGiftLinkOpen(true)}>
                 <Icon icon={IconLink} size={16} /> share a ready-to-buy link
               </Button>
             </div>
@@ -238,6 +250,10 @@ export default function FamilyHomePage() {
       </main>
 
       <BottomTabBar tabs={TABS} active="Home" />
+
+      <PerAssetVisibilityModal open={visibilityOpen} onClose={() => setVisibilityOpen(false)} />
+      <AddFamilyMemberModal open={addMemberOpen} onClose={() => setAddMemberOpen(false)} />
+      <CreateGiftLinkModal open={giftLinkOpen} onClose={() => setGiftLinkOpen(false)} />
     </div>
   );
 }
