@@ -3,9 +3,10 @@ import { canViewAsset, type AssetRef } from '@/authz';
 import { assets, printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
+import type { DbHandle } from './db';
 import { ensureHomeFamily } from './onboarding';
-import { resolveViewerContext } from './assets';
-import { getCurrentAccount } from './session';
+import { getViewableAssetOrThrow, resolveAssetViewer, resolveViewerContext } from './assets';
+import { getCurrentAccount, getUploadClaims } from './session';
 
 export interface StudioTemplate {
   printWidthPx: number;
@@ -64,7 +65,12 @@ export async function loadStudioData(): Promise<StudioData | null> {
     keepsakes.push({ id: r.asset.id, imageUrl: await presignDownload(r.key, 600) });
   }
 
-  // printable product variants (those with a print template)
+  return { keepsakes, variants: await loadPrintableVariants(db) };
+}
+
+/** The printable product variants (those with a print template) — shared by the
+ * member and guest-draft editors. */
+async function loadPrintableVariants(db: DbHandle): Promise<StudioVariant[]> {
   const vrows = await db
     .select({ v: productVariants, p: products, t: printTemplates })
     .from(productVariants)
@@ -72,7 +78,7 @@ export async function loadStudioData(): Promise<StudioData | null> {
     .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
     .where(and(eq(products.active, true), eq(productVariants.active, true)));
 
-  const variants: StudioVariant[] = vrows.map(({ v, p, t }) => ({
+  return vrows.map(({ v, p, t }) => ({
     id: v.id,
     productKey: p.key,
     label: p.label,
@@ -85,6 +91,34 @@ export async function loadStudioData(): Promise<StudioData | null> {
       requiredDpi: t.requiredDpi,
     },
   }));
+}
 
-  return { keepsakes, variants };
+/**
+ * The editor for a SINGLE pre-account ephemeral draft (the guest buy flow): the
+ * viewer is resolved by membership OR the held upload claim, and the asset is
+ * gated through the same canViewAsset chokepoint. Returns null if the draft isn't
+ * accessible (no/expired claim, blocked, or gone) so the page can send them back
+ * to start a new one.
+ */
+export async function loadDraftStudioData(assetId: string): Promise<StudioData | null> {
+  const db = getDb();
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const viewer = await resolveAssetViewer(db, assetId, account?.id ?? null, claims);
+
+  try {
+    await getViewableAssetOrThrow(db, assetId, viewer); // gate (also rejects BLOCKED)
+  } catch {
+    return null;
+  }
+  const [obj] = await db
+    .select({ key: storageObjects.key })
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!obj?.key) return null;
+
+  return {
+    keepsakes: [{ id: assetId, imageUrl: await presignDownload(obj.key, 600) }],
+    variants: await loadPrintableVariants(db),
+  };
 }

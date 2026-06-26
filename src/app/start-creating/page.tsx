@@ -11,6 +11,7 @@ import { ProductCard } from '@/ui/components/ProductCard';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { toast, useUpload } from '@/lib/store';
 import { keepCreation } from '@/app/actions/keep';
+import { startGuestUpload } from '@/app/actions/guestUpload';
 
 const RANGE: { name: string; price: string; product: ProductKey; featured?: boolean }[] = [
   { name: 'framed print', price: '£22', product: 'framedPrint' },
@@ -28,6 +29,8 @@ export default function StartCreatingPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
   const [keeping, setKeeping] = useState(false);
+  const [placing, setPlacing] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -35,6 +38,33 @@ export default function StartCreatingPage() {
     const reader = new FileReader();
     reader.onload = () => setUpload({ dataUrl: String(reader.result), name: file.name });
     reader.readAsDataURL(file);
+  };
+
+  // Place it on a real product: the bytes go to the server as a pre-account
+  // ephemeral draft (EXIF-stripped, content-safety-checked, retention-scheduled),
+  // and we open the real editor with the live DPI gate + magic edits. No account
+  // wall — keeping/buying is the gentle next step.
+  const place = async () => {
+    if (!upload || placing || !termsAccepted) return;
+    setPlacing(true);
+    try {
+      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+      const fd = new FormData();
+      fd.append('image', blob, upload.name || 'drawing.png');
+      fd.append('termsAccepted', 'true');
+      const res = await startGuestUpload(fd);
+      if (res.blocked) {
+        toast('we couldn’t use that image — try another');
+        return;
+      }
+      if (!res.ok || !res.assetId) {
+        toast('hmm, that didn’t work — try again');
+        return;
+      }
+      router.push(`/studio/position?draft=${res.assetId}`);
+    } finally {
+      setPlacing(false);
+    }
   };
 
   // Keep for real: the bytes go to the server, get EXIF-stripped, and are stored
@@ -151,12 +181,13 @@ export default function StartCreatingPage() {
                 ))}
               </div>
 
-              <div className="mt-7 hidden flex-wrap gap-3 md:flex">
-                <Button href="/catalogue" size="lg">
-                  see the full range →
+              <TermsConsent checked={termsAccepted} onChange={setTermsAccepted} className="mt-6 hidden md:flex" />
+              <div className="mt-4 hidden flex-wrap gap-3 md:flex">
+                <Button size="lg" onClick={place} disabled={placing || !termsAccepted}>
+                  {placing ? 'getting it ready…' : 'place it on a product →'}
                 </Button>
-                <Button href="/studio/new" variant="secondary" size="lg">
-                  open in studio
+                <Button href="/catalogue" variant="secondary" size="lg">
+                  see the full range →
                 </Button>
                 <Button variant="ghost" size="lg" onClick={keep} disabled={keeping}>
                   {keeping ? 'keeping…' : 'keep this'}
@@ -167,12 +198,13 @@ export default function StartCreatingPage() {
 
           {/* Mobile: pinned actions */}
           <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#EFE6D6] bg-oat px-4 pb-5 pt-3 md:hidden">
-            <Button href="/catalogue" size="lg" className="w-full">
-              see the full range →
+            <TermsConsent checked={termsAccepted} onChange={setTermsAccepted} className="mb-2.5 flex" />
+            <Button size="lg" className="w-full" onClick={place} disabled={placing || !termsAccepted}>
+              {placing ? 'getting it ready…' : 'place it on a product →'}
             </Button>
             <div className="mt-1.5 flex justify-center gap-4 text-sm">
-              <Link href="/studio/new" className="font-bold text-cinnamon">
-                open in studio
+              <Link href="/catalogue" className="font-bold text-cinnamon">
+                see the full range →
               </Link>
               <button type="button" onClick={keep} disabled={keeping} className="font-bold text-cinnamon disabled:opacity-60">
                 {keeping ? 'keeping…' : 'keep this'}
@@ -182,5 +214,34 @@ export default function StartCreatingPage() {
         </main>
       )}
     </div>
+  );
+}
+
+/** The terms reference + consent at the upload moment — the lawful basis for
+ * processing the drawing (the detail lives in the linked terms). */
+function TermsConsent({
+  checked,
+  onChange,
+  className = '',
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  className?: string;
+}) {
+  return (
+    <label className={`items-start gap-2 text-[12px] leading-relaxed text-[#6F6358] ${className}`}>
+      <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-cta" />
+      <span>
+        I agree to the{' '}
+        <Link href="/trust/terms" className="font-semibold text-cinnamon underline">
+          terms
+        </Link>{' '}
+        &amp;{' '}
+        <Link href="/trust/privacy" className="font-semibold text-cinnamon underline">
+          privacy notice
+        </Link>
+        . we use your drawing to make your previews &amp; products — it&apos;s deleted within 30 days unless you keep it.
+      </span>
+    </label>
   );
 }

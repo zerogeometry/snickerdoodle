@@ -8,7 +8,7 @@ import { UPLOAD_CLAIM_COOKIE, signClaims, verifyClaims } from '@/server/uploadCl
 
 /** The terms version a guest accepts at the upload moment. Bump on any change so
  * the recorded consent always points at the exact terms that were shown. */
-export const TERMS_VERSION = '2026-06-26';
+const TERMS_VERSION = '2026-06-26';
 
 /**
  * Start a PRE-ACCOUNT upload (the no-account-wall wow flow). The guest accepts

@@ -23,7 +23,7 @@ import type { StudioData, StudioVariant } from '@/server/studio';
 
 const PREVIEW_W = 360; // on-screen canvas width in CSS px
 
-export function Positioner({ data }: { data: StudioData }) {
+export function Positioner({ data, draft = false }: { data: StudioData; draft?: boolean }) {
   const [assetIdx, setAssetIdx] = useState(0);
   const [variantId, setVariantId] = useState(data.variants[0]?.id ?? '');
   const [tf, setTf] = useState<Transform>({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
@@ -107,6 +107,17 @@ export function Positioner({ data }: { data: StudioData }) {
 
   // Capture the placement onto the basket line. The server re-clamps + freezes it.
   const add = () => {
+    // A pre-account ephemeral draft isn't orderable until it's kept (adopted into a
+    // family). Send the guest to the keep/sign-in moment with their placement intact.
+    if (draft) {
+      sessionStorage.setItem(
+        'sd_pending_place',
+        JSON.stringify({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId ?? null }),
+      );
+      toast('one quick step to keep & order ✨');
+      router.push('/login?next=/checkout');
+      return;
+    }
     addToBasket({
       id: `pos-${keepsake.id}-${variant.id}`,
       name: variant.label,
@@ -257,7 +268,8 @@ export function Positioner({ data }: { data: StudioData }) {
           </div>
 
           <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
-            <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant.pricePence)}
+            <Icon icon={IconShoppingBag} size={16} />{' '}
+            {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
           </Button>
           <button
             type="button"
