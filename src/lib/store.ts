@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { ProductKey } from '@/ui/components/ProductArt';
+import { DELIVERY_PENCE, formatPence } from '@/pricing';
 
 /**
  * Lightweight client-side stores so the docs/03 flows are walkable end-to-end
@@ -10,12 +11,9 @@ import type { ProductKey } from '@/ui/components/ProductArt';
 
 export type VisibilityTier = 'ONLY_ME' | 'FAMILY' | 'EXTENDED';
 
-// ── money helpers ────────────────────────────────────────────────────────────
-export const DELIVERY_PENCE = 399;
-export function gbp(pence: number): string {
-  const pounds = pence / 100;
-  return Number.isInteger(pounds) ? `£${pounds}` : `£${pounds.toFixed(2)}`;
-}
+// ── money helpers (re-exported from the server-trusted pricing module) ───────
+export { DELIVERY_PENCE };
+export const gbp = formatPence;
 
 // ── the uploaded drawing (from Start Creating / camera) ──────────────────────
 export type Upload = { dataUrl: string; name: string } | null;

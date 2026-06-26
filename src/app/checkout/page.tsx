@@ -3,21 +3,15 @@
 import { IconArrowLeft, IconGift, IconHeart, IconLock, IconShieldCheck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { CartLineItem } from '@/ui/components/CartLineItem';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
-import {
-  basketSubtotal,
-  DELIVERY_PENCE,
-  gbp,
-  toast,
-  useBasket,
-  useOrders,
-  type BasketItem,
-} from '@/lib/store';
+import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket, useOrders } from '@/lib/store';
+import { quoteBasket } from '@/app/actions/quote';
+import type { Quote } from '@/pricing';
 
 const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
   { id: 'addon-card', product: 'card', name: 'card', pricePence: 400 },
@@ -35,10 +29,31 @@ export default function CheckoutPage() {
 
   const [gift, setGift] = useState(false);
   const [email, setEmail] = useState('');
+  const [quote, setQuote] = useState<Quote | null>(null);
 
-  const subtotal = basketSubtotal(items);
-  const total = items.length ? subtotal + DELIVERY_PENCE : 0;
   const empty = items.length === 0;
+
+  // The authoritative total comes from the server — it re-prices every line from
+  // the trusted catalogue, so the client can't influence what's charged.
+  useEffect(() => {
+    let live = true;
+    if (empty) {
+      setQuote(null);
+      return;
+    }
+    quoteBasket({ items: items.map((i) => ({ productKey: i.product, qty: i.qty })), gift }).then((q) => {
+      if (live) setQuote(q);
+    });
+    return () => {
+      live = false;
+    };
+  }, [items, gift, empty]);
+
+  // Optimistic client figures until the server quote lands (then it governs).
+  const subtotalPence = quote?.subtotalPence ?? basketSubtotal(items);
+  const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
+  const savingPence = quote?.joinSavingPence ?? 0;
+  const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
 
   const placeOrder = () => {
     if (empty) return;
@@ -52,11 +67,17 @@ export default function CheckoutPage() {
     <dl className="mt-3 space-y-2 text-[13px] text-[#5F564C]">
       <div className="flex justify-between">
         <dt>Subtotal</dt>
-        <dd>{gbp(subtotal)}</dd>
+        <dd>{gbp(subtotalPence)}</dd>
       </div>
+      {savingPence > 0 ? (
+        <div className="flex justify-between text-green-save">
+          <dt>Family saving (5%)</dt>
+          <dd>−{gbp(savingPence)}</dd>
+        </div>
+      ) : null}
       <div className="flex justify-between">
         <dt>Delivery</dt>
-        <dd>{gbp(DELIVERY_PENCE)}</dd>
+        <dd>{gbp(deliveryPence)}</dd>
       </div>
       <div className="flex justify-between border-t border-[#EDE2CD] pt-2 text-base font-extrabold text-cocoa">
         <dt>Total</dt>
