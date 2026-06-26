@@ -450,7 +450,13 @@ export const products = pgTable('products', {
   key: text('key').notNull().unique(), // matches today's productKey, e.g. 'framedPrint'
   category: productCategory('category').notNull(),
   label: text('label').notNull(),
-  blurb: text('blurb'),
+  blurb: text('blurb'), // short tagline on the tile
+  // The expandable product description + specs (material/dimensions/finish). These
+  // are POPULATED BY THE PRODIGI CATALOGUE SYNC (P3); seeded with brand-voice
+  // placeholders for now. The blurb headline stays in our voice; specs come from
+  // Prodigi.
+  description: text('description'),
+  specs: jsonb('specs'),
   active: boolean('active').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
   createdAt,
@@ -463,10 +469,14 @@ export const productVariants = pgTable(
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
-    sku: text('sku').notNull().unique(), // internal sku, e.g. 'PRINT-A4-FRAME'
+    sku: text('sku').notNull().unique(), // internal sku, e.g. 'framedPrint-A4-oak'
     label: text('label').notNull(),
+    // Size / colour / finish axes (Prodigi-shaped, e.g. { size: 'A4', colour: 'oak' }).
+    attributes: jsonb('attributes').$type<Record<string, string>>(),
     pricePence: integer('price_pence').notNull(), // PRICE lives here — pricing reads this
     currency: text('currency').notNull().default('GBP'),
+    isDefault: boolean('is_default').notNull().default(false), // the variant a quick-add uses
+    sortOrder: integer('sort_order').notNull().default(0),
     active: boolean('active').notNull().default(true),
     createdAt,
   },

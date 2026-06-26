@@ -1,13 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariants, storageObjects } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import type { DbHandle } from './db';
 import { resolveViewerContext } from './assets';
-import { getCatalogue } from './catalogue';
+import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
 
 function newRef(): string {
   const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
@@ -59,10 +59,8 @@ export async function placeOrder(
   // The valid input lines align 1:1 (same order) with the priced lines.
   const valid = input.items.filter((l) => inCatalogue(catalogue, l.productKey) && clampQty(l.qty) > 0);
   const keys = [...new Set(valid.map((l) => l.productKey))];
-  const variantRows = keys.length
-    ? await db.select({ id: productVariants.id, sku: productVariants.sku }).from(productVariants).where(inArray(productVariants.sku, keys))
-    : [];
-  const variantByKey = new Map(variantRows.map((r) => [r.sku, r.id]));
+  // Resolve each line key (product key → default variant, or variant sku) → variant id.
+  const variantByKey = await resolveVariantIdsByKey(db, keys);
 
   // Pre-validate every personalised line BEFORE writing anything (authz + a frozen
   // template snapshot + a server-clamped transform). A bad placement fails here,

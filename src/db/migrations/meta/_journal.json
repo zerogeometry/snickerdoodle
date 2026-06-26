@@ -71,6 +71,13 @@
       "when": 1782501718674,
       "tag": "0009_guest_ephemeral_upload",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1782507557969,
+      "tag": "0010_product_variants_attributes",
+      "breakpoints": true
     }
   ]
 }
