@@ -189,3 +189,55 @@ describe('assertCanViewAsset', () => {
     ).not.toThrow();
   });
 });
+
+// ── Ephemeral pre-account drafts — gated SOLELY by the upload claim (STEP 0) ──
+describe('ephemeral upload claim (pre-account guest draft)', () => {
+  const CLAIM = 'claim-xyz';
+  // An ephemeral draft has NO family / uploader / controller — only its claim.
+  const draft = (over: Partial<AssetRef> = {}): AssetRef =>
+    asset({ familyId: null, uploaderAccountId: null, controllerAccountId: null, ephemeralClaimId: CLAIM, ...over });
+  const claimViewer = (claim: string | null, membership: Membership | null = null): ViewerContext => ({
+    accountId: null,
+    membership,
+    uploadClaim: claim,
+  });
+
+  it('the holder of the matching claim CAN see their own draft', () => {
+    expect(canViewAsset(draft(), claimViewer(CLAIM)).allowed).toBe(true);
+  });
+
+  it('a WRONG claim cannot see the draft', () => {
+    expect(canViewAsset(draft(), claimViewer('some-other-claim')).allowed).toBe(false);
+  });
+
+  it('a guest with NO claim cannot see the draft', () => {
+    expect(canViewAsset(draft(), claimViewer(null)).allowed).toBe(false);
+    expect(canViewAsset(draft(), viewer(null)).allowed).toBe(false); // uploadClaim omitted entirely
+  });
+
+  it('a fully signed-in family member (no claim) cannot see someone else\'s ephemeral draft', () => {
+    const member = viewer('acct-fam', mem({ accountId: 'acct-fam', circle: 'FAMILY' }));
+    expect(canViewAsset(draft(), member).allowed).toBe(false);
+  });
+
+  it('the claim bypasses visibility tiers — even an ONLY_ME draft is visible to its claim holder', () => {
+    expect(canViewAsset(draft({ visibility: 'ONLY_ME' }), claimViewer(CLAIM)).allowed).toBe(true);
+  });
+
+  it('a claim grants access to EXACTLY one asset — not another draft', () => {
+    const other = draft({ id: 'asset-2', ephemeralClaimId: 'claim-for-asset-2' });
+    expect(canViewAsset(other, claimViewer(CLAIM)).allowed).toBe(false);
+  });
+
+  it('a claim NEVER unlocks a real (family-scoped) asset — even if the viewer holds one', () => {
+    // a real FAMILY asset (ephemeralClaimId null); a stray/forged claim must be ignored
+    expect(canViewAsset(asset({ visibility: 'FAMILY' }), claimViewer(CLAIM)).allowed).toBe(false);
+    // even if the claim equals the asset id, STEP 0 is skipped for a real asset
+    expect(canViewAsset(asset({ visibility: 'EXTENDED' }), claimViewer('asset-1')).allowed).toBe(false);
+  });
+
+  it('assertCanViewAsset throws for a draft without the matching claim', () => {
+    expect(() => assertCanViewAsset(draft(), claimViewer(null))).toThrow(AuthzError);
+    expect(() => assertCanViewAsset(draft(), claimViewer(CLAIM))).not.toThrow();
+  });
+});

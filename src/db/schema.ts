@@ -212,18 +212,18 @@ export const assets = pgTable(
   'assets',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    familyId: uuid('family_id') // tenancy key — the first authz gate
-      .notNull()
-      .references(() => families.id),
+    // Tenancy key — the first authz gate. NULL only for a pre-account ephemeral
+    // draft (a guest's upload, no family yet), which is gated by ephemeralClaimId.
+    familyId: uuid('family_id').references(() => families.id),
     kind: assetKind('kind').notNull(),
-    uploaderAccountId: uuid('uploader_account_id')
-      .notNull()
-      .references(() => accounts.id),
+    uploaderAccountId: uuid('uploader_account_id').references(() => accounts.id),
     childSubjectId: uuid('child_subject_id').references(() => children.id),
     // Resolved on insert: child's controller if child_subject set, else uploader.
-    controllerAccountId: uuid('controller_account_id')
-      .notNull()
-      .references(() => accounts.id),
+    // NULL only for an ephemeral draft (adopted into a family on keep/sign-in).
+    controllerAccountId: uuid('controller_account_id').references(() => accounts.id),
+    // Single-use claim for a pre-account ephemeral upload (the signed cookie the
+    // guest holds). Authz grants access to THIS asset alone when the claim matches.
+    ephemeralClaimId: uuid('ephemeral_claim_id').unique(),
     // Privacy-by-default at the DB level: no insert path can default wider.
     visibility: visibilityTier('visibility').notNull().default('FAMILY'),
     // Content-safety gate (D8). An asset cannot reach a print order unless CLEAR.
@@ -236,7 +236,14 @@ export const assets = pgTable(
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
     createdAt,
   },
-  (t) => [index('asset_family_child_visibility_idx').on(t.familyId, t.childSubjectId, t.visibility)],
+  (t) => [
+    index('asset_family_child_visibility_idx').on(t.familyId, t.childSubjectId, t.visibility),
+    // Invariant: a real asset has a family + controller; an ephemeral draft has a claim.
+    check(
+      'asset_owned_or_ephemeral',
+      sql`(${t.ephemeralClaimId} IS NOT NULL) OR (${t.familyId} IS NOT NULL AND ${t.controllerAccountId} IS NOT NULL)`,
+    ),
+  ],
 );
 
 // ── storage_object — the bytes. Originals are write-once; derivatives disposable.

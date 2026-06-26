@@ -14,17 +14,25 @@ import type { AccessLevel, Circle, MembershipStatus, VisibilityTier } from '../d
 
 export interface AssetRef {
   id: string;
-  /** Tenancy key — the first thing the policy checks. */
-  familyId: string;
-  uploaderAccountId: string;
+  /** Tenancy key — the first thing the policy checks. NULL only for a pre-account
+   * ephemeral draft, which is gated by its upload claim instead (STEP 0). */
+  familyId: string | null;
+  uploaderAccountId: string | null;
   /**
    * Resolved controller: the controlling parent for a child's asset, otherwise
    * the uploader. ONLY_ME is keyed on THIS, never on the raw uploader, so a
    * contributing relative can't lock the controlling parent out, and a parent's
-   * ONLY_ME asset of their child isn't visible to a co-uploader.
+   * ONLY_ME asset of their child isn't visible to a co-uploader. NULL only for an
+   * ephemeral draft (no account yet).
    */
-  controllerAccountId: string;
+  controllerAccountId: string | null;
   visibility: VisibilityTier;
+  /**
+   * Set ONLY for a pre-account ephemeral upload (a guest's draft, no family yet).
+   * When set, the asset is gated SOLELY by this single-use claim — never by family
+   * scope — and grants access to exactly this one asset. Null for every real asset.
+   */
+  ephemeralClaimId?: string | null;
 }
 
 export interface Membership {
@@ -39,10 +47,13 @@ export interface Membership {
 /**
  * The viewer's identity plus their membership IN the asset's family (resolved by
  * the caller; null when they have none). `accountId` is null for guest/anonymous.
+ * `uploadClaim` is the single-use claim a guest holds for their own ephemeral
+ * draft (from the signed upload-claim cookie); null for everyone else.
  */
 export interface ViewerContext {
   accountId: string | null;
   membership: Membership | null;
+  uploadClaim?: string | null;
 }
 
 export interface Decision {
@@ -89,6 +100,17 @@ function isOwnerOrController(asset: AssetRef, viewer: ViewerContext): boolean {
  * owned draft and is gated by a separate session-ownership check, not this module.
  */
 export function canViewAsset(asset: AssetRef, viewer: ViewerContext): Decision {
+  // STEP 0 — a pre-account EPHEMERAL draft is gated SOLELY by its upload claim and
+  // is NOT family-scoped. The claim grants access to exactly the one asset it was
+  // minted for; a claim never unlocks any other (real, family-scoped) asset. A real
+  // asset (ephemeralClaimId == null) ignores the claim entirely and falls through.
+  if (asset.ephemeralClaimId != null) {
+    const claim = viewer.uploadClaim ?? null;
+    return claim !== null && claim === asset.ephemeralClaimId
+      ? allow('ephemeral draft: viewer holds the matching upload claim')
+      : deny('ephemeral draft: requires the matching upload claim');
+  }
+
   const membership = activeMembershipFor(asset, viewer);
 
   // STEP 1 — family-scope precondition (tenancy isolation), evaluated FIRST.
@@ -104,7 +126,7 @@ export function canViewAsset(asset: AssetRef, viewer: ViewerContext): Decision {
 
   // STEP 2 — ONLY_ME: visible to the controller alone.
   if (asset.visibility === 'ONLY_ME') {
-    return viewer.accountId === asset.controllerAccountId
+    return viewer.accountId !== null && asset.controllerAccountId !== null && viewer.accountId === asset.controllerAccountId
       ? allow('only_me: viewer is the controller')
       : deny('only_me: visible to the controller alone');
   }

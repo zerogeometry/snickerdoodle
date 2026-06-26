@@ -87,6 +87,8 @@ export async function placeOrder(
     if (asset.moderationStatus !== 'CLEAR') {
       throw new Error('keepsake is not cleared for printing');
     }
+    // An orderable keepsake is a real, adopted asset (never an ephemeral draft).
+    if (!asset.controllerAccountId) throw new Error('keepsake has no controller');
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     if (!tpl) continue;
     // validate the source object (a bg-removed cutout) belongs to THIS asset

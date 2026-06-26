@@ -30,6 +30,7 @@ function toAssetRef(row: AssetRow): AssetRef {
     uploaderAccountId: row.uploaderAccountId,
     controllerAccountId: row.controllerAccountId,
     visibility: row.visibility,
+    ephemeralClaimId: row.ephemeralClaimId,
   };
 }
 
@@ -46,9 +47,11 @@ function denied(reason: string): AuthzError {
 export async function resolveViewerContext(
   db: DbHandle,
   accountId: string | null,
-  familyId: string,
+  familyId: string | null,
 ): Promise<ViewerContext> {
-  if (!accountId) return { accountId: null, membership: null };
+  // No account, or an ephemeral asset with no family → no membership to resolve.
+  // (An ephemeral draft is reached via its upload claim, not this path.)
+  if (!accountId || !familyId) return { accountId: accountId ?? null, membership: null };
   const rows = await db
     .select()
     .from(memberships)

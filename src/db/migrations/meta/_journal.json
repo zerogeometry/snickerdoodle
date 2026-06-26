@@ -57,6 +57,13 @@
       "when": 1782499688936,
       "tag": "0007_content_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1782501088620,
+      "tag": "0008_ephemeral_upload_claims",
+      "breakpoints": true
     }
   ]
 }
