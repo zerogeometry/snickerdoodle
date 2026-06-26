@@ -113,7 +113,12 @@ export function HomeView({ data }: { data: HomeData }) {
               </div>
             ) : (
               <>
-                <p className="mt-1 text-xs text-[#9C8E7E]">Tap a keepsake to choose who can see it.</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-[#9C8E7E]">
+                  Tap a keepsake to choose who can see it.
+                  <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
+                    place one on a product →
+                  </Link>
+                </p>
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {data.keepsakes.map((k) => (
                     <button key={k.id} type="button" onClick={() => setActive(k)} className="block text-left">

@@ -6,7 +6,7 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { assessResolution, clampTransform, computeLayerRect, type Transform } from './geometry';
+import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
 
 export interface RenderResult {
   printObjectId: string;
@@ -29,7 +29,7 @@ export interface RenderResult {
 export async function renderPrintFile(
   db: DbHandle,
   viewer: ViewerContext,
-  input: { assetId: string; variantId: string; transform: Partial<Transform>; sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE' },
+  input: { assetId: string; variantId: string; transform: RawTransform; sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE' },
 ): Promise<RenderResult> {
   await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
 

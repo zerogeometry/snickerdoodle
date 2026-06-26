@@ -32,6 +32,12 @@ const TIER0_MAX = 2; // classical resample handles up to 2×; above that needs M
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
+/** The ONE mm→px conversion — used by the seeder, the renderer, and the editor
+ * preview so the canvas frame, the guides, and the output file never disagree. */
+export function mmToPx(mm: number, dpi: number): number {
+  return Math.round((mm / 25.4) * dpi);
+}
+
 function snapRotation(deg: number): Rotation {
   const n = (((Math.round((deg ?? 0) / 90) * 90) % 360) + 360) % 360;
   return n as Rotation;

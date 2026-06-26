@@ -1,13 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
+import { mmToPx } from './print/geometry';
 import type { DbHandle } from './db';
 
-/** The ONE mm→px conversion — used by the seeder and (later) the renderer so the
- * canvas frame and the output file can never disagree by a pixel. */
-export function mmToPx(mm: number, dpi: number): number {
-  return Math.round((mm / 25.4) * dpi);
-}
+export { mmToPx };
 
 /**
  * The price list the pricing engine prices against, loaded from the DB. While the
