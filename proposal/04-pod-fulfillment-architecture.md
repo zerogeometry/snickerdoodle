@@ -3,6 +3,10 @@
 > Status: **DESIGN** (not built). Grounded in the real codebase on branch `build/phase-0-trust-spine`; every existing seam is cited `file:symbol`. Anything depending on Prodigi's live API is flagged **TO-VERIFY** and must be confirmed against current Prodigi Print/Order API v4 docs before the adapter is coded.
 >
 > Binding constraints throughout: children's images are the most sensitive data; **no live child image leaves the VPC to any third-party processor (including the POD) before LG3 + LG6 are green**; price, print-spec, and ownership are **server-authoritative**; POD is **provider-agnostic** (Prodigi default); originals are **sacred / write-once**; uploads are private + signed-URL-only after an authz ALLOW.
+>
+> **Build progress:** **Phase 0 is built** (commit `4b60dd9`): DB catalogue (products/variants/print_templates/provider-map), DB-backed pricing, `order_item_artwork`, and the two code-gap fixes (authz-gated derivative grant; in-flight-order purge guard).
+>
+> **Decisions resolved (locked) — see §9:** O-1 reuse `DERIVATIVE`; O-2 per-item fulfilment state; O-4 re-validate at placeOrder + render; **O-5 order-scoped (= one Prodigi order per order, which bundles postage; Prodigi may still split into multiple *shipments*, invisible to the buyer)**; O-6 token-scoped guest/gift tracking; O-3 hold the whole fulfilment surface until LG3+LG6 are green (no partial launch); O-9 snapped rotation at launch; O-10 GBP-only, add-ons = non-printable variants; O-8 ML cap ~20/creation, ~500/account/mo (env-tunable); O-7 minimised buyer-delivery only, no child surname. **NEW:** availability = nightly Prodigi catalogue sync baseline + an optional checkout-time check if Prodigi exposes a fast one (POD is made-to-order, so this is *availability*, not stock-count). **Shipping price** (flat vs Prodigi pass-through) deferred to Phase 3 — leaning flat at launch.
 
 ---
 
