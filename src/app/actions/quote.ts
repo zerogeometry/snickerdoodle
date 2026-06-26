@@ -1,7 +1,7 @@
 'use server';
 
 import { quote, type Quote, type RequestedLine } from '@/pricing';
-import type { JoinProvenance } from '@/pricing';
+import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 
 /**
  * The authoritative basket quote. The client sends ONLY product keys + quantities
@@ -25,14 +25,8 @@ export async function quoteBasket(req: QuoteRequest): Promise<Quote> {
   return quote(items, { gift: req.gift ?? false, joinProvenance });
 }
 
-/**
- * Resolves the real join provenance from the session + DB. Until auth and the
- * invite/membership flow are wired, there is no verified join server-side, so
- * this returns null (guest) and the join saving correctly never applies live —
- * the engine's join logic is exhaustively unit-tested and ready to light up the
- * moment auth lands. Wiring a client-trusted shortcut here would break a
- * non-negotiable, so we don't.
- */
-async function resolveJoinProvenance(): Promise<JoinProvenance | null> {
-  return null;
+/** The real, server-resolved join provenance (a joined member within their
+ * invite window earns the 5%); never trusts the request. */
+async function resolveJoinProvenance() {
+  return resolveSessionJoinProvenance();
 }

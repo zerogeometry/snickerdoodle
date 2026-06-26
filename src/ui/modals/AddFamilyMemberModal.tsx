@@ -8,29 +8,31 @@ import {
   IconUserPlus,
   IconUsers,
 } from '@tabler/icons-react';
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useRef, useState, useTransition, type ChangeEvent } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { Toggle } from '@/ui/primitives/Toggle';
-import { toast, useFamily } from '@/lib/store';
+import { toast } from '@/lib/store';
+import { createInviteAction } from '@/app/actions/invite';
+import type { AccessLevel, Relationship } from '@/domain/types';
 
 type Rel = 'Child' | 'Parent' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
 
-const RELS: { label: Rel; circle: 'Family' | 'Extended' | 'subject' }[] = [
-  { label: 'Child', circle: 'subject' },
-  { label: 'Parent', circle: 'Family' },
-  { label: 'Grandparent', circle: 'Extended' },
-  { label: 'Aunt / uncle', circle: 'Extended' },
-  { label: 'Close friend', circle: 'Extended' },
-  { label: 'Other', circle: 'Extended' },
+const RELS: { label: Rel; circle: 'Family' | 'Extended' | 'subject'; enum: Relationship }[] = [
+  { label: 'Child', circle: 'subject', enum: 'CHILD' },
+  { label: 'Parent', circle: 'Family', enum: 'PARENT' },
+  { label: 'Grandparent', circle: 'Extended', enum: 'GRANDPARENT' },
+  { label: 'Aunt / uncle', circle: 'Extended', enum: 'AUNT_UNCLE' },
+  { label: 'Close friend', circle: 'Extended', enum: 'CLOSE_FRIEND' },
+  { label: 'Other', circle: 'Extended', enum: 'OTHER' },
 ];
 
-const PALETTE = ['#84BBD0', '#93B97C', '#E8786E', '#F2A640', '#C8623A'];
+const ACCESS_ENUM: Record<string, AccessLevel> = { view: 'VIEW', view_buy: 'VIEW_BUY', contribute: 'CONTRIBUTE' };
 
-function circleOf(rel: Rel) {
-  return RELS.find((r) => r.label === rel)!.circle;
+function relOf(rel: Rel) {
+  return RELS.find((r) => r.label === rel)!;
 }
 
 export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -43,10 +45,9 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
   const [photo, setPhoto] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
-  const members = useFamily((s) => s.members);
-  const add = useFamily((s) => s.add);
+  const [pending, startTransition] = useTransition();
 
-  const circle = circleOf(rel);
+  const circle = relOf(rel).circle;
   const isChild = circle === 'subject';
 
   const onPhoto = (e: ChangeEvent<HTMLInputElement>) => {
@@ -71,23 +72,39 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
       toast('add a name first');
       return;
     }
-    if (!isChild && invite && !email.trim()) {
+    const first = trimmed.split(' ')[0] ?? trimmed;
+
+    if (isChild) {
+      // A child is a keepsake subject, not an invitee — full child profiles are a
+      // follow-up; for now we don't send them an invite.
+      toast(`child profiles are coming soon`);
+      reset();
+      onClose();
+      return;
+    }
+    if (!email.trim()) {
       toast('add their email to send the invite');
       return;
     }
-    const first = trimmed.split(' ')[0] ?? trimmed;
-    const color = PALETTE[members.length % PALETTE.length] ?? '#84BBD0';
-    add({
-      id: `m-${Date.now()}`,
-      initial: trimmed.charAt(0).toUpperCase(),
-      name: first,
-      sub: isChild ? 'little one' : rel.toLowerCase(),
-      color,
-      textColor: color === '#F2A640' ? '#3A2E1E' : undefined,
+
+    startTransition(async () => {
+      const res = await createInviteAction({
+        email: email.trim(),
+        relationship: relOf(rel).enum,
+        accessLevel: ACCESS_ENUM[access] ?? 'VIEW_BUY',
+      });
+      if (res.needsAuth) {
+        toast('log in to invite family');
+        return;
+      }
+      if (!res.ok) {
+        toast('couldn’t send that invite — try again');
+        return;
+      }
+      toast(`invite sent to ${first} — they’ll appear once they join`);
+      reset();
+      onClose();
     });
-    toast(isChild ? `${first} added to your family` : invite ? `invite emailed to ${first}` : `${first} added`);
-    reset();
-    onClose();
   };
 
   return (
@@ -97,8 +114,9 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
       title="Add a family member"
       subtitle="Grow your family circle"
       footer={
-        <Button size="lg" className="w-full" onClick={submit}>
-          <Icon icon={IconUserPlus} size={16} /> {isChild ? 'add to family' : 'send invite & add to family'}
+        <Button size="lg" className="w-full" onClick={submit} disabled={pending}>
+          <Icon icon={IconUserPlus} size={16} />{' '}
+          {pending ? 'sending…' : isChild ? 'add to family' : 'send invite'}
         </Button>
       }
     >
