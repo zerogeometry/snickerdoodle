@@ -53,6 +53,9 @@ export async function createGiftLink(
     if (!canViewAsset({ id: a.id, familyId: a.familyId, uploaderAccountId: a.uploaderAccountId, controllerAccountId: a.controllerAccountId, visibility: a.visibility }, creator).allowed) {
       continue;
     }
+    // A gift link is shared OUTSIDE the family (token, no membership) — only fully
+    // content-cleared art may be snapshotted into it (D8). Never share FLAGGED/BLOCKED.
+    if (a.moderationStatus !== 'CLEAR') continue;
     items.push({
       assetId: a.id,
       productKey: GIFT_PRODUCT,
@@ -123,7 +126,9 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   const items = link.items as GiftItem[];
   const assetIds = items.map((i) => i.assetId);
   const present = await db.select().from(assets).where(inArray(assets.id, assetIds));
-  if (present.length < assetIds.length) return { state: 'gone' }; // a source keepsake was deleted
+  // "gone" if a source was deleted OR is no longer content-cleared — never serve
+  // uncleared/CSAM-blocked bytes to a token holder outside the family (D8).
+  if (present.length < assetIds.length || present.some((a) => a.moderationStatus !== 'CLEAR')) return { state: 'gone' };
 
   const keyByAsset = new Map<string, string>();
   const objs = await db

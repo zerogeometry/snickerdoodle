@@ -105,4 +105,23 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const view = await getGiftLink(db, token);
     expect(view.state).toBe('active');
   });
+
+  it('a BLOCKED (CSAM) keepsake can never be shared into a gift link (D8)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await keptAsset();
+    await db.update(assets).set({ moderationStatus: 'BLOCKED' }).where(eq(assets.id, assetId));
+    // the only chosen keepsake is blocked → nothing shareable
+    await expect(createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] })).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('a link whose source becomes uncleared serves "gone" — never an URL to BLOCKED bytes', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await keptAsset();
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] }); // CLEAR at creation
+    expect((await getGiftLink(db, token)).state).toBe('active');
+
+    await db.update(assets).set({ moderationStatus: 'BLOCKED' }).where(eq(assets.id, assetId));
+    const view = await getGiftLink(db, token);
+    expect(view.state).toBe('gone'); // the token holder gets no bytes
+  });
 });

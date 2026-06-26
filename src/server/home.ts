@@ -84,7 +84,9 @@ export async function loadHome(): Promise<HomeData | null> {
     .where(and(eq(assets.familyId, familyId), eq(assets.keptInHome, true)))
     .orderBy(desc(assets.createdAt));
 
-  const visible = rows.filter((r) => canViewAsset(refOf(r.asset), viewer).allowed);
+  // Authz first, then never mint a URL for CSAM-blocked content (D8 runbook).
+  // FLAGGED/PENDING stay visible to the family — the flag gates ordering, not viewing.
+  const visible = rows.filter((r) => canViewAsset(refOf(r.asset), viewer).allowed && r.asset.moderationStatus !== 'BLOCKED');
 
   const keepsakes: HomeKeepsake[] = await Promise.all(
     visible.map(async (r) => ({

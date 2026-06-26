@@ -60,6 +60,7 @@ export async function loadStudioData(): Promise<StudioData | null> {
   for (const r of rows) {
     if (!r.key) continue;
     if (!canViewAsset(refOf(r.asset), viewer).allowed) continue;
+    if (r.asset.moderationStatus === 'BLOCKED') continue; // CSAM-blocked content is never served
     keepsakes.push({ id: r.asset.id, imageUrl: await presignDownload(r.key, 600) });
   }
 
