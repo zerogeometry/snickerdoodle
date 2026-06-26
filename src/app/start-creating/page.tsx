@@ -153,45 +153,52 @@ export default function StartCreatingPage() {
       ) : (
         // ── Made-real state ──
         <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-          <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
-          <p className="mt-1 text-sm text-[#6F6358]">The same drawing, on a whole family range. Tap + to add, or customize.</p>
-
-          {/* uploaded thumbnail + fast-track actions */}
-          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewImg ?? ''} alt="your drawing" className="h-14 w-14 rounded-lg border border-[#EFE6D6] object-cover" />
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-[#E6D8BE] bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey">
-                upload a different drawing
-              </button>
-              <button type="button" onClick={removeBg} disabled={removingBg} className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey disabled:opacity-50">
-                <Icon icon={IconSparkles} size={14} className={upload.cutout ? 'text-green-save' : 'text-cinnamon'} />
-                {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
-              </button>
-            </div>
-            <span className="ml-auto hidden items-center gap-1.5 text-[11px] text-green-save sm:flex">
-              <Icon icon={IconLock} size={13} /> this stays yours
-            </span>
-          </div>
-
-          {/* the personalised range */}
-          <div className="mt-5">
-            {products ? (
-              <FlowCatalogue products={featured} />
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="h-48 animate-pulse rounded-2xl border border-[#EADFC9] bg-[#FBF5E9]" />
-                ))}
+          <div className="grid gap-8 md:grid-cols-5 md:items-start">
+            {/* Left: the drawing, large, with change + remove background underneath */}
+            <div className="md:col-span-2 md:sticky md:top-6">
+              <div className="inline-block rounded-lg border-8 border-honey bg-[#FFFDF8] p-2 shadow-[0_4px_14px_rgba(46,39,35,.08)]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-auto rounded-sm" />
               </div>
-            )}
-          </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-[#E6D8BE] bg-white px-3.5 py-2 text-xs font-bold text-cocoa hover:border-honey">
+                  change drawing
+                </button>
+                <button type="button" onClick={removeBg} disabled={removingBg} className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3.5 py-2 text-xs font-bold text-cocoa hover:border-honey disabled:opacity-50">
+                  <Icon icon={IconSparkles} size={14} className={upload.cutout ? 'text-green-save' : 'text-cinnamon'} />
+                  {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
+                </button>
+              </div>
+              <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#EAF1E4] p-3">
+                <Icon icon={IconLock} size={16} className="mt-0.5 shrink-0 text-green-save" />
+                <p className="text-[13px] leading-relaxed text-[#46402F]">
+                  <b>This stays yours. Always.</b> We use it to make your bits, then it&apos;s gone — unless you keep it.
+                </p>
+              </div>
+            </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-            <Link href="/catalogue" className="font-bold text-cinnamon">see the full range →</Link>
-            <button type="button" onClick={keep} disabled={keeping} className="font-bold text-[#7A6A58] hover:text-cinnamon disabled:opacity-60">
-              {keeping ? 'keeping…' : 'keep this in my keepsake box'}
-            </button>
+            {/* Right: the personalised range */}
+            <div className="md:col-span-3">
+              <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
+              <p className="mt-1 text-sm text-[#6F6358]">The same drawing, on a whole family range. Tap + to add, or customize.</p>
+              <div className="mt-4">
+                {products ? (
+                  <FlowCatalogue products={featured} compact />
+                ) : (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="h-48 animate-pulse rounded-2xl border border-[#EADFC9] bg-[#FBF5E9]" />
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                <Link href="/catalogue" className="font-bold text-cinnamon">see the full range →</Link>
+                <button type="button" onClick={keep} disabled={keeping} className="font-bold text-[#7A6A58] hover:text-cinnamon disabled:opacity-60">
+                  {keeping ? 'keeping…' : 'keep this in my keepsake box'}
+                </button>
+              </div>
+            </div>
           </div>
         </main>
       )}

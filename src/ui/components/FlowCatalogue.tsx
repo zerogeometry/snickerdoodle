@@ -28,10 +28,12 @@ function variantSub(v: CatalogueVariant): string | undefined {
 export function FlowCatalogue({
   products,
   showCategories = false,
+  compact = false,
   className,
 }: {
   products: CatalogueProduct[];
   showCategories?: boolean;
+  compact?: boolean; // denser grid for the narrower uploaded-page column
   className?: string;
 }) {
   const router = useRouter();
@@ -141,34 +143,28 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4">
+      <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);
           return (
             <div key={p.key} className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)]">
               <div className="relative flex h-32 items-center justify-center bg-[#FBF5E9]">
                 <ProductMockup product={p.key as ProductKey} image={mockImg} size={104} uid={p.key} />
-                {/* mobile: tap to zoom */}
+                {/* tap/click to enlarge — same on desktop + mobile, so it never covers the controls */}
                 <button
                   type="button"
                   onClick={() => setZoom(p)}
-                  aria-label={`Zoom ${p.label}`}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm md:hidden"
+                  aria-label={`Enlarge ${p.label} preview`}
+                  className="absolute right-1.5 top-1.5 rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm hover:text-cinnamon"
                 >
                   <Icon icon={IconZoomScan} size={15} />
                 </button>
-                {/* desktop: hover preview */}
-                {upload ? (
-                  <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 hidden -translate-x-1/2 -translate-y-1/2 scale-95 rounded-2xl border border-[#E6D8BE] bg-[#FFFDF8] p-2 opacity-0 shadow-[0_16px_40px_rgba(46,39,35,.25)] transition-all duration-150 group-hover:scale-100 group-hover:opacity-100 md:block">
-                    <ProductMockup product={p.key as ProductKey} image={mockImg} size={200} uid={`${p.key}-zoom`} />
-                  </div>
-                ) : null}
               </div>
 
               <div className="flex flex-1 flex-col gap-2 border-t border-[#EFE6D6] px-3 py-2.5">
                 <div className="flex items-baseline justify-between gap-1">
-                  <span className="text-sm font-bold text-cocoa">{p.label}</span>
-                  <span className="text-xs text-[#9C8E7E]">from {gbp(p.fromPence)}</span>
+                  <span className="min-w-0 truncate text-sm font-bold text-cocoa">{p.label}</span>
+                  <span className="shrink-0 whitespace-nowrap text-xs text-[#9C8E7E]">from {gbp(p.fromPence)}</span>
                 </div>
                 <div className="mt-auto flex items-center justify-between gap-2">
                   <div className="flex items-center rounded-full border border-[#E6D8BE] bg-white">
