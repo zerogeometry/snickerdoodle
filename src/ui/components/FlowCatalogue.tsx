@@ -2,7 +2,7 @@
 
 import { IconGift, IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
@@ -60,8 +60,10 @@ export function FlowCatalogue({
 
   const [category, setCategory] = useState('all');
   const [zoom, setZoom] = useState<CatalogueProduct | null>(null);
-  const [busy, setBusy] = useState(false);
   const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
+  // A single in-flight ingest, shared across clicks — so a slow first ingest can't
+  // deadlock the catalogue (the previous global "busy" flag froze every button).
+  const ingestRef = useRef<Promise<string | null> | null>(null);
 
   const categories = useMemo(
     () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
@@ -73,20 +75,30 @@ export function FlowCatalogue({
   const mockImg = upload?.cutout?.url ?? upload?.dataUrl ?? null; // bg-removed cutout wins
 
   // Ingest the upload server-side once, so add-to-basket + render have a real asset.
+  // Concurrent callers share the SAME in-flight ingest (no double-upload, no freeze).
   const ensureAsset = useCallback(async (): Promise<string | null> => {
     if (upload?.assetId) return upload.assetId;
     if (!upload || !termsAccepted) return null;
-    const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-    const fd = new FormData();
-    fd.append('image', blob, upload.name || 'drawing.png');
-    fd.append('termsAccepted', 'true');
-    const res = await startGuestUpload(fd);
-    if (res.ok && res.assetId) {
-      setAssetId(res.assetId);
-      return res.assetId;
+    if (ingestRef.current) return ingestRef.current; // an ingest is already running — reuse it
+    const run = (async (): Promise<string | null> => {
+      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+      const fd = new FormData();
+      fd.append('image', blob, upload.name || 'drawing.png');
+      fd.append('termsAccepted', 'true');
+      const res = await startGuestUpload(fd);
+      if (res.ok && res.assetId) {
+        setAssetId(res.assetId);
+        return res.assetId;
+      }
+      toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
+      return null;
+    })();
+    ingestRef.current = run;
+    try {
+      return await run;
+    } finally {
+      ingestRef.current = null;
     }
-    toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
-    return null;
   }, [upload, termsAccepted, setAssetId]);
 
   const guardUpload = (): boolean => {
@@ -108,45 +120,39 @@ export function FlowCatalogue({
   const tileQty = (p: CatalogueProduct) => items.find((i) => i.id === lineId(defaultVariant(p).sku))?.qty ?? 0;
 
   const quickAdd = async (p: CatalogueProduct, delta: number) => {
-    if (busy) return;
     const def = defaultVariant(p);
     const id = lineId(def.sku);
-    const existing = items.find((i) => i.id === id);
+    // Decrement is purely local — always allowed (never gated by an in-flight ingest).
     if (delta < 0) {
+      const existing = items.find((i) => i.id === id);
       if (existing) setQty(id, existing.qty - 1);
       return;
     }
     if (!guardUpload()) return;
-    setBusy(true);
-    try {
-      const assetId = await ensureAsset();
-      if (!assetId) return;
-      if (existing) setQty(id, existing.qty + 1);
-      else
-        add({
-          id,
-          name: p.label,
-          product: p.key as ProductKey,
-          sku: def.sku,
-          variantId: def.id,
-          pricePence: def.pricePence,
-          sub: variantSub(def),
-          artwork: { assetId, transform: DEFAULT_TF, sourceObjectId: upload?.cutout?.sourceObjectId },
-        });
-    } finally {
-      setBusy(false);
-    }
+    if (!upload?.assetId && !ingestRef.current) toast('adding to your basket…'); // first add ingests — show it's working
+    const assetId = await ensureAsset();
+    if (!assetId) return;
+    // Re-read from the store — a concurrent add may have created the line meanwhile.
+    const current = useBasket.getState().items.find((i) => i.id === id);
+    if (current) setQty(id, current.qty + 1);
+    else
+      add({
+        id,
+        name: p.label,
+        product: p.key as ProductKey,
+        sku: def.sku,
+        variantId: def.id,
+        pricePence: def.pricePence,
+        sub: variantSub(def),
+        artwork: { assetId, transform: DEFAULT_TF, sourceObjectId: upload?.cutout?.sourceObjectId },
+      });
   };
 
   const customize = async (p: CatalogueProduct) => {
-    if (busy || !guardUpload()) return;
-    setBusy(true);
-    try {
-      const assetId = await ensureAsset();
-      if (assetId) router.push(`/customize/${p.key}`);
-    } finally {
-      setBusy(false);
-    }
+    if (!guardUpload()) return;
+    if (!upload?.assetId && !ingestRef.current) toast('getting it ready…');
+    const assetId = await ensureAsset();
+    if (assetId) router.push(`/customize/${p.key}`);
   };
 
   return (
