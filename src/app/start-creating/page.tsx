@@ -121,8 +121,8 @@ export default function StartCreatingPage() {
         </main>
       ) : (
         // ── Made-real state — fits one viewport; only the range scrolls ──
-        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-5 md:h-[calc(100dvh-3.5rem)] md:overflow-hidden">
-          <div className="grid gap-8 md:h-full md:grid-cols-5">
+        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-5 md:overflow-hidden">
+          <div className="grid gap-8 md:grid-cols-5 md:items-start">
             {/* Left: the drawing, large, with change / remove background / terms — all equal width */}
             <div className="flex flex-col md:col-span-2">
               <div className="w-full overflow-hidden rounded-lg border-8 border-honey bg-[#FFFDF8] shadow-[0_4px_14px_rgba(46,39,35,.08)]">
@@ -147,12 +147,12 @@ export default function StartCreatingPage() {
               <TermsGate className="mt-2 w-full" />
             </div>
 
-            {/* Right: the personalised range — title fixed, range scrolls, actions pinned */}
-            <div className="md:col-span-3 md:flex md:h-full md:min-h-0 md:flex-col">
-              <h1 className="shrink-0 font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
-              <div className="mt-4 md:flex md:min-h-0 md:flex-1 md:flex-col">
+            {/* Right: the personalised range — title fixed, range scrolls in its container */}
+            <div className="md:col-span-3">
+              <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
+              <div className="mt-4">
                 {products ? (
-                  <FlowCatalogue products={products} compact scrollable showCategories className="md:h-full" />
+                  <FlowCatalogue products={products} compact scrollable showCategories />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }).map((_, i) => (

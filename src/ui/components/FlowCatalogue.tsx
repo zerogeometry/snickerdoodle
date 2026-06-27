@@ -146,9 +146,9 @@ export function FlowCatalogue({
   };
 
   return (
-    <div className={`${className ?? ''} ${scrollable ? 'flex min-h-0 flex-col' : ''}`}>
+    <div className={className}>
       {showCategories ? (
-        <div className="mb-3 flex shrink-0 gap-2 overflow-x-auto pb-1">
+        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
           {categories.map((c) => (
             <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
               {c}
@@ -157,7 +157,8 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
-      <div className={scrollable ? 'brand-scroll min-h-0 flex-1 overflow-y-auto pr-2 max-h-[60vh] md:max-h-none' : undefined}>
+      {/* bounded, scrollable range — sized to the viewport so the PAGE never scrolls, only this does */}
+      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 max-h-[55vh] md:max-h-[calc(100dvh-23rem)]' : undefined}>
       <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);
@@ -211,7 +212,7 @@ export function FlowCatalogue({
       </div>
 
       {/* Footer: basket count (so "Create another" clearly keeps the basket) + total + actions */}
-      <div className="mt-4 shrink-0 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4">
+      <div className="mt-4 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4">
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold text-cocoa">
             {count > 0 ? `${count} item${count === 1 ? '' : 's'} added to your basket` : 'nothing added yet'}
