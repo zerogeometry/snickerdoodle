@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCamera, IconCircleCheck, IconLock, IconSparkles, IconUpload } from '@tabler/icons-react';
+import { IconCamera, IconCircleCheck, IconLock, IconPencil, IconSparkles, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -8,6 +8,7 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { PlaceholderDoodle } from '@/ui/components/PlaceholderDoodle';
 import { CameraCapture } from '@/ui/components/CameraCapture';
+import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue, TermsGate } from '@/ui/components/FlowCatalogue';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
@@ -26,6 +27,7 @@ export default function StartCreatingPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [removingBg, setRemovingBg] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
 
   useEffect(() => {
@@ -92,6 +94,12 @@ export default function StartCreatingPage() {
         onCapture={(dataUrl, name) => setUpload({ dataUrl, name })}
         onUploadInstead={() => fileRef.current?.click()}
       />
+      <ImageStudio
+        open={studioOpen}
+        image={upload?.dataUrl ?? null}
+        onClose={() => setStudioOpen(false)}
+        onApply={(edited) => setUpload({ dataUrl: edited, name: upload?.name ?? 'drawing.png' })}
+      />
 
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
         <Link href="/" className="font-display text-xl font-semibold text-cocoa" aria-label="Snickerdoodle home">
@@ -138,6 +146,9 @@ export default function StartCreatingPage() {
                 <Button size="lg" className="w-full" onClick={removeBg} disabled={removingBg}>
                   <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
                   {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
+                </Button>
+                <Button size="lg" className="w-full" onClick={() => setStudioOpen(true)}>
+                  <Icon icon={IconPencil} size={16} /> edit in studio
                 </Button>
               </div>
               <div className="mt-3 flex w-full items-start gap-2.5 rounded-xl bg-[#EAF1E4] p-3">
