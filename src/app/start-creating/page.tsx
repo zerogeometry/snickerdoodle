@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCamera, IconLock, IconSparkles, IconUpload } from '@tabler/icons-react';
+import { IconCamera, IconCircleCheck, IconLock, IconSparkles, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -156,14 +156,14 @@ export default function StartCreatingPage() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-auto rounded-sm" />
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-full border border-[#E6D8BE] bg-white px-3.5 py-2 text-xs font-bold text-cocoa hover:border-honey">
-                  change drawing
-                </button>
-                <button type="button" onClick={removeBg} disabled={removingBg} className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3.5 py-2 text-xs font-bold text-cocoa hover:border-honey disabled:opacity-50">
-                  <Icon icon={IconSparkles} size={14} className={upload.cutout ? 'text-green-save' : 'text-cinnamon'} />
+              <div className="mt-3 flex flex-col gap-2 sm:max-w-[17rem]">
+                <Button variant="secondary" size="lg" onClick={() => fileRef.current?.click()}>
+                  change image
+                </Button>
+                <Button size="lg" onClick={removeBg} disabled={removingBg}>
+                  <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
                   {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
-                </button>
+                </Button>
               </div>
               <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#EAF1E4] p-3">
                 <Icon icon={IconLock} size={16} className="mt-0.5 shrink-0 text-green-save" />
@@ -176,10 +176,9 @@ export default function StartCreatingPage() {
             {/* Right: the personalised range */}
             <div className="md:col-span-3">
               <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
-              <p className="mt-1 text-sm text-[#6F6358]">The same drawing, on a whole family range. Tap + to add, or customize.</p>
               <div className="mt-4">
                 {products ? (
-                  <FlowCatalogue products={products} compact scrollable />
+                  <FlowCatalogue products={products} compact scrollable showCategories />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }).map((_, i) => (

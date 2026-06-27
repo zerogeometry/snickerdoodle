@@ -14,6 +14,16 @@ import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 const DEFAULT_TF = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 
+const SWATCH: Record<string, string> = { oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8', natural: '#E7D9BE' };
+const swatch = (name: string) => SWATCH[name] ?? '#E0C7A8';
+
+// Friendly filter groups (the product category enum → a shopper-facing label).
+const GROUP: Record<string, string> = {
+  CARD: 'cards & prints', PRINT: 'cards & prints', MUG: 'home', CUSHION: 'home', BLANKET: 'home',
+  APPAREL: 'wear', BOOK: 'books', PUZZLE: 'gifts', BAG: 'gifts',
+};
+const groupOf = (category: string) => GROUP[category] ?? 'gifts';
+
 function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour].filter(Boolean);
   return bits.length ? bits.join(' · ') : undefined;
@@ -50,8 +60,11 @@ export function FlowCatalogue({
   const [zoom, setZoom] = useState<CatalogueProduct | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const categories = useMemo(() => ['all', ...new Set(products.map((p) => p.category.toLowerCase()))], [products]);
-  const shown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || p.category.toLowerCase() === category));
+  const categories = useMemo(
+    () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
+    [products],
+  );
+  const shown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
   const subtotal = basketSubtotal(items);
   const count = basketCount(items);
   const mockImg = upload?.cutout?.url ?? upload?.dataUrl ?? null; // bg-removed cutout wins
@@ -146,7 +159,7 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
-      <div className={scrollable ? 'max-h-[30rem] overflow-y-auto pr-1' : undefined}>
+      <div className={scrollable ? 'brand-scroll max-h-[30rem] overflow-y-auto pr-2' : undefined}>
       <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);
@@ -154,15 +167,23 @@ export function FlowCatalogue({
             <div key={p.key} className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)]">
               <div className="relative flex h-32 items-center justify-center bg-[#FBF5E9]">
                 <ProductMockup product={p.key as ProductKey} image={mockImg} size={104} uid={p.key} />
-                {/* tap/click to enlarge — same on desktop + mobile, so it never covers the controls */}
+                {/* tap/click to enlarge — top-left, so it never covers the controls */}
                 <button
                   type="button"
                   onClick={() => setZoom(p)}
                   aria-label={`Enlarge ${p.label} preview`}
-                  className="absolute right-1.5 top-1.5 rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm hover:text-cinnamon"
+                  className="absolute left-1.5 top-1.5 rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm hover:text-cinnamon"
                 >
                   <Icon icon={IconZoomScan} size={15} />
                 </button>
+                {/* colour-option key — top-right */}
+                {p.colours.length > 0 ? (
+                  <div className="absolute right-1.5 top-1.5 flex flex-col gap-1">
+                    {p.colours.map((c) => (
+                      <span key={c} title={c} className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c) }} />
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-1 flex-col gap-2 border-t border-[#EFE6D6] px-3 py-2.5">
