@@ -128,6 +128,11 @@ export const useOrders = create<{ orders: Order[]; add: (o: Order) => void }>((s
   add: (o) => set((s) => ({ orders: [o, ...s.orders] })),
 }));
 
+// The child a creation is "for" — captured in "Who's this for?", carried across
+// the magic-link round-trip via sessionStorage so checkout / share can show + use
+// it. Child FIRST NAME ONLY (never a surname) per the children's-data rules.
+export const SUBJECT_KEY = 'sd_subject';
+
 // ── family members (added via the Add-family-member modal) ───────────────────
 export type Member = { id: string; initial: string; name: string; sub?: string; color: string; textColor?: string };
 export const useFamily = create<{ members: Member[]; add: (m: Member) => void }>((set) => ({

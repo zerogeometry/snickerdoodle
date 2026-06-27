@@ -1,12 +1,13 @@
 'use client';
 
-import { IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
+import { IconGift, IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
+import { WhoForModal } from '@/ui/modals/WhoForModal';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
@@ -60,6 +61,7 @@ export function FlowCatalogue({
   const [category, setCategory] = useState('all');
   const [zoom, setZoom] = useState<CatalogueProduct | null>(null);
   const [busy, setBusy] = useState(false);
+  const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
 
   const categories = useMemo(
     () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
@@ -224,15 +226,20 @@ export function FlowCatalogue({
             <div className="text-[11px] text-[#9C8E7E]">shipping TBC</div>
           </div>
         </div>
-        <div className="mt-3 flex gap-2.5">
-          <Button variant="secondary" size="lg" className="flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
+        <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
+          <Button variant="secondary" size="lg" className="sm:flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
             create another
           </Button>
-          <Button size="lg" className="flex-1" onClick={() => router.push('/checkout')} disabled={items.length === 0}>
+          <Button variant="secondary" size="lg" className="sm:flex-1" onClick={() => setWhoMode('share')} disabled={items.length === 0}>
+            <Icon icon={IconGift} size={15} /> share a wish
+          </Button>
+          <Button size="lg" className="sm:flex-1" onClick={() => setWhoMode('checkout')} disabled={items.length === 0}>
             checkout now <Icon icon={IconSparkles} size={15} />
           </Button>
         </div>
       </div>
+
+      <WhoForModal open={!!whoMode} mode={whoMode ?? 'checkout'} onClose={() => setWhoMode(null)} />
 
       <Modal open={!!zoom} onClose={() => setZoom(null)} title={zoom?.label ?? ''} subtitle={zoom ? `from ${gbp(zoom.fromPence)}` : undefined}>
         {zoom ? (
