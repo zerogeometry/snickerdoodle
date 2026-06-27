@@ -173,10 +173,10 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
-      {/* bounded, scrollable range — a FIXED height (3 tiles wide × 2 rows on smaller
-          screens, × 3 rows on large) so the layout stays put when you switch category;
-          only this scrolls, not the page. Tile ≈ 206px + 16px gap. */}
-      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[27.5rem] xl:h-[41.5rem]' : undefined}>
+      {/* bounded, scrollable range — height is EXPLICIT (steady when you switch
+          category) and fits the viewport so the PAGE never scrolls, capped at ~2.5
+          tiles tall on large screens (the half-row peek cues the scroll). Tile ≈ 206px. */}
+      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined}>
       <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);

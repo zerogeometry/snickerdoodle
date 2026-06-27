@@ -149,14 +149,14 @@ export default function StartCreatingPage() {
                 <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-full object-contain" />
               </div>
               <div className="mt-3 flex w-full flex-col gap-2">
-                <Button variant="secondary" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
+                <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image
                 </Button>
-                <Button size="lg" className="w-full" onClick={removeBg} disabled={removingBg}>
+                <Button variant="design" size="lg" className="w-full" onClick={removeBg} disabled={removingBg}>
                   <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
                   {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
                 </Button>
-                <Button size="lg" className="w-full" onClick={() => setStudioOpen(true)}>
+                <Button variant="design" size="lg" className="w-full" onClick={() => setStudioOpen(true)}>
                   <Icon icon={IconPencil} size={16} /> edit in studio
                 </Button>
               </div>

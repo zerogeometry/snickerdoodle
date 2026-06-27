@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'design' | 'designOutline';
 type Size = 'sm' | 'md' | 'lg';
 
 // ≥44px tap target (min-h-11). The gentle hover tilt is the "CTA wobble";
@@ -20,6 +20,10 @@ const variants: Record<Variant, string> = {
   primary: 'bg-cta text-cta-text shadow-sm hover:bg-cinnamon',
   secondary: 'border-[1.5px] border-[#E0C7A8] bg-transparent text-cinnamon hover:bg-honey-band',
   ghost: 'bg-transparent text-cinnamon hover:bg-honey-band',
+  // Design / creative tools (sky) — visually distinct from the cinnamon TRANSACTION
+  // CTAs so "magic edits" never read as a buy action.
+  design: 'bg-[#84BBD0] text-cocoa shadow-sm hover:bg-[#74AFC6]',
+  designOutline: 'border-[1.5px] border-[#A9D2E0] bg-transparent text-[#3C7E97] hover:bg-[#EAF3F6]',
 };
 
 type BaseProps = {
