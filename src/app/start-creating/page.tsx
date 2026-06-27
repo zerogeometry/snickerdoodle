@@ -7,6 +7,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { PlaceholderDoodle } from '@/ui/components/PlaceholderDoodle';
+import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue, TermsGate } from '@/ui/components/FlowCatalogue';
@@ -47,17 +48,22 @@ export default function StartCreatingPage() {
   const ensureAsset = async (): Promise<string | null> => {
     if (upload?.assetId) return upload.assetId;
     if (!upload) return null;
-    const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-    const fd = new FormData();
-    fd.append('image', blob, upload.name || 'drawing.png');
-    fd.append('termsAccepted', 'true');
-    const res = await startGuestUpload(fd);
-    if (res.ok && res.assetId) {
-      setAssetId(res.assetId);
-      return res.assetId;
+    try {
+      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+      const fd = new FormData();
+      fd.append('image', blob, upload.name || 'drawing.png');
+      fd.append('termsAccepted', 'true');
+      const res = await startGuestUpload(fd);
+      if (res.ok && res.assetId) {
+        setAssetId(res.assetId);
+        return res.assetId;
+      }
+      toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
+      return null;
+    } catch {
+      toast('that didn’t upload — try again, or a smaller image');
+      return null;
     }
-    toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
-    return null;
   };
 
   // Fast-track: remove the background right here, without opening Customize.
@@ -108,7 +114,10 @@ export default function StartCreatingPage() {
         <span className="hidden text-xs text-[#A89B8C] sm:inline">
           <b className={upload ? '' : 'text-cinnamon'}>upload</b> · <b className={upload ? 'text-cinnamon' : ''}>your range</b> · checkout
         </span>
-        <Link href="/login" className="text-xs text-[#7A6A58] hover:text-cinnamon">log in</Link>
+        <div className="flex items-center gap-1.5">
+          <BasketButton />
+          <Link href="/login" className="text-xs text-[#7A6A58] hover:text-cinnamon">log in</Link>
+        </div>
       </header>
 
       {!upload ? (

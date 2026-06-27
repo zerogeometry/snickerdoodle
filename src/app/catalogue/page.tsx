@@ -1,17 +1,17 @@
 'use client';
 
-import { IconArrowLeft, IconShoppingBag } from '@tabler/icons-react';
+import { IconArrowLeft } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
+import { BasketButton } from '@/ui/components/BasketButton';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
-import { basketCount, useBasket, useUpload } from '@/lib/store';
+import { useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 export default function CataloguePage() {
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
-  const count = basketCount(useBasket((s) => s.items));
   const upload = useUpload((s) => s.upload);
 
   useEffect(() => {
@@ -27,12 +27,7 @@ export default function CataloguePage() {
           </Link>
           <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
         </div>
-        <Link href="/checkout" aria-label={`Basket, ${count} items`} className="relative text-[#7A6A58] hover:text-cinnamon">
-          <Icon icon={IconShoppingBag} size={22} />
-          {count > 0 ? (
-            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-cinnamon px-1 text-[10px] font-bold text-cta-text">{count}</span>
-          ) : null}
-        </Link>
+        <BasketButton />
       </header>
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">

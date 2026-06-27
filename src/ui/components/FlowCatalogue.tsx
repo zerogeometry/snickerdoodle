@@ -81,17 +81,23 @@ export function FlowCatalogue({
     if (!upload || !termsAccepted) return null;
     if (ingestRef.current) return ingestRef.current; // an ingest is already running — reuse it
     const run = (async (): Promise<string | null> => {
-      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-      const fd = new FormData();
-      fd.append('image', blob, upload.name || 'drawing.png');
-      fd.append('termsAccepted', 'true');
-      const res = await startGuestUpload(fd);
-      if (res.ok && res.assetId) {
-        setAssetId(res.assetId);
-        return res.assetId;
+      try {
+        const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+        const fd = new FormData();
+        fd.append('image', blob, upload.name || 'drawing.png');
+        fd.append('termsAccepted', 'true');
+        const res = await startGuestUpload(fd);
+        if (res.ok && res.assetId) {
+          setAssetId(res.assetId);
+          return res.assetId;
+        }
+        toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
+        return null;
+      } catch {
+        // e.g. a too-large upload or a network blip — surface it, never throw silently
+        toast('that didn’t upload — try again, or a smaller image');
+        return null;
       }
-      toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
-      return null;
     })();
     ingestRef.current = run;
     try {
@@ -167,8 +173,9 @@ export function FlowCatalogue({
         </div>
       ) : null}
 
-      {/* bounded, scrollable range — sized to the viewport so the PAGE never scrolls, only this does */}
-      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 max-h-[55vh] md:max-h-[calc(100dvh-23rem)]' : undefined}>
+      {/* bounded, scrollable range — a FIXED height so the layout stays put when you
+          switch category (fewer items just leave room); only this scrolls, not the page */}
+      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)]' : undefined}>
       <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
         {shown.map((p) => {
           const qty = tileQty(p);
