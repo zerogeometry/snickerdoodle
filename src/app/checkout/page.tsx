@@ -8,7 +8,7 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
-import { basketSubtotal, DELIVERY_PENCE, gbp, toast, useBasket } from '@/lib/store';
+import { basketSubtotal, DELIVERY_PENCE, gbp, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -32,8 +32,19 @@ export default function CheckoutPage() {
   const [email, setEmail] = useState('');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [placing, setPlacing] = useState(false);
+  const [subject, setSubject] = useState<string | null>(null);
 
   const empty = items.length === 0;
+
+  // The child this is for, named in "Who's this for?" before checkout.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      setSubject(sessionStorage.getItem(SUBJECT_KEY));
+    } catch {
+      // sessionStorage unavailable — no subject line
+    }
+  }, []);
 
   // Returning from the guest "keep it & check out" flow: a placement was stashed
   // before sign-in. Now that they're (hopefully) signed in, adopt the draft into
@@ -180,6 +191,11 @@ export default function CheckoutPage() {
             {/* Basket */}
             <div>
               <h1 className="font-display text-xl font-semibold text-cocoa">Your basket</h1>
+              {subject ? (
+                <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[#9C8772]">
+                  <Icon icon={IconHeart} size={13} className="text-cinnamon" /> a keepsake for {subject}
+                </p>
+              ) : null}
               <div className="mt-3 space-y-2.5">
                 {items.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">

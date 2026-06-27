@@ -1,9 +1,9 @@
 'use client';
 
-import { IconGift, IconHeart, IconLock, IconPlus, IconUsers, IconWand } from '@tabler/icons-react';
+import { IconGift, IconHeart, IconLock, IconPlus, IconSparkles, IconUsers, IconWand } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
@@ -32,6 +32,20 @@ export function HomeView({ data }: { data: HomeData }) {
   const [active, setActive] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const [highlightNew, setHighlightNew] = useState(false);
+  const newestRef = useRef<HTMLDivElement>(null);
+
+  // Arriving from a just-completed checkout / share (…/home?new=1): spotlight the
+  // newest keepsake (it's first — loadHome orders desc by createdAt) and scroll to
+  // it, then clean the URL so a refresh doesn't re-trigger.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('new') !== '1') return;
+    setHighlightNew(true);
+    const t = setTimeout(() => newestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+    window.history.replaceState({}, '', '/home');
+    return () => clearTimeout(t);
+  }, []);
 
   const greetingName = data.account.name ?? data.account.email.split('@')[0];
 
@@ -119,17 +133,31 @@ export function HomeView({ data }: { data: HomeData }) {
                     place one on a product →
                   </Link>
                 </p>
+                {highlightNew ? (
+                  <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#F0CF9C] bg-honey-band px-3 py-2 text-xs text-[#8A6F52]">
+                    <Icon icon={IconSparkles} size={14} className="text-cinnamon" /> just added — your newest keepsake&apos;s right here.
+                  </div>
+                ) : null}
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {data.keepsakes.map((k) => (
-                    <button key={k.id} type="button" onClick={() => setActive(k)} className="block text-left">
-                      <KeepsakeTile
-                        name="Keepsake"
-                        meta={monthLabel(k.createdAtISO)}
-                        image={k.imageUrl ?? undefined}
-                        badge={VIS_LABEL[k.visibility]}
-                      />
-                    </button>
-                  ))}
+                  {data.keepsakes.map((k, idx) => {
+                    const isNewest = idx === 0 && highlightNew;
+                    return (
+                      <div
+                        key={k.id}
+                        ref={isNewest ? newestRef : undefined}
+                        className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
+                      >
+                        <button type="button" onClick={() => setActive(k)} className="block w-full text-left">
+                          <KeepsakeTile
+                            name="Keepsake"
+                            meta={monthLabel(k.createdAtISO)}
+                            image={k.imageUrl ?? undefined}
+                            badge={VIS_LABEL[k.visibility]}
+                          />
+                        </button>
+                      </div>
+                    );
+                  })}
                   <Link
                     href="/start-creating"
                     className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[#E0A268] bg-[#FCF1E3] text-cinnamon"

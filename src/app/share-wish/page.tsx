@@ -249,7 +249,7 @@ export default function ShareWishPage() {
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-green-save">
               <Icon icon={IconShieldCheck} size={13} /> Private &amp; unguessable. Revoke it any time from your keepsakes.
             </p>
-            <Button variant="secondary" size="lg" className="mt-4 w-full" onClick={() => (window.location.href = '/home')}>
+            <Button variant="secondary" size="lg" className="mt-4 w-full" onClick={() => (window.location.href = '/home?new=1')}>
               <Icon icon={IconHome} size={16} /> see it in your keepsake home
             </Button>
           </div>

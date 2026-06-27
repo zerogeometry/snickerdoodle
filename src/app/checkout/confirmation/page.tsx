@@ -24,7 +24,7 @@ function Confirmation() {
         <Icon icon={IconMail} size={14} className="text-cinnamon" /> order {ref}
       </p>
       <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-        <Button href="/home" size="lg">
+        <Button href="/home?new=1" size="lg">
           <Icon icon={IconHeart} size={16} /> go to your keepsake home
         </Button>
         <Button href="/catalogue" variant="secondary" size="lg">
