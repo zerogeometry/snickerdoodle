@@ -60,7 +60,7 @@ export default function CustomizePage() {
     return (
       <Shell>
         <p className="py-16 text-center text-sm text-[#6F6358]">
-          That product isn’t available. <Link href="/catalogue" className="font-bold text-cinnamon">back to the range</Link>.
+          That product isn’t available. <Link href="/start-creating" className="font-bold text-cinnamon">back to the range</Link>.
         </p>
       </Shell>
     );
@@ -101,7 +101,7 @@ export default function CustomizePage() {
       artwork: { assetId: upload.assetId, transform: placement, sourceObjectId: upload.cutout?.sourceObjectId },
     });
     toast('added to basket ✓');
-    router.push('/catalogue');
+    router.push('/start-creating');
   };
 
   return (
@@ -224,7 +224,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
       <header className="flex items-center gap-3 border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/catalogue" aria-label="Back to the range">
+        <Link href="/start-creating" aria-label="Back to your range">
           <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
         </Link>
         <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>

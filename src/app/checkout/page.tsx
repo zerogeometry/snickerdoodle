@@ -166,7 +166,7 @@ export default function CheckoutPage() {
     <div className="flex min-h-dvh flex-col bg-oat pb-40 md:pb-0">
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
         <div className="flex items-center gap-2.5">
-          <Link href="/catalogue" aria-label="Back to the range">
+          <Link href="/start-creating" aria-label="Back to your range">
             <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
           </Link>
           <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
@@ -186,7 +186,7 @@ export default function CheckoutPage() {
           <p className="mt-1.5 max-w-xs text-sm text-[#6F6358]">
             Pop a drawing on something lovely and it&apos;ll show up here.
           </p>
-          <Button href="/catalogue" size="lg" className="mt-6">
+          <Button href="/start-creating" size="lg" className="mt-6">
             see the range →
           </Button>
         </main>
