@@ -35,6 +35,9 @@ export default function CheckoutPage() {
   const [subject, setSubject] = useState<string | null>(null);
 
   const empty = items.length === 0;
+  // A personalised line (a drawing on a product) needs the controlling parent — so
+  // checkout asks a guest to sign up; pure add-ons can still guest-checkout.
+  const hasPersonalised = items.some((i) => i.artwork);
 
   // The child this is for, named in "Who's this for?" before checkout.
   useEffect(() => {
@@ -115,10 +118,26 @@ export default function CheckoutPage() {
     if (empty || placing) return;
     setPlacing(true);
     try {
+      // Read the subject FRESH (it may have been set just before, or carried across
+      // the magic-link round-trip) rather than the mount-time value.
+      let liveSubject = subject;
+      try {
+        liveSubject = sessionStorage.getItem(SUBJECT_KEY) ?? subject;
+      } catch {
+        // ignore
+      }
       const res = await placeOrderAction({
         items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: i.artwork } : {}) })),
         gift,
+        subject: liveSubject ?? undefined,
       });
+      if (res.needsAuth) {
+        // a personalised order needs the controlling parent — keep + order after sign-up.
+        // basket + "who's this for" persist (sessionStorage) across the magic-link round-trip.
+        toast('a quick sign-up keeps your keepsake safe');
+        router.push('/login?next=/checkout');
+        return;
+      }
       if (!res.ok) {
         toast('hmm, that didn’t go through — try again');
         return;
@@ -299,11 +318,17 @@ export default function CheckoutPage() {
                   {placing ? 'placing your order…' : 'checkout'}
                 </Button>
                 <p className="mt-3 text-center text-[11px] text-[#7A6A58]">
-                  <b>No account needed.</b> Checkout as a guest — or{' '}
-                  <Link href="/login" className="font-bold text-cinnamon">
-                    log in
-                  </Link>
-                  .
+                  {hasPersonalised ? (
+                    <>
+                      A quick <b>magic-link sign-up</b> keeps your keepsake safe — no password. Already with us?{' '}
+                      <Link href="/login?next=/checkout" className="font-bold text-cinnamon">log in</Link>.
+                    </>
+                  ) : (
+                    <>
+                      <b>No account needed.</b> Checkout as a guest — or{' '}
+                      <Link href="/login?next=/checkout" className="font-bold text-cinnamon">log in</Link>.
+                    </>
+                  )}
                 </p>
                 <p className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-[#EAF1E4] px-2 py-2 text-[11px] text-green-save">
                   <Icon icon={IconShieldCheck} size={14} /> Your data is yours. Nothing shared, ever.
@@ -327,7 +352,13 @@ export default function CheckoutPage() {
             {placing ? 'placing…' : 'checkout'}
           </Button>
           <p className="mt-2 text-center text-[11px] text-[#7A6A58]">
-            <b>No account needed</b> — guest checkout, perfect for grandparents
+            {hasPersonalised ? (
+              <>a quick sign-up keeps your keepsake safe — no password</>
+            ) : (
+              <>
+                <b>No account needed</b> — guest checkout, perfect for grandparents
+              </>
+            )}
           </p>
         </div>
       ) : null}
