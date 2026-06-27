@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconCamera, IconLock, IconSparkles, IconUpload } from '@tabler/icons-react';
+import { IconCamera, IconLock, IconSparkles, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -119,13 +119,10 @@ export default function StartCreatingPage() {
       />
 
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <Link href="/" aria-label="Back to home">
-            <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58] md:hidden" />
-            <span className="hidden font-display text-xl font-semibold text-cocoa md:inline">snickerdoodle</span>
-          </Link>
-        </div>
-        <span className="text-xs text-[#A89B8C]">
+        <Link href="/" className="font-display text-xl font-semibold text-cocoa" aria-label="Snickerdoodle home">
+          snickerdoodle
+        </Link>
+        <span className="hidden text-xs text-[#A89B8C] sm:inline">
           <b className={upload ? '' : 'text-cinnamon'}>upload</b> · <b className={upload ? 'text-cinnamon' : ''}>your range</b> · checkout
         </span>
         <Link href="/login" className="text-xs text-[#7A6A58] hover:text-cinnamon">log in</Link>

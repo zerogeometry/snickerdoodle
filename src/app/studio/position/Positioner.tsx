@@ -367,9 +367,8 @@ function Shell({ children, back = '/home' }: { children: React.ReactNode; back?:
         <Link href={back} aria-label="Back">
           <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
         </Link>
-        <span className="font-display text-lg font-semibold text-cocoa">
-          place your keepsake <span className="rounded-full bg-[#EFE4D0] px-2 py-0.5 text-[11px] font-bold text-[#7A6A58]">studio</span>
-        </span>
+        <Link href="/" className="font-display text-lg font-semibold text-cocoa">snickerdoodle</Link>
+        <span className="rounded-full bg-[#EFE4D0] px-2 py-0.5 text-[11px] font-bold text-[#7A6A58]">studio</span>
       </header>
       <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-6 py-6">
         {children}

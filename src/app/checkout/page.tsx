@@ -149,10 +149,12 @@ export default function CheckoutPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-40 md:pb-0">
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/home" className="flex items-center gap-3">
-          <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58] md:hidden" />
-          <span className="hidden font-display text-xl font-semibold text-cocoa md:inline">snickerdoodle</span>
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <Link href="/catalogue" aria-label="Back to the range">
+            <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
+          </Link>
+          <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
+        </div>
         <span className="flex items-center gap-1.5 text-xs text-[#6F6358]">
           <Icon icon={IconLock} size={14} className="text-green-save" /> secure checkout
         </span>
