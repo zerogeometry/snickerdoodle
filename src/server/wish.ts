@@ -1,4 +1,7 @@
+import { and, eq, inArray } from 'drizzle-orm';
+import { assets } from '@/db/schema';
 import { adoptEphemeralDraft, resolveViewerContext } from '@/server/assets';
+import { resolveChildSubject } from '@/server/children';
 import { createGiftLink } from '@/server/giftLinks';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { screenChildFirstName } from '@/server/textSafety';
@@ -42,14 +45,30 @@ export async function mintWish(
 
   const familyId = await ensureHomeFamily(db, account.id, account.name);
 
+  // The child this wish is FOR — find-or-create from the screened first name, so the
+  // kept creations file into their corner of the keepsake home (grows with the child).
+  const child = screened.value ? await resolveChildSubject(db, familyId, account.id, screened.value) : null;
+
   // Keep each creation. Idempotent for an already-kept asset the owner holds; a
   // draft we can't claim (wrong claim / BLOCKED) throws and is left out of the link.
+  const adopted: string[] = [];
   for (const assetId of ids) {
     try {
       await adoptEphemeralDraft(db, account.id, familyId, assetId, uploadClaims);
+      adopted.push(assetId);
     } catch {
       // not ours to keep / blocked / already gone
     }
+  }
+
+  // File the kept creations under the child subject. The controller is the CHILD'S
+  // controlling parent (not necessarily the uploader) — a child's asset is keyed to
+  // its controller, never the uploader (children's-data rule).
+  if (child && adopted.length > 0) {
+    await db
+      .update(assets)
+      .set({ childSubjectId: child.id, controllerAccountId: child.controllerAccountId })
+      .where(and(inArray(assets.id, adopted), eq(assets.familyId, familyId)));
   }
 
   const viewer = await resolveViewerContext(db, account.id, familyId);

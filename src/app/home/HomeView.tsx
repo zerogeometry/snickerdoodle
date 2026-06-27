@@ -71,6 +71,35 @@ export function HomeView({ data }: { data: HomeData }) {
     }
   };
 
+  // Group keepsakes into each child's corner; whatever isn't filed under a child
+  // falls into a final catch-all (which also holds the "create new" tile).
+  const newestId = data.keepsakes[0]?.id ?? null;
+  const childGroups = data.children
+    .map((c) => ({ child: c, items: data.keepsakes.filter((k) => k.childSubjectId === c.id) }))
+    .filter((g) => g.items.length > 0);
+  const filedIds = new Set(childGroups.flatMap((g) => g.items.map((k) => k.id)));
+  const unfiled = data.keepsakes.filter((k) => !filedIds.has(k.id));
+
+  const renderTile = (k: HomeKeepsake) => {
+    const isNewest = k.id === newestId && highlightNew;
+    return (
+      <div
+        key={k.id}
+        ref={isNewest ? newestRef : undefined}
+        className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
+      >
+        <button type="button" onClick={() => setActive(k)} className="block w-full text-left">
+          <KeepsakeTile
+            name="Keepsake"
+            meta={monthLabel(k.createdAtISO)}
+            image={k.imageUrl ?? undefined}
+            badge={VIS_LABEL[k.visibility]}
+          />
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
       <AppDesktopNav active="Home" />
@@ -148,33 +177,34 @@ export function HomeView({ data }: { data: HomeData }) {
                     <Icon icon={IconSparkles} size={14} className="text-cinnamon" /> just added — your newest keepsake&apos;s right here.
                   </div>
                 ) : null}
-                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                  {data.keepsakes.map((k, idx) => {
-                    const isNewest = idx === 0 && highlightNew;
-                    return (
-                      <div
-                        key={k.id}
-                        ref={isNewest ? newestRef : undefined}
-                        className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
-                      >
-                        <button type="button" onClick={() => setActive(k)} className="block w-full text-left">
-                          <KeepsakeTile
-                            name="Keepsake"
-                            meta={monthLabel(k.createdAtISO)}
-                            image={k.imageUrl ?? undefined}
-                            badge={VIS_LABEL[k.visibility]}
-                          />
-                        </button>
-                      </div>
-                    );
-                  })}
-                  <Link
-                    href="/start-creating"
-                    className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[#E0A268] bg-[#FCF1E3] text-cinnamon"
-                  >
-                    <Icon icon={IconPlus} size={22} />
-                    <span className="text-xs font-bold">create new</span>
-                  </Link>
+
+                {/* Each little one's corner — the home grows with the child */}
+                {childGroups.map((g) => (
+                  <div key={g.child.id} className="mt-5">
+                    <p className="mb-2 flex items-baseline gap-2 font-display text-base font-semibold text-cocoa">
+                      {g.child.firstName}&apos;s corner
+                      <span className="text-xs font-normal text-[#9C8E7E]">
+                        {g.items.length} {g.items.length === 1 ? 'keepsake' : 'keepsakes'}
+                      </span>
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">{g.items.map(renderTile)}</div>
+                  </div>
+                ))}
+
+                <div className="mt-5">
+                  {childGroups.length > 0 && unfiled.length > 0 ? (
+                    <p className="mb-2 font-display text-base font-semibold text-cocoa">Not yet filed</p>
+                  ) : null}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                    {unfiled.map(renderTile)}
+                    <Link
+                      href="/start-creating"
+                      className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-dashed border-[#E0A268] bg-[#FCF1E3] text-cinnamon"
+                    >
+                      <Icon icon={IconPlus} size={22} />
+                      <span className="text-xs font-bold">create new</span>
+                    </Link>
+                  </div>
                 </div>
               </>
             )}

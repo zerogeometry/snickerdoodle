@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { canViewAsset, type AssetRef } from '@/authz';
-import { accounts, assets, families, memberships, storageObjects } from '@/db/schema';
+import { accounts, assets, children, families, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
 import type { Circle, VisibilityTier } from '@/domain/types';
@@ -22,6 +22,12 @@ export interface HomeKeepsake {
   visibility: VisibilityTier;
   createdAtISO: string;
   imageUrl: string | null;
+  childSubjectId: string | null;
+}
+
+export interface HomeChild {
+  id: string;
+  firstName: string;
 }
 
 export interface HomeData {
@@ -29,6 +35,7 @@ export interface HomeData {
   familyId: string;
   familyName: string;
   members: HomeMember[];
+  children: HomeChild[];
   keepsakes: HomeKeepsake[];
 }
 
@@ -94,14 +101,23 @@ export async function loadHome(): Promise<HomeData | null> {
       visibility: r.asset.visibility,
       createdAtISO: r.asset.createdAt.toISOString(),
       imageUrl: r.key ? await presignDownload(r.key, 300) : null,
+      childSubjectId: r.asset.childSubjectId,
     })),
   );
+
+  // The family's children (keepsake subjects), so the home can file keepsakes into
+  // each little one's corner.
+  const childRows = await db
+    .select({ id: children.id, firstName: children.firstName })
+    .from(children)
+    .where(eq(children.familyId, familyId));
 
   return {
     account,
     familyId,
     familyName: family?.displayName ?? 'Your family',
     members,
+    children: childRows,
     keepsakes,
   };
 }

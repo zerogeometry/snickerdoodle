@@ -4,7 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { assets, auditRecords, giftLinks } from '@/db/schema';
+import { assets, auditRecords, children, giftLinks } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { getGiftLink } from '@/server/giftLinks';
 import { mintWish } from '@/server/wish';
@@ -182,6 +182,29 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const view = await getGiftLink(db, tokenOf(res.url));
     expect(view.state).toBe('active');
     if (view.state === 'active') expect(view.title).toBe('Mia’s wishlist');
+  });
+
+  it('files the kept creations under the named child (grows with the child)', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mabel' });
+    expect(res.ok).toBe(true);
+
+    const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+    expect(row!.childSubjectId).toBeTruthy();
+    expect(row!.controllerAccountId).toBe(ids.samId); // controller = the child's controlling parent
+
+    const [kid] = await db.select().from(children).where(eq(children.id, row!.childSubjectId!));
+    expect(kid!.firstName).toBe('Mabel');
+    expect(kid!.familyId).toBe(ids.hartleyId);
+    expect(kid!.controllerAccountId).toBe(ids.samId);
+  });
+
+  it('a subject-less wish leaves the keepsake unfiled (no child)', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId] });
+    expect(res.ok).toBe(true);
+    const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+    expect(row!.childSubjectId).toBeNull();
   });
 
   it('an all-FLAGGED wish keeps the creations for review but mints no link', async () => {
