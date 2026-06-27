@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag, IconSparkles } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -9,18 +9,21 @@ import { Icon } from '@/ui/primitives/Icon';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
-import { removeBackgroundAction } from '@/app/actions/magic';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const DEFAULT_TF = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 
+/**
+ * Customize a product: size + colour + placement only. Image-level edits (remove
+ * background, the studio) live on the catalogue page and apply to every product —
+ * here we just place the (already-edited) image on this product.
+ */
 export default function CustomizePage() {
   const router = useRouter();
   const params = useParams<{ productKey: string }>();
   const productKey = params.productKey;
 
   const upload = useUpload((s) => s.upload);
-  const setStoreCutout = useUpload((s) => s.setCutout);
   const add = useBasket((s) => s.add);
   const placements = usePlacements((s) => s.placements);
 
@@ -28,8 +31,6 @@ export default function CustomizePage() {
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
-  const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(null);
-  const [removing, setRemoving] = useState(false);
 
   useEffect(() => {
     void loadCatalogueAction().then(setProducts);
@@ -37,7 +38,6 @@ export default function CustomizePage() {
 
   const product = products?.find((p) => p.key === productKey) ?? null;
 
-  // Initialise the selection from the default variant.
   useEffect(() => {
     if (!product) return;
     const def = product.variants.find((v) => v.isDefault) ?? product.variants[0]!;
@@ -73,24 +73,15 @@ export default function CustomizePage() {
     );
   }
 
-  const removeBg = async () => {
-    if (removing) return;
+  const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const placement = (upload?.assetId && placements[`${upload.assetId}-${product.key}`]) || DEFAULT_TF;
+
+  const editPlacement = () => {
     if (!upload?.assetId) {
       toast('upload a drawing first');
       return;
     }
-    setRemoving(true);
-    try {
-      const res = await removeBackgroundAction({ assetId: upload.assetId });
-      if (res.ok) {
-        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
-        setStoreCutout({ url: res.url, sourceObjectId: res.sourceObjectId }); // carry it back to the grid
-        toast('background removed ✨');
-      } else if (res.reason === 'budget') toast('that’s all your magic edits for now');
-      else toast('couldn’t do that — try again');
-    } finally {
-      setRemoving(false);
-    }
+    router.push(`/studio/position?draft=${upload.assetId}&return=${encodeURIComponent(`/customize/${product.key}`)}`);
   };
 
   const addToBasket = () => {
@@ -99,8 +90,6 @@ export default function CustomizePage() {
       return;
     }
     const sub = [variant.attributes.size, variant.attributes.colour].filter(Boolean).join(' · ') || undefined;
-    // Use the placement saved in the studio if they edited it, else the default.
-    const transform = placements[`${upload.assetId}-${product.key}`] ?? DEFAULT_TF;
     add({
       id: `cat-${variant.sku}`,
       name: product.label,
@@ -109,44 +98,48 @@ export default function CustomizePage() {
       variantId: variant.id,
       pricePence: variant.pricePence,
       sub,
-      artwork: { assetId: upload.assetId, transform, sourceObjectId: cutout?.sourceObjectId ?? upload.cutout?.sourceObjectId },
+      artwork: { assetId: upload.assetId, transform: placement, sourceObjectId: upload.cutout?.sourceObjectId },
     });
     toast('added to basket ✓');
     router.push('/catalogue');
   };
 
-  const editInStudio = () => {
-    if (!upload?.assetId) {
-      toast('upload a drawing first');
-      return;
-    }
-    router.push(`/studio/position?draft=${upload.assetId}&return=${encodeURIComponent(`/customize/${product.key}`)}`);
-  };
-
-  const previewImg = cutout?.url ?? upload?.cutout?.url ?? upload?.dataUrl ?? null;
-
   return (
     <Shell>
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
-        {/* Big preview */}
-        <div className="flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-          <ProductMockup product={product.key as ProductKey} image={previewImg} size={300} uid="customize" />
+        {/* Left: preview + angle thumbnails + edit placement */}
+        <div>
+          <div className="flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
+            <ProductMockup product={product.key as ProductKey} image={previewImg} placement={placement} size={300} uid="customize" />
+          </div>
+          {/* angle thumbnails — real product photography lands here on the Prodigi sync */}
+          <div className="mt-3 flex items-center gap-2">
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                title={i === 0 ? 'front' : 'more angles coming with product photography'}
+                className={`flex h-14 w-14 items-center justify-center rounded-xl border bg-[#FBF5E9] ${i === 0 ? 'border-cinnamon' : 'border-[#EFE6D6] opacity-50'}`}
+              >
+                <ProductMockup product={product.key as ProductKey} image={previewImg} placement={placement} size={44} uid={`thumb-${i}`} />
+              </div>
+            ))}
+          </div>
+          <Button variant="secondary" size="lg" className="mt-3 w-full" onClick={editPlacement}>
+            <Icon icon={IconPencil} size={15} /> edit placement
+          </Button>
         </div>
 
-        {/* Options */}
-        <div>
+        {/* Right: options → description → add to basket (bottom-right) */}
+        <div className="flex flex-col">
           <h1 className="font-display text-3xl font-semibold text-cocoa">{product.label}</h1>
           {product.blurb ? <p className="mt-1 text-sm text-[#6F6358]">{product.blurb}</p> : null}
           <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant.pricePence)}</div>
+          <p className="text-[11px] text-[#9C8E7E]">+ shipping, calculated at checkout</p>
 
-          {product.sizes.length > 0 ? (
-            <Picker label="Size" options={product.sizes} value={size} onChange={setSize} />
-          ) : null}
-          {product.colours.length > 0 ? (
-            <Picker label="Colour" options={product.colours} value={colour} onChange={setColour} swatch />
-          ) : null}
+          {product.sizes.length > 0 ? <Picker label="Size" options={product.sizes} value={size} onChange={setSize} /> : null}
+          {product.colours.length > 0 ? <Picker label="Colour" options={product.colours} value={colour} onChange={setColour} swatch /> : null}
 
-          {/* Expandable description */}
+          {/* collapsible, scrollable-in-container description */}
           {product.description ? (
             <div className="mt-5 rounded-xl border border-[#EFE6D6] bg-white">
               <button
@@ -159,7 +152,7 @@ export default function CustomizePage() {
                 <Icon icon={IconChevronDown} size={16} className={`text-[#9C8E7E] transition-transform ${descOpen ? 'rotate-180' : ''}`} />
               </button>
               {descOpen ? (
-                <div className="border-t border-[#EFE6D6] px-4 py-3 text-[13px] leading-relaxed text-[#6F6358]">
+                <div className="brand-scroll max-h-44 overflow-y-auto border-t border-[#EFE6D6] px-4 py-3 text-[13px] leading-relaxed text-[#6F6358]">
                   <p>{product.description}</p>
                   {Object.keys(product.specs).length > 0 ? (
                     <dl className="mt-3 space-y-1">
@@ -176,17 +169,9 @@ export default function CustomizePage() {
             </div>
           ) : null}
 
-          {/* Actions */}
-          <Button size="lg" className="mt-6 w-full" onClick={addToBasket}>
-            <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant.pricePence)}
-          </Button>
-          <div className="mt-2.5 flex gap-2.5">
-            <Button variant="secondary" size="lg" className="flex-1" onClick={editInStudio}>
-              <Icon icon={IconPencil} size={15} /> edit in studio
-            </Button>
-            <Button variant="secondary" size="lg" className="flex-1" onClick={removeBg} disabled={removing}>
-              <Icon icon={IconSparkles} size={15} className={cutout ? 'text-green-save' : 'text-cinnamon'} />
-              {removing ? 'removing…' : cutout ? 'bg removed' : 'remove background'}
+          <div className="mt-6 flex justify-end">
+            <Button size="lg" className="w-full sm:w-auto" onClick={addToBasket}>
+              <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant.pricePence)}
             </Button>
           </div>
         </div>

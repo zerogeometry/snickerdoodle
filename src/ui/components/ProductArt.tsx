@@ -136,14 +136,24 @@ export function ProductMockup({
   image,
   size = 96,
   uid,
+  placement,
 }: {
   product: ProductKey;
   image?: string | null;
   size?: number;
   uid?: string;
+  /** Reflect a placement (scale/offset/rotate) on the composited image — approximate
+   * preview; the exact print render lives in the positioner. */
+  placement?: { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
 }) {
   const rect = PRINT_RECT[product];
   const clipId = `pm-${product}-${uid ?? 'a'}`;
+  let transform: string | undefined;
+  if (rect && placement) {
+    const cx = rect.x + rect.w / 2;
+    const cy = rect.y + rect.h / 2;
+    transform = `rotate(${placement.rotationDeg} ${cx} ${cy}) translate(${(placement.offsetX * rect.w) / 2} ${(placement.offsetY * rect.h) / 2}) translate(${cx} ${cy}) scale(${placement.scale}) translate(${-cx} ${-cy})`;
+  }
   return (
     <svg viewBox="0 0 96 96" width={size} height={size} role="img" aria-label={`your drawing on a ${product}`}>
       {ART[product]}
@@ -154,15 +164,9 @@ export function ProductMockup({
               <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx="1" />
             </clipPath>
           </defs>
-          <image
-            href={image}
-            x={rect.x}
-            y={rect.y}
-            width={rect.w}
-            height={rect.h}
-            preserveAspectRatio="xMidYMid slice"
-            clipPath={`url(#${clipId})`}
-          />
+          <g clipPath={`url(#${clipId})`}>
+            <image href={image} x={rect.x} y={rect.y} width={rect.w} height={rect.h} preserveAspectRatio="xMidYMid slice" transform={transform} />
+          </g>
         </>
       ) : null}
     </svg>
