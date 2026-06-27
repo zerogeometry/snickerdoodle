@@ -1,11 +1,13 @@
 import { adoptEphemeralDraft, resolveViewerContext } from '@/server/assets';
 import { createGiftLink } from '@/server/giftLinks';
 import { ensureHomeFamily } from '@/server/onboarding';
+import { screenChildFirstName } from '@/server/textSafety';
 import type { DbHandle } from './db';
 
 export interface MintWishInput {
   assetIds: string[];
-  title?: string | null;
+  /** The child this wish is FOR — first name only; screened + turned into the title here. */
+  subject?: string | null;
 }
 
 /**
@@ -14,6 +16,10 @@ export interface MintWishInput {
  * mint ONE gift link from them. Drafts the caller can't claim, or that are BLOCKED,
  * are skipped (adoption throws and is swallowed); createGiftLink then snapshots only
  * the viewable + kept + content-CLEAR keepsakes.
+ *
+ * The subject (child first name) is SCREENED server-side — first-name-only, no
+ * surname, no abuse (children's-data rules) — and only then composed into the gift
+ * title here; a bad name fails fast (reason: 'name') BEFORE anything is kept.
  *
  * Pure server core — takes the db, the resolved account, and the held upload claims
  * as arguments — so it's exercisable in integration tests. The 'use server' action
@@ -24,9 +30,15 @@ export async function mintWish(
   account: { id: string; name: string | null },
   uploadClaims: string[],
   input: MintWishInput,
-): Promise<{ ok: boolean; url?: string }> {
+): Promise<{ ok: boolean; url?: string; reason?: 'name' }> {
   const ids = [...new Set((input.assetIds ?? []).filter(Boolean))];
   if (ids.length === 0) return { ok: false };
+
+  // Screen the child's name BEFORE keeping anything — never store an unscreened
+  // subject, and never silently strip a surname.
+  const screened = screenChildFirstName(input.subject);
+  if (!screened.ok) return { ok: false, reason: 'name' };
+  const title = screened.value ? `${screened.value}’s wishlist` : null;
 
   const familyId = await ensureHomeFamily(db, account.id, account.name);
 
@@ -45,7 +57,7 @@ export async function mintWish(
     const { token } = await createGiftLink(db, viewer, {
       familyId,
       assetIds: ids,
-      title: input.title ?? null,
+      title,
       invite: null,
     });
     return { ok: true, url: `/g/${token}` };

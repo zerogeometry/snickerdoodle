@@ -124,6 +124,11 @@ export default function CheckoutPage() {
         return;
       }
       clear();
+      try {
+        sessionStorage.removeItem(SUBJECT_KEY); // consumed — don't leak into a later checkout
+      } catch {
+        // ignore
+      }
       if (res.checkoutUrl) {
         window.location.href = res.checkoutUrl; // → Stripe Checkout
         return;

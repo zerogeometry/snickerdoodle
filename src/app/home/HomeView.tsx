@@ -42,10 +42,20 @@ export function HomeView({ data }: { data: HomeData }) {
     if (typeof window === 'undefined') return;
     if (new URLSearchParams(window.location.search).get('new') !== '1') return;
     setHighlightNew(true);
-    const t = setTimeout(() => newestRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+    // scrollIntoView's `behavior` is a DOM API, NOT governed by the CSS reduced-motion
+    // rule — honour the preference explicitly (NN7).
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const t = setTimeout(() => newestRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' }), 250);
     window.history.replaceState({}, '', '/home');
     return () => clearTimeout(t);
   }, []);
+
+  // Let the spotlight fade on its own so it never lingers as un-dismissable clutter.
+  useEffect(() => {
+    if (!highlightNew) return;
+    const t = setTimeout(() => setHighlightNew(false), 8000);
+    return () => clearTimeout(t);
+  }, [highlightNew]);
 
   const greetingName = data.account.name ?? data.account.email.split('@')[0];
 

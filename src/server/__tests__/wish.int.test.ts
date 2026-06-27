@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { assets, giftLinks } from '@/db/schema';
+import { assets, auditRecords, giftLinks } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { getGiftLink } from '@/server/giftLinks';
 import { mintWish } from '@/server/wish';
@@ -155,5 +155,55 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const res = await mintWish(db, sam(), [], { assetIds: [] });
     expect(res.ok).toBe(false);
     expect(res.url).toBeUndefined();
+  });
+
+  it('rejects a subject that contains a surname — and keeps nothing (child first name only)', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia Smith' });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('name');
+    // screened BEFORE adoption — the creation is not kept
+    const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+    expect(row!.familyId).toBeNull();
+    expect(row!.keptInHome).toBe(false);
+  });
+
+  it('rejects an abusive subject', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'fuckface' });
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe('name');
+  });
+
+  it('a valid first name becomes the gift title', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia' });
+    expect(res.ok).toBe(true);
+    const view = await getGiftLink(db, tokenOf(res.url));
+    expect(view.state).toBe('active');
+    if (view.state === 'active') expect(view.title).toBe('Mia’s wishlist');
+  });
+
+  it('an all-FLAGGED wish keeps the creations for review but mints no link', async () => {
+    const f1 = await draft('FLAGGED');
+    const f2 = await draft('FLAGGED');
+    const res = await mintWish(db, sam(), [f1.claimId, f2.claimId], { assetIds: [f1.assetId, f2.assetId] });
+    expect(res.ok).toBe(false); // nothing CLEAR to share
+    for (const f of [f1, f2]) {
+      const [row] = await db.select().from(assets).where(eq(assets.id, f.assetId));
+      expect(row!.keptInHome).toBe(true); // kept in the family, in review
+      expect(row!.familyId).toBe(ids.hartleyId);
+    }
+  });
+
+  it('writes a GIFT_LINK_CREATED audit record', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId] });
+    expect(res.ok).toBe(true);
+    const audits = await db
+      .select()
+      .from(auditRecords)
+      .where(and(eq(auditRecords.familyId, ids.hartleyId), eq(auditRecords.event, 'GIFT_LINK_CREATED')));
+    expect(audits.length).toBeGreaterThan(0);
   });
 });

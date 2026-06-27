@@ -22,7 +22,7 @@ import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
 import { SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { createWishAction } from '@/app/actions/wish';
 
-type State = 'minting' | 'needsAuth' | 'ready' | 'error' | 'empty';
+type State = 'minting' | 'needsAuth' | 'ready' | 'error' | 'empty' | 'badName';
 
 const SHARE_MSG = 'A little gift list for you 🎁';
 const SHARE: { label: string; icon: TablerIconComponent; href: (u: string) => string | null }[] = [
@@ -62,14 +62,23 @@ export default function ShareWishPage() {
     })();
     setSubject(who);
     setState('minting');
-    const res = await createWishAction({ assetIds, title: who ? `${who}’s wishlist` : undefined });
+    const res = await createWishAction({ assetIds, subject: who || undefined });
     if (res.needsAuth) {
       setState('needsAuth');
+      return;
+    }
+    if (res.reason === 'name') {
+      setState('badName'); // server rejected the child's name (surname / abuse)
       return;
     }
     if (res.ok && res.url) {
       setUrl(res.url);
       setState('ready');
+      try {
+        sessionStorage.removeItem(SUBJECT_KEY); // consumed — don't leak into a later flow
+      } catch {
+        // ignore
+      }
       return;
     }
     setState('error');
@@ -159,6 +168,19 @@ export default function ShareWishPage() {
             <p className="mt-2 text-sm text-[#6F6358]">We couldn’t make your wish link just now. Give it another go.</p>
             <Button size="lg" className="mt-5 w-full" onClick={() => { ran.current = false; void mint(); }}>
               try again
+            </Button>
+          </div>
+        ) : null}
+
+        {state === 'badName' ? (
+          <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
+            <h1 className="font-display text-xl font-semibold text-cocoa">Just a first name, please</h1>
+            <p className="mt-2 text-sm text-[#6F6358]">
+              We keep little ones safe by storing their <b>first name only</b> — no surnames. Pop back and pick who it’s
+              for again.
+            </p>
+            <Button size="lg" className="mt-5 w-full" onClick={() => (window.location.href = '/catalogue')}>
+              back to the range
             </Button>
           </div>
         ) : null}

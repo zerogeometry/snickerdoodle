@@ -35,6 +35,10 @@ export function WhoForModal({
       toast('pop in their first name');
       return;
     }
+    if (/\s/.test(subject)) {
+      toast('just their first name — no surname');
+      return;
+    }
     try {
       sessionStorage.setItem(SUBJECT_KEY, subject);
     } catch {

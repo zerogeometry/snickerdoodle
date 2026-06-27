@@ -17,8 +17,8 @@ import { mintWish } from '@/server/wish';
  */
 export async function createWishAction(input: {
   assetIds: string[];
-  title?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string }> {
+  subject?: string;
+}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
 
