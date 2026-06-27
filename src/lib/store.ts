@@ -23,18 +23,22 @@ export type Upload = { dataUrl: string; name: string; assetId?: string; cutout?:
 export const useUpload = create<{
   upload: Upload;
   termsAccepted: boolean;
+  termsNudge: number; // bumped when a gated action is blocked → flashes the terms tick
   setUpload: (u: Upload) => void;
   setAssetId: (id: string) => void;
   setCutout: (c: { url: string; sourceObjectId: string }) => void;
   setTermsAccepted: (v: boolean) => void;
+  nudgeTerms: () => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket + consent
 }>((set) => ({
   upload: null,
   termsAccepted: false,
+  termsNudge: 0,
   setUpload: (upload) => set({ upload }),
   setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
   setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
   setTermsAccepted: (termsAccepted) => set({ termsAccepted }),
+  nudgeTerms: () => set((s) => ({ termsNudge: s.termsNudge + 1 })),
   resetUpload: () => set({ upload: null }),
 }));
 

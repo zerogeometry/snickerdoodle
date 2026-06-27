@@ -21,6 +21,7 @@ export default function StartCreatingPage() {
   const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
   const termsAccepted = useUpload((s) => s.termsAccepted);
+  const nudgeTerms = useUpload((s) => s.nudgeTerms);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [removingBg, setRemovingBg] = useState(false);
@@ -61,7 +62,8 @@ export default function StartCreatingPage() {
   const removeBg = async () => {
     if (removingBg) return;
     if (!termsAccepted) {
-      toast('tick the terms to continue');
+      toast('please tick the terms first');
+      nudgeTerms();
       return;
     }
     setRemovingBg(true);

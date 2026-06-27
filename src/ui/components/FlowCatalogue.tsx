@@ -2,7 +2,7 @@
 
 import { IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
@@ -51,6 +51,7 @@ export function FlowCatalogue({
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
   const termsAccepted = useUpload((s) => s.termsAccepted);
+  const nudgeTerms = useUpload((s) => s.nudgeTerms);
   const setAssetId = useUpload((s) => s.setAssetId);
   const items = useBasket((s) => s.items);
   const add = useBasket((s) => s.add);
@@ -93,7 +94,8 @@ export function FlowCatalogue({
       return false;
     }
     if (!termsAccepted) {
-      toast('tick the terms to continue');
+      toast('please tick the terms first');
+      nudgeTerms(); // flashes the terms checkbox on the left
       return false;
     }
     return true;
@@ -249,15 +251,29 @@ export function FlowCatalogue({
 }
 
 /** Inline terms consent — the lawful basis for ingesting the drawing. Rendered by
- * the catalogue page (left panel), under "this stays yours". */
+ * the catalogue page (left panel), under "this stays yours". Stands out while
+ * un-ticked (it gates adding) and flashes when a blocked action nudges it. */
 export function TermsGate({ className = '' }: { className?: string }) {
   const termsAccepted = useUpload((s) => s.termsAccepted);
   const setTermsAccepted = useUpload((s) => s.setTermsAccepted);
+  const nudge = useUpload((s) => s.termsNudge);
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    if (nudge > 0) {
+      setFlash(true);
+      const t = setTimeout(() => setFlash(false), 1300);
+      return () => clearTimeout(t);
+    }
+  }, [nudge]);
   return (
-    <label className={`flex items-start gap-2 rounded-xl border border-[#E6D8BE] bg-[#FCF6EC] px-3 py-2.5 text-[12px] leading-relaxed text-[#6F6358] ${className}`}>
+    <label
+      className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed transition-shadow ${
+        termsAccepted ? 'border-[#E6D8BE] bg-[#FCF6EC] text-[#6F6358]' : 'border-cta bg-[#FBEFE0] text-[#46402F]'
+      } ${flash ? 'animate-pulse ring-2 ring-cta ring-offset-1' : ''} ${className}`}
+    >
       <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-cta" />
       <span>
-        tick to agree to the{' '}
+        <b>tick to agree</b> to the{' '}
         <a href="/trust/terms" className="font-semibold text-cinnamon underline">terms</a> &amp;{' '}
         <a href="/trust/privacy" className="font-semibold text-cinnamon underline">privacy notice</a> — we use your drawing to make your previews &amp; products, deleted within 30 days unless you keep it.
       </span>
