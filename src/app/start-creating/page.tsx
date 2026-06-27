@@ -8,9 +8,8 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { PlaceholderDoodle } from '@/ui/components/PlaceholderDoodle';
 import { CameraCapture } from '@/ui/components/CameraCapture';
-import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
+import { FlowCatalogue, TermsGate } from '@/ui/components/FlowCatalogue';
 import { toast, useUpload } from '@/lib/store';
-import { keepCreation } from '@/app/actions/keep';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -24,7 +23,6 @@ export default function StartCreatingPage() {
   const termsAccepted = useUpload((s) => s.termsAccepted);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [keeping, setKeeping] = useState(false);
   const [removingBg, setRemovingBg] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
@@ -81,31 +79,6 @@ export default function StartCreatingPage() {
     }
   };
 
-  // Keep into the family keepsake home (needs an account; guests go to log in).
-  const keep = async () => {
-    if (!upload || keeping) return;
-    setKeeping(true);
-    try {
-      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-      const fd = new FormData();
-      fd.append('image', blob, upload.name || 'drawing.png');
-      const res = await keepCreation(fd);
-      if (res.needsAuth) {
-        toast('log in to keep this safely');
-        router.push('/login?next=/start-creating');
-        return;
-      }
-      if (!res.ok) {
-        toast('hmm, that didn’t save — try again');
-        return;
-      }
-      toast('Added to your Keepsake ✓');
-      router.push('/home');
-    } finally {
-      setKeeping(false);
-    }
-  };
-
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
 
   return (
@@ -147,38 +120,39 @@ export default function StartCreatingPage() {
           </p>
         </main>
       ) : (
-        // ── Made-real state ──
-        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">
-          <div className="grid gap-8 md:grid-cols-5 md:items-start">
-            {/* Left: the drawing, large, with change + remove background underneath */}
-            <div className="md:col-span-2 md:sticky md:top-6">
-              <div className="inline-block rounded-lg border-8 border-honey bg-[#FFFDF8] p-2 shadow-[0_4px_14px_rgba(46,39,35,.08)]">
+        // ── Made-real state — fits one viewport; only the range scrolls ──
+        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-5 md:h-[calc(100dvh-3.5rem)] md:overflow-hidden">
+          <div className="grid gap-8 md:h-full md:grid-cols-5">
+            {/* Left: the drawing, large, with change / remove background / terms — all equal width */}
+            <div className="flex flex-col md:col-span-2">
+              <div className="w-full overflow-hidden rounded-lg border-8 border-honey bg-[#FFFDF8] shadow-[0_4px_14px_rgba(46,39,35,.08)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-auto rounded-sm" />
+                <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-full object-contain" />
               </div>
-              <div className="mt-3 flex flex-col gap-2 sm:max-w-[17rem]">
-                <Button variant="secondary" size="lg" onClick={() => fileRef.current?.click()}>
+              <div className="mt-3 flex w-full flex-col gap-2">
+                <Button variant="secondary" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image
                 </Button>
-                <Button size="lg" onClick={removeBg} disabled={removingBg}>
+                <Button size="lg" className="w-full" onClick={removeBg} disabled={removingBg}>
                   <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
                   {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
                 </Button>
               </div>
-              <div className="mt-4 flex items-start gap-2.5 rounded-xl bg-[#EAF1E4] p-3">
+              <div className="mt-3 flex w-full items-start gap-2.5 rounded-xl bg-[#EAF1E4] p-3">
                 <Icon icon={IconLock} size={16} className="mt-0.5 shrink-0 text-green-save" />
                 <p className="text-[13px] leading-relaxed text-[#46402F]">
                   <b>This stays yours. Always.</b> We use it to make your bits, then it&apos;s gone — unless you keep it.
                 </p>
               </div>
+              <TermsGate className="mt-2 w-full" />
             </div>
 
-            {/* Right: the personalised range */}
-            <div className="md:col-span-3">
-              <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
-              <div className="mt-4">
+            {/* Right: the personalised range — title fixed, range scrolls, actions pinned */}
+            <div className="md:col-span-3 md:flex md:h-full md:min-h-0 md:flex-col">
+              <h1 className="shrink-0 font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
+              <div className="mt-4 md:flex md:min-h-0 md:flex-1 md:flex-col">
                 {products ? (
-                  <FlowCatalogue products={products} compact scrollable showCategories />
+                  <FlowCatalogue products={products} compact scrollable showCategories className="md:h-full" />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }).map((_, i) => (
@@ -186,11 +160,6 @@ export default function StartCreatingPage() {
                     ))}
                   </div>
                 )}
-              </div>
-              <div className="mt-3 text-center sm:text-left">
-                <button type="button" onClick={keep} disabled={keeping} className="text-sm font-bold text-[#7A6A58] hover:text-cinnamon disabled:opacity-60">
-                  {keeping ? 'keeping…' : 'keep this in my keepsake box'}
-                </button>
               </div>
             </div>
           </div>
