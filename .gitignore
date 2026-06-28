@@ -1,5 +1,6 @@
 node_modules/
 .next/
+.next-e2e/
 out/
 dist/
 build/
@@ -13,3 +14,8 @@ coverage/
 *.tsbuildinfo
 # Vitest writes a transient compiled config next to vitest.config.ts
 vitest.config.ts.timestamp-*.mjs
+# Playwright e2e artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
