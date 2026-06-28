@@ -45,14 +45,33 @@ export default function CustomizePage() {
     setColour(def.attributes.colour ?? null);
   }, [product]);
 
+  // Colours actually available for the selected size — the matrix can be SPARSE (e.g.
+  // an 11oz mug in 3 colours but 15oz in white only), so never offer an unavailable combo.
+  const coloursForSize = useMemo(() => {
+    if (!product) return [];
+    const avail = product.variants
+      .filter((v) => product.sizes.length === 0 || v.attributes.size === size)
+      .map((v) => v.attributes.colour)
+      .filter((c): c is string => Boolean(c));
+    return [...new Set(avail)];
+  }, [product, size]);
+
+  // Keep the chosen colour valid for the chosen size (auto-correct on size change).
+  useEffect(() => {
+    if (!product || product.colours.length === 0) return;
+    if (coloursForSize.length > 0 && (!colour || !coloursForSize.includes(colour))) {
+      setColour(coloursForSize[0]!);
+    }
+  }, [product, coloursForSize, colour]);
+
+  // Exact match for the chosen size+colour — NO silent fallback to the default, which
+  // would order + charge the WRONG variant. null ⇒ the combination isn't available.
   const variant = useMemo(() => {
     if (!product) return null;
     return (
       product.variants.find(
         (v) => (product.sizes.length === 0 || v.attributes.size === size) && (product.colours.length === 0 || v.attributes.colour === colour),
-      ) ??
-      product.variants.find((v) => v.isDefault) ??
-      product.variants[0]!
+      ) ?? null
     );
   }, [product, size, colour]);
 
@@ -65,7 +84,7 @@ export default function CustomizePage() {
       </Shell>
     );
   }
-  if (!product || !variant) {
+  if (!product) {
     return (
       <Shell>
         <div className="py-16 text-center text-sm text-[#9C8E7E]">loading…</div>
@@ -87,6 +106,10 @@ export default function CustomizePage() {
   const addToBasket = () => {
     if (!upload?.assetId) {
       toast('upload a drawing first');
+      return;
+    }
+    if (!variant) {
+      toast('that size + colour isn’t available — pick another');
       return;
     }
     const sub = [variant.attributes.size, variant.attributes.colour].filter(Boolean).join(' · ') || undefined;
@@ -133,11 +156,11 @@ export default function CustomizePage() {
         <div className="flex flex-col">
           <h1 className="font-display text-3xl font-semibold text-cocoa">{product.label}</h1>
           {product.blurb ? <p className="mt-1 text-sm text-[#6F6358]">{product.blurb}</p> : null}
-          <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant.pricePence)}</div>
+          <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant?.pricePence ?? product.fromPence)}</div>
           <p className="text-[11px] text-[#9C8E7E]">+ shipping, calculated at checkout</p>
 
           {product.sizes.length > 0 ? <Picker label="Size" options={product.sizes} value={size} onChange={setSize} /> : null}
-          {product.colours.length > 0 ? <Picker label="Colour" options={product.colours} value={colour} onChange={setColour} swatch /> : null}
+          {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}
 
           {/* collapsible, scrollable-in-container description */}
           {product.description ? (
@@ -170,8 +193,8 @@ export default function CustomizePage() {
           ) : null}
 
           <div className="mt-6 flex justify-end">
-            <Button size="lg" className="w-full sm:w-auto" onClick={addToBasket}>
-              <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant.pricePence)}
+            <Button size="lg" className="w-full sm:w-auto" onClick={addToBasket} disabled={!variant}>
+              <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
         </div>
@@ -216,7 +239,10 @@ function Picker({
 }
 
 function swatchColour(name: string): string {
-  const map: Record<string, string> = { oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8', natural: '#E7D9BE' };
+  const map: Record<string, string> = {
+    oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
+    natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
+  };
   return map[name] ?? '#E0C7A8';
 }
 

@@ -1,10 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { assertLiveOrderingEnabled, getProduct, isProdigiConfigured, ProdigiError } from '../client';
+import { getProduct, isProdigiConfigured, ProdigiError } from '../client';
 
 const ORIG = {
   key: process.env.PRODIGI_API_KEY,
   base: process.env.PRODIGI_BASE_URL,
-  live: process.env.PRODIGI_LIVE_ORDERS,
 };
 const realFetch = global.fetch;
 
@@ -17,7 +16,6 @@ afterEach(() => {
   global.fetch = realFetch;
   setEnv('PRODIGI_API_KEY', ORIG.key);
   setEnv('PRODIGI_BASE_URL', ORIG.base);
-  setEnv('PRODIGI_LIVE_ORDERS', ORIG.live);
   vi.restoreAllMocks();
 });
 
@@ -69,12 +67,5 @@ describe('prodigi client', () => {
   it('getProduct throws when no key is configured', async () => {
     delete process.env.PRODIGI_API_KEY;
     await expect(getProduct('X')).rejects.toBeInstanceOf(ProdigiError);
-  });
-
-  it('assertLiveOrderingEnabled is GATED by default — opens only with the explicit env flag', () => {
-    delete process.env.PRODIGI_LIVE_ORDERS;
-    expect(() => assertLiveOrderingEnabled()).toThrow(/gated/i);
-    process.env.PRODIGI_LIVE_ORDERS = 'enabled';
-    expect(() => assertLiveOrderingEnabled()).not.toThrow();
   });
 });

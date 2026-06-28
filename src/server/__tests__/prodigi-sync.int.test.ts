@@ -19,14 +19,21 @@ const mockClient: ProdigiClient = {
   async getProduct(sku) {
     if (sku === 'TEST-MISSING') return null;
     const color = sku === 'TEST-COLOUR' ? ['black'] : undefined;
-    const shipsTo = sku === 'TEST-USONLY' ? ['US', 'CA'] : ['GB', 'US'];
+    // ships-to-GB is aggregated across ALL variants: a SKU with one US-only and one
+    // GB variant still ships to GB. TEST-USONLY is the negative (no GB anywhere).
+    const variants =
+      sku === 'TEST-USONLY'
+        ? [{ attributes: {}, shipsTo: ['US', 'CA'] }]
+        : sku === 'TEST-MIXED-GB'
+          ? [{ attributes: {}, shipsTo: ['US'] }, { attributes: {}, shipsTo: ['GB'] }]
+          : [{ attributes: {}, shipsTo: ['GB', 'US'] }];
     return {
       sku,
       description: `Desc ${sku}`,
       productDimensions: { width: 10, height: 20, units: 'cm' },
       attributes: { paperType: ['EMA'], substrateWeight: ['200gsm'], ...(color ? { color } : {}) },
       printAreas: { default: { required: true } },
-      variants: [{ attributes: {}, shipsTo }],
+      variants,
     };
   },
 };
@@ -46,11 +53,13 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
       .values({ key: PK, category: 'PRINT', label: 'sync test', blurb: 'b', description: 'KEEP-THIS-BRAND-DESCRIPTION', specs: { placeholder: 'x' } })
       .returning();
 
-    const variants: { sku: string; attrs: Record<string, string>; sku2: string; provider: 'PRODIGI' | 'MANUAL'; isDefault: boolean }[] = [
-      { sku: `${PK}-ok`, attrs: { size: 'A4' }, sku2: 'TEST-OK', provider: 'PRODIGI', isDefault: true },
-      { sku: `${PK}-missing`, attrs: { size: 'A3' }, sku2: 'TEST-MISSING', provider: 'PRODIGI', isDefault: false },
+    const variants: { sku: string; attrs: Record<string, string>; sku2: string; provider: 'PRODIGI' | 'MANUAL'; isDefault: boolean; config?: unknown }[] = [
+      // PK-ok carries prodigiAttrs (the order-time disambiguator) — it MUST survive the sync.
+      { sku: `${PK}-ok`, attrs: { size: 'A4' }, sku2: 'TEST-OK', provider: 'PRODIGI', isDefault: true, config: { prodigiAttrs: { color: 'gold' } } },
+      { sku: `${PK}-missing`, attrs: { size: 'A3' }, sku2: 'TEST-MISSING', provider: 'PRODIGI', isDefault: false, config: { prodigiAttrs: { color: 'black' } } },
       { sku: `${PK}-usonly`, attrs: { size: '5x7' }, sku2: 'TEST-USONLY', provider: 'PRODIGI', isDefault: false },
       { sku: `${PK}-colour`, attrs: { colour: 'turquoise' }, sku2: 'TEST-COLOUR', provider: 'PRODIGI', isDefault: false },
+      { sku: `${PK}-mixedgb`, attrs: { size: '8x10' }, sku2: 'TEST-MIXED-GB', provider: 'PRODIGI', isDefault: false },
       { sku: `${PK}-manual`, attrs: {}, sku2: 'TEST-MANUAL', provider: 'MANUAL', isDefault: false },
     ];
     let sort = 0;
@@ -61,7 +70,7 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
         .returning();
       await db
         .insert(productVariantProviders)
-        .values({ variantId: variant!.id, provider: v.provider, providerSku: v.sku2, isDefault: true });
+        .values({ variantId: variant!.id, provider: v.provider, providerSku: v.sku2, providerConfig: v.config ?? null, isDefault: true });
     }
 
     report = await syncProdigiCatalogue(db, mockClient);
@@ -83,6 +92,12 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
     expect(e?.warnings.some((w) => /ship to GB/i.test(w))).toBe(true);
   });
 
+  it('aggregates ships-to-GB across all variants (mixed US + GB → no warning)', () => {
+    const e = report.entries.find((x) => x.providerSku === 'TEST-MIXED-GB');
+    expect(e?.status).toBe('ok');
+    expect(e?.warnings.some((w) => /ship to GB/i.test(w))).toBe(false);
+  });
+
   it('reconciles colours against the Prodigi colour axis', () => {
     const e = report.entries.find((x) => x.providerSku === 'TEST-COLOUR');
     expect(e?.warnings.some((w) => /colour/i.test(w))).toBe(true);
@@ -98,15 +113,28 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
     expect(p!.description).toBe('KEEP-THIS-BRAND-DESCRIPTION');
   });
 
-  it('snapshots each variant Prodigi data into providerConfig', async () => {
+  it('snapshots Prodigi data into providerConfig WITHOUT destroying prodigiAttrs', async () => {
     const rows = await db
       .select({ cfg: productVariantProviders.providerConfig })
       .from(productVariantProviders)
       .innerJoin(productVariants, eq(productVariants.id, productVariantProviders.variantId))
       .where(eq(productVariants.sku, `${PK}-ok`));
-    const cfg = rows[0]?.cfg as { description?: string; shipsToGB?: boolean; syncedAt?: string } | null;
+    const cfg = rows[0]?.cfg as { description?: string; shipsToGB?: boolean; syncedAt?: string; prodigiAttrs?: Record<string, string> } | null;
     expect(cfg?.description).toBe('Desc TEST-OK');
     expect(cfg?.shipsToGB).toBe(true);
     expect(cfg?.syncedAt).toBeTruthy();
+    // The order-time disambiguator survives — without it, a shared-SKU variant loses its colour/size.
+    expect(cfg?.prodigiAttrs).toEqual({ color: 'gold' });
+  });
+
+  it('preserves prodigiAttrs even when the SKU is missing (404)', async () => {
+    const rows = await db
+      .select({ cfg: productVariantProviders.providerConfig })
+      .from(productVariantProviders)
+      .innerJoin(productVariants, eq(productVariants.id, productVariantProviders.variantId))
+      .where(eq(productVariants.sku, `${PK}-missing`));
+    const cfg = rows[0]?.cfg as { missing?: boolean; prodigiAttrs?: Record<string, string> } | null;
+    expect(cfg?.missing).toBe(true);
+    expect(cfg?.prodigiAttrs).toEqual({ color: 'black' });
   });
 });

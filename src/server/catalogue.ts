@@ -1,3 +1,4 @@
+import 'server-only';
 import { and, asc, eq, inArray, ne, notInArray, or } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
@@ -66,7 +67,7 @@ const DEFS: Record<string, ProductDef> = {
   card: {
     category: 'CARD', label: 'card', blurb: 'a little card, a big smile', print: true,
     description: "A folded greeting card with your little one's artwork on the front — ready to write in and give.",
-    specs: { material: '[Prodigi: 330gsm card]', inside: 'blank for your message' },
+    specs: { material: '330gsm card', inside: 'blank for your message' },
     variants: [
       { size: '7×5″', pricePence: 400, wMm: 127, hMm: 178, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
       { size: 'A5', pricePence: 450, wMm: 148, hMm: 210, prodigiSku: 'CLASSIC-GRE-FEDR-A5-BLA' },
@@ -75,13 +76,13 @@ const DEFS: Record<string, ProductDef> = {
   framedPrint: {
     category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true,
     description: 'A gallery-quality print of the original, framed and ready to hang — the wonky bits framed in gold.',
-    specs: { material: '[Prodigi: EMA 200gsm fine-art paper]', frame: '[Prodigi: classic frame]', glazing: '[Prodigi: Perspex]' },
+    specs: { material: 'fine-art paper', glazing: 'shatterproof Perspex' },
     variants: frameVariants(),
   },
   mug: {
     category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true,
     description: "Their masterpiece wrapped around a sturdy mug — for the grown-up who'll treasure every sip.",
-    specs: { material: '[Prodigi: ceramic]', care: '[Prodigi: dishwasher safe]' },
+    specs: { material: 'ceramic', care: 'dishwasher safe' },
     variants: [
       { size: '11oz', colour: 'white', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-W' },
       { size: '11oz', colour: 'pink', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-11OZ-PNK' },
@@ -92,13 +93,13 @@ const DEFS: Record<string, ProductDef> = {
   kidsTee: {
     category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true,
     description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
-    specs: { material: '[Prodigi: 100% organic cotton]', care: '[Prodigi: wash at 30°]' },
+    specs: { care: 'wash at 30°' },
     variants: teeVariants(),
   },
   cushion: {
     category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true,
     description: 'A plump cushion with their artwork on it — a keepsake you can actually hug.',
-    specs: { material: '[Prodigi: canvas, double-sided]', filling: '[Prodigi: fibre fill included]' },
+    specs: { material: 'canvas, double-sided', filling: 'fibre fill included' },
     variants: [
       { size: '16″', pricePence: 2800, wMm: 406, hMm: 406, prodigiSku: 'GLOBAL-CUSH-16X16-CAN-DUAL' },
       { size: '20″', pricePence: 3400, wMm: 508, hMm: 508, prodigiSku: 'GLOBAL-CUSH-20X20-CAN-DUAL' },
@@ -107,7 +108,7 @@ const DEFS: Record<string, ProductDef> = {
   blanket: {
     category: 'BLANKET', label: 'blanket', blurb: 'cuddles, with their art woven in', print: true,
     description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
-    specs: { material: '[Prodigi: fleece]', care: '[Prodigi: machine washable]' },
+    specs: { material: 'fleece', care: 'machine washable' },
     variants: [
       { size: 'medium', colour: 'white', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMWHITE' },
       { size: 'medium', colour: 'pink', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMPINK' },
@@ -118,13 +119,13 @@ const DEFS: Record<string, ProductDef> = {
   storybook: {
     category: 'BOOK', label: 'storybook', blurb: "they're the hero of the story", print: true,
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
-    specs: { material: '[Prodigi: hardcover, gloss]', pages: '[Prodigi: 24pp]' },
+    specs: { material: 'hardcover', pages: '24 pages' },
     variants: [{ size: 'A4', pricePence: 2400, wMm: 210, hMm: 297, prodigiSku: 'BOOK-FE-A4-P-HARD-G' }],
   },
   jigsaw: {
     category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true,
     description: 'Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece.',
-    specs: { material: '[Prodigi: board, in a tin]' },
+    specs: { material: 'board, in a keepsake tin' },
     variants: [
       { size: '30 pieces', pricePence: 2000, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-30' },
       { size: '110 pieces', pricePence: 2600, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-110' },
@@ -134,7 +135,7 @@ const DEFS: Record<string, ProductDef> = {
   toteBag: {
     category: 'BAG', label: 'tote bag', blurb: 'carry their creativity everywhere', print: true,
     description: 'A roomy canvas tote with their artwork printed on — creativity you can carry to the shops.',
-    specs: { material: '[Prodigi: canvas]', handles: '[Prodigi: black]' },
+    specs: { material: 'canvas', handles: 'black' },
     variants: [{ size: '14×18.5″', pricePence: 1600, wMm: 350, hMm: 400, prodigiSku: 'H-BAG-CTB' }],
   },
   giftWrap: {
@@ -246,10 +247,11 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
 
   for (const key of keys) {
     const def = DEFS[key]!;
+    const order = sortOrder++;
     const [product] = await db
       .insert(products)
-      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: sortOrder++ })
-      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true } })
+      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order })
+      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order } })
       .returning();
 
     const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === 0));

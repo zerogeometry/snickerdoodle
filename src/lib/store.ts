@@ -17,28 +17,22 @@ export { DELIVERY_PENCE };
 export const gbp = formatPence;
 
 // ── the uploaded drawing (from Start Creating / camera) ──────────────────────
-// `assetId` is set once the upload is ingested server-side (an ephemeral draft);
-// `termsAccepted` gates that ingest and persists across the flow.
+// `assetId` is set once the upload is ingested server-side (an ephemeral draft).
+// Consent is NOT a client flag: the ACT of uploading is the acceptance (lawful basis
+// = CONTRACT, Art 6(1)(b)), recorded SERVER-SIDE at ingest (termsAcceptedAt +
+// termsVersion). The conspicuous upload-step notice is the transparency. See DECISIONS.md.
 export type Upload = { dataUrl: string; name: string; assetId?: string; cutout?: { url: string; sourceObjectId: string } } | null;
 export const useUpload = create<{
   upload: Upload;
-  termsAccepted: boolean;
   setUpload: (u: Upload) => void;
   setAssetId: (id: string) => void;
   setCutout: (c: { url: string; sourceObjectId: string }) => void;
-  setTermsAccepted: (v: boolean) => void;
-  resetUpload: () => void; // "Create Another" — new drawing, keep the basket + consent
+  resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 }>((set) => ({
   upload: null,
-  termsAccepted: false,
-  // The ACT of uploading IS the acceptance: the lawful basis for the core flow is
-  // CONTRACT (Art 6(1)(b)), not consent, so no tickbox — the conspicuous upload-step
-  // notice gives transparency + the rights-warranty, and we record it server-side at
-  // ingest (termsAcceptedAt + termsVersion). See DECISIONS.md.
-  setUpload: (upload) => set({ upload, termsAccepted: true }),
+  setUpload: (upload) => set({ upload }),
   setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
   setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
-  setTermsAccepted: (termsAccepted) => set({ termsAccepted }),
   resetUpload: () => set({ upload: null }),
 }));
 

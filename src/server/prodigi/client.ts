@@ -1,16 +1,17 @@
 /**
  * Prodigi Print API v4 client — the POD provider adapter (D4).
  *
- * SCOPE & SAFETY: this module currently exposes METADATA-ONLY calls (product
- * details, used by the catalogue sync). It NEVER sends a child's image. The live
- * hand-off of a child's artwork to Prodigi (order submission) is the single gated
- * chokepoint — see {@link assertLiveOrderingEnabled}, which stays closed until
- * LG3 (content-safety live) + LG6 (a signed Article 28 DPA) are green. Do not add
- * an order-submission call that bypasses that guard.
+ * SCOPE & SAFETY: this module exposes METADATA-ONLY calls (product details, used by
+ * the catalogue sync). It NEVER sends a child's image. The live hand-off of a child's
+ * artwork to a POD (order submission, Phase 3) must pass the single chokepoint
+ * `assertPodEgressAllowed` in src/fulfillment/gate.ts — a server-side, asset-aware
+ * predicate that stays closed until LG3 + LG6 are green. Do not add an order-submission
+ * call here that bypasses that gate.
  *
  * Residency: the sandbox/live API is Prodigi's (api.prodigi.com). Only SKUs and,
  * later, order metadata flow here — never an image until the gate opens.
  */
+import 'server-only';
 
 const DEFAULT_BASE = 'https://api.sandbox.prodigi.com/v4.0';
 
@@ -105,20 +106,7 @@ export interface ProdigiClient {
 
 export const prodigiClient: ProdigiClient = { getProduct };
 
-/**
- * THE GATED CHOKEPOINT. Any code path that would send a child's image to Prodigi
- * (i.e. submitting a real print order) MUST call this first. It throws until BOTH:
- *  - LG3: content-safety pipeline live (CSAM hash-check + classifier in-region), and
- *  - LG6: a signed Article 28 DPA with Prodigi (+ a transfer assessment if non-UK/EU),
- * which we represent operationally with an explicit env opt-in. This keeps the
- * non-negotiable — "no live child image leaves the VPC before LG3+LG6" — enforced
- * in code, not just in docs. Catalogue sync does NOT call this (it sends no image).
- */
-export function assertLiveOrderingEnabled(): void {
-  if (process.env.PRODIGI_LIVE_ORDERS !== 'enabled') {
-    throw new ProdigiError(
-      'Prodigi live ordering is gated: a child image must not be sent before LG3 (content-safety) + LG6 (Article 28 DPA). Set PRODIGI_LIVE_ORDERS=enabled only once both gates are signed off.',
-      0,
-    );
-  }
-}
+// The live child-image hand-off is gated by assertPodEgressAllowed in
+// src/fulfillment/gate.ts (a server-side, asset-aware predicate). It is intentionally
+// NOT here: this client is metadata-only, and the gate must sit beside the order/render
+// path where the asset is in hand — not on the API client.

@@ -73,6 +73,7 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       productId: products.id,
       productKey: products.key,
       productSpecs: products.specs,
+      providerConfig: productVariantProviders.providerConfig,
     })
     .from(productVariantProviders)
     .innerJoin(productVariants, eq(productVariants.id, productVariantProviders.variantId))
@@ -94,6 +95,11 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
 
   for (const r of rows) {
     const warnings: string[] = [];
+    // The order-time Prodigi attributes (size/colour for SKUs shared across variants)
+    // are the only per-variant disambiguator — PRESERVE them across every sync write.
+    const prodigiAttrs = (r.providerConfig as { prodigiAttrs?: Record<string, string> } | null)?.prodigiAttrs;
+    const keepAttrs = prodigiAttrs ? { prodigiAttrs } : {};
+
     let product: ProdigiProduct | null = null;
     try {
       product = await client.getProduct(r.providerSku);
@@ -106,20 +112,20 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       // 404 — the SKU doesn't exist (typo/renamed/placeholder). Record it, don't enrich.
       await db
         .update(productVariantProviders)
-        .set({ providerConfig: { missing: true, syncedAt: now.toISOString() } })
+        .set({ providerConfig: { ...keepAttrs, missing: true, syncedAt: now.toISOString() } })
         .where(eq(productVariantProviders.id, r.providerId));
       entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, status: 'missing', warnings: ['SKU not found on Prodigi'] });
       continue;
     }
 
-    const variant0 = product.variants?.[0];
-    const shipsToGB = Boolean(variant0?.shipsTo?.includes('GB')) || (product.variants ?? []).some((v) => v.shipsTo?.includes('GB'));
+    const shipsToGB = (product.variants ?? []).some((v) => v.shipsTo?.includes('GB'));
     if (!shipsToGB) warnings.push('does not ship to GB');
 
-    // Reconcile our colour (if any) against Prodigi's colour axis.
+    // Resolve Prodigi's colour axis ONCE (either spelling) — used for both the warning
+    // and the snapshot, so they can never disagree.
+    const prodigiColours = product.attributes?.color ?? product.attributes?.colour ?? [];
     const ourColour = ((r.attributes as Record<string, string> | null)?.colour ?? '').toLowerCase();
-    const prodigiColours = (product.attributes?.color ?? product.attributes?.colour ?? []).map((c) => c.toLowerCase());
-    if (ourColour && prodigiColours.length > 0 && !prodigiColours.includes(ourColour)) {
+    if (ourColour && prodigiColours.length > 0 && !prodigiColours.map((c) => c.toLowerCase()).includes(ourColour)) {
       warnings.push(`colour "${ourColour}" not in Prodigi colours [${prodigiColours.join(', ')}] — needs a colour map`);
     }
 
@@ -127,10 +133,11 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       .update(productVariantProviders)
       .set({
         providerConfig: {
+          ...keepAttrs,
           description: product.description,
           productDimensions: product.productDimensions ?? null,
           shipsToGB,
-          colours: product.attributes?.color ?? [],
+          colours: prodigiColours,
           sizes: product.attributes?.size ?? [],
           printAreas: Object.keys(product.printAreas ?? {}),
           variantCount: (product.variants ?? []).length,
@@ -139,7 +146,11 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       })
       .where(eq(productVariantProviders.id, r.providerId));
 
-    if (r.isDefault) productSpecUpdates.set(r.productId, specsFromProdigi(product));
+    // Enrich the product's technical specs from its DEFAULT variant — MERGE over the
+    // seeded brand-voice specs (so brand-only lines survive; Prodigi technicals win).
+    if (r.isDefault) {
+      productSpecUpdates.set(r.productId, { ...((r.productSpecs as Record<string, string>) ?? {}), ...specsFromProdigi(product) });
+    }
 
     entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, status: 'ok', warnings });
   }

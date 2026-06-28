@@ -1,11 +1,12 @@
+import 'server-only';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
 
 // Lazily created so importing the schema (e.g. in tests, or drizzle-kit) never
 // opens a connection. The connection string points at the UK/EU Postgres and is
-// only present at runtime — never committed. (Add `import 'server-only'` once the
-// Next.js app shell lands, to keep this off the client bundle.)
+// only present at runtime — never committed. `import 'server-only'` keeps this — and
+// the DATABASE_URL it reads — out of any client bundle via a build-time error.
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let _client: ReturnType<typeof postgres> | null = null;
 
