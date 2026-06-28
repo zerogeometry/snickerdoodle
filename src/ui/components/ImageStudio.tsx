@@ -71,7 +71,7 @@ export function ImageStudio({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-cocoa/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label="Edit in studio" className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)]">
+      <div role="dialog" aria-modal="true" aria-label="Edit in studio" className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)]">
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
           <h2 className="font-display text-lg font-semibold text-cocoa">Edit in studio</h2>
           <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-full p-1 text-[#B3A491] hover:bg-[#F2EADB]">

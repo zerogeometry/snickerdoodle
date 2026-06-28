@@ -38,22 +38,27 @@ export async function moderateAndRecord(
   input: { assetId: string; familyId: string | null; buffer: Buffer; sha256: string; now?: Date },
   providers?: ModerationProviders,
 ): Promise<ModerationVerdict> {
-  const verdict = await moderateImage({ buffer: input.buffer, sha256: input.sha256 }, providers);
+  const raw = await moderateImage({ buffer: input.buffer, sha256: input.sha256 }, providers);
+  // Fail-safe (D8): a malformed/unrecognised verdict routes to human review — NEVER
+  // silently CLEAR. Defends the gate against a future provider returning garbage.
+  const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
+  const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
+
   await db
     .update(assets)
-    .set({ moderationStatus: verdict.status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels: verdict.labels } })
+    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels } })
     .where(eq(assets.id, input.assetId));
-  if (verdict.status !== 'CLEAR') {
+  if (status !== 'CLEAR') {
     await db.insert(auditRecords).values({
       familyId: input.familyId,
       actorType: 'SYSTEM',
-      event: verdict.status === 'BLOCKED' ? 'CONTENT_BLOCKED' : 'CONTENT_FLAGGED',
+      event: status === 'BLOCKED' ? 'CONTENT_BLOCKED' : 'CONTENT_FLAGGED',
       targetType: 'asset',
       targetId: input.assetId,
-      metadata: { labels: verdict.labels },
+      metadata: { labels },
     });
   }
-  return verdict;
+  return { status, labels };
 }
 
 export { defaultProviders, isModerationConfigured } from './providers';

@@ -320,7 +320,7 @@ export default function CheckoutPage() {
                 <p className="mt-3 text-center text-[11px] text-[#7A6A58]">
                   {hasPersonalised ? (
                     <>
-                      A quick <b>magic-link sign-up</b> keeps your keepsake safe — no password. Already with us?{' '}
+                      A quick <b>magic-link sign-up</b> keeps your keepsake safe — no password. already signed up?{' '}
                       <Link href="/login?next=/checkout" className="font-bold text-cinnamon">log in</Link>.
                     </>
                   ) : (
