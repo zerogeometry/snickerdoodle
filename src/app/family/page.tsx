@@ -1,11 +1,11 @@
 import { redirect } from 'next/navigation';
-import { getCurrentAccount } from '@/server/session';
+import { loadFamily } from '@/server/family';
 import { FamilyView } from './FamilyView';
 
-// The family circle is a logged-in, children's-data surface — gate it. (The member
-// list itself is still demo data; wiring it to real DB members + invites is next.)
+// The family circle is a logged-in, children's-data surface — gate it, then render
+// the REAL members + keepsake subjects from the DB.
 export default async function FamilyPage() {
-  const account = await getCurrentAccount();
-  if (!account) redirect('/login?next=/family');
-  return <FamilyView />;
+  const data = await loadFamily();
+  if (!data) redirect('/login?next=/family');
+  return <FamilyView data={data} />;
 }
