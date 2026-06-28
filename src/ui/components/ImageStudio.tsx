@@ -101,9 +101,14 @@ export function ImageStudio({
           </div>
 
           <div className="mt-4">
-            <label htmlFor="brightness" className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
-              Brightness
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="brightness" className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
+                Brightness
+              </label>
+              <span className="text-[11px] font-bold text-[#7A6A58]" aria-hidden>
+                {Math.round(brightness * 100)}%
+              </span>
+            </div>
             <input
               id="brightness"
               type="range"
@@ -111,6 +116,7 @@ export function ImageStudio({
               max={1.5}
               step={0.05}
               value={brightness}
+              aria-valuetext={`${Math.round(brightness * 100)}% brightness`}
               onChange={(e) => setBrightness(Number(e.target.value))}
               className="mt-1 w-full accent-cta"
             />

@@ -62,7 +62,13 @@ export default function ShareWishPage() {
     })();
     setSubject(who);
     setState('minting');
-    const res = await createWishAction({ assetIds, subject: who || undefined });
+    // Guard against a hung server — fall to the error state rather than spin forever.
+    const res = await Promise.race([
+      createWishAction({ assetIds, subject: who || undefined }),
+      new Promise<{ ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' }>((resolve) =>
+        setTimeout(() => resolve({ ok: false }), 15000),
+      ),
+    ]).catch(() => ({ ok: false }) as { ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' });
     if (res.needsAuth) {
       setState('needsAuth');
       return;

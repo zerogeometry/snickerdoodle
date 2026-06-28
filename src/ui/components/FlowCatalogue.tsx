@@ -210,12 +210,12 @@ export function FlowCatalogue({
                 </div>
                 <div className="mt-auto flex items-center justify-between gap-2">
                   <div className="flex items-center rounded-full border border-[#E6D8BE] bg-white">
-                    <button type="button" aria-label={`one fewer ${p.label}`} onClick={() => quickAdd(p, -1)} disabled={qty === 0} className="px-2 py-1 text-[#7A6A58] disabled:opacity-30">
-                      <Icon icon={IconMinus} size={13} />
+                    <button type="button" aria-label={`one fewer ${p.label}`} onClick={() => quickAdd(p, -1)} disabled={qty === 0} className="flex min-h-9 min-w-9 items-center justify-center px-2 text-[#7A6A58] disabled:opacity-30">
+                      <Icon icon={IconMinus} size={14} />
                     </button>
                     <span className="min-w-5 text-center text-xs font-bold text-cocoa">{qty}</span>
-                    <button type="button" aria-label={`add a ${p.label}`} onClick={() => quickAdd(p, 1)} className="px-2 py-1 text-cinnamon">
-                      <Icon icon={IconPlus} size={13} />
+                    <button type="button" aria-label={`add a ${p.label}`} onClick={() => quickAdd(p, 1)} className="flex min-h-9 min-w-9 items-center justify-center px-2 text-cinnamon">
+                      <Icon icon={IconPlus} size={14} />
                     </button>
                   </div>
                   <button type="button" onClick={() => customize(p)} className="rounded-full border border-[#E6D8BE] bg-white px-2.5 py-1 text-[11px] font-bold text-cocoa hover:border-honey">

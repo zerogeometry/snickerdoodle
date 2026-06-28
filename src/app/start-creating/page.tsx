@@ -30,10 +30,15 @@ export default function StartCreatingPage() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
-  useEffect(() => {
-    void loadCatalogueAction().then(setProducts);
-  }, []);
+  const loadCatalogue = () => {
+    setLoadError(false);
+    void loadCatalogueAction()
+      .then(setProducts)
+      .catch(() => setLoadError(true));
+  };
+  useEffect(loadCatalogue, []);
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -173,7 +178,14 @@ export default function StartCreatingPage() {
             <div className="md:col-span-3">
               <h1 className="font-display text-2xl font-semibold leading-tight md:text-3xl">Your masterpiece, made real.</h1>
               <div className="mt-4">
-                {products ? (
+                {loadError ? (
+                  <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-6 text-center">
+                    <p className="text-sm text-[#6F6358]">we couldn’t load the range just now.</p>
+                    <Button variant="secondary" size="lg" className="mt-3" onClick={loadCatalogue}>
+                      try again
+                    </Button>
+                  </div>
+                ) : products ? (
                   <FlowCatalogue products={products} compact scrollable showCategories />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

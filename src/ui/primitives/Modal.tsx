@@ -1,10 +1,14 @@
 'use client';
 
 import { IconX } from '@tabler/icons-react';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Icon } from './Icon';
 
-/** Accessible modal dialog — dimmed backdrop, Escape/backdrop to close, scrollable body. */
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
+/** Accessible modal dialog — dimmed backdrop, Escape/backdrop to close, scrollable
+ * body, and a focus TRAP that returns focus to the trigger on close (NN7). */
 export function Modal({
   open,
   onClose,
@@ -22,17 +26,50 @@ export function Modal({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
+    const dialog = dialogRef.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    const focusables = () =>
+      dialog
+        ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE)).filter((el) => el.offsetParent !== null)
+        : [];
+    // Move focus into the dialog on open.
+    (focusables()[0] ?? dialog)?.focus();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab') return;
+      const els = focusables();
+      if (els.length === 0) {
+        e.preventDefault();
+        dialog?.focus();
+        return;
+      }
+      const first = els[0]!;
+      const last = els[els.length - 1]!;
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      previouslyFocused?.focus?.(); // restore focus to whatever opened the modal
     };
   }, [open, onClose]);
 
@@ -42,10 +79,12 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-cocoa/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="relative z-10 flex max-h-[90vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)]"
+        tabIndex={-1}
+        className="relative z-10 flex max-h-[90vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)] focus:outline-none"
       >
         <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-4">
           <div className="flex items-center gap-3">
@@ -59,7 +98,7 @@ export function Modal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="-mr-1 -mt-1 rounded-full p-1 text-[#B3A491] hover:bg-[#F2EADB]"
+            className="-mr-2 -mt-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-[#B3A491] hover:bg-[#F2EADB]"
           >
             <Icon icon={IconX} size={18} />
           </button>
