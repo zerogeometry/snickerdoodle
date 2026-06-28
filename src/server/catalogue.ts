@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, notInArray, or } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
@@ -6,97 +6,155 @@ import type { DbHandle } from './db';
 
 export { mmToPx };
 
-// ── Starter variant catalogue ────────────────────────────────────────────────
-// Sizes/colours/prices + the warm blurb here are PLACEHOLDERS. The real variant
-// list, dimensions, specs and per-variant prices come from the Prodigi catalogue
-// sync (P3); these only give the flow real, shaped data to run on now. Each size
-// carries its own print geometry; colours of the same size share it.
-type SizeDef = { label: string; wMm: number; hMm: number; dpi?: number; pricePence: number };
+// ── Variant catalogue, mapped to REAL Prodigi SKUs (D4) ──────────────────────
+// Each variant carries the live, sandbox-validated Prodigi SKU it's fulfilled by
+// plus the Prodigi `attributes` to send at order time (size/colour when Prodigi
+// models them as attributes of one SKU rather than separate SKUs). The brand voice
+// (label/blurb/description) is OURS; the technical `specs` here are placeholders
+// the Prodigi catalogue sync overwrites with real values. Prices are our retail
+// pence (server-authoritative); Prodigi cost is a separate quote concern.
+type VariantDef = {
+  size?: string; // display size, e.g. 'A4', '11oz', '30 pieces'; omit for one-size
+  colour?: string; // display colour
+  pricePence: number;
+  wMm: number;
+  hMm: number;
+  dpi?: number;
+  prodigiSku?: string; // the live Prodigi SKU (absent ⇒ MANUAL-fulfilled, e.g. add-ons)
+  prodigiAttrs?: Record<string, string>; // attributes to send to Prodigi at order time
+};
 type ProductDef = {
   category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'ADDON';
   label: string;
   blurb: string;
   description: string;
   specs: Record<string, string>;
-  sizes: Record<string, SizeDef>;
-  colours?: string[];
   print: boolean;
+  variants: VariantDef[]; // the FIRST is the default
 };
+
+// Frame: colour is a Prodigi *attribute* of one SKU per size → many of our variants
+// share a SKU. "framed in gold" is the brand signature, so gold is offered.
+const FRAME_COLOURS = ['natural', 'black', 'white', 'gold'];
+const FRAME_SIZES = [
+  { size: 'A4', sku: 'GLOBAL-CFPM-A4', wMm: 210, hMm: 297, pricePence: 2200 },
+  { size: 'A3', sku: 'GLOBAL-CFPM-A3', wMm: 297, hMm: 420, pricePence: 3200 },
+] as const;
+function frameVariants(): VariantDef[] {
+  return FRAME_SIZES.flatMap((s) =>
+    FRAME_COLOURS.map((colour) => ({
+      size: s.size, colour, pricePence: s.pricePence, wMm: s.wMm, hMm: s.hMm,
+      prodigiSku: s.sku, prodigiAttrs: { color: colour },
+    })),
+  );
+}
+
+// Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of
+// ONE SKU. Values are the exact Prodigi attribute strings (so orders are accurate).
+const TEE_SIZES = ['3-4 years', '5-6 years', '7-8 years'];
+const TEE_COLOURS = ['white', 'caribbean blue', 'cotton pink'];
+function teeVariants(): VariantDef[] {
+  return TEE_SIZES.flatMap((size) =>
+    TEE_COLOURS.map((colour) => ({
+      size, colour, pricePence: 1800, wMm: 240, hMm: 300,
+      prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: colour },
+    })),
+  );
+}
 
 const DEFS: Record<string, ProductDef> = {
   card: {
     category: 'CARD', label: 'card', blurb: 'a little card, a big smile', print: true,
     description: "A folded greeting card with your little one's artwork on the front — ready to write in and give.",
-    specs: { material: '[Prodigi: 300gsm silk card]', finish: '[Prodigi: matte, scored fold]', inside: 'blank for your message' },
-    sizes: { a5: { label: 'A5', wMm: 148, hMm: 210, pricePence: 400 }, a4: { label: 'A4', wMm: 210, hMm: 297, pricePence: 600 } },
+    specs: { material: '[Prodigi: 330gsm card]', inside: 'blank for your message' },
+    variants: [
+      { size: '7×5″', pricePence: 400, wMm: 127, hMm: 178, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'A5', pricePence: 450, wMm: 148, hMm: 210, prodigiSku: 'CLASSIC-GRE-FEDR-A5-BLA' },
+    ],
   },
   framedPrint: {
     category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true,
     description: 'A gallery-quality print of the original, framed and ready to hang — the wonky bits framed in gold.',
-    specs: { material: '[Prodigi: museum-grade matte paper]', frame: '[Prodigi: solid wood]', glazing: '[Prodigi: shatterproof]' },
-    sizes: { a4: { label: 'A4', wMm: 210, hMm: 297, pricePence: 2200 }, a3: { label: 'A3', wMm: 297, hMm: 420, pricePence: 3200 } },
-    colours: ['oak', 'black', 'white'],
+    specs: { material: '[Prodigi: EMA 200gsm fine-art paper]', frame: '[Prodigi: classic frame]', glazing: '[Prodigi: Perspex]' },
+    variants: frameVariants(),
   },
   mug: {
     category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true,
     description: "Their masterpiece wrapped around a sturdy mug — for the grown-up who'll treasure every sip.",
-    specs: { material: '[Prodigi: ceramic, 11oz]', care: '[Prodigi: dishwasher safe]' },
-    sizes: { std: { label: 'one size', wMm: 200, hMm: 85, pricePence: 1400 } },
+    specs: { material: '[Prodigi: ceramic]', care: '[Prodigi: dishwasher safe]' },
+    variants: [
+      { size: '11oz', colour: 'white', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-W' },
+      { size: '11oz', colour: 'pink', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-11OZ-PNK' },
+      { size: '11oz', colour: 'blue', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-11OZ-BLU' },
+      { size: '15oz', colour: 'white', pricePence: 1800, wMm: 220, hMm: 95, prodigiSku: 'H-MUG-15OZ-W' },
+    ],
   },
   kidsTee: {
     category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true,
-    description: 'A soft cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
-    specs: { material: '[Prodigi: 100% organic cotton]', print: '[Prodigi: DTG]', care: '[Prodigi: wash at 30°]' },
-    sizes: {
-      '1-2': { label: 'age 1–2', wMm: 200, hMm: 250, pricePence: 1800 },
-      '3-4': { label: 'age 3–4', wMm: 240, hMm: 300, pricePence: 1800 },
-      '5-6': { label: 'age 5–6', wMm: 280, hMm: 350, pricePence: 1800 },
-      '7-8': { label: 'age 7–8', wMm: 300, hMm: 380, pricePence: 1800 },
-    },
-    colours: ['white', 'sky', 'pink'],
+    description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
+    specs: { material: '[Prodigi: 100% organic cotton]', care: '[Prodigi: wash at 30°]' },
+    variants: teeVariants(),
   },
   cushion: {
     category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true,
     description: 'A plump cushion with their artwork on it — a keepsake you can actually hug.',
-    specs: { material: '[Prodigi: soft-touch suede feel]', filling: '[Prodigi: included]' },
-    sizes: { std: { label: 'one size', wMm: 450, hMm: 450, pricePence: 2800 } },
+    specs: { material: '[Prodigi: canvas, double-sided]', filling: '[Prodigi: fibre fill included]' },
+    variants: [
+      { size: '16″', pricePence: 2800, wMm: 406, hMm: 406, prodigiSku: 'GLOBAL-CUSH-16X16-CAN-DUAL' },
+      { size: '20″', pricePence: 3400, wMm: 508, hMm: 508, prodigiSku: 'GLOBAL-CUSH-20X20-CAN-DUAL' },
+    ],
   },
   blanket: {
     category: 'BLANKET', label: 'blanket', blurb: 'cuddles, with their art woven in', print: true,
-    description: 'A cosy blanket carrying their drawing — for snuggles that last long after they grow.',
-    specs: { material: '[Prodigi: sherpa fleece]', care: '[Prodigi: machine washable]' },
-    sizes: { std: { label: 'one size', wMm: 1000, hMm: 750, dpi: 150, pricePence: 4500 } },
+    description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
+    specs: { material: '[Prodigi: fleece]', care: '[Prodigi: machine washable]' },
+    variants: [
+      { size: 'medium', colour: 'white', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMWHITE' },
+      { size: 'medium', colour: 'pink', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMPINK' },
+      { size: 'large', colour: 'white', pricePence: 6000, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLWHITE' },
+      { size: 'large', colour: 'pink', pricePence: 6000, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLPINK' },
+    ],
   },
   storybook: {
     category: 'BOOK', label: 'storybook', blurb: "they're the hero of the story", print: true,
-    description: 'A keepsake storybook starring your little one and their artwork — the tale they were always the hero of.',
-    specs: { material: '[Prodigi: hardcover, matte laminate]', pages: '[Prodigi: 24pp]' },
-    sizes: { std: { label: 'one size', wMm: 200, hMm: 200, pricePence: 2400 } },
+    description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
+    specs: { material: '[Prodigi: hardcover, gloss]', pages: '[Prodigi: 24pp]' },
+    variants: [{ size: 'A4', pricePence: 2400, wMm: 210, hMm: 297, prodigiSku: 'BOOK-FE-A4-P-HARD-G' }],
   },
   jigsaw: {
     category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true,
-    description: 'Their drawing turned into a jigsaw — rainy-afternoon magic, piece by piece.',
-    specs: { material: '[Prodigi: recycled board]', pieces: '[Prodigi: 30 pieces]' },
-    sizes: { std: { label: 'one size', wMm: 280, hMm: 200, pricePence: 2000 } },
+    description: 'Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece.',
+    specs: { material: '[Prodigi: board, in a tin]' },
+    variants: [
+      { size: '30 pieces', pricePence: 2000, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-30' },
+      { size: '110 pieces', pricePence: 2600, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-110' },
+      { size: '252 pieces', pricePence: 3200, wMm: 375, hMm: 285, prodigiSku: 'JIGSAW-PUZZLE-252' },
+    ],
   },
   toteBag: {
     category: 'BAG', label: 'tote bag', blurb: 'carry their creativity everywhere', print: true,
-    description: 'A roomy cotton tote with their artwork printed on — creativity you can carry to the shops.',
-    specs: { material: '[Prodigi: heavyweight cotton]', handles: '[Prodigi: long]' },
-    sizes: { std: { label: 'one size', wMm: 350, hMm: 400, pricePence: 1600 } },
+    description: 'A roomy canvas tote with their artwork printed on — creativity you can carry to the shops.',
+    specs: { material: '[Prodigi: canvas]', handles: '[Prodigi: black]' },
+    variants: [{ size: '14×18.5″', pricePence: 1600, wMm: 350, hMm: 400, prodigiSku: 'H-BAG-CTB' }],
   },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false,
     description: "We'll wrap it beautifully and tuck in a handwritten-style note.",
     specs: {},
-    sizes: { std: { label: 'one size', wMm: 0, hMm: 0, pricePence: 300 } },
+    variants: [{ pricePence: 300, wMm: 0, hMm: 0 }], // no Prodigi SKU ⇒ MANUAL
   },
 };
 
+/** A short, stable code for a variant's size/colour, used in its internal sku. */
+function slug(s: string | undefined): string | null {
+  if (!s) return null;
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
 /** Stable sku for a variant: the default keeps the legacy product key (back-compat). */
-function variantSku(productKey: string, sizeCode: string, colour: string | undefined, isDefault: boolean): string {
+function variantSku(productKey: string, v: VariantDef, isDefault: boolean): string {
   if (isDefault) return productKey;
-  return [productKey, sizeCode === 'std' ? null : sizeCode, colour].filter(Boolean).join('-');
+  return [productKey, slug(v.size), slug(v.colour)].filter(Boolean).join('-');
 }
 
 /**
@@ -174,9 +232,12 @@ export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
 
 /**
  * Seed/refresh the catalogue (idempotent). Products get the blurb/description/specs;
- * each product gets its size×colour variants — the FIRST is the default and keeps
- * the legacy product key as its sku for back-compat. Each printable variant gets a
- * print template sized to its size.
+ * each product gets its explicit variants — the FIRST is the default and keeps the
+ * legacy product key as its sku for back-compat. Each printable variant gets a print
+ * template, and exactly one provider row: PRODIGI (with the live SKU + the order-time
+ * attributes) or MANUAL when no Prodigi SKU is mapped (e.g. add-ons). Variants no
+ * longer in the DEFS are DEACTIVATED (kept for order history, hidden from the shop).
+ * The Prodigi catalogue sync then validates each SKU + enriches the specs.
  */
 export async function seedCatalogue(db: DbHandle): Promise<{ products: number; variants: number }> {
   const keys = Object.keys(DEFS);
@@ -191,44 +252,61 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true } })
       .returning();
 
-    const colours = def.colours ?? [undefined];
+    const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === 0));
+
     let vsort = 0;
-    let isFirst = true;
-    for (const sizeCode of Object.keys(def.sizes)) {
-      const size = def.sizes[sizeCode]!;
-      for (const colour of colours) {
-        const isDefault = isFirst;
-        isFirst = false;
-        const sku = variantSku(key, sizeCode, colour, isDefault);
-        const attributes: Record<string, string> = {};
-        if (size.label !== 'one size') attributes.size = size.label;
-        if (colour) attributes.colour = colour;
-        const vlabel = [def.label, size.label !== 'one size' ? size.label : null, colour].filter(Boolean).join(' · ');
+    for (const v of def.variants) {
+      const isDefault = vsort === 0;
+      const sku = variantSku(key, v, isDefault);
+      const attributes: Record<string, string> = {};
+      if (v.size) attributes.size = v.size;
+      if (v.colour) attributes.colour = v.colour;
+      const vlabel = [def.label, v.size, v.colour].filter(Boolean).join(' · ');
 
-        const [variant] = await db
-          .insert(productVariants)
-          .values({ productId: product!.id, sku, label: vlabel, attributes, pricePence: size.pricePence, isDefault, sortOrder: vsort++ })
-          .onConflictDoUpdate({ target: productVariants.sku, set: { productId: product!.id, label: vlabel, attributes, pricePence: size.pricePence, isDefault, sortOrder: vsort } })
-          .returning();
-        variantCount++;
+      const [variant] = await db
+        .insert(productVariants)
+        .values({ productId: product!.id, sku, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true })
+        .onConflictDoUpdate({ target: productVariants.sku, set: { productId: product!.id, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true } })
+        .returning();
+      vsort++;
+      variantCount++;
 
-        if (def.print) {
-          const dpi = size.dpi ?? 300;
-          const wPx = mmToPx(size.wMm, dpi);
-          const hPx = mmToPx(size.hMm, dpi);
-          const tpl = {
-            orientation: (size.wMm > size.hMm ? 'LANDSCAPE' : size.wMm < size.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
-            printWidthMm: size.wMm, printHeightMm: size.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx,
-            aspectMilli: Math.round((size.wMm / size.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
-          };
-          await db.insert(printTemplates).values({ variantId: variant!.id, ...tpl }).onConflictDoUpdate({ target: printTemplates.variantId, set: tpl });
-        }
-        await db
-          .insert(productVariantProviders)
-          .values({ variantId: variant!.id, provider: 'PRODIGI', providerSku: `PRODIGI-PLACEHOLDER-${sku}`, isDefault: true })
-          .onConflictDoNothing();
+      if (def.print) {
+        const dpi = v.dpi ?? 300;
+        const wPx = mmToPx(v.wMm, dpi);
+        const hPx = mmToPx(v.hMm, dpi);
+        const tpl = {
+          orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
+          printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx,
+          aspectMilli: Math.round((v.wMm / v.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
+        };
+        await db.insert(printTemplates).values({ variantId: variant!.id, ...tpl }).onConflictDoUpdate({ target: printTemplates.variantId, set: tpl });
       }
+
+      // Exactly one provider row per variant: Prodigi when a live SKU is mapped (the
+      // order-time attributes go in providerConfig), else MANUAL. Concurrency-safe
+      // (the int suite seeds in parallel): drop any wrong-provider row (e.g. an old
+      // placeholder), then upsert the correct one.
+      const provider = v.prodigiSku ? 'PRODIGI' : 'MANUAL';
+      const providerSku = v.prodigiSku ?? sku;
+      const providerConfig = v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : null;
+      await db
+        .delete(productVariantProviders)
+        .where(and(eq(productVariantProviders.variantId, variant!.id), ne(productVariantProviders.provider, provider)));
+      await db
+        .insert(productVariantProviders)
+        .values({ variantId: variant!.id, provider, providerSku, providerConfig, isDefault: true })
+        .onConflictDoUpdate({
+          target: [productVariantProviders.variantId, productVariantProviders.provider],
+          set: { providerSku, providerConfig, isDefault: true, active: true },
+        });
     }
+
+    // Hide any variant of this product no longer in the DEFS (e.g. an old colour).
+    await db
+      .update(productVariants)
+      .set({ active: false })
+      .where(and(eq(productVariants.productId, product!.id), notInArray(productVariants.sku, currentSkus)));
   }
   return { products: keys.length, variants: variantCount };
 }

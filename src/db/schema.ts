@@ -469,7 +469,7 @@ export const productVariants = pgTable(
     productId: uuid('product_id')
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
-    sku: text('sku').notNull().unique(), // internal sku, e.g. 'framedPrint-A4-oak'
+    sku: text('sku').notNull().unique(), // internal sku, e.g. 'framedPrint-a4-black'
     label: text('label').notNull(),
     // Size / colour / finish axes (Prodigi-shaped, e.g. { size: 'A4', colour: 'oak' }).
     attributes: jsonb('attributes').$type<Record<string, string>>(),
