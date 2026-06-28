@@ -2,20 +2,26 @@
 
 > Maintained by Cowork. Every settled decision goes here with the docs it changed. **Claude Code proposes options; Simon decides; Cowork logs it and propagates the change into `docs/`.**
 
-## Open (awaiting Simon's decision — Code to propose options)
+> **Reconciliation note (2026-06-26, Cowork).** Code built against the proposed stack (`proposal/00–03`) and four directional decisions Simon gave (UK/EU-first residency; hybrid AI; provider-agnostic POD defaulting to Prodigi; responsive web + PWA).
+> **Update — Simon confirmed the architecture/stack on 2026-06-26.** The stack (D1) and the directional shape of D2/D4/D5/D6 are **accepted**. What remains genuinely open is the **per-provider selection + contracting**: the specific generative-AI provider (D3, drives LG6), the email/SMS provider (D7), the P3 book printer (D4), and the Article-28 DPAs for storage/payments/POD (LG5). Those stay open until chosen.
+
+## Open / directional (Simon to confirm; per-provider contracts pending)
 
 | # | Decision area | Why it matters | Status |
 |---|---|---|---|
-| D1 | **Tech stack** (framework, DB, hosting) | Foundation for everything | open |
-| D2 | **Children's image storage** | Most sensitive data; must be private, access-controlled, deletable | open |
-| D3 | **AI image provider** | Magic edits + upscale; **must be no-retention / no-training** | open |
-| D4 | **Print-on-demand provider(s)** incl. the **book printer** | Quality, AOV, fulfilment; book is the flagship | open |
-| D5 | **Payments** | Guest + member checkout, gifting, server-side pricing | open |
-| D6 | **Background jobs** | Image processing, reminders, fulfilment | open |
-| D7 | **Email** (transactional + reminders) | Invites, verification, occasion nudges; PECR consent | open |
+| D1 | **Tech stack** (framework, DB, hosting) | Foundation for everything | **directional** — Next.js 15 + React 19 + TS, Drizzle/Postgres, AWS `eu-west-2`; built against, pending sign-off |
+| D2 | **Children's image storage** | Most sensitive data; private, access-controlled, deletable | **directional** — S3 `eu-west-2`, private + SSE-KMS, separate originals key; **not built**, no provider DPA |
+| D3 | **AI image provider** | Magic edits + upscale; **must be no-retention / no-training** | **open** — hybrid: self-hosted in-region for Core edits; generative API (no-retention/ZDR) only from P3. Provider unchosen; LG6 open |
+| D4 | **Print-on-demand provider(s)** incl. **book printer** | Quality, AOV, fulfilment; book is flagship | **directional** — Prodigi default behind a swappable adapter; book printer for P3 unchosen |
+| D5 | **Payments** | Guest + member checkout, gifting, server-side pricing | **directional** — Stripe (token only, server-side totals); **not wired**, no DPA |
+| D6 | **Background jobs** | Image processing, reminders, fulfilment | **directional** — pg-boss (Postgres-backed); **not built** |
+| D7 | **Email** (transactional + reminders) | Invites, verification, occasion nudges; PECR consent | **open** — UK/EU ESP / AWS SES; unchosen |
 
 ## Settled
 
 | Date | Decision | Docs updated | Why |
 |---|---|---|---|
-| — | _(none yet)_ | | |
+| 2026-06-26 | **Architecture / stack ACCEPTED** by Simon: Next.js 15 + React 19 + TS · Drizzle/Postgres · AWS `eu-west-2` · S3 private + SSE-KMS storage · Stripe (token only) · Prodigi-default POD behind a swappable adapter · pg-boss jobs · hybrid AI (self-host Core edits in-region; generative no-retention API from P3) · web + PWA. Per-provider DPAs and the specific generative-AI / email / book-printer providers remain open. | DECISIONS.md, BUILD-LOG.md; proposal/ to be marked "accepted" | Founder sign-off given |
+| 2026-06-26 | **D9 — One "Studio" that grows.** The creative surface is a single product called **Studio** — never renamed, never split into "Editor". It grows in capability over time (mirroring the Keepsake Home that grows with the child). Future end-to-end / create-from-scratch / standalone generative design lands as **"Studio Plus"**, an upgraded mode *within* Studio. Near term, all generative use serves a purchasable product (COGS, priced in); standalone generation is a deferred Studio Plus concern. Per-account generation/abuse cap retained regardless of pricing model. **Pricing model itself deferred** (not a now-decision) — instrument cost-per-account + conversion-per-creation meanwhile. | docs/02 (naming), docs/03 §4 | Founder decision |
+| 2026-06-28 | **D10 — Consent UX + lawful basis for the upload.** The core *upload → make → deliver the keepsake* processing runs on **CONTRACT, UK GDPR Art 6(1)(b)** (necessary to perform the parent's purchase), **not consent** — so there is **no consent tickbox**. ICO: a consent box gating processing that's a precondition of the service is "tied"/bundled consent and *presumed invalid*, so removing it is the correct call. Replaced with **action-based acceptance at the upload step**: a conspicuous notice — *"by uploading, you confirm it's your little one's own artwork that you're free to use, and you accept our terms & privacy notice"* — with the **rights-warranty surfaced prominently** (Interfoto "red-hand") + terms/privacy linked; acceptance is **recorded server-side at ingest** (`termsAcceptedAt` + `termsVersion`). Researched vs ICO guidance, UK GDPR Art 4/6/7, *Parker-Grennan v Camelot* [2024] EWCA Civ 185, *Interfoto*, CRA 2015. **Open for the DP/IP advisor** 🧑‍⚖️: (a) confirm action-based acceptance is fine for the rights-warranty; (b) review/narrow any **consumer indemnity** for CRA 2015 s.62 fairness (prefer warranty + fast takedown); (c) record the **Children's-Code scope assessment** (likely out-of-scope — adults-only, children don't access — but evidence it in the DPIA) + the lawful basis in the **DPIA**; (d) keep **marketing** + the **P3 generative magic edits** as separate, unbundled opt-ins (never folded into the upload). | docs/05, CLAUDE.md, start-creating UI | Founder decision after research |
+| 2026-06-26 | **D8 — Content-safety approach** (from `project-office/briefs/CONTENT-SAFETY-options.md`). (1) **Copyright = S3-b**: user rights-warranty + brand-voice framing around the child's *own* original drawing + disclaimer of others' characters/logos + fast takedown; automated character-detection (S3-c) held in reserve for P2+. **IP lawyer to validate** 🧑‍⚖️. (2) **Upload classifier = AWS Rekognition Content Moderation** (in-region `eu-west-2`, pay-per-use), flag-for-review not auto-reject; self-host swap kept open. (3) **Must-haves confirmed as P0**: IWF **Image Intercept** (free CSAM hash-block at upload) + a **report/takedown** path. (4) **Generative (P3) = preset magic edits only, no free-text prompt box**; output re-screened. (5) **OSA scope** reworded from "largely out of scope" → "in scope but small/low-risk", to be confirmed by the **DP professional** 🧑‍⚖️. | docs/05, docs/03, CLAUDE.md, BUILD-LOG.md, LAUNCH-GATES.md | Founder decided all five |

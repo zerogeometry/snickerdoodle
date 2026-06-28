@@ -10,7 +10,7 @@ import { PlaceholderDoodle } from '@/ui/components/PlaceholderDoodle';
 import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
-import { FlowCatalogue, TermsGate } from '@/ui/components/FlowCatalogue';
+import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -22,8 +22,6 @@ export default function StartCreatingPage() {
   const setUpload = useUpload((s) => s.setUpload);
   const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
-  const termsAccepted = useUpload((s) => s.termsAccepted);
-  const nudgeTerms = useUpload((s) => s.nudgeTerms);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [removingBg, setRemovingBg] = useState(false);
@@ -74,11 +72,6 @@ export default function StartCreatingPage() {
   // Fast-track: remove the background right here, without opening Customize.
   const removeBg = async () => {
     if (removingBg) return;
-    if (!termsAccepted) {
-      toast('please tick the terms first');
-      nudgeTerms();
-      return;
-    }
     setRemovingBg(true);
     try {
       const assetId = await ensureAsset();
@@ -139,9 +132,18 @@ export default function StartCreatingPage() {
               <Icon icon={IconCamera} size={18} /> use camera
             </Button>
           </div>
-          <p className="mt-5 inline-flex items-center gap-1.5 text-xs text-[#6F6358]">
-            <Icon icon={IconLock} size={14} className="text-green-save" /> This stays yours. Always.
-          </p>
+          <div className="mt-6 max-w-sm rounded-xl border border-[#EADFC9] bg-[#FBF8F1] p-3 text-left text-xs leading-relaxed text-[#6F6358]">
+            <p className="flex items-start gap-1.5 font-bold text-cocoa">
+              <Icon icon={IconLock} size={14} className="mt-px shrink-0 text-green-save" />
+              By uploading, you confirm it&apos;s your little one&apos;s own artwork that you&apos;re free to use.
+            </p>
+            <p className="mt-1.5">
+              You also accept our{' '}
+              <Link href="/trust/terms" className="font-bold text-cinnamon">terms</Link> &amp;{' '}
+              <Link href="/trust/privacy" className="font-bold text-cinnamon">privacy notice</Link>. It stays yours — we use it
+              to make your bits, then it&apos;s gone unless you keep it.
+            </p>
+          </div>
         </main>
       ) : (
         // ── Made-real state — fits one viewport; only the range scrolls ──
@@ -171,7 +173,6 @@ export default function StartCreatingPage() {
                   <b>This stays yours. Always.</b> We use it to make your bits, then it&apos;s gone — unless you keep it.
                 </p>
               </div>
-              <TermsGate className="mt-2 w-full" />
             </div>
 
             {/* Right: the personalised range — title fixed, range scrolls in its container */}

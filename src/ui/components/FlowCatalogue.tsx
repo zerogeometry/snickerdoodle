@@ -2,7 +2,7 @@
 
 import { IconGift, IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
@@ -51,8 +51,6 @@ export function FlowCatalogue({
 }) {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
-  const termsAccepted = useUpload((s) => s.termsAccepted);
-  const nudgeTerms = useUpload((s) => s.nudgeTerms);
   const setAssetId = useUpload((s) => s.setAssetId);
   const items = useBasket((s) => s.items);
   const add = useBasket((s) => s.add);
@@ -78,7 +76,7 @@ export function FlowCatalogue({
   // Concurrent callers share the SAME in-flight ingest (no double-upload, no freeze).
   const ensureAsset = useCallback(async (): Promise<string | null> => {
     if (upload?.assetId) return upload.assetId;
-    if (!upload || !termsAccepted) return null;
+    if (!upload) return null;
     if (ingestRef.current) return ingestRef.current; // an ingest is already running — reuse it
     const run = (async (): Promise<string | null> => {
       try {
@@ -105,17 +103,12 @@ export function FlowCatalogue({
     } finally {
       ingestRef.current = null;
     }
-  }, [upload, termsAccepted, setAssetId]);
+  }, [upload, setAssetId]);
 
   const guardUpload = (): boolean => {
     if (!upload) {
       toast('upload a drawing first');
       router.push('/start-creating');
-      return false;
-    }
-    if (!termsAccepted) {
-      toast('please tick the terms first');
-      nudgeTerms(); // flashes the terms checkbox on the left
       return false;
     }
     return true;
@@ -271,33 +264,3 @@ export function FlowCatalogue({
   );
 }
 
-/** Inline terms consent — the lawful basis for ingesting the drawing. Rendered by
- * the catalogue page (left panel), under "this stays yours". Stands out while
- * un-ticked (it gates adding) and flashes when a blocked action nudges it. */
-export function TermsGate({ className = '' }: { className?: string }) {
-  const termsAccepted = useUpload((s) => s.termsAccepted);
-  const setTermsAccepted = useUpload((s) => s.setTermsAccepted);
-  const nudge = useUpload((s) => s.termsNudge);
-  const [flash, setFlash] = useState(false);
-  useEffect(() => {
-    if (nudge > 0) {
-      setFlash(true);
-      const t = setTimeout(() => setFlash(false), 1300);
-      return () => clearTimeout(t);
-    }
-  }, [nudge]);
-  return (
-    <label
-      className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[12px] leading-relaxed transition-shadow ${
-        termsAccepted ? 'border-[#E6D8BE] bg-[#FCF6EC] text-[#6F6358]' : 'border-cta bg-[#FBEFE0] text-[#46402F]'
-      } ${flash ? 'animate-pulse ring-2 ring-cta ring-offset-1' : ''} ${className}`}
-    >
-      <input type="checkbox" checked={termsAccepted} onChange={(e) => setTermsAccepted(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-cta" />
-      <span>
-        <b>tick to agree</b> to the{' '}
-        <a href="/trust/terms" className="font-semibold text-cinnamon underline">terms</a> &amp;{' '}
-        <a href="/trust/privacy" className="font-semibold text-cinnamon underline">privacy notice</a> — we use your drawing to make your previews &amp; products, deleted within 30 days unless you keep it.
-      </span>
-    </label>
-  );
-}
