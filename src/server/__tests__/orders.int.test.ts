@@ -157,10 +157,10 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     // the client's wild transform was CLAMPED server-side (scale 99→4, offset 5→1, rotation 44→0)
     expect(art!.transform).toMatchObject({ scale: 4, offsetX: 1, offsetY: -1, rotationDeg: 0 });
     expect((art!.templateSnapshot as { requiredDpi: number }).requiredDpi).toBe(300); // template frozen
-    expect(art!.status).toBe('READY'); // the paid flip ENQUEUED fulfilment (PENDING→READY)
+    expect(art!.status).toBe('PENDING'); // awaiting the fulfilment worker; the PAID order is the enqueue
   });
 
-  it('paying enqueues fulfilment (artwork PENDING→READY) atomically + idempotently', async () => {
+  it('marking paid is atomic + idempotent — the PAID order is the fulfilment enqueue', async () => {
     const [asset] = await db
       .insert(assets)
       .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
@@ -172,17 +172,14 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     });
     await track(res);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.status).toBe('PAID');
+    expect(order!.status).toBe('PAID'); // dev fallback paid it → claimable by the worker
     const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
     const [art1] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
-    expect(art1!.status).toBe('READY'); // enqueued in the same guarded transition
+    expect(art1!.status).toBe('PENDING'); // markOrderPaid never touches artwork
 
-    // A duplicate trigger (e.g. a Stripe webhook retry) is a no-op — the guarded
-    // PENDING→PAID flip already happened, so nothing re-enqueues or double-spends.
+    // A duplicate trigger (e.g. a Stripe webhook retry) is a clean no-op.
     await markOrderPaid(db, order!.id);
-    const [art2] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
     const [order2] = await db.select().from(orders).where(eq(orders.id, order!.id));
-    expect(art2!.status).toBe('READY');
     expect(order2!.status).toBe('PAID');
   });
 

@@ -169,16 +169,15 @@ export async function placeOrder(
 }
 
 /**
- * Mark an order paid and enqueue its fulfilment — ATOMICALLY and idempotently.
+ * Mark an order paid and spend the one-time join saving — ATOMICALLY and idempotently.
  *
- * The PENDING→PAID flip, the fulfilment enqueue, and the one-time join-saving spend
- * all happen in ONE transaction, and the enqueue is a conditional state flip gated on
- * the SAME guarded transition (`.where(status='PENDING')`) — not a separate call after
- * it (proposal/04 §6). So a Stripe webhook retry (which finds the order already PAID)
- * can never re-enqueue or double-spend, and a crash can't leave the flip half-applied.
+ * The PENDING→PAID flip and the join-saving spend run in ONE transaction, guarded on
+ * the transition (`.where(status='PENDING')`). So a Stripe webhook retry (which finds
+ * the order already PAID) can never double-spend, and a crash can't half-apply the flip.
  *
- * Enqueue = the order's printed lines move PENDING→READY; the fulfilment worker (§6,
- * not built yet) claims READY artwork and steps it render → gate → submit.
+ * The PAID status IS the fulfilment enqueue (proposal/04 §6): the worker claims the
+ * PENDING artwork of PAID orders. We deliberately do NOT add a separate post-flip
+ * enqueue write — that's the exact double-fire footgun §6 warns about.
  */
 export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void> {
   await db.transaction(async (tx) => {
@@ -188,21 +187,6 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
       .where(and(eq(orders.id, orderId), eq(orders.status, 'PENDING')))
       .returning();
     if (!updated) return; // already paid / unknown → no-op (idempotent)
-
-    // Enqueue fulfilment in the same guarded transition.
-    await tx
-      .update(orderItemArtwork)
-      .set({ status: 'READY' })
-      .where(
-        and(
-          inArray(
-            orderItemArtwork.orderItemId,
-            tx.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, updated.id)),
-          ),
-          eq(orderItemArtwork.status, 'PENDING'),
-        ),
-      );
-
     if (updated.joinSavingPence > 0 && updated.accountId) {
       await consumeJoinSaving(tx, updated.accountId);
     }
