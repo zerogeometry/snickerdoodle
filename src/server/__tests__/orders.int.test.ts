@@ -22,7 +22,11 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   const orderIds: string[] = [];
   const webhookIds: string[] = [];
 
+  // These tests exercise the dev "mark-paid" fallback path — force Stripe UNCONFIGURED
+  // so a real STRIPE_SECRET_KEY in the dev .env can't divert placeOrder to Checkout.
+  const prevStripeKey = process.env.STRIPE_SECRET_KEY;
   beforeAll(async () => {
+    delete process.env.STRIPE_SECRET_KEY;
     client = postgres(URL!, { prepare: false });
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
@@ -34,6 +38,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     if (webhookIds.length) await db.delete(webhookEvents).where(inArray(webhookEvents.id, webhookIds));
     if (ids) await cleanupDemoFamilies(db, ids);
     await client.end();
+    if (prevStripeKey !== undefined) process.env.STRIPE_SECRET_KEY = prevStripeKey;
   });
 
   async function track(res: { ref?: string }) {
