@@ -5,7 +5,7 @@ import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplat
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
-import type { DbHandle } from './db';
+import type { DbHandle, Tx } from './db';
 import { resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
 
@@ -168,20 +168,48 @@ export async function placeOrder(
   return { ok: true, ref };
 }
 
-/** Mark an order paid — idempotent (only PENDING→PAID) — and spend the one-time join saving. */
+/**
+ * Mark an order paid and enqueue its fulfilment — ATOMICALLY and idempotently.
+ *
+ * The PENDING→PAID flip, the fulfilment enqueue, and the one-time join-saving spend
+ * all happen in ONE transaction, and the enqueue is a conditional state flip gated on
+ * the SAME guarded transition (`.where(status='PENDING')`) — not a separate call after
+ * it (proposal/04 §6). So a Stripe webhook retry (which finds the order already PAID)
+ * can never re-enqueue or double-spend, and a crash can't leave the flip half-applied.
+ *
+ * Enqueue = the order's printed lines move PENDING→READY; the fulfilment worker (§6,
+ * not built yet) claims READY artwork and steps it render → gate → submit.
+ */
 export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void> {
-  const [updated] = await db
-    .update(orders)
-    .set({ status: 'PAID', paidAt: new Date() })
-    .where(and(eq(orders.id, orderId), eq(orders.status, 'PENDING')))
-    .returning();
-  if (!updated) return; // already paid / unknown → no-op (idempotent)
-  if (updated.joinSavingPence > 0 && updated.accountId) {
-    await consumeJoinSaving(db, updated.accountId);
-  }
+  await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(orders)
+      .set({ status: 'PAID', paidAt: new Date() })
+      .where(and(eq(orders.id, orderId), eq(orders.status, 'PENDING')))
+      .returning();
+    if (!updated) return; // already paid / unknown → no-op (idempotent)
+
+    // Enqueue fulfilment in the same guarded transition.
+    await tx
+      .update(orderItemArtwork)
+      .set({ status: 'READY' })
+      .where(
+        and(
+          inArray(
+            orderItemArtwork.orderItemId,
+            tx.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, updated.id)),
+          ),
+          eq(orderItemArtwork.status, 'PENDING'),
+        ),
+      );
+
+    if (updated.joinSavingPence > 0 && updated.accountId) {
+      await consumeJoinSaving(tx, updated.accountId);
+    }
+  });
 }
 
-async function consumeJoinSaving(db: DbHandle, accountId: string): Promise<void> {
+async function consumeJoinSaving(db: DbHandle | Tx, accountId: string): Promise<void> {
   const [m] = await db
     .select({ id: memberships.id })
     .from(memberships)

@@ -7,7 +7,7 @@ import * as schema from '@/db/schema';
 import { assets, invites, memberships, orderItemArtwork, orderItems, orders, productVariants, webhookEvents } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
-import { getOrdersForAccount, placeOrder } from '@/server/orders';
+import { getOrdersForAccount, markOrderPaid, placeOrder } from '@/server/orders';
 import { seedCatalogue } from '@/server/catalogue';
 import { handleStripeEvent } from '@/payments';
 import type { JoinProvenance } from '@/pricing';
@@ -157,6 +157,33 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     // the client's wild transform was CLAMPED server-side (scale 99→4, offset 5→1, rotation 44→0)
     expect(art!.transform).toMatchObject({ scale: 4, offsetX: 1, offsetY: -1, rotationDeg: 0 });
     expect((art!.templateSnapshot as { requiredDpi: number }).requiredDpi).toBe(300); // template frozen
+    expect(art!.status).toBe('READY'); // the paid flip ENQUEUED fulfilment (PENDING→READY)
+  });
+
+  it('paying enqueues fulfilment (artwork PENDING→READY) atomically + idempotently', async () => {
+    const [asset] = await db
+      .insert(assets)
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
+      .returning();
+    const res = await placeOrder(db, {
+      items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
+      account: { id: ids.samId },
+      joinProvenance: null,
+    });
+    await track(res);
+    const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
+    expect(order!.status).toBe('PAID');
+    const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
+    const [art1] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
+    expect(art1!.status).toBe('READY'); // enqueued in the same guarded transition
+
+    // A duplicate trigger (e.g. a Stripe webhook retry) is a no-op — the guarded
+    // PENDING→PAID flip already happened, so nothing re-enqueues or double-spends.
+    await markOrderPaid(db, order!.id);
+    const [art2] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
+    const [order2] = await db.select().from(orders).where(eq(orders.id, order!.id));
+    expect(art2!.status).toBe('READY');
+    expect(order2!.status).toBe('PAID');
   });
 
   it('refuses a personalised line for a keepsake the buyer cannot see', async () => {
