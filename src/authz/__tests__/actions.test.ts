@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   canBuyFromGiftList,
   canContributeCreations,
+  canDeleteAsset,
   canManageFamily,
   canSetAssetVisibility,
   type AssetRef,
@@ -82,4 +83,33 @@ describe('canSetAssetVisibility (the asset controller, while an active member)',
     expect(canSetAssetVisibility(asset, activeIn('acct-other'))).toBe(false));
   it('anonymous cannot set visibility', () =>
     expect(canSetAssetVisibility(asset, { accountId: null, membership: null })).toBe(false));
+});
+
+describe('canDeleteAsset (controller-only, while an active member — NN8)', () => {
+  const asset: AssetRef = {
+    id: 'a1',
+    familyId: 'fam-A',
+    uploaderAccountId: 'acct-uploader',
+    controllerAccountId: 'acct-controller',
+    visibility: 'FAMILY',
+  };
+  const activeIn = (accountId: string): ViewerContext => ({ accountId, membership: mem({ accountId, familyId: 'fam-A' }) });
+
+  it('the controlling parent (active) can delete', () =>
+    expect(canDeleteAsset(asset, activeIn('acct-controller'))).toBe(true));
+  it('the non-controller uploader (e.g. a co-uploading relative) cannot delete', () =>
+    expect(canDeleteAsset(asset, activeIn('acct-uploader'))).toBe(false));
+  it('a removed controller cannot delete', () =>
+    expect(
+      canDeleteAsset(asset, {
+        accountId: 'acct-controller',
+        membership: mem({ accountId: 'acct-controller', familyId: 'fam-A', status: 'REMOVED' }),
+      }),
+    ).toBe(false));
+  it('an Extended-circle member (not controller) cannot delete', () =>
+    expect(canDeleteAsset(asset, { accountId: 'acct-x', membership: mem({ accountId: 'acct-x', familyId: 'fam-A', circle: 'EXTENDED' }) })).toBe(false));
+  it('a member of ANOTHER family cannot delete (family-scope)', () =>
+    expect(canDeleteAsset(asset, { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', familyId: 'fam-B' }) })).toBe(false));
+  it('anonymous cannot delete', () =>
+    expect(canDeleteAsset(asset, { accountId: null, membership: null })).toBe(false));
 });

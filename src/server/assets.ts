@@ -1,9 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { assets, auditRecords, memberships, storageObjects } from '@/db/schema';
-import { presignDownload } from '@/storage';
+import { deleteObjectConfirmed, presignDownload } from '@/storage';
 import {
   AuthzError,
   assertCanViewAsset,
+  canDeleteAsset,
   canSetAssetVisibility,
   canViewAsset,
   type AssetRef,
@@ -227,4 +228,42 @@ export async function changeAssetVisibility(
     metadata: { from: row.visibility, to: next },
   });
   return { ...ref, visibility: next };
+}
+
+/**
+ * Permanently delete an asset on the controller's demand (NN8 + children's-data
+ * rules). Authz-gated to the controlling parent, then:
+ *   1. the BYTES are removed from storage, CONFIRMED with retry (a child's
+ *      original is provably gone, not best-effort);
+ *   2. an append-only ASSET_DELETED audit row is written (before the row is gone);
+ *   3. the asset row is dropped — which CASCADES its storage_object rows and nulls
+ *      the asset link on any frozen order / ML record.
+ * Gift links to it then resolve "gone" (the snapshot serves no missing bytes).
+ * Backups are crypto-shredded / excluded from long-lived backups at the infra layer.
+ */
+export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerContext): Promise<void> {
+  const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
+  if (!row) throw denied('not found');
+  if (!canDeleteAsset(toAssetRef(row), viewer)) {
+    throw denied('only the controlling parent may delete this keepsake');
+  }
+
+  // 1. bytes first — never drop the DB record while bytes might linger.
+  const objects = await db.select().from(storageObjects).where(eq(storageObjects.assetId, assetId));
+  for (const o of objects) {
+    await deleteObjectConfirmed(o.key);
+  }
+
+  // 2. append-only audit while the family link is still valid.
+  await db.insert(auditRecords).values({
+    familyId: row.familyId,
+    actorAccountId: viewer.accountId,
+    actorType: 'MEMBER',
+    event: 'ASSET_DELETED',
+    targetType: 'asset',
+    targetId: assetId,
+  });
+
+  // 3. drop the row — cascades storage_object rows; nulls order/ML asset links.
+  await db.delete(assets).where(eq(assets.id, assetId));
 }

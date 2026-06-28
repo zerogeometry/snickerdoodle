@@ -16,7 +16,7 @@ import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
-import { setAssetVisibilityAction } from '@/app/actions/keep';
+import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
 import type { HomeData, HomeKeepsake } from '@/server/home';
 import type { VisibilityTier } from '@/domain/types';
 
@@ -68,6 +68,18 @@ export function HomeView({ data }: { data: HomeData }) {
       router.refresh(); // re-fetch the server data so the badge updates
     } else {
       toast('couldn’t change that');
+    }
+  };
+
+  const deleteActive = async () => {
+    if (!active) return;
+    const res = await deleteKeepsakeAction(active.id);
+    setActive(null);
+    if (res.ok) {
+      toast('keepsake deleted — gone for good');
+      router.refresh();
+    } else {
+      toast('couldn’t delete that');
     }
   };
 
@@ -242,6 +254,7 @@ export function HomeView({ data }: { data: HomeData }) {
         tier={active?.visibility ?? 'FAMILY'}
         onClose={() => setActive(null)}
         onSave={saveVisibility}
+        onDelete={deleteActive}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <CreateGiftLinkModal

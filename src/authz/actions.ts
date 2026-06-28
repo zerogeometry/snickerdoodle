@@ -40,3 +40,19 @@ export function canSetAssetVisibility(asset: AssetRef, viewer: ViewerContext): b
     viewer.accountId === asset.controllerAccountId
   );
 }
+
+/**
+ * Delete an asset (the keepsake + its bytes) — ONLY the asset's controller (the
+ * controlling parent for a child's asset), and only while they hold an ACTIVE
+ * membership. Deletion is at least as privileged as setting visibility: a co-
+ * uploading relative, an Extended-circle member, or a removed member can never
+ * delete it. NN8 + children's-data rules: originals are deletable on demand by
+ * the controlling parent.
+ */
+export function canDeleteAsset(asset: AssetRef, viewer: ViewerContext): boolean {
+  return (
+    activeMembershipFor(asset, viewer) !== null &&
+    viewer.accountId !== null &&
+    viewer.accountId === asset.controllerAccountId
+  );
+}

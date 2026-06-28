@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { changeAssetVisibility, resolveViewerContext } from '@/server/assets';
+import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
@@ -54,6 +54,28 @@ export async function setAssetVisibilityAction(
   const viewer = await resolveViewerContext(db, account.id, asset.familyId);
   try {
     await changeAssetVisibility(db, assetId, viewer, tier);
+  } catch {
+    return { ok: false };
+  }
+  revalidatePath('/home');
+  return { ok: true };
+}
+
+/**
+ * Delete a keepsake on demand (NN8 + children's-data rules) — controller-only,
+ * re-checked server-side. Real + cascading: bytes (confirmed) + DB row + audit.
+ */
+export async function deleteKeepsakeAction(assetId: string): Promise<{ ok: boolean }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false };
+
+  const db = getDb();
+  const [asset] = await db.select({ familyId: assets.familyId }).from(assets).where(eq(assets.id, assetId));
+  if (!asset) return { ok: false };
+
+  const viewer = await resolveViewerContext(db, account.id, asset.familyId);
+  try {
+    await deleteAsset(db, assetId, viewer);
   } catch {
     return { ok: false };
   }

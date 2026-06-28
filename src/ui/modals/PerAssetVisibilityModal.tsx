@@ -1,6 +1,6 @@
 'use client';
 
-import { IconHomeHeart, IconLock, IconShieldCheck, IconUser, IconUsers } from '@tabler/icons-react';
+import { IconHomeHeart, IconLock, IconShieldCheck, IconTrash, IconUser, IconUsers } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
@@ -67,6 +67,7 @@ export function PerAssetVisibilityModal({
   tier: initialTier,
   onClose,
   onSave,
+  onDelete,
 }: {
   open: boolean;
   name: string;
@@ -74,12 +75,18 @@ export function PerAssetVisibilityModal({
   tier: Tier;
   onClose: () => void;
   onSave: (tier: Tier) => void;
+  /** When provided, shows a two-tap "delete this keepsake" control (NN8). */
+  onDelete?: () => void;
 }) {
   const [tier, setTier] = useState<Tier>(initialTier);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Reflect the keepsake that was actually tapped each time the modal opens.
   useEffect(() => {
-    if (open) setTier(initialTier);
+    if (open) {
+      setTier(initialTier);
+      setConfirmDelete(false);
+    }
   }, [open, initialTier, name]);
 
   const thumb = image ? (
@@ -152,6 +159,28 @@ export function PerAssetVisibilityModal({
           New keepsakes start as <b>Family</b>. Widen to Extended any time — nothing is ever public.
         </span>
       </p>
+      {onDelete ? (
+        <div className="mt-3 border-t border-[#F2EADB] pt-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                return;
+              }
+              onDelete();
+            }}
+            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-berry hover:underline"
+          >
+            <Icon icon={IconTrash} size={14} /> {confirmDelete ? 'tap again to delete for good' : 'delete this keepsake'}
+          </button>
+          {confirmDelete ? (
+            <p className="mt-1 text-[11px] leading-relaxed text-[#9C8E7E]">
+              this removes the original from our store, processors &amp; backups — it can’t be undone.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
     </Modal>
   );
 }

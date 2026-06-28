@@ -13,6 +13,7 @@ export {
 export {
   canBuyFromGiftList,
   canContributeCreations,
+  canDeleteAsset,
   canManageFamily,
   canSetAssetVisibility,
 } from './actions';
