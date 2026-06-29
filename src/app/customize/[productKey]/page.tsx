@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
+import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -133,7 +134,18 @@ export default function CustomizePage() {
         {/* Left: preview + angle thumbnails + edit placement */}
         <div>
           <div className="flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            <ProductMockup product={product.key as ProductKey} image={previewImg} placement={placement} size={300} uid="customize" />
+            <MockupPreview
+              productKey={product.key as ProductKey}
+              assetId={upload?.assetId ?? null}
+              variantId={variant?.id ?? null}
+              transform={placement}
+              size="zoom"
+              sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+              image={previewImg}
+              placement={placement}
+              px={300}
+              uid="customize"
+            />
           </div>
           {/* angle thumbnails — real product photography lands here on the Prodigi sync */}
           <div className="mt-3 flex items-center gap-2">
