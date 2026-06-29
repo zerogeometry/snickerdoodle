@@ -1,3 +1,4 @@
+import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';

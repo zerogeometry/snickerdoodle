@@ -78,6 +78,13 @@
       "when": 1782507557969,
       "tag": "0010_product_variants_attributes",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1782735114354,
+      "tag": "0011_fixed_christian_walker",
+      "breakpoints": true
     }
   ]
 }

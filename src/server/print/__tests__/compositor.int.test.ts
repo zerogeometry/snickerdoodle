@@ -1,0 +1,171 @@
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { eq } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/postgres-js';
+import postgres from 'postgres';
+import sharp from 'sharp';
+import * as schema from '@/db/schema';
+import { printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
+import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
+import { AuthzError } from '@/authz';
+import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
+import { ingestOriginalAsset } from '@/server/ingest';
+import { seedCatalogue } from '@/server/catalogue';
+import { composeMockup, NoMockupTemplateError } from '@/server/print/compositor';
+import { deleteObject, putObject } from '@/storage';
+import type { DbHandle } from '@/server/db';
+
+const DB = process.env.DATABASE_URL;
+const S3 = process.env.S3_ENDPOINT;
+// A colourful design + a flat "product photo" blank (stand-in for a real photo).
+const design = () => sharp({ create: { width: 1200, height: 1500, channels: 4, background: { r: 220, g: 90, b: 60, alpha: 1 } } }).png().toBuffer();
+const blankPhoto = () => sharp({ create: { width: 600, height: 800, channels: 3, background: { r: 232, g: 226, b: 214 } } }).png().toBuffer();
+// Axis-aligned print area (FLAT) — central window of the blank.
+const QUAD: [number, number][] = [[0.2, 0.2], [0.8, 0.2], [0.8, 0.8], [0.2, 0.8]];
+
+describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
+  let client: ReturnType<typeof postgres>;
+  let db: DbHandle;
+  let ids: SeededIds;
+  let variantId = '';
+  let blankAssetId = '';
+  const designAssetIds: string[] = [];
+  const keys: string[] = [];
+
+  beforeAll(async () => {
+    client = postgres(DB!, { prepare: false });
+    db = drizzle(client, { schema });
+    ids = await seedDemoFamilies(db);
+    await seedCatalogue(db);
+    const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
+    variantId = v!.id;
+
+    // Brand-safe NON-child blank in template_assets + wire the variant's mockup template.
+    const buf = await blankPhoto();
+    const blankKey = `templates/test-${ids.nonce}/blank.png`;
+    await putObject(blankKey, buf, 'image/png');
+    keys.push(blankKey);
+    const [ta] = await db
+      .insert(templateAssets)
+      .values({ kind: 'BLANK', bucket: process.env.S3_BUCKET!, key: blankKey, contentType: 'image/png', byteSize: buf.byteLength, widthPx: 600, heightPx: 800 })
+      .returning();
+    blankAssetId = ta!.id;
+    await db.update(printTemplates).set({ blankObjectId: blankAssetId, printQuad: QUAD, templateVersion: 1, materialClass: 'PAPER' }).where(eq(printTemplates.variantId, variantId));
+  });
+
+  afterAll(async () => {
+    // Reset the shared variant's mockup template, then drop the blank + design assets.
+    await db.update(printTemplates).set({ blankObjectId: null, printQuad: null, templateVersion: 1 }).where(eq(printTemplates.variantId, variantId)).catch(() => {});
+    if (blankAssetId) await db.delete(templateAssets).where(eq(templateAssets.id, blankAssetId)).catch(() => {});
+    for (const id of designAssetIds) {
+      const objs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, id));
+      for (const o of objs) await deleteObject(o.key).catch(() => {});
+      await db.delete(schema.assets).where(eq(schema.assets.id, id)).catch(() => {});
+    }
+    for (const k of keys) await deleteObject(k).catch(() => {});
+    if (ids) await cleanupDemoFamilies(db, ids);
+    await client.end();
+  });
+
+  async function ingestDesign() {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const r = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await design(), keptInHome: true });
+    keys.push(r.key);
+    designAssetIds.push(r.assetId);
+    return r.assetId;
+  }
+
+  it('composites a real WebP mockup of the design on the blank, gated + cached', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+
+    const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    expect(res.tier).toBe('FLAT');
+    expect(res.cached).toBe(false);
+    expect(res.format).toBe('webp');
+
+    // The derivative is a real WebP, under the asset, EXIF-stripped.
+    const [row] = await db.select().from(storageObjects).where(eq(storageObjects.id, res.mockupObjectId));
+    expect(row!.assetId).toBe(assetId); // a child-image derivative → covered by retention/cascade
+    expect(row!.contentType).toBe('image/webp');
+    expect(row!.exifStripped).toBe(true);
+
+    const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+    const fetched = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+    const meta = await sharp(fetched).metadata();
+    expect(meta.format).toBe('webp');
+    expect(Math.max(meta.width ?? 0, meta.height ?? 0)).toBeLessThanOrEqual(400); // 'thumb' default
+
+    // Second call → cache HIT, same object, no new row.
+    const before = (await db.select().from(storageObjects).where(eq(storageObjects.assetId, assetId))).length;
+    const again = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    expect(again.cached).toBe(true);
+    expect(again.mockupObjectId).toBe(res.mockupObjectId);
+    const after = (await db.select().from(storageObjects).where(eq(storageObjects.assetId, assetId))).length;
+    expect(after).toBe(before);
+  });
+
+  it('ZERO third-party egress: a render touches only our own storage host', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const s3host = new URL(process.env.S3_ENDPOINT!).host;
+
+    const calls: string[] = [];
+    const orig = globalThis.fetch;
+    globalThis.fetch = ((...a: Parameters<typeof fetch>) => {
+      calls.push(String(a[0]));
+      return orig(...a);
+    }) as typeof fetch;
+    try {
+      await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1.4, offsetX: 0.1, offsetY: 0, rotationDeg: 0 } });
+    } finally {
+      globalThis.fetch = orig;
+    }
+    const offenders = calls.filter((u) => {
+      try {
+        const h = new URL(u).host;
+        return h !== s3host && !/^(localhost|127\.0\.0\.1)(:|$)/.test(h);
+      } catch {
+        return false;
+      }
+    });
+    expect(offenders).toEqual([]); // the child's design never goes to any third party
+  });
+
+  it('templateVersion bump produces a fresh render (no stale mockup)', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+
+    const a = await composeMockup(db, sam, { assetId, variantId, transform: tf });
+    await db.update(printTemplates).set({ templateVersion: 2 }).where(eq(printTemplates.variantId, variantId));
+    const b = await composeMockup(db, sam, { assetId, variantId, transform: tf });
+    expect(b.mockupObjectId).not.toBe(a.mockupObjectId); // new key ⇒ new derivative
+    await db.update(printTemplates).set({ templateVersion: 1 }).where(eq(printTemplates.variantId, variantId));
+  });
+
+  it('denies a viewer who cannot see the asset (authz first)', async () => {
+    const assetId = await ingestDesign();
+    const outsider = await resolveViewerContext(db, ids.blakeId, ids.bloomId); // a different family
+    await expect(composeMockup(db, outsider, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } })).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('falls back (throws NoMockupTemplateError) for a variant with no template', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [mug] = await db.select().from(productVariants).where(eq(productVariants.sku, 'mug')); // never given a blank
+    await expect(composeMockup(db, sam, { assetId, variantId: mug!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } })).rejects.toBeInstanceOf(NoMockupTemplateError);
+  });
+
+  it('deleting the asset cascades the mockup derivative but NOT the template asset', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+
+    await db.delete(schema.assets).where(eq(schema.assets.id, assetId)); // cascades storage_objects
+    designAssetIds.splice(designAssetIds.indexOf(assetId), 1); // already gone
+    const gone = await db.select().from(storageObjects).where(eq(storageObjects.id, res.mockupObjectId));
+    expect(gone).toHaveLength(0); // mockup derivative cascaded with the asset
+    const blankStill = await db.select().from(templateAssets).where(eq(templateAssets.id, blankAssetId));
+    expect(blankStill).toHaveLength(1); // the brand-safe blank is NOT child data → untouched
+  });
+});

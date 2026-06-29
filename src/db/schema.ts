@@ -430,6 +430,11 @@ export const productCategory = pgEnum('product_category', [
 export const orientation = pgEnum('orientation', ['PORTRAIT', 'LANDSCAPE', 'SQUARE']);
 export const fitMode = pgEnum('fit_mode', ['CONTAIN', 'COVER']);
 export const providerSlug = pgEnum('provider_slug', ['PRODIGI', 'MANUAL']);
+// Material of a product's print surface — selects the mockup blend recipe (a
+// DARK_FABRIC underbase stops the art crushing to black, etc.). See compositor.ts.
+export const materialClass = pgEnum('material_class', ['PAPER', 'LIGHT_FABRIC', 'DARK_FABRIC', 'CERAMIC', 'GLOSS']);
+// Brand-safe (NON-child) template asset kinds for the mockup compositor.
+export const templateAssetKind = pgEnum('template_asset_kind', ['BLANK', 'MASK', 'LIGHTING', 'TEXTURE', 'DISPLACEMENT']);
 // Per-item fulfilment state (per the locked decision: per-item, item A ships while B retries).
 export const fulfillmentState = pgEnum('fulfillment_state', [
   'PENDING',
@@ -501,7 +506,45 @@ export const printTemplates = pgTable('print_templates', {
   fitMode: fitMode('fit_mode').notNull().default('CONTAIN'),
   minSourceWidthPx: integer('min_source_width_px').notNull(),
   minSourceHeightPx: integer('min_source_height_px').notNull(),
+  // ── Mockup-compositor template (NULL ⇒ the catalogue falls back to the SVG
+  // ProductMockup for this variant). The print geometry above stays the single
+  // source of truth for what Prodigi prints; the mockup reuses it so the preview
+  // can't drift from the print. Template assets are brand-safe + NON-child
+  // (template_assets), never the child's design. See src/server/print/compositor.ts.
+  templateVersion: integer('template_version').notNull().default(1), // cache-invalidation lever (in the derivative key)
+  materialClass: materialClass('material_class').notNull().default('PAPER'),
+  blankObjectId: uuid('blank_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+  printQuad: jsonb('print_quad').$type<[number, number][]>(), // 4 normalised corners TL,TR,BR,BL of the print surface on the blank
+  maskObjectId: uuid('mask_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+  lightingObjectId: uuid('lighting_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+  textureObjectId: uuid('texture_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+  displacementObjectId: uuid('displacement_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+  displacementAmpX: integer('displacement_amp_x').notNull().default(0),
+  displacementAmpY: integer('displacement_amp_y').notNull().default(0),
+  mapResolutionPx: integer('map_resolution_px').notNull().default(1500), // canonical res the maps were authored at
+  iccProfile: text('icc_profile').notNull().default('srgb'),
 });
+
+// ── template_assets — brand-safe, NON-child mockup template images (blank product
+// photos + the maps derived from them). DELIBERATELY has no assetId/childSubjectId,
+// so it is structurally outside the children's-data world: never touched by the
+// retention purge, never seen by the egress gate. Only the child's DESIGN lives in
+// storage_objects; these blanks/maps can come from anywhere (CLAUDE.md asymmetry).
+export const templateAssets = pgTable(
+  'template_assets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    kind: templateAssetKind('kind').notNull(),
+    bucket: text('bucket').notNull(),
+    key: text('key').notNull().unique(), // e.g. templates/{variantId}/v{n}/blank.webp — NO assets/ prefix
+    contentType: text('content_type'),
+    byteSize: bigint('byte_size', { mode: 'number' }),
+    sha256: text('sha256'),
+    widthPx: integer('width_px'),
+    heightPx: integer('height_px'),
+    createdAt,
+  },
+);
 
 export const productVariantProviders = pgTable(
   'product_variant_providers',
