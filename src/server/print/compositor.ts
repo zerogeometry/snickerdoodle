@@ -31,6 +31,12 @@ import { clampTransform, computeLayerRect, type RawTransform, type Transform } f
  */
 
 const MAX_INPUT_PIXELS = 50_000_000; // decompression-bomb guard on every decode
+// Cap the DRAWN layer too: computeLayerRect cover-fits from the SHORT source dimension,
+// so an extreme-aspect source makes the scaled layer enormous (a 10000×100 design →
+// tens of thousands of px wide) and the intermediate .resize() buffer can OOM the worker
+// independent of the decode cap. Beyond this we fall back to the SVG (the source is the
+// wrong shape for a faithful mockup anyway).
+const MAX_DRAWN_PIXELS = 16_000_000;
 const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 
@@ -105,13 +111,14 @@ function quadBboxPx(quad: [number, number][], W: number, H: number): { x: number
   };
 }
 
-export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: ComposeMockupInput): Promise<MockupResult> {
-  return withLimit(() => composeInner(db, viewer, input));
-}
+// Concurrent identical renders (React strictMode double-fires the preview effect; the
+// grid fan-out requests the same thumb twice) share ONE pipeline + ONE insert. Keyed by
+// the deterministic cache key, AFTER each caller has passed its own authz check.
+const inFlight = new Map<string, Promise<MockupResult>>();
 
-async function composeInner(db: DbHandle, viewer: ViewerContext, input: ComposeMockupInput): Promise<MockupResult> {
-  // 1. AUTHZ FIRST — identical gate to renderPrintFile. Nothing below runs for a
-  //    viewer who can't see the asset (incl. the warm/thumbnail fan-out).
+export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: ComposeMockupInput): Promise<MockupResult> {
+  // 1. AUTHZ FIRST — identical gate to renderPrintFile, run on EVERY call (a deduped or
+  //    cache-hit caller is still authorised here before any byte is returned).
   await getViewableAssetOrThrow(db, input.assetId, viewer);
 
   // 2. Template + its brand-safe blank (NON-child). No template ⇒ SVG fallback.
@@ -134,37 +141,68 @@ async function composeInner(db: DbHandle, viewer: ViewerContext, input: ComposeM
         .where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!srcObj) throw new NoMockupTemplateError('no source object for the design');
 
-  // 4. Deterministic, VERSIONED cache key (templateVersion + size are load-bearing —
-  //    omitting templateVersion is the classic stale-mockup bug). A hit does no sharp work.
+  // 4. Deterministic, VERSIONED cache key. templateVersion + size + the SOURCE OBJECT id
+  //    are all load-bearing: the source id keeps the ORIGINAL and a bg-removed cutout
+  //    (both DERIVATIVE/ORIGINAL under the SAME asset) from colliding on one key.
   const t = clampTransform(input.transform);
   const size: MockupSize = input.size ?? 'thumb';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}-${size}-v${tpl.templateVersion}-${transformHash(t)}`);
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}-${size}-v${tpl.templateVersion}-${srcObj.id}-${transformHash(t)}`);
+
+  // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
   if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: 'FLAT', cached: true };
 
-  // 5. Render the FLAT mockup.
+  // 6. In-flight dedup → render + persist once (concurrency-capped) and share the result.
+  const pending = inFlight.get(key);
+  if (pending) return pending;
+  const p = withLimit(() =>
+    renderAndPersist(db, {
+      assetId: input.assetId,
+      key,
+      blankKey: blank.key,
+      designKey: srcObj.key,
+      quad: tpl.printQuad!,
+      transform: t,
+      workEdge: tpl.mapResolutionPx,
+      outputEdge: OUTPUT_EDGE[size],
+    }),
+  );
+  inFlight.set(key, p);
+  try {
+    return await p;
+  } finally {
+    inFlight.delete(key);
+  }
+}
+
+async function renderAndPersist(
+  db: DbHandle,
+  args: { assetId: string; key: string; blankKey: string; designKey: string; quad: [number, number][]; transform: Transform; workEdge: number; outputEdge: number },
+): Promise<MockupResult> {
   const out = await renderFlat({
-    blankBuf: await getObjectBytes(blank.key),
-    designBuf: await getObjectBytes(srcObj.key),
-    quad: tpl.printQuad,
-    transform: t,
-    workEdge: tpl.mapResolutionPx,
-    outputEdge: OUTPUT_EDGE[size],
+    blankBuf: await getObjectBytes(args.blankKey),
+    designBuf: await getObjectBytes(args.designKey),
+    quad: args.quad,
+    transform: args.transform,
+    workEdge: args.workEdge,
+    outputEdge: args.outputEdge,
   });
 
-  // 6. Write-once DERIVATIVE under the asset (mirrors render.ts 82-99): retention +
-  //    cascading delete already cover it; private bucket; EXIF stripped by re-encode.
+  // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
+  // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
+  // index on key makes onConflictDoNothing a genuine arbiter, so a concurrent racer that
+  // slipped past the cache check + dedup can't duplicate the row.
   const sha256 = createHash('sha256').update(out.buffer).digest('hex');
   const { bucket } = getS3();
-  await putObject(key, out.buffer, 'image/webp');
+  await putObject(args.key, out.buffer, 'image/webp');
   const [row] = await db
     .insert(storageObjects)
-    .values({ assetId: input.assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/webp', byteSize: out.buffer.byteLength, sha256, exifStripped: true, writeOnce: true })
-    .onConflictDoNothing()
+    .values({ assetId: args.assetId, objectClass: 'DERIVATIVE', bucket, key: args.key, contentType: 'image/webp', byteSize: out.buffer.byteLength, sha256, exifStripped: true, writeOnce: true })
+    .onConflictDoNothing({ target: storageObjects.key })
     .returning();
-  const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
+  const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, args.key)))[0]!.id;
 
-  return { mockupObjectId, key, format: 'webp', tier: 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
+  return { mockupObjectId, key: args.key, format: 'webp', tier: 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
 }
 
 /**
@@ -208,6 +246,9 @@ async function renderFlat(args: {
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
 
   const layer = computeLayerRect({ printWidthPx: rect.w, printHeightPx: rect.h, bleedMm: 0, requiredDpi: 300 }, src, transform);
+  if (layer.width * layer.height > MAX_DRAWN_PIXELS) {
+    throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
+  }
 
   // Rotate → scale to the drawn rect → extract the print-area window (clamped in-bounds,
   // mirroring render.ts). ensureAlpha so cutouts keep transparency over the product.

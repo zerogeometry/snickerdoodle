@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
@@ -167,5 +167,61 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     expect(gone).toHaveLength(0); // mockup derivative cascaded with the asset
     const blankStill = await db.select().from(templateAssets).where(eq(templateAssets.id, blankAssetId));
     expect(blankStill).toHaveLength(1); // the brand-safe blank is NOT child data → untouched
+  });
+
+  it('concurrent identical renders → ONE derivative (in-flight dedup + unique key)', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const results = await Promise.all([
+      composeMockup(db, sam, { assetId, variantId, transform: tf }),
+      composeMockup(db, sam, { assetId, variantId, transform: tf }),
+      composeMockup(db, sam, { assetId, variantId, transform: tf }),
+    ]);
+    expect(new Set(results.map((r) => r.mockupObjectId)).size).toBe(1); // all share one object
+    const rows = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')));
+    expect(rows.filter((r) => r.key.includes('mockup-'))).toHaveLength(1); // no duplicate row
+  });
+
+  it('the ORIGINAL and a cutout source render to DISTINCT keys (no collision)', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const cutoutBuf = await sharp({ create: { width: 800, height: 1000, channels: 4, background: { r: 90, g: 180, b: 120, alpha: 1 } } }).png().toBuffer();
+    const cutoutKey = `assets/${assetId}/derivatives/cutout-test.png`;
+    await putObject(cutoutKey, cutoutBuf, 'image/png');
+    keys.push(cutoutKey);
+    const [cutout] = await db
+      .insert(storageObjects)
+      .values({ assetId, objectClass: 'DERIVATIVE', bucket: process.env.S3_BUCKET!, key: cutoutKey, contentType: 'image/png', exifStripped: true })
+      .returning();
+    const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const fromOriginal = await composeMockup(db, sam, { assetId, variantId, transform: tf });
+    const fromCutout = await composeMockup(db, sam, { assetId, variantId, transform: tf, sourceObjectId: cutout!.id });
+    expect(fromOriginal.key).not.toBe(fromCutout.key);
+    expect(fromOriginal.mockupObjectId).not.toBe(fromCutout.mockupObjectId);
+  });
+
+  it('authz runs BEFORE the cache — an outsider is denied even on a cache HIT', async () => {
+    const assetId = await ingestDesign();
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    await composeMockup(db, sam, { assetId, variantId, transform: tf }); // populate the cache
+    const outsider = await resolveViewerContext(db, ids.blakeId, ids.bloomId);
+    await expect(composeMockup(db, outsider, { assetId, variantId, transform: tf })).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('falls back (bounded memory, no OOM) for an extreme-aspect design', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const wide = await ingestOriginalAsset(db, sam, {
+      familyId: ids.hartleyId,
+      kind: 'DRAWING',
+      buffer: await sharp({ create: { width: 12000, height: 100, channels: 3, background: { r: 200, g: 100, b: 50 } } }).png().toBuffer(),
+      keptInHome: true,
+    });
+    keys.push(wide.key);
+    designAssetIds.push(wide.assetId);
+    await expect(
+      composeMockup(db, sam, { assetId: wide.assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } }),
+    ).rejects.toBeInstanceOf(NoMockupTemplateError);
   });
 });

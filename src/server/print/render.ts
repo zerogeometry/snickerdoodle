@@ -92,11 +92,14 @@ export async function renderPrintFile(
     await db.update(storageObjects).set({ byteSize: out.byteLength, sha256 }).where(eq(storageObjects.id, existing.id));
     printObjectId = existing.id;
   } else {
+    // Conflict-safe under the unique index on key: a concurrent racer that also saw no
+    // existing row can't double-insert — the loser no-ops and we re-read the winner.
     const [row] = await db
       .insert(storageObjects)
       .values({ assetId: input.assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: out.byteLength, sha256, exifStripped: true, writeOnce: true })
+      .onConflictDoNothing({ target: storageObjects.key })
       .returning();
-    printObjectId = row!.id;
+    printObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
   }
 
   return {

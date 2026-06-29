@@ -66,7 +66,14 @@ export function MockupPreview({
   if (url) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={url} alt={`your drawing on a ${productKey}`} width={px} height={px} className="h-auto w-full rounded-lg object-contain" />
+      <img
+        src={url}
+        alt={`your drawing on a ${productKey}`}
+        width={px}
+        height={px}
+        className="h-auto w-full rounded-lg object-contain"
+        onError={() => setUrl(null)} // a failed/expired signed URL reverts to the SVG — never a broken image
+      />
     );
   }
   return <ProductMockup product={productKey} image={image} placement={placement ?? undefined} size={px} uid={uid} />;

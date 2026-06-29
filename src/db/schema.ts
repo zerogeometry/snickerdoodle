@@ -274,6 +274,11 @@ export const storageObjects = pgTable(
     uniqueIndex('storage_one_original_per_asset')
       .on(t.assetId)
       .where(sql`${t.objectClass} = 'ORIGINAL'`),
+    // Object keys are deterministic + write-once (originalKey/derivativeKey namespace
+    // by asset), so a key is unique by construction. Enforcing it makes the write-once
+    // upserts in render.ts + compositor.ts genuinely idempotent under concurrent races
+    // (onConflictDoNothing({ target: key })) instead of racing to duplicate rows.
+    uniqueIndex('storage_object_key_unique').on(t.key),
     index('storage_asset_idx').on(t.assetId),
   ],
 );
