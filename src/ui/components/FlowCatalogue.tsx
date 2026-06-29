@@ -2,13 +2,14 @@
 
 import { IconGift, IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { WhoForModal } from '@/ui/modals/WhoForModal';
-import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
+import { type ProductKey } from '@/ui/components/ProductArt';
+import { MockupPreview } from '@/ui/components/MockupPreview';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
@@ -114,6 +115,14 @@ export function FlowCatalogue({
     return true;
   };
 
+  // Warm path: the moment a drawing is present, ingest it in the BACKGROUND so the grid can
+  // upgrade tile-by-tile from the stylised SVG to the real in-VPC photoreal mockup — the
+  // shopper never waits, and nothing renders until an asset exists. Idempotent, and shares
+  // the single in-flight ingest with the add/customize handlers via ensureAsset/ingestRef.
+  useEffect(() => {
+    if (upload && !upload.assetId) void ensureAsset();
+  }, [upload, ensureAsset]);
+
   const defaultVariant = (p: CatalogueProduct) => p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
   const lineId = (sku: string) => `cat-${sku}`;
   const tileQty = (p: CatalogueProduct) => items.find((i) => i.id === lineId(defaultVariant(p).sku))?.qty ?? 0;
@@ -176,7 +185,17 @@ export function FlowCatalogue({
           return (
             <div key={p.key} className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)]">
               <div className="relative flex h-32 items-center justify-center bg-[#FBF5E9]">
-                <ProductMockup product={p.key as ProductKey} image={mockImg} size={104} uid={p.key} />
+                <MockupPreview
+                  productKey={p.key as ProductKey}
+                  assetId={upload?.assetId}
+                  variantId={defaultVariant(p).id}
+                  transform={DEFAULT_TF}
+                  size="thumb"
+                  sourceObjectId={upload?.cutout?.sourceObjectId}
+                  image={mockImg}
+                  px={104}
+                  uid={p.key}
+                />
                 {/* tap/click to enlarge — top-left, so it never covers the controls */}
                 <button
                   type="button"
@@ -252,7 +271,17 @@ export function FlowCatalogue({
         {zoom ? (
           <div className="flex flex-col items-center gap-3 py-2">
             <div className="rounded-2xl bg-[#FBF5E9] p-3">
-              <ProductMockup product={zoom.key as ProductKey} image={mockImg} size={240} uid="modal" />
+              <MockupPreview
+                productKey={zoom.key as ProductKey}
+                assetId={upload?.assetId}
+                variantId={defaultVariant(zoom).id}
+                transform={DEFAULT_TF}
+                size="zoom"
+                sourceObjectId={upload?.cutout?.sourceObjectId}
+                image={mockImg}
+                px={240}
+                uid="modal"
+              />
             </div>
             <Button size="lg" className="w-full" onClick={() => { const p = zoom; setZoom(null); if (p) void customize(p); }}>
               customize this
