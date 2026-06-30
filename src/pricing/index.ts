@@ -9,6 +9,7 @@ export {
   type PricedCatalogue,
 } from './catalogue';
 export { formatPence } from './format';
+export { computeRetailPence, marginAtPrice, roundUpToX9Pence, RETAIL, type RetailParams } from './retail';
 export { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 export {
   priceBasket,
