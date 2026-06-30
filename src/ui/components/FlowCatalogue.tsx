@@ -177,7 +177,7 @@ export function FlowCatalogue({
   const flatShown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
 
   const gridClassName = compact
-    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3' // 2-up on mobile so the tile's 44px tap targets fit
+    ? 'grid grid-cols-2 gap-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
     : 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4';
   const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
   const gridProps = { qtyOf, mockImg, upload, lazy: true, onAdd: (p: CatalogueProduct) => quickAdd(p, 1), onSub: (p: CatalogueProduct) => quickAdd(p, -1), onCustomize: customize };
@@ -186,9 +186,11 @@ export function FlowCatalogue({
     <div className={className}>
       {mode === 'sections' ? (
         <>
-          {/* Fixed action row — Full Catalogue is always reachable, top-right */}
+          {/* Header — the section title and the Full Catalogue button on one aligned row.
+              When the shopper has picks from the full catalogue the title steps aside to
+              "your range" and the two sections are labelled inside the scroll instead. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <p className="text-xs text-[#9C8E7E]">tap + to add, or customize</p>
+            <h2 className="font-display text-xl font-semibold text-cocoa">{picks.length > 0 ? 'your range' : 'most popular'}</h2>
             <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
               full catalogue <Icon icon={IconChevronRight} size={15} />
             </Button>
@@ -202,7 +204,7 @@ export function FlowCatalogue({
             ) : null}
             {popular.length > 0 ? (
               <>
-                <SectionLabel className={picks.length > 0 ? 'mt-5' : ''}>most popular</SectionLabel>
+                {picks.length > 0 ? <SectionLabel className="mt-5">most popular</SectionLabel> : null}
                 <ProductGrid products={popular} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
               </>
             ) : picks.length === 0 ? (

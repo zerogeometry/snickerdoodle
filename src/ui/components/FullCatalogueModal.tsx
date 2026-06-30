@@ -68,6 +68,7 @@ export function FullCatalogueModal({
       open={open}
       onClose={onClose}
       size="xl"
+      fill
       title="The full catalogue"
       subtitle="every keepsake — search, add, or customize"
       footer={
