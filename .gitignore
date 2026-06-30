@@ -1,4 +1,5 @@
 node_modules/
+.prodigi-assets/
 .next/
 .next-e2e/
 .next-preview/
