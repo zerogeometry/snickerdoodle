@@ -469,6 +469,10 @@ export const products = pgTable('products', {
   specs: jsonb('specs'),
   active: boolean('active').notNull().default(true),
   sortOrder: integer('sort_order').notNull().default(0),
+  // Curated "Most Popular" rank (1 = first). NULL ⇒ the product lives only in the
+  // Full Catalogue, not the front-of-shop popular grid. Founder-curated for now;
+  // ready to be driven by real order counts later.
+  popularRank: integer('popular_rank'),
   createdAt,
 });
 

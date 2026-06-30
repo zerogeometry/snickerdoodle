@@ -9,6 +9,13 @@
       "autoPort": false
     },
     {
+      "name": "preview",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["cross-env", "NEXT_DIST_DIR=.next-preview", "next", "dev", "-p", "3007"],
+      "port": 3007,
+      "autoPort": false
+    },
+    {
       "name": "mockups",
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "8137"],

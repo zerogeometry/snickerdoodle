@@ -146,6 +146,16 @@ const DEFS: Record<string, ProductDef> = {
   },
 };
 
+// Curated "Most Popular" front-of-shop order (by product key). Anything NOT listed
+// lives only in the Full Catalogue — so the founder's incoming big list defaults to
+// full-catalogue-only until promoted here. Founder-curated for now; ready to be
+// driven by real order counts later. Order in this array = the popular rank.
+const POPULAR_ORDER = ['framedPrint', 'mug', 'kidsTee', 'cushion', 'card', 'blanket', 'jigsaw', 'storybook', 'toteBag'];
+function popularRankOf(key: string): number | null {
+  const i = POPULAR_ORDER.indexOf(key);
+  return i === -1 ? null : i + 1;
+}
+
 /** A short, stable code for a variant's size/colour, used in its internal sku. */
 function slug(s: string | undefined): string | null {
   if (!s) return null;
@@ -201,13 +211,15 @@ export interface CatalogueProduct {
   sizes: string[];
   colours: string[];
   variants: CatalogueVariant[];
+  /** Curated front-of-shop rank (1 = first). null ⇒ Full-Catalogue-only. */
+  popularRank: number | null;
 }
 
 /** Every active product with its variants — for the catalogue + customise screens. */
 export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
   const rows = await db
     .select({
-      key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder,
+      key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
       vId: productVariants.id, vSku: productVariants.sku, vAttrs: productVariants.attributes, vPrice: productVariants.pricePence, vDefault: productVariants.isDefault, vSort: productVariants.sortOrder,
     })
     .from(products)
@@ -219,7 +231,7 @@ export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
   for (const r of rows) {
     let p = byKey.get(r.key);
     if (!p) {
-      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], variants: [] };
+      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], variants: [], popularRank: r.popularRank ?? null };
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
@@ -248,10 +260,11 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
   for (const key of keys) {
     const def = DEFS[key]!;
     const order = sortOrder++;
+    const popularRank = popularRankOf(key);
     const [product] = await db
       .insert(products)
-      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order })
-      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order } })
+      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank })
+      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank } })
       .returning();
 
     const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === 0));

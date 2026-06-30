@@ -187,7 +187,7 @@ export default function StartCreatingPage() {
                     </Button>
                   </div>
                 ) : products ? (
-                  <FlowCatalogue products={products} compact scrollable showCategories />
+                  <FlowCatalogue products={products} mode="sections" compact scrollable />
                 ) : (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {Array.from({ length: 6 }).map((_, i) => (

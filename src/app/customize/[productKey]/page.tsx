@@ -9,6 +9,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
+import { lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
 
@@ -115,7 +116,7 @@ export default function CustomizePage() {
     }
     const sub = [variant.attributes.size, variant.attributes.colour].filter(Boolean).join(' · ') || undefined;
     add({
-      id: `cat-${variant.sku}`,
+      id: lineIdForSku(variant.sku),
       name: product.label,
       product: product.key as ProductKey,
       sku: variant.sku,

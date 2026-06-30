@@ -1,6 +1,6 @@
 'use client';
 
-import { IconGift, IconMinus, IconPlus, IconSparkles, IconZoomScan } from '@tabler/icons-react';
+import { IconChevronRight, IconGift, IconSparkles } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -10,44 +10,49 @@ import { Modal } from '@/ui/primitives/Modal';
 import { WhoForModal } from '@/ui/modals/WhoForModal';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
+import { ProductGrid } from '@/ui/components/ProductGrid';
+import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
+import { groupOf, lineIdForSku, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 const DEFAULT_TF = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
-
-const SWATCH: Record<string, string> = { oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8', natural: '#E7D9BE' };
-const swatch = (name: string) => SWATCH[name] ?? '#E0C7A8';
-
-// Friendly filter groups (the product category enum → a shopper-facing label).
-const GROUP: Record<string, string> = {
-  CARD: 'cards & prints', PRINT: 'cards & prints', MUG: 'home', CUSHION: 'home', BLANKET: 'home',
-  APPAREL: 'wear', BOOK: 'books', PUZZLE: 'gifts', BAG: 'gifts',
-};
-const groupOf = (category: string) => GROUP[category] ?? 'gifts';
 
 function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour].filter(Boolean);
   return bits.length ? bits.join(' · ') : undefined;
 }
 
+function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return <h2 className={`mb-2 font-display text-base font-semibold text-cocoa ${className}`}>{children}</h2>;
+}
+
 /**
- * The shared "your art on a range" grid — used by the uploaded page and the full
- * catalogue. Each tile previews the real drawing on the product, with qty controls
- * and a Customize button; the footer tallies a running total + Create Another /
- * Checkout Now. The upload is ingested lazily (once) the first time it's needed.
+ * The shared "your art on a range" grid. Two layouts:
+ *  - `sections` (Start Creating front-of-shop): a curated **Most Popular** grid with a
+ *    **Full Catalogue** button top-right that opens the searchable full range in a modal;
+ *    anything the shopper adds from there that isn't already popular is pinned above as
+ *    **your picks** on return.
+ *  - `flat` (the standalone /catalogue page): the whole range in one grid with category
+ *    chips.
+ * Tiles are lazy (compose only when scrolled into view), and the upload is ingested in
+ * the background so previews are ready as the shopper browses. The footer tallies a
+ * running total + Create Another / Share / Checkout.
  */
 export function FlowCatalogue({
   products,
+  mode = 'flat',
   showCategories = false,
   compact = false,
   scrollable = false,
   className,
 }: {
   products: CatalogueProduct[];
-  showCategories?: boolean;
-  compact?: boolean; // denser grid for the narrower uploaded-page column
-  scrollable?: boolean; // scroll the full range inside a fixed-height container
+  mode?: 'sections' | 'flat';
+  showCategories?: boolean; // flat mode only
+  compact?: boolean; // denser grid for the narrower Start-Creating column
+  scrollable?: boolean; // scroll the range inside a fixed-height container
   className?: string;
 }) {
   const router = useRouter();
@@ -60,15 +65,11 @@ export function FlowCatalogue({
   const [category, setCategory] = useState('all');
   const [zoom, setZoom] = useState<CatalogueProduct | null>(null);
   const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
+  const [fullOpen, setFullOpen] = useState(false);
   // A single in-flight ingest, shared across clicks — so a slow first ingest can't
   // deadlock the catalogue (the previous global "busy" flag froze every button).
   const ingestRef = useRef<Promise<string | null> | null>(null);
 
-  const categories = useMemo(
-    () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
-    [products],
-  );
-  const shown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
   const subtotal = basketSubtotal(items);
   const count = basketCount(items);
   const mockImg = upload?.cutout?.url ?? upload?.dataUrl ?? null; // bg-removed cutout wins
@@ -115,25 +116,28 @@ export function FlowCatalogue({
     return true;
   };
 
-  // Warm path: the moment a drawing is present, ingest it in the BACKGROUND so the grid can
-  // upgrade tile-by-tile from the stylised SVG to the real in-VPC photoreal mockup — the
-  // shopper never waits, and nothing renders until an asset exists. Idempotent, and shares
-  // the single in-flight ingest with the add/customize handlers via ensureAsset/ingestRef.
+  // Warm path: the moment a drawing is present, ingest it in the BACKGROUND so tiles can
+  // upgrade from the stylised SVG to the real in-VPC photoreal mockup as they scroll into
+  // view — the shopper never waits. Idempotent, and shares the single in-flight ingest.
   useEffect(() => {
     if (upload && !upload.assetId) void ensureAsset();
   }, [upload, ensureAsset]);
 
   const defaultVariant = (p: CatalogueProduct) => p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
-  const lineId = (sku: string) => `cat-${sku}`;
-  const tileQty = (p: CatalogueProduct) => items.find((i) => i.id === lineId(defaultVariant(p).sku))?.qty ?? 0;
+  const qtyOf = useCallback((p: CatalogueProduct) => productQtyInBasket(items, p), [items]);
 
   const quickAdd = async (p: CatalogueProduct, delta: number) => {
     const def = defaultVariant(p);
-    const id = lineId(def.sku);
+    const defId = lineIdForSku(def.sku);
     // Decrement is purely local — always allowed (never gated by an in-flight ingest).
+    // Take one off the DEFAULT quick-add line first; otherwise the most-recently-added
+    // line of this product (so the tile's product-level count steps down by one, and a
+    // carefully-customized line is only removed once it actually hits zero).
     if (delta < 0) {
-      const existing = items.find((i) => i.id === id);
-      if (existing) setQty(id, existing.qty - 1);
+      const current = useBasket.getState().items;
+      const ids = new Set(p.variants.map((v) => lineIdForSku(v.sku)));
+      const target = current.find((i) => i.id === defId) ?? [...current].reverse().find((i) => ids.has(i.id));
+      if (target) setQty(target.id, target.qty - 1);
       return;
     }
     if (!guardUpload()) return;
@@ -141,11 +145,11 @@ export function FlowCatalogue({
     const assetId = await ensureAsset();
     if (!assetId) return;
     // Re-read from the store — a concurrent add may have created the line meanwhile.
-    const current = useBasket.getState().items.find((i) => i.id === id);
-    if (current) setQty(id, current.qty + 1);
+    const current = useBasket.getState().items.find((i) => i.id === defId);
+    if (current) setQty(defId, current.qty + 1);
     else
       add({
-        id,
+        id: defId,
         name: p.label,
         product: p.key as ProductKey,
         sku: def.sku,
@@ -163,83 +167,68 @@ export function FlowCatalogue({
     if (assetId) router.push(`/customize/${p.key}`);
   };
 
+  const { picks, popular } = useMemo(() => splitCatalogue(products, items), [products, items]);
+
+  // flat mode (the standalone /catalogue page): category chips over one grid
+  const flatCategories = useMemo(
+    () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
+    [products],
+  );
+  const flatShown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
+
+  const gridClassName = compact
+    ? 'grid grid-cols-2 gap-3 sm:grid-cols-3' // 2-up on mobile so the tile's 44px tap targets fit
+    : 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4';
+  const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
+  const gridProps = { qtyOf, mockImg, upload, lazy: true, onAdd: (p: CatalogueProduct) => quickAdd(p, 1), onSub: (p: CatalogueProduct) => quickAdd(p, -1), onCustomize: customize };
+
   return (
     <div className={className}>
-      {showCategories ? (
-        <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
-          {categories.map((c) => (
-            <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
-              {c}
-            </Chip>
-          ))}
-        </div>
-      ) : null}
-
-      {/* bounded, scrollable range — height is EXPLICIT (steady when you switch
-          category) and fits the viewport so the PAGE never scrolls, capped at ~2.5
-          tiles tall on large screens (the half-row peek cues the scroll). Tile ≈ 206px. */}
-      <div className={scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined}>
-      <div className={`grid gap-3 md:gap-4 ${compact ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4'}`}>
-        {shown.map((p) => {
-          const qty = tileQty(p);
-          return (
-            <div key={p.key} className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)]">
-              <div className="relative flex h-32 items-center justify-center bg-[#FBF5E9]">
-                <MockupPreview
-                  productKey={p.key as ProductKey}
-                  assetId={upload?.assetId}
-                  variantId={defaultVariant(p).id}
-                  transform={DEFAULT_TF}
-                  size="thumb"
-                  sourceObjectId={upload?.cutout?.sourceObjectId}
-                  image={mockImg}
-                  px={104}
-                  uid={p.key}
-                />
-                {/* tap/click to enlarge — top-left, so it never covers the controls */}
-                <button
-                  type="button"
-                  onClick={() => setZoom(p)}
-                  aria-label={`Enlarge ${p.label} preview`}
-                  className="absolute left-1.5 top-1.5 rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm hover:text-cinnamon"
-                >
-                  <Icon icon={IconZoomScan} size={15} />
-                </button>
-                {/* colour-option key — top-right */}
-                {p.colours.length > 0 ? (
-                  <div className="absolute right-1.5 top-1.5 flex flex-col gap-1">
-                    {p.colours.map((c) => (
-                      <span key={c} title={c} className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c) }} />
-                    ))}
-                  </div>
-                ) : null}
+      {mode === 'sections' ? (
+        <>
+          {/* Fixed action row — Full Catalogue is always reachable, top-right */}
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-xs text-[#9C8E7E]">tap + to add, or customize</p>
+            <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
+              full catalogue <Icon icon={IconChevronRight} size={15} />
+            </Button>
+          </div>
+          <div className={scrollClasses}>
+            {picks.length > 0 ? (
+              <>
+                <SectionLabel>your picks</SectionLabel>
+                <ProductGrid products={picks} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
+              </>
+            ) : null}
+            {popular.length > 0 ? (
+              <>
+                <SectionLabel className={picks.length > 0 ? 'mt-5' : ''}>most popular</SectionLabel>
+                <ProductGrid products={popular} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
+              </>
+            ) : picks.length === 0 ? (
+              // success-but-empty: never a bare heading over a void
+              <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-6 text-center text-sm text-[#6F6358]">
+                tap <b className="text-cinnamon">full catalogue</b> to browse the whole range.
               </div>
-
-              <div className="flex flex-1 flex-col gap-2 border-t border-[#EFE6D6] px-3 py-2.5">
-                <div className="flex items-baseline justify-between gap-1">
-                  <span className="min-w-0 truncate text-sm font-bold text-cocoa">{p.label}</span>
-                  <span className="shrink-0 whitespace-nowrap text-xs text-[#9C8E7E]">from {gbp(p.fromPence)}</span>
-                </div>
-                <div className="mt-auto flex items-center justify-between gap-2">
-                  <div className="flex items-center rounded-full border border-[#E6D8BE] bg-white">
-                    <button type="button" aria-label={`one fewer ${p.label}`} onClick={() => quickAdd(p, -1)} disabled={qty === 0} className="flex min-h-9 min-w-9 items-center justify-center px-2 text-[#7A6A58] disabled:opacity-30">
-                      <Icon icon={IconMinus} size={14} />
-                    </button>
-                    <span className="min-w-5 text-center text-xs font-bold text-cocoa">{qty}</span>
-                    <button type="button" aria-label={`add a ${p.label}`} onClick={() => quickAdd(p, 1)} className="flex min-h-9 min-w-9 items-center justify-center px-2 text-cinnamon">
-                      <Icon icon={IconPlus} size={14} />
-                    </button>
-                  </div>
-                  <button type="button" onClick={() => customize(p)} className="rounded-full border border-[#E6D8BE] bg-white px-2.5 py-1 text-[11px] font-bold text-cocoa hover:border-honey">
-                    customize
-                  </button>
-                </div>
-              </div>
+            ) : null}
+          </div>
+        </>
+      ) : (
+        <>
+          {showCategories ? (
+            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+              {flatCategories.map((c) => (
+                <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
+                  {c}
+                </Chip>
+              ))}
             </div>
-          );
-        })}
-        </div>
-      </div>
+          ) : null}
+          <div className={scrollClasses}>
+            <ProductGrid products={flatShown} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
+          </div>
+        </>
+      )}
 
       {/* Footer: basket count (so "Create another" clearly keeps the basket) + total + actions */}
       <div className="mt-4 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4">
@@ -267,6 +256,22 @@ export function FlowCatalogue({
 
       <WhoForModal open={!!whoMode} mode={whoMode ?? 'checkout'} onClose={() => setWhoMode(null)} />
 
+      {mode === 'sections' ? (
+        <FullCatalogueModal
+          open={fullOpen}
+          onClose={() => setFullOpen(false)}
+          products={products}
+          qtyOf={qtyOf}
+          mockImg={mockImg}
+          upload={upload}
+          count={count}
+          subtotal={subtotal}
+          onAdd={(p) => quickAdd(p, 1)}
+          onSub={(p) => quickAdd(p, -1)}
+          onCustomize={customize}
+        />
+      ) : null}
+
       <Modal open={!!zoom} onClose={() => setZoom(null)} title={zoom?.label ?? ''} subtitle={zoom ? `from ${gbp(zoom.fromPence)}` : undefined}>
         {zoom ? (
           <div className="flex flex-col items-center gap-3 py-2">
@@ -292,4 +297,3 @@ export function FlowCatalogue({
     </div>
   );
 }
-

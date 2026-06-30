@@ -9,6 +9,8 @@ const FOCUSABLE =
 
 /** Accessible modal dialog — dimmed backdrop, Escape/backdrop to close, scrollable
  * body, and a focus TRAP that returns focus to the trigger on close (NN7). */
+const SIZE = { sm: 'max-w-[440px]', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const;
+
 export function Modal({
   open,
   onClose,
@@ -17,6 +19,7 @@ export function Modal({
   headerLeading,
   children,
   footer,
+  size = 'sm',
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,6 +28,7 @@ export function Modal({
   headerLeading?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  size?: keyof typeof SIZE;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -84,7 +88,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative z-10 flex max-h-[90vh] w-full max-w-[440px] flex-col overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)] focus:outline-none"
+        className={`relative z-10 flex max-h-[90vh] w-full ${SIZE[size]} flex-col overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)] focus:outline-none`}
       >
         <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-4">
           <div className="flex items-center gap-3">
