@@ -240,7 +240,7 @@ export function FlowCatalogue({
           </span>
           <div className="text-right">
             <div className="font-display text-xl font-semibold text-cocoa">{gbp(subtotal)}</div>
-            <div className="text-[11px] text-[#9C8E7E]">shipping TBC</div>
+            <div className="text-[11px] text-[#9C8E7E]">free tracked delivery</div>
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
