@@ -11,9 +11,15 @@ export type ProductKey =
   | 'framedPrint'
   | 'mug'
   | 'kidsTee'
+  | 'adultTee'
+  | 'babyBodysuit'
+  | 'apron'
   | 'cushion'
   | 'toteBag'
   | 'blanket'
+  | 'calendar'
+  | 'bauble'
+  | 'sack'
   | 'storybook'
   | 'jigsaw'
   | 'giftWrap';
@@ -95,6 +101,72 @@ const ART: Record<ProductKey, ReactNode> = {
       <House transform="translate(30,32) scale(0.86)" />
     </>
   ),
+  adultTee: (
+    <>
+      <path
+        d="M14 32 L34 18 Q48 10 62 18 L82 32 L71 50 L60 43 L60 86 L36 86 L36 43 L25 50 Z"
+        fill="#FFFDF8"
+        stroke="#C8623A"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <House transform="translate(31,48) scale(0.62)" />
+    </>
+  ),
+  babyBodysuit: (
+    <>
+      <path
+        d="M22 30 L34 20 Q48 14 62 20 L74 30 L67 44 L60 39 L60 66 Q60 78 48 78 Q36 78 36 66 L36 39 L29 44 Z"
+        fill="#FFFDF8"
+        stroke="#84BBD0"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <circle cx="44" cy="72" r="1.6" fill="#84BBD0" />
+      <circle cx="52" cy="72" r="1.6" fill="#84BBD0" />
+      <House transform="translate(34,44) scale(0.58)" />
+    </>
+  ),
+  apron: (
+    <>
+      <path d="M42 16 Q48 9 54 16" fill="none" stroke="#93B97C" strokeWidth="3" strokeLinecap="round" />
+      <path d="M34 44 q-11 3 -15 9 M62 44 q11 3 15 9" fill="none" stroke="#93B97C" strokeWidth="3" strokeLinecap="round" />
+      <path
+        d="M38 20 Q38 15 48 15 Q58 15 58 20 L64 26 Q67 34 62 40 L62 80 L34 80 L34 40 Q29 34 32 26 Z"
+        fill="#FFFDF8"
+        stroke="#93B97C"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <House transform="translate(35,44) scale(0.64)" />
+    </>
+  ),
+  calendar: (
+    <>
+      <line x1="32" y1="13" x2="32" y2="23" stroke="#C8623A" strokeWidth="3" strokeLinecap="round" />
+      <line x1="48" y1="13" x2="48" y2="23" stroke="#C8623A" strokeWidth="3" strokeLinecap="round" />
+      <line x1="64" y1="13" x2="64" y2="23" stroke="#C8623A" strokeWidth="3" strokeLinecap="round" />
+      <rect x="20" y="18" width="56" height="64" rx="3" fill="#FFFDF8" stroke="#84BBD0" strokeWidth="4" />
+      <line x1="20" y1="56" x2="76" y2="56" stroke="#84BBD0" strokeWidth="2.4" />
+      <path d="M34 64 h28 M34 72 h28 M43 60 v20 M53 60 v20" stroke="#E0C9A8" strokeWidth="1.6" />
+      <House transform="translate(34,26) scale(0.62)" />
+    </>
+  ),
+  bauble: (
+    <>
+      <path d="M48 20 q0 -7 6 -7" fill="none" stroke="#C8623A" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="43" y="18" width="10" height="8" rx="1.5" fill="#F2A640" stroke="#C8623A" strokeWidth="2" />
+      <circle cx="48" cy="53" r="28" fill="#FFFDF8" stroke="#E8786E" strokeWidth="4" />
+      <House transform="translate(33,39) scale(0.78)" />
+    </>
+  ),
+  sack: (
+    <>
+      <path d="M28 26 Q48 20 68 26 L66 35 Q48 30 30 35 Z" fill="#F6E2D6" stroke="#C8623A" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M30 35 Q48 31 66 35 L72 78 Q48 84 24 78 Z" fill="#FFFDF8" stroke="#C8623A" strokeWidth="4" strokeLinejoin="round" />
+      <House transform="translate(33,45) scale(0.72)" />
+    </>
+  ),
   giftWrap: (
     <>
       <rect x="22" y="40" width="52" height="40" rx="3" fill="#F6E2D6" stroke="#C8623A" strokeWidth="3.5" />
@@ -124,6 +196,12 @@ const PRINT_RECT: Record<ProductKey, { x: number; y: number; w: number; h: numbe
   blanket: { x: 24, y: 28, w: 48, h: 44 },
   storybook: { x: 40, y: 24, w: 28, h: 48 },
   jigsaw: { x: 24, y: 24, w: 48, h: 48 },
+  adultTee: { x: 40, y: 46, w: 20, h: 26 },
+  babyBodysuit: { x: 39, y: 43, w: 20, h: 22 },
+  apron: { x: 36, y: 42, w: 24, h: 30 },
+  calendar: { x: 26, y: 25, w: 44, h: 27 },
+  bauble: { x: 34, y: 40, w: 28, h: 27 },
+  sack: { x: 33, y: 44, w: 32, h: 28 },
   giftWrap: null,
 };
 

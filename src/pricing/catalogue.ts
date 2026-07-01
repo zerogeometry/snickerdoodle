@@ -8,8 +8,9 @@
  * loader behind `getCatalogue()` — the engine stays pure and price-list-shaped.)
  */
 
-/** Standard UK delivery, in pence. Added once per order when the basket is non-empty. */
-export const DELIVERY_PENCE = 399;
+/** Delivery, in pence. FREE — the tracked shipping cost is baked into each product's retail
+ * price (founder-approved 2026-07-01), so there is no separate delivery line. */
+export const DELIVERY_PENCE = 0;
 
 /** The join saving, in basis points (500 = 5%). Applied to goods, never delivery. */
 export const JOIN_SAVING_BPS = 500;
@@ -19,16 +20,24 @@ export interface CatalogueEntry {
   label: string;
 }
 
+// The fallback / seed price list — the "from" (default-variant) price per product. The runtime
+// getCatalogue() loads the full per-variant list from the DB; this constant is the pre-seed
+// fallback AND the sellable-key allowlist (isCatalogueKey). Prices are VAT-inc, free delivery.
 export const CATALOGUE = {
-  card: { pricePence: 400, label: 'card' },
-  framedPrint: { pricePence: 2200, label: 'framed print' },
-  mug: { pricePence: 1400, label: 'mug' },
-  kidsTee: { pricePence: 1800, label: 'kids tee' },
-  cushion: { pricePence: 2800, label: 'cushion' },
-  blanket: { pricePence: 4500, label: 'blanket' },
-  storybook: { pricePence: 2400, label: 'storybook' },
-  jigsaw: { pricePence: 2000, label: 'jigsaw' },
-  toteBag: { pricePence: 1600, label: 'tote bag' },
+  framedPrint: { pricePence: 6695, label: 'framed print' },
+  mug: { pricePence: 1595, label: 'mug' },
+  cushion: { pricePence: 2295, label: 'cushion' },
+  storybook: { pricePence: 2350, label: 'storybook' },
+  kidsTee: { pricePence: 2095, label: 'kids tee' },
+  jigsaw: { pricePence: 2795, label: 'jigsaw' },
+  blanket: { pricePence: 5795, label: 'fleece blanket' },
+  babyBodysuit: { pricePence: 2195, label: 'baby bodysuit' },
+  card: { pricePence: 495, label: 'greetings card' },
+  calendar: { pricePence: 1895, label: 'calendar' },
+  adultTee: { pricePence: 2895, label: 'adult tee' },
+  apron: { pricePence: 2495, label: 'apron' },
+  bauble: { pricePence: 2095, label: 'ceramic bauble' },
+  sack: { pricePence: 3495, label: 'christmas sack' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

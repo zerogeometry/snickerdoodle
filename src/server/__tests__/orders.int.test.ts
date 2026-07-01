@@ -51,8 +51,8 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('guest order: server-priced from the catalogue, marked paid (dev fallback)', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'mug', qty: 2 }, // 2800
-        { productKey: 'card', qty: 1 }, // 400
+        { productKey: 'mug', qty: 2 }, // 3190
+        { productKey: 'card', qty: 1 }, // 495
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
       account: null,
@@ -61,7 +61,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(3200); // catalogue, not the client
+    expect(order!.subtotalPence).toBe(3685); // catalogue (2×1595 + 495), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });
@@ -92,14 +92,14 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     };
 
     const res = await placeOrder(db, {
-      items: [{ productKey: 'storybook', qty: 1 }], // 2400
+      items: [{ productKey: 'storybook', qty: 1 }], // 2350
       account: { id: ids.rosieId },
       joinProvenance: provenance,
     });
     await track(res);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.joinSavingPence).toBe(120); // 5% of 2400
-    expect(order!.totalPence).toBe(2400 - 120 + 399);
+    expect(order!.joinSavingPence).toBe(118); // Math.round(5% of 2350) = 118
+    expect(order!.totalPence).toBe(2350 - 118 + 0); // free delivery
 
     // consumed: the membership now records when the saving was spent
     const [m] = await db.select().from(memberships).where(eq(memberships.id, row!.m.id));

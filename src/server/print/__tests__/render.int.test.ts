@@ -4,12 +4,12 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { productVariants, storageObjects } from '@/db/schema';
+import { printTemplates, productVariants, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { seedCatalogue } from '@/server/catalogue';
+import { mmToPx, seedCatalogue } from '@/server/catalogue';
 import { renderPrintFile } from '@/server/print/render';
 import { deleteObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -21,9 +21,10 @@ const S3 = process.env.S3_ENDPOINT;
 const src = (w: number, h: number) =>
   sharp({ create: { width: w, height: h, channels: 3, background: { r: 200, g: 120, b: 60 } } }).png().toBuffer();
 
-// framedPrint = A4 @ 300dpi (210×297mm) → 2480×3508 print + 35px bleed each side = 2550×3578 canvas.
-const CANVAS_W = 2550;
-const CANVAS_H = 3578;
+// The default framed print's canvas = print px + bleed on every side. Derived from the seeded
+// template in beforeAll so the test survives catalogue geometry changes (e.g. the default size).
+let CANVAS_W = 0;
+let CANVAS_H = 0;
 
 describe.skipIf(!DB || !S3)('print-file render — integration', () => {
   let client: ReturnType<typeof postgres>;
@@ -39,6 +40,10 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     await seedCatalogue(db);
     const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     variantId = v!.id;
+    const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
+    const bleedPx = mmToPx(tpl!.bleedMm, tpl!.requiredDpi);
+    CANVAS_W = tpl!.printWidthPx + 2 * bleedPx;
+    CANVAS_H = tpl!.printHeightPx + 2 * bleedPx;
   });
 
   afterAll(async () => {
@@ -56,7 +61,7 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
 
   it('renders a print file at exactly the bleed canvas + the product DPI, without an upscale', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const assetId = await ingest(await src(3000, 4200)); // plenty of resolution
+    const assetId = await ingest(await src(4200, 5400)); // plenty of resolution for the 11×14 canvas
     const res = await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
     keys.push(res.key);
 
@@ -74,8 +79,8 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     const [orig] = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
     const origGrant = await getStorageObjectGrant(db, orig!.id, sam);
     const origMeta = await sharp(Buffer.from(await (await fetch(origGrant.url)).arrayBuffer())).metadata();
-    expect(origMeta.width).toBe(3000);
-    expect(origMeta.height).toBe(4200);
+    expect(origMeta.width).toBe(4200);
+    expect(origMeta.height).toBe(5400);
     // and a DERIVATIVE print file now exists alongside it
     const derivs = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')));
     expect(derivs.length).toBeGreaterThanOrEqual(1);

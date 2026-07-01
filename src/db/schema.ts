@@ -430,6 +430,7 @@ export const productCategory = pgEnum('product_category', [
   'PUZZLE',
   'BAG',
   'CARD',
+  'FESTIVE',
   'ADDON',
 ]);
 export const orientation = pgEnum('orientation', ['PORTRAIT', 'LANDSCAPE', 'SQUARE']);

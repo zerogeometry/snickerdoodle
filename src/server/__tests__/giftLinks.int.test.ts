@@ -53,7 +53,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(view.state).toBe('active');
     if (view.state !== 'active') return;
     expect(view.items).toHaveLength(1);
-    expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 2200 });
+    expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 6695 });
     expect(view.items[0]!.imageUrl).toMatch(/^http/); // a signed URL
   });
 

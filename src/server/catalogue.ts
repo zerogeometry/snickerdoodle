@@ -25,7 +25,7 @@ type VariantDef = {
   prodigiAttrs?: Record<string, string>; // attributes to send to Prodigi at order time
 };
 type ProductDef = {
-  category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'ADDON';
+  category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON';
   label: string;
   blurb: string;
   description: string;
@@ -34,109 +34,196 @@ type ProductDef = {
   variants: VariantDef[]; // the FIRST is the default
 };
 
-// Frame: colour is a Prodigi *attribute* of one SKU per size → many of our variants
-// share a SKU. "framed in gold" is the brand signature, so gold is offered.
-const FRAME_COLOURS = ['natural', 'black', 'white', 'gold'];
+// Framed print: 5 sizes; frame colour is a Prodigi *attribute* of one SKU per size, so the
+// colours share a SKU. "framed in gold" is the brand signature → gold leads (and is the default).
+// Prices are the founder-approved retail (free delivery baked in). Large sizes drop to 150dpi.
+const FRAME_COLOURS = ['gold', 'black', 'white', 'natural'];
 const FRAME_SIZES = [
-  { size: 'A4', sku: 'GLOBAL-CFPM-A4', wMm: 210, hMm: 297, pricePence: 2200 },
-  { size: 'A3', sku: 'GLOBAL-CFPM-A3', wMm: 297, hMm: 420, pricePence: 3200 },
+  { size: '11×14″', sku: 'GLOBAL-CFP-11X14', wMm: 279, hMm: 356, dpi: 300, pricePence: 6695 },
+  { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 6995 },
+  { size: '18×24″', sku: 'GLOBAL-CFP-18X24', wMm: 457, hMm: 610, dpi: 150, pricePence: 8995 },
+  { size: '24×32″', sku: 'GLOBAL-CFP-24X32', wMm: 610, hMm: 813, dpi: 150, pricePence: 10995 },
+  { size: '28×40″', sku: 'GLOBAL-CFP-28X40', wMm: 711, hMm: 1016, dpi: 150, pricePence: 13995 },
 ] as const;
 function frameVariants(): VariantDef[] {
   return FRAME_SIZES.flatMap((s) =>
     FRAME_COLOURS.map((colour) => ({
-      size: s.size, colour, pricePence: s.pricePence, wMm: s.wMm, hMm: s.hMm,
+      size: s.size, colour, pricePence: s.pricePence, wMm: s.wMm, hMm: s.hMm, dpi: s.dpi,
       prodigiSku: s.sku, prodigiAttrs: { color: colour },
     })),
   );
 }
 
-// Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of
-// ONE SKU. Values are the exact Prodigi attribute strings (so orders are accurate).
-const TEE_SIZES = ['3-4 years', '5-6 years', '7-8 years'];
-const TEE_COLOURS = ['white', 'caribbean blue', 'cotton pink'];
-function teeVariants(): VariantDef[] {
-  return TEE_SIZES.flatMap((size) =>
-    TEE_COLOURS.map((colour) => ({
-      size, colour, pricePence: 1800, wMm: 240, hMm: 300,
-      prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: colour },
+// Mug: the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is its
+// OWN Prodigi SKU — plus a 15oz white. White leads (default).
+const MUG_TWOTONE = [
+  { colour: 'white', sku: 'H-MUG-11OZ-W' }, { colour: 'black', sku: 'H-MUG-11OZ-WB' },
+  { colour: 'blue', sku: 'H-MUG-11OZ-WBL' }, { colour: 'green', sku: 'H-MUG-11OZ-WG' },
+  { colour: 'orange', sku: 'H-MUG-11OZ-WO' }, { colour: 'pink', sku: 'H-MUG-11OZ-WP' },
+  { colour: 'red', sku: 'H-MUG-11OZ-WR' }, { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
+] as const;
+function mugVariants(): VariantDef[] {
+  return [
+    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1595, wMm: 200, hMm: 85, prodigiSku: m.sku })),
+    { size: '15oz', colour: 'white', pricePence: 2095, wMm: 220, hMm: 95, prodigiSku: 'H-MUG-15OZ-W' },
+  ];
+}
+
+// Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of ONE SKU.
+// Values are the exact Prodigi attribute strings. White is the cheaper tier; colours a touch more.
+const KTEE_SIZES = ['3-4 years', '5-6 years', '7-8 years', '9-11 years', '12-14 years'];
+const KTEE_COLOURS = [
+  { colour: 'white', attr: 'white', pricePence: 2095 },
+  { colour: 'blue', attr: 'caribbean blue', pricePence: 2295 },
+  { colour: 'pink', attr: 'cotton pink', pricePence: 2295 },
+];
+function kidsTeeVariants(): VariantDef[] {
+  return KTEE_SIZES.flatMap((size) =>
+    KTEE_COLOURS.map((c) => ({
+      size, colour: c.colour, pricePence: c.pricePence, wMm: 240, hMm: 300, dpi: 150,
+      prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr },
     })),
   );
 }
 
+// Adult tee: one price across sizes. Mens (Sparker STTM559) + Womens (Bella+Canvas 6004) are
+// DISTINCT SKUs; size is a Prodigi attribute of each.
+function adultTeeVariants(): VariantDef[] {
+  const white = (sizes: string[], sku: string, gender: string) =>
+    sizes.map((s) => ({
+      size: `${gender} ${s}`, colour: 'white', pricePence: 2895, wMm: 300, hMm: 360, dpi: 150,
+      prodigiSku: sku, prodigiAttrs: { size: s.toLowerCase(), color: 'white' },
+    }));
+  return [...white(['S', 'M', 'L', 'XL', '2XL'], 'TEE-SS-STTM559', 'Mens'), ...white(['S', 'M', 'L', 'XL'], 'GLOBAL-TEE-BC-6004', 'Womens')];
+}
+
+// Baby bodysuit: Rabbit Skins short-sleeve; size is a Prodigi attribute of one SKU.
+function babyVariants(): VariantDef[] {
+  return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
+    size, colour: 'white', pricePence: 2195, wMm: 180, hMm: 200, dpi: 150,
+    prodigiSku: 'GLOBAL-BB-RS-4424', prodigiAttrs: { size, color: 'white' },
+  }));
+}
+
+// Fleece blanket: each size+colour is its own Prodigi SKU.
+function blanketVariants(): VariantDef[] {
+  return [
+    { size: 'medium', colour: 'white', pricePence: 5795, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMWHITE' },
+    { size: 'medium', colour: 'pink', pricePence: 6495, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMPINK' },
+    { size: 'medium', colour: 'blue', pricePence: 6495, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMBLUE' },
+    { size: 'large', colour: 'white', pricePence: 7595, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLWHITE' },
+    { size: 'large', colour: 'pink', pricePence: 7595, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLPINK' },
+  ];
+}
+
+// The founder-approved launch range (2026-07-01). Prices are our retail pence, VAT-inclusive with
+// FREE tracked delivery baked in (the shipping cost is inside the price, no separate line). Every
+// SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
 const DEFS: Record<string, ProductDef> = {
-  card: {
-    category: 'CARD', label: 'card', blurb: 'a little card, a big smile', print: true,
-    description: "A folded greeting card with your little one's artwork on the front — ready to write in and give.",
-    specs: { material: '330gsm card', inside: 'blank for your message' },
-    variants: [
-      { size: '7×5″', pricePence: 400, wMm: 127, hMm: 178, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
-      { size: 'A5', pricePence: 450, wMm: 148, hMm: 210, prodigiSku: 'CLASSIC-GRE-FEDR-A5-BLA' },
-    ],
-  },
   framedPrint: {
     category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true,
     description: 'A gallery-quality print of the original, framed and ready to hang — the wonky bits framed in gold.',
-    specs: { material: 'fine-art paper', glazing: 'shatterproof Perspex' },
+    specs: { material: 'fine-art paper', glazing: 'shatterproof' },
     variants: frameVariants(),
   },
   mug: {
     category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true,
-    description: "Their masterpiece wrapped around a sturdy mug — for the grown-up who'll treasure every sip.",
+    description: "Their masterpiece wrapped around a sturdy two-tone mug — for the grown-up who'll treasure every sip.",
     specs: { material: 'ceramic', care: 'dishwasher safe' },
-    variants: [
-      { size: '11oz', colour: 'white', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-W' },
-      { size: '11oz', colour: 'pink', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-11OZ-PNK' },
-      { size: '11oz', colour: 'blue', pricePence: 1400, wMm: 200, hMm: 85, prodigiSku: 'H-MUG-11OZ-BLU' },
-      { size: '15oz', colour: 'white', pricePence: 1800, wMm: 220, hMm: 95, prodigiSku: 'H-MUG-15OZ-W' },
-    ],
-  },
-  kidsTee: {
-    category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true,
-    description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
-    specs: { care: 'wash at 30°' },
-    variants: teeVariants(),
+    variants: mugVariants(),
   },
   cushion: {
     category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true,
-    description: 'A plump cushion with their artwork on it — a keepsake you can actually hug.',
-    specs: { material: 'canvas, double-sided', filling: 'fibre fill included' },
+    description: 'A plump cushion with their artwork on it — heart, round or square, a keepsake you can actually hug.',
+    specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
-      { size: '16″', pricePence: 2800, wMm: 406, hMm: 406, prodigiSku: 'GLOBAL-CUSH-16X16-CAN-DUAL' },
-      { size: '20″', pricePence: 3400, wMm: 508, hMm: 508, prodigiSku: 'GLOBAL-CUSH-20X20-CAN-DUAL' },
-    ],
-  },
-  blanket: {
-    category: 'BLANKET', label: 'blanket', blurb: 'cuddles, with their art woven in', print: true,
-    description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
-    specs: { material: 'fleece', care: 'machine washable' },
-    variants: [
-      { size: 'medium', colour: 'white', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMWHITE' },
-      { size: 'medium', colour: 'pink', pricePence: 4500, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMPINK' },
-      { size: 'large', colour: 'white', pricePence: 6000, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLWHITE' },
-      { size: 'large', colour: 'pink', pricePence: 6000, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLPINK' },
+      { size: 'heart', pricePence: 2295, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      { size: '18″ round', pricePence: 2995, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
+      { size: '12″ square', pricePence: 3250, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
+      { size: '22″ square', pricePence: 4250, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-SUE-DUAL' },
     ],
   },
   storybook: {
     category: 'BOOK', label: 'storybook', blurb: "they're the hero of the story", print: true,
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
-    specs: { material: 'hardcover', pages: '24 pages' },
-    variants: [{ size: 'A4', pricePence: 2400, wMm: 210, hMm: 297, prodigiSku: 'BOOK-FE-A4-P-HARD-G' }],
+    specs: { material: 'hardcover, gloss', pages: '24 pages' },
+    variants: [
+      { size: 'A5', pricePence: 2350, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
+      { size: 'A4', pricePence: 2595, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
+    ],
+  },
+  kidsTee: {
+    category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true,
+    description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
+    specs: { material: 'organic cotton', care: 'wash at 30°' },
+    variants: kidsTeeVariants(),
   },
   jigsaw: {
     category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true,
     description: 'Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece.',
-    specs: { material: 'board, in a keepsake tin' },
+    specs: { material: 'board, in a keepsake tin', delivery: 'tracked' },
     variants: [
-      { size: '30 pieces', pricePence: 2000, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-30' },
-      { size: '110 pieces', pricePence: 2600, wMm: 250, hMm: 200, prodigiSku: 'JIGSAW-PUZZLE-110' },
-      { size: '252 pieces', pricePence: 3200, wMm: 375, hMm: 285, prodigiSku: 'JIGSAW-PUZZLE-252' },
+      { size: '30 pieces', pricePence: 2795, wMm: 250, hMm: 200, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-30' },
+      { size: '110 pieces', pricePence: 3250, wMm: 250, hMm: 200, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-110' },
+      { size: '252 pieces', pricePence: 3495, wMm: 375, hMm: 285, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-252' },
     ],
   },
-  toteBag: {
-    category: 'BAG', label: 'tote bag', blurb: 'carry their creativity everywhere', print: true,
-    description: 'A roomy canvas tote with their artwork printed on — creativity you can carry to the shops.',
-    specs: { material: 'canvas', handles: 'black' },
-    variants: [{ size: '14×18.5″', pricePence: 1600, wMm: 350, hMm: 400, prodigiSku: 'H-BAG-CTB' }],
+  blanket: {
+    category: 'BLANKET', label: 'fleece blanket', blurb: 'cuddles, with their art woven in', print: true,
+    description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
+    specs: { material: 'fleece', care: 'machine washable' },
+    variants: blanketVariants(),
+  },
+  babyBodysuit: {
+    category: 'APPAREL', label: 'baby bodysuit', blurb: 'their first masterpiece, worn tiny', print: true,
+    description: "A soft cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little.",
+    specs: { material: 'fine jersey cotton', care: 'machine washable' },
+    variants: babyVariants(),
+  },
+  card: {
+    category: 'CARD', label: 'greetings card', blurb: 'a little card, a big smile', print: true,
+    description: "A folded greetings card with your little one's artwork on the front — ready to write in and give.",
+    specs: { material: '350gsm card', inside: 'blank for your message' },
+    variants: [
+      { size: '7×5″', pricePence: 495, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'GLOBAL-GRE-GLOS-7X5-BLA' },
+      { size: '7×5″ premium', pricePence: 575, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'GLOBAL-GRE-MOH-7X5-BLA' },
+    ],
+  },
+  calendar: {
+    category: 'PRINT', label: 'calendar', blurb: 'a year of their masterpieces', print: true,
+    description: 'A wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month.',
+    specs: { material: 'silk 300gsm', format: 'landscape wall calendar' },
+    variants: [
+      { size: 'A5', pricePence: 1895, wMm: 210, hMm: 148, dpi: 300, prodigiSku: 'CALENDAR-A5-L-UNDATED' },
+      { size: 'A4', pricePence: 2095, wMm: 297, hMm: 210, dpi: 300, prodigiSku: 'CALENDAR-A4-L-UNDATED' },
+    ],
+  },
+  adultTee: {
+    category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true,
+    description: "A soft adult tee with your little one's artwork on the front — for the grown-up who'll wear it with pride.",
+    specs: { material: 'combed cotton', care: 'wash at 30°' },
+    variants: adultTeeVariants(),
+  },
+  apron: {
+    category: 'APPAREL', label: 'apron', blurb: 'little chef, big mess, kept forever', print: true,
+    description: 'A wipe-clean apron with their artwork on it — for baking days, painting days, and every happy mess.',
+    specs: { material: 'poly-cotton', ties: 'black' },
+    variants: [
+      { size: 'child', pricePence: 2495, wMm: 220, hMm: 280, dpi: 150, prodigiSku: 'H-APR-CA-BTIE' },
+      { size: 'adult', pricePence: 2895, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
+    ],
+  },
+  bauble: {
+    category: 'FESTIVE', label: 'ceramic bauble', blurb: 'a little masterpiece for the tree', print: true,
+    description: "A ceramic bauble carrying their drawing — the ornament you'll unwrap and smile at every Christmas.",
+    specs: { material: 'ceramic', size: '3″' },
+    variants: [{ size: '3″', pricePence: 2095, wMm: 75, hMm: 75, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+  },
+  sack: {
+    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true,
+    description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
+    specs: { material: 'cotton', size: '19×30″' },
+    variants: [{ size: 'one size', pricePence: 3495, wMm: 500, hMm: 750, dpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false,
@@ -150,7 +237,7 @@ const DEFS: Record<string, ProductDef> = {
 // lives only in the Full Catalogue — so the founder's incoming big list defaults to
 // full-catalogue-only until promoted here. Founder-curated for now; ready to be
 // driven by real order counts later. Order in this array = the popular rank.
-const POPULAR_ORDER = ['framedPrint', 'mug', 'kidsTee', 'cushion', 'card', 'blanket', 'jigsaw', 'storybook', 'toteBag'];
+const POPULAR_ORDER = ['framedPrint', 'storybook', 'cushion', 'mug', 'jigsaw', 'kidsTee', 'blanket', 'babyBodysuit', 'card'];
 function popularRankOf(key: string): number | null {
   const i = POPULAR_ORDER.indexOf(key);
   return i === -1 ? null : i + 1;
@@ -323,6 +410,12 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       .set({ active: false })
       .where(and(eq(productVariants.productId, product!.id), notInArray(productVariants.sku, currentSkus)));
   }
+
+  // Retire any whole product no longer in the DEFS (e.g. the discontinued tote bag) so removing a
+  // line from the catalogue actually takes it off the shelf — and clear its popular rank so it
+  // can't collide with a live product's rank.
+  await db.update(products).set({ active: false, popularRank: null }).where(notInArray(products.key, keys));
+
   return { products: keys.length, variants: variantCount };
 }
 

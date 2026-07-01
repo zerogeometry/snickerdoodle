@@ -170,7 +170,7 @@ export default function CustomizePage() {
           <h1 className="font-display text-3xl font-semibold text-cocoa">{product.label}</h1>
           {product.blurb ? <p className="mt-1 text-sm text-[#6F6358]">{product.blurb}</p> : null}
           <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant?.pricePence ?? product.fromPence)}</div>
-          <p className="text-[11px] text-[#9C8E7E]">+ shipping, calculated at checkout</p>
+          <p className="text-[11px] text-[#9C8E7E]">free tracked delivery</p>
 
           {product.sizes.length > 0 ? <Picker label="Size" options={product.sizes} value={size} onChange={setSize} /> : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}

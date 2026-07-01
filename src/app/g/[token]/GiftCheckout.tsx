@@ -78,7 +78,7 @@ export function GiftCheckout({
           </div>
           <div className="flex justify-between">
             <dt>Delivery</dt>
-            <dd>{gbp(DELIVERY_PENCE)}</dd>
+            <dd>{DELIVERY_PENCE === 0 ? <span className="font-semibold text-green-save">Free</span> : gbp(DELIVERY_PENCE)}</dd>
           </div>
           <div className="flex justify-between border-t border-[#EDE2CD] pt-1.5 text-[15px] font-extrabold text-cocoa">
             <dt>Total</dt>

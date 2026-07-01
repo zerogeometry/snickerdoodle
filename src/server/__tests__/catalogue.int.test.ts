@@ -34,7 +34,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     const [framed] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     const tpl = await db.select().from(printTemplates).where(eq(printTemplates.variantId, framed!.id));
     expect(tpl).toHaveLength(1);
-    expect(tpl[0]!.printWidthMm).toBe(210);
+    expect(tpl[0]!.printWidthMm).toBe(279); // default framed print is now 11×14″ (279mm wide)
 
     const [wrap] = await db.select().from(productVariants).where(eq(productVariants.sku, 'giftWrap'));
     expect(await db.select().from(printTemplates).where(eq(printTemplates.variantId, wrap!.id))).toHaveLength(0);

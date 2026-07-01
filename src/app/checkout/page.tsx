@@ -172,7 +172,7 @@ export default function CheckoutPage() {
       ) : null}
       <div className="flex justify-between">
         <dt>Delivery</dt>
-        <dd>{gbp(deliveryPence)}</dd>
+        <dd>{deliveryPence === 0 ? <span className="font-semibold text-green-save">Free</span> : gbp(deliveryPence)}</dd>
       </div>
       <div className="flex justify-between border-t border-[#EDE2CD] pt-2 text-base font-extrabold text-cocoa">
         <dt>Total</dt>

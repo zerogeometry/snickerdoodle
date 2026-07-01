@@ -26,32 +26,32 @@ describe('priceBasket — totals', () => {
     expect(q.lines).toEqual([]);
   });
 
-  it('single item adds delivery once', () => {
+  it('single item, free delivery baked in', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }]);
-    expect(q.subtotalPence).toBe(1400);
-    expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(1400 + DELIVERY_PENCE);
+    expect(q.subtotalPence).toBe(1595);
+    expect(q.deliveryPence).toBe(DELIVERY_PENCE); // 0 — free delivery
+    expect(q.totalPence).toBe(1595 + DELIVERY_PENCE);
   });
 
-  it('multiple items + quantities sum correctly, one delivery', () => {
+  it('multiple items + quantities sum correctly, free delivery', () => {
     const q = priceBasket([
-      { productKey: 'storybook', qty: 1 }, // 2400
-      { productKey: 'framedPrint', qty: 2 }, // 4400
-      { productKey: 'card', qty: 3 }, // 1200
+      { productKey: 'storybook', qty: 1 }, // 2350
+      { productKey: 'framedPrint', qty: 2 }, // 13390
+      { productKey: 'card', qty: 3 }, // 1485
     ]);
-    expect(q.subtotalPence).toBe(2400 + 4400 + 1200);
+    expect(q.subtotalPence).toBe(2350 + 13390 + 1485);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(8000 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(17225 + DELIVERY_PENCE);
     expect(q.lines).toHaveLength(3);
-    expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 2200, linePence: 4400 });
+    expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 6695, linePence: 13390 });
   });
 
   it('uses the SERVER price even if the request smuggles a fake pricePence', () => {
     // The client tries to pay 1p for a blanket. Engine ignores the extra field.
     const evil = { productKey: 'blanket', qty: 1, pricePence: 1, unitPricePence: 1 } as unknown as RequestedLine;
     const q = priceBasket([evil]);
-    expect(q.lines[0]!.unitPricePence).toBe(CATALOGUE.blanket.pricePence); // 4500, not 1
-    expect(q.totalPence).toBe(4500 + DELIVERY_PENCE);
+    expect(q.lines[0]!.unitPricePence).toBe(CATALOGUE.blanket.pricePence); // 5795, not 1
+    expect(q.totalPence).toBe(CATALOGUE.blanket.pricePence + DELIVERY_PENCE);
   });
 });
 
@@ -75,13 +75,13 @@ describe('priceBasket — quantity hardening', () => {
   it('floors fractional quantities', () => {
     const q = priceBasket([{ productKey: 'card', qty: 2.9 }]);
     expect(q.lines[0]!.qty).toBe(2);
-    expect(q.subtotalPence).toBe(800);
+    expect(q.subtotalPence).toBe(2 * 495);
   });
 
   it('clamps absurd quantities to a sane max (no overflow)', () => {
     const q = priceBasket([{ productKey: 'card', qty: 10_000_000 }]);
     expect(q.lines[0]!.qty).toBe(99);
-    expect(q.subtotalPence).toBe(400 * 99);
+    expect(q.subtotalPence).toBe(495 * 99);
     expect(Number.isSafeInteger(q.totalPence)).toBe(true);
   });
 });
@@ -96,7 +96,7 @@ describe('priceBasket — unknown products', () => {
     expect(q.lines.map((l) => l.productKey)).toEqual(['mug']);
     expect(q.rejectedKeys).toContain('diamond-ring');
     expect(q.rejectedKeys).toContain('__proto__'); // prototype-pollution-style key is just rejected
-    expect(q.subtotalPence).toBe(1400);
+    expect(q.subtotalPence).toBe(1595);
   });
 });
 
@@ -108,12 +108,12 @@ describe('gift price-hiding', () => {
 
   it('the payer still pays the real total (gift only hides recipient-facing prices)', () => {
     expect(q.gift).toBe(true);
-    expect(q.totalPence).toBe(2400 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(2350 + DELIVERY_PENCE);
   });
 
   it('recipient line shows "gift" instead of a price when gifting', () => {
     expect(recipientLineLabel(q.lines[0]!, true)).toBe('gift');
-    expect(recipientLineLabel(q.lines[0]!, false)).toBe('£24');
+    expect(recipientLineLabel(q.lines[0]!, false)).toBe('£23.50');
   });
 });
 
@@ -166,23 +166,23 @@ describe('resolveJoinContext — only a genuine verified join earns the saving',
 
 describe('join saving — applied to goods only, via quote()', () => {
   const items: RequestedLine[] = [
-    { productKey: 'storybook', qty: 1 }, // 2400
-    { productKey: 'framedPrint', qty: 1 }, // 2200
-  ]; // subtotal 4600
+    { productKey: 'storybook', qty: 1 }, // 2350
+    { productKey: 'framedPrint', qty: 1 }, // 6695
+  ]; // subtotal 9045
 
-  it('valid join → 5% off the £46 subtotal, delivery untouched', () => {
+  it('valid join → 5% off the subtotal, delivery untouched', () => {
     const q = quote(items, { joinProvenance: provenance() });
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(230); // 5% of 4600
+    expect(q.joinSavingPence).toBe(452); // Math.round(5% of 9045) = 452
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(4600 - 230 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9045 - 452 + DELIVERY_PENCE);
   });
 
   it('guest (no provenance) → no saving', () => {
     const q = quote(items, {});
     expect(q.joinSavingApplied).toBe(false);
     expect(q.joinSavingPence).toBe(0);
-    expect(q.totalPence).toBe(4600 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9045 + DELIVERY_PENCE);
   });
 
   it('forged "I am joining" with no real provenance → no saving', () => {
@@ -190,7 +190,7 @@ describe('join saving — applied to goods only, via quote()', () => {
     // guest, so resolveJoinContext returns null and no discount is granted.
     const q = quote(items, { joinProvenance: provenance({ invite: null, membership: null }) });
     expect(q.joinSavingApplied).toBe(false);
-    expect(q.totalPence).toBe(4600 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9045 + DELIVERY_PENCE);
   });
 
   it('existing active member (membership not from an invite) → no saving', () => {
@@ -205,19 +205,19 @@ describe('join saving — applied to goods only, via quote()', () => {
   });
 
   it('saving rounds to the nearest penny', () => {
-    // 1 mug = 1400; 5% = 70 exactly. Use an odd subtotal to exercise rounding.
+    // Use an odd subtotal to exercise rounding: jigsaw 2795 + card 495 = 3290.
     const odd = quote([{ productKey: 'jigsaw', qty: 1 }, { productKey: 'card', qty: 1 }], {
       joinProvenance: provenance(),
-    }); // subtotal 2400 → 5% = 120
-    expect(odd.joinSavingPence).toBe(120);
+    }); // subtotal 3290 → 5% = 164.5 → Math.round → 165
+    expect(odd.joinSavingPence).toBe(165);
   });
 
   it('gift AND a valid join compose (recipient prices hidden, payer pays the discounted total)', () => {
-    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 4600
+    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9045
     expect(q.gift).toBe(true);
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(230);
-    expect(q.totalPence).toBe(4600 - 230 + DELIVERY_PENCE);
+    expect(q.joinSavingPence).toBe(452);
+    expect(q.totalPence).toBe(9045 - 452 + DELIVERY_PENCE);
     expect(recipientLineLabel(q.lines[0]!, q.gift)).toBe('gift');
   });
 });
@@ -247,12 +247,12 @@ describe('priceBasket — delivery override', () => {
   it('a zero override yields free delivery on a non-empty basket', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 0 });
     expect(q.deliveryPence).toBe(0);
-    expect(q.totalPence).toBe(1400);
+    expect(q.totalPence).toBe(1595);
   });
   it('a custom override flows into the total', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 1500 });
     expect(q.deliveryPence).toBe(1500);
-    expect(q.totalPence).toBe(1400 + 1500);
+    expect(q.totalPence).toBe(1595 + 1500);
   });
   it('the override is ignored on an empty basket (delivery stays zero)', () => {
     const q = priceBasket([], { deliveryPence: 1500 });
@@ -268,7 +268,7 @@ describe('priceBasket — duplicate product keys', () => {
       { productKey: 'mug', qty: 1 },
     ]);
     expect(q.lines).toHaveLength(2);
-    expect(q.subtotalPence).toBe(2 * 1400);
+    expect(q.subtotalPence).toBe(2 * 1595);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
   });
 });

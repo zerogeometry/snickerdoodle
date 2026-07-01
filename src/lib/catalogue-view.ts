@@ -49,7 +49,7 @@ export function splitCatalogue(
 // Friendly filter groups (the product category enum → a shopper-facing label).
 const GROUP: Record<string, string> = {
   CARD: 'cards & prints', PRINT: 'cards & prints', MUG: 'home', CUSHION: 'home', BLANKET: 'home',
-  APPAREL: 'wear', BOOK: 'books', PUZZLE: 'gifts', BAG: 'gifts',
+  APPAREL: 'wear', BOOK: 'books', PUZZLE: 'gifts', BAG: 'gifts', FESTIVE: 'festive',
 };
 export const groupOf = (category: string): string => GROUP[category] ?? 'gifts';
 
