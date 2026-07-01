@@ -33,10 +33,22 @@ shown_price  = roundUpToX9( exVAT_retail × 1.20 )        # VAT-inclusive, ends 
   apparel. Columns vary by category (apparel adds Color/Size/Edge/Gender/Style/Brand), so **parse by
   header, not column index**; filter to destination GB + the chosen shipping method. (`(1)` dupes +
   `acrylic-prism` placeholder can be ignored.)
-- **Stragglers still to pull (need exact dashboard sub-slug):** Pets→dog bandana, Stickers→wall
-  stickers (kiss-cut is in `stickers-stickers`), Stationery→invitations, Apparel→baby bibs,
-  Home&Living→Christmas sack ("Christmas stockings" sub-slug TBC). Glow poster likely inside
-  `wall-art-framed-prints`.
+- **Slug discovery = the dashboard `Download price sheet` link's `href`.** On dashboard.prodigi.com/pricing
+  the download link's href IS the exact blob URL and updates live as the Category/Subcategory/Shipping
+  selects change — set the selects (via `form_input` on the native `<select>`s), read the href, done. No
+  more guessing. The blob is public (no auth); navigating a browser tab to the href downloads the CSV.
+- **Pulled 2026-07-01 (the founder's 15):** storybook → `books-%26-magazines-hardcover-books`
+  (SKU `BOOK-FE-A4-P-HARD-G`, +A5); jigsaw → `sports-%26-games-jigsaws` (`JIGSAW-PUZZLE-30/110/252`,
+  each *in a metal tin*); keepsake box → `home-%26-living-metal-tin` (`MET-TIN-REC` + `MET-TIN-ROU`,
+  NOT `PERSONALISED-TIN`).
+- **Baby bibs are Prodigi US-ONLY** — `apparel/Baby Bibs` offers no GB (or any non-US) shipping
+  destination, so there is NO `-gb` sheet. Baby *bodysuits* ship GB fine. For a UK bib we'd need a
+  second POD supplier (Gelato/Printful) or drop it. Dropped from the 15's pricing; bodysuit kept.
+- **Note:** for jigsaw + metal tin the *Standard* shipping tier is "Not Tracked" (Express/Overnight are
+  tracked). The generator bakes in Standard for consistency; founder may prefer baking in a tracked tier
+  for these two.
+- **Still un-pulled (not in the 15):** Pets→dog bandana, Stickers→wall stickers (kiss-cut is in
+  `stickers-stickers`), Stationery→invitations. Glow poster likely inside `wall-art-framed-prints`.
 
 ## VAT
 Snickerdoodle is **VAT-registered**: Prodigi's input VAT is reclaimable (costs are ex-VAT), output VAT
