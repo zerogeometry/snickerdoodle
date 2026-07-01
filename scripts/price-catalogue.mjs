@@ -1,97 +1,65 @@
-// One-off: compute founder-approved retail prices for the catalogue from the captured
-// Prodigi cost sheets (.prodigi-assets/pricing/). For each SKU it picks the CHEAPEST LANDED
-// (cost + Standard shipping) production source that ships to GB, converts to GBP, applies the
-// PRICING.md formula, and writes a review table to .prodigi-assets/PRICE-LIST.md.
+// Itemised catalogue price breakdown from the captured Prodigi cost sheets
+// (.prodigi-assets/pricing/). For each SKU it uses the CHEAPEST LANDED (cost + Standard
+// shipping) GB source, converts USD/EUR→GBP, and for every distinct price point emits the
+// full margin decomposition. Writes .prodigi-assets/PRICE-BREAKDOWN.md.
 //
-// Run: node scripts/price-catalogue.mjs
-// Formula MIRRORS src/pricing/retail.ts (the tested canonical).
+// Run: node scripts/price-catalogue.mjs   ·   Formula mirrors src/pricing/retail.ts.
 
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 const DIR = '.prodigi-assets/pricing';
-// FX to GBP (approx, mid-2026 — slightly conservative to protect margin; refine later).
 const FX = { GBP: 1, EUR: 0.87, USD: 0.8 };
-const HIGH_SHIP_PENCE = 1200; // flag products whose cheapest GB route still ships dear
 
-// ── formula (mirror of src/pricing/retail.ts) ───────────────────────────────
-const RETAIL = { marginRate: 0.25, vatRate: 0.2, stripePct: 0.015, stripeFixedPence: 20 };
+// ── formula ─────────────────────────────────────────────────────────────────
+const R = { marginRate: 0.25, vatRate: 0.2, stripePct: 0.015, stripeFixedPence: 20 };
+const K = R.stripePct * (1 + R.vatRate);       // Stripe % effect on ex-VAT (0.018)
 const roundUpToX9 = (p) => Math.floor(Math.ceil(p - 1e-6) / 10) * 10 + 9;
-function computeRetail(costP, shipP) {
-  const denom = 1 - RETAIL.marginRate - RETAIL.stripePct * (1 + RETAIL.vatRate);
-  return roundUpToX9(((costP + shipP + RETAIL.stripeFixedPence) / denom) * (1 + RETAIL.vatRate));
-}
-const gbp = (p) => '£' + (p / 100).toFixed(2);
+// Model A: 25% margin on everything (cost + shipping + fees).
+const retailA = (C, S) => roundUpToX9(((C + S + R.stripeFixedPence) / (1 - R.marginRate - K)) * (1 + R.vatRate));
+// Model B: shipping recovered at cost (no margin on it), 25% margin on the item only.
+const retailB = (C, S) => roundUpToX9((((C + R.stripeFixedPence) / (1 - R.marginRate - K)) + S / (1 - K)) * (1 + R.vatRate));
+const f = (p) => (p / 100).toFixed(2);
 
-// ── CSV (handles quoted commas + variable columns) ──────────────────────────
-function parseLine(line) {
-  const out = []; let cur = ''; let q = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
-    else if (c === ',' && !q) { out.push(cur); cur = ''; }
-    else cur += c;
-  }
-  out.push(cur); return out;
-}
-function parseCsv(text) {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  const header = parseLine(lines[0]).map((h) => h.trim());
-  return lines.slice(1).map((l) => {
-    const cells = parseLine(l); const row = {};
-    header.forEach((h, i) => (row[h] = (cells[i] ?? '').trim()));
-    return row;
-  });
-}
+// ── CSV ─────────────────────────────────────────────────────────────────────
+function parseLine(line) { const o = []; let c = '', q = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (ch === '"') { if (q && line[i + 1] === '"') { c += '"'; i++; } else q = !q; } else if (ch === ',' && !q) { o.push(c); c = ''; } else c += ch; } o.push(c); return o; }
+function parseCsv(t) { const L = t.split(/\r?\n/).filter((l) => l.trim()); const h = parseLine(L[0]).map((x) => x.trim()); return L.slice(1).map((l) => { const cs = parseLine(l); const r = {}; h.forEach((x, i) => (r[x] = (cs[i] ?? '').trim())); return r; }); }
 
-// ── load GB+Standard rows, keep ALL source options per SKU ──────────────────
-const toGbpPence = (v, cur) => { const n = parseFloat(v); if (!Number.isFinite(n)) return NaN; return Math.round(n * 100 * (FX[cur] ?? 1)); };
+// ── load GB+Standard rows per SKU ───────────────────────────────────────────
+const toGbp = (v, cur) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 100 * (FX[cur] ?? 1)) : NaN; };
 const bySku = new Map();
-for (const f of readdirSync(DIR)) {
-  if (!f.endsWith('.csv')) continue;
-  for (const r of parseCsv(readFileSync(path.join(DIR, f), 'utf8'))) {
-    if (r['Destination country'] !== 'GB') continue;
-    if ((r['Shipping method'] || '').toLowerCase() !== 'standard') continue;
+for (const file of readdirSync(DIR)) {
+  if (!file.endsWith('.csv')) continue;
+  for (const r of parseCsv(readFileSync(path.join(DIR, file), 'utf8'))) {
+    if (r['Destination country'] !== 'GB' || (r['Shipping method'] || '').toLowerCase() !== 'standard') continue;
     const sku = r['SKU']; if (!sku) continue;
-    const cost = toGbpPence(r['Product price'], r['Product currency']);
-    const ship = toGbpPence(r['Shipping price'], r['Shipping currency']);
-    if (!Number.isFinite(cost)) continue;
+    const cost = toGbp(r['Product price'], r['Product currency']); if (!Number.isFinite(cost)) continue;
+    const ship = toGbp(r['Shipping price'], r['Shipping currency']);
+    const label = r['Size (inches)'] || r['Size'] || r['Size (cm)'] || r['Color'] || '';
     if (!bySku.has(sku)) bySku.set(sku, []);
-    bySku.get(sku).push({ cost, ship: Number.isFinite(ship) ? ship : 0, src: r['Source country'], cur: r['Product currency'] });
+    bySku.get(sku).push({ cost, ship: Number.isFinite(ship) ? ship : 0, src: r['Source country'], label });
   }
 }
-// per SKU: the cheapest LANDED (cost+ship) source variant, and the range across colour/size.
-function variantsForSku(sku) {
-  const rows = bySku.get(sku); if (!rows?.length) return null;
-  // group identical (cost,ship,src) — but for range we just need landed extremes among cheapest-source.
-  // Pick the source country with the lowest median landed, then report its cost/ship spread.
-  // Simpler + safe: per row landed = cost+ship; choose the row-set sharing the min source's shipping.
+// cheapest-landed source's rows for a SKU
+function rowsForSku(sku) {
+  const rows = bySku.get(sku); if (!rows?.length) return [];
   const minLanded = Math.min(...rows.map((r) => r.cost + r.ship));
-  const bestSrc = rows.find((r) => r.cost + r.ship === minLanded).src;
-  const best = rows.filter((r) => r.src === bestSrc);
-  return {
-    minCost: Math.min(...best.map((r) => r.cost)),
-    maxCost: Math.max(...best.map((r) => r.cost)),
-    ship: Math.min(...best.map((r) => r.ship)),
-    maxShip: Math.max(...best.map((r) => r.ship)),
-    src: bestSrc, cur: best[0].cur,
-  };
+  const src = rows.find((r) => r.cost + r.ship === minLanded).src;
+  return rows.filter((r) => r.src === src);
 }
 
-// ── the founder's product list (from the Google sheet) ──────────────────────
 const PRODUCTS = [
   { name: 'Stretched canvas', skus: ['GLOBAL-CAN-12X16', 'GLOBAL-CAN-16X20', 'GLOBAL-CAN-24X32', 'GLOBAL-CAN-28X40', 'GLOBAL-CAN-30X40'] },
   { name: 'Eco canvas', skus: ['ECO-CAN-8X8', 'ECO-CAN-16X16', 'ECO-CAN-8X12', 'ECO-CAN-16X24', 'ECO-CAN-20X30'] },
   { name: 'Classic frame', skus: ['GLOBAL-CFP-11X14', 'GLOBAL-CFP-12X16', 'GLOBAL-CFP-18X24', 'GLOBAL-CFP-24X32', 'GLOBAL-CFP-28X40'] },
-  { name: 'Glow-in-dark framed poster', skus: ['FRA-CLA-GITD-6X6', 'FRA-CLA-GITD-A4', 'FRA-CLA-GITD-10X10', 'FRA-CLA-GITD-12X16', 'FRA-CLA-GITD-30X40', 'FRA-CLA-GITD-40X40'] },
+  { name: 'Glow framed poster', skus: ['FRA-CLA-GITD-6X6', 'FRA-CLA-GITD-A4', 'FRA-CLA-GITD-10X10', 'FRA-CLA-GITD-12X16', 'FRA-CLA-GITD-30X40', 'FRA-CLA-GITD-40X40'] },
   { name: 'Kiss-cut sticker', skus: ['M-STI-3X4', 'M-STI-5_5X5_5', 'M-STI-8_5X8_5', 'M-STI-14X14'] },
-  { name: 'Wall sticker', skus: ['WALL-STKR-A4', 'WALL-STKR-400X500', 'WALL-STKR-600X600', 'WALL-STKR-800X800', 'WALL-STKR-A0', 'WALL-STKR-1000X4000'] },
   { name: 'Magnets', skus: ['MAG-1-10X10', 'MAG-1-15X15', 'MAG-4-10X10', 'MAG-4-15X15', 'MAG-9-15X15'] },
   { name: 'Mousemat', skus: ['GLOBAL-MOUSEMAT'] },
   { name: 'Large mug 15oz', skus: ['H-MUG-15OZ-W'] },
   { name: 'Coloured mug 11oz', skus: ['H-MUG-11OZ-BLA', 'H-MUG-11OZ-BLU', 'H-MUG-11OZ-RED', 'H-MUG-11OZ-YLW', 'H-MUG-11OZ-PNK', 'H-MUG-11OZ-LIGR'] },
   { name: 'Travel mug', skus: ['H-MUG-METAL-16OZ-B'] },
-  { name: 'Insulated water bottle', skus: ['650ML-WATER-BOTTLE'] },
+  { name: 'Water bottle', skus: ['650ML-WATER-BOTTLE'] },
   { name: 'Cushion', skus: ['GLOBAL-CUSH-24X24-SUE', 'GLOBAL-CUSH-24X24-LIN', 'GLOBAL-CUSH-18R-SCSSS', 'GLOBAL-CUSH-SH-SCSSS', 'GLOBAL-CUSH-12X12-LIN-DUAL', 'GLOBAL-CUSH-22X22-SUE-DUAL'] },
   { name: 'Tea towel', skus: ['H-TEATOWEL-SUB'] },
   { name: 'Adults apron', skus: ['H-APR-AA-BTIE', 'H-APR-AA-WTIE'] },
@@ -101,53 +69,55 @@ const PRODUCTS = [
   { name: 'Curtains', skus: ['GLOBAL-CURT-BLKOUT-50X84', 'GLOBAL-CURT-SHEER-50X84'] },
   { name: 'Clock', skus: ['WALL-CLOCK-10X10'] },
   { name: 'Fleece blanket', skus: ['H-BLA-PBLWHITE', 'H-BLA-PBLPINK', 'H-BLA-PBMWHITE', 'H-BLA-PBMPINK', 'H-BLA-PBMBLUE'] },
-  { name: 'Dog bandana', skus: ['PET-BANDANA-SML', 'PET-BANDANA-MED', 'PET-BANDANA-LRG'] },
   { name: "Kid's towel", skus: ['H-TOW-PTM'] },
   { name: 'Adults towel', skus: ['H-TOW-PTL'] },
   { name: 'Ceramic Xmas ornament', skus: ['XMAS-PORC-BAUB'] },
   { name: 'Christmas baubles', skus: ['XMAS-PLAS-BAUB'] },
   { name: 'Christmas sack', skus: ['XMAS-SACK'] },
   { name: 'Greetings cards', skus: ['GLOBAL-GRE-GLOS-6X4-BLA', 'GLOBAL-GRE-GLOS-6X6-BLA', 'GLOBAL-GRE-GLOS-7X5-BLA', 'GLOBAL-GRE-MOH-7X5-BLA', 'GLOBAL-GRE-GLOS-6X4-DIR', 'GLOBAL-GRE-MOH-7X5-DIR'] },
-  { name: 'Invitations', skus: ['CLASSIC-INV-GLOS-6X6', 'CLASSIC-INV-GLOS-6X6-10'] },
   { name: 'Wrapping paper', skus: ['WRAP-1-50X70', 'WRAP-1-75X90', 'WRAP-3-50X70', 'WRAP-3-75X90', 'WRAP-ROL-70X100'] },
-  { name: 'Calendars', skus: ['CALENDAR-A4-L-DATED', 'CALENDAR-A5-L-DATED'] },
-  { name: "Men's organic cotton tee", skus: ['TEE-SS-STTM559'] },
-  { name: "Men's organic cotton hoodie", skus: ['HOOD-SS-STSU812'] },
-  { name: "Women's cotton tee", skus: ['GLOBAL-TEE-BC-6004'] },
+  { name: "Men's tee", skus: ['TEE-SS-STTM559'] },
+  { name: "Men's hoodie", skus: ['HOOD-SS-STSU812'] },
+  { name: "Women's tee", skus: ['GLOBAL-TEE-BC-6004'] },
   { name: "Women's hoodie", skus: ['HOOD-AWD-JH001F'] },
-  { name: 'Baby bodysuit (long sleeve)', skus: ['GLOBAL-BB-RS-4411'] },
-  { name: 'Baby bodysuit (short sleeve)', skus: ['GLOBAL-BB-RS-4424'] },
-  { name: 'Baby cotton tee', skus: ['GLOBAL-TEE-RS-3322'] },
-  { name: 'Baby bib', skus: ['GLOBAL-BIB-RS-1004'] },
-  { name: 'Kids organic cotton tee', skus: ['TEE-SS-STTK909'] },
+  { name: 'Baby bodysuit (LS)', skus: ['GLOBAL-BB-RS-4411'] },
+  { name: 'Baby bodysuit (SS)', skus: ['GLOBAL-BB-RS-4424'] },
+  { name: 'Baby tee', skus: ['GLOBAL-TEE-RS-3322'] },
+  { name: 'Kids tee', skus: ['TEE-SS-STTK909'] },
   { name: 'Kids hoodie', skus: ['HOOD-SS-STSK911', 'STSK911'] },
-  { name: 'Kids sweatshirt', skus: ['SWEAT-SS-STSK913'] },
-  { name: 'Cotton tote bag', skus: ['H-BAG-LTOTE'] },
-  { name: 'Canvas tote bag', skus: ['H-BAG-CTB'] },
+  { name: 'Cotton tote', skus: ['H-BAG-LTOTE'] },
+  { name: 'Canvas tote', skus: ['H-BAG-CTB'] },
   { name: 'Ankle socks', skus: ['GLOBAL-ANKLE-SOCKS'] },
   { name: 'Tube socks', skus: ['GLOBAL-TUBE-SOCKS'] },
 ];
 
-const lines = ['# Computed retail price list (for approval)', '',
-  'Free Standard delivery baked in · 25% margin on ex-VAT · +20% VAT · rounded to .x9. Cheapest GB-landed source per SKU; FX→GBP USD ' + FX.USD + ', EUR ' + FX.EUR + '.', '',
-  '| Product | SKUs | Source | Prodigi cost (ex-VAT) | Std ship | **Retail (inc VAT)** | flag |',
-  '|---|--:|--|--|--:|--|--|'];
-const missing = [], flagged = [];
+// ── itemise: one row per distinct (cost, ship) price point ──────────────────
+const out = [
+  '# Itemised price + margin breakdown (for approval)',
+  '',
+  'All £, VAT-inclusive retail. Model A = 25% margin on everything (current). Fees = Stripe (1.5% of retail + £0.20). ',
+  'Total cost = item + shipping + fees. Profit split proportionally (item vs shipping). "No-ship-margin" = shipping passed at cost, 25% only on the item.',
+  '',
+  '| Product | variants | item £ | ship £ | fees £ | total cost £ | **retail £** | ship profit £ | item profit £ | margin % | no-ship-margin retail £ |',
+  '|---|--:|--:|--:|--:|--:|--:|--:|--:|--:|--:|',
+];
+let sumProfit = 0, sumShipProfit = 0, n = 0;
 for (const p of PRODUCTS) {
-  const vs = p.skus.map(variantsForSku).filter(Boolean);
-  if (!vs.length) { missing.push(p.name); lines.push(`| ${p.name} | 0 | — | — | — | _no cost data_ | |`); continue; }
-  const minCost = Math.min(...vs.map((v) => v.minCost)), maxCost = Math.max(...vs.map((v) => v.maxCost));
-  const ship = Math.min(...vs.map((v) => v.ship)), maxShip = Math.max(...vs.map((v) => v.maxShip));
-  const srcs = [...new Set(vs.map((v) => v.src))].join('/');
-  const rFrom = computeRetail(minCost, ship), rTo = computeRetail(maxCost, maxShip);
-  let flag = '';
-  if (maxShip >= HIGH_SHIP_PENCE) { flag = `⚠ ship ${gbp(maxShip)} (${srcs})`; flagged.push(`${p.name} (${srcs}, ship ${gbp(maxShip)})`); }
-  const costStr = minCost === maxCost ? gbp(minCost) : `${gbp(minCost)}–${gbp(maxCost)}`;
-  const retStr = rFrom === rTo ? `**${gbp(rFrom)}**` : `**${gbp(rFrom)}–${gbp(rTo)}**`;
-  lines.push(`| ${p.name} | ${vs.length} | ${srcs} | ${costStr} | ${gbp(ship)} | ${retStr} | ${flag} |`);
+  const rows = p.skus.flatMap(rowsForSku);
+  if (!rows.length) { out.push(`| ${p.name} | 0 | — | — | — | — | _no data_ | | | | |`); continue; }
+  const groups = new Map();
+  for (const r of rows) { const k = r.cost + '|' + r.ship; if (!groups.has(k)) groups.set(k, { cost: r.cost, ship: r.ship, labels: new Set(), count: 0 }); const g = groups.get(k); g.labels.add(r.label); g.count++; }
+  const pts = [...groups.values()].sort((a, b) => (a.cost + a.ship) - (b.cost + b.ship));
+  pts.forEach((g, i) => {
+    const P = retailA(g.cost, g.ship), rev = P / 1.2, stripe = R.stripePct * P + R.stripeFixedPence;
+    const totalCost = g.cost + g.ship + stripe, profit = rev - totalCost, base = g.cost + g.ship + R.stripeFixedPence;
+    const shipProfit = profit * (g.ship / base), itemProfit = profit - shipProfit, margin = profit / rev;
+    sumProfit += profit; sumShipProfit += shipProfit; n++;
+    const sizes = [...g.labels].filter(Boolean).join(', ').slice(0, 28);
+    out.push(`| ${i === 0 ? p.name : '↳'}${sizes ? ' _' + sizes + '_' : ''} | ${g.count} | ${f(g.cost)} | ${f(g.ship)} | ${f(stripe)} | ${f(totalCost)} | **${f(P)}** | ${f(shipProfit)} | ${f(itemProfit)} | ${(margin * 100).toFixed(1)} | ${f(retailB(g.cost, g.ship))} |`);
+  });
 }
-lines.push('', `_${PRODUCTS.length - missing.length}/${PRODUCTS.length} priced. No cost data: ${missing.join(', ') || 'none'}._`);
-if (flagged.length) lines.push('', '**⚠ High-shipping (non-GB sourced — economics questionable):** ' + flagged.join('; ') + '.');
+out.push('', `_${n} distinct price points. Avg profit £${f(sumProfit / n)}/item, of which £${f(sumShipProfit / n)} is shipping markup (${(sumShipProfit / sumProfit * 100).toFixed(0)}% of profit comes from marking up shipping — the lever you flagged)._`);
 
-writeFileSync('.prodigi-assets/PRICE-LIST.md', lines.join('\n'));
-console.log(lines.join('\n'));
+writeFileSync('.prodigi-assets/PRICE-BREAKDOWN.md', out.join('\n'));
+console.log(out.join('\n'));
