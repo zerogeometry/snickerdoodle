@@ -17,7 +17,14 @@ shown_price  = roundUpToX9( exVAT_retail × 1.20 )        # VAT-inclusive, ends 
 → ×1.20 = £27.05 → **£27.09**. Check: ex-VAT take £22.58 − £12 − £4.30 − Stripe £0.61 = £5.67 = **25.1%**. ✓
 
 ## Shipping model (founder-confirmed)
-- **Free Standard tracked delivery**, baked into each product price (the `S` above). No shipping line.
+- **Free Standard delivery**, baked into each product price (the `S` above). No shipping line.
+- ⚠️ **Standard is NOT tracked on every product** (verified 2026-07-01 from the sheets' "Tracked shipping"
+  column, GB/Standard row per SKU): **untracked** = greetings card, baby bodysuit, jigsaw, keepsake tin,
+  + the cheaper variant of mug (11oz), adult tee (Bella+Canvas 6004) and bauble (plastic); **tracked** =
+  framed print, storybook, calendar, cushion, blanket, kids tee, xmas sack, apron, + mug 15oz, mens tee,
+  porcelain bauble. Pattern: the cheapest shipping tier (~£2.15–£6.45) is untracked; a tracked tier exists
+  but costs more. **Decision pending:** advertise plain "free delivery" (accurate now) vs. bake in the
+  cheapest *tracked* tier for the untracked items so we can honestly say "tracked" (raises those prices).
 - Prodigi discounts multi-item orders ("Plus one shipping price" ≈ £1/extra item), so multi-item
   baskets cost us less than we baked in → **bonus margin, never a loss.**
 - **Premium postage = paid upgrade** (Express/Overnight) at checkout, priced as the *extra* over
@@ -44,9 +51,8 @@ shown_price  = roundUpToX9( exVAT_retail × 1.20 )        # VAT-inclusive, ends 
 - **Baby bibs are Prodigi US-ONLY** — `apparel/Baby Bibs` offers no GB (or any non-US) shipping
   destination, so there is NO `-gb` sheet. Baby *bodysuits* ship GB fine. For a UK bib we'd need a
   second POD supplier (Gelato/Printful) or drop it. Dropped from the 15's pricing; bodysuit kept.
-- **Note:** for jigsaw + metal tin the *Standard* shipping tier is "Not Tracked" (Express/Overnight are
-  tracked). The generator bakes in Standard for consistency; founder may prefer baking in a tracked tier
-  for these two.
+- **Note:** the generator bakes in the cheapest-landed *Standard* row for consistency; see the tracked-vs-
+  untracked breakdown under "Shipping model" — several of the 15 have an untracked Standard tier.
 - **Still un-pulled (not in the 15):** Pets→dog bandana, Stickers→wall stickers (kiss-cut is in
   `stickers-stickers`), Stationery→invitations. Glow poster likely inside `wall-art-framed-prints`.
 
