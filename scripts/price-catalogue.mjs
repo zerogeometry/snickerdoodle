@@ -27,45 +27,55 @@ const csv = ['Product,Variants / sizes,No. variants,Item cost (GBP),Shipping (GB
 function parseLine(line) { const o = []; let c = '', q = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (ch === '"') { if (q && line[i + 1] === '"') { c += '"'; i++; } else q = !q; } else if (ch === ',' && !q) { o.push(c); c = ''; } else c += ch; } o.push(c); return o; }
 function parseCsv(t) { const L = t.split(/\r?\n/).filter((l) => l.trim()); const h = parseLine(L[0]).map((x) => x.trim()); return L.slice(1).map((l) => { const cs = parseLine(l); const r = {}; h.forEach((x, i) => (r[x] = (cs[i] ?? '').trim())); return r; }); }
 
-// ── load GB+Standard rows per SKU ───────────────────────────────────────────
+// ── load all GB rows per SKU (every shipping method) ─────────────────────────
 const toGbp = (v, cur) => { const n = parseFloat(v); return Number.isFinite(n) ? Math.round(n * 100 * (FX[cur] ?? 1)) : NaN; };
 const bySku = new Map();
 for (const file of readdirSync(DIR)) {
   if (!file.endsWith('.csv')) continue;
   for (const r of parseCsv(readFileSync(path.join(DIR, file), 'utf8'))) {
-    if (r['Destination country'] !== 'GB' || (r['Shipping method'] || '').toLowerCase() !== 'standard') continue;
+    if (r['Destination country'] !== 'GB') continue;
     const sku = r['SKU']; if (!sku) continue;
     const cost = toGbp(r['Product price'], r['Product currency']); if (!Number.isFinite(cost)) continue;
     const ship = toGbp(r['Shipping price'], r['Shipping currency']);
     const label = r['Size (inches)'] || r['Size'] || r['Size (cm)'] || r['Color'] || '';
+    const method = (r['Shipping method'] || '').toLowerCase();
+    const tracked = /track/i.test(r['Tracked shipping'] || '') && !/not/i.test(r['Tracked shipping'] || '');
     if (!bySku.has(sku)) bySku.set(sku, []);
-    bySku.get(sku).push({ cost, ship: Number.isFinite(ship) ? ship : 0, src: r['Source country'], label });
+    bySku.get(sku).push({ cost, ship: Number.isFinite(ship) ? ship : 0, src: r['Source country'], label, method, tracked });
   }
 }
-// cheapest-landed source's rows for a SKU
-function rowsForSku(sku) {
-  const rows = bySku.get(sku); if (!rows?.length) return [];
+// cheapest-landed source's rows for a SKU, for the chosen shipping method (default Standard).
+// A product may opt into a tracked tier (e.g. Express) via `ship` — see the jigsaw.
+function rowsForSku(sku, method = 'standard') {
+  const rows = (bySku.get(sku) || []).filter((r) => r.method === method);
+  if (!rows.length) return [];
   const minLanded = Math.min(...rows.map((r) => r.cost + r.ship));
   const src = rows.find((r) => r.cost + r.ship === minLanded).src;
   return rows.filter((r) => r.src === src);
 }
 
-// The founder-chosen 15 (emotional-keepsake curation). SKUs for the 4 not-yet-costed
-// products (storybook, jigsaw, keepsake tin, baby bib) are best-guesses — they'll show
-// "no data" until their Prodigi/other price sheets are pulled.
+// The founder-chosen 15 (emotional-keepsake curation), all costed from GB Prodigi sheets.
+// Shipping-tracking policy (founder 2026-07-01): Standard is baked-in "free delivery"; where a
+// product's Standard tier is untracked, we either swap to a tracked variant (mug, bauble), bake in
+// a tracked tier (jigsaw → Express), or offer tracked as a paid checkout upgrade (greetings card).
+// Baby bib dropped (Prodigi US-only). Keepsake tin (MET-TIN) is untracked-only on Prodigi — pending
+// a tracked second-supplier (Contrado) decision; priced here on Standard as a placeholder.
 const PRODUCTS = [
   { name: 'Framed print', skus: ['GLOBAL-CFP-11X14', 'GLOBAL-CFP-12X16', 'GLOBAL-CFP-18X24', 'GLOBAL-CFP-24X32', 'GLOBAL-CFP-28X40'] },
   { name: 'Storybook', skus: ['BOOK-FE-A5-P-HARD-G', 'BOOK-FE-A4-P-HARD-G'] },
-  { name: 'Mug (11oz colours + 15oz)', skus: ['H-MUG-11OZ-BLA', 'H-MUG-11OZ-BLU', 'H-MUG-11OZ-RED', 'H-MUG-11OZ-YLW', 'H-MUG-11OZ-PNK', 'H-MUG-11OZ-LIGR', 'H-MUG-15OZ-W'] },
+  // Two-tone range (white body + coloured rim/handle/interior) is TRACKED (Standard £4.30);
+  // the coloured-handle mugs were untracked, so they're dropped. (founder 2026-07-01)
+  { name: 'Mug (two-tone colours + 15oz)', skus: ['H-MUG-11OZ-W', 'H-MUG-11OZ-WB', 'H-MUG-11OZ-WBL', 'H-MUG-11OZ-WG', 'H-MUG-11OZ-WO', 'H-MUG-11OZ-WP', 'H-MUG-11OZ-WR', 'H-MUG-11OZ-WY', 'H-MUG-15OZ-W'] },
   { name: 'Calendar', skus: ['CALENDAR-A4-L-UNDATED', 'CALENDAR-A5-L-UNDATED', 'CALENDAR-A4-L-DATED', 'CALENDAR-A5-L-DATED'] },
   { name: 'Cushion', skus: ['GLOBAL-CUSH-24X24-SUE', 'GLOBAL-CUSH-24X24-LIN', 'GLOBAL-CUSH-18R-SCSSS', 'GLOBAL-CUSH-SH-SCSSS', 'GLOBAL-CUSH-12X12-LIN-DUAL', 'GLOBAL-CUSH-22X22-SUE-DUAL'] },
   { name: 'Fleece blanket', skus: ['H-BLA-PBLWHITE', 'H-BLA-PBLPINK', 'H-BLA-PBMWHITE', 'H-BLA-PBMPINK', 'H-BLA-PBMBLUE'] },
   { name: 'Kids tee', skus: ['TEE-SS-STTK909'] },
   { name: 'Adult tee (Mens + Womens)', skus: ['TEE-SS-STTM559', 'GLOBAL-TEE-BC-6004'] },
-  { name: 'Christmas ornament / bauble', skus: ['XMAS-PORC-BAUB', 'XMAS-PLAS-BAUB'] },
+  { name: 'Christmas ornament / bauble', skus: ['XMAS-PORC-BAUB'] }, // ceramic (tracked); plastic dropped (untracked)
   { name: 'Christmas stocking / sack', skus: ['XMAS-SACK'] },
   { name: 'Baby bodysuit', skus: ['GLOBAL-BB-RS-4411', 'GLOBAL-BB-RS-4424'] }, // bib (GLOBAL-BIB-RS-1004) is Prodigi US-only — not GB-fulfillable
-  { name: 'Jigsaw (keepsake tin)', skus: ['JIGSAW-PUZZLE-30', 'JIGSAW-PUZZLE-110', 'JIGSAW-PUZZLE-252'] },
+  // Jigsaw ships in a keepsake metal tin; Standard is untracked so we bake in Express (tracked, +~£1). (founder 2026-07-01)
+  { name: 'Jigsaw (keepsake tin, tracked)', skus: ['JIGSAW-PUZZLE-30', 'JIGSAW-PUZZLE-110', 'JIGSAW-PUZZLE-252'], ship: 'express' },
   { name: 'Greetings card', skus: ['GLOBAL-GRE-GLOS-6X4-BLA', 'GLOBAL-GRE-GLOS-6X6-BLA', 'GLOBAL-GRE-GLOS-7X5-BLA', 'GLOBAL-GRE-MOH-7X5-BLA', 'GLOBAL-GRE-GLOS-6X4-DIR', 'GLOBAL-GRE-MOH-7X5-DIR'] },
   { name: 'Keepsake box (metal tin)', skus: ['MET-TIN-REC', 'MET-TIN-ROU'] },
   { name: 'Apron (adult + child)', skus: ['H-APR-AA-BTIE', 'H-APR-AA-WTIE', 'H-APR-CA-BTIE', 'H-APR-CA-WTIE'] },
@@ -83,7 +93,7 @@ const out = [
 ];
 let sumProfit = 0, sumShipProfit = 0, n = 0;
 for (const p of PRODUCTS) {
-  const rows = p.skus.flatMap(rowsForSku);
+  const rows = p.skus.flatMap((s) => rowsForSku(s, p.ship || 'standard'));
   if (!rows.length) { out.push(`| ${p.name} | 0 | — | — | — | — | _no data_ | | | | |`); csv.push([p.name.replace(/,/g, ';'), 'PENDING - cost sheet not yet pulled', '', '', '', '', '', '', '', '', '', '', '', '', ''].join(',')); continue; }
   const groups = new Map();
   for (const r of rows) { const k = r.cost + '|' + r.ship; if (!groups.has(k)) groups.set(k, { cost: r.cost, ship: r.ship, labels: new Set(), count: 0, src: r.src }); const g = groups.get(k); g.labels.add(r.label); g.count++; }
