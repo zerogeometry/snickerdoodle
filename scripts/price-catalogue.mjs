@@ -58,8 +58,9 @@ function rowsForSku(sku, method = 'standard') {
 // Shipping-tracking policy (founder 2026-07-01): Standard is baked-in "free delivery"; where a
 // product's Standard tier is untracked, we either swap to a tracked variant (mug, bauble), bake in
 // a tracked tier (jigsaw → Express), or offer tracked as a paid checkout upgrade (greetings card).
-// Baby bib dropped (Prodigi US-only). Keepsake tin (MET-TIN) is untracked-only on Prodigi — pending
-// a tracked second-supplier (Contrado) decision; priced here on Standard as a placeholder.
+// Baby bib dropped (Prodigi US-only). Keepsake box DEFERRED to post-launch: Prodigi's metal tin is
+// untracked-only + lid-only; the real keepsake box will be a Contrado product (tracked, UK, lid photo
+// + side design + inside-lid message). Launch range below = 14 products, all tracked/resolved.
 const PRODUCTS = [
   { name: 'Framed print', skus: ['GLOBAL-CFP-11X14', 'GLOBAL-CFP-12X16', 'GLOBAL-CFP-18X24', 'GLOBAL-CFP-24X32', 'GLOBAL-CFP-28X40'] },
   { name: 'Storybook', skus: ['BOOK-FE-A5-P-HARD-G', 'BOOK-FE-A4-P-HARD-G'] },
@@ -77,7 +78,7 @@ const PRODUCTS = [
   // Jigsaw ships in a keepsake metal tin; Standard is untracked so we bake in Express (tracked, +~£1). (founder 2026-07-01)
   { name: 'Jigsaw (keepsake tin, tracked)', skus: ['JIGSAW-PUZZLE-30', 'JIGSAW-PUZZLE-110', 'JIGSAW-PUZZLE-252'], ship: 'express' },
   { name: 'Greetings card', skus: ['GLOBAL-GRE-GLOS-6X4-BLA', 'GLOBAL-GRE-GLOS-6X6-BLA', 'GLOBAL-GRE-GLOS-7X5-BLA', 'GLOBAL-GRE-MOH-7X5-BLA', 'GLOBAL-GRE-GLOS-6X4-DIR', 'GLOBAL-GRE-MOH-7X5-DIR'] },
-  { name: 'Keepsake box (metal tin)', skus: ['MET-TIN-REC', 'MET-TIN-ROU'] },
+  // Keepsake box DEFERRED → Contrado (see header note). Prodigi MET-TIN is untracked-only.
   { name: 'Apron (adult + child)', skus: ['H-APR-AA-BTIE', 'H-APR-AA-WTIE', 'H-APR-CA-BTIE', 'H-APR-CA-WTIE'] },
 ];
 
