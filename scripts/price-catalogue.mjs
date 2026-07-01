@@ -23,6 +23,12 @@ const f = (p) => (p / 100).toFixed(2);
 const csvEsc = (v) => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 const csv = ['Product,Variants / sizes,No. variants,Item cost (GBP),Shipping (GBP),Stripe fees (GBP),Total cost (GBP),Retail inc-VAT (GBP),Shipping profit (GBP),Item profit (GBP),Total profit (GBP),Margin (%),No-ship-margin retail (GBP),Source,US-sourced?'];
 
+// Founder-facing sheet (no profit on shipping): the product is priced for 25% margin on
+// (cost + card fees), shipping is a SEPARATE at-cost line, and net profit is what we actually
+// keep. Price = computeRetail(cost, 0) — i.e. the 25%-margin VAT-inc charm price with NO
+// shipping in it. Customer also pays shipping at cost (VAT added at checkout); we make £0 on it.
+const sheet = ['Item,Variant,Product cost (GBP),Stripe fees (GBP),Shipping at cost (GBP),Price inc-VAT (GBP),Net profit (GBP),Net %'];
+
 // ── CSV ─────────────────────────────────────────────────────────────────────
 function parseLine(line) { const o = []; let c = '', q = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (ch === '"') { if (q && line[i + 1] === '"') { c += '"'; i++; } else q = !q; } else if (ch === ',' && !q) { o.push(c); c = ''; } else c += ch; } o.push(c); return o; }
 function parseCsv(t) { const L = t.split(/\r?\n/).filter((l) => l.trim()); const h = parseLine(L[0]).map((x) => x.trim()); return L.slice(1).map((l) => { const cs = parseLine(l); const r = {}; h.forEach((x, i) => (r[x] = (cs[i] ?? '').trim())); return r; }); }
@@ -109,11 +115,19 @@ for (const p of PRODUCTS) {
     out.push(`| ${i === 0 ? p.name : '↳'}${sizes ? ' _' + sizes + '_' : ''} | ${g.count} | ${f(g.cost)} | ${f(g.ship)} | ${f(stripe)} | ${f(totalCost)} | **${f(P)}** | ${f(shipProfit)} | ${f(itemProfit)} | ${(margin * 100).toFixed(1)} | ${f(retailB(g.cost, g.ship))} |`);
     const csvSizes = allSizes.replace(/"/g, 'in').replace(/,/g, ';');
     csv.push([p.name.replace(/,/g, ';'), csvSizes, g.count, f(g.cost), f(g.ship), f(stripe), f(totalCost), f(P), f(shipProfit), f(itemProfit), f(profit), (margin * 100).toFixed(1), f(retailB(g.cost, g.ship)), g.src, g.src !== 'GB' ? 'YES' : ''].join(','));
+    // founder sheet: product priced at 25% margin on (cost+fees), shipping SEPARATE at cost.
+    const priceNoShip = retailA(g.cost, 0);                 // 25%-margin VAT-inc charm price, no shipping
+    const custIncVat = priceNoShip + Math.round(g.ship * 1.2); // what the card is charged (product + ship, inc VAT)
+    const stripeFull = R.stripePct * custIncVat + R.stripeFixedPence;
+    const netProfit = priceNoShip / 1.2 - g.cost - stripeFull; // shipping in = shipping out; we keep the product margin
+    const netPct = (netProfit / (priceNoShip / 1.2)) * 100;
+    sheet.push([p.name.replace(/,/g, ';'), csvSizes || '—', f(g.cost), f(stripeFull), f(g.ship), f(priceNoShip), f(netProfit), netPct.toFixed(1) + '%'].join(','));
   });
 }
 out.push('', `_${n} distinct price points. Avg profit £${f(sumProfit / n)}/item, of which £${f(sumShipProfit / n)} is shipping markup (${(sumShipProfit / sumProfit * 100).toFixed(0)}% of profit comes from marking up shipping — the lever you flagged)._`);
 
 writeFileSync('.prodigi-assets/PRICE-BREAKDOWN.md', out.join('\n'));
 writeFileSync('.prodigi-assets/price-breakdown.csv', csv.join('\n'));
-console.log(csv.join('\n'));
-console.log('\nWrote .prodigi-assets/price-breakdown.csv (' + (csv.length - 1) + ' rows)');
+writeFileSync('.prodigi-assets/founder-price-sheet.csv', sheet.join('\n'));
+console.log(sheet.join('\n'));
+console.log('\nWrote .prodigi-assets/founder-price-sheet.csv (' + (sheet.length - 1) + ' rows) + price-breakdown.csv');
