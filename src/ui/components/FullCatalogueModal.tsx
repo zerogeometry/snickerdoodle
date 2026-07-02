@@ -30,6 +30,7 @@ export function FullCatalogueModal({
   onAdd,
   onSub,
   onCustomize,
+  onZoom,
 }: {
   open: boolean;
   onClose: () => void;
@@ -42,6 +43,7 @@ export function FullCatalogueModal({
   onAdd: (p: CatalogueProduct) => void;
   onSub: (p: CatalogueProduct) => void;
   onCustomize: (p: CatalogueProduct) => void;
+  onZoom: (p: CatalogueProduct) => void;
 }) {
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('all');
@@ -114,11 +116,11 @@ export function FullCatalogueModal({
           mockImg={mockImg}
           upload={upload}
           lazy
-          enableZoom={false}
           gridClassName="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4"
           onAdd={onAdd}
           onSub={onSub}
           onCustomize={onCustomize}
+          onZoom={onZoom}
         />
       ) : (
         <p className="py-12 text-center text-sm text-[#6F6358]">

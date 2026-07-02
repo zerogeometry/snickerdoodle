@@ -3,13 +3,14 @@
 import { IconAlertTriangle, IconArrowBackUp, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { gbp, toast, useBasket, usePlacements } from '@/lib/store';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
 import { removeBackgroundAction } from '@/app/actions/magic';
+import { mockupContextAction, type MockupContext } from '@/app/actions/mockup';
 import {
   assessResolution,
   canvasSizePx,
@@ -17,6 +18,7 @@ import {
   computeLayerRect,
   containScale,
   MAX_ZOOM,
+  MIN_SCALE,
   mmToPx,
   type Rotation,
   type Transform,
@@ -25,9 +27,23 @@ import type { StudioData, StudioVariant } from '@/server/studio';
 
 const PREVIEW_W = 360; // on-screen canvas width in CSS px
 
-export function Positioner({ data, draft = false, returnTo }: { data: StudioData; draft?: boolean; returnTo?: string }) {
+export function Positioner({
+  data,
+  draft = false,
+  returnTo,
+  focusVariantId,
+}: {
+  data: StudioData;
+  draft?: boolean;
+  returnTo?: string;
+  /** Arrived from Customize for ONE specific product+variant: scope the editor to it —
+   * this session edits THAT creation's placement, not the whole catalogue. */
+  focusVariantId?: string;
+}) {
+  const focused = Boolean(focusVariantId && data.variants.some((v) => v.id === focusVariantId));
+  const variants = focused ? data.variants.filter((v) => v.id === focusVariantId) : data.variants;
   const [assetIdx, setAssetIdx] = useState(0);
-  const [variantId, setVariantId] = useState(data.variants[0]?.id ?? '');
+  const [variantId, setVariantId] = useState((focused ? focusVariantId : undefined) ?? data.variants[0]?.id ?? '');
   // scale 0 = the CONTAIN sentinel: "fit the whole image" — the default placement. It
   // re-resolves automatically when the product or rotation changes; a touched zoom
   // becomes a concrete number.
@@ -37,13 +53,16 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
   const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(null);
   const [removing, setRemoving] = useState(false);
+  // The product context: blank photo + print-area quad (+ silhouette mask) — so the image
+  // is placed ON the product, not on an abstract canvas. Falls back to the flat canvas.
+  const [ctx, setCtx] = useState<MockupContext | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
   const setPlacement = usePlacements((s) => s.setPlacement);
 
   const keepsake = data.keepsakes[assetIdx];
-  const variant = data.variants.find((v) => v.id === variantId) ?? data.variants[0];
+  const variant = variants.find((v) => v.id === variantId) ?? variants[0];
 
   if (!keepsake || !variant) {
     return (
@@ -73,6 +92,29 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
   // "Fit the whole image" scale for THIS product + rotation — the zoom slider's centre.
   const fitScale = natural ? containScale(t, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
   const zoomValue = tf.scale === 0 ? fitScale : tf.scale;
+
+  // Load the product context whenever the variant changes (photoreal products only).
+  useEffect(() => {
+    let live = true;
+    setCtx(null);
+    if (!variantId) return;
+    void mockupContextAction({ variantId }).then((c) => { if (live) setCtx(c); });
+    return () => { live = false; };
+  }, [variantId]);
+
+  /** Switch product/variant PRESERVING the relative zoom (zoom-vs-fit), so the image
+   * appears consistently sized across variants with different print aspects. */
+  const switchVariant = (v: StudioVariant) => {
+    if (v.id === variantId) return;
+    if (natural && tf.scale !== 0) {
+      const src = { width: natural.w, height: natural.h };
+      const rel = tf.scale / containScale(t, src, tf.rotationDeg);
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, rel * containScale(v.template, src, tf.rotationDeg)));
+      setTf((p) => ({ ...p, scale: next }));
+    }
+    setVariantId(v.id);
+    setResult(null);
+  };
 
   const setRot = () => {
     const next = (((tf.rotationDeg + 90) % 360) as Rotation);
@@ -106,6 +148,8 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
         toast('background removed ✨');
       } else if (res.reason === 'budget') {
         toast('that’s all your magic edits for now');
+      } else if (res.reason === 'nochange') {
+        toast('we couldn’t find a clean background to remove on this one');
       } else {
         toast('couldn’t do that — try again');
       }
@@ -166,35 +210,118 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
     };
   }, [rect, scale, tf.rotationDeg]);
 
+  // ── Product-backdrop geometry (preview px): the print-area quad on the blank photo, and
+  // the image's placement INSIDE it via the SAME shared geometry as the print renderer and
+  // the compositor — you're placing the image on the product, and what you see is what prints.
+  const bd = useMemo(() => {
+    if (!ctx || !ctx.ok) return null;
+    const pvH = Math.round((PREVIEW_W * ctx.blankH) / ctx.blankW);
+    const qx = ctx.quad[0]![0] * PREVIEW_W;
+    const qy = ctx.quad[0]![1] * pvH;
+    const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * PREVIEW_W;
+    const qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
+    return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx };
+  }, [ctx, t]);
+
+  const bdImgStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (!bd || !natural) return undefined;
+    const geomPv = { printWidthPx: Math.max(1, Math.round(bd.qw)), printHeightPx: Math.max(1, Math.round(bd.qh)), bleedMm: t.bleedMm, requiredDpi: t.requiredDpi * bd.s };
+    const r = computeLayerRect(geomPv, { width: natural.w, height: natural.h }, tf);
+    const bleedPv = (r.canvasWidth - Math.round(bd.qw)) / 2;
+    const swap = tf.rotationDeg % 180 !== 0;
+    const imgW = swap ? r.height : r.width;
+    const imgH = swap ? r.width : r.height;
+    return {
+      position: 'absolute',
+      left: r.x - bleedPv + r.width / 2,
+      top: r.y - bleedPv + r.height / 2,
+      width: imgW,
+      height: imgH,
+      transform: `translate(-50%, -50%) rotate(${tf.rotationDeg}deg)`,
+      objectFit: 'fill',
+    };
+  }, [bd, natural, tf, t]);
+  const safePv = bd ? mmToPx(t.safeInsetMm, t.requiredDpi) * bd.s : 0;
+  const maskStyle: React.CSSProperties | undefined = ctx && ctx.ok && ctx.maskUrl
+    ? {
+        WebkitMaskImage: `url(${ctx.maskUrl})`,
+        maskImage: `url(${ctx.maskUrl})`,
+        WebkitMaskSize: '100% 100%',
+        maskSize: '100% 100%',
+        maskMode: 'luminance',
+      }
+    : undefined;
+
   return (
     <Shell>
       <div className="grid gap-6 md:grid-cols-[auto_1fr]">
-        {/* Canvas */}
+        {/* Canvas — the image ON the product (photo backdrop) when a template exists;
+            the flat print canvas otherwise. Same shared geometry either way. */}
         <div>
-          <div
-            className="relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9]"
-            style={{ width: PREVIEW_W, height: previewH }}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              ref={imgRef}
-              src={cutout?.url ?? keepsake.imageUrl}
-              alt="your keepsake"
-              style={imgStyle}
-              onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
-            />
-            {/* print-area + safe-area guides */}
+          {bd && ctx && ctx.ok ? (
             <div
-              className="pointer-events-none absolute border border-dashed border-cinnamon/70"
-              style={{ left: bleedPxv * scale, top: bleedPxv * scale, right: bleedPxv * scale, bottom: bleedPxv * scale }}
-            />
+              className="relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9]"
+              style={{ width: PREVIEW_W, height: bd.pvH }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={ctx.blankUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full" />
+              <div className="absolute inset-0" style={maskStyle}>
+                <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    ref={imgRef}
+                    src={cutout?.url ?? keepsake.imageUrl}
+                    alt="your keepsake"
+                    style={bdImgStyle}
+                    onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                  />
+                </div>
+              </div>
+              {/* labelled guides */}
+              <div className="pointer-events-none absolute border border-dashed border-cinnamon/80" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }} />
+              <span className="pointer-events-none absolute rounded-sm bg-cinnamon/90 px-1 py-px text-[9px] font-bold text-white" style={{ left: bd.qx + 3, top: bd.qy + 3 }}>
+                print area
+              </span>
+              <div
+                className="pointer-events-none absolute border border-dotted border-green-save/80"
+                style={{ left: bd.qx + safePv, top: bd.qy + safePv, width: bd.qw - 2 * safePv, height: bd.qh - 2 * safePv }}
+              />
+              <span
+                className="pointer-events-none absolute rounded-sm bg-green-save/90 px-1 py-px text-[9px] font-bold text-white"
+                style={{ left: bd.qx + safePv + 3, top: bd.qy + bd.qh - safePv - 16 }}
+              >
+                keep inside
+              </span>
+            </div>
+          ) : (
             <div
-              className="pointer-events-none absolute border border-dotted border-green-save/60"
-              style={{ left: safePxv * scale, top: safePxv * scale, right: safePxv * scale, bottom: safePxv * scale }}
-            />
-          </div>
+              className="relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9]"
+              style={{ width: PREVIEW_W, height: previewH }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                ref={imgRef}
+                src={cutout?.url ?? keepsake.imageUrl}
+                alt="your keepsake"
+                style={imgStyle}
+                onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+              />
+              {/* labelled print-edge + safe-area guides */}
+              <div
+                className="pointer-events-none absolute border border-dashed border-cinnamon/70"
+                style={{ left: bleedPxv * scale, top: bleedPxv * scale, right: bleedPxv * scale, bottom: bleedPxv * scale }}
+              />
+              <span className="pointer-events-none absolute rounded-sm bg-cinnamon/90 px-1 py-px text-[9px] font-bold text-white" style={{ left: bleedPxv * scale + 3, top: bleedPxv * scale + 3 }}>
+                print area
+              </span>
+              <div
+                className="pointer-events-none absolute border border-dotted border-green-save/60"
+                style={{ left: safePxv * scale, top: safePxv * scale, right: safePxv * scale, bottom: safePxv * scale }}
+              />
+            </div>
+          )}
           <p className="mt-2 text-center text-[11px] text-[#9C8772]">
-            dashed = trim · dotted = keep the important bits inside
+            anything outside the <b className="text-cinnamon">dashed line</b> won&apos;t print · keep faces &amp; words inside the <b className="text-green-save">dotted line</b>
           </p>
 
           {/* DPI status */}
@@ -221,11 +348,18 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
         {/* Controls */}
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Product</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {data.variants.map((v) => (
-              <ProductChip key={v.id} v={v} active={v.id === variantId} onClick={() => { setVariantId(v.id); setResult(null); }} />
-            ))}
-          </div>
+          {focused ? (
+            // Scoped to the ONE creation being customized — no catalogue here.
+            <p className="mt-2 inline-flex rounded-full border border-cinnamon bg-[#FBEFE0] px-3 py-1.5 text-xs font-semibold text-cocoa">
+              {variant.label} · {gbp(variant.pricePence)}
+            </p>
+          ) : (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {variants.map((v) => (
+                <ProductChip key={v.id} v={v} active={v.id === variantId} onClick={() => switchVariant(v)} />
+              ))}
+            </div>
+          )}
 
           {data.keepsakes.length > 1 ? (
             <>

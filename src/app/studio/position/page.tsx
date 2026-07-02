@@ -8,18 +8,18 @@ import { Positioner } from './Positioner';
 export default async function PositionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ draft?: string; return?: string }>;
+  searchParams: Promise<{ draft?: string; return?: string; variant?: string }>;
 }) {
-  const { draft, return: returnTo } = await searchParams;
+  const { draft, return: returnTo, variant } = await searchParams;
   const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : undefined;
 
   if (draft) {
     const data = await loadDraftStudioData(draft);
     if (!data) redirect('/start-creating'); // no/expired claim, blocked, or gone
-    return <Positioner data={data} draft returnTo={safeReturn} />;
+    return <Positioner data={data} draft returnTo={safeReturn} focusVariantId={variant} />;
   }
 
   const data = await loadStudioData();
   if (!data) redirect('/login');
-  return <Positioner data={data} returnTo={safeReturn} />;
+  return <Positioner data={data} returnTo={safeReturn} focusVariantId={variant} />;
 }

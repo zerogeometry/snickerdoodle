@@ -49,6 +49,12 @@ export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerConte
   const srcBuf = await getObjectBytes(orig.key);
   const res = await runImageOp({ kind: 'BG_REMOVE' }, srcBuf); // self-hosted; one image; PNG, no EXIF
 
+  // HONESTY GATE: if the edit didn't meaningfully change anything (no clean background
+  // found) or would erase essentially the whole image (border == subject), fail here —
+  // BEFORE storing a "cutout" or spending budget — so the UI never claims a fake success.
+  const removed = res.removedFraction ?? 0;
+  if (removed < 0.02 || removed > 0.95) throw new Error('no-clean-background');
+
   const key = derivativeKey(assetId, 'cutout');
   await putObject(key, res.buffer, res.contentType);
   const { bucket } = getS3();

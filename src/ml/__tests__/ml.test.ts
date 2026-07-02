@@ -21,7 +21,7 @@ async function pixels(buf: Buffer) {
 
 describe('self-hosted image ops (the magic edits)', () => {
   it('removeBackground keys out the near-white background, keeps the drawing opaque', async () => {
-    const cut = await removeBackground(await drawingOnWhite());
+    const cut = (await removeBackground(await drawingOnWhite())).buffer;
     const px = await pixels(cut);
     expect(px(2, 2).a).toBe(0); // a corner of the white background → transparent
     expect(px(98, 98).a).toBe(0);
@@ -31,8 +31,44 @@ describe('self-hosted image ops (the magic edits)', () => {
     expect(centre.g).toBeLessThan(120);
   });
 
+  it('removes a DARK background too (border-connected, any solid colour)', async () => {
+    const light = await sharp({ create: { width: 40, height: 40, channels: 3, background: { r: 235, g: 220, b: 200 } } }).png().toBuffer();
+    const onBlack = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 12, g: 10, b: 14 } } })
+      .composite([{ input: light, left: 30, top: 30 }])
+      .png()
+      .toBuffer();
+    const res = await removeBackground(onBlack);
+    const px = await pixels(res.buffer);
+    expect(px(2, 2).a).toBe(0); // black background gone
+    expect(px(50, 50).a).toBe(255); // light subject kept
+    expect(res.removedFraction).toBeGreaterThan(0.5);
+  });
+
+  it('keeps background-coloured areas ENCLOSED by the subject (only border-connected goes)', async () => {
+    const hole = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
+    const frame = await sharp({ create: { width: 60, height: 60, channels: 3, background: { r: 204, g: 34, b: 34 } } })
+      .composite([{ input: hole, left: 20, top: 20 }])
+      .png()
+      .toBuffer();
+    const img = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+      .composite([{ input: frame, left: 20, top: 20 }])
+      .png()
+      .toBuffer();
+    const res = await removeBackground(img);
+    const px = await pixels(res.buffer);
+    expect(px(2, 2).a).toBe(0); // outer white removed
+    expect(px(50, 50).a).toBe(255); // the white HOLE inside the red frame survives
+  });
+
+  it('reports a tiny removedFraction when there is no clean background (honesty signal)', async () => {
+    // A full-bleed solid: the border IS the subject → the flood would erase everything.
+    const solid = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 204, g: 34, b: 34 } } }).png().toBuffer();
+    const res = await removeBackground(solid);
+    expect(res.removedFraction).toBeGreaterThan(0.95); // caller's honesty gate rejects this
+  });
+
   it('a magic edit strips ALL metadata — no EXIF/GPS survives', async () => {
-    const cut = await removeBackground(await drawingOnWhite());
+    const cut = (await removeBackground(await drawingOnWhite())).buffer;
     const meta = await sharp(cut).metadata();
     expect(meta.exif).toBeUndefined();
   });
@@ -49,6 +85,7 @@ describe('self-hosted image ops (the magic edits)', () => {
     expect(r.contentType).toBe('image/png');
     expect(r.sha256).toMatch(/^[a-f0-9]{64}$/);
     expect(r.byteSize).toBeGreaterThan(0);
+    expect(r.removedFraction).toBeGreaterThan(0.5); // the white ground was removed
     expect((await sharp(r.buffer).metadata()).channels).toBe(4); // RGBA cutout
   });
 });

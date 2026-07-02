@@ -271,13 +271,15 @@ export function FlowCatalogue({
           onAdd={(p) => quickAdd(p, 1)}
           onSub={(p) => quickAdd(p, -1)}
           onCustomize={customize}
+          onZoom={setZoom}
         />
       ) : null}
 
-      <Modal open={!!zoom} onClose={() => setZoom(null)} title={zoom?.label ?? ''} subtitle={zoom ? `from ${gbp(zoom.fromPence)}` : undefined}>
+      {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
+      <Modal open={!!zoom} onClose={() => setZoom(null)} size="xl" fill title={zoom?.label ?? ''} subtitle={zoom ? `from ${gbp(zoom.fromPence)}` : undefined}>
         {zoom ? (
-          <div className="flex flex-col items-center gap-3 py-2">
-            <div className="rounded-2xl bg-[#FBF5E9] p-3">
+          <div className="flex h-full flex-col items-center gap-3 py-2">
+            <div className="flex w-full flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#FBF5E9] p-3">
               <MockupPreview
                 productKey={zoom.key as ProductKey}
                 assetId={upload?.assetId}
@@ -286,7 +288,7 @@ export function FlowCatalogue({
                 size="zoom"
                 sourceObjectId={upload?.cutout?.sourceObjectId}
                 image={mockImg}
-                px={240}
+                px={720}
                 uid="modal"
               />
             </div>

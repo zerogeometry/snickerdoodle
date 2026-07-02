@@ -1,12 +1,13 @@
 'use client';
 
-import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
+import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
-import { ProductMockup, type ProductKey } from '@/ui/components/ProductArt';
+import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
 import { lineIdForSku } from '@/lib/catalogue-view';
@@ -33,6 +34,7 @@ export default function CustomizePage() {
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
+  const [zoomOpen, setZoomOpen] = useState(false);
 
   useEffect(() => {
     void loadCatalogueAction().then(setProducts);
@@ -102,7 +104,12 @@ export default function CustomizePage() {
       toast('upload a drawing first');
       return;
     }
-    router.push(`/studio/position?draft=${upload.assetId}&return=${encodeURIComponent(`/customize/${product.key}`)}`);
+    if (!variant) {
+      toast('pick a size + colour first');
+      return;
+    }
+    // Scoped to THIS product + variant — the positioner edits this creation's placement only.
+    router.push(`/studio/position?draft=${upload.assetId}&variant=${variant.id}&return=${encodeURIComponent(`/customize/${product.key}`)}`);
   };
 
   const addToBasket = () => {
@@ -131,10 +138,27 @@ export default function CustomizePage() {
 
   return (
     <Shell>
+      {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
+      <Modal open={zoomOpen} onClose={() => setZoomOpen(false)} size="xl" fill title={product.label} subtitle={gbp(variant?.pricePence ?? product.fromPence)}>
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-[#FBF5E9] p-3">
+          <MockupPreview
+            productKey={product.key as ProductKey}
+            assetId={upload?.assetId ?? null}
+            variantId={variant?.id ?? null}
+            transform={placement}
+            size="zoom"
+            sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+            image={previewImg}
+            placement={placement}
+            px={720}
+            uid="customize-zoom"
+          />
+        </div>
+      </Modal>
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
         {/* Left: preview + angle thumbnails + edit placement */}
         <div>
-          <div className="flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
+          <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
             <MockupPreview
               productKey={product.key as ProductKey}
               assetId={upload?.assetId ?? null}
@@ -147,20 +171,16 @@ export default function CustomizePage() {
               px={300}
               uid="customize"
             />
+            <button
+              type="button"
+              onClick={() => setZoomOpen(true)}
+              aria-label={`Enlarge ${product.label} preview`}
+              className="absolute left-2.5 top-2.5 flex items-center justify-center rounded-full bg-white/85 p-1.5 text-[#7A6A58] shadow-sm before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon"
+            >
+              <Icon icon={IconZoomScan} size={17} />
+            </button>
           </div>
-          {/* angle thumbnails — real product photography lands here on the Prodigi sync */}
-          <div className="mt-3 flex items-center gap-2">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                title={i === 0 ? 'front' : 'more angles coming with product photography'}
-                className={`flex h-14 w-14 items-center justify-center rounded-xl border bg-[#FBF5E9] ${i === 0 ? 'border-cinnamon' : 'border-[#EFE6D6] opacity-50'}`}
-              >
-                <ProductMockup product={product.key as ProductKey} image={previewImg} placement={placement} size={44} uid={`thumb-${i}`} />
-              </div>
-            ))}
-          </div>
-          <Button variant="secondary" size="lg" className="mt-3 w-full" onClick={editPlacement}>
+          <Button variant="design" size="lg" className="mt-3 w-full" onClick={editPlacement}>
             <Icon icon={IconPencil} size={15} /> edit placement
           </Button>
         </div>

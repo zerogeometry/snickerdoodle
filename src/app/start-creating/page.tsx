@@ -89,6 +89,7 @@ export default function StartCreatingPage() {
         setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
         toast('background removed ✨');
       } else if (res.reason === 'budget') toast('that’s all your magic edits for now');
+      else if (res.reason === 'nochange') toast('we couldn’t find a clean background to remove on this one');
       else toast('couldn’t do that — try again');
     } finally {
       setRemovingBg(false);

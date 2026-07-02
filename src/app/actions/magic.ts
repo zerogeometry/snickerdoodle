@@ -14,7 +14,7 @@ import { getCurrentAccount, getUploadClaims } from '@/server/session';
  */
 export async function removeBackgroundAction(input: {
   assetId: string;
-}): Promise<{ ok: true; url: string; sourceObjectId: string } | { ok: false; needsAuth?: boolean; reason?: 'budget' }> {
+}): Promise<{ ok: true; url: string; sourceObjectId: string } | { ok: false; needsAuth?: boolean; reason?: 'budget' | 'nochange' }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
@@ -27,6 +27,7 @@ export async function removeBackgroundAction(input: {
   } catch (e) {
     const msg = String(e);
     if (msg.includes('budget')) return { ok: false, reason: 'budget' };
+    if (msg.includes('no-clean-background')) return { ok: false, reason: 'nochange' };
     return { ok: false, needsAuth: account === null && viewer.uploadClaim == null };
   }
 }
