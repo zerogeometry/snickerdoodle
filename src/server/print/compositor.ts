@@ -126,6 +126,9 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   if (!tpl || !tpl.blankObjectId || !tpl.printQuad) throw new NoMockupTemplateError('variant has no mockup template');
   const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
   if (!blank) throw new NoMockupTemplateError('blank template asset missing');
+  // Optional product-silhouette mask (NON-child, same family as the blank): the design is
+  // clipped to it, so art can never overlap the product's edge on shaped blanks.
+  const [mask] = tpl.maskObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.maskObjectId)) : [undefined];
 
   // 3. The DESIGN — read from storage_objects, scoped to THIS asset (never from
   //    template_assets). A specific source object (e.g. a bg-removed cutout) must
@@ -160,6 +163,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       assetId: input.assetId,
       key,
       blankKey: blank.key,
+      maskKey: mask?.key,
       designKey: srcObj.key,
       quad: tpl.printQuad!,
       transform: t,
@@ -177,10 +181,11 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 
 async function renderAndPersist(
   db: DbHandle,
-  args: { assetId: string; key: string; blankKey: string; designKey: string; quad: [number, number][]; transform: Transform; workEdge: number; outputEdge: number },
+  args: { assetId: string; key: string; blankKey: string; maskKey?: string; designKey: string; quad: [number, number][]; transform: Transform; workEdge: number; outputEdge: number },
 ): Promise<MockupResult> {
   const out = await renderFlat({
     blankBuf: await getObjectBytes(args.blankKey),
+    maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
     designBuf: await getObjectBytes(args.designKey),
     quad: args.quad,
     transform: args.transform,
@@ -214,13 +219,14 @@ async function renderAndPersist(
  */
 async function renderFlat(args: {
   blankBuf: Buffer;
+  maskBuf?: Buffer;
   designBuf: Buffer;
   quad: [number, number][];
   transform: Transform;
   workEdge: number;
   outputEdge: number;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, designBuf, quad, transform, workEdge, outputEdge } = args;
+  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge } = args;
 
   // Working blank dimensions: cap the longest edge at workEdge (scRGB is 32-bit float,
   // ~4× memory, so this cap is load-bearing). The normalised quad scales with it.
@@ -272,6 +278,25 @@ async function renderFlat(args: {
     designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
   } catch {
     // keep `windowed`
+  }
+
+  // Clip the design to the product SILHOUETTE (mask: white = printable). The mask shares
+  // the blank's frame, so resize it to working res, cut the same print-area window, and
+  // multiply it into the design's alpha (dest-in) — art can never overlap the product's
+  // edge on shaped blanks (heart/round cushions, bauble, sack, apron). Unlike the feather
+  // this is NOT best-effort: a template authored WITH a mask must never render unclipped.
+  if (maskBuf) {
+    const maskWin = await sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+      .resize(WW, WH, { fit: 'fill' })
+      .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
+      .toColourspace('b-w')
+      .blur(0.6) // soft edge so the clip doesn't alias
+      .toBuffer();
+    const clip = await sharp({ create: { width: rect.w, height: rect.h, channels: 3, background: '#000' } })
+      .joinChannel(maskWin)
+      .png()
+      .toBuffer();
+    designLayer = await sharp(designLayer).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
   }
 
   // Composite the design over the working-res blank IN LINEAR LIGHT (own pipeline:

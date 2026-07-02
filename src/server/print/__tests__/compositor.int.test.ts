@@ -152,8 +152,10 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
   it('falls back (throws NoMockupTemplateError) for a variant with no template', async () => {
     const assetId = await ingestDesign();
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const [mug] = await db.select().from(productVariants).where(eq(productVariants.sku, 'mug')); // never given a blank
-    await expect(composeMockup(db, sam, { assetId, variantId: mug!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } })).rejects.toBeInstanceOf(NoMockupTemplateError);
+    // giftWrap is an ADDON (print: false) — it has no print_template row at all, and never
+    // will, so it's a stable "no mockup template" case (real products may be authored blanks).
+    const [wrap] = await db.select().from(productVariants).where(eq(productVariants.sku, 'giftWrap'));
+    await expect(composeMockup(db, sam, { assetId, variantId: wrap!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } })).rejects.toBeInstanceOf(NoMockupTemplateError);
   });
 
   it('deleting the asset cascades the mockup derivative but NOT the template asset', async () => {
@@ -208,6 +210,46 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     await composeMockup(db, sam, { assetId, variantId, transform: tf }); // populate the cache
     const outsider = await resolveViewerContext(db, ids.blakeId, ids.bloomId);
     await expect(composeMockup(db, outsider, { assetId, variantId, transform: tf })).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('clips the design to the silhouette MASK — art cannot overlap the product edge', async () => {
+    const assetId = await ingestDesign(); // solid red 1200×1500
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+
+    // Mask: a white circle (the "product face") inside the quad, black elsewhere — full blank frame.
+    const maskBuf = await sharp(
+      Buffer.from('<svg width="600" height="800"><rect width="600" height="800" fill="black"/><circle cx="300" cy="400" r="120" fill="white"/></svg>'),
+    ).png().toBuffer();
+    const maskKey = `templates/test-${ids.nonce}/mask.png`;
+    await putObject(maskKey, maskBuf, 'image/png');
+    keys.push(maskKey);
+    const [ma] = await db
+      .insert(templateAssets)
+      .values({ kind: 'MASK', bucket: process.env.S3_BUCKET!, key: maskKey, contentType: 'image/png', byteSize: maskBuf.byteLength, widthPx: 600, heightPx: 800 })
+      .returning();
+    await db.update(printTemplates).set({ maskObjectId: ma!.id, templateVersion: 7 }).where(eq(printTemplates.variantId, variantId));
+
+    try {
+      const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, size: 'zoom' });
+      const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+      const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+      const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+      const at = (x: number, y: number) => {
+        const i = (y * info.width! + x) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      };
+      // Output is the blank's own resolution (600×800 fits inside the zoom edge).
+      expect(info.width).toBe(600);
+      // Centre of the circle → the red design shows.
+      const [r1] = at(300, 400);
+      expect(r1).toBeGreaterThan(150);
+      // Inside the QUAD but OUTSIDE the circle → the blank's grey (the design is clipped).
+      const [r2, g2, b2] = at(140, 180);
+      expect(Math.abs(r2 - 232) + Math.abs(g2 - 226) + Math.abs(b2 - 214)).toBeLessThan(45);
+    } finally {
+      await db.update(printTemplates).set({ maskObjectId: null, templateVersion: 1 }).where(eq(printTemplates.variantId, variantId));
+      await db.delete(templateAssets).where(eq(templateAssets.id, ma!.id)).catch(() => {});
+    }
   });
 
   it('falls back (bounded memory, no OOM) for an extreme-aspect design', async () => {

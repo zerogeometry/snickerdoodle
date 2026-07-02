@@ -2,7 +2,7 @@
 
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
-import { composeMockup, type MockupSize } from '@/server/print/compositor';
+import { composeMockup, NoMockupTemplateError, type MockupSize } from '@/server/print/compositor';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 
@@ -41,7 +41,12 @@ export async function composeMockupAction(input: {
     });
     const grant = await getStorageObjectGrant(db, res.mockupObjectId, viewer, 600);
     return { ok: true, url: grant.url, tier: res.tier, widthPx: res.widthPx, heightPx: res.heightPx };
-  } catch {
+  } catch (err) {
+    // "No template yet" is the expected steady state for SVG-only products — silent.
+    // Anything else is an ENGINE failure the SVG fallback would otherwise hide: log it.
+    if (!(err instanceof NoMockupTemplateError)) {
+      console.warn('[mockup] compose failed, serving SVG fallback:', err instanceof Error ? err.message : err);
+    }
     return { ok: false, needsAuth: account === null && viewer.uploadClaim == null, fallback: true };
   }
 }
