@@ -63,9 +63,11 @@ const MUG_TWOTONE = [
   { colour: 'red', sku: 'H-MUG-11OZ-WR' }, { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
 ] as const;
 function mugVariants(): VariantDef[] {
+  // Print canvases from Prodigi's OFFICIAL templates (11oz: 2473×1157px @300dpi = 209×98mm;
+  // 15oz: 2563×1157px = 217×98mm) — the wrap the print file must fill.
   return [
-    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1595, wMm: 200, hMm: 85, prodigiSku: m.sku })),
-    { size: '15oz', colour: 'white', pricePence: 2095, wMm: 220, hMm: 95, prodigiSku: 'H-MUG-15OZ-W' },
+    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1595, wMm: 209, hMm: 98, prodigiSku: m.sku })),
+    { size: '15oz', colour: 'white', pricePence: 2095, wMm: 217, hMm: 98, prodigiSku: 'H-MUG-15OZ-W' },
   ];
 }
 
@@ -217,13 +219,15 @@ const DEFS: Record<string, ProductDef> = {
     category: 'FESTIVE', label: 'ceramic bauble', blurb: 'a little masterpiece for the tree', print: true,
     description: "A ceramic bauble carrying their drawing — the ornament you'll unwrap and smile at every Christmas.",
     specs: { material: 'ceramic', size: '3″' },
-    variants: [{ size: '3″', pricePence: 2095, wMm: 75, hMm: 75, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+    // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
+    variants: [{ size: '3″', pricePence: 2095, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
   },
   sack: {
     category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true,
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
-    variants: [{ size: 'one size', pricePence: 3495, wMm: 500, hMm: 750, dpi: 150, prodigiSku: 'XMAS-SACK' }],
+    // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
+    variants: [{ size: 'one size', pricePence: 3495, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false,

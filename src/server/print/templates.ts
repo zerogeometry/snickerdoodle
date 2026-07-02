@@ -35,6 +35,13 @@ export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateIn
   if (!Array.isArray(input.printQuad) || input.printQuad.length !== 4) {
     throw new Error('printQuad must be 4 normalised [x,y] corners (TL,TR,BR,BL)');
   }
+  // Fail LOUD at authoring, not at render: a quad outside the blank (e.g. an aspect-locked
+  // cover on a wrong-orientation photo) would make the compositor throw on every request.
+  for (const [x, y] of input.printQuad) {
+    if (x < -0.005 || x > 1.005 || y < -0.005 || y > 1.005) {
+      throw new Error(`printQuad extends outside the blank (got [${x.toFixed(3)}, ${y.toFixed(3)}]) — wrong photo orientation or region for this print canvas?`);
+    }
+  }
   const [tpl] = await db.select({ version: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
   if (!tpl) throw new Error(`no print_template for variant ${input.variantId}`);
   const templateVersion = (tpl.version ?? 1) + 1; // bump → cached mockups invalidate (version is in the key)
