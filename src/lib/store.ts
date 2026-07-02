@@ -21,20 +21,56 @@ export const gbp = formatPence;
 // Consent is NOT a client flag: the ACT of uploading is the acceptance (lawful basis
 // = CONTRACT, Art 6(1)(b)), recorded SERVER-SIDE at ingest (termsAcceptedAt +
 // termsVersion). The conspicuous upload-step notice is the transparency. See DECISIONS.md.
-export type Upload = { dataUrl: string; name: string; assetId?: string; cutout?: { url: string; sourceObjectId: string } } | null;
+// `opaqueBg` = the image has NO transparent pixels (detected client-side after upload) —
+// used to nudge "remove background" only when it would actually do something.
+export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; cutout?: { url: string; sourceObjectId: string } } | null;
 export const useUpload = create<{
   upload: Upload;
   setUpload: (u: Upload) => void;
   setAssetId: (id: string) => void;
+  setOpaqueBg: (opaque: boolean) => void;
   setCutout: (c: { url: string; sourceObjectId: string }) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 }>((set) => ({
   upload: null,
   setUpload: (upload) => set({ upload }),
   setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
+  setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
   setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
   resetUpload: () => set({ upload: null }),
 }));
+
+/**
+ * Does the image contain any transparency? Downsampled alpha scan (≤128px) so it's
+ * effectively free. Non-PNG formats can't carry alpha → opaque without decoding.
+ * Resolves true/false; on any decode failure resolves false (no nudge — never nag wrongly).
+ */
+export function detectOpaqueBg(dataUrl: string, name: string): Promise<boolean> {
+  if (!/\.png$/i.test(name) && !dataUrl.startsWith('data:image/png')) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, 128 / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(false);
+        ctx.drawImage(img, 0, 0, w, h);
+        const { data } = ctx.getImageData(0, 0, w, h);
+        for (let i = 3; i < data.length; i += 4) if (data[i]! < 250) return resolve(false); // transparency found
+        resolve(true);
+      } catch {
+        resolve(false);
+      }
+    };
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
+}
 
 // ── basket ───────────────────────────────────────────────────────────────────
 export type PlacementTransform = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };

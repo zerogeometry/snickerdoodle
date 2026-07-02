@@ -88,8 +88,11 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'prodigi-christmas-sack-blank-asset/Prodigi-Christmas-Sack blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-physical', mask: true, productWidthMm: 483, bottomInsetFrac: 0.06 };
     case 'apron': // chest-to-hem centre panel; aspect locked to the print canvas, offsets pending official spec
       return { file: 'prodigi-apron-blank-asset/Prodigi-Apron-blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.24, y0: 0.38, x1: 0.76, y1: 0.92 } };
-    case 'mug': // cylinder: front band at true print-height scale (see header note)
-      return { file: 'prodigi-11oz-mug-blank-asset/Prodigi 11oz Mug blank.png', material: 'CERAMIC', register: 'band', mask: true, region: { x0: 0.05, y0: 0.28, x1: 0.62, y1: 0.76 } };
+    case 'mug': // cylinder: a near-square decal CENTRED on the visible front face (founder call:
+      // clarity over wrap fidelity on the tile; the Studio positioner stays exact on the wrap).
+      // NO mask: the white body reads as background locally (white-on-light-grey), so the
+      // silhouette bites into the decal — and the panel sits fully inside the body anyway.
+      return { file: 'prodigi-11oz-mug-blank-asset/Prodigi 11oz Mug blank.png', material: 'CERAMIC', register: 'band', mask: false, region: { x0: 0.11, y0: 0.25, x1: 0.57, y1: 0.75 } };
     default:
       return null; // storybook, kidsTee, adultTee, babyBodysuit, card, calendar, giftWrap → keep SVG
   }

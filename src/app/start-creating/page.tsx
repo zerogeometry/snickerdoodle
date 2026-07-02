@@ -11,7 +11,7 @@ import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
-import { toast, useUpload } from '@/lib/store';
+import { detectOpaqueBg, toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -21,6 +21,7 @@ export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
   const setUpload = useUpload((s) => s.setUpload);
   const setAssetId = useUpload((s) => s.setAssetId);
+  const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
   const setCutout = useUpload((s) => s.setCutout);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -38,11 +39,18 @@ export default function StartCreatingPage() {
   };
   useEffect(loadCatalogue, []);
 
+  /** Set the upload, then detect whether its background is opaque (drives the
+   * "remove background" nudge — only shown when removing would actually do something). */
+  const applyUpload = (dataUrl: string, name: string) => {
+    setUpload({ dataUrl, name });
+    void detectOpaqueBg(dataUrl, name).then(setOpaqueBg);
+  };
+
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => setUpload({ dataUrl: String(reader.result), name: file.name });
+    reader.onload = () => applyUpload(String(reader.result), file.name);
     reader.readAsDataURL(file);
   };
 
@@ -95,14 +103,14 @@ export default function StartCreatingPage() {
       <CameraCapture
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
-        onCapture={(dataUrl, name) => setUpload({ dataUrl, name })}
+        onCapture={(dataUrl, name) => applyUpload(dataUrl, name)}
         onUploadInstead={() => fileRef.current?.click()}
       />
       <ImageStudio
         open={studioOpen}
         image={upload?.dataUrl ?? null}
         onClose={() => setStudioOpen(false)}
-        onApply={(edited) => setUpload({ dataUrl: edited, name: upload?.name ?? 'drawing.png' })}
+        onApply={(edited) => applyUpload(edited, upload?.name ?? 'drawing.png')}
       />
 
       <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
@@ -159,7 +167,16 @@ export default function StartCreatingPage() {
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image
                 </Button>
-                <Button variant="design" size="lg" className="w-full" onClick={removeBg} disabled={removingBg}>
+                <Button
+                  variant="design"
+                  size="lg"
+                  className="w-full"
+                  onClick={removeBg}
+                  disabled={removingBg}
+                  // Nudge (same wobble as start-creating) ONLY when removing would do something:
+                  // the upload is detected as fully opaque and hasn't been bg-removed yet.
+                  attention={!removingBg && !upload.cutout && upload.opaqueBg === true}
+                >
                   <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
                   {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
                 </Button>
