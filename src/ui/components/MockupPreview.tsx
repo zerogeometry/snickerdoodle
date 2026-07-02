@@ -96,7 +96,9 @@ export function MockupPreview({
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId]);
 
   return (
-    <div ref={containerRef} className="flex w-full items-center justify-center">
+    // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
+    // parent (customize page) it falls back to content height and max-h-full is inert.
+    <div ref={containerRef} className="flex h-full w-full items-center justify-center">
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -104,7 +106,7 @@ export function MockupPreview({
           alt={`your drawing on a ${productKey}`}
           width={px}
           height={px}
-          className="h-auto w-full rounded-lg object-contain"
+          className="h-auto max-h-full w-full rounded-lg object-contain"
           onError={() => setUrl(null)} // a failed/expired signed URL reverts to the SVG — never a broken image
         />
       ) : (

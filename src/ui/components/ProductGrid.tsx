@@ -51,7 +51,9 @@ export function ProductTile({
   const def = defaultVariant(p);
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)] @container">
-      <div className="relative flex h-32 items-center justify-center bg-[#FBF5E9]">
+      {/* SQUARE image area (the product photos are square-ish): the preview is contained
+          inside it, so the name/price row + controls below are never covered. */}
+      <div className="relative aspect-square w-full overflow-hidden bg-[#FBF5E9] p-2">
         <MockupPreview
           productKey={p.key as ProductKey}
           assetId={upload?.assetId}
@@ -60,7 +62,7 @@ export function ProductTile({
           size="thumb"
           sourceObjectId={upload?.cutout?.sourceObjectId}
           image={mockImg}
-          px={104}
+          px={128}
           uid={p.key}
           lazy={lazy}
         />

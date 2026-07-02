@@ -7,7 +7,7 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
+import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -169,6 +169,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       transform: t,
       workEdge: tpl.mapResolutionPx,
       outputEdge: OUTPUT_EDGE[size],
+      print: { widthPx: tpl.printWidthPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
     }),
   );
   inFlight.set(key, p);
@@ -181,7 +182,11 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 
 async function renderAndPersist(
   db: DbHandle,
-  args: { assetId: string; key: string; blankKey: string; maskKey?: string; designKey: string; quad: [number, number][]; transform: Transform; workEdge: number; outputEdge: number },
+  args: {
+    assetId: string; key: string; blankKey: string; maskKey?: string; designKey: string; quad: [number, number][];
+    transform: Transform; workEdge: number; outputEdge: number;
+    print: { widthPx: number; bleedMm: number; requiredDpi: number };
+  },
 ): Promise<MockupResult> {
   const out = await renderFlat({
     blankBuf: await getObjectBytes(args.blankKey),
@@ -191,6 +196,7 @@ async function renderAndPersist(
     transform: args.transform,
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
+    print: args.print,
   });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
@@ -225,8 +231,10 @@ async function renderFlat(args: {
   transform: Transform;
   workEdge: number;
   outputEdge: number;
+  /** The variant's real print geometry, for bleed-exact windowing. */
+  print: { widthPx: number; bleedMm: number; requiredDpi: number };
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge } = args;
+  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge, print } = args;
 
   // Working blank dimensions: cap the longest edge at workEdge (scRGB is 32-bit float,
   // ~4× memory, so this cap is load-bearing). The normalised quad scales with it.
@@ -251,22 +259,33 @@ async function renderFlat(args: {
   const src = { width: dMeta.width ?? 0, height: dMeta.height ?? 0 };
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
 
-  const layer = computeLayerRect({ printWidthPx: rect.w, printHeightPx: rect.h, bleedMm: 0, requiredDpi: 300 }, src, transform);
+  // BLEED-EXACT placement: the print file cover-fits the art over the BLEED canvas (print
+  // area + bleed) and Prodigi trims the bleed off. Replicate that exactly at photo scale —
+  // cover-fit over the scaled bleed canvas, then window the print-area (trim box) — so the
+  // preview IS the trimmed print, not an approximation of it. The photo-scale bleed comes
+  // from the same mm→px conversion the print renderer uses, scaled by photo-px per print-px.
+  const s = rect.w / print.widthPx;
+  const layer = computeLayerRect(
+    { printWidthPx: rect.w, printHeightPx: rect.h, bleedMm: print.bleedMm, requiredDpi: print.requiredDpi * s },
+    src,
+    transform,
+  );
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) {
     throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
   }
+  const bleed = Math.round((layer.canvasWidth - rect.w) / 2); // the scaled bleed margin
 
-  // Rotate → scale to the drawn rect → extract the print-area window (clamped in-bounds,
+  // Rotate → scale to the drawn rect → extract the TRIM window (clamped in-bounds,
   // mirroring render.ts). ensureAlpha so cutouts keep transparency over the product.
   const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .rotate(transform.rotationDeg)
     .resize(layer.width, layer.height, { fit: 'fill' })
     .ensureAlpha()
     .toBuffer();
-  const left = Math.min(Math.max(0, -layer.x), Math.max(0, layer.width - layer.canvasWidth));
-  const top = Math.min(Math.max(0, -layer.y), Math.max(0, layer.height - layer.canvasHeight));
+  const left = Math.min(Math.max(0, bleed - layer.x), Math.max(0, layer.width - rect.w));
+  const top = Math.min(Math.max(0, bleed - layer.y), Math.max(0, layer.height - rect.h));
   const windowed = await sharp(scaled)
-    .extract({ left, top, width: layer.canvasWidth, height: layer.canvasHeight })
+    .extract({ left, top, width: Math.min(rect.w, layer.width), height: Math.min(rect.h, layer.height) })
     .toBuffer();
 
   // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a

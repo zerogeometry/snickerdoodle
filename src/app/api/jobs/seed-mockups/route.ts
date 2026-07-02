@@ -76,6 +76,12 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     }
     case 'blanket': // photo is landscape but the print canvas is PORTRAIT (600×1000mm) → rotate the blank to match
       return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, rotate: 90 };
+    case 'calendar': // page photo is portrait; our calendar canvas is LANDSCAPE (297×210) → rotate to match
+      return { file: 'prodigi-calendar-blank-assets/Blank Calendars/calendar blank.png', material: 'PAPER', register: 'face-cover', mask: false, rotate: 90 };
+    case 'storybook': // derived from Prodigi's hardcover photo-book back shot (thumbnails in-painted, portrait crop)
+      return { file: 'derived/storybook-blank.jpg', material: 'PAPER', register: 'face-cover', mask: false };
+    case 'card': // interim studio synth (flat 7×5 card, soft shadow) until real photography
+      return { file: 'derived/card-blank.png', material: 'PAPER', register: 'face-cover', mask: true };
     case 'bauble':
       return { file: 'prodigi-ceramic-christmas-tree-ornament-blank-asset/Prodigi-ceramic-christmas-ornament-blank.jpg', material: 'CERAMIC', register: 'face-cover', mask: true };
     case 'sack': // official panel 320×500mm on a 19×30″ (483mm-wide) sack, above the bottom seam
@@ -177,7 +183,27 @@ async function detectProduct(buf: Buffer, thresh = 18): Promise<{ bbox: Box; mas
   return { bbox: { x0: minX / W, y0: minY / H, x1: (maxX + 1) / W, y1: (maxY + 1) / H }, mask, coverage: productPx / bboxArea };
 }
 
-const asQuad = (b: Box): Quad => [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]];
+/** Keep a derived box inside the photo: translate in if it fits, else shrink about its centre
+ * (aspect preserved). A face-cover on a tightly-cropped blank can overshoot by a few % — losing
+ * that sliver beats rejecting the template (the quad ASPECT, which preview==print rides on,
+ * is untouched). */
+function fitWithin01(b: Box): Box {
+  let { x0, y0, x1, y1 } = b;
+  const w = x1 - x0, h = y1 - y0;
+  const scale = Math.min(1, 1 / w, 1 / h);
+  if (scale < 1) {
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    x0 = cx - (w * scale) / 2; x1 = cx + (w * scale) / 2;
+    y0 = cy - (h * scale) / 2; y1 = cy + (h * scale) / 2;
+  }
+  if (x0 < 0) { x1 -= x0; x0 = 0; }
+  if (y0 < 0) { y1 -= y0; y0 = 0; }
+  if (x1 > 1) { x0 -= x1 - 1; x1 = 1; }
+  if (y1 > 1) { y0 -= y1 - 1; y1 = 1; }
+  return { x0, y0, x1, y1 };
+}
+
+const asQuad = (b: Box): Quad => { const f = fitWithin01(b); return [[f.x0, f.y0], [f.x1, f.y0], [f.x1, f.y1], [f.x0, f.y1]]; };
 
 /** Centre an aspect-locked rect over `box`, covering or containing it — in PIXEL space (the
  * photo may be non-square, so normalised units can't carry an aspect ratio). */

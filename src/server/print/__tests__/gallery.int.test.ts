@@ -24,7 +24,7 @@ const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
 const OUT = process.env.GALLERY_OUT;
 
-const KEYS = ['framedPrint', 'mug', 'cushion', 'jigsaw', 'blanket', 'apron', 'bauble', 'sack'];
+const KEYS = ['framedPrint', 'mug', 'cushion', 'jigsaw', 'blanket', 'apron', 'bauble', 'sack', 'card', 'storybook', 'calendar'];
 
 async function houseDrawing(): Promise<Buffer> {
   const svg = `<svg width="1600" height="2000" xmlns="http://www.w3.org/2000/svg">
