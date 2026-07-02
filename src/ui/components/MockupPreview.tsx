@@ -80,7 +80,7 @@ export function MockupPreview({
     composeMockupAction({
       assetId,
       variantId,
-      transform: transform ?? { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 },
+      transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
       size,
       sourceObjectId: sourceObjectId ?? undefined,
     })

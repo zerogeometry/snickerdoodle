@@ -261,6 +261,19 @@ export async function POST(req: Request): Promise<Response> {
       let win = windows.get(cacheKey);
       if (!win) { win = await frameWindow(buf); windows.set(cacheKey, win); }
       quad = asQuad(aspectRect(win, d.W, d.H, printAspect, 'cover'));
+      // Store the blank with the transparent window FLATTENED TO WHITE (the paper): with a
+      // contain placement the design no longer covers the whole window, and the uncovered
+      // margin must read as paper, not a transparent hole. (Detection above used the alpha.)
+      const flat = await sharp(buf).flatten({ background: '#ffffff' }).png().toBuffer();
+      await setMockupTemplate(db, { variantId: r.id, blank: flat, contentType: 'image/png', printQuad: quad, materialClass: p.material });
+      authored++;
+      const qaF = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.register,
+        quadAspect: Math.round(qaF * 1000) / 1000, printAspect: Math.round(printAspect * 1000) / 1000,
+        driftPct: Math.round(Math.abs(qaF / printAspect - 1) * 1000) / 10,
+      });
+      continue;
     } else {
       let det = detected.get(cacheKey);
       if (!det) { det = await detectProduct(buf); detected.set(cacheKey, det); }

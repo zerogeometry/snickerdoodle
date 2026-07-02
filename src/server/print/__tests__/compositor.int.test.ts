@@ -252,6 +252,25 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     }
   });
 
+  it('CONTAIN default (scale 0): the whole design fits, margins show the blank through', async () => {
+    const assetId = await ingestDesign(); // solid red 1200×1500 (aspect 0.8) on a 0.75-aspect print area
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, size: 'zoom' });
+    const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+    const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+    const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => {
+      const i = (y * info.width! + x) * info.channels!;
+      return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+    };
+    // Quad = x[120..480] y[160..640] on the 600×800 blank. Contain leaves ~10px bands top +
+    // bottom INSIDE the print area where the grey blank shows through; the centre is design.
+    const [rTop, gTop, bTop] = at(300, 163); // just inside the window's top edge → blank grey
+    expect(Math.abs(rTop - 232) + Math.abs(gTop - 226) + Math.abs(bTop - 214)).toBeLessThan(45);
+    const [rMid] = at(300, 400); // centre → the red design
+    expect(rMid).toBeGreaterThan(150);
+  });
+
   it('falls back (bounded memory, no OOM) for an extreme-aspect design', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const wide = await ingestOriginalAsset(db, sam, {

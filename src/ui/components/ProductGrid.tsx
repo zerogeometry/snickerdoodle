@@ -7,7 +7,7 @@ import { type ProductKey } from './ProductArt';
 import { gbp, type Upload } from '@/lib/store';
 import type { CatalogueProduct } from '@/server/catalogue';
 
-const DEFAULT_TF = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image (contain)
 
 const SWATCH: Record<string, string> = {
   oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',

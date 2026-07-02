@@ -15,6 +15,8 @@ import {
   canvasSizePx,
   clampTransform,
   computeLayerRect,
+  containScale,
+  MAX_ZOOM,
   mmToPx,
   type Rotation,
   type Transform,
@@ -26,7 +28,10 @@ const PREVIEW_W = 360; // on-screen canvas width in CSS px
 export function Positioner({ data, draft = false, returnTo }: { data: StudioData; draft?: boolean; returnTo?: string }) {
   const [assetIdx, setAssetIdx] = useState(0);
   const [variantId, setVariantId] = useState(data.variants[0]?.id ?? '');
-  const [tf, setTf] = useState<Transform>({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
+  // scale 0 = the CONTAIN sentinel: "fit the whole image" — the default placement. It
+  // re-resolves automatically when the product or rotation changes; a touched zoom
+  // becomes a concrete number.
+  const [tf, setTf] = useState<Transform>({ scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 });
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
@@ -65,6 +70,9 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
 
   const rect = natural ? computeLayerRect(t, { width: natural.w, height: natural.h }, tf) : null;
   const assess = natural ? assessResolution(t, { width: natural.w, height: natural.h }, tf) : null;
+  // "Fit the whole image" scale for THIS product + rotation — the zoom slider's centre.
+  const fitScale = natural ? containScale(t, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
+  const zoomValue = tf.scale === 0 ? fitScale : tf.scale;
 
   const setRot = () => {
     const next = (((tf.rotationDeg + 90) % 360) as Rotation);
@@ -240,7 +248,11 @@ export function Positioner({ data, draft = false, returnTo }: { data: StudioData
 
           <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Position</p>
           <div className="mt-2 space-y-3">
-            <Slider label="Zoom" min={1} max={4} step={0.05} value={tf.scale} onChange={(v) => update({ scale: v })} format={(v) => `${v.toFixed(1)}×`} />
+            <ZoomSlider
+              fit={fitScale}
+              value={zoomValue}
+              onChange={(v) => update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })}
+            />
             <Slider label="Left / right" min={-1} max={1} step={0.05} value={tf.offsetX} onChange={(v) => update({ offsetX: v })} format={() => ''} />
             <Slider label="Up / down" min={-1} max={1} step={0.05} value={tf.offsetY} onChange={(v) => update({ offsetY: v })} format={() => ''} />
             <button
@@ -322,6 +334,34 @@ function ProductChip({ v, active, onClick }: { v: StudioVariant; active: boolean
     >
       {v.label} · {gbp(v.pricePence)}
     </button>
+  );
+}
+
+/**
+ * Zoom with "fit the whole image" at the CENTRE of the track: the left half runs
+ * fit/2 → fit (zoom out, more margin), the right half fit → 4× (zoom in, crop) —
+ * each half linear, so the default placement sits mid-track and the user can zoom
+ * either way from it. Displays zoom relative to fit (fit = 1.0×).
+ */
+function ZoomSlider({ fit, value, onChange }: { fit: number; value: number; onChange: (v: number) => void }) {
+  const minZ = fit / 2;
+  const toT = (v: number) => (v <= fit ? (0.5 * (v - minZ)) / (fit - minZ || 1) : 0.5 + (0.5 * (v - fit)) / (MAX_ZOOM - fit || 1));
+  const fromT = (raw: number) => (raw <= 0.5 ? minZ + (raw / 0.5) * (fit - minZ) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
+  return (
+    <label className="flex items-center gap-2">
+      <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">Zoom</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.005}
+        value={Math.min(1, Math.max(0, toT(value)))}
+        aria-label="Zoom"
+        onChange={(e) => onChange(fromT(Number(e.target.value)))}
+        className="h-1.5 flex-1 accent-cinnamon"
+      />
+      <span className="w-8 shrink-0 text-right text-[11px] text-[#9C8E7E]">{`${(value / fit).toFixed(1)}×`}</span>
+    </label>
   );
 }
 

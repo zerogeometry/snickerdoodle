@@ -275,17 +275,25 @@ async function renderFlat(args: {
   }
   const bleed = Math.round((layer.canvasWidth - rect.w) / 2); // the scaled bleed margin
 
-  // Rotate → scale to the drawn rect → extract the TRIM window (clamped in-bounds,
-  // mirroring render.ts). ensureAlpha so cutouts keep transparency over the product.
+  // Rotate → scale to the drawn rect → INTERSECT with the TRIM window and place at its
+  // offset on a TRANSPARENT window canvas (mirroring render.ts's white canvas — here the
+  // margins stay transparent so the product photo shows through, exactly like unprinted
+  // surface). Handles cover (crop) and contain/zoom-out (whole image, centred) alike.
   const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .rotate(transform.rotationDeg)
     .resize(layer.width, layer.height, { fit: 'fill' })
     .ensureAlpha()
     .toBuffer();
-  const left = Math.min(Math.max(0, bleed - layer.x), Math.max(0, layer.width - rect.w));
-  const top = Math.min(Math.max(0, bleed - layer.y), Math.max(0, layer.height - rect.h));
-  const windowed = await sharp(scaled)
-    .extract({ left, top, width: Math.min(rect.w, layer.width), height: Math.min(rect.h, layer.height) })
+  const ix = Math.max(0, bleed - layer.x);
+  const iy = Math.max(0, bleed - layer.y);
+  const ox = Math.max(0, layer.x - bleed);
+  const oy = Math.max(0, layer.y - bleed);
+  const iw = Math.max(1, Math.min(layer.width - ix, rect.w - ox));
+  const ih = Math.max(1, Math.min(layer.height - iy, rect.h - oy));
+  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const windowed = await sharp({ create: { width: rect.w, height: rect.h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: part, left: ox, top: oy }])
+    .png()
     .toBuffer();
 
   // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a

@@ -159,9 +159,13 @@ export default function StartCreatingPage() {
           <div className="grid gap-8 md:grid-cols-5 md:items-start">
             {/* Left: the drawing, large, with change / remove background / terms — all equal width */}
             <div className="flex flex-col md:col-span-2">
-              <div className="w-full overflow-hidden rounded-lg border-8 border-honey bg-[#FFFDF8] shadow-[0_4px_14px_rgba(46,39,35,.08)]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewImg ?? ''} alt="your drawing" className="block max-h-[20rem] w-full object-contain" />
+              {/* The honey frame HUGS the drawing's own aspect ratio (inline-block sized by
+                  the image) instead of a fixed full-width box with white slabs inside. */}
+              <div className="flex w-full justify-center">
+                <div className="inline-block overflow-hidden rounded-lg border-8 border-honey bg-[#FFFDF8] shadow-[0_4px_14px_rgba(46,39,35,.08)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewImg ?? ''} alt="your drawing" className="block h-auto max-h-[20rem] w-auto max-w-full" />
+                </div>
               </div>
               <div className="mt-3 flex w-full flex-col gap-2">
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>

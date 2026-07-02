@@ -68,13 +68,20 @@ export async function renderPrintFile(
   }
 
   const rect = computeLayerRect(geom, src, transform);
-  // rotate → scale to the drawn rect → extract the canvas window (clamped to stay
-  // in-bounds against rounding) → flatten on white → embed the print DPI.
+  // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
+  // on a white canvas. Handles both regimes: cover/zoom (layer ≥ canvas → crop, offset 0,
+  // identical to the old extract) and contain/zoom-out (layer < canvas → whole image
+  // placed centred with white margins — unprinted product surface).
   const layer = await sharp(srcBuf).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill' }).toBuffer();
-  const left = Math.min(Math.max(0, -rect.x), Math.max(0, rect.width - rect.canvasWidth));
-  const top = Math.min(Math.max(0, -rect.y), Math.max(0, rect.height - rect.canvasHeight));
-  const out = await sharp(layer)
-    .extract({ left, top, width: rect.canvasWidth, height: rect.canvasHeight })
+  const ix = Math.max(0, -rect.x);
+  const iy = Math.max(0, -rect.y);
+  const ox = Math.max(0, rect.x);
+  const oy = Math.max(0, rect.y);
+  const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
+  const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
+  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const out = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
+    .composite([{ input: part, left: ox, top: oy }])
     .flatten({ background: '#ffffff' })
     .png()
     .withMetadata({ density: tpl.requiredDpi })

@@ -97,6 +97,26 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     expect(res.widthPx).toBe(CANVAS_W); // still rendered to spec
   });
 
+  it('CONTAIN default (scale 0): whole image on the print file, white margins, canvas exact', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await ingest(await src(4200, 5400)); // aspect 0.778 vs canvas ~0.787 → thin side margins
+    const res = await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    keys.push(res.key);
+    expect(res).toMatchObject({ widthPx: CANVAS_W, heightPx: CANVAS_H }); // the canvas never shrinks
+
+    const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
+    const fetched = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+    const { data, info } = await sharp(fetched).raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => {
+      const i = (y * info.width! + x) * info.channels!;
+      return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+    };
+    const [rEdge, gEdge, bEdge] = at(3, Math.round(CANVAS_H / 2)); // inside the left margin → white
+    expect(rEdge + gEdge + bEdge).toBeGreaterThan(720);
+    const [rMid, gMid, bMid] = at(Math.round(CANVAS_W / 2), Math.round(CANVAS_H / 2)); // centre → the design
+    expect(Math.abs(rMid - 200) + Math.abs(gMid - 120) + Math.abs(bMid - 60)).toBeLessThan(60);
+  });
+
   it('BLOCKS a source too low-res to print', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await ingest(await src(400, 560));

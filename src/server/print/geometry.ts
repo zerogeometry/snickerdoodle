@@ -3,10 +3,14 @@
  * unit-testable. The server is the ONLY authority on placement and resolution;
  * the client merely *proposes* a normalised transform.
  *
- * Model: the art is COVER-fit to the full bleed canvas (print area + bleed), so a
- * keepsake fills the product with no white border and Prodigi's own crop is a
- * no-op. `scale` zooms in; `offset` pans within the resulting slack; `rotationDeg`
- * is snapped to 0/90/180/270 (the launch decision).
+ * Model: `scale: 1` is COVER-fit to the full bleed canvas (print area + bleed) — fills
+ * the product, no border, Prodigi's crop is a no-op. `scale: 0` is the CONTAIN sentinel
+ * ("fit the whole image"), resolved against the real canvas + source aspects inside
+ * computeLayerRect, so the print renderer, the mockup compositor and the DPI gate all
+ * resolve it identically (preview == print). It is the DEFAULT placement: the full
+ * extents of the upload always fit on the product; zooming crops from there. Fractional
+ * scales between are valid (zoomed out below cover). `offset` pans within the slack;
+ * `rotationDeg` is snapped to 0/90/180/270 (the launch decision).
  */
 
 export interface TemplateGeom {
@@ -20,13 +24,16 @@ export type Rotation = 0 | 90 | 180 | 270;
 
 /** What the client proposes (it owns nothing authoritative). */
 export interface Transform {
-  scale: number; // ≥ 1 zoom (1 = cover-fit)
+  scale: number; // 0 = CONTAIN sentinel (fit whole image, the default); 1 = cover-fit; >1 zooms in
   offsetX: number; // -1..1 pan within slack
   offsetY: number; // -1..1
   rotationDeg: Rotation;
 }
 
 export const MAX_ZOOM = 4;
+/** Sanity floor for an explicit numeric scale (a zoom-out below contain is legitimate —
+ * a small motif with margins — but never microscopic). The UI offers contain/2 at most. */
+export const MIN_SCALE = 0.1;
 export const MAX_UPSCALE = 4; // beyond this we can't reach print quality → BLOCK
 const TIER0_MAX = 2; // classical resample handles up to 2×; above that needs ML (tier 1)
 
@@ -46,11 +53,15 @@ function snapRotation(deg: number): Rotation {
 /** A raw, untrusted transform as it may arrive from the client (any numbers). */
 export type RawTransform = { scale?: number; offsetX?: number; offsetY?: number; rotationDeg?: number };
 
-/** Clamp a client-proposed transform to the valid range — the server-authoritative step. */
+/** Clamp a client-proposed transform to the valid range — the server-authoritative step.
+ * `scale ≤ 0` is preserved as the CONTAIN sentinel (0); it resolves against the real
+ * canvas/source aspects wherever the geometry is actually used (computeLayerRect), so a
+ * clamp WITHOUT source knowledge (e.g. at order freeze) can't corrupt it into a crop. */
 export function clampTransform(input: RawTransform | null | undefined): Transform {
   const t = input ?? {};
+  const s = Number.isFinite(t.scale) ? (t.scale as number) : 1;
   return {
-    scale: clamp(Number.isFinite(t.scale) ? (t.scale as number) : 1, 1, MAX_ZOOM),
+    scale: s <= 0 ? 0 : clamp(s, MIN_SCALE, MAX_ZOOM),
     offsetX: clamp(Number.isFinite(t.offsetX) ? (t.offsetX as number) : 0, -1, 1),
     offsetY: clamp(Number.isFinite(t.offsetY) ? (t.offsetY as number) : 0, -1, 1),
     rotationDeg: snapRotation(t.rotationDeg ?? 0),
@@ -76,6 +87,21 @@ export interface LayerRect {
   rotationDeg: Rotation;
 }
 
+/**
+ * The scale (in cover-relative units, ≤ 1) at which the WHOLE source fits inside the
+ * canvas — the value the `scale: 0` contain sentinel resolves to. 1 when the aspects
+ * already match (contain == cover).
+ */
+export function containScale(t: TemplateGeom, src: { width: number; height: number }, rotationDeg: Rotation = 0): number {
+  const { width: CW, height: CH } = canvasSizePx(t);
+  const rotated = rotationDeg % 180 !== 0;
+  const sw = rotated ? src.height : src.width;
+  const sh = rotated ? src.width : src.height;
+  const cover = Math.max(CW / sw, CH / sh);
+  const fit = Math.min(CW / sw, CH / sh);
+  return fit / cover;
+}
+
 /** Where the (rotated, scaled) source is drawn on the full bleed canvas. */
 export function computeLayerRect(t: TemplateGeom, src: { width: number; height: number }, transform: Transform): LayerRect {
   const { width: CW, height: CH } = canvasSizePx(t);
@@ -83,9 +109,13 @@ export function computeLayerRect(t: TemplateGeom, src: { width: number; height: 
   const sw = rotated ? src.height : src.width; // effective source dims after rotation
   const sh = rotated ? src.width : src.height;
 
+  // Resolve the CONTAIN sentinel here — the one place every consumer (print renderer,
+  // compositor, DPI gate, positioner preview) shares, so they can never disagree.
+  const scale = transform.scale === 0 ? containScale(t, src, transform.rotationDeg) : transform.scale;
+
   const base = Math.max(CW / sw, CH / sh); // cover-fit the canvas
-  const drawW = Math.round(sw * base * transform.scale);
-  const drawH = Math.round(sh * base * transform.scale);
+  const drawW = Math.round(sw * base * scale);
+  const drawH = Math.round(sh * base * scale);
 
   const slackX = Math.max(0, drawW - CW);
   const slackY = Math.max(0, drawH - CH);

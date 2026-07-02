@@ -4,6 +4,9 @@ import {
   canvasSizePx,
   clampTransform,
   computeLayerRect,
+  containScale,
+  MAX_ZOOM,
+  MIN_SCALE,
   type TemplateGeom,
   type Transform,
 } from '@/server/print/geometry';
@@ -17,10 +20,15 @@ const sq = (printPx: number, dpi = 300, bleedMm = 0): TemplateGeom => ({
 const T = (over: Partial<Transform> = {}): Transform => ({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0, ...over });
 
 describe('clampTransform — the server-authoritative clamp', () => {
-  it('clamps scale to [1, 4]', () => {
-    expect(clampTransform({ scale: 0.2 }).scale).toBe(1);
-    expect(clampTransform({ scale: 99 }).scale).toBe(4);
-    expect(clampTransform({ scale: Number.NaN }).scale).toBe(1);
+  it('clamps a numeric scale to [MIN_SCALE, MAX_ZOOM]; zoom-out below cover is valid', () => {
+    expect(clampTransform({ scale: 0.01 }).scale).toBe(MIN_SCALE);
+    expect(clampTransform({ scale: 0.7 }).scale).toBe(0.7);
+    expect(clampTransform({ scale: 99 }).scale).toBe(MAX_ZOOM);
+    expect(clampTransform({ scale: Number.NaN }).scale).toBe(1); // missing/invalid → legacy cover
+  });
+  it('preserves scale ≤ 0 as the CONTAIN sentinel (never corrupted into a crop)', () => {
+    expect(clampTransform({ scale: 0 }).scale).toBe(0);
+    expect(clampTransform({ scale: -3 }).scale).toBe(0);
   });
   it('clamps offsets to [-1, 1]', () => {
     expect(clampTransform({ offsetX: -5, offsetY: 5 })).toMatchObject({ offsetX: -1, offsetY: 1 });
@@ -72,6 +80,36 @@ describe('computeLayerRect — cover-fit', () => {
     const r = computeLayerRect(sq(1000), land, T({ rotationDeg: 90 }));
     // effective source becomes 1000×2000 (portrait) → cover a 1000² canvas
     expect(r.height).toBeGreaterThanOrEqual(r.width);
+  });
+});
+
+describe('containScale + the scale-0 CONTAIN sentinel — "fit the whole image"', () => {
+  const portrait: TemplateGeom = { printWidthPx: 1000, printHeightPx: 1500, bleedMm: 0, requiredDpi: 300 };
+
+  it('containScale is 1 when the aspects match, < 1 otherwise, rotation-aware', () => {
+    expect(containScale(portrait, { width: 500, height: 750 })).toBe(1);
+    expect(containScale(portrait, { width: 1000, height: 1000 })).toBeCloseTo(2 / 3, 5); // square on 2:3
+    expect(containScale(portrait, { width: 1500, height: 1000 }, 90)).toBe(1); // rotated to match
+  });
+
+  it('scale 0 resolves to contain: the whole image inside the canvas, centred', () => {
+    const r = computeLayerRect(portrait, { width: 1000, height: 1000 }, T({ scale: 0 }));
+    expect(r).toMatchObject({ x: 0, y: 250, width: 1000, height: 1000 }); // fits width; centred in the 1500 height
+    expect(r.width).toBeLessThanOrEqual(r.canvasWidth);
+    expect(r.height).toBeLessThanOrEqual(r.canvasHeight);
+  });
+
+  it('scale 1 still cover-fits — legacy transforms are unchanged', () => {
+    const r = computeLayerRect(portrait, { width: 1000, height: 1000 }, T({ scale: 1 }));
+    expect(r.width).toBe(1500); // covers the height, overflows the width
+    expect(r.x).toBe(-250);
+  });
+
+  it('the DPI gate resolves the sentinel too (contain needs FEWER source pixels than cover)', () => {
+    const src = { width: 900, height: 900 };
+    const cover = assessResolution(portrait, src, T({ scale: 1 }));
+    const contain = assessResolution(portrait, src, T({ scale: 0 }));
+    expect(contain.effectiveDpi).toBeGreaterThan(cover.effectiveDpi);
   });
 });
 
