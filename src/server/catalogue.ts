@@ -413,8 +413,12 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
 
   // Retire any whole product no longer in the DEFS (e.g. the discontinued tote bag) so removing a
   // line from the catalogue actually takes it off the shelf — and clear its popular rank so it
-  // can't collide with a live product's rank.
+  // can't collide with a live product's rank. Cascade to its variants so none linger active.
   await db.update(products).set({ active: false, popularRank: null }).where(notInArray(products.key, keys));
+  await db
+    .update(productVariants)
+    .set({ active: false })
+    .where(inArray(productVariants.productId, db.select({ id: products.id }).from(products).where(notInArray(products.key, keys))));
 
   return { products: keys.length, variants: variantCount };
 }
