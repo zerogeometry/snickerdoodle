@@ -109,6 +109,7 @@ export default function CheckoutPage() {
   const subtotalPence = quote?.subtotalPence ?? basketSubtotal(items);
   const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
   const savingPence = quote?.joinSavingPence ?? 0;
+  const setSavingPence = quote?.familySetSavingPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
 
   // Place a REAL order: the server re-prices and persists it. With Stripe
@@ -168,6 +169,12 @@ export default function CheckoutPage() {
         <div className="flex justify-between text-green-save">
           <dt>Family saving (5%)</dt>
           <dd>−{gbp(savingPence)}</dd>
+        </div>
+      ) : null}
+      {setSavingPence > 0 ? (
+        <div className="flex justify-between text-green-save">
+          <dt>Family set saving (5%)</dt>
+          <dd>−{gbp(setSavingPence)}</dd>
         </div>
       ) : null}
       <div className="flex justify-between">

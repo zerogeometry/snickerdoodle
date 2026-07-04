@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronRight, IconGift, IconSparkles } from '@tabler/icons-react';
+import { IconChevronRight, IconGift, IconShirt, IconSparkles } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -12,7 +12,9 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { ProductGrid } from '@/ui/components/ProductGrid';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
+import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
+import { FAMILY_SET_PRODUCT_KEYS } from '@/pricing';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { groupOf, lineIdForSku, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
@@ -66,6 +68,7 @@ export function FlowCatalogue({
   const [zoom, setZoom] = useState<CatalogueProduct | null>(null);
   const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
   const [fullOpen, setFullOpen] = useState(false);
+  const [familyOpen, setFamilyOpen] = useState(false);
   // A single in-flight ingest, shared across clicks — so a slow first ingest can't
   // deadlock the catalogue (the previous global "busy" flag froze every button).
   const ingestRef = useRef<Promise<string | null> | null>(null);
@@ -169,6 +172,11 @@ export function FlowCatalogue({
 
   const { picks, popular } = useMemo(() => splitCatalogue(products, items), [products, items]);
 
+  // The banner promises "matching organic tees + a bodysuit" — only show it when all
+  // three garments are actually purchasable (an unseeded/partial catalogue would
+  // otherwise open a dead-end set builder).
+  const familySetAvailable = FAMILY_SET_PRODUCT_KEYS.every((k) => products.some((p) => p.key === k));
+
   // flat mode (the standalone /catalogue page): category chips over one grid
   const flatCategories = useMemo(
     () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
@@ -195,6 +203,23 @@ export function FlowCatalogue({
               full catalogue <Icon icon={IconChevronRight} size={15} />
             </Button>
           </div>
+          {/* The hero set: one drawing, the whole family matching. Opens the set builder. */}
+          {familySetAvailable ? (
+            <button
+              type="button"
+              onClick={() => { if (guardUpload()) setFamilyOpen(true); }}
+              className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-[#F0DDBC] bg-honey-band p-3.5 text-left transition-colors hover:border-honey"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70">
+                <Icon icon={IconShirt} size={20} className="text-cinnamon" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="font-display text-base font-semibold text-cocoa">dress the whole family</span>
+                <span className="block text-[12px] text-[#7A6A58]">matching organic tees + a bodysuit for the littlest — 3+ pieces saves 5%</span>
+              </span>
+              <Icon icon={IconChevronRight} size={18} className="shrink-0 text-[#B3985F]" />
+            </button>
+          ) : null}
           <div className={scrollClasses}>
             {picks.length > 0 ? (
               <>
@@ -257,6 +282,17 @@ export function FlowCatalogue({
       </div>
 
       <WhoForModal open={!!whoMode} mode={whoMode ?? 'checkout'} onClose={() => setWhoMode(null)} />
+
+      {mode === 'sections' && familySetAvailable ? (
+        <FamilySetModal
+          open={familyOpen}
+          onClose={() => setFamilyOpen(false)}
+          products={products}
+          upload={upload}
+          mockImg={mockImg}
+          ensureAsset={ensureAsset}
+        />
+      ) : null}
 
       {mode === 'sections' ? (
         <FullCatalogueModal

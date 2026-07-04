@@ -34,6 +34,9 @@ export async function createCheckoutSession(args: {
   lines: PricedLine[];
   deliveryPence: number;
   joinSavingPence: number;
+  // Required (not optional) on purpose: dropping it at a call-site must be a compile
+  // error, or Stripe would charge more than the order total it is meant to mirror.
+  familySetSavingPence: number;
 }): Promise<{ id: string; url: string | null }> {
   const stripe = getStripe();
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = args.lines.map((l) => ({
@@ -52,10 +55,13 @@ export async function createCheckoutSession(args: {
     });
   }
 
-  // Stripe line items can't be negative; carry the discount as a coupon.
+  // Stripe line items can't be negative; carry the discounts as ONE coupon (a
+  // Checkout Session allows a single discount) so Stripe's total always equals
+  // our authoritative order total.
   const discounts: Stripe.Checkout.SessionCreateParams.Discount[] = [];
-  if (args.joinSavingPence > 0) {
-    const coupon = await stripe.coupons.create({ amount_off: args.joinSavingPence, currency: 'gbp', duration: 'once', name: 'Family saving' });
+  const savingPence = args.joinSavingPence + args.familySetSavingPence;
+  if (savingPence > 0) {
+    const coupon = await stripe.coupons.create({ amount_off: savingPence, currency: 'gbp', duration: 'once', name: 'Family saving' });
     discounts.push({ coupon: coupon.id });
   }
 

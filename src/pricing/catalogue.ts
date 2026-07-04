@@ -15,6 +15,23 @@ export const DELIVERY_PENCE = 0;
 /** The join saving, in basis points (500 = 5%). Applied to goods, never delivery. */
 export const JOIN_SAVING_BPS = 500;
 
+/**
+ * The family-set saving: 5% off GARMENT lines when the order carries 3 or more
+ * garments ("dress the whole family" — one drawing, matching tees + bodysuit).
+ * Self-funding: 3+ garments leave as ONE tracked consignment, so the baked-in
+ * per-item shipping over-recovers by roughly this discount. Server-resolved from
+ * line keys + quantities only — no client flag exists.
+ */
+export const FAMILY_SET_SAVING_BPS = 500;
+export const FAMILY_SET_MIN_QTY = 3;
+/** The garment product keys. Variant skus are `${key}-size-colour`, the default IS the key. */
+export const FAMILY_SET_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit'] as const;
+
+/** Does this priced-line key (product key OR variant sku) belong to a family-set garment? */
+export function isFamilySetKey(key: string): boolean {
+  return FAMILY_SET_PRODUCT_KEYS.some((k) => key === k || key.startsWith(`${k}-`));
+}
+
 export interface CatalogueEntry {
   pricePence: number;
   label: string;
@@ -25,16 +42,16 @@ export interface CatalogueEntry {
 // fallback AND the sellable-key allowlist (isCatalogueKey). Prices are VAT-inc, free delivery.
 export const CATALOGUE = {
   framedPrint: { pricePence: 6695, label: 'framed print' },
-  mug: { pricePence: 1595, label: 'mug' },
+  mug: { pricePence: 1795, label: 'mug' },
   cushion: { pricePence: 2295, label: 'cushion' },
-  storybook: { pricePence: 2350, label: 'storybook' },
-  kidsTee: { pricePence: 2095, label: 'kids tee' },
+  storybook: { pricePence: 2595, label: 'storybook' },
+  kidsTee: { pricePence: 2495, label: 'kids tee' },
   jigsaw: { pricePence: 2795, label: 'jigsaw' },
   blanket: { pricePence: 5795, label: 'fleece blanket' },
   babyBodysuit: { pricePence: 2195, label: 'baby bodysuit' },
   card: { pricePence: 495, label: 'greetings card' },
   calendar: { pricePence: 1895, label: 'calendar' },
-  adultTee: { pricePence: 2895, label: 'adult tee' },
+  adultTee: { pricePence: 3195, label: 'adult tee' },
   apron: { pricePence: 2495, label: 'apron' },
   bauble: { pricePence: 2095, label: 'ceramic bauble' },
   sack: { pricePence: 3495, label: 'christmas sack' },

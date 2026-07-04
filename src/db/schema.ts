@@ -367,6 +367,7 @@ export const orders = pgTable(
     subtotalPence: integer('subtotal_pence').notNull(),
     deliveryPence: integer('delivery_pence').notNull(),
     joinSavingPence: integer('join_saving_pence').notNull().default(0),
+    familySetSavingPence: integer('family_set_saving_pence').notNull().default(0),
     totalPence: integer('total_pence').notNull(),
     currency: text('currency').notNull().default('GBP'),
     isGift: boolean('is_gift').notNull().default(false),
@@ -386,6 +387,16 @@ export const orderItems = pgTable('order_items', {
   // The catalogue variant (nullable during migration; the printed line carries an
   // order_item_artwork row with the server-authoritative spec).
   variantId: uuid('variant_id').references(() => productVariants.id),
+  // WHAT WAS SOLD, frozen at order time: { sku, attributes, providerSku, providerConfig }.
+  // Variant rows can be re-seeded/repurposed after the order (a price change, a supplier
+  // SKU swap, a default move) — fulfilment must consume THIS snapshot, never a live
+  // lookup, so the customer receives exactly the size/colour/garment they paid for.
+  spec: jsonb('spec').$type<{
+    sku: string;
+    attributes: Record<string, string>;
+    providerSku: string | null;
+    providerConfig: unknown;
+  } | null>(),
   qty: integer('qty').notNull(),
   unitPricePence: integer('unit_price_pence').notNull(),
   linePence: integer('line_pence').notNull(),

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, storageObjects } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -61,6 +61,33 @@ export async function placeOrder(
   const keys = [...new Set(valid.map((l) => l.productKey))];
   // Resolve each line key (product key → default variant, or variant sku) → variant id.
   const variantByKey = await resolveVariantIdsByKey(db, keys);
+
+  // Freeze WHAT IS BEING SOLD per variant (sku, size/colour attributes, provider SKU +
+  // order-time config) onto the order line. Variant rows get re-seeded over time — a
+  // supplier swap or a default move must never change the meaning of a paid order.
+  const variantIds = [...new Set([...variantByKey.values()])];
+  const specByVariantId = new Map<string, { sku: string; attributes: Record<string, string>; providerSku: string | null; providerConfig: unknown }>();
+  if (variantIds.length > 0) {
+    const specRows = await db
+      .select({
+        id: productVariants.id,
+        sku: productVariants.sku,
+        attributes: productVariants.attributes,
+        providerSku: productVariantProviders.providerSku,
+        providerConfig: productVariantProviders.providerConfig,
+      })
+      .from(productVariants)
+      .leftJoin(productVariantProviders, eq(productVariantProviders.variantId, productVariants.id))
+      .where(inArray(productVariants.id, variantIds));
+    for (const r of specRows) {
+      specByVariantId.set(r.id, {
+        sku: r.sku,
+        attributes: (r.attributes as Record<string, string>) ?? {},
+        providerSku: r.providerSku ?? null,
+        providerConfig: r.providerConfig ?? null,
+      });
+    }
+  }
 
   // Pre-validate every personalised line BEFORE writing anything (authz + a frozen
   // template snapshot + a server-clamped transform). A bad placement fails here,
@@ -126,6 +153,7 @@ export async function placeOrder(
       subtotalPence: q.subtotalPence,
       deliveryPence: q.deliveryPence,
       joinSavingPence: q.joinSavingPence,
+      familySetSavingPence: q.familySetSavingPence,
       totalPence: q.totalPence,
       isGift: q.gift,
     })
@@ -136,7 +164,15 @@ export async function placeOrder(
     const variantId = variantByKey.get(l.productKey) ?? null;
     const [oi] = await db
       .insert(orderItems)
-      .values({ orderId: order!.id, productKey: l.productKey, variantId, qty: l.qty, unitPricePence: l.unitPricePence, linePence: l.linePence })
+      .values({
+        orderId: order!.id,
+        productKey: l.productKey,
+        variantId,
+        spec: variantId ? (specByVariantId.get(variantId) ?? null) : null,
+        qty: l.qty,
+        unitPricePence: l.unitPricePence,
+        linePence: l.linePence,
+      })
       .returning();
     const art = artworkByIndex.get(i);
     if (art) {
@@ -159,6 +195,7 @@ export async function placeOrder(
       lines: q.lines,
       deliveryPence: q.deliveryPence,
       joinSavingPence: q.joinSavingPence,
+      familySetSavingPence: q.familySetSavingPence,
     });
     await db.update(orders).set({ stripeSessionId: session.id }).where(eq(orders.id, order!.id));
     return { ok: true, ref, checkoutUrl: session.url ?? undefined };

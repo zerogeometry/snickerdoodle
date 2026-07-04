@@ -1,4 +1,4 @@
-import { CATALOGUE, DELIVERY_PENCE, type PricedCatalogue } from './catalogue';
+import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, isFamilySetKey, type PricedCatalogue } from './catalogue';
 import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
 
@@ -22,9 +22,12 @@ export interface Quote {
   subtotalPence: number;
   deliveryPence: number;
   joinSavingPence: number;
+  /** The family-set saving: 5% off garment lines when 3+ garments ship together. */
+  familySetSavingPence: number;
   totalPence: number;
   gift: boolean;
   joinSavingApplied: boolean;
+  familySetApplied: boolean;
   /** Client-supplied keys we don't sell — dropped, never priced, surfaced for honesty. */
   rejectedKeys: string[];
 }
@@ -99,16 +102,29 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   // override is handed in server-side.
   const joinSavingPence = joinSavingApplied ? Math.min(bpsOf(subtotalPence, ctx.savingBps), subtotalPence) : 0;
 
-  const totalPence = Math.max(0, subtotalPence - joinSavingPence + deliveryPence);
+  // Family-set saving: resolved from the priced lines alone (keys + quantities) —
+  // there is NO client flag to forge. 3+ garments in one order ship as one
+  // consignment, and 5% of the garment lines goes back to the customer.
+  const garmentLines = lines.filter((l) => isFamilySetKey(l.productKey));
+  const garmentQty = garmentLines.reduce((n, l) => n + l.qty, 0);
+  const garmentPence = garmentLines.reduce((n, l) => n + l.linePence, 0);
+  const familySetApplied = garmentQty >= FAMILY_SET_MIN_QTY && garmentPence > 0;
+  const familySetSavingPence = familySetApplied
+    ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence - joinSavingPence)
+    : 0;
+
+  const totalPence = Math.max(0, subtotalPence - joinSavingPence - familySetSavingPence + deliveryPence);
 
   return {
     lines,
     subtotalPence,
     deliveryPence,
     joinSavingPence,
+    familySetSavingPence,
     totalPence,
     gift,
     joinSavingApplied,
+    familySetApplied,
     rejectedKeys,
   };
 }

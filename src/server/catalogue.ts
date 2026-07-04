@@ -23,6 +23,7 @@ type VariantDef = {
   dpi?: number;
   prodigiSku?: string; // the live Prodigi SKU (absent ⇒ MANUAL-fulfilled, e.g. add-ons)
   prodigiAttrs?: Record<string, string>; // attributes to send to Prodigi at order time
+  default?: boolean; // mark the default variant when it isn't the first (e.g. size M of XS–2XL)
 };
 type ProductDef = {
   category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON';
@@ -31,7 +32,7 @@ type ProductDef = {
   description: string;
   specs: Record<string, string>;
   print: boolean;
-  variants: VariantDef[]; // the FIRST is the default
+  variants: VariantDef[]; // the FIRST is the default unless one sets `default: true`
 };
 
 // Framed print: 5 sizes; frame colour is a Prodigi *attribute* of one SKU per size, so the
@@ -66,8 +67,8 @@ function mugVariants(): VariantDef[] {
   // Print canvases from Prodigi's OFFICIAL templates (11oz: 2473×1157px @300dpi = 209×98mm;
   // 15oz: 2563×1157px = 217×98mm) — the wrap the print file must fill.
   return [
-    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1595, wMm: 209, hMm: 98, prodigiSku: m.sku })),
-    { size: '15oz', colour: 'white', pricePence: 2095, wMm: 217, hMm: 98, prodigiSku: 'H-MUG-15OZ-W' },
+    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1795, wMm: 209, hMm: 98, prodigiSku: m.sku })),
+    { size: '15oz', colour: 'white', pricePence: 2295, wMm: 217, hMm: 98, prodigiSku: 'H-MUG-15OZ-W' },
   ];
 }
 
@@ -75,9 +76,9 @@ function mugVariants(): VariantDef[] {
 // Values are the exact Prodigi attribute strings. White is the cheaper tier; colours a touch more.
 const KTEE_SIZES = ['3-4 years', '5-6 years', '7-8 years', '9-11 years', '12-14 years'];
 const KTEE_COLOURS = [
-  { colour: 'white', attr: 'white', pricePence: 2095 },
-  { colour: 'blue', attr: 'caribbean blue', pricePence: 2295 },
-  { colour: 'pink', attr: 'cotton pink', pricePence: 2295 },
+  { colour: 'white', attr: 'white', pricePence: 2495 },
+  { colour: 'blue', attr: 'caribbean blue', pricePence: 2695 },
+  { colour: 'pink', attr: 'cotton pink', pricePence: 2695 },
 ];
 function kidsTeeVariants(): VariantDef[] {
   return KTEE_SIZES.flatMap((size) =>
@@ -88,22 +89,27 @@ function kidsTeeVariants(): VariantDef[] {
   );
 }
 
-// Adult tee: one price across sizes. Mens (Sparker STTM559) + Womens (Bella+Canvas 6004) are
-// DISTINCT SKUs; size is a Prodigi attribute of each.
+// Adult tee: Stanley/Stella Sparker 2.0 (STTU171) — a UNISEX organic heavy tee, the grown-up
+// sibling of the kids' Mini Creator. ONE SKU for everyone (the Bella+Canvas womens tee was
+// dropped 2026-07-03: not organic, and unisex S/S keeps the family matching set in one garment
+// family). Size is a Prodigi attribute; £12 flat cost across XS–2XL, GB-fulfilled, tracked.
 function adultTeeVariants(): VariantDef[] {
-  const white = (sizes: string[], sku: string, gender: string) =>
-    sizes.map((s) => ({
-      size: `${gender} ${s}`, colour: 'white', pricePence: 2895, wMm: 300, hMm: 360, dpi: 150,
-      prodigiSku: sku, prodigiAttrs: { size: s.toLowerCase(), color: 'white' },
-    }));
-  return [...white(['S', 'M', 'L', 'XL', '2XL'], 'TEE-SS-STTM559', 'Mens'), ...white(['S', 'M', 'L', 'XL'], 'GLOBAL-TEE-BC-6004', 'Womens')];
+  return ['XS', 'S', 'M', 'L', 'XL', '2XL'].map((s) => ({
+    size: s, colour: 'white', pricePence: 3195, wMm: 300, hMm: 360, dpi: 150,
+    prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: 'white' },
+    default: s === 'M', // sizes display XS→2XL; M is the sane default
+  }));
 }
 
-// Baby bodysuit: Rabbit Skins short-sleeve; size is a Prodigi attribute of one SKU.
+// Baby bodysuit: Rabbit Skins LONG-sleeve 4411. The short-sleeve 4424 is GB-fulfilled only in
+// colours — its WHITE ships from Canada/Australia (5–21 days, and a child's image routed to a
+// non-UK/EU lab fails our residency posture). White 4411 is GB-made, £9, next-day. Tracked
+// shipping for a bodysuit-ALONE order is Express-only — flagged to the founder; in a family-set
+// order the garments ship together tracked.
 function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
     size, colour: 'white', pricePence: 2195, wMm: 180, hMm: 200, dpi: 150,
-    prodigiSku: 'GLOBAL-BB-RS-4424', prodigiAttrs: { size, color: 'white' },
+    prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' },
   }));
 }
 
@@ -150,8 +156,8 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
     specs: { material: 'hardcover, gloss', pages: '24 pages' },
     variants: [
-      { size: 'A5', pricePence: 2350, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
-      { size: 'A4', pricePence: 2595, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
+      { size: 'A5', pricePence: 2595, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
+      { size: 'A4', pricePence: 2895, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
     ],
   },
   kidsTee: {
@@ -178,8 +184,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   babyBodysuit: {
     category: 'APPAREL', label: 'baby bodysuit', blurb: 'their first masterpiece, worn tiny', print: true,
-    description: "A soft cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little.",
-    specs: { material: 'fine jersey cotton', care: 'machine washable' },
+    description: "A soft long-sleeved cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little.",
+    specs: { material: 'fine jersey cotton', sleeves: 'long', care: 'machine washable' },
     variants: babyVariants(),
   },
   card: {
@@ -202,8 +208,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   adultTee: {
     category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true,
-    description: "A soft adult tee with your little one's artwork on the front — for the grown-up who'll wear it with pride.",
-    specs: { material: 'combed cotton', care: 'wash at 30°' },
+    description: "The grown-up version of the kids tee — the same organic cotton, sized up, with your little one's artwork on the front. A relaxed unisex fit for mums, dads and anyone in their fan club.",
+    specs: { material: 'organic cotton', fit: 'unisex, XS–2XL', care: 'wash at 30°' },
     variants: adultTeeVariants(),
   },
   apron: {
@@ -358,11 +364,12 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank } })
       .returning();
 
-    const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === 0));
+    const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
+    const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === defaultIndex));
 
     let vsort = 0;
     for (const v of def.variants) {
-      const isDefault = vsort === 0;
+      const isDefault = vsort === defaultIndex;
       const sku = variantSku(key, v, isDefault);
       const attributes: Record<string, string> = {};
       if (v.size) attributes.size = v.size;

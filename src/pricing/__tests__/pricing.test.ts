@@ -28,20 +28,20 @@ describe('priceBasket — totals', () => {
 
   it('single item, free delivery baked in', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }]);
-    expect(q.subtotalPence).toBe(1595);
+    expect(q.subtotalPence).toBe(1795);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE); // 0 — free delivery
-    expect(q.totalPence).toBe(1595 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(1795 + DELIVERY_PENCE);
   });
 
   it('multiple items + quantities sum correctly, free delivery', () => {
     const q = priceBasket([
-      { productKey: 'storybook', qty: 1 }, // 2350
+      { productKey: 'storybook', qty: 1 }, // 2595
       { productKey: 'framedPrint', qty: 2 }, // 13390
       { productKey: 'card', qty: 3 }, // 1485
     ]);
-    expect(q.subtotalPence).toBe(2350 + 13390 + 1485);
+    expect(q.subtotalPence).toBe(2595 + 13390 + 1485);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(17225 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(17470 + DELIVERY_PENCE);
     expect(q.lines).toHaveLength(3);
     expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 6695, linePence: 13390 });
   });
@@ -96,7 +96,7 @@ describe('priceBasket — unknown products', () => {
     expect(q.lines.map((l) => l.productKey)).toEqual(['mug']);
     expect(q.rejectedKeys).toContain('diamond-ring');
     expect(q.rejectedKeys).toContain('__proto__'); // prototype-pollution-style key is just rejected
-    expect(q.subtotalPence).toBe(1595);
+    expect(q.subtotalPence).toBe(1795);
   });
 });
 
@@ -108,12 +108,12 @@ describe('gift price-hiding', () => {
 
   it('the payer still pays the real total (gift only hides recipient-facing prices)', () => {
     expect(q.gift).toBe(true);
-    expect(q.totalPence).toBe(2350 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(2595 + DELIVERY_PENCE);
   });
 
   it('recipient line shows "gift" instead of a price when gifting', () => {
     expect(recipientLineLabel(q.lines[0]!, true)).toBe('gift');
-    expect(recipientLineLabel(q.lines[0]!, false)).toBe('£23.50');
+    expect(recipientLineLabel(q.lines[0]!, false)).toBe('£25.95');
   });
 });
 
@@ -166,23 +166,23 @@ describe('resolveJoinContext — only a genuine verified join earns the saving',
 
 describe('join saving — applied to goods only, via quote()', () => {
   const items: RequestedLine[] = [
-    { productKey: 'storybook', qty: 1 }, // 2350
+    { productKey: 'storybook', qty: 1 }, // 2595
     { productKey: 'framedPrint', qty: 1 }, // 6695
-  ]; // subtotal 9045
+  ]; // subtotal 9290
 
   it('valid join → 5% off the subtotal, delivery untouched', () => {
     const q = quote(items, { joinProvenance: provenance() });
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(452); // Math.round(5% of 9045) = 452
+    expect(q.joinSavingPence).toBe(465); // Math.round(5% of 9290) = 465
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(9045 - 452 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9290 - 465 + DELIVERY_PENCE);
   });
 
   it('guest (no provenance) → no saving', () => {
     const q = quote(items, {});
     expect(q.joinSavingApplied).toBe(false);
     expect(q.joinSavingPence).toBe(0);
-    expect(q.totalPence).toBe(9045 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9290 + DELIVERY_PENCE);
   });
 
   it('forged "I am joining" with no real provenance → no saving', () => {
@@ -190,7 +190,7 @@ describe('join saving — applied to goods only, via quote()', () => {
     // guest, so resolveJoinContext returns null and no discount is granted.
     const q = quote(items, { joinProvenance: provenance({ invite: null, membership: null }) });
     expect(q.joinSavingApplied).toBe(false);
-    expect(q.totalPence).toBe(9045 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9290 + DELIVERY_PENCE);
   });
 
   it('existing active member (membership not from an invite) → no saving', () => {
@@ -213,11 +213,118 @@ describe('join saving — applied to goods only, via quote()', () => {
   });
 
   it('gift AND a valid join compose (recipient prices hidden, payer pays the discounted total)', () => {
-    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9045
+    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9290
     expect(q.gift).toBe(true);
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(452);
-    expect(q.totalPence).toBe(9045 - 452 + DELIVERY_PENCE);
+    expect(q.joinSavingPence).toBe(465);
+    expect(q.totalPence).toBe(9290 - 465 + DELIVERY_PENCE);
+    expect(recipientLineLabel(q.lines[0]!, q.gift)).toBe('gift');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The 5% family-set saving — "dress the whole family" (3+ garments)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('family-set saving — 3+ garments in one order', () => {
+  it('kids tee + adult tee + bodysuit → 5% off the garment lines', () => {
+    const q = priceBasket([
+      { productKey: 'kidsTee', qty: 1 }, // 2495
+      { productKey: 'adultTee', qty: 1 }, // 3195
+      { productKey: 'babyBodysuit', qty: 1 }, // 2195
+    ]); // garments 7885
+    expect(q.familySetApplied).toBe(true);
+    expect(q.familySetSavingPence).toBe(394); // Math.round(5% of 7885)
+    expect(q.totalPence).toBe(7885 - 394 + DELIVERY_PENCE);
+  });
+
+  it('two garments → no set saving', () => {
+    const q = priceBasket([
+      { productKey: 'kidsTee', qty: 1 },
+      { productKey: 'adultTee', qty: 1 },
+    ]);
+    expect(q.familySetApplied).toBe(false);
+    expect(q.familySetSavingPence).toBe(0);
+  });
+
+  it('quantity counts: 3× the same garment qualifies', () => {
+    const q = priceBasket([{ productKey: 'kidsTee', qty: 3 }]); // 7485
+    expect(q.familySetApplied).toBe(true);
+    expect(q.familySetSavingPence).toBe(374); // Math.round(5% of 7485)
+  });
+
+  it('3+ NON-garment items do not qualify', () => {
+    const q = priceBasket([{ productKey: 'mug', qty: 3 }]);
+    expect(q.familySetApplied).toBe(false);
+    expect(q.familySetSavingPence).toBe(0);
+  });
+
+  it('the saving applies to GARMENT lines only — other goods are not discounted', () => {
+    const q = priceBasket([
+      { productKey: 'kidsTee', qty: 2 }, // 4990
+      { productKey: 'adultTee', qty: 1 }, // 3195 → garments 8185
+      { productKey: 'framedPrint', qty: 1 }, // 6695 — not a garment
+    ]);
+    expect(q.familySetApplied).toBe(true);
+    expect(q.familySetSavingPence).toBe(409); // Math.round(5% of 8185), NOT of 14880
+    expect(q.totalPence).toBe(14880 - 409 + DELIVERY_PENCE);
+  });
+
+  it('variant skus (kidsTee-34years-blue …) classify as garments too', () => {
+    // The DB catalogue keys lines by variant sku; the default variant IS the key.
+    const dbCatalogue = {
+      'kidsTee-34years-blue': { pricePence: 2695, label: 'kids tee' },
+      'adultTee-m-white': { pricePence: 3195, label: 'adult tee' },
+      'babyBodysuit-newborn-white': { pricePence: 2195, label: 'baby bodysuit' },
+    };
+    const q = priceBasket(
+      Object.keys(dbCatalogue).map((k) => ({ productKey: k, qty: 1 })),
+      { catalogue: dbCatalogue },
+    ); // garments 8085
+    expect(q.familySetApplied).toBe(true);
+    expect(q.familySetSavingPence).toBe(404); // Math.round(5% of 8085)
+  });
+
+  it('a smuggled familySetApplied flag on the request is ignored (derived, never trusted)', () => {
+    const evil = { productKey: 'mug', qty: 1, familySetApplied: true, familySetSavingPence: 9999 } as unknown as RequestedLine;
+    const q = priceBasket([evil]);
+    expect(q.familySetApplied).toBe(false);
+    expect(q.familySetSavingPence).toBe(0);
+    expect(q.totalPence).toBe(1795);
+  });
+
+  it('composes with the join saving (both apply; total reflects both)', () => {
+    const q = quote(
+      [
+        { productKey: 'kidsTee', qty: 1 }, // 2495
+        { productKey: 'adultTee', qty: 2 }, // 6390 → garments 8885
+      ],
+      { joinProvenance: provenance() },
+    ); // subtotal 8885
+    expect(q.joinSavingApplied).toBe(true);
+    expect(q.familySetApplied).toBe(true);
+    expect(q.joinSavingPence).toBe(444); // 5% of 8885
+    expect(q.familySetSavingPence).toBe(444); // 5% of the same garments
+    expect(q.totalPence).toBe(8885 - 444 - 444 + DELIVERY_PENCE);
+  });
+
+  it('combined savings can never exceed the goods (clamped, total ≥ 0)', () => {
+    const oversized: JoinContext = { familyId: 'f', inviteId: 'i', savingBps: 50_000 };
+    const q = priceBasket([{ productKey: 'kidsTee', qty: 3 }], { joinContext: oversized });
+    expect(q.joinSavingPence + q.familySetSavingPence).toBeLessThanOrEqual(q.subtotalPence);
+    expect(q.totalPence).toBeGreaterThanOrEqual(0);
+  });
+
+  it('gift + family set compose (recipient prices hidden, payer pays the discounted total)', () => {
+    const q = priceBasket(
+      [
+        { productKey: 'kidsTee', qty: 1 },
+        { productKey: 'adultTee', qty: 1 },
+        { productKey: 'babyBodysuit', qty: 1 },
+      ],
+      { gift: true },
+    );
+    expect(q.gift).toBe(true);
+    expect(q.familySetApplied).toBe(true);
     expect(recipientLineLabel(q.lines[0]!, q.gift)).toBe('gift');
   });
 });
@@ -247,12 +354,12 @@ describe('priceBasket — delivery override', () => {
   it('a zero override yields free delivery on a non-empty basket', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 0 });
     expect(q.deliveryPence).toBe(0);
-    expect(q.totalPence).toBe(1595);
+    expect(q.totalPence).toBe(1795);
   });
   it('a custom override flows into the total', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 1500 });
     expect(q.deliveryPence).toBe(1500);
-    expect(q.totalPence).toBe(1595 + 1500);
+    expect(q.totalPence).toBe(1795 + 1500);
   });
   it('the override is ignored on an empty basket (delivery stays zero)', () => {
     const q = priceBasket([], { deliveryPence: 1500 });
@@ -268,7 +375,7 @@ describe('priceBasket — duplicate product keys', () => {
       { productKey: 'mug', qty: 1 },
     ]);
     expect(q.lines).toHaveLength(2);
-    expect(q.subtotalPence).toBe(2 * 1595);
+    expect(q.subtotalPence).toBe(2 * 1795);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
   });
 });

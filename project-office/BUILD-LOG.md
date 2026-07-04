@@ -2,9 +2,9 @@
 
 > Maintained by Cowork. The at-a-glance "where are we." Phases follow Claude Code's own plan — rename/renumber to match once Code proposes it.
 
-**Current status:** _not started — awaiting Claude Code's architecture + phase plan_
-**Current phase:** —
-**Last updated:** —
+**Current status:** _Real backend landing — auth, S3 storage, moderation, fulfilment egress gate, Stripe, Prodigi, real data-rights. Non-negotiables enforced at tested chokepoints. Compliance gates now the critical path._
+**Current phase:** P1 (build well advanced; live use blocked on P0 compliance gates, not code)
+**Last updated:** 2026-06-30 (REVIEW-phase-1; HEAD ffa4d40, ~50 commits since last review)
 
 ---
 
@@ -12,13 +12,41 @@
 
 | Phase | Goal | Status | Shipped | Notes |
 |---|---|---|---|---|
-| 0 | Architecture & plan signed off | ☐ not started | | Code proposes stack, schema, structure, plan; Simon signs off before any build |
-| — | _(Code's phases go here as the plan firms up — e.g. foundations, identity & family/permissions, studio, catalogue, checkout, gift loop, occasion engine, polish & launch)_ | | | |
+| 0 | Architecture & plan signed off | ◐ in progress | proposal/00–03 + CLAUDE.md | Stack proposed & built against; still marked "PROPOSED — pending founder sign-off". Four directional decisions made (UK/EU residency, hybrid AI, Prodigi-default POD, web+PWA) |
+| 0 | Trust/data **spine — logic layer** | ◐ in progress | authz module (+tests), Drizzle schema/migration, server-side pricing (+tests) | Pure logic + schema only. Storage, signed URLs, purge jobs, audit/DSAR backend, auth = **not built** |
+| 1 | **UI prototype** — marketing, Studio shell, catalogue, checkout, gift link, family home, trust pages | ◐ in progress | full screen set in `src/app` | Walkable end-to-end on **in-memory client stores** (`src/lib/store.ts`) — demo, not persistence |
+| 1+ | Real backend: auth, encrypted storage, image pipeline, Stripe, Prodigi, retention, data-rights | ◐ in progress | Auth.js + sessions; S3 storage (private, presigned, EXIF strip); fulfilment worker + **egress gate**; Stripe + signed/idempotent webhook; Prodigi adapter + sync; print compositor; real NN8 delete/download; 14 migrations; 36 test files | Non-negotiables enforced at tested chokepoints. Email + retention purge still to confirm. Int suites need CI/DB |
+| 0 | **Content safety (decision D8)** — moderation gate + report/takedown | ◐ in progress | Moderation module (CSAM-hash-first → BLOCKED; classifier FLAGS; fail-safe); wired at ingest; **orders gated on moderationStatus=CLEAR** | IWF **Image Intercept** provider + report/takedown UX still to wire to the real classifier/runbook |
+| — | **Verification (2026-06-30):** typecheck clean; **198/198 unit tests pass**; ~17 integration suites present (need a live DB — confirm green in CI) | | | |
 
 Status key: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 
-## Open questions for Simon
-- _(list decisions Code is waiting on — keep short)_
+**Verification (2026-06-26):** `typecheck` clean; `npm test` 107/107 pass (authz 55, pricing 47, schema 5).
 
-## Recently shipped
-- _(rolling list, newest first)_
+## Open questions for Simon
+- **Stack accepted** ✓ (2026-06-26). Remaining provider picks still open: generative-AI provider (D3/LG6), email/SMS (D7), P3 book printer (D4).
+- **Content-safety (D8) decided** ✓ — now needs two external sign-offs: **IP/brand lawyer** (copyright posture S3-b) and the **DP professional** (OSA scope wording + CSAM reporting workflow + human-review-of-children's-images assessment).
+- Visual fidelity vs `/mockups` — Simon will advise when ready (Cowork can't pixel-judge).
+
+## Recently shipped (newest first)
+- Family set ("dress the whole family"): set builder from Start Creating; server-side 5% family-set
+  saving (3+ garments, derived from line keys — no client flag) through quote → order → Stripe;
+  order lines now FREEZE the sold spec (sku/attributes/provider SKU+config) so re-seeds can't change
+  a paid order; adult tee → ONE unisex Stanley/Stella Sparker 2.0 SKU (Bella+Canvas dropped — not
+  organic); white bodysuit → GB long-sleeve RS-4411 (white RS-4424 was CA/AU-fulfilled: residency +
+  delivery); niche-band reprice (kids tee 24.95, adult 31.95, mug 17.95, storybook A5 25.95) per
+  project-office/briefs/PRICING-elasticity-premium.md
+- Catalogue: Most Popular + full-catalogue modal; in-VPC photoreal product-mockup compositor
+- Prodigi POD adapter wired (typed client, real-SKU catalogue, live-validated sync) + fulfilment worker with egress gate
+- Stripe (test) + signed/idempotent webhook; atomic paid-flip + fulfilment enqueue
+- Content moderation (D8) wired at ingest; orders gated on CLEAR; moderation fail-safe
+- Real on-demand delete + download (NN8); Family/Home wired to real DB; child-subject filing
+- Auth.js + sessions; storage layer (private S3, presigned, EXIF strip); Share a Wish; Edit-in-Studio
+- Server-side pricing authority + local Postgres spine
+- Studio made interactive (keep, basket, magic edits, DPI badge)
+- Missing pages built; app nav reconciled; modals + cookie banner wired
+- Upload / basket / checkout / gift-link wired via client store
+- Public trust pages (privacy, family promise, cookies, s.164A complaint)
+- Studio MVP shell; visibility / add-member / create-gift-link modals
+- Phase-0 trust-spine schema + migration; central authz module + tests
+- Architecture proposal, CLAUDE.md, scaffolding
