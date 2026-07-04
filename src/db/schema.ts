@@ -373,6 +373,33 @@ export const orders = pgTable(
     isGift: boolean('is_gift').notNull().default(false),
     stripeSessionId: text('stripe_session_id'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
+    // ── POD submission (Prodigi) ──
+    // The provider's order id — set EXACTLY once on successful submission; doubles as
+    // the idempotency latch (an order with a prodigiOrderId is never re-submitted).
+    prodigiOrderId: text('prodigi_order_id'),
+    // Captured from Stripe Checkout's shipping_address_collection at payment time.
+    // Null on the dev fallback path (submission substitutes a sandbox address).
+    shippingAddress: jsonb('shipping_address').$type<{
+      name: string;
+      line1: string;
+      line2?: string | null;
+      townOrCity: string;
+      postcode: string;
+      countryCode: string;
+    } | null>(),
+    // What we actually asked the POD for ('Standard' | 'Express') — resolved at
+    // submission from the order's lines, persisted for support/repricing forensics.
+    shippingMethod: text('shipping_method'),
+    // Latest shipment info from the status sync: carrier + tracking number/url.
+    tracking: jsonb('tracking').$type<{ carrier?: string | null; number?: string | null; url?: string | null } | null>(),
+    // The last submission failure (order stays PAID + claimable for retry).
+    submitError: text('submit_error'),
+    // When the PAID→FULFILLING claim was taken — keys the stale-claim recovery sweep
+    // (a crash mid-submit must never strand a paid order invisibly).
+    claimedAt: timestamp('claimed_at', { withTimezone: true }),
+    // Bounded submission retry with backoff: attempts so far + the earliest next try.
+    submitAttempts: integer('submit_attempts').notNull().default(0),
+    nextSubmitAttemptAt: timestamp('next_submit_attempt_at', { withTimezone: true }),
     createdAt,
   },
   (t) => [index('order_account_idx').on(t.accountId, t.createdAt)],
@@ -387,13 +414,15 @@ export const orderItems = pgTable('order_items', {
   // The catalogue variant (nullable during migration; the printed line carries an
   // order_item_artwork row with the server-authoritative spec).
   variantId: uuid('variant_id').references(() => productVariants.id),
-  // WHAT WAS SOLD, frozen at order time: { sku, attributes, providerSku, providerConfig }.
-  // Variant rows can be re-seeded/repurposed after the order (a price change, a supplier
-  // SKU swap, a default move) — fulfilment must consume THIS snapshot, never a live
-  // lookup, so the customer receives exactly the size/colour/garment they paid for.
+  // WHAT WAS SOLD, frozen at order time: { sku, attributes, provider, providerSku,
+  // providerConfig }. Variant rows can be re-seeded/repurposed after the order (a price
+  // change, a supplier SKU swap, a default move) — fulfilment must consume THIS snapshot,
+  // never a live lookup, so the customer receives exactly what they paid for. `provider`
+  // distinguishes POD lines from MANUAL ones (a MANUAL row still carries an internal sku).
   spec: jsonb('spec').$type<{
     sku: string;
     attributes: Record<string, string>;
+    provider?: string | null;
     providerSku: string | null;
     providerConfig: unknown;
   } | null>(),

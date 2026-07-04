@@ -66,13 +66,14 @@ export async function placeOrder(
   // order-time config) onto the order line. Variant rows get re-seeded over time — a
   // supplier swap or a default move must never change the meaning of a paid order.
   const variantIds = [...new Set([...variantByKey.values()])];
-  const specByVariantId = new Map<string, { sku: string; attributes: Record<string, string>; providerSku: string | null; providerConfig: unknown }>();
+  const specByVariantId = new Map<string, { sku: string; attributes: Record<string, string>; provider: string | null; providerSku: string | null; providerConfig: unknown }>();
   if (variantIds.length > 0) {
     const specRows = await db
       .select({
         id: productVariants.id,
         sku: productVariants.sku,
         attributes: productVariants.attributes,
+        provider: productVariantProviders.provider,
         providerSku: productVariantProviders.providerSku,
         providerConfig: productVariantProviders.providerConfig,
       })
@@ -83,6 +84,7 @@ export async function placeOrder(
       specByVariantId.set(r.id, {
         sku: r.sku,
         attributes: (r.attributes as Record<string, string>) ?? {},
+        provider: r.provider ?? null,
         providerSku: r.providerSku ?? null,
         providerConfig: r.providerConfig ?? null,
       });

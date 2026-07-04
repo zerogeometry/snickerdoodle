@@ -161,6 +161,44 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(events).toHaveLength(1); // recorded exactly once
   });
 
+  it('the webhook captures the Stripe-collected shipping address BEFORE the paid-flip', async () => {
+    const sessionId = `cs_ship_${ids.nonce}`;
+    const [order] = await db
+      .insert(orders)
+      .values({ ref: `SNK-ship-${ids.nonce}`, status: 'PENDING', subtotalPence: 2495, deliveryPence: 0, totalPence: 2495, stripeSessionId: sessionId })
+      .returning();
+    orderIds.push(order!.id);
+
+    const eventId = `evt_ship_${ids.nonce}`;
+    webhookIds.push(eventId);
+    const event = {
+      id: eventId,
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: sessionId,
+          collected_information: {
+            shipping_details: {
+              name: 'Sam Hartley',
+              address: { line1: '12 Meadow Way', line2: null, city: 'Bristol', postal_code: 'BS1 2AB', country: 'GB', state: null },
+            },
+          },
+        },
+      },
+    } as unknown as Stripe.Event;
+
+    await handleStripeEvent(db, event);
+    const [paid] = await db.select().from(orders).where(eq(orders.id, order!.id));
+    expect(paid!.status).toBe('PAID');
+    expect(paid!.shippingAddress).toMatchObject({
+      name: 'Sam Hartley',
+      line1: '12 Meadow Way',
+      townOrCity: 'Bristol',
+      postcode: 'BS1 2AB',
+      countryCode: 'GB',
+    });
+  });
+
   it('a personalised line freezes a SERVER-CLAMPED spec into order_item_artwork', async () => {
     const [asset] = await db
       .insert(assets)

@@ -70,6 +70,9 @@ export async function createCheckoutSession(args: {
     line_items: lineItems,
     discounts,
     client_reference_id: args.ref,
+    // The POD needs a real delivery address; Stripe collects + validates it so we
+    // never build address forms (or store card data) ourselves. UK-only at launch.
+    shipping_address_collection: { allowed_countries: ['GB'] },
     success_url: `${appUrl()}/checkout/confirmation?ref=${args.ref}`,
     cancel_url: `${appUrl()}/checkout`,
   });

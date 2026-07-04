@@ -370,6 +370,11 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     let vsort = 0;
     for (const v of def.variants) {
       const isDefault = vsort === defaultIndex;
+      // A printable product without a POD SKU would seed as MANUAL and silently never
+      // fulfil — that's an authoring mistake, not a configuration.
+      if (def.print && !v.prodigiSku) {
+        console.warn(`[seed-catalogue] printable variant ${key}/${v.size ?? ''}/${v.colour ?? ''} has NO prodigiSku — it will be MANUAL-fulfilled`);
+      }
       const sku = variantSku(key, v, isDefault);
       const attributes: Record<string, string> = {};
       if (v.size) attributes.size = v.size;

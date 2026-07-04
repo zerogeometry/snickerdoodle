@@ -30,6 +30,27 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
     if (session.id) {
       const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.stripeSessionId, session.id));
       if (order) {
+        // Capture the delivery address BEFORE the paid-flip: the fulfilment worker
+        // only claims PAID orders, so the address is always present by then. Older
+        // Stripe API versions delivered it as session.shipping_details — accept both
+        // (and the submitter can still backfill from the session as a last resort).
+        const legacy = (session as unknown as { shipping_details?: Stripe.Checkout.Session.CollectedInformation.ShippingDetails | null }).shipping_details;
+        const ship = session.collected_information?.shipping_details ?? legacy ?? null;
+        if (ship?.address?.line1 && ship.address.city && ship.address.postal_code && ship.address.country) {
+          await db
+            .update(orders)
+            .set({
+              shippingAddress: {
+                name: ship.name,
+                line1: ship.address.line1,
+                line2: ship.address.line2 ?? null,
+                townOrCity: ship.address.city,
+                postcode: ship.address.postal_code,
+                countryCode: ship.address.country,
+              },
+            })
+            .where(eq(orders.id, order.id));
+        }
         await markOrderPaid(db, order.id);
         handled = true;
       }

@@ -29,18 +29,24 @@ interface ClaimedItem {
  * RENDERING, then for each renders the print file IN-VPC and runs the egress GATE:
  *
  *   render OK + gate OK → READY          (rendered + cleared, ready to submit)
- *   gate blocked        → BLOCKED_GATE   (correctly waiting; a sweep releases it when the gate flips)
- *   render failed       → RENDER_FAILED  (the error recorded)
+ *   gate blocked        → BLOCKED_GATE   (correctly waiting; releaseBlockedArtwork in
+ *                                         ./submit.ts re-checks + releases when the gate flips)
+ *   render failed       → RENDER_FAILED  (the error recorded; the submitter surfaces it
+ *                                         loudly on the order instead of waiting forever)
  *
  * No image leaves the VPC here — rendering is local, and the GATE guards egress. POD
- * submission (READY → SUBMITTED) is the next increment and sits behind the same gate.
+ * submission (READY → SUBMITTED) lives in ./submit.ts behind the same gate.
  */
-export async function processFulfilment(db: DbHandle, opts?: { limit?: number; env?: GateEnv }): Promise<FulfilmentSummary> {
+export async function processFulfilment(
+  db: DbHandle,
+  opts?: { limit?: number; env?: GateEnv; onlyOrderIds?: string[] },
+): Promise<FulfilmentSummary> {
   const env = opts?.env ?? gateEnv();
   const limit = opts?.limit ?? 50;
 
   // 1. CLAIM — lock the PENDING artwork of PAID orders, skip rows another tick holds,
   //    and flip them to RENDERING atomically so they can't be re-claimed.
+  //    `onlyOrderIds` scopes a tick to specific orders (targeted support retries; tests).
   const claimed: ClaimedItem[] = await db.transaction(async (tx) => {
     const rows = await tx
       .select({
@@ -54,7 +60,13 @@ export async function processFulfilment(db: DbHandle, opts?: { limit?: number; e
       .from(orderItemArtwork)
       .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
       .innerJoin(orders, eq(orders.id, orderItems.orderId))
-      .where(and(eq(orders.status, 'PAID'), eq(orderItemArtwork.status, 'PENDING')))
+      .where(
+        and(
+          eq(orders.status, 'PAID'),
+          eq(orderItemArtwork.status, 'PENDING'),
+          ...(opts?.onlyOrderIds ? [inArray(orders.id, opts.onlyOrderIds)] : []),
+        ),
+      )
       .limit(limit)
       .for('update', { skipLocked: true });
     if (rows.length === 0) return [];

@@ -7,6 +7,7 @@ export {
   putObject,
   getObjectBytes,
   presignDownload,
+  presignProviderIngest,
   deleteObject,
   deleteObjectConfirmed,
 } from './objects';

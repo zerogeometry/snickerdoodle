@@ -29,6 +29,14 @@ Status key: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - Visual fidelity vs `/mockups` — Simon will advise when ready (Cowork can't pixel-judge).
 
 ## Recently shipped (newest first)
+- Prodigi ORDER SUBMISSION — the last leg of the money loop: paid → rendered in-VPC → egress gate
+  re-asserted per asset at the URL-minting moment (deny-by-default on unresolvable assets) →
+  submitted from the FROZEN sold-spec (idempotencyKey = order id; verified live against the real
+  sandbox: ord_… returned, synced InProgress) → polled to SHIPPED with tracking stored. Stripe now
+  collects the GB delivery address (webhook capture + submit-time session backfill). Nothing stalls
+  silently: stale-claim recovery sweep, BLOCKED_GATE release sweep, bounded backoff retries,
+  provider-text URL redaction, SANDBOX/LIVE split-brain guard, structured console.error surfacing.
+  20 adversarial-review findings fixed in-increment. 357 tests green ×3.
 - Family set ("dress the whole family"): set builder from Start Creating; server-side 5% family-set
   saving (3+ garments, derived from line keys — no client flag) through quote → order → Stripe;
   order lines now FREEZE the sold spec (sku/attributes/provider SKU+config) so re-seeds can't change

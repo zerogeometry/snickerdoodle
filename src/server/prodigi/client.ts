@@ -67,7 +67,20 @@ function config(): { apiKey: string; baseUrl: string } {
   return { apiKey, baseUrl };
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<{ status: number; body: T | null }> {
+/** Does the configured transport point at Prodigi's SANDBOX host? Key-independent, so
+ * the gate/submitter can check config consistency without needing an API key. */
+export function isSandboxHost(): boolean {
+  const baseUrl = (process.env.PRODIGI_BASE_URL || DEFAULT_BASE).replace(/\/+$/, '');
+  try {
+    return new URL(baseUrl).hostname === 'api.sandbox.prodigi.com';
+  } catch {
+    return false; // unparseable base URL — treat as NOT sandbox (the conservative answer)
+  }
+}
+
+/** Shared HTTP helper — also used by the ORDER transport in ./orders.ts, whose only
+ * caller is the gated fulfilment submitter (src/fulfillment/submit.ts). */
+export async function request<T>(path: string, init?: RequestInit): Promise<{ status: number; body: T | null }> {
   const { apiKey, baseUrl } = config();
   const res = await fetch(`${baseUrl}${path}`, {
     ...init,

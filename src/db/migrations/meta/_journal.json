@@ -113,6 +113,20 @@
       "when": 1783180960141,
       "tag": "0015_silly_wolverine",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1783189245681,
+      "tag": "0016_long_jackal",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1783191588339,
+      "tag": "0017_bent_stranger",
+      "breakpoints": true
     }
   ]
 }

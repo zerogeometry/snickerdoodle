@@ -69,6 +69,19 @@ export async function presignDownload(key: string, ttlSeconds = 120): Promise<st
   return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttlSeconds });
 }
 
+/**
+ * A PROVIDER-INGESTION GET URL — the separate policy from interactive viewing
+ * (CLAUDE.md security): deliberately longer-lived because the POD downloads
+ * asynchronously and retries (Prodigi: up to 10 attempts). Mint ONLY from the
+ * fulfilment submitter, and ONLY after {@link assertPodEgressAllowed} has
+ * authorised THIS asset's egress — this URL leaving the VPC IS the egress event.
+ * In production these should sign with dedicated ingestion credentials.
+ */
+export async function presignProviderIngest(key: string, ttlSeconds = 60 * 60 * 48): Promise<string> {
+  const { client, bucket } = getS3();
+  return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttlSeconds });
+}
+
 export async function deleteObject(key: string): Promise<void> {
   const { client, bucket } = getS3();
   await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));

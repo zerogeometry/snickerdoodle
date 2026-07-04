@@ -114,7 +114,9 @@ describe.skipIf(!DB || !S3)('guest ephemeral upload + claim authz (integration)'
     await expect(adoptEphemeralDraft(db, ids.samId, ids.hartleyId, r.assetId, [])).rejects.toBeInstanceOf(AuthzError);
   });
 
-  it('adoption turns the draft into a real, kept, orderable family asset', async () => {
+  // Real S3 ingest + adopt + placeOrder — the default 5s starves under a full parallel
+  // suite run (several print renders saturate the CPU in sibling workers).
+  it('adoption turns the draft into a real, kept, orderable family asset', { timeout: 20_000 }, async () => {
     const r = await draft();
     await adoptEphemeralDraft(db, ids.samId, ids.hartleyId, r.assetId, [r.claimId]);
 
