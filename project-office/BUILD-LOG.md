@@ -29,13 +29,19 @@ Status key: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - Visual fidelity vs `/mockups` — Simon will advise when ready (Cowork can't pixel-judge).
 
 ## Recently shipped (newest first)
-- Preview programme Tiers A+B: the positioner is a direct-manipulation editor (drag/pinch/
-  double-tap with 60fps live transforms committing through the shared print geometry; snapping +
-  guides; undo/redo; full keyboard equivalents per WCAG 2.5.1/2.5.7; actionable DPI fixes —
-  "zoom out to print-ready"/"zoom out to fix"; design↔product view toggle) and the compositor
-  gained Tier-B fabric fx (self-calibrating displacement + shading from the blank photo's own
-  luminance — cushion creases/blanket fleece/sack cords read through the art; mean-relative, so
-  untextured regions are identity ops; zero new dependencies, in-VPC)
+- Preview programme Tiers A–D (all four): (A) the positioner is a direct-manipulation editor
+  (drag/pinch/double-tap with 60fps live transforms committing through the shared print geometry;
+  snapping + guides; undo/redo; full keyboard equivalents per WCAG 2.5.1/2.5.7; actionable DPI
+  fixes; design↔product view toggle); (B) the compositor gained self-calibrating fabric fx
+  (displacement + shading from the blank photo's own luminance — cushion creases/blanket fleece
+  read through the art; mean-relative, so untextured regions are identity ops); (C) client-side
+  3D "spin it around" for mug + framed print (parametric models built in code — no licence risk;
+  drawing painted onto a CanvasTexture through the shared geometry; lazy three.js); (D) "see it on
+  your wall" for framed prints — a true-scale room composite (100% of devices, canvas, side-table
+  scale anchor) + wall AR via <model-viewer> (client-built GLB from the same parametric frame,
+  ar-modes "webxr quick-look" only — Scene Viewer dropped for privacy; USDZ auto-generated
+  on-device). ⚠ AR itself needs on-device sign-off (founder's phone). three.js + model-viewer
+  are the only new deps, both lazy-loaded, in-VPC by construction
 - Prodigi ORDER SUBMISSION — the last leg of the money loop: paid → rendered in-VPC → egress gate
   re-asserted per asset at the URL-minting moment (deny-by-default on unresolvable assets) →
   submitted from the FROZEN sold-spec (idempotencyKey = order id; verified live against the real

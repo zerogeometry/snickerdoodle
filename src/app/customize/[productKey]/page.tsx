@@ -22,6 +22,11 @@ const Product3D = dynamic(() => import('@/ui/three/Product3D'), {
   ssr: false,
   loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-[#9C8E7E]">warming up the spin view…</div>,
 });
+// Tier-D "see it on your wall" — framed prints only; also lazy.
+const WallView = dynamic(() => import('@/ui/three/WallView'), {
+  ssr: false,
+  loading: () => <div className="flex h-80 w-full items-center justify-center text-xs text-[#9C8E7E]">setting the scene…</div>,
+});
 
 /** Print-area mm per 3D-capable variant (mirrors DEFS; display-only — the print
  * pipeline resolves its own server-side truth at order time). */
@@ -58,10 +63,12 @@ export default function CustomizePage() {
   const [colour, setColour] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [spin, setSpin] = useState(false); // 3D spin view (mug + framed print only)
+  const [view, setView] = useState<'photo' | 'spin' | 'wall'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
+  const canWall = productKey === 'framedPrint';
   useEffect(() => {
     setCanSpin(Boolean(SPIN_MM[productKey]) && webglOk());
+    setView('photo'); // reset when the product changes
   }, [productKey]);
 
   useEffect(() => {
@@ -184,30 +191,25 @@ export default function CustomizePage() {
         </div>
       </Modal>
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
-        {/* Left: preview (photo / 3D spin) + edit placement */}
+        {/* Left: preview (photo / 3D spin / on your wall) + edit placement */}
         <div>
-          {canSpin ? (
-            <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
-              <button
-                type="button"
-                onClick={() => setSpin(false)}
-                aria-pressed={!spin}
-                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${!spin ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-              >
-                photo
-              </button>
-              <button
-                type="button"
-                onClick={() => setSpin(true)}
-                aria-pressed={spin}
-                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${spin ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-              >
-                spin it around
-              </button>
+          {canSpin || canWall ? (
+            <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
+              {(['photo', ...(canSpin ? ['spin'] as const : []), ...(canWall ? ['wall'] as const : [])] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setView(m)}
+                  aria-pressed={view === m}
+                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${view === m ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  {m === 'photo' ? 'photo' : m === 'spin' ? 'spin it around' : 'on your wall'}
+                </button>
+              ))}
             </div>
           ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            {spin && canSpin && previewImg ? (
+            {view === 'spin' && canSpin && previewImg ? (
               <div className="h-80 w-full">
                 <Product3D
                   kind={product.key as 'mug' | 'framedPrint'}
@@ -216,6 +218,17 @@ export default function CustomizePage() {
                   placement={placement}
                   printWmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[0]}
                   printHmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[1]}
+                  frameColour={colour ?? 'gold'}
+                />
+              </div>
+            ) : view === 'wall' && canWall && previewImg ? (
+              <div className="w-full">
+                <WallView
+                  image={previewImg}
+                  fallbackImage={upload?.dataUrl ?? null}
+                  placement={placement}
+                  printWmm={(SPIN_MM.framedPrint?.[size ?? ''] ?? [279, 356])[0]}
+                  printHmm={(SPIN_MM.framedPrint?.[size ?? ''] ?? [279, 356])[1]}
                   frameColour={colour ?? 'gold'}
                 />
               </div>
@@ -244,7 +257,7 @@ export default function CustomizePage() {
               </>
             )}
           </div>
-          {spin && canSpin ? (
+          {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
           ) : null}
           <Button variant="design" size="lg" className="mt-3 w-full" onClick={editPlacement}>

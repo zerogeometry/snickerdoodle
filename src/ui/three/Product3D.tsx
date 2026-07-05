@@ -3,15 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { clampTransform, computeLayerRect } from '@/server/print/geometry';
+import { buildFrame, buildMug, paintPlacement } from './models';
 import type { PlacementTransform } from '@/lib/store';
 
 /**
  * Tier-C interactive 3D preview (PREVIEW-state-of-the-art brief) — fully CLIENT-SIDE:
  * the drawing is painted onto a canvas texture in the browser and mapped onto a
- * PARAMETRIC model built in code (no marketplace GLBs — their licences forbid raw
- * model distribution; a cylinder and a box carry no licence at all). Nothing leaves
- * the page: the same image element the 2D preview shows becomes the texture.
+ * PARAMETRIC model built in code (models.ts — shared with the AR GLB export so the
+ * spun model and the wall-anchored model are identical). Nothing leaves the page.
  *
  * Honesty: the print-area texture is drawn through the SAME shared geometry as the
  * print renderer and compositor (cover-fit over the bleed canvas, trim-box window),
@@ -37,131 +36,7 @@ export interface Product3DProps {
   className?: string;
 }
 
-const FRAME_FINISH: Record<string, { color: string; metalness: number; roughness: number }> = {
-  gold: { color: '#C9A227', metalness: 0.85, roughness: 0.3 },
-  black: { color: '#241f1b', metalness: 0.1, roughness: 0.55 },
-  white: { color: '#F4F1EA', metalness: 0.05, roughness: 0.6 },
-  natural: { color: '#C8A06A', metalness: 0.05, roughness: 0.65 },
-};
-
-/** Paint the PRINT AREA (trim box, white margins) with the placed design — the same
- * maths as the compositor's bleed-exact windowing, in 2D canvas form. */
-function paintPlacement(img: HTMLImageElement, wMm: number, hMm: number, tf: PlacementTransform): HTMLCanvasElement {
-  const W = 1024;
-  const H = Math.max(8, Math.round((W * hMm) / wMm));
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d')!;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, W, H);
-
-  const t = clampTransform(tf);
-  const pxPerMm = W / wMm;
-  const rect = computeLayerRect(
-    { printWidthPx: W, printHeightPx: H, bleedMm: 3, requiredDpi: pxPerMm * 25.4 },
-    { width: img.naturalWidth || 1, height: img.naturalHeight || 1 },
-    t,
-  );
-  const bleedPx = Math.round((rect.canvasWidth - W) / 2);
-  const swap = t.rotationDeg % 180 !== 0;
-  const iw = swap ? rect.height : rect.width; // pre-rotation draw size
-  const ih = swap ? rect.width : rect.height;
-  const cx = rect.x - bleedPx + rect.width / 2;
-  const cy = rect.y - bleedPx + rect.height / 2;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(0, 0, W, H); // trim-box clip — overflow is bleed, not visible print
-  ctx.clip();
-  ctx.translate(cx, cy);
-  ctx.rotate((t.rotationDeg * Math.PI) / 180);
-  ctx.drawImage(img, -iw / 2, -ih / 2, iw, ih);
-  ctx.restore();
-  return canvas;
-}
-
-function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm: number): THREE.Group {
-  const group = new THREE.Group();
-  // 11oz-class proportions (mm): Ø82 body, 96 tall. The wrap arc = wrapWmm of the
-  // circumference; the decal sits a hair off the body so it never z-fights.
-  const R = 41;
-  const H = 96;
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(R, R, H, 96, 1, false),
-    new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.32, metalness: 0.02 }),
-  );
-  group.add(body);
-  // handle: a half-torus on +x
-  const handle = new THREE.Mesh(
-    new THREE.TorusGeometry(24, 6.5, 24, 48, Math.PI),
-    new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.32, metalness: 0.02 }),
-  );
-  handle.rotation.z = -Math.PI / 2;
-  handle.position.set(R + 3, 0, 0);
-  group.add(handle);
-  // print wrap: open cylinder segment, arc length = wrapWmm (capped just short of full)
-  const theta = Math.min((wrapWmm / (2 * Math.PI * R)) * 2 * Math.PI, Math.PI * 1.96);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  // Cylinder UVs run u with theta — mirror horizontally so the art reads correctly
-  // from OUTSIDE the mug (cylinder u maps counter-clockwise seen from outside).
-  texture.wrapS = THREE.ClampToEdgeWrapping;
-  texture.repeat.x = -1;
-  texture.offset.x = 1;
-  const printH = Math.min(wrapHmm, H - 4);
-  // face the wrap's CENTRE toward the camera (camera starts on +z; handle on +x)
-  const decal = new THREE.Mesh(
-    new THREE.CylinderGeometry(R + 0.35, R + 0.35, printH, 96, 1, true, Math.PI / 2 - theta / 2, theta),
-    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3, metalness: 0.02 }),
-  );
-  group.add(decal);
-  return group;
-}
-
-function buildFrame(texture: THREE.CanvasTexture, wMm: number, hMm: number, colour: string): THREE.Group {
-  const group = new THREE.Group();
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  // the print: a thin board, textured on the front face only
-  const board = 4;
-  const printMats = [
-    new THREE.MeshStandardMaterial({ color: '#f2efe8', roughness: 0.85 }), // +x edge
-    new THREE.MeshStandardMaterial({ color: '#f2efe8', roughness: 0.85 }),
-    new THREE.MeshStandardMaterial({ color: '#f2efe8', roughness: 0.85 }),
-    new THREE.MeshStandardMaterial({ color: '#f2efe8', roughness: 0.85 }),
-    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.75, metalness: 0 }), // +z front
-    new THREE.MeshStandardMaterial({ color: '#efece4', roughness: 0.85 }), // back
-  ];
-  const print = new THREE.Mesh(new THREE.BoxGeometry(wMm, hMm, board), printMats);
-  group.add(print);
-  // the frame: four mitred-ish bars around the print
-  const finish = FRAME_FINISH[colour] ?? FRAME_FINISH.gold!;
-  const mat = new THREE.MeshStandardMaterial(finish);
-  const face = 22; // frame face width (mm)
-  const depth = 30;
-  const zOff = (depth - board) / 2 - 2; // frame proud of the print
-  const top = new THREE.Mesh(new THREE.BoxGeometry(wMm + 2 * face, face, depth), mat);
-  top.position.set(0, hMm / 2 + face / 2, zOff);
-  const bottom = top.clone();
-  bottom.position.y = -(hMm / 2 + face / 2);
-  const left = new THREE.Mesh(new THREE.BoxGeometry(face, hMm, depth), mat);
-  left.position.set(-(wMm / 2 + face / 2), 0, zOff);
-  const right = left.clone();
-  right.position.x = wMm / 2 + face / 2;
-  group.add(top, bottom, left, right);
-  return group;
-}
-
-/** True when a WebGL context is obtainable — the offer gate for the 3D view. */
-export function webglAvailable(): boolean {
-  try {
-    const c = document.createElement('canvas');
-    return Boolean(c.getContext('webgl2') ?? c.getContext('webgl'));
-  } catch {
-    return false;
-  }
-}
+export { webglAvailable } from './models';
 
 export default function Product3D({ kind, image, fallbackImage, placement, printWmm, printHmm, frameColour, className }: Product3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
