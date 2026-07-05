@@ -2,6 +2,7 @@
 
 import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -15,6 +16,28 @@ import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image (contain)
+
+// Tier-C 3D spin view — lazy, so three.js never loads unless someone opens it.
+const Product3D = dynamic(() => import('@/ui/three/Product3D'), {
+  ssr: false,
+  loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-[#9C8E7E]">warming up the spin view…</div>,
+});
+
+/** Print-area mm per 3D-capable variant (mirrors DEFS; display-only — the print
+ * pipeline resolves its own server-side truth at order time). */
+const SPIN_MM: Record<string, Record<string, [number, number]>> = {
+  mug: { '11oz': [209, 98], '15oz': [217, 98] },
+  framedPrint: { '11×14″': [279, 356], '12×16″': [305, 406], '18×24″': [457, 610], '24×32″': [610, 813], '28×40″': [711, 1016] },
+};
+
+function webglOk(): boolean {
+  try {
+    const c = document.createElement('canvas');
+    return Boolean(c.getContext('webgl2') ?? c.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Customize a product: size + colour + placement only. Image-level edits (remove
@@ -35,6 +58,11 @@ export default function CustomizePage() {
   const [colour, setColour] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  const [spin, setSpin] = useState(false); // 3D spin view (mug + framed print only)
+  const [canSpin, setCanSpin] = useState(false);
+  useEffect(() => {
+    setCanSpin(Boolean(SPIN_MM[productKey]) && webglOk());
+  }, [productKey]);
 
   useEffect(() => {
     void loadCatalogueAction().then(setProducts);
@@ -156,30 +184,69 @@ export default function CustomizePage() {
         </div>
       </Modal>
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
-        {/* Left: preview + angle thumbnails + edit placement */}
+        {/* Left: preview (photo / 3D spin) + edit placement */}
         <div>
+          {canSpin ? (
+            <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
+              <button
+                type="button"
+                onClick={() => setSpin(false)}
+                aria-pressed={!spin}
+                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${!spin ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+              >
+                photo
+              </button>
+              <button
+                type="button"
+                onClick={() => setSpin(true)}
+                aria-pressed={spin}
+                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${spin ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+              >
+                spin it around
+              </button>
+            </div>
+          ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            <MockupPreview
-              productKey={product.key as ProductKey}
-              assetId={upload?.assetId ?? null}
-              variantId={variant?.id ?? null}
-              transform={placement}
-              size="zoom"
-              sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
-              image={previewImg}
-              placement={placement}
-              px={300}
-              uid="customize"
-            />
-            <button
-              type="button"
-              onClick={() => setZoomOpen(true)}
-              aria-label={`Enlarge ${product.label} preview`}
-              className="absolute left-2.5 top-2.5 flex items-center justify-center rounded-full bg-white/85 p-1.5 text-[#7A6A58] shadow-sm before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon"
-            >
-              <Icon icon={IconZoomScan} size={17} />
-            </button>
+            {spin && canSpin && previewImg ? (
+              <div className="h-80 w-full">
+                <Product3D
+                  kind={product.key as 'mug' | 'framedPrint'}
+                  image={previewImg}
+                  fallbackImage={upload?.dataUrl ?? null}
+                  placement={placement}
+                  printWmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[0]}
+                  printHmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[1]}
+                  frameColour={colour ?? 'gold'}
+                />
+              </div>
+            ) : (
+              <>
+                <MockupPreview
+                  productKey={product.key as ProductKey}
+                  assetId={upload?.assetId ?? null}
+                  variantId={variant?.id ?? null}
+                  transform={placement}
+                  size="zoom"
+                  sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+                  image={previewImg}
+                  placement={placement}
+                  px={300}
+                  uid="customize"
+                />
+                <button
+                  type="button"
+                  onClick={() => setZoomOpen(true)}
+                  aria-label={`Enlarge ${product.label} preview`}
+                  className="absolute left-2.5 top-2.5 flex items-center justify-center rounded-full bg-white/85 p-1.5 text-[#7A6A58] shadow-sm before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon"
+                >
+                  <Icon icon={IconZoomScan} size={17} />
+                </button>
+              </>
+            )}
           </div>
+          {spin && canSpin ? (
+            <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+          ) : null}
           <Button variant="design" size="lg" className="mt-3 w-full" onClick={editPlacement}>
             <Icon icon={IconPencil} size={15} /> edit placement
           </Button>
