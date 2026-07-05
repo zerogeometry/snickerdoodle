@@ -61,6 +61,9 @@ export function Positioner({
   // The product context: blank photo + print-area quad (+ silhouette mask) — so the image
   // is placed ON the product, not on an abstract canvas. Falls back to the flat canvas.
   const [ctx, setCtx] = useState<MockupContext | null>(null);
+  // Contrado-style view toggle: place ON the product photo, or on the exact flat
+  // print layout (the order-of-record view). Only offered when a product photo exists.
+  const [viewMode, setViewMode] = useState<'product' | 'flat'>('product');
   const imgRef = useRef<HTMLImageElement>(null);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
@@ -156,6 +159,30 @@ export function Positioner({
   const fitScale = natural ? containScale(t, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
   const zoomValue = tf.scale === 0 ? fitScale : tf.scale;
 
+  // The ACTIONABLE fix for a soft/blocked placement: effective dpi ∝ 1/scale, so the
+  // largest print-ready zoom is current·(dpi/required). Offered only when it's actually
+  // reachable on the zoom track (≥ fit/2) — otherwise the honest advice stays "smaller
+  // product", and we never fake it.
+  const dpiFix = useMemo<{ scale: number; kind: 'ok' | 'enhance' } | null>(() => {
+    if (!assess || assess.decision === 'OK') return null;
+    // dpi ∝ 1/scale, so the largest zoom that reaches a dpi d is zoom·(effective/d).
+    // Prefer full print-ready; from BLOCK, falling back to the enhanceable tier
+    // (required/2 → classical resample) still un-blocks the order honestly. The
+    // 0.995 nudges the landing safely inside the boundary against px rounding.
+    const floor = Math.max(fitScale / 2, MIN_SCALE);
+    const scaleFor = (d: number) => zoomValue * (assess.effectiveDpi / d) * 0.995;
+    const ok = scaleFor(assess.requiredDpi);
+    const enhance = scaleFor(assess.requiredDpi / 2);
+    const pick =
+      ok >= floor
+        ? { scale: ok, kind: 'ok' as const }
+        : assess.decision === 'BLOCK' && enhance >= floor
+          ? { scale: enhance, kind: 'enhance' as const }
+          : null;
+    if (!pick) return null; // unreachable — the honest advice stays "smaller product"
+    return { ...pick, scale: Math.abs(pick.scale - fitScale) < fitScale * FIT_SNAP ? 0 : pick.scale };
+  }, [assess, zoomValue, fitScale]);
+
   // Load the product context whenever the variant changes (photoreal products only).
   useEffect(() => {
     let live = true;
@@ -185,20 +212,28 @@ export function Positioner({
     const next = (((tf.rotationDeg + 90) % 360) as Rotation);
     update({ rotationDeg: next });
   };
-  const update = (patch: Partial<Transform>) => {
+  /** Commit a placement change. Accepts a function so rapid bursts (key auto-repeat,
+   * queued events) COMPOUND instead of all reading the same stale snapshot — a direct
+   * patch would collapse 20 zoom presses into one step. The history push runs inside
+   * the updater; the time-coalesce guard makes StrictMode's double-invoke harmless. */
+  const update = (patch: Partial<Transform> | ((prev: Transform) => Partial<Transform>)) => {
     setResult(null);
-    const next = clampTransform({ ...tfRef.current, ...patch });
-    if (!sameTf(next, tfRef.current)) pushHistory(tfRef.current);
-    setTf(next);
+    setTf((prev) => {
+      const p = typeof patch === 'function' ? patch(prev) : patch;
+      const next = clampTransform({ ...prev, ...p });
+      if (!sameTf(next, prev)) pushHistory(prev);
+      return next;
+    });
   };
 
   /** Zoom by a factor around the current placement, snapping back to "fit" (the
    * contain sentinel) when within a whisker of it — the keyboard/pinch zoom core. */
   const zoomBy = (factor: number) => {
-    const s0 = tfRef.current.scale === 0 ? fitScale : tfRef.current.scale;
-    const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * factor));
-    if (Math.abs(next - fitScale) < fitScale * FIT_SNAP) return update({ scale: 0 });
-    update({ scale: next });
+    update((prev) => {
+      const s0 = prev.scale === 0 ? fitScale : prev.scale;
+      const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * factor));
+      return { scale: Math.abs(next - fitScale) < fitScale * FIT_SNAP ? 0 : next };
+    });
   };
 
   const generate = async () => {
@@ -508,7 +543,7 @@ export function Positioner({
         const now = Date.now();
         if (now - lastTapRef.current < DOUBLE_TAP_MS) {
           // double-tap: fit ↔ fill toggle, centred
-          update({ scale: tfRef.current.scale === 0 ? 1 : 0, offsetX: 0, offsetY: 0 });
+          update((prev) => ({ scale: prev.scale === 0 ? 1 : 0, offsetX: 0, offsetY: 0 }));
           lastTapRef.current = 0;
         } else {
           lastTapRef.current = now;
@@ -538,16 +573,16 @@ export function Positioner({
     }
     switch (key) {
       case 'ArrowLeft':
-        update({ offsetX: tfRef.current.offsetX - step });
+        update((prev) => ({ offsetX: prev.offsetX - step }));
         break;
       case 'ArrowRight':
-        update({ offsetX: tfRef.current.offsetX + step });
+        update((prev) => ({ offsetX: prev.offsetX + step }));
         break;
       case 'ArrowUp':
-        update({ offsetY: tfRef.current.offsetY - step });
+        update((prev) => ({ offsetY: prev.offsetY - step }));
         break;
       case 'ArrowDown':
-        update({ offsetY: tfRef.current.offsetY + step });
+        update((prev) => ({ offsetY: prev.offsetY + step }));
         break;
       case '+':
       case '=':
@@ -598,9 +633,29 @@ export function Positioner({
     <Shell>
       <div className="grid gap-6 md:grid-cols-[auto_1fr]">
         {/* Canvas — the image ON the product (photo backdrop) when a template exists;
-            the flat print canvas otherwise. Same shared geometry either way. */}
+            the flat print canvas otherwise (or on request). Same shared geometry either way. */}
         <div>
           {bd && ctx && ctx.ok ? (
+            <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
+              <button
+                type="button"
+                onClick={() => setViewMode('product')}
+                aria-pressed={viewMode === 'product'}
+                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'product' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+              >
+                on the product
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('flat')}
+                aria-pressed={viewMode === 'flat'}
+                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'flat' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+              >
+                print layout
+              </button>
+            </div>
+          ) : null}
+          {bd && ctx && ctx.ok && viewMode === 'product' ? (
             <div
               {...canvasInteractionProps}
               className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
@@ -680,10 +735,11 @@ export function Positioner({
             anything outside the <b className="text-cinnamon">dashed line</b> won&apos;t print · keep faces &amp; words inside the <b className="text-green-save">dotted line</b>
           </p>
 
-          {/* DPI status */}
+          {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX
+              offered right where the warning is, never a dead end. */}
           {assess ? (
             <div
-              className={`mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold ${
+              className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold ${
                 assess.decision === 'OK'
                   ? 'bg-[#EAF1E4] text-green-save'
                   : assess.decision === 'UPSCALE'
@@ -692,11 +748,24 @@ export function Positioner({
               }`}
             >
               <Icon icon={assess.decision === 'BLOCK' ? IconAlertTriangle : IconCircleCheck} size={15} />
-              {assess.decision === 'OK'
-                ? `print-ready · ${t.requiredDpi} dpi`
-                : assess.decision === 'UPSCALE'
-                  ? `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
-                  : `too small to print well here — zoom out or pick a smaller product`}
+              <span className="min-w-0 flex-1">
+                {assess.decision === 'OK'
+                  ? `print-ready · ${t.requiredDpi} dpi`
+                  : assess.decision === 'UPSCALE'
+                    ? `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
+                    : dpiFix !== null
+                      ? 'too soft at this zoom'
+                      : 'too small to print well here — try a smaller product'}
+              </span>
+              {dpiFix !== null ? (
+                <button
+                  type="button"
+                  onClick={() => update({ scale: dpiFix.scale })}
+                  className="relative rounded-full border border-current px-2.5 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-['']"
+                >
+                  {dpiFix.kind === 'ok' ? 'zoom out to print-ready' : 'zoom out to fix'}
+                </button>
+              ) : null}
             </div>
           ) : null}
         </div>
