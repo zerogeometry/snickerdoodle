@@ -29,6 +29,13 @@ Status key: ☐ not started · ◐ in progress · ☑ done · ⚠ blocked
 - Visual fidelity vs `/mockups` — Simon will advise when ready (Cowork can't pixel-judge).
 
 ## Recently shipped (newest first)
+- Preview programme Tiers A+B: the positioner is a direct-manipulation editor (drag/pinch/
+  double-tap with 60fps live transforms committing through the shared print geometry; snapping +
+  guides; undo/redo; full keyboard equivalents per WCAG 2.5.1/2.5.7; actionable DPI fixes —
+  "zoom out to print-ready"/"zoom out to fix"; design↔product view toggle) and the compositor
+  gained Tier-B fabric fx (self-calibrating displacement + shading from the blank photo's own
+  luminance — cushion creases/blanket fleece/sack cords read through the art; mean-relative, so
+  untextured regions are identity ops; zero new dependencies, in-VPC)
 - Prodigi ORDER SUBMISSION — the last leg of the money loop: paid → rendered in-VPC → egress gate
   re-asserted per asset at the URL-minting moment (deny-by-default on unresolvable assets) →
   submitted from the FROZEN sold-spec (idempotencyKey = order id; verified live against the real

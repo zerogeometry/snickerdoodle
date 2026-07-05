@@ -8,6 +8,7 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
+import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -39,6 +40,9 @@ const MAX_INPUT_PIXELS = 50_000_000; // decompression-bomb guard on every decode
 const MAX_DRAWN_PIXELS = 16_000_000;
 const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
+// Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
+// fabric fx) re-renders cached mockups without a per-template version bump.
+const RENDER_REV = 'r2';
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -149,7 +153,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   //    (both DERIVATIVE/ORIGINAL under the SAME asset) from colliding on one key.
   const t = clampTransform(input.transform);
   const size: MockupSize = input.size ?? 'thumb';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}-${size}-v${tpl.templateVersion}-${srcObj.id}-${transformHash(t)}`);
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}-${size}-v${tpl.templateVersion}${RENDER_REV}-${srcObj.id}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
@@ -170,6 +174,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       workEdge: tpl.mapResolutionPx,
       outputEdge: OUTPUT_EDGE[size],
       print: { widthPx: tpl.printWidthPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
+      materialClass: tpl.materialClass,
     }),
   );
   inFlight.set(key, p);
@@ -186,6 +191,7 @@ async function renderAndPersist(
     assetId: string; key: string; blankKey: string; maskKey?: string; designKey: string; quad: [number, number][];
     transform: Transform; workEdge: number; outputEdge: number;
     print: { widthPx: number; bleedMm: number; requiredDpi: number };
+    materialClass: string;
   },
 ): Promise<MockupResult> {
   const out = await renderFlat({
@@ -197,6 +203,7 @@ async function renderAndPersist(
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
     print: args.print,
+    materialClass: args.materialClass,
   });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
@@ -233,8 +240,10 @@ async function renderFlat(args: {
   outputEdge: number;
   /** The variant's real print geometry, for bleed-exact windowing. */
   print: { widthPx: number; bleedMm: number; requiredDpi: number };
+  /** Drives the Tier-B fabric fx intensities (fold displacement + shading). */
+  materialClass: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge, print, materialClass } = args;
 
   // Working blank dimensions: cap the longest edge at workEdge (scRGB is 32-bit float,
   // ~4× memory, so this cap is load-bearing). The normalised quad scales with it.
@@ -305,6 +314,43 @@ async function renderFlat(args: {
     designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
   } catch {
     // keep `windowed`
+  }
+
+  // ── Tier-B fabric fx: displace the art along the blank's folds + re-apply the
+  // photo's own shading (fabricFx.ts — mean-relative, so a flat untextured region is
+  // an identity op). Runs BEFORE the mask clip, mirroring the reference pipeline, so
+  // a fold-displaced edge is still clipped to the silhouette. Pure enhancement: any
+  // failure keeps the un-fx'd layer — a mockup must never break for realism's sake.
+  const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
+  if (fx.disp > 0 || fx.shade > 0) {
+    try {
+      const blankGray = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS })
+        .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
+        .toColourspace('b-w')
+        .raw()
+        .toBuffer();
+      const blankGrayBlur = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS })
+        .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
+        .toColourspace('b-w')
+        .blur(Math.max(3, rect.w / 80)) // folds, not fabric grain
+        .raw()
+        .toBuffer();
+      const designRaw = await sharp(designLayer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      if (designRaw.info.width === rect.w && designRaw.info.height === rect.h && blankGray.length === rect.w * rect.h) {
+        const fxOut = applyFabricFx({
+          design: designRaw.data,
+          width: rect.w,
+          height: rect.h,
+          blankGray,
+          blankGrayBlur,
+          displaceStrength: fx.disp * Math.min(10, Math.max(2, rect.w / 60)),
+          shadeAmount: fx.shade,
+        });
+        designLayer = await sharp(fxOut, { raw: { width: rect.w, height: rect.h, channels: 4 } }).png().toBuffer();
+      }
+    } catch {
+      // keep the un-fx'd designLayer
+    }
   }
 
   // Clip the design to the product SILHOUETTE (mask: white = printable). The mask shares
