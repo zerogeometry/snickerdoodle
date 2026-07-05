@@ -1,9 +1,9 @@
 'use client';
 
-import { IconAlertTriangle, IconArrowBackUp, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { gbp, toast, useBasket, usePlacements } from '@/lib/store';
@@ -26,6 +26,11 @@ import {
 import type { StudioData, StudioVariant } from '@/server/studio';
 
 const PREVIEW_W = 360; // on-screen canvas width in CSS px
+const SNAP_OFFSET = 0.07; // |offset| within this of centre snaps to 0 (with a guide flash)
+const FIT_SNAP = 0.03; // scale within 3% of "fit" snaps back to the contain sentinel
+const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
+const DOUBLE_TAP_MS = 300;
+const HISTORY_COALESCE_MS = 800; // slider drags / key bursts collapse into one undo entry
 
 export function Positioner({
   data,
@@ -60,6 +65,64 @@ export function Positioner({
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
   const setPlacement = usePlacements((s) => s.setPlacement);
+
+  // ── Direct manipulation + history ──────────────────────────────────────────
+  // Gestures apply a LIVE css transform on the image via CSS vars (60fps, no React
+  // re-render per move) and COMMIT through the same shared geometry on release —
+  // what you dragged is exactly what prints. Undo coalesces continuous input
+  // (slider drags, key bursts) into single entries.
+  const tfRef = useRef(tf);
+  tfRef.current = tf;
+  const undoRef = useRef<Transform[]>([]);
+  const redoRef = useRef<Transform[]>([]);
+  const lastPushRef = useRef(0);
+  const [, setHistVer] = useState(0); // re-render for undo/redo button states
+  const [dragging, setDragging] = useState(false);
+  const [snapAxis, setSnapAxis] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
+  const snapAxisRef = useRef(snapAxis);
+  const hintedRef = useRef(false);
+  const lastTapRef = useRef(0);
+  const gestureRef = useRef<null | {
+    pointers: Map<number, { x: number; y: number; startX: number; startY: number }>;
+    base: Transform; // tf when the gesture (or its current phase) began
+    baseDist: number | null; // two-pointer start distance (pinch)
+    moved: boolean;
+    at: number; // last activity — a pointer whose pointerup never arrives must not poison the editor
+  }>(null);
+  const GESTURE_STALE_MS = 2000;
+
+  const sameTf = (a: Transform, b: Transform) =>
+    a.scale === b.scale && a.offsetX === b.offsetX && a.offsetY === b.offsetY && a.rotationDeg === b.rotationDeg;
+
+  const pushHistory = useCallback((prev: Transform) => {
+    const now = Date.now();
+    if (now - lastPushRef.current > HISTORY_COALESCE_MS) {
+      undoRef.current.push(prev);
+      if (undoRef.current.length > 50) undoRef.current.shift();
+      redoRef.current = [];
+      setHistVer((v) => v + 1);
+    }
+    lastPushRef.current = now;
+  }, []);
+
+  const undo = () => {
+    const prev = undoRef.current.pop();
+    if (!prev) return;
+    redoRef.current.push(tfRef.current);
+    lastPushRef.current = 0;
+    setResult(null);
+    setTf(prev);
+    setHistVer((v) => v + 1);
+  };
+  const redo = () => {
+    const next = redoRef.current.pop();
+    if (!next) return;
+    undoRef.current.push(tfRef.current);
+    lastPushRef.current = 0;
+    setResult(null);
+    setTf(next);
+    setHistVer((v) => v + 1);
+  };
 
   const keepsake = data.keepsakes[assetIdx];
   const variant = variants.find((v) => v.id === variantId) ?? variants[0];
@@ -106,6 +169,8 @@ export function Positioner({
    * appears consistently sized across variants with different print aspects. */
   const switchVariant = (v: StudioVariant) => {
     if (v.id === variantId) return;
+    gestureRef.current = null; // never carry a live gesture across products
+    setDragging(false);
     if (natural && tf.scale !== 0) {
       const src = { width: natural.w, height: natural.h };
       const rel = tf.scale / containScale(t, src, tf.rotationDeg);
@@ -122,7 +187,18 @@ export function Positioner({
   };
   const update = (patch: Partial<Transform>) => {
     setResult(null);
-    setTf((prev) => clampTransform({ ...prev, ...patch }));
+    const next = clampTransform({ ...tfRef.current, ...patch });
+    if (!sameTf(next, tfRef.current)) pushHistory(tfRef.current);
+    setTf(next);
+  };
+
+  /** Zoom by a factor around the current placement, snapping back to "fit" (the
+   * contain sentinel) when within a whisker of it — the keyboard/pinch zoom core. */
+  const zoomBy = (factor: number) => {
+    const s0 = tfRef.current.scale === 0 ? fitScale : tfRef.current.scale;
+    const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * factor));
+    if (Math.abs(next - fitScale) < fitScale * FIT_SNAP) return update({ scale: 0 });
+    update({ scale: next });
   };
 
   const generate = async () => {
@@ -205,7 +281,9 @@ export function Positioner({
       top: rect.y * scale + boxH / 2,
       width: imgW,
       height: imgH,
-      transform: `translate(-50%, -50%) rotate(${tf.rotationDeg}deg)`,
+      // --gx/--gy/--gk are the LIVE gesture deltas (set via ref, no re-render);
+      // they read 0/1 outside a gesture, so this is the committed placement.
+      transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
       objectFit: 'fill',
     };
   }, [rect, scale, tf.rotationDeg]);
@@ -237,11 +315,275 @@ export function Positioner({
       top: r.y - bleedPv + r.height / 2,
       width: imgW,
       height: imgH,
-      transform: `translate(-50%, -50%) rotate(${tf.rotationDeg}deg)`,
+      transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
       objectFit: 'fill',
     };
   }, [bd, natural, tf, t]);
   const safePv = bd ? mmToPx(t.safeInsetMm, t.requiredDpi) * bd.s : 0;
+
+  // ── Gesture-space geometry: pan slack + preview-px-per-space-px for whichever
+  // canvas mode is live. Offsets only pan within OVERFLOW slack (the print model),
+  // so at "fit" there is nothing to drag — the hint says so instead of lying.
+  const gestureGeom = useMemo(() => {
+    if (!natural) return null;
+    const src = { width: natural.w, height: natural.h };
+    if (bd) {
+      const geomPv = { printWidthPx: Math.max(1, Math.round(bd.qw)), printHeightPx: Math.max(1, Math.round(bd.qh)), bleedMm: t.bleedMm, requiredDpi: t.requiredDpi * bd.s };
+      const geom = (probe: Transform) => {
+        const r = computeLayerRect(geomPv, src, probe);
+        return { slackX: Math.max(0, r.width - r.canvasWidth), slackY: Math.max(0, r.height - r.canvasHeight) };
+      };
+      return { geom, pxPerSpace: 1 };
+    }
+    const geom = (probe: Transform) => {
+      const r = computeLayerRect(t, src, probe);
+      return { slackX: Math.max(0, r.width - r.canvasWidth), slackY: Math.max(0, r.height - r.canvasHeight) };
+    };
+    return { geom, pxPerSpace: scale };
+  }, [bd, natural, t, scale]);
+  const slackNow = gestureGeom ? gestureGeom.geom(tf) : { slackX: 0, slackY: 0 };
+
+  /** Live pointer deltas → the css-var transform on the image (no re-render). */
+  const applyLive = (dxPv: number, dyPv: number, k: number) => {
+    const el = imgRef.current;
+    if (!el) return;
+    el.style.setProperty('--gx', `${dxPv}px`);
+    el.style.setProperty('--gy', `${dyPv}px`);
+    el.style.setProperty('--gk', `${k}`);
+  };
+  const clearLive = () => {
+    const el = imgRef.current;
+    if (!el) return;
+    el.style.removeProperty('--gx');
+    el.style.removeProperty('--gy');
+    el.style.removeProperty('--gk');
+  };
+
+  /** Current gesture deltas in preview px (+ pinch factor) from live pointers. */
+  const gestureDeltas = () => {
+    const g = gestureRef.current!;
+    const pts = [...g.pointers.values()];
+    if (pts.length >= 2 && g.baseDist) {
+      const [p1, p2] = pts;
+      const k = Math.hypot(p1!.x - p2!.x, p1!.y - p2!.y) / g.baseDist;
+      const dx = (p1!.x - p1!.startX + p2!.x - p2!.startX) / 2;
+      const dy = (p1!.y - p1!.startY + p2!.y - p2!.startY) / 2;
+      return { dx, dy, k };
+    }
+    const p = pts[0];
+    return p ? { dx: p.x - p.startX, dy: p.y - p.startY, k: 1 } : { dx: 0, dy: 0, k: 1 };
+  };
+
+  /** Commit the live gesture through the SHARED geometry (what you see is what prints). */
+  const commitGesture = () => {
+    const g = gestureRef.current;
+    if (!g || !gestureGeom) return;
+    const { dx, dy, k } = gestureDeltas();
+    clearLive();
+    if (!g.moved && k === 1) return; // a tap, not a gesture — nothing to commit
+
+    const s0 = g.base.scale === 0 ? fitScale : g.base.scale;
+    let nextScale: number = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * k));
+    if (Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+
+    // Pan against the slack AT THE NEW SCALE (the range grows as you zoom in).
+    const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: nextScale });
+    const dxSpace = dx / gestureGeom.pxPerSpace;
+    const dySpace = dy / gestureGeom.pxPerSpace;
+    let offsetX = slackX > 0 ? Math.max(-1, Math.min(1, g.base.offsetX + (2 * dxSpace) / slackX)) : 0;
+    let offsetY = slackY > 0 ? Math.max(-1, Math.min(1, g.base.offsetY + (2 * dySpace) / slackY)) : 0;
+    if (Math.abs(offsetX) < SNAP_OFFSET) offsetX = 0; // snap to centre
+    if (Math.abs(offsetY) < SNAP_OFFSET) offsetY = 0;
+
+    setResult(null);
+    const next = clampTransform({ ...g.base, scale: nextScale, offsetX, offsetY });
+    if (!sameTf(next, g.base)) pushHistory(g.base);
+    lastPushRef.current = 0; // a gesture is its own undo entry — never coalesced away
+    setTf(next);
+  };
+
+  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!gestureGeom) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId); // keeps moves flowing off-element
+    } catch {
+      // capture is an optimisation; a pointer that can't be captured still drags
+    }
+    let g = gestureRef.current;
+    // A gesture whose pointers stopped reporting (missed pointerup/cancel — happens on
+    // interrupted touches) is abandoned, never joined: start fresh.
+    if (g && Date.now() - g.at > GESTURE_STALE_MS) {
+      clearLive();
+      g = null;
+      gestureRef.current = null;
+    }
+    if (!g) {
+      g = { pointers: new Map(), base: tfRef.current, baseDist: null, moved: false, at: Date.now() };
+      gestureRef.current = g;
+      setDragging(true);
+    } else {
+      // A second finger joins mid-drag: fold the pan so far into the base, then pinch.
+      commitGesture();
+      g.base = tfRef.current;
+      g.moved = false;
+    }
+    g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, startX: e.clientX, startY: e.clientY });
+    g.at = Date.now();
+    if (g.pointers.size === 2) {
+      const [p1, p2] = [...g.pointers.values()];
+      for (const p of g.pointers.values()) {
+        p.startX = p.x;
+        p.startY = p.y;
+      }
+      g.baseDist = Math.hypot(p1!.x - p2!.x, p1!.y - p2!.y) || 1;
+    }
+  };
+
+  const onCanvasPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    if (!g || !gestureGeom) return;
+    const p = g.pointers.get(e.pointerId);
+    if (!p) return;
+    g.at = Date.now();
+    p.x = e.clientX;
+    p.y = e.clientY;
+    const { dx, dy, k } = gestureDeltas();
+    if (Math.abs(dx) + Math.abs(dy) > 3 || Math.abs(k - 1) > 0.01) g.moved = true;
+
+    // Dragging at "fit" with no slack: nothing CAN move — say so once, honestly.
+    const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: g.base.scale === 0 ? 0 : g.base.scale * k });
+    if (g.moved && k === 1 && slackX === 0 && slackY === 0) {
+      if (!hintedRef.current) {
+        hintedRef.current = true;
+        toast('the whole drawing fits at this zoom — zoom in a touch to move it around');
+      }
+      return;
+    }
+
+    // Snap-to-centre pinning (drag only): pin the live delta on a snapped axis so the
+    // image visibly clicks to centre, with a guide flash.
+    let liveDx = slackX > 0 ? dx : 0;
+    let liveDy = slackY > 0 ? dy : 0;
+    let snapX = false;
+    let snapY = false;
+    if (k === 1) {
+      const slackPvX = slackX * gestureGeom.pxPerSpace;
+      const slackPvY = slackY * gestureGeom.pxPerSpace;
+      if (slackX > 0) {
+        const o = g.base.offsetX + (2 * (dx / gestureGeom.pxPerSpace)) / slackX;
+        if (Math.abs(o) < SNAP_OFFSET) {
+          liveDx = (-g.base.offsetX * slackPvX) / 2;
+          snapX = true;
+        }
+      }
+      if (slackY > 0) {
+        const o = g.base.offsetY + (2 * (dy / gestureGeom.pxPerSpace)) / slackY;
+        if (Math.abs(o) < SNAP_OFFSET) {
+          liveDy = (-g.base.offsetY * slackPvY) / 2;
+          snapY = true;
+        }
+      }
+    }
+    if (snapX !== snapAxisRef.current.x || snapY !== snapAxisRef.current.y) {
+      snapAxisRef.current = { x: snapX, y: snapY };
+      setSnapAxis(snapAxisRef.current);
+    }
+    applyLive(liveDx, liveDy, k);
+  };
+
+  const onCanvasPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = gestureRef.current;
+    if (!g) return;
+    const wasTap = !g.moved && g.pointers.size === 1;
+    commitGesture();
+    g.pointers.delete(e.pointerId);
+    if (g.pointers.size === 0) {
+      gestureRef.current = null;
+      setDragging(false);
+      if (snapAxisRef.current.x || snapAxisRef.current.y) {
+        snapAxisRef.current = { x: false, y: false };
+        setSnapAxis(snapAxisRef.current);
+      }
+      if (wasTap) {
+        const now = Date.now();
+        if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+          // double-tap: fit ↔ fill toggle, centred
+          update({ scale: tfRef.current.scale === 0 ? 1 : 0, offsetX: 0, offsetY: 0 });
+          lastTapRef.current = 0;
+        } else {
+          lastTapRef.current = now;
+        }
+      }
+    } else {
+      // one finger lifted mid-pinch: continue as a fresh drag with the other finger
+      g.base = tfRef.current;
+      g.baseDist = null;
+      g.moved = false;
+      for (const p of g.pointers.values()) {
+        p.startX = p.x;
+        p.startY = p.y;
+      }
+    }
+  };
+
+  // Keyboard equivalents (WCAG 2.5.1/2.5.7): every gesture has a key.
+  const onCanvasKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const step = e.shiftKey ? NUDGE * 4 : NUDGE;
+    const key = e.key;
+    if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'Z')) {
+      e.preventDefault();
+      if (e.shiftKey) redo();
+      else undo();
+      return;
+    }
+    switch (key) {
+      case 'ArrowLeft':
+        update({ offsetX: tfRef.current.offsetX - step });
+        break;
+      case 'ArrowRight':
+        update({ offsetX: tfRef.current.offsetX + step });
+        break;
+      case 'ArrowUp':
+        update({ offsetY: tfRef.current.offsetY - step });
+        break;
+      case 'ArrowDown':
+        update({ offsetY: tfRef.current.offsetY + step });
+        break;
+      case '+':
+      case '=':
+        zoomBy(1.08);
+        break;
+      case '-':
+      case '_':
+        zoomBy(1 / 1.08);
+        break;
+      case 'r':
+      case 'R':
+        setRot();
+        break;
+      case 'f':
+      case 'F':
+      case '0':
+        update({ scale: 0, offsetX: 0, offsetY: 0 });
+        break;
+      default:
+        return; // unhandled — let it through
+    }
+    e.preventDefault();
+  };
+
+  const canvasInteractionProps = {
+    onPointerDown: onCanvasPointerDown,
+    onPointerMove: onCanvasPointerMove,
+    onPointerUp: onCanvasPointerUp,
+    onPointerCancel: onCanvasPointerUp,
+    onKeyDown: onCanvasKeyDown,
+    tabIndex: 0,
+    role: 'application',
+    'aria-label':
+      'drawing position. drag to move, pinch or press plus and minus to zoom, double-tap to fill or fit, R to rotate, arrow keys to nudge, F to fit the whole drawing.',
+  } as const;
+  const canvasInteractionClass = `touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-cinnamon focus-visible:ring-offset-2 ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`;
   const maskStyle: React.CSSProperties | undefined = ctx && ctx.ok && ctx.maskUrl
     ? {
         WebkitMaskImage: `url(${ctx.maskUrl})`,
@@ -260,11 +602,12 @@ export function Positioner({
         <div>
           {bd && ctx && ctx.ok ? (
             <div
-              className="relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9]"
+              {...canvasInteractionProps}
+              className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
               style={{ width: PREVIEW_W, height: bd.pvH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={ctx.blankUrl} alt="" aria-hidden className="absolute inset-0 h-full w-full" />
+              <img src={ctx.blankUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
               <div className="absolute inset-0" style={maskStyle}>
                 <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -272,11 +615,19 @@ export function Positioner({
                     ref={imgRef}
                     src={cutout?.url ?? keepsake.imageUrl}
                     alt="your keepsake"
+                    draggable={false}
                     style={bdImgStyle}
                     onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
                   />
                 </div>
               </div>
+              {/* snap-to-centre guide flashes (drag only) */}
+              {dragging && snapAxis.x ? (
+                <div className="pointer-events-none absolute w-px bg-cinnamon/80" style={{ left: bd.qx + bd.qw / 2, top: bd.qy, height: bd.qh }} />
+              ) : null}
+              {dragging && snapAxis.y ? (
+                <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw }} />
+              ) : null}
               {/* labelled guides */}
               <div className="pointer-events-none absolute border border-dashed border-cinnamon/80" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }} />
               <span className="pointer-events-none absolute rounded-sm bg-cinnamon/90 px-1 py-px text-[9px] font-bold text-white" style={{ left: bd.qx + 3, top: bd.qy + 3 }}>
@@ -295,7 +646,8 @@ export function Positioner({
             </div>
           ) : (
             <div
-              className="relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9]"
+              {...canvasInteractionProps}
+              className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
               style={{ width: PREVIEW_W, height: previewH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -303,9 +655,13 @@ export function Positioner({
                 ref={imgRef}
                 src={cutout?.url ?? keepsake.imageUrl}
                 alt="your keepsake"
+                draggable={false}
                 style={imgStyle}
                 onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               />
+              {/* snap-to-centre guide flashes (drag only) */}
+              {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-cinnamon/80" /> : null}
+              {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
               {/* labelled print-edge + safe-area guides */}
               <div
                 className="pointer-events-none absolute border border-dashed border-cinnamon/70"
@@ -380,15 +736,58 @@ export function Positioner({
             </>
           ) : null}
 
-          <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Position</p>
+          <div className="mt-5 flex items-center justify-between">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Position</p>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={undo}
+                disabled={undoRef.current.length === 0}
+                aria-label="undo placement change"
+                className="relative rounded-full p-1.5 text-[#7A6A58] before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+              >
+                <Icon icon={IconArrowBackUp} size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={redo}
+                disabled={redoRef.current.length === 0}
+                aria-label="redo placement change"
+                className="relative rounded-full p-1.5 text-[#7A6A58] before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+              >
+                <Icon icon={IconArrowForwardUp} size={16} />
+              </button>
+            </div>
+          </div>
+          <p className="mt-1 text-[11px] text-[#9C8E7E]">drag the drawing to move it · pinch or slide to zoom · double-tap to fill</p>
           <div className="mt-2 space-y-3">
             <ZoomSlider
               fit={fitScale}
               value={zoomValue}
               onChange={(v) => update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })}
             />
-            <Slider label="Left / right" min={-1} max={1} step={0.05} value={tf.offsetX} onChange={(v) => update({ offsetX: v })} format={() => ''} />
-            <Slider label="Up / down" min={-1} max={1} step={0.05} value={tf.offsetY} onChange={(v) => update({ offsetY: v })} format={() => ''} />
+            <Slider
+              label="Left / right"
+              min={-1}
+              max={1}
+              step={0.05}
+              value={tf.offsetX}
+              onChange={(v) => update({ offsetX: v })}
+              format={() => ''}
+              disabled={slackNow.slackX === 0}
+              disabledHint="zoom in to move it sideways"
+            />
+            <Slider
+              label="Up / down"
+              min={-1}
+              max={1}
+              step={0.05}
+              value={tf.offsetY}
+              onChange={(v) => update({ offsetY: v })}
+              format={() => ''}
+              disabled={slackNow.slackY === 0}
+              disabledHint="zoom in to move it up or down"
+            />
             <button
               type="button"
               onClick={setRot}
@@ -507,6 +906,8 @@ function Slider({
   value,
   onChange,
   format,
+  disabled = false,
+  disabledHint,
 }: {
   label: string;
   min: number;
@@ -515,9 +916,12 @@ function Slider({
   value: number;
   onChange: (v: number) => void;
   format: (v: number) => string;
+  /** Honest disabling: at "fit" there is no pan slack, so the slider would do nothing. */
+  disabled?: boolean;
+  disabledHint?: string;
 }) {
   return (
-    <label className="flex items-center gap-2">
+    <label className={`flex items-center gap-2 ${disabled ? 'opacity-45' : ''}`} title={disabled ? disabledHint : undefined}>
       <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">{label}</span>
       <input
         type="range"
@@ -525,7 +929,8 @@ function Slider({
         max={max}
         step={step}
         value={value}
-        aria-label={label}
+        aria-label={disabled && disabledHint ? `${label} — ${disabledHint}` : label}
+        disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
         className="h-1.5 flex-1 accent-cinnamon"
       />
