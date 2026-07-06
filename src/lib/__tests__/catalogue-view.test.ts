@@ -4,7 +4,7 @@ import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { filterCatalogue, lineIdForSku, matchesQuery, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
 
 const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = false): CatalogueVariant => ({
-  id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault,
+  id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault, printWmm: 209, printHmm: 98,
 });
 const product = (key: string, opts: Partial<CatalogueProduct> & { variants: CatalogueVariant[] }): CatalogueProduct => ({
   key, label: opts.label ?? key, blurb: opts.blurb ?? null, description: null, specs: {},

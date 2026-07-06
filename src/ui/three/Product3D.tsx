@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { buildFrame, buildMug, paintPlacement } from './models';
+import { paintPlacement } from './models';
+import { buildProduct } from './builders';
 import type { PlacementTransform } from '@/lib/store';
 
 /**
@@ -19,26 +20,26 @@ import type { PlacementTransform } from '@/lib/store';
  * invisible to the accessibility tree).
  */
 
-export type Product3DKind = 'mug' | 'framedPrint';
-
 export interface Product3DProps {
-  kind: Product3DKind;
+  /** Product key — any SPINNABLE product (builders.ts dispatches the model). */
+  kind: string;
   /** Same-origin-safe image source (data: URL or CORS-enabled signed URL). */
   image: string;
   /** Fallback source if the primary taints the canvas (e.g. a signed URL without CORS). */
   fallbackImage?: string | null;
   placement: PlacementTransform;
-  /** Print area in mm (the wrap for the mug; the paper for the frame). */
+  /** The variant's print canvas in mm (from the catalogue payload). */
   printWmm: number;
   printHmm: number;
-  /** Frame colour name (framedPrint only): gold | black | white | natural. */
-  frameColour?: string;
+  /** The chosen variant attributes (colour drives the frame finish / blanket back;
+   * size drives the cushion shape). */
+  attributes?: Record<string, string>;
   className?: string;
 }
 
 export { webglAvailable } from './models';
 
-export default function Product3D({ kind, image, fallbackImage, placement, printWmm, printHmm, frameColour, className }: Product3DProps) {
+export default function Product3D({ kind, image, fallbackImage, placement, printWmm, printHmm, attributes, className }: Product3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -79,7 +80,8 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       const camera = new THREE.PerspectiveCamera(32, W / H, 1, 5000);
 
       const texture = new THREE.CanvasTexture(paintPlacement(img, printWmm, printHmm, placement));
-      const model = kind === 'mug' ? buildMug(texture, printWmm, printHmm) : buildFrame(texture, printWmm, printHmm, frameColour ?? 'gold');
+      const model = buildProduct(kind, texture, printWmm, printHmm, attributes ?? {});
+      if (!model) return setFailed(true);
       scene.add(model);
 
       // fit the camera to the model
@@ -148,7 +150,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
         renderer.domElement.remove();
       }
     };
-  }, [kind, image, fallbackImage, placement, printWmm, printHmm, frameColour]);
+  }, [kind, image, fallbackImage, placement, printWmm, printHmm, attributes]);
 
   if (failed) {
     return (

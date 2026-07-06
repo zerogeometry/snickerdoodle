@@ -13,6 +13,7 @@ import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
 import { lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
+import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image (contain)
@@ -27,13 +28,6 @@ const WallView = dynamic(() => import('@/ui/three/WallView'), {
   ssr: false,
   loading: () => <div className="flex h-80 w-full items-center justify-center text-xs text-[#9C8E7E]">setting the scene…</div>,
 });
-
-/** Print-area mm per 3D-capable variant (mirrors DEFS; display-only — the print
- * pipeline resolves its own server-side truth at order time). */
-const SPIN_MM: Record<string, Record<string, [number, number]>> = {
-  mug: { '11oz': [209, 98], '15oz': [217, 98] },
-  framedPrint: { '11×14″': [279, 356], '12×16″': [305, 406], '18×24″': [457, 610], '24×32″': [610, 813], '28×40″': [711, 1016] },
-};
 
 function webglOk(): boolean {
   try {
@@ -67,7 +61,7 @@ export default function CustomizePage() {
   const [canSpin, setCanSpin] = useState(false);
   const canWall = productKey === 'framedPrint';
   useEffect(() => {
-    setCanSpin(Boolean(SPIN_MM[productKey]) && webglOk());
+    setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
   }, [productKey]);
 
@@ -209,16 +203,16 @@ export default function CustomizePage() {
             </div>
           ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            {view === 'spin' && canSpin && previewImg ? (
+            {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
               <div className="h-80 w-full">
                 <Product3D
-                  kind={product.key as 'mug' | 'framedPrint'}
+                  kind={product.key}
                   image={previewImg}
                   fallbackImage={upload?.dataUrl ?? null}
                   placement={placement}
-                  printWmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[0]}
-                  printHmm={(SPIN_MM[product.key]?.[size ?? ''] ?? [200, 200])[1]}
-                  frameColour={colour ?? 'gold'}
+                  printWmm={variant.printWmm}
+                  printHmm={variant.printHmm}
+                  attributes={variant.attributes}
                 />
               </div>
             ) : view === 'wall' && canWall && previewImg ? (
@@ -227,8 +221,8 @@ export default function CustomizePage() {
                   image={previewImg}
                   fallbackImage={upload?.dataUrl ?? null}
                   placement={placement}
-                  printWmm={(SPIN_MM.framedPrint?.[size ?? ''] ?? [279, 356])[0]}
-                  printHmm={(SPIN_MM.framedPrint?.[size ?? ''] ?? [279, 356])[1]}
+                  printWmm={variant?.printWmm ?? 279}
+                  printHmm={variant?.printHmm ?? 356}
                   frameColour={colour ?? 'gold'}
                 />
               </div>

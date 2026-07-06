@@ -296,6 +296,11 @@ export interface CatalogueVariant {
   attributes: Record<string, string>;
   pricePence: number;
   isDefault: boolean;
+  /** The variant's print canvas in mm (from its print template) — display-only truth
+   * for previews (3D spin view, DPI hints). null for non-printable variants (gift wrap).
+   * The print pipeline still resolves its own server-side template at order time. */
+  printWmm: number | null;
+  printHmm: number | null;
 }
 export interface CatalogueProduct {
   key: string;
@@ -318,9 +323,11 @@ export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
     .select({
       key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
       vId: productVariants.id, vSku: productVariants.sku, vAttrs: productVariants.attributes, vPrice: productVariants.pricePence, vDefault: productVariants.isDefault, vSort: productVariants.sortOrder,
+      tWmm: printTemplates.printWidthMm, tHmm: printTemplates.printHeightMm,
     })
     .from(products)
     .innerJoin(productVariants, eq(productVariants.productId, products.id))
+    .leftJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
     .where(and(eq(products.active, true), eq(productVariants.active, true)))
     .orderBy(asc(products.sortOrder), asc(productVariants.sortOrder));
 
@@ -332,7 +339,7 @@ export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
-    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault });
+    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null });
     p.fromPence = Math.min(p.fromPence, r.vPrice);
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);
