@@ -42,7 +42,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r2';
+const RENDER_REV = 'r4'; // r4: LIGHT_FABRIC composites multiply, shade 0 (ink-on-fabric, no white box)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -377,7 +377,7 @@ async function renderFlat(args: {
   // it under the design — so the downscale must be a SEPARATE pipeline).
   const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .pipelineColourspace('scrgb')
-    .composite([{ input: designLayer, left: rect.x, top: rect.y, blend: 'over' }])
+    .composite([{ input: designLayer, left: rect.x, top: rect.y, blend: fx.blend }])
     .toColourspace('srgb')
     .toBuffer();
 

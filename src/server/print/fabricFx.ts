@@ -132,12 +132,20 @@ export function applyFabricFx(i: FabricFxInput): Buffer {
   return out;
 }
 
-/** Per-material fx intensities. Fabrics fold; paper barely textures; ceramic/gloss
- * keep their sheen but never warp the art. */
-export const MATERIAL_FX: Record<string, { disp: number; shade: number }> = {
-  LIGHT_FABRIC: { disp: 1, shade: 0.85 },
-  DARK_FABRIC: { disp: 1, shade: 0.85 },
-  PAPER: { disp: 0.15, shade: 0.35 },
-  CERAMIC: { disp: 0, shade: 0.55 },
-  GLOSS: { disp: 0, shade: 0.65 },
+/** Per-material fx intensities + final composite blend. Fabrics fold; paper barely
+ * textures; ceramic/gloss keep their sheen but never warp the art.
+ *
+ * LIGHT_FABRIC composites MULTIPLY: ink on a light garment prints with no white
+ * underbase, so the design's white background vanishes into the fabric and the ink
+ * is modulated by the blank's REAL folds showing through — the physically honest
+ * DTG/sublimation-on-light model. Multiply carries ALL of the blank's shading, so
+ * the re-applied shade must be ZERO — any residue double-darkens the design's white
+ * in the blank's shadow regions and reads as a faint box around the art. DARK_FABRIC
+ * keeps `over`: dark garments print a white underbase, which multiply cannot model. */
+export const MATERIAL_FX: Record<string, { disp: number; shade: number; blend: 'over' | 'multiply' }> = {
+  LIGHT_FABRIC: { disp: 1, shade: 0, blend: 'multiply' },
+  DARK_FABRIC: { disp: 1, shade: 0.85, blend: 'over' },
+  PAPER: { disp: 0.15, shade: 0.35, blend: 'over' },
+  CERAMIC: { disp: 0, shade: 0.55, blend: 'over' },
+  GLOSS: { disp: 0, shade: 0.65, blend: 'over' },
 };

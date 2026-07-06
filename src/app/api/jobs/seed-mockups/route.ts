@@ -34,8 +34,8 @@ import { setMockupTemplate } from '@/server/print/templates';
  *     shows the front band at true print HEIGHT scale, width unlocked (the Studio positioner
  *     remains exact on the full 209×98mm wrap). PERSPECTIVE tier will close this.
  *
- * Products without a suitable blank (storybook, tees, bodysuit, card, calendar) are skipped
- * and keep the SVG tile until a blank is authored.
+ * Products without any blank (giftWrap) are skipped and keep the SVG tile. Garments (tees,
+ * bodysuit), the card and the storybook use DERIVED/synthetic flat-lays until real photography.
  */
 
 const ROOT = path.join(process.cwd(), '.prodigi-assets', 'blanks');
@@ -88,13 +88,22 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'prodigi-christmas-sack-blank-asset/Prodigi-Christmas-Sack blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-physical', mask: true, productWidthMm: 483, bottomInsetFrac: 0.06 };
     case 'apron': // chest-to-hem centre panel; aspect locked to the print canvas, offsets pending official spec
       return { file: 'prodigi-apron-blank-asset/Prodigi-Apron-blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.24, y0: 0.38, x1: 0.76, y1: 0.92 } };
+    // Garments: interim SYNTHETIC cotton flat-lays (scripts/make-garment-blanks.mjs) until real
+    // Prodigi/own photography. The child's drawing lands on the CHEST panel, aspect-locked to the
+    // garment's true print canvas; LIGHT_FABRIC lets the Tier-B fx make the art follow the baked
+    // folds. No mask (the chest panel sits well inside the light jersey — same reasoning as the mug).
+    case 'kidsTee':
+    case 'adultTee':
+      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.60 } };
+    case 'babyBodysuit':
+      return { file: 'derived/bodysuit-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.58 } };
     case 'mug': // cylinder: a near-square decal CENTRED on the visible front face (founder call:
       // clarity over wrap fidelity on the tile; the Studio positioner stays exact on the wrap).
       // NO mask: the white body reads as background locally (white-on-light-grey), so the
       // silhouette bites into the decal — and the panel sits fully inside the body anyway.
       return { file: 'prodigi-11oz-mug-blank-asset/Prodigi 11oz Mug blank.png', material: 'CERAMIC', register: 'band', mask: false, region: { x0: 0.11, y0: 0.25, x1: 0.57, y1: 0.75 } };
     default:
-      return null; // storybook, kidsTee, adultTee, babyBodysuit, card, calendar, giftWrap → keep SVG
+      return null; // giftWrap (no print) → keep SVG
   }
 }
 
