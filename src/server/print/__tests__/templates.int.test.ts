@@ -18,6 +18,9 @@ describe.skipIf(!DB || !S3)('setMockupTemplate — authoring path (integration)'
   let client: ReturnType<typeof postgres>;
   let db: DbHandle;
   let variantId = '';
+  // Snapshot of the mug's REAL mockup template — restored verbatim so the suite never
+  // wipes the live catalogue's photoreal mug for the running dev server.
+  let realTpl: { blankObjectId: string | null; printQuad: [number, number][] | null; maskObjectId: string | null; materialClass: 'PAPER' | 'LIGHT_FABRIC' | 'DARK_FABRIC' | 'CERAMIC' | 'GLOSS'; templateVersion: number } | undefined;
   const keys: string[] = [];
   const taIds: string[] = [];
 
@@ -27,11 +30,21 @@ describe.skipIf(!DB || !S3)('setMockupTemplate — authoring path (integration)'
     await seedCatalogue(db);
     const [mug] = await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'));
     variantId = mug!.id;
+    [realTpl] = await db
+      .select({ blankObjectId: printTemplates.blankObjectId, printQuad: printTemplates.printQuad, maskObjectId: printTemplates.maskObjectId, materialClass: printTemplates.materialClass, templateVersion: printTemplates.templateVersion })
+      .from(printTemplates)
+      .where(eq(printTemplates.variantId, variantId));
   });
 
   afterAll(async () => {
-    // Reset the shared variant's mockup template + drop the test blanks.
-    if (variantId) await db.update(printTemplates).set({ blankObjectId: null, printQuad: null, materialClass: 'PAPER', templateVersion: 1 }).where(eq(printTemplates.variantId, variantId)).catch(() => {});
+    // RESTORE the mug's REAL mockup template (never null it), then drop the test blanks.
+    if (variantId && realTpl) {
+      await db
+        .update(printTemplates)
+        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: realTpl.templateVersion })
+        .where(eq(printTemplates.variantId, variantId))
+        .catch(() => {});
+    }
     for (const id of taIds) await db.delete(templateAssets).where(eq(templateAssets.id, id)).catch(() => {});
     for (const k of keys) await deleteObject(k).catch(() => {});
     await client.end();

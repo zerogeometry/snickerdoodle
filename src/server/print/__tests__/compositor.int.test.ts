@@ -28,6 +28,9 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
   let ids: SeededIds;
   let variantId = '';
   let blankAssetId = '';
+  // The REAL mockup template of the shared framedPrint variant, snapshotted so the suite
+  // restores it verbatim — otherwise a test run wipes the live catalogue's photoreal mockup.
+  let realTpl: { blankObjectId: string | null; printQuad: [number, number][] | null; maskObjectId: string | null; materialClass: 'PAPER' | 'LIGHT_FABRIC' | 'DARK_FABRIC' | 'CERAMIC' | 'GLOSS'; templateVersion: number } | undefined;
   const designAssetIds: string[] = [];
   const keys: string[] = [];
 
@@ -38,6 +41,11 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     await seedCatalogue(db);
     const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     variantId = v!.id;
+    // Snapshot the REAL template BEFORE we overwrite it with the test blank.
+    [realTpl] = await db
+      .select({ blankObjectId: printTemplates.blankObjectId, printQuad: printTemplates.printQuad, maskObjectId: printTemplates.maskObjectId, materialClass: printTemplates.materialClass, templateVersion: printTemplates.templateVersion })
+      .from(printTemplates)
+      .where(eq(printTemplates.variantId, variantId));
 
     // Brand-safe NON-child blank in template_assets + wire the variant's mockup template.
     const buf = await blankPhoto();
@@ -53,8 +61,15 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
   });
 
   afterAll(async () => {
-    // Reset the shared variant's mockup template, then drop the blank + design assets.
-    await db.update(printTemplates).set({ blankObjectId: null, printQuad: null, templateVersion: 1 }).where(eq(printTemplates.variantId, variantId)).catch(() => {});
+    // RESTORE the shared variant's REAL mockup template (never null it — that wipes the
+    // live catalogue's photoreal mockup for the running dev server), then drop test assets.
+    if (realTpl) {
+      await db
+        .update(printTemplates)
+        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: realTpl.templateVersion })
+        .where(eq(printTemplates.variantId, variantId))
+        .catch(() => {});
+    }
     if (blankAssetId) await db.delete(templateAssets).where(eq(templateAssets.id, blankAssetId)).catch(() => {});
     for (const id of designAssetIds) {
       const objs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, id));
