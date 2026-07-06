@@ -11,7 +11,7 @@ import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
-import { detectOpaqueBg, toast, useUpload } from '@/lib/store';
+import { detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -42,8 +42,13 @@ export default function StartCreatingPage() {
   /** Set the upload, then detect whether its background is opaque (drives the
    * "remove background" nudge — only shown when removing would actually do something). */
   const applyUpload = (dataUrl: string, name: string) => {
-    setUpload({ dataUrl, name });
-    void detectOpaqueBg(dataUrl, name).then(setOpaqueBg);
+    // Normalise oversized uploads BEFORE they reach the store/ingest (a big phone photo
+    // or AI render would otherwise 413 the ingest server action and silently break every
+    // mockup). Best-effort: falls back to the original on any hiccup.
+    void normalizeUpload(dataUrl, name).then(({ dataUrl: d, name: n }) => {
+      setUpload({ dataUrl: d, name: n });
+      void detectOpaqueBg(d, n).then(setOpaqueBg);
+    });
   };
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {

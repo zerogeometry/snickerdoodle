@@ -72,6 +72,68 @@ export function detectOpaqueBg(dataUrl: string, name: string): Promise<boolean> 
   });
 }
 
+// The ingest server action has a 20MB body cap (next.config). A modern phone photo or
+// an AI-generated render can exceed it → a 413 that leaves the upload with no assetId,
+// so every mockup silently falls back to the placeholder. Normalise BEFORE ingest:
+// cap the longest edge (still ample for print — the DPI gate + tiered upscale cover the
+// largest products), and re-encode heavy OPAQUE images as JPEG (a 20MB photo-PNG becomes
+// ~1MB); transparency stays PNG so cut-outs and the bg-remove flow are untouched.
+const MAX_UPLOAD_EDGE = 4500; // px — 15in at 300dpi; the biggest frame upscales gracefully
+const REENCODE_BYTES = 8_000_000; // re-encode anything heavier than this
+
+/** Best-effort client-side normalise. On any failure returns the input unchanged —
+ * a normalise problem must never block an upload. */
+export function normalizeUpload(dataUrl: string, name: string): Promise<{ dataUrl: string; name: string }> {
+  const approxBytes = dataUrl.length * 0.75; // base64 → bytes
+  const looksPng = /\.png$/i.test(name) || dataUrl.startsWith('data:image/png');
+  return new Promise((resolve) => {
+    const done = (d: string, n: string) => resolve({ dataUrl: d, name: n });
+    const img = new Image();
+    img.onerror = () => done(dataUrl, name);
+    img.onload = () => {
+      try {
+        const longest = Math.max(img.width, img.height);
+        if (longest <= MAX_UPLOAD_EDGE && approxBytes <= REENCODE_BYTES) return done(dataUrl, name); // small original — leave it
+        const scale = Math.min(1, MAX_UPLOAD_EDGE / longest);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return done(dataUrl, name);
+        ctx.drawImage(img, 0, 0, w, h);
+        // Detect transparency on a small scan (only PNGs can carry it).
+        let alpha = false;
+        if (looksPng) {
+          const s = Math.min(1, 220 / Math.max(w, h));
+          const sw = Math.max(1, Math.round(w * s));
+          const sh = Math.max(1, Math.round(h * s));
+          const tmp = document.createElement('canvas');
+          tmp.width = sw;
+          tmp.height = sh;
+          const tctx = tmp.getContext('2d');
+          if (tctx) {
+            tctx.drawImage(img, 0, 0, sw, sh);
+            const { data } = tctx.getImageData(0, 0, sw, sh);
+            for (let i = 3; i < data.length; i += 4)
+              if (data[i]! < 250) {
+                alpha = true;
+                break;
+              }
+          }
+        }
+        const base = name.replace(/\.[^.]+$/, '') || 'drawing';
+        if (alpha) done(canvas.toDataURL('image/png'), `${base}.png`);
+        else done(canvas.toDataURL('image/jpeg', 0.92), `${base}.jpg`);
+      } catch {
+        done(dataUrl, name);
+      }
+    };
+    img.src = dataUrl;
+  });
+}
+
 // ── basket ───────────────────────────────────────────────────────────────────
 export type PlacementTransform = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
 export type BasketItem = {
