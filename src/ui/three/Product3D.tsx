@@ -49,6 +49,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
     let disposed = false;
     let renderer: THREE.WebGLRenderer | null = null;
     let controls: OrbitControls | null = null;
+    let cleanupResize: (() => void) | null = null;
     let raf = 0;
 
     const loadImg = (src: string) =>
@@ -84,12 +85,16 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       if (!model) return setFailed(true);
       scene.add(model);
 
-      // fit the camera to the model
+      // fit the camera to the model — near/far scale with it (a large blanket is
+      // 1500mm; a fixed far plane would clip it when zoomed out to maxDistance)
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const maxDim = Math.max(size.x, size.y, size.z);
       const dist = maxDim / (2 * Math.tan((camera.fov * Math.PI) / 360)) + maxDim * 0.35;
       camera.position.set(0, maxDim * 0.08, dist);
+      camera.near = Math.max(0.5, maxDim / 200);
+      camera.far = (dist + maxDim) * 3;
+      camera.updateProjectionMatrix();
 
       // warm, soft studio light
       scene.add(new THREE.HemisphereLight('#fffdf6', '#c9bda9', 1.1));
@@ -123,6 +128,20 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       // Always render on interaction too: in a background/throttled tab rAF never
       // fires, and reduced-motion opts out of the loop entirely — 'change' covers both.
       controls.addEventListener('change', render);
+
+      // Track the host's size (orientation change, responsive relayout) — the canvas
+      // is otherwise frozen at its mount-time dimensions.
+      const ro = new ResizeObserver(() => {
+        if (!renderer || disposed) return;
+        const w = host.clientWidth || W;
+        const h = host.clientHeight || H;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        render();
+      });
+      ro.observe(host);
+      cleanupResize = () => ro.disconnect();
       if (!reducedMotion) {
         const loop = () => {
           if (disposed) return;
@@ -144,6 +163,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      cleanupResize?.();
       controls?.dispose();
       if (renderer) {
         renderer.dispose();

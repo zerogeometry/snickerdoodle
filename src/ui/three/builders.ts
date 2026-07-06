@@ -161,6 +161,7 @@ function buildCushion(texture: THREE.Texture, printWmm: number, size: string): T
     plateau: printWmm * 0.3,
     fold: (x, y) => printWmm * 0.006 * Math.sin(x * (24 / printWmm)) * Math.sin(y * (20 / printWmm)),
     faceCoverUV: true,
+    faceCoverAspect: 1, // all cushion canvases are square — cover-crops the heart's 1.106 bbox
   });
   const group = new THREE.Group();
   group.add(new THREE.Mesh(body.front, printedSurface(texture, { roughness: 0.92, sheen: 0.4 })), new THREE.Mesh(body.back, cotton('#f4efe6')));
@@ -178,6 +179,7 @@ function buildBlanket(texture: THREE.Texture, wMm: number, hMm: number, colour: 
     // draped waves along the length + a soft diagonal — the fleece character
     fold: (x, y) => 6 * Math.sin(y * 0.012) + 2.5 * Math.sin(x * 0.02 + y * 0.008),
     faceCoverUV: true,
+    faceCoverAspect: wMm / hMm, // equals the bbox aspect — explicit, not load-bearing
   });
   const group = new THREE.Group();
   group.add(new THREE.Mesh(body.front, printedSurface(texture, { roughness: 1, sheen: 0.7 })), new THREE.Mesh(body.back, fleece(back[colour] ?? back.white!)));
@@ -229,7 +231,14 @@ function buildApron(texture: THREE.Texture, printWmm: number, printHmm: number):
   const group = new THREE.Group();
   const mat = cotton('#f7f4ed');
   group.add(new THREE.Mesh(body.front, mat), new THREE.Mesh(body.back, mat));
-  const rect = containRect({ x: 115, y: 170, w: 230, h: 350 }, printWmm, printHmm);
+  // The seeder's apron region fractions {0.24–0.76, 0.38–0.92} applied to THIS
+  // silhouette's bbox — same registration constants, same relative placement.
+  const b = polygonBounds([outline]);
+  const rect = containRect(
+    { x: b.x0 + 0.24 * (b.x1 - b.x0), y: b.y0 + 0.38 * (b.y1 - b.y0), w: 0.52 * (b.x1 - b.x0), h: 0.54 * (b.y1 - b.y0) },
+    printWmm,
+    printHmm,
+  );
   const patch = new THREE.Mesh(buildPrintPatch(body, rect), inkOnFabric(texture));
   patch.renderOrder = 1;
   group.add(patch);

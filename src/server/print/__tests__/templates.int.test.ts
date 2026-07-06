@@ -38,10 +38,15 @@ describe.skipIf(!DB || !S3)('setMockupTemplate — authoring path (integration)'
 
   afterAll(async () => {
     // RESTORE the mug's REAL mockup template (never null it), then drop the test blanks.
+    // The version is NOT restored verbatim: mockup derivatives are write-once and keyed
+    // by version, so rewinding would let a mockup cached against the TEST blank (e.g. a
+    // dev-server tab composing during the run) collide with the next real authoring
+    // bump. Restoring at (post-test version + 1) keeps every future cache key fresh.
     if (variantId && realTpl) {
+      const [cur] = await db.select({ v: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, variantId));
       await db
         .update(printTemplates)
-        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: realTpl.templateVersion })
+        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: (cur?.v ?? realTpl.templateVersion) + 1 })
         .where(eq(printTemplates.variantId, variantId))
         .catch(() => {});
     }

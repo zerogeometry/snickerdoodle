@@ -48,7 +48,7 @@ type Plan = { rotate?: 90 } & (
   | { file: string; material: Material; register: 'window-cover' }
   | { file: string; material: Material; register: 'face-cover'; mask: boolean }
   | { file: string; material: Material; register: 'panel-physical'; mask: boolean; productWidthMm: number; bottomInsetFrac: number }
-  | { file: string; material: Material; register: 'panel-contain'; mask: boolean; region: Box }
+  | { file: string; material: Material; register: 'panel-contain'; mask: boolean; region: Box; frame?: 'bbox' | 'canvas' }
   | { file: string; material: Material; register: 'band'; mask: boolean; region: Box }
 );
 
@@ -94,9 +94,9 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     // folds. No mask (the chest panel sits well inside the light jersey — same reasoning as the mug).
     case 'kidsTee':
     case 'adultTee':
-      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.60 } };
+      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.60 } };
     case 'babyBodysuit':
-      return { file: 'derived/bodysuit-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.58 } };
+      return { file: 'derived/bodysuit-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.58 } };
     case 'mug': // cylinder: a near-square decal CENTRED on the visible front face (founder call:
       // clarity over wrap fidelity on the tile; the Studio positioner stays exact on the wrap).
       // NO mask: the white body reads as background locally (white-on-light-grey), so the
@@ -298,11 +298,17 @@ export async function POST(req: Request): Promise<Response> {
         const y1 = (det.bbox.y1 - p.bottomInsetFrac * (det.bbox.y1 - det.bbox.y0)) * d.H;
         quad = asQuad({ x0: (cx - w / 2) / d.W, y0: (y1 - h) / d.H, x1: (cx + w / 2) / d.W, y1: y1 / d.H });
       } else if (p.register === 'panel-contain') {
-        const b = det.bbox;
-        const region: Box = {
-          x0: b.x0 + p.region.x0 * (b.x1 - b.x0), y0: b.y0 + p.region.y0 * (b.y1 - b.y0),
-          x1: b.x0 + p.region.x1 * (b.x1 - b.x0), y1: b.y0 + p.region.y1 * (b.y1 - b.y0),
-        };
+        // frame 'canvas': the region is AUTHORED in full-canvas fractions (our synthetic
+        // garment blanks declare their chest panel in the blank's own coordinates — the
+        // same constants the 3D builders use, so photo and spin views agree by
+        // construction). Default 'bbox': fractions of the detected product extent
+        // (real photography, where the product's position in frame isn't authored).
+        const region: Box = p.frame === 'canvas'
+          ? p.region
+          : {
+              x0: det.bbox.x0 + p.region.x0 * (det.bbox.x1 - det.bbox.x0), y0: det.bbox.y0 + p.region.y0 * (det.bbox.y1 - det.bbox.y0),
+              x1: det.bbox.x0 + p.region.x1 * (det.bbox.x1 - det.bbox.x0), y1: det.bbox.y0 + p.region.y1 * (det.bbox.y1 - det.bbox.y0),
+            };
         quad = asQuad(aspectRect(region, d.W, d.H, printAspect, 'contain'));
       } else {
         // band (mug): the stated region of the bbox, aspect deliberately unlocked (cylinder).

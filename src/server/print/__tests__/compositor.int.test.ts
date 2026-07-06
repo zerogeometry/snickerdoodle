@@ -63,10 +63,15 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
   afterAll(async () => {
     // RESTORE the shared variant's REAL mockup template (never null it — that wipes the
     // live catalogue's photoreal mockup for the running dev server), then drop test assets.
+    // templateVersion is NOT restored verbatim: mockup derivatives are write-once and
+    // keyed by version, so rewinding lets a mockup cached against the TEST blank (a dev
+    // tab composing mid-suite) collide with the next real authoring bump. Restore at a
+    // version ABOVE anything this suite minted so future cache keys stay fresh.
     if (realTpl) {
+      const [cur] = await db.select({ v: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, variantId));
       await db
         .update(printTemplates)
-        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: realTpl.templateVersion })
+        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: Math.max(cur?.v ?? 0, 7, realTpl.templateVersion) + 1 })
         .where(eq(printTemplates.variantId, variantId))
         .catch(() => {});
     }
@@ -284,6 +289,39 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     expect(Math.abs(rTop - 232) + Math.abs(gTop - 226) + Math.abs(bTop - 214)).toBeLessThan(45);
     const [rMid] = at(300, 400); // centre → the red design
     expect(rMid).toBeGreaterThan(150);
+  });
+
+  it('LIGHT_FABRIC composites MULTIPLY: design white vanishes into the fabric, ink darkens it', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    // A white design with a dark ink square in the middle (a drawing on white paper).
+    const inkSquare = await sharp({ create: { width: 400, height: 500, channels: 3, background: { r: 40, g: 35, b: 30 } } }).png().toBuffer();
+    const inkDesign = await sharp({ create: { width: 1200, height: 1500, channels: 3, background: '#ffffff' } })
+      .composite([{ input: inkSquare, left: 400, top: 500 }])
+      .png()
+      .toBuffer();
+    const r = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: inkDesign, keptInHome: true });
+    keys.push(r.key);
+    designAssetIds.push(r.assetId);
+    await db.update(printTemplates).set({ materialClass: 'LIGHT_FABRIC', templateVersion: 8 }).where(eq(printTemplates.variantId, variantId));
+    try {
+      const res = await composeMockup(db, sam, { assetId: r.assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, size: 'zoom' });
+      const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+      const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+      const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+      const at = (x: number, y: number) => {
+        const i = (y * info.width! + x) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      };
+      // Inside the print area where the design is WHITE → the blank's grey fabric shows
+      // through (multiply identity), NOT an opaque white panel.
+      const [rW, gW, bW] = at(150, 200);
+      expect(Math.abs(rW - 232) + Math.abs(gW - 226) + Math.abs(bW - 214)).toBeLessThan(45);
+      // The ink square → clearly darker than the fabric.
+      const [rI] = at(300, 380);
+      expect(rI).toBeLessThan(120);
+    } finally {
+      await db.update(printTemplates).set({ materialClass: 'PAPER', templateVersion: 1 }).where(eq(printTemplates.variantId, variantId));
+    }
   });
 
   it('falls back (bounded memory, no OOM) for an extreme-aspect design', async () => {

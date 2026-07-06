@@ -131,6 +131,12 @@ export interface SoftBodyOptions {
   /** Map the FRONT surface's UVs over the silhouette bbox (the 2D face-cover
    * registration) so a print texture covers the face; otherwise UVs are zero. */
   faceCoverUV?: boolean;
+  /** The print canvas aspect (w/h) for faceCoverUV. When the silhouette bbox aspect
+   * differs (heart cushion: bbox 1.106 vs square canvas), a plain bbox-linear map
+   * would stretch the art non-uniformly — this switches to an aspect-locked COVER
+   * map (uniform mm-per-texel, overflow cropped), matching the 2D seeder's
+   * face-cover registration and the real print. */
+  faceCoverAspect?: number;
 }
 
 export interface SoftBody {
@@ -200,6 +206,12 @@ export function buildSoftBody(opts: SoftBodyOptions): SoftBody {
     }
   }
 
+  // faceCover UV frame: bbox-linear by default; aspect-locked COVER when the print
+  // canvas aspect is given (uniform scale, overflow cropped — the print's own crop).
+  const aspect = opts.faceCoverAspect;
+  const texW = aspect ? Math.max(bw, bh * aspect) : bw;
+  const texH = aspect ? texW / aspect : bh;
+
   const makeSurface = (sign: 1 | -1, depth: number): THREE.BufferGeometry => {
     const positions: number[] = [];
     const uvs: number[] = [];
@@ -209,7 +221,7 @@ export function buildSoftBody(opts: SoftBodyOptions): SoftBody {
       if (map[i] === -1) {
         const z = sign === 1 ? pz[i]! : -(pz[i]! * (depth / (puff || 1)));
         positions.push(px[i]! - cx, cy - py[i]!, z);
-        uvs.push((px[i]! - bounds.x0) / bw, 1 - (py[i]! - bounds.y0) / bh);
+        uvs.push(0.5 + (px[i]! - cx) / texW, 0.5 - (py[i]! - cy) / texH);
         map[i] = positions.length / 3 - 1;
       }
       return map[i]!;

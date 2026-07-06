@@ -52,6 +52,7 @@ describe('softBody engine', () => {
     const [cx, cy] = body.centre;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i) + cx; // back to blank space
       const y = cy - pos.getY(i);
@@ -59,13 +60,37 @@ describe('softBody engine', () => {
       minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       // the patch vertex lies on the body's own height function + the lift
       expect(Math.abs(pos.getZ(i) - (body.heightAt(x, y) + lift))).toBeLessThan(1e-6);
-      expect(uv.getX(i)).toBeGreaterThanOrEqual(0);
-      expect(uv.getX(i)).toBeLessThanOrEqual(1);
+      minU = Math.min(minU, uv.getX(i)); maxU = Math.max(maxU, uv.getX(i));
+      minV = Math.min(minV, uv.getY(i)); maxV = Math.max(maxV, uv.getY(i));
     }
     expect(minX).toBeCloseTo(rect.x, 6);
     expect(maxX).toBeCloseTo(rect.x + rect.w, 6);
     expect(minY).toBeCloseTo(rect.y, 6);
     expect(maxY).toBeCloseTo(rect.y + rect.h, 6);
+    // BOTH UV axes span exactly [0,1] over the rect — the painted canvas maps 1:1
+    expect(minU).toBeCloseTo(0, 6);
+    expect(maxU).toBeCloseTo(1, 6);
+    expect(minV).toBeCloseTo(0, 6);
+    expect(maxV).toBeCloseTo(1, 6);
+  });
+
+  it('faceCoverAspect keeps mm-per-texel UNIFORM (no stretch on a heart-shaped bbox)', () => {
+    // a bbox whose aspect (2:1) differs from the square canvas — bbox-linear UVs
+    // would stretch the art 2×; cover UVs must stay uniform and crop instead.
+    const wide: [number, number][] = [[0, 0], [200, 0], [200, 100], [0, 100]];
+    const body = buildSoftBody({ outline: wide, puff: 5, faceCoverUV: true, faceCoverAspect: 1 });
+    const pos = body.front.getAttribute('position');
+    const uv = body.front.getAttribute('uv');
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (let i = 0; i < pos.count; i++) {
+      minU = Math.min(minU, uv.getX(i)); maxU = Math.max(maxU, uv.getX(i));
+      minV = Math.min(minV, uv.getY(i)); maxV = Math.max(maxV, uv.getY(i));
+    }
+    // mm-per-uv equal on both axes: 200mm spans ΔU, 100mm spans ΔV → ΔU = 2·ΔV… with a
+    // square canvas cover-fit over a 200×100 bbox, U spans [0,1] and V the middle half.
+    expect(maxU - minU).toBeCloseTo(1, 5);
+    expect(maxV - minV).toBeCloseTo(0.5, 5);
+    expect((200 / (maxU - minU)) / (100 / (maxV - minV))).toBeCloseTo(1, 5); // uniform scale
   });
 
   it('containRect is the aspect-locked panel-contain the seeder uses', () => {
