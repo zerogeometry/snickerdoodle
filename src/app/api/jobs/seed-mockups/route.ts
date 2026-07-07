@@ -633,9 +633,17 @@ export async function POST(req: Request): Promise<Response> {
     const tin = await buildTinView(TIN_DIR);
     if (tin) {
       for (const r of rows.filter((row) => row.key === 'jigsaw')) {
+        // Orient the lid print to the VARIANT so the tin shows the SAME crop as the puzzle: a
+        // PORTRAIT jigsaw gets a portrait design canvas (its portrait crop sits upright on the
+        // lid — the compositor's transpose-fit leaves it un-rotated), while a LANDSCAPE jigsaw's
+        // landscape crop rotates −90° to fill the portrait-in-photo lid.
+        const portrait = ((r.attrs as Record<string, string> | null) ?? {}).orientation === 'portrait';
         await setMockupView(db, {
           variantId: r.id, view: 'tin', blank: tin.blank, contentType: 'image/png',
-          printQuad: tin.quad, printWidthPx: TIN_LID_PX.w, printHeightPx: TIN_LID_PX.h, materialClass: 'PAPER',
+          printQuad: tin.quad,
+          printWidthPx: portrait ? TIN_LID_PX.h : TIN_LID_PX.w,
+          printHeightPx: portrait ? TIN_LID_PX.w : TIN_LID_PX.h,
+          materialClass: 'PAPER',
         });
         authoredViews++;
       }
