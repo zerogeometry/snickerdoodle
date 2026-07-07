@@ -9,7 +9,8 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { composeMockup } from '@/server/print/compositor';
-import { deleteObject } from '@/storage';
+import { renderPrintFile } from '@/server/print/render';
+import { deleteObject, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
 /**
@@ -101,5 +102,30 @@ describe.skipIf(!DB || !S3)('cover-fill keeps the source aspect (circle stays ro
     expect(dW).toBeGreaterThan(100); // the circle is actually there, at real size
     expect(dW / dH).toBeGreaterThan(0.98);
     expect(dW / dH).toBeLessThan(1.02);
+  }, 120_000);
+
+  it('a LANDSCAPE frame ships a PORTRAIT print file (Prodigi fixed-portrait spec), art rotated inside', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    // print-resolution source (the shared circle asset is deliberately small)
+    const big = await sharp(
+      Buffer.from('<svg width="4400" height="3400"><rect width="4400" height="3400" fill="#10265c"/><circle cx="2200" cy="1700" r="1200" fill="#ffffff"/></svg>'),
+    ).png().toBuffer();
+    const bigAsset = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: big, keptInHome: true });
+    const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint-1114-gold-landscape'));
+    expect(v).toBeTruthy();
+    const res = await renderPrintFile(db, sam, { assetId: bigAsset.assetId, variantId: v!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    // the finished file is PORTRAIT px (Prodigi's fixed-portrait frame spec)...
+    expect(res.heightPx).toBeGreaterThan(res.widthPx);
+    const buf = await getObjectBytes(res.key);
+    const meta = await sharp(buf).metadata();
+    expect(meta.width).toBe(res.widthPx);
+    expect(meta.height).toBe(res.heightPx);
+    // ...and it matches the 11×14 portrait canvas (279×356mm + 3mm bleed @300dpi)
+    expect(Math.abs(meta.width! - Math.round(((279 + 6) / 25.4) * 300))).toBeLessThanOrEqual(2);
+    expect(Math.abs(meta.height! - Math.round(((356 + 6) / 25.4) * 300))).toBeLessThanOrEqual(2);
+    // cleanup the big asset (cascades its derivatives)
+    const objs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, bigAsset.assetId));
+    for (const o of objs) await deleteObject(o.key).catch(() => {});
+    await db.delete(schema.assets).where(eq(schema.assets.id, bigAsset.assetId)).catch(() => {});
   }, 120_000);
 });

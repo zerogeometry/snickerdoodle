@@ -50,6 +50,8 @@ export default function CustomizePage() {
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
+  const [orientation, setOrientation] = useState<string>('portrait');
+  const [orientationTouched, setOrientationTouched] = useState(false);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
@@ -76,6 +78,7 @@ export default function CustomizePage() {
     const def = product.variants.find((v) => v.isDefault) ?? product.variants[0]!;
     setSize(def.attributes.size ?? null);
     setColour(def.attributes.colour ?? null);
+    setOrientation(def.attributes.orientation ?? 'portrait');
   }, [product]);
 
   // Colours actually available for the selected size — the matrix can be SPARSE (e.g.
@@ -111,16 +114,32 @@ export default function CustomizePage() {
     });
   }, [colour, coloursForSize]);
 
-  // Exact match for the chosen size+colour — NO silent fallback to the default, which
-  // would order + charge the WRONG variant. null ⇒ the combination isn't available.
+  // Orientation: auto-defaults to the shape of the uploaded image the first time
+  // (a wide drawing suggests a landscape frame); the shopper can override any time.
+  useEffect(() => {
+    if (!product || product.orientations.length === 0 || orientationTouched || !upload?.dataUrl) return;
+    const img = new window.Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setOrientation(img.naturalWidth > img.naturalHeight ? 'landscape' : 'portrait');
+      }
+    };
+    img.src = upload.dataUrl;
+  }, [product, upload?.dataUrl, orientationTouched]);
+
+  // Exact match for the chosen size+colour+orientation — NO silent fallback to the
+  // default, which would order + charge the WRONG variant. null ⇒ not available.
   const variant = useMemo(() => {
     if (!product) return null;
     return (
       product.variants.find(
-        (v) => (product.sizes.length === 0 || v.attributes.size === size) && (product.colours.length === 0 || v.attributes.colour === colour),
+        (v) =>
+          (product.sizes.length === 0 || v.attributes.size === size) &&
+          (product.colours.length === 0 || v.attributes.colour === colour) &&
+          (product.orientations.length === 0 || v.attributes.orientation === orientation),
       ) ?? null
     );
-  }, [product, size, colour]);
+  }, [product, size, colour, orientation]);
 
   if (products && !product) {
     return (
@@ -164,7 +183,7 @@ export default function CustomizePage() {
       toast('that size + colour isn’t available — pick another');
       return;
     }
-    const sub = [variant.attributes.size, variant.attributes.colour].filter(Boolean).join(' · ') || undefined;
+    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join(' · ') || undefined;
     add({
       id: lineIdForSku(variant.sku),
       name: product.label,
@@ -277,7 +296,10 @@ export default function CustomizePage() {
                 >
                   {coloursForSize.map((c) => {
                     const cv = product.variants.find(
-                      (v) => (product.sizes.length === 0 || v.attributes.size === size) && v.attributes.colour === c,
+                      (v) =>
+                        (product.sizes.length === 0 || v.attributes.size === size) &&
+                        v.attributes.colour === c &&
+                        (product.orientations.length === 0 || v.attributes.orientation === orientation),
                     );
                     if (!cv) return null;
                     return (
@@ -331,6 +353,17 @@ export default function CustomizePage() {
           <p className="text-[11px] text-[#9C8E7E]">free tracked delivery</p>
 
           {product.sizes.length > 0 ? <Picker label="Size" options={product.sizes} value={size} onChange={setSize} /> : null}
+          {product.orientations.length > 0 ? (
+            <Picker
+              label="Orientation"
+              options={product.orientations}
+              value={orientation}
+              onChange={(o) => {
+                setOrientationTouched(true);
+                setOrientation(o);
+              }}
+            />
+          ) : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}
 
           {/* collapsible, scrollable-in-container description */}

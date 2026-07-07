@@ -2,7 +2,7 @@ import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { printTemplates, storageObjects } from '@/db/schema';
+import { printTemplates, productVariants, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
@@ -67,6 +67,13 @@ export async function renderPrintFile(
     throw new Error(`source too low-res for this product (would need ${assess.upscaleFactor.toFixed(1)}× upscale)`);
   }
 
+  // A LANDSCAPE frame designs natively landscape, but Prodigi's frame print files are
+  // fixed-portrait (printAreaSizes verified 2026-07-07) — the finished file rotates 90°
+  // back to their spec. "Preview the exact print file" shows this same rotated file:
+  // exactly what the printer receives.
+  const [variantRow] = await db.select({ attributes: productVariants.attributes }).from(productVariants).where(eq(productVariants.id, input.variantId));
+  const landscape = ((variantRow?.attributes as Record<string, string>) ?? {}).orientation === 'landscape';
+
   const rect = computeLayerRect(geom, src, transform);
   // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
   // on a white canvas. Handles both regimes: cover/zoom (layer ≥ canvas → crop, offset 0,
@@ -80,12 +87,15 @@ export async function renderPrintFile(
   const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
   const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
   const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
-  const out = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
+  let out = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
     .composite([{ input: part, left: ox, top: oy }])
     .flatten({ background: '#ffffff' })
     .png()
     .withMetadata({ density: tpl.requiredDpi })
     .toBuffer();
+  if (landscape) {
+    out = await sharp(out).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+  }
 
   const key = derivativeKey(input.assetId, `printfile-${input.variantId}`);
   await putObject(key, out, 'image/png');
@@ -115,7 +125,7 @@ export async function renderPrintFile(
     renderedDpi: tpl.requiredDpi, // the file's embedded density
     effectiveDpi: assess.effectiveDpi, // the real source resolution at this placement
     upscaled: assess.decision === 'UPSCALE',
-    widthPx: rect.canvasWidth,
-    heightPx: rect.canvasHeight,
+    widthPx: landscape ? rect.canvasHeight : rect.canvasWidth,
+    heightPx: landscape ? rect.canvasWidth : rect.canvasHeight,
   };
 }

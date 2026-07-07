@@ -17,6 +17,7 @@ export { mmToPx };
 type VariantDef = {
   size?: string; // display size, e.g. 'A4', '11oz', '30 pieces'; omit for one-size
   colour?: string; // display colour
+  orientation?: 'portrait' | 'landscape'; // frames: how it hangs (landscape = swapped canvas)
   pricePence: number;
   wMm: number;
   hMm: number;
@@ -54,11 +55,22 @@ const FRAME_SIZES = [
   { size: '28×40″', sku: 'GLOBAL-CFP-28X40', wMm: 711, hMm: 1016, dpi: 150, pricePence: 13995 },
 ] as const;
 function frameVariants(): VariantDef[] {
+  // Orientation is OURS, not Prodigi's: their frame print files are fixed-portrait
+  // (printAreaSizes 3307×4192px, verified 2026-07-07), and the frame hangs either
+  // way. A landscape variant works natively landscape (swapped canvas) through the
+  // preview + positioner; the fulfilment render rotates the finished print file 90°
+  // back to Prodigi's portrait spec. Portrait skus keep their existing names.
   return FRAME_SIZES.flatMap((s) =>
-    FRAME_COLOURS.map((colour) => ({
-      size: s.size, colour, pricePence: s.pricePence, wMm: s.wMm, hMm: s.hMm, dpi: s.dpi,
-      prodigiSku: s.sku, prodigiAttrs: { color: colour },
-    })),
+    (['portrait', 'landscape'] as const).flatMap((orientation) =>
+      FRAME_COLOURS.map((colour) => ({
+        size: s.size, colour, orientation,
+        pricePence: s.pricePence,
+        wMm: orientation === 'landscape' ? s.hMm : s.wMm,
+        hMm: orientation === 'landscape' ? s.wMm : s.hMm,
+        dpi: s.dpi,
+        prodigiSku: s.sku, prodigiAttrs: { color: colour },
+      })),
+    ),
   );
 }
 
@@ -281,7 +293,9 @@ function slug(s: string | undefined): string | null {
 /** Stable sku for a variant: the default keeps the legacy product key (back-compat). */
 function variantSku(productKey: string, v: VariantDef, isDefault: boolean): string {
   if (isDefault) return productKey;
-  return [productKey, slug(v.size), slug(v.colour)].filter(Boolean).join('-');
+  // orientation appears in the sku ONLY for landscape — portrait skus keep their
+  // pre-orientation names (no churn in baskets, orders or tests).
+  return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join('-');
 }
 
 /**
@@ -331,6 +345,8 @@ export interface CatalogueProduct {
   fromPence: number;
   sizes: string[];
   colours: string[];
+  /** Orientation axis (frames: portrait | landscape). Empty for single-orientation products. */
+  orientations: string[];
   variants: CatalogueVariant[];
   /** Curated front-of-shop rank (1 = first). null ⇒ Full-Catalogue-only. */
   popularRank: number | null;
@@ -360,7 +376,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
   for (const r of rows) {
     let p = byKey.get(r.key);
     if (!p) {
-      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], variants: [], popularRank: r.popularRank ?? null };
+      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], orientations: [], variants: [], popularRank: r.popularRank ?? null };
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
@@ -368,6 +384,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
     p.fromPence = Math.min(p.fromPence, r.vPrice);
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);
+    if (attrs.orientation && !p.orientations.includes(attrs.orientation)) p.orientations.push(attrs.orientation);
   }
   return [...byKey.values()];
 }
@@ -412,7 +429,8 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       const attributes: Record<string, string> = {};
       if (v.size) attributes.size = v.size;
       if (v.colour) attributes.colour = v.colour;
-      const vlabel = [def.label, v.size, v.colour].filter(Boolean).join(' · ');
+      if (v.orientation) attributes.orientation = v.orientation;
+      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join(' · ');
 
       const [variant] = await db
         .insert(productVariants)

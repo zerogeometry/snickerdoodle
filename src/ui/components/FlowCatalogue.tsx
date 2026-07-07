@@ -20,7 +20,7 @@ import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, splitCa
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 function variantSub(v: CatalogueVariant): string | undefined {
-  const bits = [v.attributes.size, v.attributes.colour].filter(Boolean);
+  const bits = [v.attributes.size, v.attributes.colour, v.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean);
   return bits.length ? bits.join(' · ') : undefined;
 }
 

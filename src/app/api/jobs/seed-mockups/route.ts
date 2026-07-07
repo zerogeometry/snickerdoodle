@@ -50,7 +50,7 @@ type Plan = { rotate?: 90 } & (
   | { file: string; material: Material; register: 'panel-physical'; mask: boolean; productWidthMm: number; bottomInsetFrac: number }
   | { file: string; material: Material; register: 'panel-contain'; mask: boolean; region: Box; frame?: 'bbox' | 'canvas' }
   | { file: string; material: Material; register: 'band'; mask: boolean; region: Box }
-  | { file?: undefined; material: Material; register: 'layered-frame'; dir: string }
+  | { file?: undefined; material: Material; register: 'layered-frame'; dir: string; orientation: 'portrait' | 'landscape' }
 );
 
 // Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
@@ -81,9 +81,13 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
   const colour = attrs.colour ?? '';
   switch (key) {
     case 'framedPrint': {
+      const orientation = attrs.orientation === 'landscape' ? 'landscape' : 'portrait';
       const dir = layeredFrameDir(colour);
-      if (dir) return { material: 'PAPER', register: 'layered-frame', dir };
-      return FRAME[colour] ? { file: FRAME[colour], material: 'PAPER', register: 'window-cover' } : null;
+      if (dir) return { material: 'PAPER', register: 'layered-frame', dir, orientation };
+      // Flat-blank fallback: the generic rotate flag turns the portrait photo 90°.
+      return FRAME[colour]
+        ? { file: FRAME[colour], material: 'PAPER', register: 'window-cover', ...(orientation === 'landscape' ? { rotate: 90 as const } : {}) }
+        : null;
     }
     case 'cushion': {
       const file = size === 'heart' ? 'Heart Cushion Blank 1.jpg' : size === '18″ round' ? 'Round cushion blank.jpg' : 'Cushion blank.jpg';
@@ -139,11 +143,11 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
  * frame edge exactly as the physical print sits in the rebate.
  */
 const layeredCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
-async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
+async function layeredFrame(dir: string, orientation: 'portrait' | 'landscape' = 'portrait'): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
   // Cache on the layers' mtimes, not just the dir — the founder iterates on these
   // files, and a long-lived dev server must never serve a stale derivation.
   const files = ['background.png', 'product.png', 'shadow.png'];
-  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const key = dir + '|' + orientation + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
   const hit = layeredCache.get(key);
   if (hit) return hit;
   const product = readFileSync(path.join(dir, 'product.png'));
@@ -213,7 +217,21 @@ async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer;
     .png()
     .toBuffer();
 
-  const out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+  let out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+
+  // LANDSCAPE: the same frame hung on its side — rotate the derived blank + mask 90°
+  // clockwise and carry the window box into the rotated space. The print canvas of a
+  // landscape variant is already swapped (356×279), so the quad aspect-locks onto it.
+  if (orientation === 'landscape') {
+    const w = out.window;
+    out = {
+      blank: await sharp(out.blank).rotate(90).png().toBuffer(),
+      mask: await sharp(out.mask).rotate(90).png().toBuffer(),
+      window: { x0: 1 - w.y1, y0: w.x0, x1: 1 - w.y0, y1: w.x1 },
+      W: out.H,
+      H: out.W,
+    };
+  }
   layeredCache.set(key, out);
   return out;
 }
@@ -368,7 +386,7 @@ export async function POST(req: Request): Promise<Response> {
     const printAspectEarly = r.printWmm / r.printHmm;
 
     if (p.register === 'layered-frame') {
-      const d = await layeredFrame(p.dir);
+      const d = await layeredFrame(p.dir, p.orientation);
       const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
       authored++;
