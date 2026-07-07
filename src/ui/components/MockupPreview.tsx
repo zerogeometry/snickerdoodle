@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ProductKey } from './ProductArt';
-import { composeMockupAction } from '@/app/actions/mockup';
+import type { MockupPreviewResult } from '@/app/api/mockup/route';
 import type { PlacementTransform } from '@/lib/store';
 
 /**
@@ -116,15 +116,25 @@ export function MockupPreview({
     const seq = ++seqRef.current;
     const isLatest = () => mountedRef.current && seq === seqRef.current;
     setResting(false); // a new attempt begins; `current` keeps showing meanwhile
-    // DEFER a beat so a strict-mode throwaway mount never dispatches a doomed call.
+    // The compose is a ROUTE HANDLER (not a Server Action): a plain concurrent fetch, so
+    // several previews compose in PARALLEL and don't abort each other (server actions
+    // serialise + cancel on re-render, which rendered thumbnails inconsistently). DEFER a
+    // beat so a strict-mode throwaway mount never dispatches; abort a superseded request.
+    const ctrl = new AbortController();
     const kickoff = setTimeout(() => {
-      composeMockupAction({
-        assetId,
-        variantId,
-        transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
-        size,
-        sourceObjectId: sourceObjectId ?? undefined,
+      fetch('/api/mockup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          assetId,
+          variantId,
+          transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
+          size,
+          sourceObjectId: sourceObjectId ?? undefined,
+        }),
+        signal: ctrl.signal,
       })
+        .then((res) => res.json() as Promise<MockupPreviewResult>)
         .then((r) => {
           if (!isLatest()) return;
           if (!r.ok) {
@@ -143,15 +153,20 @@ export function MockupPreview({
           pre.src = r.url;
         })
         .catch(() => {
+          // an aborted/superseded request is expected — only a genuine failure with nothing
+          // to show settles on the plain block (the recovery effect below retries a stuck one)
           if (isLatest() && !currentRef.current) setResting(true);
         });
     }, 50);
-    return () => clearTimeout(kickoff);
+    return () => {
+      clearTimeout(kickoff);
+      ctrl.abort();
+    };
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId, attempt]);
 
-  // ── Recovery: a compose can be dropped by Next.js (aborted server action that never
-  // settles) or lost to a transient re-render. Independently of the dispatch above, if the
-  // preview is STUCK (visible, ids present, no photo, not resting) for a few seconds, retry
+  // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
+  // Independently of the dispatch above, if the preview is STUCK (visible, ids present, no
+  // photo, not resting) for a few seconds, retry
   // by bumping `attempt`. Capped, then it rests. This is what makes a lost first-load
   // compose (the "gold frame thumbnail never loaded" report) recover on its own.
   useEffect(() => {
