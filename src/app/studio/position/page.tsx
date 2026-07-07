@@ -14,12 +14,12 @@ export default async function PositionPage({
   const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : undefined;
 
   if (draft) {
-    const data = await loadDraftStudioData(draft);
+    const data = await loadDraftStudioData(draft, variant);
     if (!data) redirect('/start-creating'); // no/expired claim, blocked, or gone
     return <Positioner data={data} draft returnTo={safeReturn} focusVariantId={variant} />;
   }
 
-  const data = await loadStudioData();
+  const data = await loadStudioData(variant);
   if (!data) redirect('/login');
   return <Positioner data={data} returnTo={safeReturn} focusVariantId={variant} />;
 }
