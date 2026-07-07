@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
@@ -140,11 +140,23 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
  */
 const layeredCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
 async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
-  const hit = layeredCache.get(dir);
+  // Cache on the layers' mtimes, not just the dir — the founder iterates on these
+  // files, and a long-lived dev server must never serve a stale derivation.
+  const files = ['background.png', 'product.png', 'shadow.png'];
+  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = layeredCache.get(key);
   if (hit) return hit;
   const product = readFileSync(path.join(dir, 'product.png'));
   const { data, info } = await sharp(product).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H, channels: c } = info;
+
+  // The PRODUCT layer is the canvas authority. The shadow must match it exactly
+  // (their registration is the alignment that matters); the background is a flat
+  // backdrop, so a size mismatch there is cover-fitted rather than rejected.
+  const shadowMeta = await sharp(readFileSync(path.join(dir, 'shadow.png'))).metadata();
+  if (shadowMeta.width !== W || shadowMeta.height !== H) {
+    throw new Error(`layered frame ${dir}: shadow.png is ${shadowMeta.width}x${shadowMeta.height} but product.png is ${W}x${H} — re-export on one canvas`);
+  }
 
   // Flood the OUTSIDE transparent area in from the borders; enclosed transparency = aperture.
   const transparent = (p: number) => data[p * c + 3]! < 128;
@@ -188,8 +200,11 @@ async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer;
     create: { width: Math.min(W - px, mx1 - mx0 + 1 + 2 * inflate), height: Math.min(H - py, my1 - my0 + 1 + 2 * inflate), channels: 3, background: '#ffffff' },
   }).png().toBuffer();
 
-  const blank = await sharp(readFileSync(path.join(dir, 'background.png')))
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png')))
     .flatten({ background: '#ffffff' }) // a transparent backdrop must not read as black
+    .resize(W, H, { fit: 'cover' }) // cover-fit to the product canvas (flat backdrop — safe)
+    .toBuffer();
+  const blank = await sharp(backdrop)
     .composite([
       { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
       { input: paper, left: px, top: py },
@@ -199,7 +214,7 @@ async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer;
     .toBuffer();
 
   const out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
-  layeredCache.set(dir, out);
+  layeredCache.set(key, out);
   return out;
 }
 
