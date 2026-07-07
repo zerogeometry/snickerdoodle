@@ -16,10 +16,8 @@ import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
 import { FAMILY_SET_PRODUCT_KEYS } from '@/pricing';
 import { startGuestUpload } from '@/app/actions/guestUpload';
-import { groupOf, lineIdForSku, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
-
-const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image (contain)
 
 function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour].filter(Boolean);
@@ -159,7 +157,7 @@ export function FlowCatalogue({
         variantId: def.id,
         pricePence: def.pricePence,
         sub: variantSub(def),
-        artwork: { assetId, transform: DEFAULT_TF, sourceObjectId: upload?.cutout?.sourceObjectId },
+        artwork: { assetId, transform: defaultTransformFor(p.key), sourceObjectId: upload?.cutout?.sourceObjectId },
       });
   };
 
@@ -334,7 +332,7 @@ export function FlowCatalogue({
                 productKey={zoom.key as ProductKey}
                 assetId={upload?.assetId}
                 variantId={defaultVariant(zoom).id}
-                transform={DEFAULT_TF}
+                transform={defaultTransformFor(zoom.key)}
                 size="zoom"
                 sourceObjectId={upload?.cutout?.sourceObjectId}
                 image={mockImg}

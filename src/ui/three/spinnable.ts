@@ -9,8 +9,10 @@
  * flat product photos with the artwork composited in 2D until a properly-made 3D
  * garment model exists.
  */
+// framedPrint deliberately absent (founder call 2026-07-07): the frame's experience
+// is ONE perfect photo view — no spin, no wall.
 export const SPINNABLE = [
-  'mug', 'framedPrint',
+  'mug',
   'cushion', 'blanket', 'sack',
   'storybook', 'jigsaw', 'calendar', 'card', 'bauble',
 ] as const;

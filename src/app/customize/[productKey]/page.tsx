@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconChevronDown, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronDown, IconChevronLeft, IconChevronRight, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
@@ -11,22 +11,17 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
-import { lineIdForSku } from '@/lib/catalogue-view';
+import { defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
 
-const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image (contain)
-
 // Tier-C 3D spin view — lazy, so three.js never loads unless someone opens it.
+// (The framed print deliberately has NO 3D/wall views — founder call 2026-07-07:
+// one perfect photo view; the spin stays for other products' curation.)
 const Product3D = dynamic(() => import('@/ui/three/Product3D'), {
   ssr: false,
   loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-[#9C8E7E]">warming up the spin view…</div>,
-});
-// Tier-D "see it on your wall" — framed prints only; also lazy.
-const WallView = dynamic(() => import('@/ui/three/WallView'), {
-  ssr: false,
-  loading: () => <div className="flex h-80 w-full items-center justify-center text-xs text-[#9C8E7E]">setting the scene…</div>,
 });
 
 function webglOk(): boolean {
@@ -57,12 +52,14 @@ export default function CustomizePage() {
   const [colour, setColour] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  const [view, setView] = useState<'photo' | 'spin' | 'wall'>('photo'); // preview mode
+  const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
-  const canWall = productKey === 'framedPrint';
+  // Colour thumbnail strip paging (3 visible at a time).
+  const [thumbIdx, setThumbIdx] = useState(0);
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
+    setThumbIdx(0);
   }, [productKey]);
 
   useEffect(() => {
@@ -100,6 +97,20 @@ export default function CustomizePage() {
     }
   }, [product, coloursForSize, colour]);
 
+  // Chip ↔ strip sync: whichever way a colour is chosen, page the strip so its
+  // thumbnail is one of the three on show.
+  useEffect(() => {
+    if (!colour) return;
+    const i = coloursForSize.indexOf(colour);
+    if (i < 0) return;
+    setThumbIdx((cur) => {
+      const max = Math.max(0, coloursForSize.length - 3);
+      if (i < cur) return Math.min(i, max);
+      if (i > cur + 2) return Math.min(i - 2, max);
+      return Math.min(cur, max);
+    });
+  }, [colour, coloursForSize]);
+
   // Exact match for the chosen size+colour — NO silent fallback to the default, which
   // would order + charge the WRONG variant. null ⇒ the combination isn't available.
   const variant = useMemo(() => {
@@ -129,7 +140,7 @@ export default function CustomizePage() {
   }
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
-  const placement = (upload?.assetId && placements[`${upload.assetId}-${product.key}`]) || DEFAULT_TF;
+  const placement = (upload?.assetId && placements[`${upload.assetId}-${product.key}`]) || defaultTransformFor(product.key);
 
   const editPlacement = () => {
     if (!upload?.assetId) {
@@ -188,11 +199,11 @@ export default function CustomizePage() {
         </div>
       </Modal>
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
-        {/* Left: preview (photo / 3D spin / on your wall) + edit placement */}
+        {/* Left: ONE photo preview (+20% vs the old view) with the colour strip under it */}
         <div>
-          {canSpin || canWall ? (
+          {canSpin ? (
             <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
-              {(['photo', ...(canSpin ? ['spin'] as const : []), ...(canWall ? ['wall'] as const : [])] as const).map((m) => (
+              {(['photo', 'spin'] as const).map((m) => (
                 <button
                   key={m}
                   type="button"
@@ -200,14 +211,14 @@ export default function CustomizePage() {
                   aria-pressed={view === m}
                   className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${view === m ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
                 >
-                  {m === 'photo' ? 'photo' : m === 'spin' ? 'spin it around' : 'on your wall'}
+                  {m === 'photo' ? 'photo' : 'spin it around'}
                 </button>
               ))}
             </div>
           ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
             {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
-              <div className="h-80 w-full">
+              <div className="h-96 w-full">
                 <Product3D
                   kind={product.key}
                   image={previewImg}
@@ -216,17 +227,6 @@ export default function CustomizePage() {
                   printWmm={variant.printWmm}
                   printHmm={variant.printHmm}
                   attributes={variant.attributes}
-                />
-              </div>
-            ) : view === 'wall' && canWall && previewImg ? (
-              <div className="w-full">
-                <WallView
-                  image={previewImg}
-                  fallbackImage={upload?.dataUrl ?? null}
-                  placement={placement}
-                  printWmm={variant?.printWmm ?? 279}
-                  printHmm={variant?.printHmm ?? 356}
-                  frameColour={colour ?? 'gold'}
                 />
               </div>
             ) : (
@@ -240,7 +240,7 @@ export default function CustomizePage() {
                   sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
                   image={previewImg}
                   placement={placement}
-                  px={300}
+                  px={360}
                   uid="customize"
                 />
                 <button
@@ -256,6 +256,67 @@ export default function CustomizePage() {
           </div>
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+          ) : null}
+          {/* Colour strip: one thumbnail per colour, 3 visible, arrows to cycle.
+              A tap selects that colour (and the chips stay in sync). */}
+          {coloursForSize.length > 1 ? (
+            <div className="mt-3 flex items-center gap-2" role="group" aria-label="colour previews">
+              <button
+                type="button"
+                onClick={() => setThumbIdx((i) => Math.max(0, i - 1))}
+                disabled={thumbIdx === 0}
+                aria-label="previous colours"
+                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EFE6D6] bg-white text-[#7A6A58] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+              >
+                <Icon icon={IconChevronLeft} size={17} />
+              </button>
+              <div className="min-w-0 flex-1 overflow-hidden">
+                <div
+                  className="flex gap-2 motion-safe:transition-transform motion-safe:duration-200"
+                  style={{ transform: `translateX(calc(${-thumbIdx} * (33.333% + 0.1667rem)))` }}
+                >
+                  {coloursForSize.map((c) => {
+                    const cv = product.variants.find(
+                      (v) => (product.sizes.length === 0 || v.attributes.size === size) && v.attributes.colour === c,
+                    );
+                    if (!cv) return null;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        onClick={() => setColour(c)}
+                        aria-label={`${c} ${product.label}`}
+                        aria-pressed={colour === c}
+                        className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${colour === c ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                      >
+                        <MockupPreview
+                          productKey={product.key as ProductKey}
+                          assetId={upload?.assetId ?? null}
+                          variantId={cv.id}
+                          transform={placement}
+                          size="thumb"
+                          sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+                          image={previewImg}
+                          placement={placement}
+                          px={110}
+                          uid={`strip-${c}`}
+                          lazy
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setThumbIdx((i) => Math.min(Math.max(0, coloursForSize.length - 3), i + 1))}
+                disabled={thumbIdx >= coloursForSize.length - 3}
+                aria-label="more colours"
+                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EFE6D6] bg-white text-[#7A6A58] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+              >
+                <Icon icon={IconChevronRight} size={17} />
+              </button>
+            </div>
           ) : null}
           <Button variant="design" size="lg" className="mt-3 w-full" onClick={editPlacement}>
             <Icon icon={IconPencil} size={15} /> edit placement

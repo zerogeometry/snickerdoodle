@@ -148,8 +148,8 @@ function blanketVariants(): VariantDef[] {
 // SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
 const DEFS: Record<string, ProductDef> = {
   framedPrint: {
-    category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true, visibleInShop: true,
-    description: 'A gallery-quality print of the original, framed and ready to hang — the wonky bits framed in gold.',
+    category: 'PRINT', label: 'framed print', blurb: 'their masterpiece, ready to hang', print: true, visibleInShop: true,
+    description: 'A gallery-quality print of the original in a hand-finished frame, ready to hang — every wonky bit treasured. Eight frames to suit any wall (gold is our signature).',
     specs: { material: 'fine-art paper', glazing: 'shatterproof' },
     variants: frameVariants(),
   },

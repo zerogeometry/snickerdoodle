@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { gbp, toast, useBasket, usePlacements } from '@/lib/store';
+import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -25,7 +26,13 @@ import {
 } from '@/server/print/geometry';
 import type { StudioData, StudioVariant } from '@/server/studio';
 
-const PREVIEW_W = 360; // on-screen canvas width in CSS px
+/** The editor canvas is deliberately MUCH larger than the customize-page preview
+ * (founder call 2026-07-07): print-area guides need to be clearly readable. Fixed at
+ * mount so pointer↔canvas maths stay coherent; capped to the viewport on mobile. */
+function initialPreviewW(): number {
+  if (typeof window === 'undefined') return 360;
+  return Math.max(300, Math.min(560, window.innerWidth - 48));
+}
 const SNAP_OFFSET = 0.07; // |offset| within this of centre snaps to 0 (with a guide flash)
 const FIT_SNAP = 0.03; // scale within 3% of "fit" snaps back to the contain sentinel
 const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
@@ -46,13 +53,25 @@ export function Positioner({
   focusVariantId?: string;
 }) {
   const focused = Boolean(focusVariantId && data.variants.some((v) => v.id === focusVariantId));
-  const variants = focused ? data.variants.filter((v) => v.id === focusVariantId) : data.variants;
+  // The editor is ALWAYS scoped to one creation (founder call 2026-07-07 — no catalogue
+  // in here). Arriving without a focus variant scopes to the first product's default.
+  const variants = focused ? data.variants.filter((v) => v.id === focusVariantId) : data.variants.slice(0, 1);
   const [assetIdx, setAssetIdx] = useState(0);
   const [variantId, setVariantId] = useState((focused ? focusVariantId : undefined) ?? data.variants[0]?.id ?? '');
   // scale 0 = the CONTAIN sentinel: "fit the whole image" — the default placement. It
   // re-resolves automatically when the product or rotation changes; a touched zoom
-  // becomes a concrete number.
-  const [tf, setTf] = useState<Transform>({ scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 });
+  // becomes a concrete number. Hydrates from the SAVED placement for this creation
+  // (edit resumes where you left it); otherwise the product's default — a frame
+  // starts COVER-filled (no white margins), everything else contains.
+  const [tf, setTf] = useState<Transform>(() => {
+    const v0 = data.variants.find((v) => v.id === ((focused ? focusVariantId : undefined) ?? data.variants[0]?.id));
+    const keepsake0 = data.keepsakes[0];
+    const saved = v0 && keepsake0 ? usePlacements.getState().placements[`${keepsake0.id}-${v0.productKey}`] : undefined;
+    // saved placements only ever come from this editor, whose rotations are quarter
+    // turns — the assertion narrows the persisted number back to the Rotation union.
+    if (saved) return saved as Transform;
+    return { scale: defaultTransformFor(v0?.productKey ?? '').scale, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  });
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
@@ -65,6 +84,7 @@ export function Positioner({
   // print layout (the order-of-record view). Only offered when a product photo exists.
   const [viewMode, setViewMode] = useState<'product' | 'flat'>('product');
   const imgRef = useRef<HTMLImageElement>(null);
+  const [previewW] = useState(initialPreviewW);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
   const setPlacement = usePlacements((s) => s.setPlacement);
@@ -148,8 +168,8 @@ export function Positioner({
   const t = variant.template;
   const canvas = canvasSizePx(t);
   const aspect = canvas.width / canvas.height;
-  const previewH = Math.round(PREVIEW_W / aspect);
-  const scale = PREVIEW_W / canvas.width; // canvas-px → preview-px
+  const previewH = Math.round(previewW / aspect);
+  const scale = previewW / canvas.width; // canvas-px → preview-px
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
   const safePxv = bleedPxv + mmToPx(t.safeInsetMm, t.requiredDpi);
 
@@ -191,22 +211,6 @@ export function Positioner({
     void mockupContextAction({ variantId }).then((c) => { if (live) setCtx(c); });
     return () => { live = false; };
   }, [variantId]);
-
-  /** Switch product/variant PRESERVING the relative zoom (zoom-vs-fit), so the image
-   * appears consistently sized across variants with different print aspects. */
-  const switchVariant = (v: StudioVariant) => {
-    if (v.id === variantId) return;
-    gestureRef.current = null; // never carry a live gesture across products
-    setDragging(false);
-    if (natural && tf.scale !== 0) {
-      const src = { width: natural.w, height: natural.h };
-      const rel = tf.scale / containScale(t, src, tf.rotationDeg);
-      const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, rel * containScale(v.template, src, tf.rotationDeg)));
-      setTf((p) => ({ ...p, scale: next }));
-    }
-    setVariantId(v.id);
-    setResult(null);
-  };
 
   const setRot = () => {
     const next = (((tf.rotationDeg + 90) % 360) as Rotation);
@@ -328,10 +332,10 @@ export function Positioner({
   // the compositor — you're placing the image on the product, and what you see is what prints.
   const bd = useMemo(() => {
     if (!ctx || !ctx.ok) return null;
-    const pvH = Math.round((PREVIEW_W * ctx.blankH) / ctx.blankW);
-    const qx = ctx.quad[0]![0] * PREVIEW_W;
+    const pvH = Math.round((previewW * ctx.blankH) / ctx.blankW);
+    const qx = ctx.quad[0]![0] * previewW;
     const qy = ctx.quad[0]![1] * pvH;
-    const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * PREVIEW_W;
+    const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * previewW;
     const qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
     return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx };
   }, [ctx, t]);
@@ -659,7 +663,7 @@ export function Positioner({
             <div
               {...canvasInteractionProps}
               className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
-              style={{ width: PREVIEW_W, height: bd.pvH }}
+              style={{ width: previewW, height: bd.pvH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={ctx.blankUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -703,7 +707,7 @@ export function Positioner({
             <div
               {...canvasInteractionProps}
               className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
-              style={{ width: PREVIEW_W, height: previewH }}
+              style={{ width: previewW, height: previewH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -773,18 +777,10 @@ export function Positioner({
         {/* Controls */}
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Product</p>
-          {focused ? (
-            // Scoped to the ONE creation being customized — no catalogue here.
-            <p className="mt-2 inline-flex rounded-full border border-cinnamon bg-[#FBEFE0] px-3 py-1.5 text-xs font-semibold text-cocoa">
-              {variant.label} · {gbp(variant.pricePence)}
-            </p>
-          ) : (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {variants.map((v) => (
-                <ProductChip key={v.id} v={v} active={v.id === variantId} onClick={() => switchVariant(v)} />
-              ))}
-            </div>
-          )}
+          {/* Scoped to the ONE creation being customized — never a catalogue in here. */}
+          <p className="mt-2 inline-flex rounded-full border border-cinnamon bg-[#FBEFE0] px-3 py-1.5 text-xs font-semibold text-cocoa">
+            {variant.label} · {gbp(variant.pricePence)}
+          </p>
 
           {data.keepsakes.length > 1 ? (
             <>
@@ -924,18 +920,6 @@ export function Positioner({
         </div>
       </div>
     </Shell>
-  );
-}
-
-function ProductChip({ v, active, onClick }: { v: StudioVariant; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${active ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'}`}
-    >
-      {v.label} · {gbp(v.pricePence)}
-    </button>
   );
 }
 

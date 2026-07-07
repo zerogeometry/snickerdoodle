@@ -13,6 +13,18 @@ import type { CatalogueProduct } from '@/server/catalogue';
  * between where a line is written and where it's read (the root of the qty-shows-0 bug). */
 export const lineIdForSku = (sku: string) => `cat-${sku}`;
 
+/**
+ * The DEFAULT artwork placement per product — the ONE place tiles, quick-add, the
+ * customize preview and the positioner all read, so a product's default can never
+ * disagree between surfaces.
+ *  - framedPrint: COVER (scale 1) — a frame wants no white margins; the image fills
+ *    the aperture edge-to-edge (founder call, 2026-07-07).
+ *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
+ */
+export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
+  return { scale: productKey === 'framedPrint' ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+}
+
 /** Every possible basket line id for a product (one per variant). */
 export const productLineIds = (p: CatalogueProduct): string[] => p.variants.map((v) => lineIdForSku(v.sku));
 
