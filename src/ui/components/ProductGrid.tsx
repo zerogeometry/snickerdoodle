@@ -4,7 +4,7 @@ import { IconMinus, IconPlus, IconZoomScan } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
-import { gbp, type Upload } from '@/lib/store';
+import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { CatalogueProduct } from '@/server/catalogue';
 
@@ -47,6 +47,21 @@ export function ProductTile({
   onZoom?: () => void;
 }) {
   const def = defaultVariant(p);
+  // Reflect the shopper's OWN choices so the tile shows what they set — not the defaults.
+  // Placement (zoom/position) is carried in usePlacements, keyed by (asset, product) to
+  // match what add-to-basket stores; the chosen size/colour/orientation in useSelection.
+  const savedTf = usePlacements((s) => (upload?.assetId ? s.placements[`${upload.assetId}-${p.key}`] : undefined));
+  const tf = savedTf ?? defaultTransformFor(p.key);
+  const sel = useSelection((s) => s.selections[p.key]);
+  const chosen = sel
+    ? p.variants.find(
+        (v) =>
+          (p.sizes.length === 0 || v.attributes.size === sel.size) &&
+          (p.colours.length === 0 || v.attributes.colour === sel.colour) &&
+          (p.orientations.length === 0 || v.attributes.orientation === sel.orientation),
+      )
+    : undefined;
+  const shownVariant = chosen ?? def;
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)] @container">
       {/* SQUARE image area (the product photos are square-ish): the preview is contained
@@ -55,8 +70,8 @@ export function ProductTile({
         <MockupPreview
           productKey={p.key as ProductKey}
           assetId={upload?.assetId}
-          variantId={def.id}
-          transform={defaultTransformFor(p.key)}
+          variantId={shownVariant.id}
+          transform={tf}
           size="thumb"
           sourceObjectId={upload?.cutout?.sourceObjectId}
           px={128}

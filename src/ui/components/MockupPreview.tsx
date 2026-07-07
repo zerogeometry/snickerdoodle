@@ -52,6 +52,16 @@ export function MockupPreview({
   const currentRef = useRef<string | null>(null);
   currentRef.current = current;
   const retriesRef = useRef(0);
+  // True while the component is mounted — so an async compose result is applied based on
+  // whether it is the LATEST request (a monotonic seq, see below), not a single effect
+  // run's closure, and no setState fires after unmount.
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   // A different DRAWING (new upload / cutout) must not linger — only variant/
   // placement changes keep the previous image while the next composes.
   const artKey = `${assetId ?? ''}|${sourceObjectId ?? ''}`;
@@ -91,43 +101,23 @@ export function MockupPreview({
     return () => io.disconnect();
   }, [lazy, visible]);
 
+  // ── Compose: dispatch, and apply the result if it is the LATEST request (a monotonic
+  // seq, not this effect-run's closure) — so a valid result is applied even when React
+  // re-ran the effect meanwhile (the bug that discarded composes and left the preview
+  // stuck pulsing). A superseded request (newer seq) is ignored.
+  const seqRef = useRef(0);
   useEffect(() => {
     if (!visible) return;
-    let live = true;
-    let timer: ReturnType<typeof setTimeout> | undefined;
     if (!assetId || !variantId) {
-      // Ids still resolving (ingest / catalogue fetch in flight) — wait quietly.
       setCurrent(null);
-      setResting(false);
+      setResting(false); // ids still resolving — wait quietly (pulse), don't rest
       return;
     }
+    const seq = ++seqRef.current;
+    const isLatest = () => mountedRef.current && seq === seqRef.current;
     setResting(false); // a new attempt begins; `current` keeps showing meanwhile
-    const retryOrRest = () => {
-      // Transient failure: the previous photo (if any) stays — it is still honest.
-      // With nothing on screen, retry gently, then settle into the plain block.
-      if (!live || currentRef.current) return;
-      if (retriesRef.current >= 2) {
-        setResting(true);
-        return;
-      }
-      retriesRef.current += 1;
-      timer = setTimeout(() => {
-        if (live) setAttempt((a) => a + 1);
-      }, 900 * retriesRef.current);
-    };
-    // An action dispatched during mount churn can be dropped by the client action
-    // queue and NEVER settle (observed in dev: the aborted first strict-mode mount
-    // takes the surviving mount's call down with it; the lazy tiles dodge it by
-    // firing late). Two defences: DEFER the dispatch a beat, so an immediately-
-    // unmounted effect never dispatches at all — and a WATCHDOG, so if a call still
-    // never settles we stop waiting and retry instead of pulsing forever.
-    let superseded = false;
-    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    // DEFER a beat so a strict-mode throwaway mount never dispatches a doomed call.
     const kickoff = setTimeout(() => {
-      watchdog = setTimeout(() => {
-        superseded = true;
-        retryOrRest();
-      }, 15_000);
       composeMockupAction({
         assetId,
         variantId,
@@ -136,36 +126,46 @@ export function MockupPreview({
         sourceObjectId: sourceObjectId ?? undefined,
       })
         .then((r) => {
-          clearTimeout(watchdog);
-          if (!live || superseded) return;
+          if (!isLatest()) return;
           if (!r.ok) {
-            // no template / blocked — terminal for this variant, and a stale image
-            // of another variant would be a lie: clear down to the plain block.
             setCurrent(null);
-            setResting(true);
+            setResting(true); // no template / blocked — settle on the plain block
             return;
           }
-          // Preload OFF-SCREEN and swap only once the pixels are ready — the visible
-          // image never blanks, and there is no half-loaded pop.
+          // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
           const pre = new window.Image();
           pre.onload = () => {
-            if (live) setCurrent(r.url);
+            if (isLatest()) setCurrent(r.url);
           };
-          pre.onerror = retryOrRest;
+          pre.onerror = () => {
+            if (isLatest() && !currentRef.current) setResting(true);
+          };
           pre.src = r.url;
         })
         .catch(() => {
-          clearTimeout(watchdog);
-          retryOrRest();
+          if (isLatest() && !currentRef.current) setResting(true);
         });
     }, 50);
-    return () => {
-      live = false;
-      clearTimeout(kickoff);
-      clearTimeout(watchdog);
-      if (timer) clearTimeout(timer);
-    };
+    return () => clearTimeout(kickoff);
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId, attempt]);
+
+  // ── Recovery: a compose can be dropped by Next.js (aborted server action that never
+  // settles) or lost to a transient re-render. Independently of the dispatch above, if the
+  // preview is STUCK (visible, ids present, no photo, not resting) for a few seconds, retry
+  // by bumping `attempt`. Capped, then it rests. This is what makes a lost first-load
+  // compose (the "gold frame thumbnail never loaded" report) recover on its own.
+  useEffect(() => {
+    if (!visible || !assetId || !variantId || current || resting) return;
+    if (retriesRef.current >= 4) {
+      setResting(true);
+      return;
+    }
+    const id = setTimeout(() => {
+      retriesRef.current += 1;
+      setAttempt((a) => a + 1);
+    }, 3500);
+    return () => clearTimeout(id);
+  }, [visible, assetId, variantId, current, resting, attempt]);
 
   return (
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
