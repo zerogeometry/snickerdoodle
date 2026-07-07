@@ -74,6 +74,39 @@ function frameVariants(): VariantDef[] {
   );
 }
 
+// Jigsaw: the child's drawing turned into a keepsake-tin puzzle. Prodigi's board is a FIXED
+// LANDSCAPE rectangle per size (250×200 / 375×285mm) — so, exactly like the frame, orientation
+// is OURS: LANDSCAPE is native (the board as printed, no rotate) and PORTRAIT works on a swapped
+// canvas, the fulfilment render rotating the finished print file 90° back to Prodigi's spec.
+// Landscape leads (the native board) and is the default. NO colour — Prodigi fulfils one board
+// per size (there's no colour SKU), so faking a colour choice would misrepresent the product.
+const JIGSAW_SIZES = [
+  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2795 },
+  { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', wMm: 250, hMm: 200, dpi: 300, pricePence: 3250 },
+  { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', wMm: 375, hMm: 285, dpi: 300, pricePence: 3495 },
+] as const;
+function jigsawVariants(): VariantDef[] {
+  return JIGSAW_SIZES.flatMap((s) =>
+    (['landscape', 'portrait'] as const).map((orientation) => ({
+      size: s.size, orientation,
+      pricePence: s.pricePence,
+      wMm: orientation === 'portrait' ? s.hMm : s.wMm,
+      hMm: orientation === 'portrait' ? s.wMm : s.hMm,
+      dpi: s.dpi,
+      prodigiSku: s.sku,
+    })),
+  );
+}
+
+/** The orientation Prodigi's print file is FIXED at (orientation is ours — we offer the other
+ * by placing on a SWAPPED canvas and rotating the finished print file 90° back at fulfilment).
+ * Frames are fixed-portrait; jigsaw boards are fixed-landscape. Products without an orientation
+ * dimension aren't listed — no rotation ever applies to them. See render.ts. */
+export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'> = {
+  framedPrint: 'portrait',
+  jigsaw: 'landscape',
+};
+
 // Mug: the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is its
 // OWN Prodigi SKU — plus a 15oz white. White leads (default).
 const MUG_TWOTONE = [
@@ -198,14 +231,10 @@ const DEFS: Record<string, ProductDef> = {
     variants: kidsTeeVariants(),
   },
   jigsaw: {
-    category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true,
+    category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true, visibleInShop: true,
     description: 'Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece.',
     specs: { material: 'board, in a keepsake tin', delivery: 'tracked' },
-    variants: [
-      { size: '30 pieces', pricePence: 2795, wMm: 250, hMm: 200, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-30' },
-      { size: '110 pieces', pricePence: 3250, wMm: 250, hMm: 200, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-110' },
-      { size: '252 pieces', pricePence: 3495, wMm: 375, hMm: 285, dpi: 300, prodigiSku: 'JIGSAW-PUZZLE-252' },
-    ],
+    variants: jigsawVariants(),
   },
   blanket: {
     category: 'BLANKET', label: 'fleece blanket', blurb: 'cuddles, with their art woven in', print: true,

@@ -51,6 +51,7 @@ type Plan = { rotate?: 90 } & (
   | { file: string; material: Material; register: 'panel-contain'; mask: boolean; region: Box; frame?: 'bbox' | 'canvas' }
   | { file: string; material: Material; register: 'band'; mask: boolean; region: Box }
   | { file?: undefined; material: Material; register: 'layered-frame'; dir: string; orientation: 'portrait' | 'landscape' }
+  | { file?: undefined; material: Material; register: 'layered-jigsaw'; dir: string; orientation: 'portrait' | 'landscape' }
 );
 
 // Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
@@ -62,6 +63,17 @@ function layeredFrameDir(colour: string): string | null {
   const dir = path.join(LAYERED, 'framedPrint', colour.replace(/\s+/g, '-'));
   const has = (f: string) => existsSync(path.join(dir, f));
   return has('background.png') && has('product.png') && has('shadow.png') ? dir : null;
+}
+
+// Founder-authored JIGSAW layers, per piece-count (30/110/252): background → shadow →
+// printquad (the white board at true dimensions, transparent surround) → puzzlelines (the
+// die-cut piece lines that sit OVER the art). The board layer does double duty: its opaque
+// region is the print quad AND the silhouette mask; the piece lines become the compositor's
+// foreground overlay. Native LANDSCAPE; portrait is the same drop rotated 90°.
+function layeredJigsawDir(pieces: string): string | null {
+  const dir = path.join(LAYERED, 'jigsaw', pieces);
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('background.png') && has('shadow.png') && has('printquad.png') && has('puzzlelines.png') ? dir : null;
 }
 
 const FRAME: Record<string, string> = {
@@ -94,8 +106,14 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: `prodigi-cushions-blank-assets/${file}`, material: 'LIGHT_FABRIC', register: 'face-cover', mask: true };
     }
     case 'jigsaw': {
-      const f = size.startsWith('252') ? 'Prodigi jigsaw 252 pcs.jpg' : size.startsWith('110') ? 'Prodigi jigsaw 110 pcs.jpg' : 'Prodigi jigsaw 30 pcs.jpg';
-      return { file: `${JIG}/${f}`, material: 'PAPER', register: 'face-cover', mask: false }; // white-on-white → no reliable mask
+      const pieces = size.startsWith('252') ? '252' : size.startsWith('110') ? '110' : '30';
+      const orientation = attrs.orientation === 'portrait' ? 'portrait' : 'landscape';
+      const dir = layeredJigsawDir(pieces);
+      // Preferred: the founder's authored layers (board + real die-cut piece lines on top).
+      if (dir) return { material: 'PAPER', register: 'layered-jigsaw', dir, orientation };
+      // Flat-photo fallback (no piece lines): the landscape Prodigi photo, rotated for portrait.
+      const f = pieces === '252' ? 'Prodigi jigsaw 252 pcs.jpg' : pieces === '110' ? 'Prodigi jigsaw 110 pcs.jpg' : 'Prodigi jigsaw 30 pcs.jpg';
+      return { file: `${JIG}/${f}`, material: 'PAPER', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
     }
     case 'blanket': // photo is landscape but the print canvas is PORTRAIT (600×1000mm) → rotate the blank to match
       return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, rotate: 90 };
@@ -233,6 +251,83 @@ async function layeredFrame(dir: string, orientation: 'portrait' | 'landscape' =
     };
   }
   layeredCache.set(key, out);
+  return out;
+}
+
+/**
+ * Founder-layered jigsaw → a (blank, mask, overlay, window) bundle. The board layer
+ * (printquad.png: a white board on a transparent surround, at the print's true dimensions)
+ * is the registration authority: its OPAQUE region is both the print quad (where the art
+ * lands) and the silhouette mask (so the art clips to the board's shape). The stored blank
+ * composites background → shadow → white board; puzzlelines.png becomes the foreground
+ * overlay the compositor lays OVER the art (the die-cut lines the drawing reads through).
+ * PORTRAIT is the same drop rotated 90° — the print canvas is already swapped, so the quad
+ * aspect-locks onto it (mirrors layeredFrame's landscape branch).
+ */
+const layeredJigCache = new Map<string, { blank: Buffer; mask: Buffer; overlay: Buffer; window: Box; W: number; H: number }>();
+async function layeredJigsaw(dir: string, orientation: 'portrait' | 'landscape'): Promise<{ blank: Buffer; mask: Buffer; overlay: Buffer; window: Box; W: number; H: number }> {
+  const files = ['background.png', 'shadow.png', 'printquad.png', 'puzzlelines.png'];
+  const key = dir + '|' + orientation + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = layeredJigCache.get(key);
+  if (hit) return hit;
+
+  // The BOARD layer is the canvas authority: opaque region = print quad AND silhouette mask.
+  const boardPng = readFileSync(path.join(dir, 'printquad.png'));
+  const { data, info } = await sharp(boardPng).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+  const maskRaw = Buffer.alloc(W * H);
+  let mx0 = W, my0 = H, mx1 = -1, my1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (data[(y * W + x) * c + 3]! >= 128) {
+        maskRaw[y * W + x] = 255;
+        if (x < mx0) mx0 = x;
+        if (x > mx1) mx1 = x;
+        if (y < my0) my0 = y;
+        if (y > my1) my1 = y;
+      }
+    }
+  if (mx1 < 0) throw new Error(`layered jigsaw ${dir}: printquad.png has no opaque board region`);
+  const mask = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+
+  // Shadow + piece lines MUST share the board's canvas (their registration IS the alignment
+  // that sells it); the background is a flat backdrop, so a size mismatch there is cover-fit.
+  for (const f of ['shadow.png', 'puzzlelines.png']) {
+    const m = await sharp(readFileSync(path.join(dir, f))).metadata();
+    if (m.width !== W || m.height !== H) {
+      throw new Error(`layered jigsaw ${dir}: ${f} is ${m.width}x${m.height} but printquad.png is ${W}x${H} — re-export on one canvas`);
+    }
+  }
+
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png')))
+    .flatten({ background: '#ffffff' }) // a transparent backdrop must not read as black
+    .resize(W, H, { fit: 'cover' })
+    .toBuffer();
+  const blank = await sharp(backdrop)
+    .composite([
+      { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
+      { input: boardPng, left: 0, top: 0 }, // the white board is the print surface
+    ])
+    .png()
+    .toBuffer();
+  const overlay = await sharp(readFileSync(path.join(dir, 'puzzlelines.png'))).png().toBuffer();
+
+  let out = { blank, mask, overlay, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+
+  // PORTRAIT: the same board turned 90° — rotate blank + mask + overlay and carry the window
+  // box into the rotated space (the portrait variant's print canvas is already swapped).
+  if (orientation === 'portrait') {
+    const w = out.window;
+    out = {
+      blank: await sharp(out.blank).rotate(90).png().toBuffer(),
+      mask: await sharp(out.mask).rotate(90).png().toBuffer(),
+      overlay: await sharp(out.overlay).rotate(90).png().toBuffer(),
+      window: { x0: 1 - w.y1, y0: w.x0, x1: 1 - w.y0, y1: w.x1 },
+      W: out.H,
+      H: out.W,
+    };
+  }
+  layeredJigCache.set(key, out);
   return out;
 }
 
@@ -393,6 +488,21 @@ export async function POST(req: Request): Promise<Response> {
       const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
       registration.push({
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-frame',
+        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
+    if (p.register === 'layered-jigsaw') {
+      const d = await layeredJigsaw(p.dir, p.orientation);
+      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+      // The piece lines ride along as the compositor's foreground overlay (over the art).
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
+      authored++;
+      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-jigsaw',
         quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
         driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
       });

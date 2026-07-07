@@ -2,8 +2,9 @@ import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { printTemplates, productVariants, storageObjects } from '@/db/schema';
+import { printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
+import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
@@ -67,12 +68,19 @@ export async function renderPrintFile(
     throw new Error(`source too low-res for this product (would need ${assess.upscaleFactor.toFixed(1)}× upscale)`);
   }
 
-  // A LANDSCAPE frame designs natively landscape, but Prodigi's frame print files are
-  // fixed-portrait (printAreaSizes verified 2026-07-07) — the finished file rotates 90°
-  // back to their spec. "Preview the exact print file" shows this same rotated file:
-  // exactly what the printer receives.
-  const [variantRow] = await db.select({ attributes: productVariants.attributes }).from(productVariants).where(eq(productVariants.id, input.variantId));
-  const landscape = ((variantRow?.attributes as Record<string, string>) ?? {}).orientation === 'landscape';
+  // Orientation is OURS: a variant in the NON-native orientation designs on a SWAPPED
+  // canvas, so the finished print file rotates 90° back to Prodigi's FIXED spec. Frames are
+  // fixed-portrait (rotate the landscape variant); jigsaw boards are fixed-landscape (rotate
+  // the portrait variant). "Preview the exact print file" shows this same rotated file —
+  // exactly what the printer receives. Unknown/no orientation ⇒ never rotate.
+  const [variantRow] = await db
+    .select({ attributes: productVariants.attributes, key: products.key })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(eq(productVariants.id, input.variantId));
+  const orientation = ((variantRow?.attributes as Record<string, string>) ?? {}).orientation;
+  const nativeOri = (variantRow?.key ? PRODIGI_NATIVE_ORIENTATION[variantRow.key] : undefined) ?? 'portrait';
+  const landscape = !!orientation && orientation !== nativeOri; // "landscape" = "needs the 90° rotate"
 
   const rect = computeLayerRect(geom, src, transform);
   // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
