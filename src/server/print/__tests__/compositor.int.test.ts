@@ -4,13 +4,14 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
+import { mockupViews, printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { seedCatalogue } from '@/server/catalogue';
 import { composeMockup, NoMockupTemplateError } from '@/server/print/compositor';
+import { setMockupView } from '@/server/print/templates';
 import { deleteObject, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -360,6 +361,35 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
       expect(rI).toBeLessThan(120);
     } finally {
       await db.update(printTemplates).set({ materialClass: 'PAPER', templateVersion: 1 }).where(eq(printTemplates.variantId, variantId));
+    }
+  });
+
+  it('PERSPECTIVE view: an alternate mockup_view warps the design onto a SKEWED quad', async () => {
+    const assetId = await ingestDesign(); // solid red 1200×1500
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    // A 'tin'-style alternate view: a grey blank + a SKEWED (perspective) quad — not axis-aligned.
+    const blank = await sharp({ create: { width: 600, height: 600, channels: 3, background: { r: 180, g: 180, b: 188 } } }).png().toBuffer();
+    const skewed: [number, number][] = [[0.30, 0.12], [0.72, 0.26], [0.60, 0.72], [0.20, 0.56]]; // TL,TR,BR,BL
+    await setMockupView(db, { variantId, view: 'tin', blank, contentType: 'image/png', printQuad: skewed, printWidthPx: 400, printHeightPx: 300, materialClass: 'PAPER' });
+    try {
+      const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, view: 'tin', size: 'zoom' });
+      expect(res.tier).toBe('PERSPECTIVE'); // the skewed quad routed through the warp, not the flat bbox
+      const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+      const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+      const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+      const at = (x: number, y: number) => {
+        const i = (y * info.width! + x) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      };
+      expect(info.width).toBe(600);
+      // Centroid of the quad (~0.455, 0.415) → the warped RED design shows.
+      const [rC] = at(Math.round(0.455 * 600), Math.round(0.415 * 600));
+      expect(rC).toBeGreaterThan(150);
+      // A corner well OUTSIDE the skewed quad → the grey blank shows through (art didn't leak).
+      const [r2, g2, b2] = at(560, 40);
+      expect(Math.abs(r2 - 180) + Math.abs(g2 - 180) + Math.abs(b2 - 188)).toBeLessThan(45);
+    } finally {
+      await db.delete(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, 'tin'))).catch(() => {});
     }
   });
 

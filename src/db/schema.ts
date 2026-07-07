@@ -602,6 +602,34 @@ export const templateAssets = pgTable(
   },
 );
 
+// ── mockup_views — ALTERNATE display mockups for a variant (a second angle / companion
+// product), keyed by `view` (e.g. 'tin'). DELIBERATELY separate from print_templates: these
+// are DISPLAY-ONLY (never a print file — Prodigi prints the tin lid from the SAME asset), so
+// they must never touch the print/fulfilment path. `printQuad` here may be a PERSPECTIVE quad
+// (4 non-axis-aligned corners) — the compositor warps the design onto it (perspective.ts).
+export const mockupViews = pgTable(
+  'mockup_views',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => productVariants.id, { onDelete: 'cascade' }),
+    view: text('view').notNull(), // 'tin', etc. (the PRIMARY product view lives on print_templates)
+    templateVersion: integer('template_version').notNull().default(1), // cache-invalidation lever
+    materialClass: materialClass('material_class').notNull().default('PAPER'),
+    blankObjectId: uuid('blank_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+    printQuad: jsonb('print_quad').$type<[number, number][]>(), // 4 corners TL,TR,BR,BL (perspective-capable)
+    maskObjectId: uuid('mask_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+    overlayObjectId: uuid('overlay_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
+    // The print area's OWN pixel size (its aspect): the compositor cover-fits the art to this,
+    // then maps it onto printQuad. e.g. the tin lid's 869×674.
+    printWidthPx: integer('print_width_px').notNull(),
+    printHeightPx: integer('print_height_px').notNull(),
+    mapResolutionPx: integer('map_resolution_px').notNull().default(1500),
+  },
+  (t) => ({ variantView: uniqueIndex('mockup_views_variant_view_uq').on(t.variantId, t.view) }),
+);
+
 export const productVariantProviders = pgTable(
   'product_variant_providers',
   {

@@ -1,8 +1,8 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { printTemplates, templateAssets } from '@/db/schema';
+import { mockupViews, printTemplates, templateAssets } from '@/db/schema';
 import { getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -115,4 +115,72 @@ export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateIn
     .where(eq(printTemplates.variantId, input.variantId));
 
   return { blankObjectId: ta!.id, templateVersion, key };
+}
+
+/** Upload a brand-safe template image + upsert its template_assets row (keyed by storage key). */
+async function putAsset(db: DbHandle, kind: 'BLANK' | 'MASK' | 'LIGHTING', key: string, buf: Buffer, contentType: string): Promise<string> {
+  const { bucket } = getS3();
+  await putObject(key, buf, contentType);
+  const meta = await sharp(buf).metadata();
+  const row = { kind, bucket, key, contentType, byteSize: buf.byteLength, sha256: createHash('sha256').update(buf).digest('hex'), widthPx: meta.width ?? null, heightPx: meta.height ?? null };
+  const [ta] = await db.insert(templateAssets).values(row).onConflictDoUpdate({ target: templateAssets.key, set: row }).returning();
+  return ta!.id;
+}
+
+export interface SetMockupViewInput {
+  variantId: string;
+  /** The alternate view name, e.g. 'tin'. */
+  view: string;
+  blank: Buffer;
+  contentType?: string;
+  /** 4 normalised corners TL,TR,BR,BL of the print area on the blank. MAY be a perspective
+   * quad (non-axis-aligned) — the compositor warps the design onto it. */
+  printQuad: [number, number][];
+  /** The print area's own pixel size (its aspect): the compositor cover-fits the art to this
+   * before warping onto printQuad. e.g. the tin lid's 869×674. */
+  printWidthPx: number;
+  printHeightPx: number;
+  materialClass?: MaterialClass;
+  mask?: Buffer;
+  overlay?: Buffer;
+}
+
+/**
+ * Author (or re-author) an ALTERNATE display mockup view for a variant (mockup_views) — the
+ * committed path for a second angle / companion product (e.g. the jigsaw tin). Display-only:
+ * it never touches print_templates or the print/fulfilment path. Bumps templateVersion so
+ * cached mockups for this view invalidate.
+ */
+export async function setMockupView(db: DbHandle, input: SetMockupViewInput): Promise<{ templateVersion: number }> {
+  if (!Array.isArray(input.printQuad) || input.printQuad.length !== 4) throw new Error('printQuad must be 4 normalised corners (TL,TR,BR,BL)');
+  for (const [x, y] of input.printQuad) {
+    if (x < -0.005 || x > 1.005 || y < -0.005 || y > 1.005) throw new Error(`printQuad corner outside the blank (got [${x.toFixed(3)}, ${y.toFixed(3)}])`);
+  }
+  const [existing] = await db
+    .select({ v: mockupViews.templateVersion })
+    .from(mockupViews)
+    .where(and(eq(mockupViews.variantId, input.variantId), eq(mockupViews.view, input.view)));
+  const templateVersion = (existing?.v ?? 0) + 1;
+
+  const contentType = input.contentType ?? 'image/webp';
+  const ext = contentType === 'image/png' ? 'png' : contentType === 'image/jpeg' ? 'jpg' : 'webp';
+  const base = `templates/${input.variantId}/${input.view}/v${templateVersion}`;
+  const blankObjectId = await putAsset(db, 'BLANK', `${base}/blank.${ext}`, input.blank, contentType);
+  const maskObjectId = input.mask ? await putAsset(db, 'MASK', `${base}/mask.png`, input.mask, 'image/png') : null;
+  const overlayObjectId = input.overlay ? await putAsset(db, 'LIGHTING', `${base}/overlay.png`, input.overlay, 'image/png') : null;
+
+  const row = {
+    variantId: input.variantId,
+    view: input.view,
+    templateVersion,
+    materialClass: input.materialClass ?? ('PAPER' as const),
+    blankObjectId,
+    printQuad: input.printQuad,
+    maskObjectId,
+    overlayObjectId,
+    printWidthPx: input.printWidthPx,
+    printHeightPx: input.printHeightPx,
+  };
+  await db.insert(mockupViews).values(row).onConflictDoUpdate({ target: [mockupViews.variantId, mockupViews.view], set: row });
+  return { templateVersion };
 }

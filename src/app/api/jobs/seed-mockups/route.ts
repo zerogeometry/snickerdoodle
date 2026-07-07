@@ -5,7 +5,7 @@ import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import { requireJobsSecret } from '@/server/jobs/auth';
-import { setMockupTemplate } from '@/server/print/templates';
+import { setMockupTemplate, setMockupView } from '@/server/print/templates';
 
 /**
  * DEV template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -454,6 +454,45 @@ function aspectRect(box: Box, W: number, H: number, printAspect: number, fit: 'c
   return { x0: (cx - w / 2) / W, y0: (cy - h / 2) / H, x1: (cx + w / 2) / W, y1: (cy + h / 2) / H };
 }
 
+// ── Alternate view: the jigsaw TIN (a PERSPECTIVE mockup). The founder's layers
+// (background, tin+shadow, printmap for the lid) live in layered/jigsaw/tin/. The label is
+// an ANGLED quad — we read its four corners from printmap.png's alpha and the compositor
+// warps the art onto them (perspective.ts). Prodigi's small-tin lid print area is 869×674px.
+const TIN_DIR = path.join(LAYERED, 'jigsaw', 'tin');
+const TIN_LID_PX = { w: 869, h: 674 };
+
+/** The four corners (TL,TR,BR,BL, normalised) of a filled quad in an image's alpha — the
+ * diagonal extremes (min/max of x±y), robust for a rotated/perspective quadrilateral. */
+async function detectQuadCorners(buf: Buffer): Promise<[number, number][] | null> {
+  const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+  let TL: [number, number] | null = null, TR: [number, number] | null = null, BR: [number, number] | null = null, BL: [number, number] | null = null;
+  let tl = Infinity, tr = -Infinity, br = -Infinity, bl = Infinity;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (data[(y * W + x) * c + 3]! < 128) continue;
+      const s = x + y, d = x - y;
+      if (s < tl) { tl = s; TL = [x, y]; }
+      if (d > tr) { tr = d; TR = [x, y]; }
+      if (s > br) { br = s; BR = [x, y]; }
+      if (d < bl) { bl = d; BL = [x, y]; }
+    }
+  if (!TL || !TR || !BR || !BL) return null;
+  return [TL, TR, BR, BL].map(([x, y]) => [x / W, y / H]);
+}
+
+/** Build the tin blank (background → tin+shadow) + the lid's perspective quad. */
+async function buildTinView(dir: string): Promise<{ blank: Buffer; quad: [number, number][] } | null> {
+  const tinBuf = readFileSync(path.join(dir, 'tin.png'));
+  const meta = await sharp(tinBuf).metadata();
+  const W = meta.width!, H = meta.height!;
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png'))).flatten({ background: '#ffffff' }).resize(W, H, { fit: 'cover' }).toBuffer();
+  const blank = await sharp(backdrop).composite([{ input: tinBuf, left: 0, top: 0 }]).png().toBuffer();
+  const quad = await detectQuadCorners(readFileSync(path.join(dir, 'printmap.png')));
+  if (!quad) return null;
+  return { blank, quad };
+}
+
 export async function POST(req: Request): Promise<Response> {
   const denied = requireJobsSecret(req);
   if (denied) return denied;
@@ -586,5 +625,22 @@ export async function POST(req: Request): Promise<Response> {
       driftPct: qa === null ? null : Math.round(Math.abs(qa / printAspect - 1) * 1000) / 10,
     });
   }
-  return Response.json({ authored, skippedProducts: [...new Set(skipped)], registration });
+  // Alternate view — the jigsaw TIN (perspective). One tin, authored for every jigsaw variant
+  // (the customer's placement is warped onto the lid at compose time). Display-only: never a
+  // print file, so it lives in mockup_views, not print_templates.
+  let authoredViews = 0;
+  if (existsSync(path.join(TIN_DIR, 'tin.png')) && existsSync(path.join(TIN_DIR, 'printmap.png'))) {
+    const tin = await buildTinView(TIN_DIR);
+    if (tin) {
+      for (const r of rows.filter((row) => row.key === 'jigsaw')) {
+        await setMockupView(db, {
+          variantId: r.id, view: 'tin', blank: tin.blank, contentType: 'image/png',
+          printQuad: tin.quad, printWidthPx: TIN_LID_PX.w, printHeightPx: TIN_LID_PX.h, materialClass: 'PAPER',
+        });
+        authoredViews++;
+      }
+    }
+  }
+
+  return Response.json({ authored, authoredViews, skippedProducts: [...new Set(skipped)], registration });
 }

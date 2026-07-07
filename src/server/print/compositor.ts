@@ -2,13 +2,14 @@ import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { printTemplates, storageObjects, templateAssets } from '@/db/schema';
+import { mockupViews, printTemplates, storageObjects, templateAssets } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
+import { perspectiveWarp } from './perspective';
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -50,7 +51,7 @@ export interface MockupResult {
   mockupObjectId: string;
   key: string;
   format: 'webp';
-  tier: 'FLAT';
+  tier: 'FLAT' | 'PERSPECTIVE';
   cached: boolean;
   widthPx?: number; // set on a fresh render
   heightPx?: number;
@@ -62,6 +63,9 @@ export interface ComposeMockupInput {
   transform: RawTransform; // client-proposed; clamped server-side
   size?: MockupSize; // default 'thumb'
   sourceObjectId?: string; // a specific stored object (e.g. a bg-removed cutout); must belong to assetId
+  /** An ALTERNATE display view (mockup_views), e.g. 'tin'. Absent/'primary' ⇒ the product's
+   * main mockup (print_templates). Alternate views can carry a PERSPECTIVE quad. */
+  view?: string;
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
@@ -115,6 +119,44 @@ function quadBboxPx(quad: [number, number][], W: number, H: number): { x: number
   };
 }
 
+/** Is the quad an axis-aligned rectangle (FLAT) or a skewed/perspective quad? */
+function isAxisAligned(quad: [number, number][]): boolean {
+  const [tl, tr, br, bl] = quad as [[number, number], [number, number], [number, number], [number, number]];
+  const tol = 0.004; // normalised
+  return (
+    Math.abs(tl[0] - bl[0]) < tol && Math.abs(tr[0] - br[0]) < tol &&
+    Math.abs(tl[1] - tr[1]) < tol && Math.abs(bl[1] - br[1]) < tol
+  );
+}
+
+/** A variant's mockup template, resolved from EITHER print_templates (the primary product
+ * view) OR mockup_views (an alternate view, e.g. 'tin'). Unifies the two so the compose
+ * pipeline is identical; alternate views are display-only (bleed 0). */
+interface ResolvedTemplate {
+  blankObjectId: string;
+  maskObjectId: string | null;
+  overlayObjectId: string | null;
+  printQuad: [number, number][];
+  printWidthPx: number;
+  printHeightPx: number;
+  bleedMm: number;
+  requiredDpi: number;
+  materialClass: string;
+  mapResolutionPx: number;
+  templateVersion: number;
+}
+async function loadResolvedTemplate(db: DbHandle, variantId: string, view: string | undefined): Promise<ResolvedTemplate | null> {
+  if (view && view !== 'primary' && view !== 'board') {
+    const [v] = await db.select().from(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, view)));
+    if (!v?.blankObjectId || !v.printQuad) return null;
+    // Display-only: no bleed (Prodigi prints from the primary geometry, never this view).
+    return { blankObjectId: v.blankObjectId, maskObjectId: v.maskObjectId, overlayObjectId: v.overlayObjectId, printQuad: v.printQuad, printWidthPx: v.printWidthPx, printHeightPx: v.printHeightPx, bleedMm: 0, requiredDpi: 300, materialClass: v.materialClass, mapResolutionPx: v.mapResolutionPx, templateVersion: v.templateVersion };
+  }
+  const [t] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
+  if (!t?.blankObjectId || !t.printQuad) return null;
+  return { blankObjectId: t.blankObjectId, maskObjectId: t.maskObjectId, overlayObjectId: t.lightingObjectId, printQuad: t.printQuad, printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi, materialClass: t.materialClass, mapResolutionPx: t.mapResolutionPx, templateVersion: t.templateVersion };
+}
+
 // Concurrent identical renders (React strictMode double-fires the preview effect; the
 // grid fan-out requests the same thumb twice) share ONE pipeline + ONE insert. Keyed by
 // the deterministic cache key, AFTER each caller has passed its own authz check.
@@ -125,17 +167,17 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   //    cache-hit caller is still authorised here before any byte is returned).
   await getViewableAssetOrThrow(db, input.assetId, viewer);
 
-  // 2. Template + its brand-safe blank (NON-child). No template ⇒ SVG fallback.
-  const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
-  if (!tpl || !tpl.blankObjectId || !tpl.printQuad) throw new NoMockupTemplateError('variant has no mockup template');
+  // 2. Template — the PRIMARY product view (print_templates) or an alternate display view
+  //    (mockup_views, e.g. the tin). Its brand-safe blank is NON-child. No template ⇒ fallback.
+  const tpl = await loadResolvedTemplate(db, input.variantId, input.view);
+  if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
   const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
   if (!blank) throw new NoMockupTemplateError('blank template asset missing');
-  // Optional product-silhouette mask (NON-child, same family as the blank): the design is
-  // clipped to it, so art can never overlap the product's edge on shaped blanks.
+  // Optional product-silhouette mask: the design is clipped to it (shaped product edges).
   const [mask] = tpl.maskObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.maskObjectId)) : [undefined];
-  // Optional FOREGROUND overlay (LIGHTING asset): authored on-top detail composited OVER
-  // the design — e.g. the jigsaw's die-cut piece lines, so the art reads as physically cut.
-  const [overlay] = tpl.lightingObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.lightingObjectId)) : [undefined];
+  // Optional FOREGROUND overlay: authored on-top detail composited OVER the design — e.g.
+  // the jigsaw's die-cut piece lines, so the art reads as physically cut.
+  const [overlay] = tpl.overlayObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.overlayObjectId)) : [undefined];
 
   // 3. The DESIGN — read from storage_objects, scoped to THIS asset (never from
   //    template_assets). A specific source object (e.g. a bg-removed cutout) must
@@ -156,11 +198,12 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   //    (both DERIVATIVE/ORIGINAL under the SAME asset) from colliding on one key.
   const t = clampTransform(input.transform);
   const size: MockupSize = input.size ?? 'thumb';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}-${size}-v${tpl.templateVersion}${RENDER_REV}-${srcObj.id}-${transformHash(t)}`);
+  const viewTag = input.view && input.view !== 'primary' && input.view !== 'board' ? `-${input.view}` : '';
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}-${srcObj.id}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
-  if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: 'FLAT', cached: true };
+  if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: isAxisAligned(tpl.printQuad) ? 'FLAT' : 'PERSPECTIVE', cached: true };
 
   // 6. In-flight dedup → render + persist once (concurrency-capped) and share the result.
   const pending = inFlight.get(key);
@@ -173,11 +216,11 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       maskKey: mask?.key,
       overlayKey: overlay?.key,
       designKey: srcObj.key,
-      quad: tpl.printQuad!,
+      quad: tpl.printQuad,
       transform: t,
       workEdge: tpl.mapResolutionPx,
       outputEdge: OUTPUT_EDGE[size],
-      print: { widthPx: tpl.printWidthPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
+      print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
     }),
   );
@@ -194,22 +237,30 @@ async function renderAndPersist(
   args: {
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; quad: [number, number][];
     transform: Transform; workEdge: number; outputEdge: number;
-    print: { widthPx: number; bleedMm: number; requiredDpi: number };
+    print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string;
   },
 ): Promise<MockupResult> {
-  const out = await renderFlat({
+  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; else the FLAT
+  // (axis-aligned bbox) placement. Same secure spine either way.
+  const perspective = !isAxisAligned(args.quad);
+  const common = {
     blankBuf: await getObjectBytes(args.blankKey),
-    maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
-    overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
     designBuf: await getObjectBytes(args.designKey),
     quad: args.quad,
     transform: args.transform,
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
     print: args.print,
-    materialClass: args.materialClass,
-  });
+  };
+  const out = perspective
+    ? await renderPerspective(common)
+    : await renderFlat({
+        ...common,
+        maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
+        overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
+        materialClass: args.materialClass,
+      });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
   // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
@@ -225,7 +276,7 @@ async function renderAndPersist(
     .returning();
   const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, args.key)))[0]!.id;
 
-  return { mockupObjectId, key: args.key, format: 'webp', tier: 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
+  return { mockupObjectId, key: args.key, format: 'webp', tier: perspective ? 'PERSPECTIVE' : 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
 }
 
 /**
@@ -433,5 +484,76 @@ async function renderFlat(args: {
     .webp({ quality: 82, effort: 4 })
     .toBuffer({ resolveWithObject: true });
 
+  return { buffer: out.data, width: out.info.width, height: out.info.height };
+}
+
+/**
+ * PERSPECTIVE tier: cover-fit + transform the design onto a print-aspect canvas (ZERO bleed —
+ * a display-only view, never printed), then HOMOGRAPHY-WARP that canvas onto the quad's four
+ * corners on the product photo (perspective.ts) and composite over it. Used for angled products
+ * like the jigsaw tin lid, where the print area is a skewed quadrilateral. Same secure spine as
+ * FLAT (authz + write-once derivative in composeMockup); the child's design never leaves the VPC.
+ */
+async function renderPerspective(args: {
+  blankBuf: Buffer;
+  designBuf: Buffer;
+  quad: [number, number][];
+  transform: Transform;
+  workEdge: number;
+  outputEdge: number;
+  print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+}): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const { blankBuf, designBuf, quad, transform, workEdge, outputEdge, print } = args;
+
+  // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
+  const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  const bw0 = bm.width ?? 0, bh0 = bm.height ?? 0;
+  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
+  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
+  const WW = Math.max(1, Math.round(bw0 * scale));
+  const WH = Math.max(1, Math.round(bh0 * scale));
+  const workingBlank = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).toBuffer();
+
+  // Prepare the design on a print-aspect canvas (dw×dh = the print area's own px) — cover-fit
+  // + transformed exactly like the flat path, but with ZERO bleed (this view is never printed).
+  const dm = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  const src = { width: dm.width ?? 0, height: dm.height ?? 0 };
+  if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
+  const dw = Math.max(2, print.widthPx);
+  const dh = Math.max(2, print.heightPx);
+  const layer = computeLayerRect({ printWidthPx: dw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
+  if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
+  const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    .rotate(transform.rotationDeg)
+    .resize(layer.width, layer.height, { fit: 'fill' })
+    .ensureAlpha()
+    .toBuffer();
+  // Window the transformed layer onto the dw×dh canvas (handles cover-crop AND contain-centre).
+  const ix = Math.max(0, -layer.x);
+  const iy = Math.max(0, -layer.y);
+  const ox = Math.max(0, layer.x);
+  const oy = Math.max(0, layer.y);
+  const iw = Math.max(1, Math.min(layer.width - ix, dw - ox));
+  const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
+  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const designCanvas = await sharp({ create: { width: dw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{ input: part, left: ox, top: oy }])
+    .raw()
+    .toBuffer();
+
+  // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
+  const quadPx = quad.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
+  const warped = perspectiveWarp({ design: designCanvas, srcW: dw, srcH: dh, quad: quadPx, canvasW: WW, canvasH: WH });
+  const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
+  const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
+    .toBuffer();
+
+  const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
+    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
+    .withMetadata({ icc: 'srgb' })
+    .webp({ quality: 82, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
   return { buffer: out.data, width: out.info.width, height: out.info.height };
 }
