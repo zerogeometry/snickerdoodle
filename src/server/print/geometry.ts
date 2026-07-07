@@ -117,8 +117,12 @@ export function computeLayerRect(t: TemplateGeom, src: { width: number; height: 
   const drawW = Math.round(sw * base * scale);
   const drawH = Math.round(sh * base * scale);
 
-  const slackX = Math.max(0, drawW - CW);
-  const slackY = Math.max(0, drawH - CH);
+  // Pan range = how far the art can travel and still touch the canvas edges. It works in
+  // BOTH regimes: OVERFLOW (art ≥ canvas → slide the crop) AND MARGIN (art < canvas, i.e.
+  // zoomed out below cover → slide within the empty space). |draw − canvas| covers both;
+  // offset 0 stays centred either way, so cover/contain defaults are unchanged.
+  const slackX = Math.abs(drawW - CW);
+  const slackY = Math.abs(drawH - CH);
   const cx = CW / 2 + (transform.offsetX * slackX) / 2;
   const cy = CH / 2 + (transform.offsetY * slackY) / 2;
 

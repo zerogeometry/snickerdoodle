@@ -198,11 +198,11 @@ export function Positioner({
   }
 
   const t = variant.template;
-  // A FRAME is always cover-FILLED — no white margins, ever (founder directive). So its
-  // zoom floors at cover (scale 1), never the contain "fit" that would letterbox. Other
-  // products keep the fit-centred model (a small motif with intentional margins is valid).
+  // A FRAME DEFAULTS to cover-filled (scale 1 = "1.0×", no margins), but the shopper CAN
+  // zoom out to 0.5× if they want a border (founder call 2026-07-07). So its zoom floors
+  // at 0.5 of cover — below the fit-centred model other products use.
   const filledDefault = defaultTransformFor(variant.productKey).scale === 1;
-  const scaleFloor = filledDefault ? 1 : MIN_SCALE;
+  const scaleFloor = filledDefault ? 0.5 : MIN_SCALE;
   const canvas = canvasSizePx(t);
   const aspect = canvas.width / canvas.height;
   const previewH = Math.round(previewW / aspect);
@@ -422,9 +422,10 @@ export function Positioner({
     };
   }, [bd, natural, tf, t]);
 
-  // ── Gesture-space geometry: pan slack + preview-px-per-space-px for whichever
-  // canvas mode is live. Offsets only pan within OVERFLOW slack (the print model),
-  // so at "fit" there is nothing to drag — the hint says so instead of lying.
+  // ── Gesture-space geometry: pan slack + preview-px-per-space-px for whichever canvas
+  // mode is live. Slack = |draw − canvas| (matches computeLayerRect): art can pan whether
+  // it OVERFLOWS the canvas (slide the crop) or is smaller than it (zoomed out below cover
+  // → slide within the margins). Only when it EXACTLY fills an axis is that axis locked.
   const gestureGeom = useMemo(() => {
     if (!natural) return null;
     const src = { width: natural.w, height: natural.h };
@@ -432,13 +433,13 @@ export function Positioner({
       const geomPv = { printWidthPx: Math.max(1, Math.round(bd.qw)), printHeightPx: Math.max(1, Math.round(bd.qh)), bleedMm: t.bleedMm, requiredDpi: t.requiredDpi * bd.s };
       const geom = (probe: Transform) => {
         const r = computeLayerRect(geomPv, src, probe);
-        return { slackX: Math.max(0, r.width - r.canvasWidth), slackY: Math.max(0, r.height - r.canvasHeight) };
+        return { slackX: Math.abs(r.width - r.canvasWidth), slackY: Math.abs(r.height - r.canvasHeight) };
       };
       return { geom, pxPerSpace: 1 };
     }
     const geom = (probe: Transform) => {
       const r = computeLayerRect(t, src, probe);
-      return { slackX: Math.max(0, r.width - r.canvasWidth), slackY: Math.max(0, r.height - r.canvasHeight) };
+      return { slackX: Math.abs(r.width - r.canvasWidth), slackY: Math.abs(r.height - r.canvasHeight) };
     };
     return { geom, pxPerSpace: scale };
   }, [bd, natural, t, scale]);
@@ -556,7 +557,7 @@ export function Positioner({
     if (g.moved && k === 1 && slackX === 0 && slackY === 0) {
       if (!hintedRef.current) {
         hintedRef.current = true;
-        toast('the whole drawing fits at this zoom — zoom in a touch to move it around');
+        toast('the drawing fills the frame exactly here — zoom in or out a touch to move it around');
       }
       return;
     }
@@ -1012,7 +1013,7 @@ export function Positioner({
               onChange={(v) => update({ offsetX: v })}
               format={() => ''}
               disabled={slackNow.slackX === 0}
-              disabledHint="zoom in to move it sideways"
+              disabledHint="zoom in or out to move it sideways"
             />
             <Slider
               label="Up / down"
@@ -1023,7 +1024,7 @@ export function Positioner({
               onChange={(v) => update({ offsetY: v })}
               format={() => ''}
               disabled={slackNow.slackY === 0}
-              disabledHint="zoom in to move it up or down"
+              disabledHint="zoom in or out to move it up or down"
             />
             <button
               type="button"
@@ -1110,7 +1111,7 @@ function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; valu
   const fromT = filled
     ? (raw: number) => floor + raw * (MAX_ZOOM - floor)
     : (raw: number) => (raw <= 0.5 ? fit / 2 + (raw / 0.5) * (fit - fit / 2) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
-  const shown = filled ? value / floor : value / fit;
+  const shown = filled ? value : value / fit; // filled: cover (scale 1) reads as 1.0×
   return (
     <label className="flex items-center gap-2">
       <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">Zoom</span>

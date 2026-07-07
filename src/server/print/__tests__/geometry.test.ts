@@ -105,6 +105,18 @@ describe('containScale + the scale-0 CONTAIN sentinel — "fit the whole image"'
     expect(r.x).toBe(-250);
   });
 
+  it('zoomed out (below cover) the art can PAN within the margins, staying inside the canvas', () => {
+    // square source contained in a 1000×1500 portrait canvas → 1000×1000, 500px vertical margin
+    const centred = computeLayerRect(portrait, { width: 1000, height: 1000 }, T({ scale: 0 }));
+    expect(centred).toMatchObject({ x: 0, y: 250 }); // offset 0 = centred (unchanged)
+    // offsetY 1 slides it to the BOTTOM edge; offsetY -1 to the TOP — never off-canvas
+    const down = computeLayerRect(portrait, { width: 1000, height: 1000 }, T({ scale: 0, offsetY: 1 }));
+    expect(down.y).toBe(500); // top at 500 → bottom edge exactly at 1500 (canvas bottom)
+    expect(down.y + down.height).toBeLessThanOrEqual(centred.canvasHeight);
+    const up = computeLayerRect(portrait, { width: 1000, height: 1000 }, T({ scale: 0, offsetY: -1 }));
+    expect(up.y).toBe(0); // top edge exactly at 0
+  });
+
   it('the DPI gate resolves the sentinel too (contain needs FEWER source pixels than cover)', () => {
     const src = { width: 900, height: 900 };
     const cover = assessResolution(portrait, src, T({ scale: 1 }));
