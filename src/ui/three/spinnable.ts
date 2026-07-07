@@ -9,12 +9,13 @@
  * flat product photos with the artwork composited in 2D until a properly-made 3D
  * garment model exists.
  */
-// framedPrint deliberately absent (founder call 2026-07-07): the frame's experience
-// is ONE perfect photo view — no spin, no wall.
+// framedPrint + jigsaw deliberately absent (founder calls 2026-07-07): each is ONE clear
+// view — the frame is a single perfect photo; the jigsaw previews as its flat photoreal
+// mockup (with the die-cut piece lines) + the "as puzzle" view in the positioner. No spin.
 export const SPINNABLE = [
   'mug',
   'cushion', 'blanket', 'sack',
-  'storybook', 'jigsaw', 'calendar', 'card', 'bauble',
+  'storybook', 'calendar', 'card', 'bauble',
 ] as const;
 
 export const has3D = (kind: string): boolean => (SPINNABLE as readonly string[]).includes(kind);

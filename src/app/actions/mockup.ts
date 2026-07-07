@@ -1,9 +1,11 @@
 'use server';
 
+import '@/server/print/sharp-init';
+import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import { getDb } from '@/db/client';
 import { printTemplates, templateAssets } from '@/db/schema';
-import { presignDownload } from '@/storage';
+import { getObjectBytes, presignDownload } from '@/storage';
 
 // The compose itself is a ROUTE HANDLER now (src/app/api/mockup/route.ts) — server
 // actions serialise and abort each other, so several previews composing at once rendered
@@ -17,6 +19,10 @@ export type MockupContext = {
   quad: [number, number][];
   blankW: number;
   blankH: number;
+  /** The foreground overlay (e.g. the jigsaw's die-cut piece lines), CROPPED to the print
+   * area + downscaled, as a data URL — so the positioner can preview the art "as a puzzle".
+   * null when the template has no overlay. */
+  overlayUrl: string | null;
 } | { ok: false };
 
 /**
@@ -32,6 +38,7 @@ export async function mockupContextAction(input: { variantId: string }): Promise
   const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
   if (!blank?.widthPx || !blank.heightPx) return { ok: false };
   const [mask] = tpl.maskObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.maskObjectId)) : [undefined];
+  const [overlay] = tpl.lightingObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.lightingObjectId)) : [undefined];
   return {
     ok: true,
     blankUrl: await presignDownload(blank.key, 600),
@@ -39,5 +46,30 @@ export async function mockupContextAction(input: { variantId: string }): Promise
     quad: tpl.printQuad,
     blankW: blank.widthPx,
     blankH: blank.heightPx,
+    overlayUrl: overlay?.widthPx && overlay.heightPx ? await croppedOverlayDataUrl(overlay.key, tpl.printQuad, overlay.widthPx, overlay.heightPx) : null,
   };
+}
+
+/**
+ * The foreground overlay cropped to the PRINT AREA (the full-frame piece-lines layer holds
+ * the lines only over the board), downscaled, as a data URL. The positioner lays it over the
+ * placed art so the flat editor previews it "as a puzzle" — the die-cut lines on the drawing.
+ */
+async function croppedOverlayDataUrl(key: string, quad: [number, number][], W: number, H: number): Promise<string | null> {
+  try {
+    const xs = quad.map((p) => p[0]);
+    const ys = quad.map((p) => p[1]);
+    const x0 = Math.max(0, Math.round(Math.min(...xs) * W));
+    const y0 = Math.max(0, Math.round(Math.min(...ys) * H));
+    const x1 = Math.min(W, Math.round(Math.max(...xs) * W));
+    const y1 = Math.min(H, Math.round(Math.max(...ys) * H));
+    const cropped = await sharp(await getObjectBytes(key), { limitInputPixels: 50_000_000 })
+      .extract({ left: x0, top: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) })
+      .resize(800, 800, { fit: 'inside', withoutEnlargement: true })
+      .png()
+      .toBuffer();
+    return `data:image/png;base64,${cropped.toString('base64')}`;
+  } catch {
+    return null; // a preview aid — never break the positioner if the crop hiccups
+  }
 }
