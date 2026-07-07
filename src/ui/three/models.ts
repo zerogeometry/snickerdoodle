@@ -18,6 +18,7 @@ export const FRAME_FINISH: Record<string, { color: string; metalness: number; ro
   black: { color: '#241f1b', metalness: 0.1, roughness: 0.55 },
   white: { color: '#F4F1EA', metalness: 0.05, roughness: 0.6 },
   natural: { color: '#C8A06A', metalness: 0.05, roughness: 0.65 },
+  brown: { color: '#6B4A32', metalness: 0.05, roughness: 0.6 },
 };
 
 /** Paint the PRINT AREA (trim box, white margins) with the placed design onto a 2D

@@ -57,6 +57,7 @@ const FRAME: Record<string, string> = {
   black: 'prodigi-classic-frame-blanks/Black classic frame_blank.png',
   white: 'prodigi-classic-frame-blanks/White classic frame_blank.png',
   natural: 'prodigi-classic-frame-blanks/Natural classic frame_blank.png',
+  brown: 'prodigi-classic-frame-blanks/Brown classic frame_blank.jpg',
 };
 const JIG = 'prodigi-jigsaw-puzzle-blank-assets/Prodigi Jigsaw blanks';
 

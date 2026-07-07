@@ -12,6 +12,7 @@ const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scal
 const SWATCH: Record<string, string> = {
   oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
   natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
+  brown: '#6B4A32',
 };
 const swatch = (name: string) => SWATCH[name] ?? '#E0C7A8';
 
