@@ -89,13 +89,19 @@ export default function CustomizePage() {
   // opens showing that exact creation. A stale/removed line falls through as a fresh customize.
   useEffect(() => {
     if (!product || editSeededRef.current) return;
-    const editParam = new URLSearchParams(window.location.search).get('edit');
+    const sp = new URLSearchParams(window.location.search);
+    const editParam = sp.get('edit');
     editSeededRef.current = true;
     if (!editParam) return;
     const line = useBasket.getState().items.find((i) => i.id === editParam);
     const lv = line && product.variants.find((v) => v.id === line.variantId);
     if (!line || !lv) return;
     setEdit({ id: line.id, assetId: line.artwork?.assetId, sourceObjectId: line.artwork?.sourceObjectId });
+    // Returning from the positioner (resume=1): the selection + placement stores already
+    // hold the user's IN-PROGRESS edits (the new placement, a toggled orientation) — re-seeding
+    // from the still-unchanged basket line would clobber them. Only seed on FIRST entry from
+    // the basket. (Fresh entry without resume DOES re-seed, resetting any unsaved stray edits.)
+    if (sp.get('resume')) return;
     useSelection.getState().setSelection(product.key, {
       size: lv.attributes.size,
       colour: lv.attributes.colour,
@@ -222,8 +228,9 @@ export default function CustomizePage() {
       return;
     }
     // Scoped to THIS product + variant — the positioner edits this creation's placement only.
-    // Keep ?edit through the round-trip so "save & return" lands back in edit mode.
-    const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}` : ''}`;
+    // Keep ?edit through the round-trip so "save & return" lands back in edit mode, and mark
+    // it resume=1 so we DON'T re-seed over the placement the positioner just saved.
+    const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`;
     router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}&return=${encodeURIComponent(ret)}`);
   };
 
