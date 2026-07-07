@@ -62,10 +62,21 @@ const BODY_PATH =
   'C405 715 382 795 360 878 L292 902 C254 912 232 888 238 845 L260 730 C290 600 345 495 420 448 L530 400 Z';
 const BODY_NECK = 'M530 400 C575 388 725 388 770 400 C780 432 735 462 650 462 C565 462 520 432 530 400 Z';
 // Chest print regions as fractions of the 1300×1500 blank — MUST match seed-mockups.
-const TEE_REGION = { x0: 0.4, y0: 0.36, x1: 0.6, y1: 0.6 };
-const BODY_REGION = { x0: 0.4, y0: 0.36, x1: 0.6, y1: 0.58 };
+// Physically derived for the DEFAULT size: kids 3-4y torso 330mm carries the 260mm
+// canvas (78.8%); adult M torso 555mm carries 396mm (71.4%); bodysuit capped at 80%
+// pending the Rabbit Skins size chart.
+const KTEE_REGION = { x0: 0.36, y0: 0.36, x1: 0.64, y1: 0.61 };
+const ATEE_REGION = { x0: 0.374, y0: 0.36, x1: 0.626, y1: 0.635 };
+const BODY_REGION = { x0: 0.38, y0: 0.36, x1: 0.627, y1: 0.58 };
 const BLANK_W = 1300;
 const BLANK_H = 1500;
+// mm per blank px, set so the TORSO width (blank x 420–880 = 460px; bodysuit x 452–855
+// = 401px) equals the verified garment width — which makes the tees' print patch mm
+// equal the true print canvas mm. (The drawn sleeves are stylised, so TOTAL width
+// overstates; only relative proportions matter to the auto-fit camera.)
+const KTEE_SCALE = 330 / 460;
+const ATEE_SCALE = 555 / 460;
+const BODY_SCALE = 190 / 401; // newborn torso ≈ 190mm — approximate, pending the chart
 
 /** Fold fields are authored in blank-px space and scaled with the garment so the
  * cloth character is identical at every size. Amplitudes are px (→ mm × scale). */
@@ -336,11 +347,11 @@ export function buildProduct(kind: string, texture: THREE.Texture, printWmm: num
     case 'framedPrint':
       return buildFrame(texture as THREE.CanvasTexture, printWmm, printHmm, attrs.colour ?? 'gold');
     case 'kidsTee':
-      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: TEE_REGION, scale: 0.44, puffMm: 13, foldPx: teeFoldPx, texture, printWmm, printHmm });
+      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: KTEE_REGION, scale: KTEE_SCALE, puffMm: 11, foldPx: teeFoldPx, texture, printWmm, printHmm });
     case 'adultTee':
-      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: TEE_REGION, scale: 0.66, puffMm: 18, foldPx: teeFoldPx, texture, printWmm, printHmm });
+      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: ATEE_REGION, scale: ATEE_SCALE, puffMm: 17, foldPx: teeFoldPx, texture, printWmm, printHmm });
     case 'babyBodysuit':
-      return buildGarment({ path: BODY_PATH, neck: BODY_NECK, region: BODY_REGION, scale: 0.485, puffMm: 11, foldPx: bodyFoldPx, texture, printWmm, printHmm });
+      return buildGarment({ path: BODY_PATH, neck: BODY_NECK, region: BODY_REGION, scale: BODY_SCALE, puffMm: 8, foldPx: bodyFoldPx, texture, printWmm, printHmm });
     case 'cushion':
       return buildCushion(texture, printWmm, attrs.size ?? 'heart');
     case 'blanket':

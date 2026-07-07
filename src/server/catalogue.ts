@@ -74,6 +74,8 @@ function mugVariants(): VariantDef[] {
 
 // Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of ONE SKU.
 // Values are the exact Prodigi attribute strings. White is the cheaper tier; colours a touch more.
+// Print canvas 260×260mm: Prodigi's API printAreaSizes = 3070×3070px (@300dpi = 259.9mm),
+// IDENTICAL for every size — verified via GET /v4.0/products/TEE-SS-STTK909, 2026-07-07.
 const KTEE_SIZES = ['3-4 years', '5-6 years', '7-8 years', '9-11 years', '12-14 years'];
 const KTEE_COLOURS = [
   { colour: 'white', attr: 'white', pricePence: 2495 },
@@ -83,7 +85,7 @@ const KTEE_COLOURS = [
 function kidsTeeVariants(): VariantDef[] {
   return KTEE_SIZES.flatMap((size) =>
     KTEE_COLOURS.map((c) => ({
-      size, colour: c.colour, pricePence: c.pricePence, wMm: 240, hMm: 300, dpi: 150,
+      size, colour: c.colour, pricePence: c.pricePence, wMm: 260, hMm: 260, dpi: 150,
       prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr },
     })),
   );
@@ -93,9 +95,12 @@ function kidsTeeVariants(): VariantDef[] {
 // sibling of the kids' Mini Creator. ONE SKU for everyone (the Bella+Canvas womens tee was
 // dropped 2026-07-03: not organic, and unisex S/S keeps the family matching set in one garment
 // family). Size is a Prodigi attribute; £12 flat cost across XS–2XL, GB-fulfilled, tracked.
+// Print canvas 396×498mm: Prodigi's API printAreaSizes = 4677×5881px (@300dpi — the
+// standard 16×20″ DTG platen), IDENTICAL for every size — verified via
+// GET /v4.0/products/TEE-SS-STTM559, 2026-07-07.
 function adultTeeVariants(): VariantDef[] {
   return ['XS', 'S', 'M', 'L', 'XL', '2XL'].map((s) => ({
-    size: s, colour: 'white', pricePence: 3195, wMm: 300, hMm: 360, dpi: 150,
+    size: s, colour: 'white', pricePence: 3195, wMm: 396, hMm: 498, dpi: 150,
     prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: 'white' },
     default: s === 'M', // sizes display XS→2XL; M is the sane default
   }));
@@ -106,9 +111,16 @@ function adultTeeVariants(): VariantDef[] {
 // non-UK/EU lab fails our residency posture). White 4411 is GB-made, £9, next-day. Tracked
 // shipping for a bodysuit-ALONE order is Express-only — flagged to the founder; in a family-set
 // order the garments ship together tracked.
+// Print canvas per size from Prodigi's API printAreaSizes (GET /v4.0/products/
+// GLOBAL-BB-RS-4411, 2026-07-07): white NB/6-12/12-18 = 2130×2130px (@300dpi =
+// 180×180mm). White 18-24 months lists TWO GB fulfilment routes with DIFFERENT
+// print areas (2130×2130 AND 1500×2010 = 127×170mm) — Prodigi picks the lab at
+// order time, so we design to the smaller INTERSECTION for that size; flagged in
+// the founder's support email for confirmation.
 function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
-    size, colour: 'white', pricePence: 2195, wMm: 180, hMm: 200, dpi: 150,
+    size, colour: 'white', pricePence: 2195,
+    wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150,
     prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' },
   }));
 }

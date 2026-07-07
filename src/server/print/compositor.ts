@@ -42,7 +42,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r4'; // r4: LIGHT_FABRIC composites multiply, shade 0 (ink-on-fabric, no white box)
+const RENDER_REV = 'r7'; // r7: multiply layers flatten to white at the WINDOW (kills the premultiplied edge line)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -305,15 +305,26 @@ async function renderFlat(args: {
     .png()
     .toBuffer();
 
-  // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a
-  // background-removal can leave. Robust: if anything is off, fall back to the raw layer.
+  const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
   let designLayer = windowed;
-  try {
-    const rgb = await sharp(windowed).removeAlpha().toBuffer();
-    const alpha = await sharp(windowed).ensureAlpha().extractChannel(3).blur(0.8).toBuffer();
-    designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
-  } catch {
-    // keep `windowed`
+  if (fx.blend === 'multiply') {
+    // MULTIPLY reads white as "no ink" — flatten the window over white IMMEDIATELY.
+    // The composite's premultiply round-trip leaves alpha-0 margins with BLACK rgb,
+    // so ANY partial-alpha edge derived from them (the feather below, displaced or
+    // downscaled edges) darkens the fabric as a line tracing the design's edge.
+    // Opaque white margins are exact (multiply identity), and the feather is
+    // unnecessary here: a bg-removal halo multiplies to invisible anyway.
+    designLayer = await sharp(windowed).flatten({ background: '#ffffff' }).png().toBuffer();
+  } else {
+    // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a
+    // background-removal can leave. Robust: if anything is off, fall back to the raw layer.
+    try {
+      const rgb = await sharp(windowed).removeAlpha().toBuffer();
+      const alpha = await sharp(windowed).ensureAlpha().extractChannel(3).blur(0.8).toBuffer();
+      designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+    } catch {
+      // keep `windowed`
+    }
   }
 
   // ── Tier-B fabric fx: displace the art along the blank's folds + re-apply the
@@ -321,7 +332,6 @@ async function renderFlat(args: {
   // an identity op). Runs BEFORE the mask clip, mirroring the reference pipeline, so
   // a fold-displaced edge is still clipped to the silhouette. Pure enhancement: any
   // failure keeps the un-fx'd layer — a mockup must never break for realism's sake.
-  const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
   if (fx.disp > 0 || fx.shade > 0) {
     try {
       const blankGray = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS })
@@ -370,6 +380,15 @@ async function renderFlat(args: {
       .png()
       .toBuffer();
     designLayer = await sharp(designLayer).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
+  }
+
+  // MULTIPLY reads white as "no ink", so flatten the layer's alpha away over white:
+  // any partial-alpha pixel (feather ring, displaced edges, mask soft edge) otherwise
+  // darkens the fabric under the premultiplied multiply — a faint line tracing the
+  // print edge. Flattening preserves the mask semantics too (clipped area → white →
+  // identity over the fabric).
+  if (fx.blend === 'multiply') {
+    designLayer = await sharp(designLayer).flatten({ background: '#ffffff' }).png().toBuffer();
   }
 
   // Composite the design over the working-res blank IN LINEAR LIGHT (own pipeline:

@@ -113,9 +113,10 @@ describe('softBody engine', () => {
 });
 
 describe('buildProduct — the full range', () => {
+  // Print canvases per Prodigi's API printAreaSizes (garments verified 2026-07-07).
   const MM: Record<string, [number, number]> = {
-    mug: [209, 98], framedPrint: [279, 356], kidsTee: [240, 300], adultTee: [300, 360],
-    babyBodysuit: [180, 200], cushion: [280, 280], blanket: [600, 1000], sack: [320, 500],
+    mug: [209, 98], framedPrint: [279, 356], kidsTee: [260, 260], adultTee: [396, 498],
+    babyBodysuit: [180, 180], cushion: [280, 280], blanket: [600, 1000], sack: [320, 500],
     apron: [220, 280], storybook: [148, 210], jigsaw: [250, 200], calendar: [297, 210],
     card: [127, 178], bauble: [82, 82],
   };
@@ -128,7 +129,10 @@ describe('buildProduct — the full range', () => {
       const box = new THREE.Box3().setFromObject(model!);
       const size = box.getSize(new THREE.Vector3());
       expect(size.x, `${kind} width`).toBeGreaterThan(10);
-      expect(size.x, `${kind} width`).toBeLessThan(1200); // nothing bigger than a large blanket
+      // Envelope guard only (the camera auto-fits; garments never reach true-scale AR).
+      // The adult tee's nominal width is ~1210mm: its TORSO anchors to the verified
+      // 555mm and the drawn flat-lay sleeves are stylised-wide.
+      expect(size.x, `${kind} width`).toBeLessThan(1300);
       expect(size.y, `${kind} height`).toBeLessThan(1700);
       const centre = box.getCenter(new THREE.Vector3());
       expect(Math.abs(centre.x), `${kind} centred x`).toBeLessThan(size.x * 0.25 + 1);
@@ -142,9 +146,10 @@ describe('buildProduct — the full range', () => {
   });
 
   it('garment print patch width equals the seeder region contain-fit (2D/3D agree)', () => {
-    // kids tee: region 0.40–0.60 of a 1300px blank at 0.44 mm/px = 114.4mm wide region;
-    // canvas 240×300 contained → width-limited at 114.4mm.
-    const model = buildProduct('kidsTee', new THREE.Texture(), 240, 300)!;
+    // kids tee: region x 0.36–0.64 of the 1300px blank at 330/460 mm-per-px; the square
+    // 260×260 canvas contains width-limited → patch width = the region width, which by
+    // construction equals ~the real 260mm print (78.8% of the verified 330mm torso).
+    const model = buildProduct('kidsTee', new THREE.Texture(), 260, 260)!;
     // the patch is the only mesh with MultiplyBlending
     let patchWidth = 0;
     model.traverse((o) => {
@@ -154,6 +159,7 @@ describe('buildProduct — the full range', () => {
         patchWidth = box.getSize(new THREE.Vector3()).x;
       }
     });
-    expect(patchWidth).toBeCloseTo(0.2 * 1300 * 0.44, 0);
+    expect(patchWidth).toBeCloseTo(0.28 * 1300 * (330 / 460), 0);
+    expect(patchWidth).toBeCloseTo(260, -1); // ≈ the true print canvas width in mm
   });
 });

@@ -92,11 +92,17 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     // Prodigi/own photography. The child's drawing lands on the CHEST panel, aspect-locked to the
     // garment's true print canvas; LIGHT_FABRIC lets the Tier-B fx make the art follow the baked
     // folds. No mask (the chest panel sits well inside the light jersey — same reasoning as the mug).
+    // Region widths are PHYSICALLY derived for the DEFAULT size (blank torso spans x 420–880px):
+    //   kids 3-4y half-chest 330mm (S&S size chart) → 260mm print = 78.8% of torso → x 0.36–0.64;
+    //   adult M half-chest 555mm (S&S) → 396mm print = 71.4% → x 0.374–0.626;
+    //   bodysuit torso (x 452–855px) capped at 80% pending the Rabbit Skins chart (support email).
+    // Mirrored in src/ui/three/builders.ts — keep in lockstep.
     case 'kidsTee':
+      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.36, y0: 0.36, x1: 0.64, y1: 0.61 } };
     case 'adultTee':
-      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.60 } };
+      return { file: 'derived/tee-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.374, y0: 0.36, x1: 0.626, y1: 0.635 } };
     case 'babyBodysuit':
-      return { file: 'derived/bodysuit-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.40, y0: 0.36, x1: 0.60, y1: 0.58 } };
+      return { file: 'derived/bodysuit-blank.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.38, y0: 0.36, x1: 0.627, y1: 0.58 } };
     case 'mug': // cylinder: a near-square decal CENTRED on the visible front face (founder call:
       // clarity over wrap fidelity on the tile; the Studio positioner stays exact on the wrap).
       // NO mask: the white body reads as background locally (white-on-light-grey), so the
