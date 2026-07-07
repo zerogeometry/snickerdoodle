@@ -42,7 +42,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r7'; // r7: multiply layers flatten to white at the WINDOW (kills the premultiplied edge line)
+const RENDER_REV = 'r8'; // r8: foreground overlay (lighting asset) composited OVER the design (jigsaw piece lines)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -133,6 +133,9 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // Optional product-silhouette mask (NON-child, same family as the blank): the design is
   // clipped to it, so art can never overlap the product's edge on shaped blanks.
   const [mask] = tpl.maskObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.maskObjectId)) : [undefined];
+  // Optional FOREGROUND overlay (LIGHTING asset): authored on-top detail composited OVER
+  // the design — e.g. the jigsaw's die-cut piece lines, so the art reads as physically cut.
+  const [overlay] = tpl.lightingObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.lightingObjectId)) : [undefined];
 
   // 3. The DESIGN — read from storage_objects, scoped to THIS asset (never from
   //    template_assets). A specific source object (e.g. a bg-removed cutout) must
@@ -168,6 +171,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       key,
       blankKey: blank.key,
       maskKey: mask?.key,
+      overlayKey: overlay?.key,
       designKey: srcObj.key,
       quad: tpl.printQuad!,
       transform: t,
@@ -188,7 +192,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 async function renderAndPersist(
   db: DbHandle,
   args: {
-    assetId: string; key: string; blankKey: string; maskKey?: string; designKey: string; quad: [number, number][];
+    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; quad: [number, number][];
     transform: Transform; workEdge: number; outputEdge: number;
     print: { widthPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string;
@@ -197,6 +201,7 @@ async function renderAndPersist(
   const out = await renderFlat({
     blankBuf: await getObjectBytes(args.blankKey),
     maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
+    overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
     designBuf: await getObjectBytes(args.designKey),
     quad: args.quad,
     transform: args.transform,
@@ -233,6 +238,8 @@ async function renderAndPersist(
 async function renderFlat(args: {
   blankBuf: Buffer;
   maskBuf?: Buffer;
+  /** Foreground overlay composited OVER the design (full-frame, same canvas as the blank). */
+  overlayBuf?: Buffer;
   designBuf: Buffer;
   quad: [number, number][];
   transform: Transform;
@@ -243,7 +250,7 @@ async function renderFlat(args: {
   /** Drives the Tier-B fabric fx intensities (fold displacement + shading). */
   materialClass: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, designBuf, quad, transform, workEdge, outputEdge, print, materialClass } = args;
+  const { blankBuf, maskBuf, overlayBuf, designBuf, quad, transform, workEdge, outputEdge, print, materialClass } = args;
 
   // Working blank dimensions: cap the longest edge at workEdge (scRGB is 32-bit float,
   // ~4× memory, so this cap is load-bearing). The normalised quad scales with it.
@@ -400,8 +407,26 @@ async function renderFlat(args: {
     .toColourspace('srgb')
     .toBuffer();
 
+  // FOREGROUND overlay (piece lines etc.) OVER the design — full-frame at working res,
+  // authored on the same canvas as the blank so it registers by construction; the art reads
+  // THROUGH it (die-cut lines sit on top). Composited in sRGB to preserve its authored look.
+  // Pure enhancement: any failure keeps `composited` — a mockup must never break for it.
+  let flattened = composited;
+  if (overlayBuf) {
+    try {
+      const ov = await sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+        .resize(WW, WH, { fit: 'fill' })
+        .ensureAlpha()
+        .png()
+        .toBuffer();
+      flattened = await sharp(composited).composite([{ input: ov, left: 0, top: 0, blend: 'over' }]).toBuffer();
+    } catch {
+      // keep `composited`
+    }
+  }
+
   // Downscale to the display size (lanczos), sharpen after resize, encode sRGB WebP.
-  const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
+  const out = await sharp(flattened, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
     .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
     .withMetadata({ icc: 'srgb' })

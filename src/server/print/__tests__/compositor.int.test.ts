@@ -272,6 +272,45 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     }
   });
 
+  it('composites a foreground OVERLAY over the design (jigsaw piece lines)', async () => {
+    const assetId = await ingestDesign(); // solid red 1200×1500
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+
+    // Full-frame overlay (same canvas as the blank): transparent except an opaque BLUE
+    // patch over the design's centre — stands in for the die-cut lines sitting on the art.
+    const overlayBuf = await sharp(
+      Buffer.from('<svg width="600" height="800"><rect x="250" y="350" width="100" height="100" fill="rgb(40,90,220)"/></svg>'),
+    ).png().toBuffer();
+    const overlayKey = `templates/test-${ids.nonce}/overlay.png`;
+    await putObject(overlayKey, overlayBuf, 'image/png');
+    keys.push(overlayKey);
+    const [oa] = await db
+      .insert(templateAssets)
+      .values({ kind: 'LIGHTING', bucket: process.env.S3_BUCKET!, key: overlayKey, contentType: 'image/png', byteSize: overlayBuf.byteLength, widthPx: 600, heightPx: 800 })
+      .returning();
+    await db.update(printTemplates).set({ lightingObjectId: oa!.id, templateVersion: 9 }).where(eq(printTemplates.variantId, variantId));
+
+    try {
+      const res = await composeMockup(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, size: 'zoom' });
+      const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
+      const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+      const { data, info } = await sharp(out).raw().toBuffer({ resolveWithObject: true });
+      const at = (x: number, y: number) => {
+        const i = (y * info.width! + x) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      };
+      // Centre → the overlay's BLUE sits OVER the red design (blue dominates, not red).
+      const [rC, , bC] = at(300, 400);
+      expect(bC).toBeGreaterThan(rC + 40);
+      // Inside the print area but OUTSIDE the overlay patch → the red design still shows.
+      const [rD] = at(150, 200);
+      expect(rD).toBeGreaterThan(150);
+    } finally {
+      await db.update(printTemplates).set({ lightingObjectId: null, templateVersion: 1 }).where(eq(printTemplates.variantId, variantId));
+      await db.delete(templateAssets).where(eq(templateAssets.id, oa!.id)).catch(() => {});
+    }
+  });
+
   it('CONTAIN default (scale 0): the whole design fits, margins show the blank through', async () => {
     const assetId = await ingestDesign(); // solid red 1200×1500 (aspect 0.8) on a 0.75-aspect print area
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);

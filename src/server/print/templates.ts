@@ -21,6 +21,11 @@ export interface SetMockupTemplateInput {
    * The compositor clips the design to it so art can never overlap the product's edge —
    * essential for shaped products (heart/round cushions, bauble, sack, apron). PNG. */
   mask?: Buffer;
+  /** Optional FOREGROUND overlay composited OVER the placed design (full-frame, same
+   * canvas as the blank; transparent where nothing sits on the art). Stored as a LIGHTING
+   * template asset. Used for authored on-top detail the art must read THROUGH — e.g. the
+   * jigsaw's die-cut piece lines, so the drawing looks physically cut, not printed flat. PNG. */
+  overlay?: Buffer;
 }
 
 /**
@@ -84,9 +89,29 @@ export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateIn
     maskObjectId = ma!.id;
   }
 
+  // Optional foreground overlay (piece lines etc.) — its own LIGHTING template_assets row,
+  // composited OVER the design at render time. Re-authoring WITHOUT one clears any previous.
+  let lightingObjectId: string | null = null;
+  if (input.overlay) {
+    const overlayKey = `templates/${input.variantId}/v${templateVersion}/overlay.png`;
+    await putObject(overlayKey, input.overlay, 'image/png');
+    const oMeta = await sharp(input.overlay).metadata();
+    const overlayRow = {
+      kind: 'LIGHTING' as const, bucket, key: overlayKey, contentType: 'image/png', byteSize: input.overlay.byteLength,
+      sha256: createHash('sha256').update(input.overlay).digest('hex'),
+      widthPx: oMeta.width ?? null, heightPx: oMeta.height ?? null,
+    };
+    const [oa] = await db
+      .insert(templateAssets)
+      .values(overlayRow)
+      .onConflictDoUpdate({ target: templateAssets.key, set: overlayRow })
+      .returning();
+    lightingObjectId = oa!.id;
+  }
+
   await db
     .update(printTemplates)
-    .set({ blankObjectId: ta!.id, maskObjectId, printQuad: input.printQuad, materialClass: input.materialClass ?? 'PAPER', templateVersion })
+    .set({ blankObjectId: ta!.id, maskObjectId, lightingObjectId, printQuad: input.printQuad, materialClass: input.materialClass ?? 'PAPER', templateVersion })
     .where(eq(printTemplates.variantId, input.variantId));
 
   return { blankObjectId: ta!.id, templateVersion, key };
