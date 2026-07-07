@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "visible_in_shop" boolean DEFAULT false NOT NULL;

@@ -32,6 +32,11 @@ type ProductDef = {
   description: string;
   specs: Record<string, string>;
   print: boolean;
+  /** STOREFRONT curation (founder, 2026-07-07): on show only when the whole product
+   * experience is "bang on" — launch is the framed print alone. Display-only; the
+   * product stays active/priceable/workable in the backend and graduates by flipping
+   * this + reseeding. */
+  visibleInShop?: boolean;
   variants: VariantDef[]; // the FIRST is the default unless one sets `default: true`
 };
 
@@ -143,7 +148,7 @@ function blanketVariants(): VariantDef[] {
 // SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
 const DEFS: Record<string, ProductDef> = {
   framedPrint: {
-    category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true,
+    category: 'PRINT', label: 'framed print', blurb: 'made real, framed in gold', print: true, visibleInShop: true,
     description: 'A gallery-quality print of the original, framed and ready to hang — the wonky bits framed in gold.',
     specs: { material: 'fine-art paper', glazing: 'shatterproof' },
     variants: frameVariants(),
@@ -331,8 +336,14 @@ export interface CatalogueProduct {
   popularRank: number | null;
 }
 
-/** Every active product with its variants — for the catalogue + customise screens. */
-export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
+/**
+ * The STOREFRONT catalogue: active products flagged {@link products.visibleInShop},
+ * with their variants — for the catalogue + customise screens. `includeHidden` is the
+ * curation workbench view (every active product regardless of the flag); its only
+ * caller gates it to non-production.
+ */
+export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boolean }): Promise<CatalogueProduct[]> {
+  const visibility = opts?.includeHidden ? [] : [eq(products.visibleInShop, true)];
   const rows = await db
     .select({
       key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
@@ -342,7 +353,7 @@ export async function loadCatalogue(db: DbHandle): Promise<CatalogueProduct[]> {
     .from(products)
     .innerJoin(productVariants, eq(productVariants.productId, products.id))
     .leftJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
-    .where(and(eq(products.active, true), eq(productVariants.active, true)))
+    .where(and(eq(products.active, true), eq(productVariants.active, true), ...visibility))
     .orderBy(asc(products.sortOrder), asc(productVariants.sortOrder));
 
   const byKey = new Map<string, CatalogueProduct>();
@@ -379,10 +390,11 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     const def = DEFS[key]!;
     const order = sortOrder++;
     const popularRank = popularRankOf(key);
+    const visibleInShop = def.visibleInShop ?? false;
     const [product] = await db
       .insert(products)
-      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank })
-      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank } })
+      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank, visibleInShop })
+      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank, visibleInShop } })
       .returning();
 
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));

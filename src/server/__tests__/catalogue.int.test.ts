@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
 import { printTemplates, productVariants, products } from '@/db/schema';
-import { getCatalogue, seedCatalogue } from '@/server/catalogue';
+import { getCatalogue, loadCatalogue, seedCatalogue } from '@/server/catalogue';
 import { CATALOGUE, quote } from '@/pricing';
 import type { DbHandle } from '@/server/db';
 
@@ -67,5 +67,27 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
   it('seeding is idempotent — no duplicate variants', async () => {
     await seedCatalogue(db);
     expect(await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'))).toHaveLength(1);
+  });
+
+  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = the framed print); the curation view sees everything', async () => {
+    // the storefront default — what every shopper-facing surface renders
+    const shop = await loadCatalogue(db);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint']);
+
+    // the dev curation workbench — every ACTIVE product regardless of the flag
+    const all = await loadCatalogue(db, { includeHidden: true });
+    expect(all.length).toBeGreaterThan(10);
+    expect(all.some((p) => p.key === 'mug')).toBe(true);
+
+    // hidden ≠ inactive: hidden products remain fully priceable in the backend
+    // (display curation only — `active` stays the sellable axis)
+    const cat = await getCatalogue(db);
+    expect(cat.mug!.pricePence).toBeGreaterThan(0);
+
+    // and the flag itself is seeded exactly as the founder set it
+    const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
+    for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
+      expect(f.v, f.key).toBe(f.key === 'framedPrint');
+    }
   });
 });

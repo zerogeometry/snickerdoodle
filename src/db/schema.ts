@@ -514,6 +514,12 @@ export const products = pgTable('products', {
   // Full Catalogue, not the front-of-shop popular grid. Founder-curated for now;
   // ready to be driven by real order counts later.
   popularRank: integer('popular_rank'),
+  // STOREFRONT curation (founder decision 2026-07-07): only products whose whole
+  // experience is "bang on" are on show — launch = the framed print alone. Display
+  // curation only: `active` remains the sellable/priceable axis, so hidden products
+  // stay fully workable in the backend and graduate by flipping this flag +
+  // reseeding — no code change.
+  visibleInShop: boolean('visible_in_shop').notNull().default(false),
   createdAt,
 });
 

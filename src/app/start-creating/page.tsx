@@ -33,7 +33,10 @@ export default function StartCreatingPage() {
 
   const loadCatalogue = () => {
     setLoadError(false);
-    void loadCatalogueAction()
+    // ?all=1 = the DEV curation view (every product, hidden included) — the server
+    // action refuses includeHidden in production, so the param is inert there.
+    const includeHidden = new URLSearchParams(window.location.search).get('all') === '1';
+    void loadCatalogueAction(includeHidden ? { includeHidden } : undefined)
       .then(setProducts)
       .catch(() => setLoadError(true));
   };

@@ -66,7 +66,10 @@ export default function CustomizePage() {
   }, [productKey]);
 
   useEffect(() => {
-    void loadCatalogueAction().then(setProducts);
+    // ?all=1 = the DEV curation view (customize a hidden product before it graduates);
+    // the server action refuses includeHidden in production.
+    const includeHidden = new URLSearchParams(window.location.search).get('all') === '1';
+    void loadCatalogueAction(includeHidden ? { includeHidden } : undefined).then(setProducts);
   }, []);
 
   const product = products?.find((p) => p.key === productKey) ?? null;

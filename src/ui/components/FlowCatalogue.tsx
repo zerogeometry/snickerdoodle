@@ -174,8 +174,16 @@ export function FlowCatalogue({
 
   // The banner promises "matching organic tees + a bodysuit" — only show it when all
   // three garments are actually purchasable (an unseeded/partial catalogue would
-  // otherwise open a dead-end set builder).
+  // otherwise open a dead-end set builder). With the curated storefront this also
+  // parks the whole family-set flow until the garments graduate back on show.
   const familySetAvailable = FAMILY_SET_PRODUCT_KEYS.every((k) => products.some((p) => p.key === k));
+
+  // "Full catalogue" earns its place only when it holds something beyond the sections
+  // already on screen — a one-product storefront must not open a modal of the same tile.
+  const hasMoreThanShown = useMemo(
+    () => products.some((p) => p.category !== 'ADDON' && p.popularRank == null && !picks.some((x) => x.key === p.key)),
+    [products, picks],
+  );
 
   // flat mode (the standalone /catalogue page): category chips over one grid
   const flatCategories = useMemo(
@@ -198,10 +206,12 @@ export function FlowCatalogue({
               When the shopper has picks from the full catalogue the title steps aside to
               "your range" and the two sections are labelled inside the scroll instead. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-display text-xl font-semibold text-cocoa">{picks.length > 0 ? 'your range' : 'most popular'}</h2>
-            <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
-              full catalogue <Icon icon={IconChevronRight} size={15} />
-            </Button>
+            <h2 className="font-display text-xl font-semibold text-cocoa">{picks.length > 0 ? 'your range' : popular.length === 1 && picks.length === 0 ? 'your keepsake' : 'most popular'}</h2>
+            {hasMoreThanShown ? (
+              <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
+                full catalogue <Icon icon={IconChevronRight} size={15} />
+              </Button>
+            ) : null}
           </div>
           {/* The hero set: one drawing, the whole family matching. Opens the set builder. */}
           {familySetAvailable ? (
@@ -235,7 +245,11 @@ export function FlowCatalogue({
             ) : picks.length === 0 ? (
               // success-but-empty: never a bare heading over a void
               <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-6 text-center text-sm text-[#6F6358]">
-                tap <b className="text-cinnamon">full catalogue</b> to browse the whole range.
+                {hasMoreThanShown ? (
+                  <>tap <b className="text-cinnamon">full catalogue</b> to browse the whole range.</>
+                ) : (
+                  <>the range is being lovingly prepared — back very soon.</>
+                )}
               </div>
             ) : null}
           </div>
@@ -294,7 +308,7 @@ export function FlowCatalogue({
         />
       ) : null}
 
-      {mode === 'sections' ? (
+      {mode === 'sections' && hasMoreThanShown ? (
         <FullCatalogueModal
           open={fullOpen}
           onClose={() => setFullOpen(false)}
