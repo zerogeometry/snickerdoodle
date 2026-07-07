@@ -1,5 +1,9 @@
 # Contrado own-label garments — cost comparison vs Prodigi
 
+> **DEFERRED (founder decision, 2026-07-07):** the Contrado all-over-print garment line is OFF
+> the plan for now — launch garments are Prodigi DTG front-prints presented as standard flat
+> product photos. Revisit only when the preview presentation earns it.
+
 > Prepared 2026-07-03 for the branding decision: Prodigi garments inherit the blank-maker's neck
 > label (Stanley/Stella, Bella+Canvas, Rabbit Skins); Contrado makes garments cut-and-sew in
 > London from printed fabric, so the label can be OURS. This is the cost of that label.

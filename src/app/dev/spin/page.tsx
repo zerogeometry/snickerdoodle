@@ -14,13 +14,9 @@ const Product3D = dynamic(() => import('@/ui/three/Product3D'), { ssr: false });
 const HARNESS: Record<string, { mm: [number, number]; attrs?: Record<string, string> }> = {
   mug: { mm: [209, 98] },
   framedPrint: { mm: [279, 356], attrs: { colour: 'gold' } },
-  kidsTee: { mm: [240, 300] },
-  adultTee: { mm: [300, 360] },
-  babyBodysuit: { mm: [180, 200] },
   cushion: { mm: [280, 280], attrs: { size: 'heart' } },
   blanket: { mm: [600, 1000], attrs: { colour: 'pink' } },
   sack: { mm: [320, 500] },
-  apron: { mm: [220, 280] },
   storybook: { mm: [148, 210] },
   jigsaw: { mm: [250, 200] },
   calendar: { mm: [297, 210] },

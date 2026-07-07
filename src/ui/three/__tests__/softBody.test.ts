@@ -113,11 +113,10 @@ describe('softBody engine', () => {
 });
 
 describe('buildProduct — the full range', () => {
-  // Print canvases per Prodigi's API printAreaSizes (garments verified 2026-07-07).
   const MM: Record<string, [number, number]> = {
-    mug: [209, 98], framedPrint: [279, 356], kidsTee: [260, 260], adultTee: [396, 498],
-    babyBodysuit: [180, 180], cushion: [280, 280], blanket: [600, 1000], sack: [320, 500],
-    apron: [220, 280], storybook: [148, 210], jigsaw: [250, 200], calendar: [297, 210],
+    mug: [209, 98], framedPrint: [279, 356],
+    cushion: [280, 280], blanket: [600, 1000], sack: [320, 500],
+    storybook: [148, 210], jigsaw: [250, 200], calendar: [297, 210],
     card: [127, 178], bauble: [82, 82],
   };
 
@@ -145,12 +144,9 @@ describe('buildProduct — the full range', () => {
     expect(buildProduct('giftWrap', new THREE.Texture(), 10, 10)).toBeNull();
   });
 
-  it('garment print patch width equals the seeder region contain-fit (2D/3D agree)', () => {
-    // kids tee: region x 0.36–0.64 of the 1300px blank at 330/460 mm-per-px; the square
-    // 260×260 canvas contains width-limited → patch width = the region width, which by
-    // construction equals ~the real 260mm print (78.8% of the verified 330mm torso).
-    const model = buildProduct('kidsTee', new THREE.Texture(), 260, 260)!;
-    // the patch is the only mesh with MultiplyBlending
+  it('sack print patch spans the official 320mm panel (physical registration in mm)', () => {
+    const model = buildProduct('sack', new THREE.Texture(), 320, 500)!;
+    // the patch is the only mesh with MultiplyBlending (ink-on-fabric)
     let patchWidth = 0;
     model.traverse((o) => {
       const mesh = o as THREE.Mesh;
@@ -159,7 +155,6 @@ describe('buildProduct — the full range', () => {
         patchWidth = box.getSize(new THREE.Vector3()).x;
       }
     });
-    expect(patchWidth).toBeCloseTo(0.28 * 1300 * (330 / 460), 0);
-    expect(patchWidth).toBeCloseTo(260, -1); // ≈ the true print canvas width in mm
+    expect(patchWidth).toBeCloseTo(320, 0); // Prodigi's 320×500mm sack panel, true mm
   });
 });

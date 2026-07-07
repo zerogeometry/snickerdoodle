@@ -1,18 +1,17 @@
 import * as THREE from 'three';
 import { buildMug, buildFrame } from './models';
-import { buildPrintPatch, buildSoftBody, containRect, pathToPolygon, polygonBounds, scalePolygon, type Pt, type SoftBody } from './softBody';
+import { buildPrintPatch, buildSoftBody, pathToPolygon, polygonBounds, type Pt } from './softBody';
 
 /**
- * Parametric 3D builders for the WHOLE launch range — every printable product gets a
- * "spin it around" view built in code (no licensed GLBs). Soft goods inflate their
- * silhouette via softBody.ts; rigid goods are primitive assemblies like the existing
- * mug/frame. The print always registers the way the 2D seeder registers it:
+ * Parametric 3D builders for the SPINNABLE products — built in code (no licensed
+ * GLBs). Soft goods inflate their silhouette via softBody.ts; rigid goods are
+ * primitive assemblies like the existing mug/frame. The print always registers the
+ * way the 2D seeder registers it:
  *   face-cover → the front surface IS the print (UV over the silhouette bbox);
- *   panel     → a patch with the print canvas aspect-locked inside the same region
- *               constants the seeder uses, composited MULTIPLY (ink on fabric, the
- *               3D twin of the compositor's LIGHT_FABRIC blend);
+ *   panel     → a patch composited MULTIPLY (ink on fabric, the 3D twin of the
+ *               compositor's LIGHT_FABRIC blend — the sack's physical panel);
  *   band/window → the existing mug wrap / frame window builders.
- * giftWrap prints nothing → no 3D.
+ * giftWrap prints nothing → no 3D. Wearables have no 3D (see spinnable.ts).
  */
 
 // ── materials ────────────────────────────────────────────────────────────────
@@ -48,90 +47,12 @@ function centred(group: THREE.Group): THREE.Group {
   return wrap;
 }
 
-// ── garment silhouettes (verbatim from scripts/make-garment-blanks.mjs, blank
-//    canvas 1300×1500 px — the SAME shapes the 2D tiles photograph) ────────────
-const TEE_PATH =
-  'M500 360 C560 348 740 348 800 360 L1010 402 C1120 430 1160 520 1150 610 L1010 690 C980 700 940 690 905 660 L880 600 ' +
-  'C872 760 872 1050 878 1210 C880 1240 855 1258 820 1258 L480 1258 C445 1258 420 1240 422 1210 C428 1050 428 760 420 600 ' +
-  'L395 660 C360 690 320 700 290 690 L150 610 C140 520 180 430 290 402 L500 360 Z';
-const TEE_NECK = 'M500 360 C560 348 740 348 800 360 C812 396 760 430 650 430 C540 430 488 396 500 360 Z';
-const BODY_PATH =
-  'M530 400 C575 388 725 388 770 400 L880 448 C955 495 1010 600 1040 730 L1062 845 C1068 888 1046 912 1008 902 L940 878 ' +
-  'C918 795 895 715 866 655 L848 618 C853 795 851 990 855 1125 C893 1160 899 1232 861 1263 C821 1293 742 1293 713 1256 ' +
-  'C691 1224 609 1224 587 1256 C558 1293 479 1293 439 1263 C401 1232 407 1160 445 1125 C449 990 447 795 452 618 L434 655 ' +
-  'C405 715 382 795 360 878 L292 902 C254 912 232 888 238 845 L260 730 C290 600 345 495 420 448 L530 400 Z';
-const BODY_NECK = 'M530 400 C575 388 725 388 770 400 C780 432 735 462 650 462 C565 462 520 432 530 400 Z';
-// Chest print regions as fractions of the 1300×1500 blank — MUST match seed-mockups.
-// Physically derived for the DEFAULT size: kids 3-4y torso 330mm carries the 260mm
-// canvas (78.8%); adult M torso 555mm carries 396mm (71.4%); bodysuit capped at 80%
-// pending the Rabbit Skins size chart.
-const KTEE_REGION = { x0: 0.36, y0: 0.36, x1: 0.64, y1: 0.61 };
-const ATEE_REGION = { x0: 0.374, y0: 0.36, x1: 0.626, y1: 0.635 };
-const BODY_REGION = { x0: 0.38, y0: 0.36, x1: 0.627, y1: 0.58 };
-const BLANK_W = 1300;
-const BLANK_H = 1500;
-// mm per blank px, set so the TORSO width (blank x 420–880 = 460px; bodysuit x 452–855
-// = 401px) equals the verified garment width — which makes the tees' print patch mm
-// equal the true print canvas mm. (The drawn sleeves are stylised, so TOTAL width
-// overstates; only relative proportions matter to the auto-fit camera.)
-const KTEE_SCALE = 330 / 460;
-const ATEE_SCALE = 555 / 460;
-const BODY_SCALE = 190 / 401; // newborn torso ≈ 190mm — approximate, pending the chart
+// NOTE: parametric GARMENT models (tees, bodysuit, apron) were removed by founder
+// decision (2026-07-07) — they didn't meet the visual bar. Wearables present as flat
+// product photos in 2D; a spin view returns only if a properly-made 3D garment model
+// (licensed/commissioned GLB, print-area UV = the Prodigi canvas) is added.
 
-/** Fold fields are authored in blank-px space and scaled with the garment so the
- * cloth character is identical at every size. Amplitudes are px (→ mm × scale). */
-const teeFoldPx = (x: number, y: number) => 3.4 * Math.sin(x * 0.013 + 1.2) * Math.sin(y * 0.005 + 0.5) + 2.2 * Math.sin((x + 0.6 * y) * 0.007);
-const bodyFoldPx = (x: number, y: number) => 3 * Math.sin(x * 0.015 + 0.8) * Math.sin(y * 0.0055) + 2 * Math.sin((x + 0.5 * y) * 0.008);
-
-function buildGarment(args: {
-  path: string;
-  neck: string;
-  region: { x0: number; y0: number; x1: number; y1: number };
-  scale: number; // mm per blank px
-  puffMm: number;
-  foldPx: (x: number, y: number) => number;
-  texture: THREE.Texture;
-  printWmm: number;
-  printHmm: number;
-}): THREE.Group {
-  const { scale: s } = args;
-  const outline = scalePolygon(pathToPolygon(args.path), s);
-  const neck = scalePolygon(pathToPolygon(args.neck), s);
-  const body = buildSoftBody({
-    outline,
-    holes: [neck],
-    puff: args.puffMm,
-    grid: 150, // garments show their curvature up close — keep facets invisible
-    fold: (x, y) => s * args.foldPx(x / s, y / s),
-  });
-  const group = new THREE.Group();
-  const mat = cotton();
-  group.add(new THREE.Mesh(body.front, mat), new THREE.Mesh(body.back, mat));
-
-  // Ribbed collar: a soft tube following the neck opening at fabric height.
-  const [ccx, ccy] = body.centre;
-  const collarPts = neck.filter((_, i) => i % 2 === 0).map(([x, y]) => new THREE.Vector3(x - ccx, ccy - y, Math.max(1.5, body.heightAt(x, y + 6 * s))));
-  const collar = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(collarPts, true), 72, 7 * s, 10, true),
-    cotton('#f4efe4'),
-  );
-  group.add(collar);
-
-  // Print patch: the seeder's region (blank fractions → mm), print canvas contained.
-  const region = {
-    x: args.region.x0 * BLANK_W * s,
-    y: args.region.y0 * BLANK_H * s,
-    w: (args.region.x1 - args.region.x0) * BLANK_W * s,
-    h: (args.region.y1 - args.region.y0) * BLANK_H * s,
-  };
-  const rect = containRect(region, args.printWmm, args.printHmm);
-  const patch = new THREE.Mesh(buildPrintPatch(body, rect), inkOnFabric(args.texture));
-  patch.renderOrder = 1;
-  group.add(patch);
-  return centred(group);
-}
-
-// ── soft goods: cushions, blanket, sack, apron ───────────────────────────────
+// ── soft goods: cushions, blanket, sack ──────────────────────────────────────
 function heartPolygon(widthMm: number): Pt[] {
   // Classic parametric heart, y flipped to blank convention (y down), scaled to width.
   const pts: Pt[] = [];
@@ -226,40 +147,6 @@ function buildSack(texture: THREE.Texture): THREE.Group {
   return centred(group);
 }
 
-// Apron (child default): bib + skirt silhouette in mm; centre chest-to-hem panel.
-const APRON_PATH =
-  'M170 16 C170 6 290 6 290 16 L298 120 C362 150 412 202 426 262 L434 520 C434 542 420 550 400 550 L60 550 C40 550 26 542 26 520 ' +
-  'L34 262 C48 202 98 150 162 120 Z';
-function buildApron(texture: THREE.Texture, printWmm: number, printHmm: number): THREE.Group {
-  const outline = pathToPolygon(APRON_PATH);
-  const body = buildSoftBody({
-    outline,
-    puff: 9,
-    backPuff: 4,
-    plateau: 60,
-    fold: (x, y) => 1.6 * Math.sin(x * 0.03 + 1) * Math.sin(y * 0.012) + 1.1 * Math.sin((x + y) * 0.012),
-  });
-  const group = new THREE.Group();
-  const mat = cotton('#f7f4ed');
-  group.add(new THREE.Mesh(body.front, mat), new THREE.Mesh(body.back, mat));
-  // The seeder's apron region fractions {0.24–0.76, 0.38–0.92} applied to THIS
-  // silhouette's bbox — same registration constants, same relative placement.
-  const b = polygonBounds([outline]);
-  const rect = containRect(
-    { x: b.x0 + 0.24 * (b.x1 - b.x0), y: b.y0 + 0.38 * (b.y1 - b.y0), w: 0.52 * (b.x1 - b.x0), h: 0.54 * (b.y1 - b.y0) },
-    printWmm,
-    printHmm,
-  );
-  const patch = new THREE.Mesh(buildPrintPatch(body, rect), inkOnFabric(texture));
-  patch.renderOrder = 1;
-  group.add(patch);
-  // neck strap: a thin tube arc over the bib
-  const strap = new THREE.Mesh(new THREE.TorusGeometry(62, 4, 10, 40, Math.PI), new THREE.MeshStandardMaterial({ color: '#3a332c', roughness: 0.7 }));
-  strap.position.set(0, 550 / 2 - 8, 4);
-  group.add(strap);
-  return centred(group);
-}
-
 // ── rigid goods: storybook, jigsaw, calendar, card, bauble ───────────────────
 function buildStorybook(texture: THREE.Texture, wMm: number, hMm: number): THREE.Group {
   const group = new THREE.Group();
@@ -346,20 +233,12 @@ export function buildProduct(kind: string, texture: THREE.Texture, printWmm: num
       return buildMug(texture as THREE.CanvasTexture, printWmm, printHmm);
     case 'framedPrint':
       return buildFrame(texture as THREE.CanvasTexture, printWmm, printHmm, attrs.colour ?? 'gold');
-    case 'kidsTee':
-      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: KTEE_REGION, scale: KTEE_SCALE, puffMm: 11, foldPx: teeFoldPx, texture, printWmm, printHmm });
-    case 'adultTee':
-      return buildGarment({ path: TEE_PATH, neck: TEE_NECK, region: ATEE_REGION, scale: ATEE_SCALE, puffMm: 17, foldPx: teeFoldPx, texture, printWmm, printHmm });
-    case 'babyBodysuit':
-      return buildGarment({ path: BODY_PATH, neck: BODY_NECK, region: BODY_REGION, scale: BODY_SCALE, puffMm: 8, foldPx: bodyFoldPx, texture, printWmm, printHmm });
     case 'cushion':
       return buildCushion(texture, printWmm, attrs.size ?? 'heart');
     case 'blanket':
       return buildBlanket(texture, printWmm, printHmm, attrs.colour ?? 'white');
     case 'sack':
       return buildSack(texture);
-    case 'apron':
-      return buildApron(texture, printWmm, printHmm);
     case 'storybook':
       return buildStorybook(texture, printWmm, printHmm);
     case 'jigsaw':
