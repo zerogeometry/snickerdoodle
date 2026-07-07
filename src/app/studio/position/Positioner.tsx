@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
-import { gbp, toast, useBasket, usePlacements } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements, useSelection } from '@/lib/store';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
@@ -53,8 +53,10 @@ export function Positioner({
 }) {
   const focused = Boolean(focusVariantId && data.variants.some((v) => v.id === focusVariantId));
   // The editor is ALWAYS scoped to one creation (founder call 2026-07-07 — no catalogue
-  // in here). Arriving without a focus variant scopes to the first product's default.
-  const variants = focused ? data.variants.filter((v) => v.id === focusVariantId) : data.variants.slice(0, 1);
+  // in here). When focused, data.variants is the creation's orientation pair (server-
+  // scoped) so the portrait/landscape toggle can switch between them. Unfocused (member
+  // home entry) scopes to the first product's default.
+  const variants = focused ? data.variants : data.variants.slice(0, 1);
   const [assetIdx, setAssetIdx] = useState(0);
   const [variantId, setVariantId] = useState((focused ? focusVariantId : undefined) ?? data.variants[0]?.id ?? '');
   // scale 0 = the CONTAIN sentinel: "fit the whole image" — the default placement. It
@@ -251,6 +253,19 @@ export function Positioner({
     const next = (((tf.rotationDeg + 90) % 360) as Rotation);
     update({ rotationDeg: next });
   };
+
+  // Orientation toggle (frames): switch to the same-size+colour sibling in the chosen
+  // orientation. Its own template flips the canvas aspect; the placement carries over.
+  // Persist the choice so Customize reflects it on save & return.
+  const available = new Set(variants.map((v) => v.orientation).filter(Boolean));
+  const orientations = (['portrait', 'landscape'] as const).filter((o) => available.has(o));
+  const switchOrientation = (o: string) => {
+    const target = variants.find((v) => v.orientation === o);
+    if (!target || target.id === variantId) return;
+    setResult(null);
+    setVariantId(target.id);
+    useSelection.getState().setSelection(target.productKey, { orientation: o });
+  };
   /** Commit a placement change. Accepts a function so rapid bursts (key auto-repeat,
    * queued events) COMPOUND instead of all reading the same stale snapshot — a direct
    * patch would collapse 20 zoom presses into one step. The history push runs inside
@@ -339,6 +354,8 @@ export function Positioner({
   // add-to-basket are finalised there (so the chosen size/colour can't be lost).
   const saveReturn = () => {
     setPlacement(`${keepsake.id}-${variant.productKey}`, { ...tf });
+    // Reflect the (possibly toggled) orientation on the product page we return to.
+    if (variant.orientation) useSelection.getState().setSelection(variant.productKey, { orientation: variant.orientation });
     toast('placement saved ✓');
     if (returnTo) router.push(returnTo);
   };
@@ -907,6 +924,29 @@ export function Positioner({
           <p className="mt-2 inline-flex rounded-full border border-cinnamon bg-[#FBEFE0] px-3 py-1.5 text-xs font-semibold text-cocoa">
             {variant.label} · {gbp(variant.pricePence)}
           </p>
+
+          {/* Orientation — portrait / landscape, right here in the editor (founder call
+              2026-07-07). Switching flips the canvas aspect to the sibling's template. */}
+          {orientations.length > 1 ? (
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Orientation</p>
+              <div className="mt-2 flex gap-1.5" role="group" aria-label="orientation">
+                {orientations.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    onClick={() => switchOrientation(o)}
+                    aria-pressed={variant.orientation === o}
+                    className={`relative rounded-full border px-3 py-1.5 text-xs font-bold before:absolute before:-inset-[6px] before:content-[''] ${
+                      variant.orientation === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'
+                    }`}
+                  >
+                    {o}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
 
           {data.keepsakes.length > 1 ? (
             <>

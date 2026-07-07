@@ -196,6 +196,21 @@ export const usePlacements = create<{
   setPlacement: (key, tf) => set((s) => ({ placements: { ...s.placements, [key]: tf } })),
 }));
 
+// ── customize selection (size / colour / orientation), keyed by productKey ──
+// Persists the shopper's chosen variant across the Customize ↔ editor round-trip
+// (so pressing "edit placement" then "save & return" no longer resets it to the
+// default), and lets the editor's orientation toggle write back so Customize
+// reflects it on return. In-memory: a demo selection, not durable state.
+export type Selection = { size?: string; colour?: string; orientation?: string };
+export const useSelection = create<{
+  selections: Record<string, Selection>;
+  setSelection: (productKey: string, patch: Selection) => void;
+}>((set) => ({
+  selections: {},
+  setSelection: (productKey, patch) =>
+    set((s) => ({ selections: { ...s.selections, [productKey]: { ...s.selections[productKey], ...patch } } })),
+}));
+
 // ── kept creations (the Keepsake Home) ───────────────────────────────────────
 export type Kept = {
   id: string;

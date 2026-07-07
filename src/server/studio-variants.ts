@@ -19,6 +19,9 @@ export interface StudioVariant {
   productKey: string;
   label: string;
   pricePence: number;
+  /** portrait | landscape when the product has an orientation axis (frames) — drives
+   * the in-editor orientation toggle. Undefined for products without one. */
+  orientation?: string;
   template: StudioTemplate;
 }
 
@@ -34,11 +37,13 @@ function variantLabel(p: typeof products.$inferSelect, v: typeof productVariants
 }
 
 function toStudioVariant({ v, p, t }: VariantRow): StudioVariant {
+  const a = (v.attributes ?? {}) as Record<string, string>;
   return {
     id: v.id,
     productKey: p.key,
     label: variantLabel(p, v),
     pricePence: v.pricePence,
+    orientation: a.orientation,
     template: {
       printWidthPx: t.printWidthPx,
       printHeightPx: t.printHeightPx,
@@ -54,19 +59,37 @@ function toStudioVariant({ v, p, t }: VariantRow): StudioVariant {
  *
  * The editor is ALWAYS scoped to ONE creation (founder call 2026-07-07 — no catalogue
  * in here). When Customize hands us the SPECIFIC variant the shopper chose (its exact
- * size/colour/orientation), we return JUST that one — its own template drives the canvas,
- * so a landscape frame edits on a landscape canvas. Without a focus (e.g. the member
- * home entry) we fall back to one representative (the default) per product. */
+ * size/colour/orientation), we return that one PLUS its orientation sibling(s) — same
+ * product, same size, same colour, the other orientation — so the editor can offer a
+ * portrait/landscape toggle without leaving the creation (each carries its own template,
+ * so the canvas aspect is always right). Without a focus (e.g. the member home entry)
+ * we fall back to one representative (the default) per product. */
 export async function loadPrintableVariants(db: DbHandle, focusVariantId?: string): Promise<StudioVariant[]> {
   if (focusVariantId) {
-    const [row] = await db
+    const [focus] = await db
       .select({ v: productVariants, p: products, t: printTemplates })
       .from(productVariants)
       .innerJoin(products, eq(products.id, productVariants.productId))
       .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
       .where(and(eq(productVariants.id, focusVariantId), eq(products.active, true), eq(productVariants.active, true)));
-    // A real, printable focus wins outright — the editor is exactly this creation.
-    if (row) return [toStudioVariant(row)];
+    if (focus) {
+      const fa = (focus.v.attributes ?? {}) as Record<string, string>;
+      if (!fa.orientation) return [toStudioVariant(focus)]; // no orientation axis → just this creation
+      // The orientation pair for this exact size+colour (portrait + landscape).
+      const rows = await db
+        .select({ v: productVariants, p: products, t: printTemplates })
+        .from(productVariants)
+        .innerJoin(products, eq(products.id, productVariants.productId))
+        .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
+        .where(and(eq(productVariants.productId, focus.p.id), eq(products.active, true), eq(productVariants.active, true)));
+      const sibs = rows.filter((r) => {
+        const a = (r.v.attributes ?? {}) as Record<string, string>;
+        return a.size === fa.size && a.colour === fa.colour;
+      });
+      // focus first, then its other-orientation sibling(s)
+      const ordered = [focus, ...sibs.filter((s) => s.v.id !== focus.v.id)];
+      return ordered.map(toStudioVariant);
+    }
     // Unknown/unprintable id: fall through to the defaults so the editor still opens.
   }
   const vrows = await db

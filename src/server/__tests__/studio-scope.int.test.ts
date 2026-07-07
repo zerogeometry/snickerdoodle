@@ -33,7 +33,7 @@ describe.skipIf(!URL)('studio editor scope — the focused variant wins (integra
     await client.end();
   });
 
-  it('a SPECIFIC non-default landscape frame → the editor scopes to exactly it, on a landscape canvas', async () => {
+  it('a SPECIFIC non-default landscape frame → scoped to that creation + its orientation sibling only', async () => {
     const [frame] = await db.select().from(products).where(eq(products.key, 'framedPrint'));
     // a real, non-default landscape frame variant (what Customize would send)
     const [landscape] = await db
@@ -42,25 +42,32 @@ describe.skipIf(!URL)('studio editor scope — the focused variant wins (integra
       .where(and(eq(productVariants.productId, frame!.id), eq(productVariants.isDefault, false)))
       .then((rows) => rows.filter((v) => (v.attributes as Record<string, string> | null)?.orientation === 'landscape'));
     expect(landscape, 'a landscape frame variant is seeded').toBeTruthy();
-    expect(landscape!.isDefault).toBe(false);
+    const la = landscape!.attributes as Record<string, string>;
 
     const scoped = await loadPrintableVariants(db, landscape!.id);
-    // exactly ONE variant — the one we asked for, never the whole catalogue
-    expect(scoped).toHaveLength(1);
-    expect(scoped[0]!.id).toBe(landscape!.id);
-    expect(scoped[0]!.productKey).toBe('framedPrint');
-    // its OWN template drives the canvas: landscape ⇒ wider than tall
+    // exactly the orientation PAIR for this size+colour — never the whole catalogue
+    expect(scoped).toHaveLength(2);
+    expect(scoped[0]!.id).toBe(landscape!.id); // focus first
+    expect(scoped.every((v) => v.productKey === 'framedPrint')).toBe(true);
+    // both share the exact size+colour, and differ only in orientation
+    expect(new Set(scoped.map((v) => v.orientation))).toEqual(new Set(['portrait', 'landscape']));
+    // the focused (landscape) drives a landscape canvas: wider than tall
     expect(scoped[0]!.template.printWidthPx).toBeGreaterThan(scoped[0]!.template.printHeightPx);
     // the pill names the exact creation (size + orientation surfaced)
     expect(scoped[0]!.label.toLowerCase()).toContain('landscape');
+    // the sibling is the SAME size + colour, portrait, on a portrait canvas
+    const portraitSib = scoped.find((v) => v.orientation === 'portrait')!;
+    expect(portraitSib.label).toContain(la.size!);
+    expect(portraitSib.label).toContain(la.colour!);
+    expect(portraitSib.template.printHeightPx).toBeGreaterThan(portraitSib.template.printWidthPx);
   });
 
-  it('the portrait default frame → a portrait canvas (the same scoping, taller than wide)', async () => {
-    const [portrait] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
-    const scoped = await loadPrintableVariants(db, portrait!.id);
+  it('a product with NO orientation axis stays scoped to exactly one variant', async () => {
+    // mug variants carry size/colour but no orientation → no sibling expansion
+    const [mug] = await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'));
+    const scoped = await loadPrintableVariants(db, mug!.id);
     expect(scoped).toHaveLength(1);
-    expect(scoped[0]!.id).toBe(portrait!.id);
-    expect(scoped[0]!.template.printHeightPx).toBeGreaterThan(scoped[0]!.template.printWidthPx);
+    expect(scoped[0]!.id).toBe(mug!.id);
   });
 
   it('an UNKNOWN focus id falls back to defaults so the editor still opens (never throws)', async () => {

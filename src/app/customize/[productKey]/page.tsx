@@ -4,13 +4,13 @@ import { IconArrowLeft, IconChevronDown, IconChevronLeft, IconChevronRight, Icon
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
-import { gbp, toast, useBasket, usePlacements, useUpload } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
@@ -52,6 +52,10 @@ export default function CustomizePage() {
   const [colour, setColour] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<string>('portrait');
   const [orientationTouched, setOrientationTouched] = useState(false);
+  // Ref (updates synchronously, unlike the state above) so the image-aspect auto-default
+  // effect — which runs in the SAME flush as the restore effect — sees an explicit choice
+  // immediately and doesn't clobber a restored/editor-chosen orientation with a guess.
+  const orientationLockedRef = useRef(false);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
@@ -76,10 +80,24 @@ export default function CustomizePage() {
   useEffect(() => {
     if (!product) return;
     const def = product.variants.find((v) => v.isDefault) ?? product.variants[0]!;
-    setSize(def.attributes.size ?? null);
-    setColour(def.attributes.colour ?? null);
-    setOrientation(def.attributes.orientation ?? 'portrait');
+    // Prefer a PERSISTED selection (survives the editor round-trip + carries the editor's
+    // orientation choice back) over the product default.
+    const saved = useSelection.getState().selections[product.key];
+    setSize(saved?.size ?? def.attributes.size ?? null);
+    setColour(saved?.colour ?? def.attributes.colour ?? null);
+    setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
+    if (saved?.orientation) {
+      orientationLockedRef.current = true; // synchronous → the auto-default effect below sees it this same flush
+      setOrientationTouched(true); // an explicit/restored choice isn't overridden by the image-aspect auto-default
+    }
   }, [product]);
+
+  // Persist the current selection so it survives navigation (edit placement → save &
+  // return) and the editor can read/reflect the chosen orientation.
+  useEffect(() => {
+    if (!product) return;
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation });
+  }, [product, size, colour, orientation]);
 
   // Colours actually available for the selected size — the matrix can be SPARSE (e.g.
   // an 11oz mug in 3 colours but 15oz in white only), so never offer an unavailable combo.
@@ -117,10 +135,10 @@ export default function CustomizePage() {
   // Orientation: auto-defaults to the shape of the uploaded image the first time
   // (a wide drawing suggests a landscape frame); the shopper can override any time.
   useEffect(() => {
-    if (!product || product.orientations.length === 0 || orientationTouched || !upload?.dataUrl) return;
+    if (!product || product.orientations.length === 0 || orientationTouched || orientationLockedRef.current || !upload?.dataUrl) return;
     const img = new window.Image();
     img.onload = () => {
-      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      if (!orientationLockedRef.current && img.naturalWidth > 0 && img.naturalHeight > 0) {
         setOrientation(img.naturalWidth > img.naturalHeight ? 'landscape' : 'portrait');
       }
     };
@@ -350,6 +368,7 @@ export default function CustomizePage() {
               options={product.orientations}
               value={orientation}
               onChange={(o) => {
+                orientationLockedRef.current = true;
                 setOrientationTouched(true);
                 setOrientation(o);
               }}
