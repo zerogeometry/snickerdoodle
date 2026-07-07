@@ -289,22 +289,7 @@ export default function CustomizePage() {
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
         {/* Left: ONE photo preview (+20% vs the old view) with the colour strip under it */}
         <div>
-          {product.key === 'jigsaw' ? (
-            // The jigsaw's companion view: the drawing as the puzzle, or on the keepsake tin.
-            <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
-              {([['primary', 'the puzzle'], ['tin', 'the tin']] as const).map(([v, label]) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setMockupView(v)}
-                  aria-pressed={mockupView === v}
-                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${mockupView === v ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : canSpin ? (
+          {canSpin ? (
             <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
               {(['photo', 'spin'] as const).map((m) => (
                 <button
@@ -357,6 +342,34 @@ export default function CustomizePage() {
           </div>
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+          ) : null}
+          {/* Jigsaw: two small thumbnails beneath the preview — the puzzle itself and the
+              drawing on the keepsake tin — that switch the main preview when tapped. */}
+          {product.key === 'jigsaw' ? (
+            <div className="mt-3 flex items-center gap-2" role="group" aria-label="preview view">
+              {([['primary', 'the puzzle'], ['tin', 'the tin']] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setMockupView(v)}
+                  aria-pressed={mockupView === v}
+                  aria-label={label}
+                  className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${mockupView === v ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                >
+                  <MockupPreview
+                    productKey={product.key as ProductKey}
+                    assetId={activeAssetId}
+                    variantId={variant?.id ?? null}
+                    transform={placement}
+                    size="thumb"
+                    sourceObjectId={activeSource ?? null}
+                    view={v === 'tin' ? 'tin' : undefined}
+                    px={120}
+                    lazy
+                  />
+                </button>
+              ))}
+            </div>
           ) : null}
           {/* Colour strip: one thumbnail per colour, 3 visible, arrows to cycle.
               A tap selects that colour (and the chips stay in sync). */}
