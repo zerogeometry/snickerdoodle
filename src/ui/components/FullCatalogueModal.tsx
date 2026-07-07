@@ -23,7 +23,6 @@ export function FullCatalogueModal({
   onClose,
   products,
   qtyOf,
-  mockImg,
   upload,
   count,
   subtotal,
@@ -36,7 +35,6 @@ export function FullCatalogueModal({
   onClose: () => void;
   products: CatalogueProduct[];
   qtyOf: (p: CatalogueProduct) => number;
-  mockImg: string | null;
   upload: Upload;
   count: number;
   subtotal: number;
@@ -113,7 +111,6 @@ export function FullCatalogueModal({
         <ProductGrid
           products={shown}
           qtyOf={qtyOf}
-          mockImg={mockImg}
           upload={upload}
           lazy
           gridClassName="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4"

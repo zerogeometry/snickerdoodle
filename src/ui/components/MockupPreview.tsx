@@ -1,18 +1,19 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ProductMockup, type ProductKey } from './ProductArt';
+import type { ProductKey } from './ProductArt';
 import { composeMockupAction } from '@/app/actions/mockup';
 import type { PlacementTransform } from '@/lib/store';
 
 /**
- * A product preview that upgrades to the real, in-VPC photoreal mockup when one is
- * available, and otherwise shows the stylised SVG ProductMockup. The SVG renders
- * IMMEDIATELY (the skeleton + the permanent fallback for any variant without a template
- * yet), then swaps to the signed WebP once the compositor returns one — so the catalogue
- * is complete from day one and upgrades SKU-by-SKU as blanks are authored, with no broken
- * or blank states. Uses a plain <img> with the signed URL (never next/image, which would
- * try to re-fetch an expired signed URL).
+ * A product preview that shows the real, in-VPC photoreal mockup — and nothing else.
+ * Until the first photo lands it holds a calm oat block (founder's rule: the stylised
+ * SVG stand-in is gone for good — "just let the thumbnail load"). Once a photo IS on
+ * screen it never blanks: a newer variant/placement composes off-screen and swaps in
+ * only when its pixels are ready, so there is no flash between variants. A failed
+ * attempt quietly retries a couple of times (a re-compose also re-mints the signed
+ * URL), then rests as the plain block. Uses a plain <img> with the signed URL (never
+ * next/image, which would try to re-fetch an expired signed URL).
  *
  * `lazy` defers the compose call until the tile scrolls into view (IntersectionObserver),
  * so a big grid — e.g. the Full Catalogue — doesn't fire dozens of renders at once; it
@@ -25,10 +26,7 @@ export function MockupPreview({
   transform,
   size,
   sourceObjectId,
-  image,
-  placement,
   px = 96,
-  uid,
   lazy = false,
 }: {
   productKey: ProductKey;
@@ -37,25 +35,23 @@ export function MockupPreview({
   transform?: PlacementTransform | null;
   size?: 'thumb' | 'zoom';
   sourceObjectId?: string | null;
-  /** Fallback SVG inputs (shown until/unless the real mockup lands). */
-  image?: string | null;
-  placement?: PlacementTransform | null;
   px?: number;
-  uid?: string;
   /** Defer composing until scrolled into view (for large grids). */
   lazy?: boolean;
 }) {
-  // `current` = the image on screen; it is NEVER cleared while a newer variant
+  // `current` = the photo on screen; it is NEVER cleared while a newer variant
   // composes (the founder's rule: stay on the previous product until the chosen
-  // one manages to load — no placeholder flash between variants). `fallback`
-  // marks the TERMINAL states where the stylised SVG is the honest render: no
-  // artwork/variant yet, no template for this product, or a failed compose.
+  // one manages to load — no placeholder flash between variants). `resting` marks
+  // the terminal no-photo states (no template / repeated failure): the block stops
+  // pulsing so it doesn't promise work that isn't happening.
   const [current, setCurrent] = useState<string | null>(null);
-  const [fallback, setFallback] = useState(false);
+  const [resting, setResting] = useState(false);
+  const [attempt, setAttempt] = useState(0); // bumped to re-run a failed compose
   const [visible, setVisible] = useState(!lazy);
   const containerRef = useRef<HTMLDivElement>(null);
   const currentRef = useRef<string | null>(null);
   currentRef.current = current;
+  const retriesRef = useRef(0);
   // A different DRAWING (new upload / cutout) must not linger — only variant/
   // placement changes keep the previous image while the next composes.
   const artKey = `${assetId ?? ''}|${sourceObjectId ?? ''}`;
@@ -65,6 +61,13 @@ export function MockupPreview({
     if (current !== null) setCurrent(null);
   }
   const tfKey = JSON.stringify(transform ?? null);
+  // Fresh inputs get a fresh retry allowance.
+  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}`;
+  const lastInputKey = useRef(inputKey);
+  if (lastInputKey.current !== inputKey) {
+    lastInputKey.current = inputKey;
+    retriesRef.current = 0;
+  }
 
   // Latch visibility once the tile nears the viewport — then never re-observe.
   useEffect(() => {
@@ -91,48 +94,78 @@ export function MockupPreview({
   useEffect(() => {
     if (!visible) return;
     let live = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (!assetId || !variantId) {
+      // Ids still resolving (ingest / catalogue fetch in flight) — wait quietly.
       setCurrent(null);
-      setFallback(true); // nothing to compose — the SVG IS the render
+      setResting(false);
       return;
     }
-    setFallback(false); // a new attempt begins; `current` keeps showing meanwhile
-    composeMockupAction({
-      assetId,
-      variantId,
-      transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
-      size,
-      sourceObjectId: sourceObjectId ?? undefined,
-    })
-      .then((r) => {
-        if (!live) return;
-        if (!r.ok) {
-          // no template / blocked — terminal for this variant, and a stale image
-          // of another variant would be a lie: show the honest SVG.
-          setCurrent(null);
-          setFallback(true);
-          return;
-        }
-        // Preload OFF-SCREEN and swap only once the pixels are ready — the visible
-        // image never blanks, and there is no half-loaded pop.
-        const pre = new window.Image();
-        pre.onload = () => {
-          if (live) setCurrent(r.url);
-        };
-        pre.onerror = () => {
-          if (live && !currentRef.current) setFallback(true); // else: keep the previous image
-        };
-        pre.src = r.url;
+    setResting(false); // a new attempt begins; `current` keeps showing meanwhile
+    const retryOrRest = () => {
+      // Transient failure: the previous photo (if any) stays — it is still honest.
+      // With nothing on screen, retry gently, then settle into the plain block.
+      if (!live || currentRef.current) return;
+      if (retriesRef.current >= 2) {
+        setResting(true);
+        return;
+      }
+      retriesRef.current += 1;
+      timer = setTimeout(() => {
+        if (live) setAttempt((a) => a + 1);
+      }, 900 * retriesRef.current);
+    };
+    // An action dispatched during mount churn can be dropped by the client action
+    // queue and NEVER settle (observed in dev: the aborted first strict-mode mount
+    // takes the surviving mount's call down with it; the lazy tiles dodge it by
+    // firing late). Two defences: DEFER the dispatch a beat, so an immediately-
+    // unmounted effect never dispatches at all — and a WATCHDOG, so if a call still
+    // never settles we stop waiting and retry instead of pulsing forever.
+    let superseded = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    const kickoff = setTimeout(() => {
+      watchdog = setTimeout(() => {
+        superseded = true;
+        retryOrRest();
+      }, 15_000);
+      composeMockupAction({
+        assetId,
+        variantId,
+        transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
+        size,
+        sourceObjectId: sourceObjectId ?? undefined,
       })
-      .catch(() => {
-        // transient failure: keep the previous image if we have one; SVG only when
-        // there is nothing better to show — never a broken image either way.
-        if (live && !currentRef.current) setFallback(true);
-      });
+        .then((r) => {
+          clearTimeout(watchdog);
+          if (!live || superseded) return;
+          if (!r.ok) {
+            // no template / blocked — terminal for this variant, and a stale image
+            // of another variant would be a lie: clear down to the plain block.
+            setCurrent(null);
+            setResting(true);
+            return;
+          }
+          // Preload OFF-SCREEN and swap only once the pixels are ready — the visible
+          // image never blanks, and there is no half-loaded pop.
+          const pre = new window.Image();
+          pre.onload = () => {
+            if (live) setCurrent(r.url);
+          };
+          pre.onerror = retryOrRest;
+          pre.src = r.url;
+        })
+        .catch(() => {
+          clearTimeout(watchdog);
+          retryOrRest();
+        });
+    }, 50);
     return () => {
       live = false;
+      clearTimeout(kickoff);
+      clearTimeout(watchdog);
+      if (timer) clearTimeout(timer);
     };
-  }, [visible, assetId, variantId, tfKey, size, sourceObjectId]);
+  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, attempt]);
 
   return (
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
@@ -147,17 +180,24 @@ export function MockupPreview({
           height={px}
           className="h-auto max-h-full w-full rounded-lg object-contain"
           onError={() => {
-            // a failed/expired signed URL reverts to the SVG — never a broken image
+            // an expired signed URL: drop the dead image and recompose (fresh URL)
             setCurrent(null);
-            setFallback(true);
+            if (retriesRef.current < 2) {
+              retriesRef.current += 1;
+              setAttempt((a) => a + 1);
+            } else {
+              setResting(true);
+            }
           }}
         />
-      ) : fallback ? (
-        <ProductMockup product={productKey} image={image} placement={placement ?? undefined} size={px} uid={uid} />
       ) : (
-        // First compose in flight with nothing to show yet: a calm empty block —
-        // deliberately NOT the SVG (founder call: no placeholder flash).
-        <div aria-hidden className="h-full w-full rounded-lg bg-[#F5EDDC] motion-safe:animate-pulse" style={{ minHeight: Math.min(px, 220) }} />
+        // No photo yet: a calm oat block, pulsing only while work is under way —
+        // deliberately never the SVG stand-in (founder call).
+        <div
+          aria-hidden
+          className={`h-full w-full rounded-lg bg-[#F5EDDC] ${resting ? '' : 'motion-safe:animate-pulse'}`}
+          style={{ minHeight: Math.min(px, 220) }}
+        />
       )}
     </div>
   );

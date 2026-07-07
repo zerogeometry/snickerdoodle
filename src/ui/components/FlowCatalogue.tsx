@@ -73,7 +73,6 @@ export function FlowCatalogue({
 
   const subtotal = basketSubtotal(items);
   const count = basketCount(items);
-  const mockImg = upload?.cutout?.url ?? upload?.dataUrl ?? null; // bg-removed cutout wins
 
   // Ingest the upload server-side once, so add-to-basket + render have a real asset.
   // Concurrent callers share the SAME in-flight ingest (no double-upload, no freeze).
@@ -194,7 +193,7 @@ export function FlowCatalogue({
     ? 'grid grid-cols-2 gap-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
     : 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4';
   const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
-  const gridProps = { qtyOf, mockImg, upload, lazy: true, onAdd: (p: CatalogueProduct) => quickAdd(p, 1), onSub: (p: CatalogueProduct) => quickAdd(p, -1), onCustomize: customize };
+  const gridProps = { qtyOf, upload, lazy: true, onAdd: (p: CatalogueProduct) => quickAdd(p, 1), onSub: (p: CatalogueProduct) => quickAdd(p, -1), onCustomize: customize };
 
   return (
     <div className={className}>
@@ -301,7 +300,6 @@ export function FlowCatalogue({
           onClose={() => setFamilyOpen(false)}
           products={products}
           upload={upload}
-          mockImg={mockImg}
           ensureAsset={ensureAsset}
         />
       ) : null}
@@ -312,7 +310,6 @@ export function FlowCatalogue({
           onClose={() => setFullOpen(false)}
           products={products}
           qtyOf={qtyOf}
-          mockImg={mockImg}
           upload={upload}
           count={count}
           subtotal={subtotal}
@@ -335,9 +332,7 @@ export function FlowCatalogue({
                 transform={defaultTransformFor(zoom.key)}
                 size="zoom"
                 sourceObjectId={upload?.cutout?.sourceObjectId}
-                image={mockImg}
                 px={720}
-                uid="modal"
               />
             </div>
             <Button size="lg" className="w-full" onClick={() => { const p = zoom; setZoom(null); if (p) void customize(p); }}>

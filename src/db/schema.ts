@@ -562,8 +562,8 @@ export const printTemplates = pgTable('print_templates', {
   fitMode: fitMode('fit_mode').notNull().default('CONTAIN'),
   minSourceWidthPx: integer('min_source_width_px').notNull(),
   minSourceHeightPx: integer('min_source_height_px').notNull(),
-  // ── Mockup-compositor template (NULL ⇒ the catalogue falls back to the SVG
-  // ProductMockup for this variant). The print geometry above stays the single
+  // ── Mockup-compositor template (NULL ⇒ no photo preview for this variant; the
+  // catalogue shows its calm empty block). The print geometry above stays the single
   // source of truth for what Prodigi prints; the mockup reuses it so the preview
   // can't drift from the print. Template assets are brand-safe + NON-child
   // (template_assets), never the child's design. See src/server/print/compositor.ts.

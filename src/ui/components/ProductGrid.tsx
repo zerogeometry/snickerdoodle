@@ -20,15 +20,14 @@ function defaultVariant(p: CatalogueProduct) {
 }
 
 /**
- * One catalogue tile — the real photoreal preview (SVG fallback), a from-price, a
- * quick +/− stepper (showing the PRODUCT-LEVEL quantity across all its variants), and
- * a Customize button. Presentational: every action is a callback, so the same tile
- * serves the Most-Popular grid, the "your picks" row, and the Full Catalogue modal.
+ * One catalogue tile — the real photoreal preview, a from-price, a quick +/− stepper
+ * (showing the PRODUCT-LEVEL quantity across all its variants), and a Customize
+ * button. Presentational: every action is a callback, so the same tile serves the
+ * Most-Popular grid, the "your picks" row, and the Full Catalogue modal.
  */
 export function ProductTile({
   p,
   qty,
-  mockImg,
   upload,
   lazy = false,
   enableZoom = true,
@@ -39,7 +38,6 @@ export function ProductTile({
 }: {
   p: CatalogueProduct;
   qty: number;
-  mockImg: string | null;
   upload: Upload;
   lazy?: boolean;
   enableZoom?: boolean;
@@ -61,9 +59,7 @@ export function ProductTile({
           transform={defaultTransformFor(p.key)}
           size="thumb"
           sourceObjectId={upload?.cutout?.sourceObjectId}
-          image={mockImg}
           px={128}
-          uid={p.key}
           lazy={lazy}
         />
         {enableZoom && onZoom ? (
@@ -119,7 +115,6 @@ export function ProductTile({
 export function ProductGrid({
   products,
   qtyOf,
-  mockImg,
   upload,
   lazy = false,
   enableZoom = true,
@@ -131,7 +126,6 @@ export function ProductGrid({
 }: {
   products: CatalogueProduct[];
   qtyOf: (p: CatalogueProduct) => number;
-  mockImg: string | null;
   upload: Upload;
   lazy?: boolean;
   enableZoom?: boolean;
@@ -148,7 +142,6 @@ export function ProductGrid({
           key={p.key}
           p={p}
           qty={qtyOf(p)}
-          mockImg={mockImg}
           upload={upload}
           lazy={lazy}
           enableZoom={enableZoom}

@@ -185,68 +185,7 @@ export function ProductArt({ product, size = 96 }: { product: ProductKey; size?:
   );
 }
 
-// The print area of each product within the 96×96 motif — where the real artwork sits.
-const PRINT_RECT: Record<ProductKey, { x: number; y: number; w: number; h: number } | null> = {
-  card: { x: 52, y: 22, w: 16, h: 52 },
-  framedPrint: { x: 23, y: 23, w: 50, h: 50 },
-  mug: { x: 28, y: 30, w: 34, h: 40 },
-  kidsTee: { x: 40, y: 44, w: 20, h: 26 },
-  cushion: { x: 24, y: 30, w: 48, h: 42 },
-  toteBag: { x: 30, y: 44, w: 36, h: 34 },
-  blanket: { x: 24, y: 28, w: 48, h: 44 },
-  storybook: { x: 40, y: 24, w: 28, h: 48 },
-  jigsaw: { x: 24, y: 24, w: 48, h: 48 },
-  adultTee: { x: 40, y: 46, w: 20, h: 26 },
-  babyBodysuit: { x: 39, y: 43, w: 20, h: 22 },
-  apron: { x: 36, y: 42, w: 24, h: 30 },
-  calendar: { x: 26, y: 25, w: 44, h: 27 },
-  bauble: { x: 34, y: 40, w: 28, h: 27 },
-  sack: { x: 33, y: 44, w: 32, h: 28 },
-  giftWrap: null,
-};
-
-/**
- * The product with the customer's real artwork composited into its print area —
- * a "made real" preview. Falls back to the placeholder motif with no image.
- */
-export function ProductMockup({
-  product,
-  image,
-  size = 96,
-  uid,
-  placement,
-}: {
-  product: ProductKey;
-  image?: string | null;
-  size?: number;
-  uid?: string;
-  /** Reflect a placement (scale/offset/rotate) on the composited image — approximate
-   * preview; the exact print render lives in the positioner. */
-  placement?: { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
-}) {
-  const rect = PRINT_RECT[product];
-  const clipId = `pm-${product}-${uid ?? 'a'}`;
-  let transform: string | undefined;
-  if (rect && placement) {
-    const cx = rect.x + rect.w / 2;
-    const cy = rect.y + rect.h / 2;
-    transform = `rotate(${placement.rotationDeg} ${cx} ${cy}) translate(${(placement.offsetX * rect.w) / 2} ${(placement.offsetY * rect.h) / 2}) translate(${cx} ${cy}) scale(${placement.scale}) translate(${-cx} ${-cy})`;
-  }
-  return (
-    <svg viewBox="0 0 96 96" width={size} height={size} role="img" aria-label={`your drawing on a ${product}`}>
-      {ART[product]}
-      {image && rect ? (
-        <>
-          <defs>
-            <clipPath id={clipId}>
-              <rect x={rect.x} y={rect.y} width={rect.w} height={rect.h} rx="1" />
-            </clipPath>
-          </defs>
-          <g clipPath={`url(#${clipId})`}>
-            <image href={image} x={rect.x} y={rect.y} width={rect.w} height={rect.h} preserveAspectRatio="xMidYMid slice" transform={transform} />
-          </g>
-        </>
-      ) : null}
-    </svg>
-  );
-}
+// (The old ProductMockup SVG composite — the drawing clipped into the motif's print
+// area — is gone by founder decree: previews show the real photoreal mockup or a calm
+// empty block, never a stylised stand-in. ProductArt above remains for durable line-item
+// art where a compose may no longer be possible, e.g. order history after source purge.)

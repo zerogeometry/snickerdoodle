@@ -19,8 +19,7 @@ export type MockupPreviewResult =
  * member via their family membership, a guest via the upload claim on their own
  * ephemeral draft. On ANY failure — no template authored yet, a too-low-res design,
  * an engine error, or an unauthorised viewer — it returns { ok:false, fallback:true }
- * so the catalogue renders the SVG ProductMockup placeholder, never a broken image
- * or a thrown 500.
+ * so the catalogue rests on its calm empty block, never a broken image or a thrown 500.
  */
 export type MockupContext = {
   ok: true;

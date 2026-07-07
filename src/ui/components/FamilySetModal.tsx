@@ -53,14 +53,12 @@ export function FamilySetModal({
   onClose,
   products,
   upload,
-  mockImg,
   ensureAsset,
 }: {
   open: boolean;
   onClose: () => void;
   products: CatalogueProduct[];
   upload: Upload;
-  mockImg: string | null;
   ensureAsset: () => Promise<string | null>;
 }) {
   const add = useBasket((s) => s.add);
@@ -176,9 +174,7 @@ export function FamilySetModal({
                   variantId={variant?.id ?? null}
                   transform={DEFAULT_TF}
                   sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
-                  image={mockImg}
                   px={56}
-                  uid={`set-${m.uid}`}
                 />
               </div>
               <div className="min-w-0 flex-1">

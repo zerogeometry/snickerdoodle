@@ -210,10 +210,7 @@ export default function CustomizePage() {
             transform={placement}
             size="zoom"
             sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
-            image={previewImg}
-            placement={placement}
             px={720}
-            uid="customize-zoom"
           />
         </div>
       </Modal>
@@ -257,10 +254,7 @@ export default function CustomizePage() {
                   transform={placement}
                   size="zoom"
                   sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
-                  image={previewImg}
-                  placement={placement}
                   px={360}
-                  uid="customize"
                 />
                 <button
                   type="button"
@@ -318,10 +312,7 @@ export default function CustomizePage() {
                           transform={placement}
                           size="thumb"
                           sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
-                          image={previewImg}
-                          placement={placement}
                           px={110}
-                          uid={`strip-${c}`}
                           lazy
                         />
                       </button>

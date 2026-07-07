@@ -65,8 +65,8 @@ export interface ComposeMockupInput {
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
- * caller treats this as "fall back to the SVG ProductMockup" — it is expected, not an
- * error to alarm on. */
+ * caller treats this as "no photo to show" (the preview rests on its calm empty
+ * block) — it is expected, not an error to alarm on. */
 export class NoMockupTemplateError extends Error {
   constructor(message: string) {
     super(message);
