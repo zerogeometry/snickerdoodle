@@ -815,7 +815,7 @@ export function Positioner({
                 aria-pressed={viewMode === 'flat'}
                 className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'flat' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
               >
-                {isJigsaw ? 'as puzzle' : 'print layout'}
+                print layout
               </button>
               <button
                 type="button"
@@ -848,6 +848,12 @@ export function Positioner({
                   />
                 </div>
               </div>
+              {/* "On the board" = as a puzzle: the die-cut piece lines over the placed art,
+                  on the print-area quad. Under the guide + handles so they stay grabbable. */}
+              {ctx.overlayUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={ctx.overlayUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh, maxWidth: 'none', maxHeight: 'none' }} />
+              ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? (
                 <div className="pointer-events-none absolute w-px bg-cinnamon/80" style={{ left: bd.qx + bd.qw / 2, top: bd.qy, height: bd.qh }} />
@@ -876,20 +882,6 @@ export function Positioner({
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-cinnamon/80" /> : null}
               {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
-              {/* "As puzzle": the die-cut piece lines laid OVER the placed art (cropped to the
-                  print area), so the flat editor previews the drawing as an actual jigsaw.
-                  Beneath the guide + handles so they stay grabbable. */}
-              {ctx && ctx.ok && ctx.overlayUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={ctx.overlayUrl}
-                  alt=""
-                  aria-hidden
-                  draggable={false}
-                  className="pointer-events-none absolute"
-                  style={{ left: bleedPxv * scale, top: bleedPxv * scale, width: previewW - 2 * bleedPxv * scale, height: previewH - 2 * bleedPxv * scale, maxWidth: 'none', maxHeight: 'none' }}
-                />
-              ) : null}
               {/* the ONE guide + resize grips (what prints / shows in the frame) */}
               {renderSelection({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale })}
             </div>
