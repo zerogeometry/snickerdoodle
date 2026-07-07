@@ -11,6 +11,7 @@ import { WhoForModal } from '@/ui/modals/WhoForModal';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { ProductGrid } from '@/ui/components/ProductGrid';
+import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
@@ -193,12 +194,25 @@ export function FlowCatalogue({
     ? 'grid grid-cols-2 gap-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
     : 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4';
   const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
-  const gridProps = { qtyOf, upload, lazy: true, onAdd: (p: CatalogueProduct) => quickAdd(p, 1), onSub: (p: CatalogueProduct) => quickAdd(p, -1), onCustomize: customize };
+  // Sections (Start-Creating) uses the basket-sidebar model: the catalogue tiles just
+  // "+ customize", and quantity lives in the basket — so no per-tile stepper.
+  const gridProps = {
+    qtyOf,
+    upload,
+    lazy: true,
+    showStepper: mode !== 'sections',
+    customizeLabel: mode === 'sections' ? '+ customize' : 'customize',
+    onAdd: (p: CatalogueProduct) => quickAdd(p, 1),
+    onSub: (p: CatalogueProduct) => quickAdd(p, -1),
+    onCustomize: customize,
+  };
 
   return (
     <div className={className}>
       {mode === 'sections' ? (
-        <>
+        // Catalogue on the left, a vertical basket sidebar on the right (founder layout).
+        <div className="grid gap-4 md:grid-cols-[1fr_15rem] md:items-start">
+          <div className="min-w-0">
           {/* Header — the section title and the Full Catalogue button on one aligned row.
               When the shopper has picks from the full catalogue the title steps aside to
               "your range" and the two sections are labelled inside the scroll instead. */}
@@ -250,7 +264,9 @@ export function FlowCatalogue({
               </div>
             ) : null}
           </div>
-        </>
+          </div>
+          <Basket className="md:max-h-[calc(100dvh-23rem)]" />
+        </div>
       ) : (
         <>
           {showCategories ? (

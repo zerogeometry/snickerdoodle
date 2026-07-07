@@ -163,8 +163,9 @@ export default function StartCreatingPage() {
           </div>
         </main>
       ) : (
-        // ── Made-real state — fits one viewport; only the range scrolls ──
-        <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-5 md:overflow-hidden">
+        // ── Made-real state — fits one viewport; only the range + basket scroll ──
+        // Wider than before to seat the new basket sidebar beside the range (founder layout).
+        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-6 py-5 md:overflow-hidden">
           <div className="grid gap-8 md:grid-cols-5 md:items-start">
             {/* Left: the drawing, large, with change / remove background / terms — all equal width */}
             <div className="flex flex-col md:col-span-2">

@@ -31,6 +31,8 @@ export function ProductTile({
   upload,
   lazy = false,
   enableZoom = true,
+  showStepper = true,
+  customizeLabel = 'customize',
   onAdd,
   onSub,
   onCustomize,
@@ -41,6 +43,10 @@ export function ProductTile({
   upload: Upload;
   lazy?: boolean;
   enableZoom?: boolean;
+  /** When false, the per-tile qty stepper is hidden — adding + adjusting quantity lives in
+   * the basket instead (the Start-Creating sidebar model). */
+  showStepper?: boolean;
+  customizeLabel?: string;
   onAdd: () => void;
   onSub: () => void;
   onCustomize: () => void;
@@ -108,17 +114,19 @@ export function ProductTile({
             container query (not a viewport one) because tiles in the compact Start-Creating
             column stay narrow even on a wide screen. Falls back to stacked if unsupported. */}
         <div className="mt-auto flex flex-col gap-2 @[14rem]:flex-row @[14rem]:items-center @[14rem]:justify-between">
-          <div className="flex items-center self-start rounded-full border border-[#E6D8BE] bg-white @[14rem]:self-auto">
-            <button type="button" aria-label={`one fewer ${p.label}`} onClick={onSub} disabled={qty === 0} className="flex min-h-11 min-w-10 items-center justify-center text-[#7A6A58] disabled:opacity-30">
-              <Icon icon={IconMinus} size={14} />
-            </button>
-            <span className="min-w-4 text-center text-xs font-bold text-cocoa">{qty}</span>
-            <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="flex min-h-11 min-w-10 items-center justify-center text-cinnamon">
-              <Icon icon={IconPlus} size={14} />
-            </button>
-          </div>
-          <button type="button" onClick={onCustomize} className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#E6D8BE] bg-white px-3 text-[11px] font-bold text-cocoa hover:border-honey sm:w-auto">
-            customize
+          {showStepper ? (
+            <div className="flex items-center self-start rounded-full border border-[#E6D8BE] bg-white @[14rem]:self-auto">
+              <button type="button" aria-label={`one fewer ${p.label}`} onClick={onSub} disabled={qty === 0} className="flex min-h-11 min-w-10 items-center justify-center text-[#7A6A58] disabled:opacity-30">
+                <Icon icon={IconMinus} size={14} />
+              </button>
+              <span className="min-w-4 text-center text-xs font-bold text-cocoa">{qty}</span>
+              <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="flex min-h-11 min-w-10 items-center justify-center text-cinnamon">
+                <Icon icon={IconPlus} size={14} />
+              </button>
+            </div>
+          ) : null}
+          <button type="button" onClick={onCustomize} className={`inline-flex min-h-11 items-center justify-center rounded-full border border-[#E6D8BE] bg-white px-3 text-[11px] font-bold text-cocoa hover:border-honey ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
+            {customizeLabel}
           </button>
         </div>
       </div>
@@ -133,6 +141,8 @@ export function ProductGrid({
   upload,
   lazy = false,
   enableZoom = true,
+  showStepper = true,
+  customizeLabel = 'customize',
   gridClassName = 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4',
   onAdd,
   onSub,
@@ -144,6 +154,8 @@ export function ProductGrid({
   upload: Upload;
   lazy?: boolean;
   enableZoom?: boolean;
+  showStepper?: boolean;
+  customizeLabel?: string;
   gridClassName?: string;
   onAdd: (p: CatalogueProduct) => void;
   onSub: (p: CatalogueProduct) => void;
@@ -160,6 +172,8 @@ export function ProductGrid({
           upload={upload}
           lazy={lazy}
           enableZoom={enableZoom}
+          showStepper={showStepper}
+          customizeLabel={customizeLabel}
           onAdd={() => onAdd(p)}
           onSub={() => onSub(p)}
           onCustomize={() => onCustomize(p)}

@@ -8,6 +8,7 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
+import { MockupPreview } from '@/ui/components/MockupPreview';
 import { basketSubtotal, DELIVERY_PENCE, gbp, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
@@ -230,8 +231,24 @@ export default function CheckoutPage() {
               <div className="mt-3 space-y-2.5">
                 {items.map((item) => (
                   <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-[#FBF5E9]">
-                      <ProductArt product={item.product} size={44} />
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#FBF5E9]">
+                      {/* The ACTUAL creation — this drawing, on this variant, at its saved
+                          placement — so checkout shows every unique instance exactly as it prints. */}
+                      {item.artwork && item.variantId ? (
+                        <MockupPreview
+                          productKey={item.product}
+                          assetId={item.artwork.assetId}
+                          variantId={item.variantId}
+                          transform={item.artwork.transform}
+                          sourceObjectId={item.artwork.sourceObjectId}
+                          size="thumb"
+                          px={56}
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <ProductArt product={item.product} size={44} />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
