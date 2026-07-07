@@ -210,9 +210,11 @@ export function FlowCatalogue({
   return (
     <div className={className}>
       {mode === 'sections' ? (
-        // Catalogue on the left, a vertical basket sidebar on the right (founder layout).
-        <div className="grid gap-4 md:grid-cols-[1fr_15rem] md:items-start">
-          <div className="min-w-0">
+        // Catalogue on the left, a slim vertical basket down the right (founder layout).
+        // Both columns are a FIXED height and scroll internally, so the panel doesn't grow
+        // or jump as creations are added — only the content inside each scrolls.
+        <div className="grid gap-4 md:h-[calc(100dvh-23rem)] md:max-h-[34rem] md:grid-cols-[1fr_8rem] md:items-stretch">
+          <div className="flex min-h-0 min-w-0 flex-col">
           {/* Header — the section title and the Full Catalogue button on one aligned row.
               When the shopper has picks from the full catalogue the title steps aside to
               "your range" and the two sections are labelled inside the scroll instead. */}
@@ -241,7 +243,8 @@ export function FlowCatalogue({
               <Icon icon={IconChevronRight} size={18} className="shrink-0 text-[#B3985F]" />
             </button>
           ) : null}
-          <div className={scrollClasses}>
+          {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
+          <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto pr-1 md:h-auto">
             {picks.length > 0 ? (
               <>
                 <SectionLabel>your picks</SectionLabel>
@@ -265,7 +268,7 @@ export function FlowCatalogue({
             ) : null}
           </div>
           </div>
-          <Basket className="md:max-h-[calc(100dvh-23rem)]" />
+          <Basket className="h-[52vh] md:h-full" />
         </div>
       ) : (
         <>

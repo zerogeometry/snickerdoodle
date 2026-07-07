@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconChevronDown, IconChevronLeft, IconChevronRight, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
+import { IconArrowLeft, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
@@ -45,7 +45,14 @@ export default function CustomizePage() {
 
   const upload = useUpload((s) => s.upload);
   const add = useBasket((s) => s.add);
+  const update = useBasket((s) => s.update);
   const placements = usePlacements((s) => s.placements);
+
+  // Edit mode: arrived from a basket line (?edit=<lineId>) to change that exact creation.
+  // We carry the line's OWN asset so editing a line placed under a previous drawing
+  // ("create another") edits the right image, not whatever's currently uploaded.
+  const [edit, setEdit] = useState<{ id: string; assetId?: string; sourceObjectId?: string } | null>(null);
+  const editSeededRef = useRef(false);
 
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [size, setSize] = useState<string | null>(null);
@@ -76,6 +83,28 @@ export default function CustomizePage() {
   }, []);
 
   const product = products?.find((p) => p.key === productKey) ?? null;
+
+  // Edit seed (runs once, before the hydration effect below so it reads these values):
+  // pull the basket line's variant → selection and its saved placement, so Customize
+  // opens showing that exact creation. A stale/removed line falls through as a fresh customize.
+  useEffect(() => {
+    if (!product || editSeededRef.current) return;
+    const editParam = new URLSearchParams(window.location.search).get('edit');
+    editSeededRef.current = true;
+    if (!editParam) return;
+    const line = useBasket.getState().items.find((i) => i.id === editParam);
+    const lv = line && product.variants.find((v) => v.id === line.variantId);
+    if (!line || !lv) return;
+    setEdit({ id: line.id, assetId: line.artwork?.assetId, sourceObjectId: line.artwork?.sourceObjectId });
+    useSelection.getState().setSelection(product.key, {
+      size: lv.attributes.size,
+      colour: lv.attributes.colour,
+      orientation: lv.attributes.orientation ?? 'portrait',
+    });
+    if (line.artwork?.assetId) {
+      usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
+    }
+  }, [product]);
 
   useEffect(() => {
     if (!product) return;
@@ -177,10 +206,14 @@ export default function CustomizePage() {
   }
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
-  const placement = (upload?.assetId && placements[`${upload.assetId}-${product.key}`]) || defaultTransformFor(product.key);
+  // The asset this screen acts on: in edit mode the basket line's own asset wins (so a line
+  // placed under an earlier drawing edits the right image); otherwise the current upload.
+  const activeAssetId = edit?.assetId ?? upload?.assetId ?? null;
+  const activeSource = edit?.sourceObjectId ?? upload?.cutout?.sourceObjectId;
+  const placement = (activeAssetId && placements[`${activeAssetId}-${product.key}`]) || defaultTransformFor(product.key);
 
   const editPlacement = () => {
-    if (!upload?.assetId) {
+    if (!activeAssetId) {
       toast('upload a drawing first');
       return;
     }
@@ -189,11 +222,13 @@ export default function CustomizePage() {
       return;
     }
     // Scoped to THIS product + variant — the positioner edits this creation's placement only.
-    router.push(`/studio/position?draft=${upload.assetId}&variant=${variant.id}&return=${encodeURIComponent(`/customize/${product.key}`)}`);
+    // Keep ?edit through the round-trip so "save & return" lands back in edit mode.
+    const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}` : ''}`;
+    router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}&return=${encodeURIComponent(ret)}`);
   };
 
   const addToBasket = () => {
-    if (!upload?.assetId) {
+    if (!activeAssetId) {
       toast('upload a drawing first');
       return;
     }
@@ -202,17 +237,24 @@ export default function CustomizePage() {
       return;
     }
     const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join(' · ') || undefined;
-    add({
-      id: lineIdForSku(variant.sku),
+    const fields = {
       name: product.label,
       product: product.key as ProductKey,
       sku: variant.sku,
       variantId: variant.id,
       pricePence: variant.pricePence,
       sub,
-      artwork: { assetId: upload.assetId, transform: placement, sourceObjectId: upload.cutout?.sourceObjectId },
-    });
-    toast('added to basket ✓');
+      artwork: { assetId: activeAssetId, transform: placement, sourceObjectId: activeSource },
+    };
+    if (edit) {
+      // Update this exact line in place; if the variant changed, re-key to the new
+      // variant's line id (merging if that line already exists) — the store handles it.
+      update(edit.id, fields, lineIdForSku(variant.sku));
+      toast('basket updated ✓');
+    } else {
+      add({ id: lineIdForSku(variant.sku), ...fields });
+      toast('added to basket ✓');
+    }
     router.push('/start-creating');
   };
 
@@ -223,11 +265,11 @@ export default function CustomizePage() {
         <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-[#FBF5E9] p-3">
           <MockupPreview
             productKey={product.key as ProductKey}
-            assetId={upload?.assetId ?? null}
+            assetId={activeAssetId}
             variantId={variant?.id ?? null}
             transform={placement}
             size="zoom"
-            sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+            sourceObjectId={activeSource ?? null}
             px={720}
           />
         </div>
@@ -267,11 +309,11 @@ export default function CustomizePage() {
               <>
                 <MockupPreview
                   productKey={product.key as ProductKey}
-                  assetId={upload?.assetId ?? null}
+                  assetId={activeAssetId}
                   variantId={variant?.id ?? null}
                   transform={placement}
                   size="zoom"
-                  sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+                  sourceObjectId={activeSource ?? null}
                   px={360}
                 />
                 <button
@@ -325,11 +367,11 @@ export default function CustomizePage() {
                       >
                         <MockupPreview
                           productKey={product.key as ProductKey}
-                          assetId={upload?.assetId ?? null}
+                          assetId={activeAssetId}
                           variantId={cv.id}
                           transform={placement}
                           size="thumb"
-                          sourceObjectId={upload?.cutout?.sourceObjectId ?? null}
+                          sourceObjectId={activeSource ?? null}
                           px={110}
                           lazy
                         />
@@ -408,7 +450,7 @@ export default function CustomizePage() {
 
           <div className="mt-6 flex justify-end">
             <Button size="lg" className="w-full sm:w-auto" onClick={addToBasket} disabled={!variant}>
-              <Icon icon={IconShoppingBag} size={16} /> add to basket · {gbp(variant?.pricePence ?? product.fromPence)}
+              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
         </div>

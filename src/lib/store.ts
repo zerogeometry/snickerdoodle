@@ -156,6 +156,11 @@ type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
   setQty: (id: string, qty: number) => void;
+  /** Edit a line in place (the basket-item → Customize → "update basket" round-trip).
+   * Keeps the line's position + quantity. If the edit changed the variant its natural
+   * line id changes too (`newId`); re-key it, and if another line already holds that id
+   * (same product+variant) fold the two together so we never get duplicate variant lines. */
+  update: (id: string, patch: Partial<Omit<BasketItem, 'id' | 'qty'>>, newId?: string) => void;
   remove: (id: string) => void;
   clear: () => void;
   seed: (items: Omit<BasketItem, 'qty'>[]) => void;
@@ -174,6 +179,24 @@ export const useBasket = create<BasketState>()(
         set((s) => ({
           items: qty <= 0 ? s.items.filter((x) => x.id !== id) : s.items.map((x) => (x.id === id ? { ...x, qty } : x)),
         })),
+      update: (id, patch, newId) =>
+        set((s) => {
+          const cur = s.items.find((x) => x.id === id);
+          if (!cur) return {};
+          const targetId = newId ?? id;
+          // Variant changed AND a line for that variant already exists → merge the two
+          // (sum quantities), dropping the edited line so there's one line per variant.
+          if (targetId !== id && s.items.some((x) => x.id === targetId)) {
+            return {
+              items: s.items
+                .filter((x) => x.id !== id)
+                .map((x) => (x.id === targetId ? { ...x, ...patch, id: targetId, qty: x.qty + cur.qty } : x)),
+            };
+          }
+          // Otherwise patch in place (re-keying to targetId if the variant changed) —
+          // position + quantity preserved.
+          return { items: s.items.map((x) => (x.id === id ? { ...x, ...patch, id: targetId } : x)) };
+        }),
       remove: (id) => set((s) => ({ items: s.items.filter((x) => x.id !== id) })),
       clear: () => set({ items: [] }),
       seed: (items) => set({ items: items.map((i) => ({ ...i, qty: 1 })) }),
