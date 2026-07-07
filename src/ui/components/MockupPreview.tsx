@@ -45,9 +45,25 @@ export function MockupPreview({
   /** Defer composing until scrolled into view (for large grids). */
   lazy?: boolean;
 }) {
-  const [url, setUrl] = useState<string | null>(null);
+  // `current` = the image on screen; it is NEVER cleared while a newer variant
+  // composes (the founder's rule: stay on the previous product until the chosen
+  // one manages to load — no placeholder flash between variants). `fallback`
+  // marks the TERMINAL states where the stylised SVG is the honest render: no
+  // artwork/variant yet, no template for this product, or a failed compose.
+  const [current, setCurrent] = useState<string | null>(null);
+  const [fallback, setFallback] = useState(false);
   const [visible, setVisible] = useState(!lazy);
   const containerRef = useRef<HTMLDivElement>(null);
+  const currentRef = useRef<string | null>(null);
+  currentRef.current = current;
+  // A different DRAWING (new upload / cutout) must not linger — only variant/
+  // placement changes keep the previous image while the next composes.
+  const artKey = `${assetId ?? ''}|${sourceObjectId ?? ''}`;
+  const lastArtKey = useRef(artKey);
+  if (lastArtKey.current !== artKey) {
+    lastArtKey.current = artKey;
+    if (current !== null) setCurrent(null);
+  }
   const tfKey = JSON.stringify(transform ?? null);
 
   // Latch visibility once the tile nears the viewport — then never re-observe.
@@ -75,8 +91,12 @@ export function MockupPreview({
   useEffect(() => {
     if (!visible) return;
     let live = true;
-    setUrl(null);
-    if (!assetId || !variantId) return;
+    if (!assetId || !variantId) {
+      setCurrent(null);
+      setFallback(true); // nothing to compose — the SVG IS the render
+      return;
+    }
+    setFallback(false); // a new attempt begins; `current` keeps showing meanwhile
     composeMockupAction({
       assetId,
       variantId,
@@ -85,10 +105,29 @@ export function MockupPreview({
       sourceObjectId: sourceObjectId ?? undefined,
     })
       .then((r) => {
-        if (live && r.ok) setUrl(r.url);
+        if (!live) return;
+        if (!r.ok) {
+          // no template / blocked — terminal for this variant, and a stale image
+          // of another variant would be a lie: show the honest SVG.
+          setCurrent(null);
+          setFallback(true);
+          return;
+        }
+        // Preload OFF-SCREEN and swap only once the pixels are ready — the visible
+        // image never blanks, and there is no half-loaded pop.
+        const pre = new window.Image();
+        pre.onload = () => {
+          if (live) setCurrent(r.url);
+        };
+        pre.onerror = () => {
+          if (live && !currentRef.current) setFallback(true); // else: keep the previous image
+        };
+        pre.src = r.url;
       })
       .catch(() => {
-        /* keep the SVG fallback — never a broken image */
+        // transient failure: keep the previous image if we have one; SVG only when
+        // there is nothing better to show — never a broken image either way.
+        if (live && !currentRef.current) setFallback(true);
       });
     return () => {
       live = false;
@@ -99,18 +138,26 @@ export function MockupPreview({
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
     // parent (customize page) it falls back to content height and max-h-full is inert.
     <div ref={containerRef} className="flex h-full w-full items-center justify-center">
-      {url ? (
+      {current ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={url}
+          src={current}
           alt={`your drawing on a ${productKey}`}
           width={px}
           height={px}
           className="h-auto max-h-full w-full rounded-lg object-contain"
-          onError={() => setUrl(null)} // a failed/expired signed URL reverts to the SVG — never a broken image
+          onError={() => {
+            // a failed/expired signed URL reverts to the SVG — never a broken image
+            setCurrent(null);
+            setFallback(true);
+          }}
         />
-      ) : (
+      ) : fallback ? (
         <ProductMockup product={productKey} image={image} placement={placement ?? undefined} size={px} uid={uid} />
+      ) : (
+        // First compose in flight with nothing to show yet: a calm empty block —
+        // deliberately NOT the SVG (founder call: no placeholder flash).
+        <div aria-hidden className="h-full w-full rounded-lg bg-[#F5EDDC] motion-safe:animate-pulse" style={{ minHeight: Math.min(px, 220) }} />
       )}
     </div>
   );
