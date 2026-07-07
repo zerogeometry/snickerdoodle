@@ -205,7 +205,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: mugVariants(),
   },
   cushion: {
-    category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true,
+    category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true, visibleInShop: true,
     description: 'A plump cushion with their artwork on it — heart, round or square, a keepsake you can actually hug.',
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [

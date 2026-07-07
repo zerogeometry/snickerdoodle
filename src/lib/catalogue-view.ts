@@ -17,11 +17,13 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
  * The DEFAULT artwork placement per product — the ONE place tiles, quick-add, the
  * customize preview and the positioner all read, so a product's default can never
  * disagree between surfaces.
- *  - framedPrint + jigsaw: COVER (scale 1) — a frame wants no white margins and a puzzle
- *    is printed edge-to-edge; the image fills the board/aperture (founder calls 2026-07-07).
+ *  - framedPrint + jigsaw + cushion: COVER (scale 1) — a frame wants no white margins, a
+ *    puzzle is printed edge-to-edge, and a cushion's face is the print; the image fills the
+ *    board/aperture/shape (founder calls 2026-07). A shaped cushion (heart/round) clips the
+ *    filled image to its silhouette, exactly as the frame clips to the aperture.
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw']);
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion']);
 export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 }

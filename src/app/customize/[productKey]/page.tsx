@@ -149,6 +149,23 @@ export default function CustomizePage() {
     return [...new Set(avail)];
   }, [product, size]);
 
+  // Cushion: the `size` attribute encodes shape+size (heart / 18″ round / 12″ square / 22″
+  // square). The shape STRIP groups by shape so the two square sizes share ONE square
+  // thumbnail (the Size chips still pick the exact 12″/22″). Selecting a thumbnail OR a chip
+  // keeps them in sync — both drive `size`. Three shapes fit the row, so no paging.
+  const cushionShapeOf = (sz: string | null): string =>
+    !sz ? '' : /round/i.test(sz) ? 'round' : /square/i.test(sz) ? 'square' : /heart/i.test(sz) ? 'heart' : sz;
+  const shapeStrip: { shape: string; size: string; variantId: string }[] = [];
+  if (product?.key === 'cushion') {
+    const seen = new Set<string>();
+    for (const v of product.variants) {
+      const shape = cushionShapeOf(v.attributes.size ?? null);
+      if (!shape || seen.has(shape)) continue;
+      seen.add(shape);
+      shapeStrip.push({ shape, size: v.attributes.size!, variantId: v.id });
+    }
+  }
+
   // Keep the chosen colour valid for the chosen size (auto-correct on size change).
   useEffect(() => {
     if (!product || product.colours.length === 0) return;
@@ -365,6 +382,34 @@ export default function CustomizePage() {
                     sourceObjectId={activeSource ?? null}
                     view={v === 'tin' ? 'tin' : undefined}
                     px={120}
+                    lazy
+                  />
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {/* Cushion shape strip: heart / round / square as small thumbnails (the two square
+              sizes share the square thumbnail — the Size chips pick 12″/22″). Tap a thumbnail
+              OR a Size chip; they stay in sync. Mirrors the frame's colour strip. */}
+          {shapeStrip.length > 1 ? (
+            <div className="mt-3 flex items-center gap-2" role="group" aria-label="cushion shape">
+              {shapeStrip.map((e) => (
+                <button
+                  key={e.shape}
+                  type="button"
+                  onClick={() => { if (cushionShapeOf(size) !== e.shape) setSize(e.size); }}
+                  aria-pressed={cushionShapeOf(size) === e.shape}
+                  aria-label={`${e.shape} cushion`}
+                  className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${cushionShapeOf(size) === e.shape ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                >
+                  <MockupPreview
+                    productKey={product.key as ProductKey}
+                    assetId={activeAssetId}
+                    variantId={e.variantId}
+                    transform={placement}
+                    size="thumb"
+                    sourceObjectId={activeSource ?? null}
+                    px={110}
                     lazy
                   />
                 </button>

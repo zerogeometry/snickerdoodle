@@ -9,12 +9,14 @@
  * flat product photos with the artwork composited in 2D until a properly-made 3D
  * garment model exists.
  */
-// framedPrint + jigsaw deliberately absent (founder calls 2026-07-07): each is ONE clear
-// view — the frame is a single perfect photo; the jigsaw previews as its flat photoreal
-// mockup (with the die-cut piece lines) + the "as puzzle" view in the positioner. No spin.
+// framedPrint + jigsaw + cushion deliberately absent (founder calls 2026-07): each is ONE
+// clear view — the frame is a single perfect photo; the jigsaw previews as its flat photoreal
+// mockup (with the die-cut piece lines) + the "as puzzle" view in the positioner; the cushion
+// previews as its flat layered mockup (heart/round/square), same single-view treatment as the
+// frame. No spin.
 export const SPINNABLE = [
   'mug',
-  'cushion', 'blanket', 'sack',
+  'blanket', 'sack',
   'storybook', 'calendar', 'card', 'bauble',
 ] as const;
 

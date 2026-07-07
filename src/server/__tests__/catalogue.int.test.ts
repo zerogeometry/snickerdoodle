@@ -69,10 +69,10 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'))).toHaveLength(1);
   });
 
-  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + jigsaw); the curation view sees everything', async () => {
-    // the storefront default — what every shopper-facing surface renders
+  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + cushion + jigsaw); the curation view sees everything', async () => {
+    // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'jigsaw']);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'cushion', 'jigsaw']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -85,7 +85,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.mug!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'jigsaw']);
+    const SHOWN = new Set(['framedPrint', 'cushion', 'jigsaw']);
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));
