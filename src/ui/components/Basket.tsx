@@ -69,24 +69,26 @@ function BasketRow({ item }: { item: BasketItem }) {
           {item.sub ? <span className="text-[10px] leading-tight text-oat/85">{item.sub}</span> : null}
         </div>
       </div>
-      {/* −qty+ and price beneath, spanning the thumbnail width. − at 1 removes the line. */}
-      <div className="mt-1.5 flex items-center justify-between rounded-full border border-[#E6D8BE] bg-white px-0.5">
+      {/* −qty+ and price beneath, spanning the thumbnail width. − at 1 removes the line.
+          The buttons fill the row height (44px) and split its width, so the tap targets
+          stay ≥44px tall even though the basket column is deliberately slim. */}
+      <div className="mt-1.5 flex items-stretch rounded-full border border-[#E6D8BE] bg-white">
         <button
           type="button"
           aria-label={`one fewer ${item.name}`}
           onClick={() => setQty(item.id, item.qty - 1)}
-          className="flex h-8 w-8 items-center justify-center text-[#7A6A58]"
+          className="flex h-11 flex-1 items-center justify-center rounded-l-full text-[#7A6A58]"
         >
-          <Icon icon={IconMinus} size={13} />
+          <Icon icon={IconMinus} size={14} />
         </button>
-        <span className="text-xs font-bold text-cocoa">{item.qty}</span>
+        <span className="flex min-w-6 items-center justify-center text-xs font-bold text-cocoa">{item.qty}</span>
         <button
           type="button"
           aria-label={`one more ${item.name}`}
           onClick={() => setQty(item.id, item.qty + 1)}
-          className="flex h-8 w-8 items-center justify-center text-cinnamon"
+          className="flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
         >
-          <Icon icon={IconPlus} size={13} />
+          <Icon icon={IconPlus} size={14} />
         </button>
       </div>
       <div className="mt-1 text-center text-[11px] font-bold text-cocoa">{gbp(item.pricePence * item.qty)}</div>
