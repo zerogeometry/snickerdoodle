@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
@@ -50,7 +50,19 @@ type Plan = { rotate?: 90 } & (
   | { file: string; material: Material; register: 'panel-physical'; mask: boolean; productWidthMm: number; bottomInsetFrac: number }
   | { file: string; material: Material; register: 'panel-contain'; mask: boolean; region: Box; frame?: 'bbox' | 'canvas' }
   | { file: string; material: Material; register: 'band'; mask: boolean; region: Box }
+  | { file?: undefined; material: Material; register: 'layered-frame'; dir: string }
 );
+
+// Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
+// aperture cut transparent in product.png) — preferred over the flat Prodigi blank when
+// present. The layer order composited here is the founder's spec: background → shadow →
+// paper → [the child's print, clipped to the aperture at render time] → frame.
+const LAYERED = path.join(ROOT, 'layered');
+function layeredFrameDir(colour: string): string | null {
+  const dir = path.join(LAYERED, 'framedPrint', colour.replace(/\s+/g, '-'));
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('background.png') && has('product.png') && has('shadow.png') ? dir : null;
+}
 
 const FRAME: Record<string, string> = {
   gold: 'prodigi-classic-frame-blanks/Gold Classic Frame_blank.png',
@@ -58,6 +70,9 @@ const FRAME: Record<string, string> = {
   white: 'prodigi-classic-frame-blanks/White classic frame_blank.png',
   natural: 'prodigi-classic-frame-blanks/Natural classic frame_blank.png',
   brown: 'prodigi-classic-frame-blanks/Brown classic frame_blank.jpg',
+  'dark grey': 'prodigi-classic-frame-blanks/Dark grey classic frame_blank.jpg',
+  'light grey': 'prodigi-classic-frame-blanks/Light grey classic frame_blank.jpg',
+  silver: 'prodigi-classic-frame-blanks/Silver Classic Frame_blank.png',
 };
 const JIG = 'prodigi-jigsaw-puzzle-blank-assets/Prodigi Jigsaw blanks';
 
@@ -65,8 +80,11 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
   const size = attrs.size ?? '';
   const colour = attrs.colour ?? '';
   switch (key) {
-    case 'framedPrint':
+    case 'framedPrint': {
+      const dir = layeredFrameDir(colour);
+      if (dir) return { material: 'PAPER', register: 'layered-frame', dir };
       return FRAME[colour] ? { file: FRAME[colour], material: 'PAPER', register: 'window-cover' } : null;
+    }
     case 'cushion': {
       const file = size === 'heart' ? 'Heart Cushion Blank 1.jpg' : size === '18″ round' ? 'Round cushion blank.jpg' : 'Cushion blank.jpg';
       return { file: `prodigi-cushions-blank-assets/${file}`, material: 'LIGHT_FABRIC', register: 'face-cover', mask: true };
@@ -110,6 +128,79 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     default:
       return null; // giftWrap (no print) → keep SVG
   }
+}
+
+/**
+ * Founder-layered frame → a standard (blank, mask, window) triple. The aperture is the
+ * ENCLOSED transparent region of product.png (flood the outside in from the border; what
+ * remains transparent is the window — exact, no heuristics). The stored blank composites
+ * background → shadow → white paper (over the window, tucked under the moulding) →
+ * product; the mask clips the child's print to the aperture, so it renders UNDER the
+ * frame edge exactly as the physical print sits in the rebate.
+ */
+const layeredCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
+async function layeredFrame(dir: string): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
+  const hit = layeredCache.get(dir);
+  if (hit) return hit;
+  const product = readFileSync(path.join(dir, 'product.png'));
+  const { data, info } = await sharp(product).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+
+  // Flood the OUTSIDE transparent area in from the borders; enclosed transparency = aperture.
+  const transparent = (p: number) => data[p * c + 3]! < 128;
+  const outside = new Uint8Array(W * H);
+  const queue: number[] = [];
+  const push = (x: number, y: number) => {
+    const p = y * W + x;
+    if (!outside[p] && transparent(p)) { outside[p] = 1; queue.push(p); }
+  };
+  for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
+  for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
+  while (queue.length) {
+    const p = queue.pop()!;
+    const x = p % W, y = (p - x) / W;
+    if (x > 0) push(x - 1, y);
+    if (x < W - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < H - 1) push(x, y + 1);
+  }
+  const maskRaw = Buffer.alloc(W * H);
+  let mx0 = W, my0 = H, mx1 = -1, my1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const p = y * W + x;
+      if (transparent(p) && !outside[p]) {
+        maskRaw[p] = 255;
+        if (x < mx0) mx0 = x;
+        if (x > mx1) mx1 = x;
+        if (y < my0) my0 = y;
+        if (y > my1) my1 = y;
+      }
+    }
+  if (mx1 < 0) throw new Error(`layered frame ${dir}: product.png has no enclosed transparent aperture`);
+  const mask = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+
+  // White paper over the aperture, inflated ~1.5% so its edge hides under the moulding.
+  const inflate = Math.round(0.015 * Math.min(W, H));
+  const px = Math.max(0, mx0 - inflate);
+  const py = Math.max(0, my0 - inflate);
+  const paper = await sharp({
+    create: { width: Math.min(W - px, mx1 - mx0 + 1 + 2 * inflate), height: Math.min(H - py, my1 - my0 + 1 + 2 * inflate), channels: 3, background: '#ffffff' },
+  }).png().toBuffer();
+
+  const blank = await sharp(readFileSync(path.join(dir, 'background.png')))
+    .flatten({ background: '#ffffff' }) // a transparent backdrop must not read as black
+    .composite([
+      { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
+      { input: paper, left: px, top: py },
+      { input: product, left: 0, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+
+  const out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+  layeredCache.set(dir, out);
+  return out;
 }
 
 /**
@@ -259,6 +350,22 @@ export async function POST(req: Request): Promise<Response> {
   for (const r of rows) {
     const p = plan(r.key, (r.attrs as Record<string, string>) ?? {});
     if (!p) { skipped.push(r.key); continue; }
+    const printAspectEarly = r.printWmm / r.printHmm;
+
+    if (p.register === 'layered-frame') {
+      const d = await layeredFrame(p.dir);
+      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
+      authored++;
+      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-frame',
+        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
     const filePath = path.join(ROOT, p.file);
     const raw = readFileSync(filePath);
     // Rotate the blank into the print canvas's orientation where needed (cache by file+rotation).

@@ -38,8 +38,9 @@ type ProductDef = {
 // Framed print: 5 sizes; frame colour is a Prodigi *attribute* of one SKU per size, so the
 // colours share a SKU. "framed in gold" is the brand signature → gold leads (and is the default).
 // Prices are the founder-approved retail (free delivery baked in). Large sizes drop to 150dpi.
-// Prodigi also offers dark grey / light grey / silver — founder call 2026-07-07: not sold.
-const FRAME_COLOURS = ['gold', 'black', 'white', 'natural', 'brown'];
+// The full Prodigi classic-frame colour range (founder call 2026-07-07: sell all eight).
+// Colour strings are Prodigi's exact `color` attribute values.
+const FRAME_COLOURS = ['gold', 'black', 'white', 'natural', 'brown', 'dark grey', 'light grey', 'silver'];
 const FRAME_SIZES = [
   { size: '11×14″', sku: 'GLOBAL-CFP-11X14', wMm: 279, hMm: 356, dpi: 300, pricePence: 6695 },
   { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 6995 },
