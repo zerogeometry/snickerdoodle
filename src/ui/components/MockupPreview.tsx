@@ -7,7 +7,7 @@ import type { PlacementTransform } from '@/lib/store';
 // The POST /api/mockup response shape (kept in sync with the route handler). Defined
 // locally so this client component never imports the server-only route module.
 type MockupPreviewResult =
-  | { ok: true; url: string; tier: 'FLAT'; widthPx?: number; heightPx?: number }
+  | { ok: true; url: string; tier: 'FLAT' | 'PERSPECTIVE'; widthPx?: number; heightPx?: number }
   | { ok: false; needsAuth?: boolean; fallback: true };
 
 /**
@@ -31,6 +31,7 @@ export function MockupPreview({
   transform,
   size,
   sourceObjectId,
+  view,
   px = 96,
   lazy = false,
 }: {
@@ -40,6 +41,9 @@ export function MockupPreview({
   transform?: PlacementTransform | null;
   size?: 'thumb' | 'zoom';
   sourceObjectId?: string | null;
+  /** An alternate display view (e.g. 'tin') — composes a mockup_views mockup instead of the
+   * product's primary one. Absent ⇒ the primary product mockup. */
+  view?: string | null;
   px?: number;
   /** Defer composing until scrolled into view (for large grids). */
   lazy?: boolean;
@@ -77,7 +81,7 @@ export function MockupPreview({
   }
   const tfKey = JSON.stringify(transform ?? null);
   // Fresh inputs get a fresh retry allowance.
-  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}`;
+  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}|${view ?? ''}`;
   const lastInputKey = useRef(inputKey);
   if (lastInputKey.current !== inputKey) {
     lastInputKey.current = inputKey;
@@ -137,6 +141,7 @@ export function MockupPreview({
         transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
         size,
         sourceObjectId: sourceObjectId ?? undefined,
+        view: view ?? undefined,
       }),
       signal: ctrl.signal,
     })
@@ -164,7 +169,7 @@ export function MockupPreview({
         if (isLatest() && !currentRef.current) setResting(true);
       });
     return () => ctrl.abort();
-  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, attempt]);
+  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, attempt]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
   // Independently of the dispatch above, if the preview is STUCK (visible, ids present, no

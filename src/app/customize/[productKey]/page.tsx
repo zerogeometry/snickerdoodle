@@ -67,11 +67,15 @@ export default function CustomizePage() {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
+  // Alternate mockup VIEW (the jigsaw's companion tin): 'primary' = the product itself,
+  // 'tin' = the drawing on the keepsake-tin lid (a perspective mockup).
+  const [mockupView, setMockupView] = useState<'primary' | 'tin'>('primary');
   // Colour thumbnail strip paging (3 visible at a time).
   const [thumbIdx, setThumbIdx] = useState(0);
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
+    setMockupView('primary');
     setThumbIdx(0);
   }, [productKey]);
 
@@ -277,6 +281,7 @@ export default function CustomizePage() {
             transform={placement}
             size="zoom"
             sourceObjectId={activeSource ?? null}
+            view={mockupView === 'tin' ? 'tin' : undefined}
             px={720}
           />
         </div>
@@ -284,7 +289,22 @@ export default function CustomizePage() {
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
         {/* Left: ONE photo preview (+20% vs the old view) with the colour strip under it */}
         <div>
-          {canSpin ? (
+          {product.key === 'jigsaw' ? (
+            // The jigsaw's companion view: the drawing as the puzzle, or on the keepsake tin.
+            <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
+              {([['primary', 'the puzzle'], ['tin', 'the tin']] as const).map(([v, label]) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setMockupView(v)}
+                  aria-pressed={mockupView === v}
+                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${mockupView === v ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : canSpin ? (
             <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
               {(['photo', 'spin'] as const).map((m) => (
                 <button
@@ -321,6 +341,7 @@ export default function CustomizePage() {
                   transform={placement}
                   size="zoom"
                   sourceObjectId={activeSource ?? null}
+                  view={mockupView === 'tin' ? 'tin' : undefined}
                   px={360}
                 />
                 <button
