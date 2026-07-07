@@ -27,12 +27,11 @@ import {
 import type { StudioData, StudioVariant } from '@/server/studio';
 
 /** The editor canvas is deliberately MUCH larger than the customize-page preview
- * (founder call 2026-07-07): print-area guides need to be clearly readable. Fixed at
- * mount so pointer↔canvas maths stay coherent; capped to the viewport on mobile. */
-function initialPreviewW(): number {
-  if (typeof window === 'undefined') return 360;
-  return Math.max(300, Math.min(560, window.innerWidth - 48));
-}
+ * (founder call 2026-07-07: "I can barely see the guides"). MAX caps it so the controls
+ * column still fits beside it on desktop; SSR default is a calm stable width used until
+ * the ResizeObserver measures the real available space (no window read during render). */
+const MAX_PREVIEW_W = 680;
+const SSR_PREVIEW_W = 420;
 const SNAP_OFFSET = 0.07; // |offset| within this of centre snaps to 0 (with a guide flash)
 const FIT_SNAP = 0.03; // scale within 3% of "fit" snaps back to the contain sentinel
 const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
@@ -80,11 +79,42 @@ export function Positioner({
   // The product context: blank photo + print-area quad (+ silhouette mask) — so the image
   // is placed ON the product, not on an abstract canvas. Falls back to the flat canvas.
   const [ctx, setCtx] = useState<MockupContext | null>(null);
-  // Contrado-style view toggle: place ON the product photo, or on the exact flat
-  // print layout (the order-of-record view). Only offered when a product photo exists.
-  const [viewMode, setViewMode] = useState<'product' | 'flat'>('product');
+  // Contrado-style view toggle: the exact flat PRINT LAYOUT (the order-of-record view —
+  // DEFAULT + first option, so placement is precise about what prints; founder call
+  // 2026-07-07), or ON the product photo. Product view only when a photo exists.
+  const [viewMode, setViewMode] = useState<'flat' | 'product'>('flat');
   const imgRef = useRef<HTMLImageElement>(null);
-  const [previewW] = useState(initialPreviewW);
+  // Callback ref: capture natural dimensions the instant the <img> attaches IF it is
+  // already loaded (a cached image fires no onLoad — that race left `natural` null, so
+  // the whole editor had no placement and no resize grips). onLoad still covers the
+  // not-yet-loaded case.
+  const setImgEl = useCallback((el: HTMLImageElement | null) => {
+    imgRef.current = el;
+    if (el && el.complete && el.naturalWidth > 0) {
+      setNatural((prev) => (prev && prev.w === el.naturalWidth && prev.h === el.naturalHeight ? prev : { w: el.naturalWidth, h: el.naturalHeight }));
+    }
+  }, []);
+  // Responsive canvas width, measured from the full-width grid container via a
+  // ResizeObserver — so it's the largest canvas that fits (founder: "make it bigger"),
+  // updates as the layout changes, and starts from an SSR-stable default (no reading
+  // window during render → no hydration mismatch).
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [previewW, setPreviewW] = useState(SSR_PREVIEW_W);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el) return;
+    const measure = () => {
+      const gw = el.clientWidth;
+      // On desktop the controls column sits beside the canvas; reserve room for it.
+      const desktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
+      const avail = desktop ? gw - 396 : gw;
+      setPreviewW(Math.max(320, Math.min(MAX_PREVIEW_W, Math.floor(avail))));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const router = useRouter();
   const addToBasket = useBasket((s) => s.add);
   const setPlacement = usePlacements((s) => s.setPlacement);
@@ -166,12 +196,16 @@ export function Positioner({
   }
 
   const t = variant.template;
+  // A FRAME is always cover-FILLED — no white margins, ever (founder directive). So its
+  // zoom floors at cover (scale 1), never the contain "fit" that would letterbox. Other
+  // products keep the fit-centred model (a small motif with intentional margins is valid).
+  const filledDefault = defaultTransformFor(variant.productKey).scale === 1;
+  const scaleFloor = filledDefault ? 1 : MIN_SCALE;
   const canvas = canvasSizePx(t);
   const aspect = canvas.width / canvas.height;
   const previewH = Math.round(previewW / aspect);
   const scale = previewW / canvas.width; // canvas-px → preview-px
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
-  const safePxv = bleedPxv + mmToPx(t.safeInsetMm, t.requiredDpi);
 
   const rect = natural ? computeLayerRect(t, { width: natural.w, height: natural.h }, tf) : null;
   const assess = natural ? assessResolution(t, { width: natural.w, height: natural.h }, tf) : null;
@@ -189,7 +223,7 @@ export function Positioner({
     // Prefer full print-ready; from BLOCK, falling back to the enhanceable tier
     // (required/2 → classical resample) still un-blocks the order honestly. The
     // 0.995 nudges the landing safely inside the boundary against px rounding.
-    const floor = Math.max(fitScale / 2, MIN_SCALE);
+    const floor = filledDefault ? scaleFloor : Math.max(fitScale / 2, MIN_SCALE);
     const scaleFor = (d: number) => zoomValue * (assess.effectiveDpi / d) * 0.995;
     const ok = scaleFor(assess.requiredDpi);
     const enhance = scaleFor(assess.requiredDpi / 2);
@@ -200,8 +234,9 @@ export function Positioner({
           ? { scale: enhance, kind: 'enhance' as const }
           : null;
     if (!pick) return null; // unreachable — the honest advice stays "smaller product"
-    return { ...pick, scale: Math.abs(pick.scale - fitScale) < fitScale * FIT_SNAP ? 0 : pick.scale };
-  }, [assess, zoomValue, fitScale]);
+    // never snap a filled product to the contain sentinel (that would letterbox it)
+    return { ...pick, scale: !filledDefault && Math.abs(pick.scale - fitScale) < fitScale * FIT_SNAP ? 0 : pick.scale };
+  }, [assess, zoomValue, fitScale, filledDefault, scaleFloor]);
 
   // Load the product context whenever the variant changes (photoreal products only).
   useEffect(() => {
@@ -230,13 +265,15 @@ export function Positioner({
     });
   };
 
-  /** Zoom by a factor around the current placement, snapping back to "fit" (the
-   * contain sentinel) when within a whisker of it — the keyboard/pinch zoom core. */
+  /** Zoom by a factor around the current placement. For a filled product (frame) the
+   * floor is cover (scale 1) so it never letterboxes; otherwise it snaps back to "fit"
+   * (the contain sentinel) within a whisker. The keyboard/wheel/pinch zoom core. */
   const zoomBy = (factor: number) => {
     update((prev) => {
       const s0 = prev.scale === 0 ? fitScale : prev.scale;
-      const next = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * factor));
-      return { scale: Math.abs(next - fitScale) < fitScale * FIT_SNAP ? 0 : next };
+      const next = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * factor));
+      if (!filledDefault && Math.abs(next - fitScale) < fitScale * FIT_SNAP) return { scale: 0 };
+      return { scale: next };
     });
   };
 
@@ -320,6 +357,11 @@ export function Positioner({
       top: rect.y * scale + boxH / 2,
       width: imgW,
       height: imgH,
+      // Cover-fill DELIBERATELY oversizes the image past the aperture so overflow is
+      // cropped — so it must be exempt from the global `img { max-width:100% }`, which
+      // would otherwise cap only the overflowing axis and SQUISH the drawing.
+      maxWidth: 'none',
+      maxHeight: 'none',
       // --gx/--gy/--gk are the LIVE gesture deltas (set via ref, no re-render);
       // they read 0/1 outside a gesture, so this is the committed placement.
       transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
@@ -354,11 +396,14 @@ export function Positioner({
       top: r.y - bleedPv + r.height / 2,
       width: imgW,
       height: imgH,
+      // exempt from `img { max-width:100% }` — cover-fill oversizes past the aperture on
+      // purpose (see imgStyle); the cap would squish the overflowing axis otherwise.
+      maxWidth: 'none',
+      maxHeight: 'none',
       transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
       objectFit: 'fill',
     };
   }, [bd, natural, tf, t]);
-  const safePv = bd ? mmToPx(t.safeInsetMm, t.requiredDpi) * bd.s : 0;
 
   // ── Gesture-space geometry: pan slack + preview-px-per-space-px for whichever
   // canvas mode is live. Offsets only pan within OVERFLOW slack (the print model),
@@ -422,8 +467,8 @@ export function Positioner({
     if (!g.moved && k === 1) return; // a tap, not a gesture — nothing to commit
 
     const s0 = g.base.scale === 0 ? fitScale : g.base.scale;
-    let nextScale: number = Math.min(MAX_ZOOM, Math.max(MIN_SCALE, s0 * k));
-    if (Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+    let nextScale: number = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
+    if (!filledDefault && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
 
     // Pan against the slack AT THE NEW SCALE (the range grows as you zoom in).
     const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: nextScale });
@@ -546,8 +591,9 @@ export function Positioner({
       if (wasTap) {
         const now = Date.now();
         if (now - lastTapRef.current < DOUBLE_TAP_MS) {
-          // double-tap: fit ↔ fill toggle, centred
-          update((prev) => ({ scale: prev.scale === 0 ? 1 : 0, offsetX: 0, offsetY: 0 }));
+          // double-tap: reset — a filled product (frame) snaps back to cover (no margins);
+          // others toggle fit ↔ fill.
+          update((prev) => (filledDefault ? { scale: 1, offsetX: 0, offsetY: 0 } : { scale: prev.scale === 0 ? 1 : 0, offsetX: 0, offsetY: 0 }));
           lastTapRef.current = 0;
         } else {
           lastTapRef.current = now;
@@ -603,7 +649,7 @@ export function Positioner({
       case 'f':
       case 'F':
       case '0':
-        update({ scale: 0, offsetX: 0, offsetY: 0 });
+        update({ scale: filledDefault ? 1 : 0, offsetX: 0, offsetY: 0 });
         break;
       default:
         return; // unhandled — let it through
@@ -611,7 +657,78 @@ export function Positioner({
     e.preventDefault();
   };
 
+  // ── Drag-to-resize (corner handles) + wheel zoom (founder call 2026-07-07: "drag
+  // and drop scaling"). A handle scales the drawing UNIFORMLY about its centre — the
+  // aspect ratio is fixed (never squishes). It commits through the same shared geometry
+  // as pinch/slider, so preview == print. (Non-uniform shift-stretch is a deliberate
+  // follow-up — it changes the printed file and needs scaleX/scaleY through the whole
+  // pipeline.) Scaling is floored at cover for a filled product so the frame stays full.
+  const resizeRef = useRef<null | { cx: number; cy: number; startDist: number; base: Transform }>(null);
+  const onHandlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const img = imgRef.current;
+    if (!img) return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // capture is an optimisation; the drag still works without it
+    }
+    const r = img.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const startDist = Math.hypot(e.clientX - cx, e.clientY - cy) || 1;
+    resizeRef.current = { cx, cy, startDist, base: tfRef.current };
+    setDragging(true);
+  };
+  const onHandlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const h = resizeRef.current;
+    if (!h) return;
+    const d = Math.hypot(e.clientX - h.cx, e.clientY - h.cy);
+    applyLive(0, 0, Math.max(0.05, d / h.startDist)); // uniform live scale about centre
+  };
+  const onHandlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const h = resizeRef.current;
+    if (!h) return;
+    const d = Math.hypot(e.clientX - h.cx, e.clientY - h.cy);
+    const k = d / h.startDist;
+    clearLive();
+    const s0 = h.base.scale === 0 ? fitScale : h.base.scale;
+    let nextScale = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
+    if (!filledDefault && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+    setResult(null);
+    const next = clampTransform({ ...h.base, scale: nextScale });
+    if (!sameTf(next, h.base)) pushHistory(h.base);
+    lastPushRef.current = 0; // a resize is its own undo entry
+    setTf(next);
+    resizeRef.current = null;
+    setDragging(false);
+  };
+  const handleProps = {
+    onPointerDown: onHandlePointerDown,
+    onPointerMove: onHandlePointerMove,
+    onPointerUp: onHandlePointerUp,
+    onPointerCancel: onHandlePointerUp,
+  };
+
+  /** Wheel = zoom (desktop). Non-passive via a ref effect so preventDefault stops the
+   * page scrolling under the cursor. */
+  const canvasElRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = canvasElRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1.06 : 1 / 1.06);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // zoomBy closes over fitScale/scaleFloor; re-bind when they change so the floor is
+    // current, and when viewMode flips (the canvas element itself swaps).
+  }, [fitScale, scaleFloor, filledDefault, viewMode]);
+
   const canvasInteractionProps = {
+    ref: canvasElRef,
     onPointerDown: onCanvasPointerDown,
     onPointerMove: onCanvasPointerMove,
     onPointerUp: onCanvasPointerUp,
@@ -620,7 +737,7 @@ export function Positioner({
     tabIndex: 0,
     role: 'application',
     'aria-label':
-      'drawing position. drag to move, pinch or press plus and minus to zoom, double-tap to fill or fit, R to rotate, arrow keys to nudge, F to fit the whole drawing.',
+      'drawing position. drag to move, drag a corner or scroll or pinch or press plus and minus to resize, double-tap to reset, R to rotate, arrow keys to nudge, F to reset.',
   } as const;
   const canvasInteractionClass = `touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-cinnamon focus-visible:ring-offset-2 ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`;
   const maskStyle: React.CSSProperties | undefined = ctx && ctx.ok && ctx.maskUrl
@@ -633,9 +750,41 @@ export function Positioner({
       }
     : undefined;
 
+  // The ONE guide (founder call 2026-07-07 — the old "print area" + "keep inside" pair
+  // confused): a single clear rectangle = the frame opening / what prints, with corner
+  // grips to drag-resize. `box` is in preview px for the current view.
+  const renderSelection = (box: { left: number; top: number; w: number; h: number }) => {
+    const corners = [
+      ['tl', box.left, box.top, 'nwse-resize'],
+      ['tr', box.left + box.w, box.top, 'nesw-resize'],
+      ['bl', box.left, box.top + box.h, 'nesw-resize'],
+      ['br', box.left + box.w, box.top + box.h, 'nwse-resize'],
+    ] as const;
+    return (
+      <>
+        <div
+          className="pointer-events-none absolute rounded-[3px] border-2 border-cinnamon/85"
+          style={{ left: box.left, top: box.top, width: box.w, height: box.h }}
+        />
+        {natural
+          ? corners.map(([k, x, y, cur]) => (
+              <div
+                key={k}
+                {...handleProps}
+                role="button"
+                aria-label="drag to resize the drawing"
+                className="absolute z-20 h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-cinnamon bg-white shadow-[0_1px_3px_rgba(46,39,35,.35)] before:absolute before:-inset-[11px] before:content-['']"
+                style={{ left: x, top: y, cursor: cur }}
+              />
+            ))
+          : null}
+      </>
+    );
+  };
+
   return (
-    <Shell>
-      <div className="grid gap-6 md:grid-cols-[auto_1fr]">
+    <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
+      <div ref={gridRef} className="grid gap-6 md:grid-cols-[auto_1fr]">
         {/* Canvas — the image ON the product (photo backdrop) when a template exists;
             the flat print canvas otherwise (or on request). Same shared geometry either way. */}
         <div>
@@ -643,19 +792,19 @@ export function Positioner({
             <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
               <button
                 type="button"
-                onClick={() => setViewMode('product')}
-                aria-pressed={viewMode === 'product'}
-                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'product' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-              >
-                on the product
-              </button>
-              <button
-                type="button"
                 onClick={() => setViewMode('flat')}
                 aria-pressed={viewMode === 'flat'}
                 className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'flat' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
               >
                 print layout
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('product')}
+                aria-pressed={viewMode === 'product'}
+                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'product' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+              >
+                in the frame
               </button>
             </div>
           ) : null}
@@ -671,7 +820,7 @@ export function Positioner({
                 <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }}>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    ref={imgRef}
+                    ref={setImgEl}
                     src={cutout?.url ?? keepsake.imageUrl}
                     alt="your keepsake"
                     draggable={false}
@@ -687,21 +836,8 @@ export function Positioner({
               {dragging && snapAxis.y ? (
                 <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw }} />
               ) : null}
-              {/* labelled guides */}
-              <div className="pointer-events-none absolute border border-dashed border-cinnamon/80" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }} />
-              <span className="pointer-events-none absolute rounded-sm bg-cinnamon/90 px-1 py-px text-[9px] font-bold text-white" style={{ left: bd.qx + 3, top: bd.qy + 3 }}>
-                print area
-              </span>
-              <div
-                className="pointer-events-none absolute border border-dotted border-green-save/80"
-                style={{ left: bd.qx + safePv, top: bd.qy + safePv, width: bd.qw - 2 * safePv, height: bd.qh - 2 * safePv }}
-              />
-              <span
-                className="pointer-events-none absolute rounded-sm bg-green-save/90 px-1 py-px text-[9px] font-bold text-white"
-                style={{ left: bd.qx + safePv + 3, top: bd.qy + bd.qh - safePv - 16 }}
-              >
-                keep inside
-              </span>
+              {/* the ONE guide + resize grips (the frame opening) */}
+              {renderSelection({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh })}
             </div>
           ) : (
             <div
@@ -711,7 +847,7 @@ export function Positioner({
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                ref={imgRef}
+                ref={setImgEl}
                 src={cutout?.url ?? keepsake.imageUrl}
                 alt="your keepsake"
                 draggable={false}
@@ -721,22 +857,12 @@ export function Positioner({
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-cinnamon/80" /> : null}
               {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
-              {/* labelled print-edge + safe-area guides */}
-              <div
-                className="pointer-events-none absolute border border-dashed border-cinnamon/70"
-                style={{ left: bleedPxv * scale, top: bleedPxv * scale, right: bleedPxv * scale, bottom: bleedPxv * scale }}
-              />
-              <span className="pointer-events-none absolute rounded-sm bg-cinnamon/90 px-1 py-px text-[9px] font-bold text-white" style={{ left: bleedPxv * scale + 3, top: bleedPxv * scale + 3 }}>
-                print area
-              </span>
-              <div
-                className="pointer-events-none absolute border border-dotted border-green-save/60"
-                style={{ left: safePxv * scale, top: safePxv * scale, right: safePxv * scale, bottom: safePxv * scale }}
-              />
+              {/* the ONE guide + resize grips (what prints / shows in the frame) */}
+              {renderSelection({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale })}
             </div>
           )}
           <p className="mt-2 text-center text-[11px] text-[#9C8772]">
-            anything outside the <b className="text-cinnamon">dashed line</b> won&apos;t print · keep faces &amp; words inside the <b className="text-green-save">dotted line</b>
+            the <b className="text-cinnamon">outlined box</b> is what shows in the frame · drag a corner to resize · keep faces &amp; words a little in from the edges
           </p>
 
           {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX
@@ -824,12 +950,18 @@ export function Positioner({
               </button>
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-[#9C8E7E]">drag the drawing to move it · pinch or slide to zoom · double-tap to fill</p>
+          <p className="mt-1 text-[11px] text-[#9C8E7E]">drag the drawing to move it · drag a corner (or scroll / pinch) to resize · double-tap to reset</p>
           <div className="mt-2 space-y-3">
             <ZoomSlider
               fit={fitScale}
               value={zoomValue}
-              onChange={(v) => update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })}
+              filled={filledDefault}
+              floor={scaleFloor}
+              onChange={(v) =>
+                filledDefault
+                  ? update({ scale: Math.max(scaleFloor, v) }) // frame: never below cover (no margins)
+                  : update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })
+              }
             />
             <Slider
               label="Left / right"
@@ -924,15 +1056,21 @@ export function Positioner({
 }
 
 /**
- * Zoom with "fit the whole image" at the CENTRE of the track: the left half runs
- * fit/2 → fit (zoom out, more margin), the right half fit → 4× (zoom in, crop) —
- * each half linear, so the default placement sits mid-track and the user can zoom
- * either way from it. Displays zoom relative to fit (fit = 1.0×).
+ * Zoom slider. Two modes:
+ *  - FILLED (a frame): linear from cover (`floor`, shown as 1.0× — the frame is full)
+ *    up to 4×. It never goes below cover, so the frame can't letterbox.
+ *  - otherwise: "fit the whole image" sits at the CENTRE of the track — left half
+ *    fit/2 → fit (more margin), right half fit → 4× (crop). Shown relative to fit.
  */
-function ZoomSlider({ fit, value, onChange }: { fit: number; value: number; onChange: (v: number) => void }) {
-  const minZ = fit / 2;
-  const toT = (v: number) => (v <= fit ? (0.5 * (v - minZ)) / (fit - minZ || 1) : 0.5 + (0.5 * (v - fit)) / (MAX_ZOOM - fit || 1));
-  const fromT = (raw: number) => (raw <= 0.5 ? minZ + (raw / 0.5) * (fit - minZ) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
+function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; value: number; filled: boolean; floor: number; onChange: (v: number) => void }) {
+  const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+  const toT = filled
+    ? (v: number) => (v - floor) / (MAX_ZOOM - floor || 1)
+    : (v: number) => (v <= fit ? (0.5 * (v - fit / 2)) / (fit - fit / 2 || 1) : 0.5 + (0.5 * (v - fit)) / (MAX_ZOOM - fit || 1));
+  const fromT = filled
+    ? (raw: number) => floor + raw * (MAX_ZOOM - floor)
+    : (raw: number) => (raw <= 0.5 ? fit / 2 + (raw / 0.5) * (fit - fit / 2) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
+  const shown = filled ? value / floor : value / fit;
   return (
     <label className="flex items-center gap-2">
       <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">Zoom</span>
@@ -941,12 +1079,12 @@ function ZoomSlider({ fit, value, onChange }: { fit: number; value: number; onCh
         min={0}
         max={1}
         step={0.005}
-        value={Math.min(1, Math.max(0, toT(value)))}
+        value={clamp01(toT(value))}
         aria-label="Zoom"
         onChange={(e) => onChange(fromT(Number(e.target.value)))}
         className="h-1.5 flex-1 accent-cinnamon"
       />
-      <span className="w-8 shrink-0 text-right text-[11px] text-[#9C8E7E]">{`${(value / fit).toFixed(1)}×`}</span>
+      <span className="w-8 shrink-0 text-right text-[11px] text-[#9C8E7E]">{`${shown.toFixed(1)}×`}</span>
     </label>
   );
 }
@@ -1002,7 +1140,7 @@ function Shell({ children, back = '/home' }: { children: React.ReactNode; back?:
         <Link href="/" className="font-display text-lg font-semibold text-cocoa">snickerdoodle</Link>
         <span className="rounded-full bg-[#EFE4D0] px-2 py-0.5 text-[11px] font-bold text-[#7A6A58]">studio</span>
       </header>
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-6 py-6">
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
         {children}
       </main>
     </div>
