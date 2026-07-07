@@ -154,7 +154,7 @@ export default function CustomizePage() {
         (v) =>
           (product.sizes.length === 0 || v.attributes.size === size) &&
           (product.colours.length === 0 || v.attributes.colour === colour) &&
-          (product.orientations.length === 0 || v.attributes.orientation === orientation),
+          (product.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === orientation),
       ) ?? null
     );
   }, [product, size, colour, orientation]);
@@ -311,7 +311,7 @@ export default function CustomizePage() {
                       (v) =>
                         (product.sizes.length === 0 || v.attributes.size === size) &&
                         v.attributes.colour === c &&
-                        (product.orientations.length === 0 || v.attributes.orientation === orientation),
+                        (product.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === orientation),
                     );
                     if (!cv) return null;
                     return (

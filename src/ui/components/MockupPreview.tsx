@@ -2,8 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ProductKey } from './ProductArt';
-import type { MockupPreviewResult } from '@/app/api/mockup/route';
 import type { PlacementTransform } from '@/lib/store';
+
+// The POST /api/mockup response shape (kept in sync with the route handler). Defined
+// locally so this client component never imports the server-only route module.
+type MockupPreviewResult =
+  | { ok: true; url: string; tier: 'FLAT'; widthPx?: number; heightPx?: number }
+  | { ok: false; needsAuth?: boolean; fallback: true };
 
 /**
  * A product preview that shows the real, in-VPC photoreal mockup — and nothing else.
@@ -118,50 +123,47 @@ export function MockupPreview({
     setResting(false); // a new attempt begins; `current` keeps showing meanwhile
     // The compose is a ROUTE HANDLER (not a Server Action): a plain concurrent fetch, so
     // several previews compose in PARALLEL and don't abort each other (server actions
-    // serialise + cancel on re-render, which rendered thumbnails inconsistently). DEFER a
-    // beat so a strict-mode throwaway mount never dispatches; abort a superseded request.
+    // serialise + cancel on re-render, which rendered thumbnails inconsistently). Dispatch
+    // IMMEDIATELY — a deferred kickoff was getting cancelled by the customize page's rapid
+    // mount re-renders, so the compose never fired. A superseded request is aborted; the
+    // seq-gate ignores its result; the recovery effect retries a genuinely stuck one.
     const ctrl = new AbortController();
-    const kickoff = setTimeout(() => {
-      fetch('/api/mockup', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          assetId,
-          variantId,
-          transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
-          size,
-          sourceObjectId: sourceObjectId ?? undefined,
-        }),
-        signal: ctrl.signal,
-      })
-        .then((res) => res.json() as Promise<MockupPreviewResult>)
-        .then((r) => {
-          if (!isLatest()) return;
-          if (!r.ok) {
-            setCurrent(null);
-            setResting(true); // no template / blocked — settle on the plain block
-            return;
-          }
-          // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
-          const pre = new window.Image();
-          pre.onload = () => {
-            if (isLatest()) setCurrent(r.url);
-          };
-          pre.onerror = () => {
-            if (isLatest() && !currentRef.current) setResting(true);
-          };
-          pre.src = r.url;
-        })
-        .catch(() => {
-          // an aborted/superseded request is expected — only a genuine failure with nothing
-          // to show settles on the plain block (the recovery effect below retries a stuck one)
+    fetch('/api/mockup', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        assetId,
+        variantId,
+        transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
+        size,
+        sourceObjectId: sourceObjectId ?? undefined,
+      }),
+      signal: ctrl.signal,
+    })
+      .then((res) => res.json() as Promise<MockupPreviewResult>)
+      .then((r) => {
+        if (!isLatest()) return;
+        if (!r.ok) {
+          setCurrent(null);
+          setResting(true); // no template / blocked — settle on the plain block
+          return;
+        }
+        // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
+        const pre = new window.Image();
+        pre.onload = () => {
+          if (isLatest()) setCurrent(r.url);
+        };
+        pre.onerror = () => {
           if (isLatest() && !currentRef.current) setResting(true);
-        });
-    }, 50);
-    return () => {
-      clearTimeout(kickoff);
-      ctrl.abort();
-    };
+        };
+        pre.src = r.url;
+      })
+      .catch(() => {
+        // an aborted/superseded request is expected — only a genuine failure with nothing
+        // to show settles on the plain block (the recovery effect below retries a stuck one)
+        if (isLatest() && !currentRef.current) setResting(true);
+      });
+    return () => ctrl.abort();
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId, attempt]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.

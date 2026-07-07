@@ -58,7 +58,7 @@ export function ProductTile({
         (v) =>
           (p.sizes.length === 0 || v.attributes.size === sel.size) &&
           (p.colours.length === 0 || v.attributes.colour === sel.colour) &&
-          (p.orientations.length === 0 || v.attributes.orientation === sel.orientation),
+          (p.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === sel.orientation),
       )
     : undefined;
   const shownVariant = chosen ?? def;
