@@ -43,7 +43,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r8'; // r8: foreground overlay (lighting asset) composited OVER the design (jigsaw piece lines)
+const RENDER_REV = 'r9'; // r9: perspective views + transpose-fit (rotate the design to a transposed quad, e.g. the tin lid)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -117,6 +117,16 @@ function quadBboxPx(quad: [number, number][], W: number, H: number): { x: number
     w: Math.max(1, Math.round((maxX - minX) * W)),
     h: Math.max(1, Math.round((maxY - minY) * H)),
   };
+}
+
+/** The quad's own width÷height (average of opposite edge lengths) — used to tell whether the
+ * print's aspect is TRANSPOSED relative to how the surface sits in the photo. */
+function quadEdgeAspect(quad: [number, number][]): number {
+  const [tl, tr, br, bl] = quad as [[number, number], [number, number], [number, number], [number, number]];
+  const len = (a: [number, number], b: [number, number]) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  const w = (len(tl, tr) + len(bl, br)) / 2;
+  const h = (len(tl, bl) + len(tr, br)) / 2;
+  return h === 0 ? 1 : w / h;
 }
 
 /** Is the quad an axis-aligned rectangle (FLAT) or a skewed/perspective quad? */
@@ -536,14 +546,20 @@ async function renderPerspective(args: {
   const iw = Math.max(1, Math.min(layer.width - ix, dw - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
   const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
-  const designCanvas = await sharp({ create: { width: dw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  const designPng = await sharp({ create: { width: dw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: part, left: ox, top: oy }])
-    .raw()
+    .png()
     .toBuffer();
+
+  // If the print's aspect and the quad's OWN aspect are TRANSPOSED — e.g. the tin's landscape
+  // lid print (869×674) shot in a portrait orientation — rotate the design −90° so it fills the
+  // quad the right way round instead of squishing across it. A no-op when the two agree.
+  const transposed = (dw / dh >= 1) !== (quadEdgeAspect(quad) >= 1);
+  const raw = await (transposed ? sharp(designPng).rotate(-90) : sharp(designPng)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 
   // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
   const quadPx = quad.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
-  const warped = perspectiveWarp({ design: designCanvas, srcW: dw, srcH: dh, quad: quadPx, canvasW: WW, canvasH: WH });
+  const warped = perspectiveWarp({ design: raw.data, srcW: raw.info.width, srcH: raw.info.height, quad: quadPx, canvasW: WW, canvasH: WH });
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
   const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
