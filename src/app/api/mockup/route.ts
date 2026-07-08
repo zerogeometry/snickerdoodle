@@ -34,13 +34,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<MockupPreview
     size?: unknown;
     sourceObjectId?: unknown;
     view?: unknown;
+    fill?: unknown;
   };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, fallback: true }, { status: 400 });
   }
-  const { assetId, variantId, transform, size, sourceObjectId, view } = body;
+  const { assetId, variantId, transform, size, sourceObjectId, view, fill } = body;
   if (typeof assetId !== 'string' || typeof variantId !== 'string') {
     return NextResponse.json({ ok: false, fallback: true }, { status: 400 });
   }
@@ -58,6 +59,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<MockupPreview
       size: (typeof size === 'string' ? size : undefined) as MockupSize | undefined,
       sourceObjectId: typeof sourceObjectId === 'string' ? sourceObjectId : undefined,
       view: typeof view === 'string' ? view : undefined,
+      fill: typeof fill === 'string' ? fill : undefined,
     });
     const grant = await getStorageObjectGrant(db, res.mockupObjectId, viewer, 600);
     return NextResponse.json(

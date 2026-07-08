@@ -66,6 +66,11 @@ export interface ComposeMockupInput {
   /** An ALTERNATE display view (mockup_views), e.g. 'tin'. Absent/'primary' ⇒ the product's
    * main mockup (print_templates). Alternate views can carry a PERSPECTIVE quad. */
   view?: string;
+  /** A solid-colour FILL instead of the child's image — a `#rrggbb` (e.g. the cushion's plain
+   * coloured back). GENERIC product render (no child pixels): the fill is multiplied over the
+   * blank so it reads as plush fabric. Display only; the asset is still authz-gated + owns the
+   * cached derivative. Absent ⇒ the real design. */
+  fill?: string;
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
@@ -209,7 +214,11 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   const t = clampTransform(input.transform);
   const size: MockupSize = input.size ?? 'thumb';
   const viewTag = input.view && input.view !== 'primary' && input.view !== 'board' ? `-${input.view}` : '';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}-${srcObj.id}-${transformHash(t)}`);
+  // A solid-colour fill (the cushion's plain back) — sanitised #rrggbb, part of the key so each
+  // colour caches separately and never collides with the real-design render.
+  const fill = input.fill && /^#[0-9a-f]{6}$/i.test(input.fill) ? input.fill.toLowerCase() : undefined;
+  const fillTag = fill ? `-fill${fill.slice(1)}` : '';
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}-${srcObj.id}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
@@ -226,6 +235,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       maskKey: mask?.key,
       overlayKey: overlay?.key,
       designKey: srcObj.key,
+      fillHex: fill,
       quad: tpl.printQuad,
       transform: t,
       workEdge: tpl.mapResolutionPx,
@@ -242,10 +252,19 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   }
 }
 
+/** A solid-colour design for a FILL render (e.g. the cushion's plain coloured back): cover-fit
+ * + multiplied over the blank, it paints the whole print area that colour. No child pixels. */
+async function solidFill(hex: string): Promise<Buffer> {
+  const r = parseInt(hex.slice(1, 3), 16),
+    g = parseInt(hex.slice(3, 5), 16),
+    b = parseInt(hex.slice(5, 7), 16);
+  return sharp({ create: { width: 512, height: 512, channels: 4, background: { r, g, b, alpha: 1 } } }).png().toBuffer();
+}
+
 async function renderAndPersist(
   db: DbHandle,
   args: {
-    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; quad: [number, number][];
+    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
     transform: Transform; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string;
@@ -256,7 +275,9 @@ async function renderAndPersist(
   const perspective = !isAxisAligned(args.quad);
   const common = {
     blankBuf: await getObjectBytes(args.blankKey),
-    designBuf: await getObjectBytes(args.designKey),
+    // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
+    // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
+    designBuf: args.fillHex ? await solidFill(args.fillHex) : await getObjectBytes(args.designKey),
     quad: args.quad,
     transform: args.transform,
     workEdge: args.workEdge,

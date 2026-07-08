@@ -151,6 +151,11 @@ export type BasketItem = {
    * (+ an optional bg-removed cutout to render from). The server re-clamps + freezes
    * this at order time. */
   artwork?: { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
+  /** CUSHION back side (double-sided-capable squares only): 'both' = the same image on
+   * both sides, or a colour token from CUSHION_BACK_COLOURS = image front + that plain
+   * back. Absent / heart+round = single-sided (white back). Display + fulfilment read this;
+   * it never changes the SKU or the price. */
+  back?: string;
 };
 type BasketState = {
   items: BasketItem[];
@@ -224,7 +229,7 @@ export const usePlacements = create<{
 // (so pressing "edit placement" then "save & return" no longer resets it to the
 // default), and lets the editor's orientation toggle write back so Customize
 // reflects it on return. In-memory: a demo selection, not durable state.
-export type Selection = { size?: string; colour?: string; orientation?: string };
+export type Selection = { size?: string; colour?: string; orientation?: string; back?: string };
 export const useSelection = create<{
   selections: Record<string, Selection>;
   setSelection: (productKey: string, patch: Selection) => void;

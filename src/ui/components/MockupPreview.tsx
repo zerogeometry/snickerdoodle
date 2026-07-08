@@ -32,6 +32,7 @@ export function MockupPreview({
   size,
   sourceObjectId,
   view,
+  fill,
   px = 96,
   lazy = false,
 }: {
@@ -44,6 +45,8 @@ export function MockupPreview({
   /** An alternate display view (e.g. 'tin') — composes a mockup_views mockup instead of the
    * product's primary one. Absent ⇒ the primary product mockup. */
   view?: string | null;
+  /** A solid-colour fill instead of the design (e.g. the cushion's plain coloured back), #rrggbb. */
+  fill?: string | null;
   px?: number;
   /** Defer composing until scrolled into view (for large grids). */
   lazy?: boolean;
@@ -81,7 +84,7 @@ export function MockupPreview({
   }
   const tfKey = JSON.stringify(transform ?? null);
   // Fresh inputs get a fresh retry allowance.
-  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}|${view ?? ''}`;
+  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}|${view ?? ''}|${fill ?? ''}`;
   const lastInputKey = useRef(inputKey);
   if (lastInputKey.current !== inputKey) {
     lastInputKey.current = inputKey;
@@ -142,6 +145,7 @@ export function MockupPreview({
         size,
         sourceObjectId: sourceObjectId ?? undefined,
         view: view ?? undefined,
+        fill: fill ?? undefined,
       }),
       signal: ctrl.signal,
     })
@@ -169,7 +173,7 @@ export function MockupPreview({
         if (isLatest() && !currentRef.current) setResting(true);
       });
     return () => ctrl.abort();
-  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, attempt]);
+  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, attempt]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
   // Independently of the dispatch above, if the preview is STUCK (visible, ids present, no

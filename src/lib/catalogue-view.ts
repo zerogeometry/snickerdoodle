@@ -28,6 +28,30 @@ export function defaultTransformFor(productKey: string): { scale: number; offset
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 }
 
+/**
+ * CUSHION back side. The double-sided-capable squares (Prodigi DUAL SKUs) can print the
+ * same IMAGE on both sides ({@link CUSHION_BACK_MATCH}) or the image on the front with a
+ * plain colour back — a colour token below, in line with the site's brand palette. Heart +
+ * round are single-sided (a white back), so they ignore this. It never changes the SKU or
+ * the price — only what we render (preview) and print (the back file).
+ */
+export const CUSHION_BACK_MATCH = 'both';
+export const CUSHION_BACK_COLOURS: { token: string; label: string; hex: string }[] = [
+  { token: 'white', label: 'white', hex: '#FFFFFF' },
+  { token: 'oat', label: 'oat', hex: '#FBF5E9' },
+  { token: 'honey', label: 'honey', hex: '#F2A640' },
+  { token: 'cinnamon', label: 'cinnamon', hex: '#C8623A' },
+  { token: 'sky', label: 'sky', hex: '#84BBD0' },
+  { token: 'berry', label: 'berry', hex: '#E8786E' },
+  { token: 'meadow', label: 'meadow', hex: '#93B97C' },
+  { token: 'cocoa', label: 'cocoa', hex: '#2E2723' },
+];
+/** The hex for a back-colour token, or null (unknown token / the 'both' image option). */
+export const cushionBackHex = (token: string | null | undefined): string | null =>
+  CUSHION_BACK_COLOURS.find((c) => c.token === token)?.hex ?? null;
+/** Only the square cushions (the DUAL SKUs) offer a back choice; heart + round are single-sided. */
+export const cushionSupportsBack = (size: string | null | undefined): boolean => !!size && /square/i.test(size);
+
 /** Every possible basket line id for a product (one per variant). */
 export const productLineIds = (p: CatalogueProduct): string[] => p.variants.map((v) => lineIdForSku(v.sku));
 
