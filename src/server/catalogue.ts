@@ -106,6 +106,7 @@ function jigsawVariants(): VariantDef[] {
 export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'> = {
   framedPrint: 'portrait',
   jigsaw: 'landscape',
+  blanket: 'portrait', // Prodigi's fleece-blanket print file is fixed PORTRAIT (600×1000 / 1000×1500mm)
 };
 
 // Mug: the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is its
@@ -178,15 +179,25 @@ function babyVariants(): VariantDef[] {
   }));
 }
 
-// Fleece blanket: each size+colour is its own Prodigi SKU.
+// Fleece blanket: WHITE only for now (founder call — no pink/blue). Orientation is OURS like the
+// frame/jigsaw: Prodigi's blanket print file is fixed PORTRAIT (taller than wide); a landscape
+// variant works on a swapped canvas and the fulfilment render rotates the finished file 90° back.
+// Portrait is native (leads + default). Each size+colour is its own Prodigi SKU (white baked in).
+const BLANKET_SIZES = [
+  { size: 'medium', wMm: 600, hMm: 1000, pricePence: 5795, sku: 'H-BLA-PBMWHITE' },
+  { size: 'large', wMm: 1000, hMm: 1500, pricePence: 7595, sku: 'H-BLA-PBLWHITE' },
+] as const;
 function blanketVariants(): VariantDef[] {
-  return [
-    { size: 'medium', colour: 'white', pricePence: 5795, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMWHITE' },
-    { size: 'medium', colour: 'pink', pricePence: 6495, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMPINK' },
-    { size: 'medium', colour: 'blue', pricePence: 6495, wMm: 600, hMm: 1000, dpi: 150, prodigiSku: 'H-BLA-PBMBLUE' },
-    { size: 'large', colour: 'white', pricePence: 7595, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLWHITE' },
-    { size: 'large', colour: 'pink', pricePence: 7595, wMm: 1000, hMm: 1500, dpi: 150, prodigiSku: 'H-BLA-PBLPINK' },
-  ];
+  return BLANKET_SIZES.flatMap((s) =>
+    (['portrait', 'landscape'] as const).map((orientation) => ({
+      size: s.size, orientation,
+      pricePence: s.pricePence,
+      wMm: orientation === 'landscape' ? s.hMm : s.wMm,
+      hMm: orientation === 'landscape' ? s.wMm : s.hMm,
+      dpi: 150,
+      prodigiSku: s.sku,
+    })),
+  );
 }
 
 // The founder-approved launch range (2026-07-01). Prices are our retail pence, VAT-inclusive with
@@ -245,7 +256,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: jigsawVariants(),
   },
   blanket: {
-    category: 'BLANKET', label: 'fleece blanket', blurb: 'cuddles, with their art woven in', print: true,
+    category: 'BLANKET', label: 'fleece blanket', blurb: 'cuddles, with their art woven in', print: true, visibleInShop: true,
     description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
     specs: { material: 'fleece', care: 'machine washable' },
     variants: blanketVariants(),

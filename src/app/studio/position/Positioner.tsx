@@ -201,7 +201,10 @@ export function Positioner({
   const isJigsaw = variant.productKey === 'jigsaw';
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
   const onProductLabel =
-    variant.productKey === 'cushion' ? 'on the cushion' : isJigsaw ? 'on the board' : 'in the frame';
+    variant.productKey === 'cushion' ? 'on the cushion'
+      : variant.productKey === 'blanket' ? 'on the blanket'
+      : isJigsaw ? 'on the board'
+      : 'in the frame';
   // A FRAME DEFAULTS to cover-filled (scale 1 = "1.0×", no margins), but the shopper CAN
   // zoom out to 0.5× if they want a border (founder call 2026-07-07). So its zoom floors
   // at 0.5 of cover — below the fit-centred model other products use.

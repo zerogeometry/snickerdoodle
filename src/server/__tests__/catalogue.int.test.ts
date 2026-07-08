@@ -69,10 +69,10 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'))).toHaveLength(1);
   });
 
-  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + cushion + jigsaw); the curation view sees everything', async () => {
+  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + cushion + jigsaw + blanket); the curation view sees everything', async () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'cushion', 'jigsaw']);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'cushion', 'jigsaw', 'blanket']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -85,10 +85,32 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.mug!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'cushion', 'jigsaw']);
+    const SHOWN = new Set(['framedPrint', 'cushion', 'jigsaw', 'blanket']);
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));
     }
+  });
+
+  it('BLANKET is WHITE-only, medium+large × portrait/landscape (4 variants, priced, no colour)', async () => {
+    const rows = await db
+      .select({ sku: productVariants.sku, attrs: productVariants.attributes, price: productVariants.pricePence, active: productVariants.active })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(eq(products.key, 'blanket'));
+    const live = rows.filter((r) => r.active);
+    expect(live).toHaveLength(4); // medium/large × portrait/landscape — no pink/blue
+    for (const r of live) {
+      const a = r.attrs as Record<string, string>;
+      expect(a.colour, `${r.sku} carries no colour dimension`).toBeUndefined(); // white is implicit
+      expect(['portrait', 'landscape']).toContain(a.orientation);
+      expect(['medium', 'large']).toContain(a.size);
+    }
+    // price by SIZE (same both orientations); pink/blue SKUs are gone (deactivated)
+    const priceOf = (size: string) => live.find((r) => (r.attrs as Record<string, string>).size === size)!.price;
+    expect(priceOf('medium')).toBe(5795);
+    expect(priceOf('large')).toBe(7595);
+    const pinkBlue = rows.filter((r) => r.active && /PINK|BLUE/i.test((r.attrs as Record<string, string>).colour ?? ''));
+    expect(pinkBlue).toHaveLength(0);
   });
 });

@@ -53,6 +53,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-frame'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-jigsaw'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-cushion'; dir: string }
+  | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
 );
 
 // Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
@@ -88,6 +89,16 @@ function layeredCushionDir(shape: string): string | null {
   const has = (f: string) => existsSync(path.join(dir, f));
   const hasShape = has('printmap.png') || has('printquad.png');
   return hasShape && has('background.png') && has('shadow.png') ? dir : null;
+}
+
+// Founder-authored BLANKET layers, per colour (white only for now): background → shadow →
+// printmap (a white face at the print's true dimensions, transparent surround). Same construction
+// as the cushion — the printmap's opaque region is BOTH the print area AND the silhouette mask —
+// but WITH orientation (the blanket offers portrait/landscape, like the jigsaw) and NO overlay.
+function layeredBlanketDir(colour: string): string | null {
+  const dir = path.join(LAYERED, 'blanket', colour.replace(/\s+/g, '-'));
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('printmap.png') && has('background.png') && has('shadow.png') ? dir : null;
 }
 
 const FRAME: Record<string, string> = {
@@ -135,8 +146,17 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       const f = pieces === '252' ? 'Prodigi jigsaw 252 pcs.jpg' : pieces === '110' ? 'Prodigi jigsaw 110 pcs.jpg' : 'Prodigi jigsaw 30 pcs.jpg';
       return { file: `${JIG}/${f}`, material: 'PAPER', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
     }
-    case 'blanket': // photo is landscape but the print canvas is PORTRAIT (600×1000mm) → rotate the blank to match
-      return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, rotate: 90 };
+    case 'blanket': {
+      // WHITE only for now; the blanket offers portrait/landscape (native PORTRAIT — the print
+      // canvas is 600×1000mm, taller than wide).
+      const orientation = attrs.orientation === 'landscape' ? 'landscape' : 'portrait';
+      const dir = layeredBlanketDir('white');
+      // Preferred: the founder's authored layers (background → shadow → white face).
+      if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-blanket', dir, orientation };
+      // Flat-photo fallback: the landscape Prodigi photo rotated to the portrait native canvas
+      // (a landscape variant then rotates the finished blank the other way via the generic flag).
+      return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
+    }
     case 'calendar': // page photo is portrait; our calendar canvas is LANDSCAPE (297×210) → rotate to match
       return { file: 'prodigi-calendar-blank-assets/Blank Calendars/calendar blank.png', material: 'PAPER', register: 'face-cover', mask: false, rotate: 90 };
     case 'storybook': // derived from Prodigi's hardcover photo-book back shot (thumbnails in-painted, portrait crop)
@@ -423,6 +443,79 @@ async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffe
 }
 
 /**
+ * Founder-layered blanket → a (blank, mask, window) bundle. Like the cushion, the printmap layer
+ * (a white face at the print's true dimensions, transparent surround) is the registration
+ * authority: its OPAQUE region is BOTH the print quad and the silhouette mask (the art clips to
+ * the blanket face). The stored blank composites background → shadow → the white face. NO overlay
+ * (a flat fleece, no plumpness). WITH orientation like the frame/jigsaw: the authored drop is
+ * PORTRAIT (native), so a LANDSCAPE variant is the same drop rotated 90° (its print canvas is
+ * already swapped, so the quad aspect-locks onto it).
+ */
+const layeredBlanketCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
+async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
+  const files = ['background.png', 'shadow.png', 'printmap.png'];
+  const key = dir + '|' + orientation + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = layeredBlanketCache.get(key);
+  if (hit) return hit;
+
+  // The FACE layer is the canvas authority: opaque region = print quad AND silhouette mask.
+  const facePng = readFileSync(path.join(dir, 'printmap.png'));
+  const { data, info } = await sharp(facePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+  const maskRaw = Buffer.alloc(W * H);
+  let mx0 = W, my0 = H, mx1 = -1, my1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (data[(y * W + x) * c + 3]! >= 128) {
+        maskRaw[y * W + x] = 255;
+        if (x < mx0) mx0 = x;
+        if (x > mx1) mx1 = x;
+        if (y < my0) my0 = y;
+        if (y > my1) my1 = y;
+      }
+    }
+  if (mx1 < 0) throw new Error(`layered blanket ${dir}: printmap.png has no opaque print region`);
+  const mask = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+
+  // The shadow MUST share the face's canvas (their registration IS the alignment that sells it);
+  // the background is a flat backdrop, so a size mismatch there is cover-fitted.
+  const sm = await sharp(readFileSync(path.join(dir, 'shadow.png'))).metadata();
+  if (sm.width !== W || sm.height !== H) {
+    throw new Error(`layered blanket ${dir}: shadow.png is ${sm.width}x${sm.height} but printmap.png is ${W}x${H} — re-export on one canvas`);
+  }
+
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png')))
+    .flatten({ background: '#ffffff' }) // a transparent backdrop must not read as black
+    .resize(W, H, { fit: 'cover' })
+    .toBuffer();
+  const blank = await sharp(backdrop)
+    .composite([
+      { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
+      { input: facePng, left: 0, top: 0 }, // the white face is the print surface
+    ])
+    .png()
+    .toBuffer();
+
+  let out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+
+  // LANDSCAPE: the same blanket turned 90° — rotate blank + mask and carry the window box into
+  // the rotated space (the landscape variant's print canvas is already swapped). Mirrors
+  // layeredFrame's landscape branch (native is portrait).
+  if (orientation === 'landscape') {
+    const w = out.window;
+    out = {
+      blank: await sharp(out.blank).rotate(90).png().toBuffer(),
+      mask: await sharp(out.mask).rotate(90).png().toBuffer(),
+      window: { x0: 1 - w.y1, y0: w.x0, x1: 1 - w.y0, y1: w.x1 },
+      W: out.H,
+      H: out.W,
+    };
+  }
+  layeredBlanketCache.set(key, out);
+  return out;
+}
+
+/**
  * The print WINDOW on a framed-print blank → normalised bbox. Preferred: the transparent hole
  * (exact). Fallback (frames shipped with an opaque white window): walk OUT from the centre until
  * the colour breaks from the window's own colour for a sustained run — the inner moulding edge —
@@ -648,6 +741,20 @@ export async function POST(req: Request): Promise<Response> {
       const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
       registration.push({
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-cushion',
+        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
+    if (p.register === 'layered-blanket') {
+      const d = await layeredBlanket(p.dir, p.orientation);
+      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
+      authored++;
+      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-blanket',
         quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
         driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
       });
