@@ -912,7 +912,7 @@ export function Positioner({
                   : assess.decision === 'UPSCALE'
                     ? `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
                     : dpiFix !== null
-                      ? 'too soft at this zoom'
+                      ? 'image quality too low at this size'
                       : 'too small to print well here — try a smaller product'}
               </span>
               {dpiFix !== null ? (
@@ -1083,7 +1083,7 @@ export function Positioner({
               "zoom out to fix" sits under the canvas, easy to miss next to a disabled save). */}
           {assess?.decision === 'BLOCK' ? (
             <p className="mt-2 text-center text-[11px] font-semibold text-berry">
-              zoom out a touch to save — it’d print soft at this size
+              zoom out a touch or upload another. the image quality is too low at this size.
             </p>
           ) : null}
           <button
