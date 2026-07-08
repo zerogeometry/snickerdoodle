@@ -6,6 +6,12 @@ import type { ReactNode } from 'react';
 import '@fontsource-variable/fraunces';
 import '@fontsource-variable/mulish';
 import '@fontsource-variable/caveat';
+// The greetings-card message fonts — casual/friendly, offered in the "add a message" picker.
+// Self-hosted via @fontsource too (no CDN). See src/lib/card-fonts.ts for the shared registry.
+import '@fontsource/patrick-hand';
+import '@fontsource/gochi-hand';
+import '@fontsource/shadows-into-light';
+import '@fontsource-variable/baloo-2';
 import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';

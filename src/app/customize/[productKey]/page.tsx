@@ -10,7 +10,8 @@ import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
-import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
+import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
@@ -76,12 +77,18 @@ export default function CustomizePage() {
   // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
   const [back, setBack] = useState<string>(CUSHION_BACK_WHITE);
   const [showBack, setShowBack] = useState(false);
+  // GREETINGS CARD inside message (card only): null = blank inside (write it by hand). `showInside`
+  // flips the preview between the front mockup and the inside message layout.
+  const [cardMessage, setCardMessage] = useState<CardMessage | null>(null);
+  const [showInside, setShowInside] = useState(false);
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
     setMockupView('primary');
     setThumbIdx(0);
     setShowBack(false);
+    setShowInside(false);
+    setCardMessage(null);
   }, [productKey]);
 
   useEffect(() => {
@@ -132,6 +139,7 @@ export default function CustomizePage() {
     setColour(saved?.colour ?? def.attributes.colour ?? null);
     setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
     setBack(saved?.back ?? CUSHION_BACK_WHITE);
+    setCardMessage(saved?.message ?? null);
     if (saved?.orientation) {
       orientationLockedRef.current = true; // synchronous → the auto-default effect below sees it this same flush
       setOrientationTouched(true); // an explicit/restored choice isn't overridden by the image-aspect auto-default
@@ -142,8 +150,8 @@ export default function CustomizePage() {
   // return) and the editor can read/reflect the chosen orientation.
   useEffect(() => {
     if (!product) return;
-    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, back });
-  }, [product, size, colour, orientation, back]);
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, back, message: cardMessage ?? undefined });
+  }, [product, size, colour, orientation, back, cardMessage]);
 
   // CUSHION back: only the DUAL squares offer a colour / both-sides back; heart + round show a
   // white reverse. `backFill` drives the "turn it around" preview — undefined = the image (both
@@ -297,7 +305,12 @@ export default function CustomizePage() {
           ? 'both sides'
           : `${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`
       : null;
-    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel].filter(Boolean).join(' · ') || undefined;
+    // CARD inside message — only attach if it actually has content (all-empty = blank inside).
+    const cardMsg: CardMessage | undefined =
+      product.key === 'card' && cardMessage && (cardMessage.greeting.trim() || cardMessage.message.trim() || cardMessage.signature.trim())
+        ? { greeting: cardMessage.greeting.trim(), message: cardMessage.message.trim(), signature: cardMessage.signature.trim(), font: cardMessage.font }
+        : undefined;
+    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
     const fields = {
       name: product.label,
       product: product.key as ProductKey,
@@ -307,6 +320,7 @@ export default function CustomizePage() {
       sub,
       artwork: { assetId: activeAssetId, transform: placement, sourceObjectId: activeSource },
       back: supportsBack ? back : undefined, // cushion back choice (the DUAL squares only)
+      message: cardMsg, // card inside message (card only)
     };
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
@@ -369,6 +383,10 @@ export default function CustomizePage() {
                   attributes={variant.attributes}
                 />
               </div>
+            ) : product.key === 'card' && showInside ? (
+              // The INSIDE of the card — the message laid out in the chosen font (a live text
+              // preview; the photoreal inside mockup follows once the founder's card assets land).
+              <CardInsidePreview message={cardMessage} />
             ) : (
               <>
                 <MockupPreview
@@ -407,6 +425,23 @@ export default function CustomizePage() {
                   onClick={() => setShowBack(b)}
                   aria-pressed={showBack === b}
                   className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${showBack === b ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {/* Card "open it up" — flip the preview between the front (the drawing) and the inside
+              (the message). Mirrors the cushion's front/back toggle. */}
+          {product.key === 'card' ? (
+            <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="open the card">
+              {([['the front', false], ['the inside', true]] as const).map(([label, inside]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setShowInside(inside)}
+                  aria-pressed={showInside === inside}
+                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${showInside === inside ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
                 >
                   {label}
                 </button>
@@ -610,6 +645,74 @@ export default function CustomizePage() {
             </div>
           ) : null}
 
+          {/* CARD inside: leave it blank (write by hand) or add a printed message — three fields
+              (greeting / message / signature) in a chosen font, auto-fit to the card inside. */}
+          {product.key === 'card' ? (
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The inside</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCardMessage(null)}
+                  aria-pressed={cardMessage === null}
+                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardMessage === null ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  leave it blank
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setCardMessage((m) => m ?? { greeting: '', message: '', signature: '', font: CARD_FONT_DEFAULT }); setShowInside(true); }}
+                  aria-pressed={cardMessage !== null}
+                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardMessage !== null ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  add a message
+                </button>
+              </div>
+              {cardMessage === null ? (
+                <p className="mt-1.5 text-[11px] text-[#9C8E7E]">left blank for you to write in by hand</p>
+              ) : (
+                <div className="mt-3 space-y-2.5">
+                  {([
+                    ['Greeting', 'greeting', 'Happy Birthday!', 80, 2],
+                    ['Message', 'message', 'Hope your special day is full of cake and fun…', 600, 4],
+                    ['Signature', 'signature', 'love, Mabel x', 80, 2],
+                  ] as const).map(([label, key, placeholder, max, rows]) => (
+                    <label key={key} className="block">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">{label}</span>
+                      <textarea
+                        value={cardMessage[key]}
+                        onChange={(e) => setCardMessage({ ...cardMessage, [key]: e.target.value.slice(0, max) })}
+                        onFocus={() => setShowInside(true)}
+                        placeholder={placeholder}
+                        rows={rows}
+                        maxLength={max}
+                        className="mt-1 w-full resize-none rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2 text-sm text-cocoa placeholder:text-[#B7A890] focus:border-cinnamon focus:outline-none"
+                      />
+                    </label>
+                  ))}
+                  <div>
+                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Font</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {CARD_FONTS.map((f) => (
+                        <button
+                          key={f.token}
+                          type="button"
+                          onClick={() => setCardMessage({ ...cardMessage, font: f.token })}
+                          aria-pressed={cardMessage.font === f.token}
+                          className={`rounded-full border-2 px-3 py-1.5 text-base leading-none ${cardMessage.font === f.token ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                          style={{ fontFamily: f.css }}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-[#9C8E7E]">screened before print · appears on the inside right</p>
+                </div>
+              )}
+            </div>
+          ) : null}
+
           {/* collapsible, scrollable-in-container description */}
           {product.description ? (
             <div className="mt-5 rounded-xl border border-[#EFE6D6] bg-white">
@@ -648,6 +751,40 @@ export default function CustomizePage() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+/**
+ * A live preview of the card's INSIDE — the message laid out on the inside-right page in the
+ * chosen font (greeting on top, message in the middle, signature at the foot). A styled text
+ * preview for now; the photoreal inside mockup follows once the founder's card assets land and
+ * the print renderer auto-fits each field to its real inside zone. Empty ⇒ a gentle placeholder.
+ */
+function CardInsidePreview({ message }: { message: CardMessage | null }) {
+  const empty = !message || (!message.greeting.trim() && !message.message.trim() && !message.signature.trim());
+  return (
+    <div className="flex h-96 w-full items-center justify-center">
+      <div
+        className="flex aspect-[5/7] h-full flex-col rounded-lg border border-[#EADFC9] bg-white px-5 py-6 text-cocoa shadow-[0_2px_10px_rgba(46,39,35,.08)]"
+        style={{ fontFamily: cardFontCss(message?.font) }}
+      >
+        {empty ? (
+          <div className="m-auto text-center text-sm text-[#B7A890]" style={{ fontFamily: 'var(--font-sans)' }}>
+            your message will appear here
+          </div>
+        ) : (
+          <>
+            {message!.greeting.trim() ? <p className="whitespace-pre-wrap break-words text-center text-2xl leading-snug">{message!.greeting}</p> : null}
+            {message!.message.trim() ? (
+              <p className="mt-3 flex-1 whitespace-pre-wrap break-words text-lg leading-snug">{message!.message}</p>
+            ) : (
+              <div className="flex-1" />
+            )}
+            {message!.signature.trim() ? <p className="mt-3 whitespace-pre-wrap break-words text-right text-xl leading-snug">{message!.signature}</p> : null}
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 

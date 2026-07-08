@@ -136,6 +136,10 @@ export function normalizeUpload(dataUrl: string, name: string): Promise<{ dataUr
 
 // ── basket ───────────────────────────────────────────────────────────────────
 export type PlacementTransform = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
+/** The greetings-card INSIDE message (optional — present only when the shopper chose "add a
+ * message"). One `font` (a card-fonts token) for all three fields; each field is auto-fit into its
+ * inside print zone at fulfilment. All three are abuse-screened server-side before they can print. */
+export type CardMessage = { greeting: string; message: string; signature: string; font: string };
 export type BasketItem = {
   id: string;
   name: string;
@@ -157,6 +161,8 @@ export type BasketItem = {
    * DUAL variant (a different SKU + price). Absent / heart+round = single-sided. Display, the
    * variant resolver, AND the DUAL fulfilment renderer all read this. */
   back?: string;
+  /** GREETINGS-CARD inside message (card only) — absent = blank inside (write it by hand). */
+  message?: CardMessage;
 };
 type BasketState = {
   items: BasketItem[];
@@ -230,7 +236,7 @@ export const usePlacements = create<{
 // (so pressing "edit placement" then "save & return" no longer resets it to the
 // default), and lets the editor's orientation toggle write back so Customize
 // reflects it on return. In-memory: a demo selection, not durable state.
-export type Selection = { size?: string; colour?: string; orientation?: string; back?: string };
+export type Selection = { size?: string; colour?: string; orientation?: string; back?: string; message?: CardMessage };
 export const useSelection = create<{
   selections: Record<string, Selection>;
   setSelection: (productKey: string, patch: Selection) => void;
