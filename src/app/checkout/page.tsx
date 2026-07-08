@@ -129,9 +129,9 @@ export default function CheckoutPage() {
         // ignore
       }
       const res = await placeOrderAction({
-        // Fold the cushion back choice into the artwork payload — it's a per-print detail the
-        // server freezes + the fulfilment renderer reads (DUAL front|back). Harmless elsewhere.
-        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back } } : {}) })),
+        // Fold the per-print details (cushion back, card inside message) into the artwork payload
+        // — the server freezes + screens them and the fulfilment renderer reads them. Harmless elsewhere.
+        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message } } : {}) })),
         gift,
         subject: liveSubject ?? undefined,
       });

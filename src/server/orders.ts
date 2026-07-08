@@ -4,6 +4,7 @@ import { assertCanViewAsset } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import type { DbHandle, Tx } from './db';
@@ -21,7 +22,7 @@ function newRef(): string {
 export interface PlaceLine {
   productKey: string;
   qty: number;
-  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string };
+  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown };
 }
 
 export interface PlaceOrderResult {
@@ -96,7 +97,7 @@ export async function placeOrder(
   // template snapshot + a server-clamped transform). A bad placement fails here,
   // not half-way through inserting an order.
   const artworkByIndex = new Map<number, {
-    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null;
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; message: ScreenedCardMessage | null;
   }>();
   for (let i = 0; i < valid.length; i++) {
     const art = valid[i]!.artwork;
@@ -144,6 +145,13 @@ export async function placeOrder(
       },
       transform: clampTransform(art.transform), // server-authoritative
       back: normalizeCushionBack(art.back), // coerced to a known token or null
+      message: (() => {
+        // Card inside message — SCREENED here (abuse) + normalised (trim/cap/font) before it can be
+        // frozen or printed. A flagged field fails the whole order with a friendly, actionable error.
+        const screen = screenCardMessage(art.message as Parameters<typeof screenCardMessage>[0]);
+        if (!screen.ok) throw new Error(`your card ${screen.field} can’t be printed — please reword it`);
+        return screen.value;
+      })(),
     });
   }
 
@@ -189,6 +197,7 @@ export async function placeOrder(
         transform: art.transform,
         sourceObjectId: art.sourceObjectId,
         back: art.back,
+        message: art.message, // screened card message (card only), or null
         status: 'PENDING',
       });
     }

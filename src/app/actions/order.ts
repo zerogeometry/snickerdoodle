@@ -20,7 +20,7 @@ import type { RawTransform } from '@/server/print/geometry';
  * keepsake is real + controller-owned + grows the child's corner of the home.
  */
 export async function placeOrderAction(input: {
-  items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string } }[];
+  items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown } }[];
   gift?: boolean;
   subject?: string;
 }): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string }> {
@@ -28,7 +28,15 @@ export async function placeOrderAction(input: {
     productKey: String(i.productKey),
     qty: Number(i.qty),
     ...(i.artwork
-      ? { artwork: { assetId: String(i.artwork.assetId), transform: i.artwork.transform, sourceObjectId: i.artwork.sourceObjectId, back: typeof i.artwork.back === 'string' ? i.artwork.back : undefined } }
+      ? {
+          artwork: {
+            assetId: String(i.artwork.assetId),
+            transform: i.artwork.transform,
+            sourceObjectId: i.artwork.sourceObjectId,
+            back: typeof i.artwork.back === 'string' ? i.artwork.back : undefined,
+            message: i.artwork.message, // untrusted — screened + normalised server-side in placeOrder
+          },
+        }
       : {}),
   }));
 

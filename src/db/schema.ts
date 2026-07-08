@@ -679,6 +679,9 @@ export const orderItemArtwork = pgTable(
     // that plain-colour back. Null / any non-DUAL variant = single-sided (renderer ignores it).
     // The SKU (not this) is authoritative for single-vs-double + price; this only picks the back.
     back: text('back'),
+    // GREETINGS-CARD inside message, frozen + SCREENED at order time: {greeting,message,signature,font}
+    // or null (blank inside). Abuse-screened before it can be stored/printed (see screenCardMessage).
+    message: jsonb('message'),
     sourceObjectId: uuid('source_object_id').references(() => storageObjects.id),
     printObjectId: uuid('print_object_id').references(() => storageObjects.id),
     renderedDpi: integer('rendered_dpi'),

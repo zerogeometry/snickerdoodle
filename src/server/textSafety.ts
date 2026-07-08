@@ -6,6 +6,7 @@
  * moderation pipeline); it is the load-bearing screen for the name fields and is
  * reusable for member names / gift messages.
  */
+import { normalizeCardFont, type CardFontToken } from '@/lib/card-fonts';
 
 // Unambiguous profanity / slurs that must never appear in a child's name field.
 // Kept short + strong and matched as a substring of a single name token, which
@@ -24,6 +25,36 @@ export function containsAbusiveText(raw: string): boolean {
 export type NameScreen =
   | { ok: true; value: string | null }
   | { ok: false; reason: 'surname' | 'invalid' | 'length' | 'abuse' };
+
+// ── Greetings-card inside message ────────────────────────────────────────────
+/** A screened, print-ready card message (trimmed, capped, font coerced to a known token). */
+export type ScreenedCardMessage = { greeting: string; message: string; signature: string; font: CardFontToken };
+export type CardMessageScreen =
+  | { ok: true; value: ScreenedCardMessage | null } // null = blank inside (nothing to print)
+  | { ok: false; field: 'greeting' | 'message' | 'signature' }; // abusive language in that field
+
+const CARD_FIELD_MAX = { greeting: 80, message: 600, signature: 80 } as const;
+
+/**
+ * Screen the card's INSIDE message before it can print. Trims + length-caps each of the three
+ * free-text fields, coerces the font to a known {@link normalizeCardFont} token, and REJECTS if
+ * any field contains abusive language (the same deterministic screen as the name fields — the
+ * text goes on a child's keepsake, and to a printer). All-empty ⇒ ok with null (a blank inside,
+ * to write by hand). Reused by order placement AND the print renderer so they can't disagree.
+ */
+export function screenCardMessage(
+  raw: { greeting?: string; message?: string; signature?: string; font?: string } | null | undefined,
+): CardMessageScreen {
+  if (!raw) return { ok: true, value: null };
+  const greeting = (raw.greeting ?? '').trim().slice(0, CARD_FIELD_MAX.greeting);
+  const message = (raw.message ?? '').trim().slice(0, CARD_FIELD_MAX.message);
+  const signature = (raw.signature ?? '').trim().slice(0, CARD_FIELD_MAX.signature);
+  if (!greeting && !message && !signature) return { ok: true, value: null };
+  if (containsAbusiveText(greeting)) return { ok: false, field: 'greeting' };
+  if (containsAbusiveText(message)) return { ok: false, field: 'message' };
+  if (containsAbusiveText(signature)) return { ok: false, field: 'signature' };
+  return { ok: true, value: { greeting, message, signature, font: normalizeCardFont(raw.font) } };
+}
 
 // A single first-name token: letters/marks (any script), apostrophe, hyphen.
 const NAME_TOKEN = /^[\p{L}\p{M}'’-]+$/u;

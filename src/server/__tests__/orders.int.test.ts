@@ -52,7 +52,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [
         { productKey: 'mug', qty: 2 }, // 3590
-        { productKey: 'card', qty: 1 }, // 495
+        { productKey: 'card', qty: 1 }, // 595
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
       account: null,
@@ -61,7 +61,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4085); // catalogue (2×1795 + 495), not the client
+    expect(order!.subtotalPence).toBe(4185); // catalogue (2×1795 + 595), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });
@@ -254,6 +254,36 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
 
     // A forged / unknown token is coerced to null server-side — junk can never drive the print.
     expect((await backOf('not-a-real-token')).back).toBeNull();
+  });
+
+  it('a CARD line SCREENS + freezes the inside message (abuse is rejected; junk font → default)', async () => {
+    const [asset] = await db
+      .insert(assets)
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
+      .returning();
+
+    const orderCard = async (message: unknown) => {
+      const res = await placeOrder(db, {
+        items: [{ productKey: 'card', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, message } }],
+        account: { id: ids.samId },
+        joinProvenance: null,
+      });
+      await track(res);
+      const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+      const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
+      const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
+      return art!.message as { greeting: string; message: string; signature: string; font: string } | null;
+    };
+
+    // A clean message is trimmed + frozen; an unknown font token normalises to the default (caveat).
+    const frozen = await orderCard({ greeting: '  Happy Birthday!  ', message: 'Have a lovely day', signature: 'love Mabel x', font: 'not-a-font' });
+    expect(frozen).toMatchObject({ greeting: 'Happy Birthday!', message: 'Have a lovely day', signature: 'love Mabel x', font: 'caveat' });
+
+    // All-empty ⇒ null (blank inside, nothing to print).
+    expect(await orderCard({ greeting: '', message: '   ', signature: '', font: 'gochi' })).toBeNull();
+
+    // Abusive text in ANY field fails the order LOUDLY — it can never be frozen or printed.
+    await expect(orderCard({ greeting: 'hi', message: 'you fucking idiot', signature: '', font: 'baloo' })).rejects.toThrow(/can’t be printed/);
   });
 
   it('marking paid is atomic + idempotent — the PAID order is the fulfilment enqueue', async () => {

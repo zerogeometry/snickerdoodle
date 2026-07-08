@@ -1,0 +1,1 @@
+ALTER TABLE "order_item_artwork" ADD COLUMN "message" jsonb;
