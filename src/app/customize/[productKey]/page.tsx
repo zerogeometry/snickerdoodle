@@ -11,7 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -557,20 +557,25 @@ export default function CustomizePage() {
           ) : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}
 
-          {/* CUSHION back: the DUAL squares choose 'image both sides' or a plain colour back;
-              heart + round are single-sided (a plain white reverse). Tapping flips the preview. */}
+          {/* CUSHION back: pick a back colour (white is the single-sided default; any other colour
+              is a double-sided upgrade) or 'image both sides'. heart + round are single-sided.
+              Tapping flips the preview. */}
           {product.key === 'cushion' && supportsBack ? (
             <div className="mt-4">
               <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setBack(CUSHION_BACK_WHITE); setShowBack(true); }}
-                  aria-pressed={back === CUSHION_BACK_WHITE}
-                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${back === CUSHION_BACK_WHITE ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-                >
-                  plain white
-                </button>
+                {CUSHION_BACK_SWATCHES.map((c) => (
+                  <button
+                    key={c.token}
+                    type="button"
+                    onClick={() => { setBack(c.token); setShowBack(true); }}
+                    aria-pressed={back === c.token}
+                    aria-label={`${c.label} back`}
+                    title={c.label}
+                    className={`h-8 w-8 rounded-full border-2 ${back === c.token ? 'border-cinnamon ring-2 ring-cinnamon/30' : 'border-[#D9CDB8] hover:border-[#E0C7A8]'}`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                ))}
                 <button
                   type="button"
                   onClick={() => { setBack(CUSHION_BACK_MATCH); setShowBack(true); }}
@@ -579,25 +584,13 @@ export default function CustomizePage() {
                 >
                   image both sides
                 </button>
-                {CUSHION_BACK_COLOURS.map((c) => (
-                  <button
-                    key={c.token}
-                    type="button"
-                    onClick={() => { setBack(c.token); setShowBack(true); }}
-                    aria-pressed={back === c.token}
-                    aria-label={`${c.label} back`}
-                    title={c.label}
-                    className={`h-8 w-8 rounded-full border-2 ${back === c.token ? 'border-cinnamon ring-2 ring-cinnamon/30' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
-                    style={{ backgroundColor: c.hex }}
-                  />
-                ))}
               </div>
               <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
                 {back === CUSHION_BACK_WHITE
-                  ? 'plain white back · single-sided'
+                  ? 'white back · single-sided'
                   : back === CUSHION_BACK_MATCH
                     ? 'your image, printed on both sides · double-sided'
-                    : `image on the front · ${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back · double-sided`}
+                    : `image on the front · ${CUSHION_BACK_SWATCHES.find((c) => c.token === back)?.label ?? ''} back · double-sided`}
               </p>
             </div>
           ) : product.key === 'cushion' ? (

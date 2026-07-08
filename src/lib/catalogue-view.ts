@@ -47,6 +47,15 @@ export const CUSHION_BACK_COLOURS: { token: string; label: string; hex: string }
   { token: 'meadow', label: 'meadow', hex: '#93B97C' },
   { token: 'cocoa', label: 'cocoa', hex: '#2E2723' },
 ];
+/** The back-colour SWATCH strip shown in the UI: white FIRST (the single-sided default, a
+ * different SKU + the lower price), then the DUAL upgrade colours. White is a swatch here but
+ * stays single-sided ({@link cushionSidesForBack}); it is NOT in CUSHION_BACK_COLOURS because
+ * that list is the DUAL colour-back palette the print renderer fills from. 'image both sides'
+ * is a separate control, not a swatch. */
+export const CUSHION_BACK_SWATCHES: { token: string; label: string; hex: string }[] = [
+  { token: CUSHION_BACK_WHITE, label: 'white', hex: '#FFFFFF' },
+  ...CUSHION_BACK_COLOURS,
+];
 /** The hex for a back-colour token, or null (unknown token / the 'both' image option). */
 export const cushionBackHex = (token: string | null | undefined): string | null =>
   CUSHION_BACK_COLOURS.find((c) => c.token === token)?.hex ?? null;
