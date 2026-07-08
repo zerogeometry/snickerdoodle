@@ -4,14 +4,14 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { printTemplates, productVariants, storageObjects } from '@/db/schema';
+import { printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { mmToPx, seedCatalogue } from '@/server/catalogue';
 import { renderPrintFile } from '@/server/print/render';
-import { deleteObject } from '@/storage';
+import { deleteObject, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -132,5 +132,46 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     const derivs = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')));
     expect(derivs).toHaveLength(0);
     void sam;
+  });
+
+  it('DISPLAY-ONLY overlay (the cushion plumpness lives here) can NEVER reach the print file', async () => {
+    // The founder's plumpness.png is stored on the template's lightingObjectId and composited
+    // ONLY by the mockup pipeline. Prove the PRINT path ignores it: hang a maximally-visible
+    // display overlay on the template — a FULLY OPAQUE BLACK sheet — then render a print file.
+    // If renderPrintFile ever composited the overlay, the file would come back black. It must
+    // stay the child's design: the print path reads only the print GEOMETRY from the template.
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const { bucket } = getS3();
+    const overlayKey = `templates/render-leak-${ids.hartleyId}/overlay.png`;
+    const black = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 1 } } }).png().toBuffer();
+    await putObject(overlayKey, black, 'image/png');
+    keys.push(overlayKey);
+    const [oa] = await db
+      .insert(templateAssets)
+      .values({ kind: 'LIGHTING', bucket, key: overlayKey, contentType: 'image/png', byteSize: black.byteLength, widthPx: 64, heightPx: 64 })
+      .returning();
+    const [tplBefore] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
+    await db.update(printTemplates).set({ lightingObjectId: oa!.id }).where(eq(printTemplates.variantId, variantId));
+    try {
+      const assetId = await ingest(await src(4200, 5400));
+      const res = await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+      keys.push(res.key);
+      const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
+      const { data, info } = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
+      const at = (x: number, y: number) => {
+        const i = (y * info.width! + x) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      };
+      // Cover placement fills the canvas → every sample must be the DESIGN colour (200,120,60),
+      // never the overlay's black. A leak would drive the sum toward 0.
+      for (const [x, y] of [[CANVAS_W >> 1, CANVAS_H >> 1], [12, 12], [CANVAS_W - 12, CANVAS_H - 12]] as const) {
+        const [r, g, b] = at(x, y);
+        expect(Math.abs(r - 200) + Math.abs(g - 120) + Math.abs(b - 60), `print pixel ${x},${y} is the design, not the display overlay`).toBeLessThan(60);
+      }
+    } finally {
+      // restore the template + drop the throwaway overlay asset (leave the shared catalogue clean)
+      await db.update(printTemplates).set({ lightingObjectId: tplBefore?.lightingObjectId ?? null }).where(eq(printTemplates.variantId, variantId));
+      await db.delete(templateAssets).where(eq(templateAssets.id, oa!.id));
+    }
   });
 });
