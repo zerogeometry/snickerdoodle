@@ -11,7 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -542,7 +542,17 @@ export default function CustomizePage() {
           <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant?.pricePence ?? product.fromPence)}</div>
           <p className="text-[11px] text-[#9C8E7E]">free tracked delivery</p>
 
-          {product.sizes.length > 0 ? <Picker label="Size" options={product.sizes} value={size} onChange={setSize} /> : null}
+          {product.sizes.length > 0 ? (
+            <Picker
+              label="Size"
+              options={product.sizes}
+              value={size}
+              onChange={setSize}
+              // Show the physical size under word-sized buttons (the blanket's medium/large); the
+              // frame/jigsaw/mug sizes already state their own measure in the name.
+              describe={product.key === 'blanket' ? (s) => sizeDimsCm(product, s) : undefined}
+            />
+          ) : null}
           {product.orientations.length > 0 ? (
             <Picker
               label="Orientation"
@@ -647,30 +657,43 @@ function Picker({
   value,
   onChange,
   swatch = false,
+  describe,
 }: {
   label: string;
   options: string[];
   value: string | null;
   onChange: (v: string) => void;
   swatch?: boolean;
+  /** Optional small sub-label under an option (e.g. a size's dimensions). */
+  describe?: (o: string) => string | undefined;
 }) {
   return (
     <div className="mt-5">
       <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">{label}</p>
       <div className="mt-2 flex flex-wrap gap-2">
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => onChange(o)}
-            className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-              value === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'
-            }`}
-          >
-            {swatch ? <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: swatchColour(o) }} /> : null}
-            {o}
-          </button>
-        ))}
+        {options.map((o) => {
+          const sub = describe?.(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => onChange(o)}
+              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                value === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'
+              }`}
+            >
+              {swatch ? <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: swatchColour(o) }} /> : null}
+              {sub ? (
+                <span className="flex flex-col items-start leading-tight">
+                  <span>{o}</span>
+                  <span className="text-[10px] font-medium text-[#A2937F]">{sub}</span>
+                </span>
+              ) : (
+                o
+              )}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

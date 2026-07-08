@@ -77,6 +77,18 @@ export const cushionSupportsBack = (size: string | null | undefined): boolean =>
  * Stone"). Used to preview their reverse — a warm taupe sampled from Prodigi's rear shot. */
 export const CUSHION_SUEDE_BACK_HEX = '#bba585';
 
+/** A shopper-facing size → its physical size in cm, read from the size's variant print mm
+ * (the same dimensions Prodigi lists). `min × max` so both orientations read the same nominal
+ * size. Returns undefined when the size has no print mm. Used as a sub-label on word-sized size
+ * buttons (e.g. the blanket's medium/large) so the shopper sees exactly how big it is. */
+export function sizeDimsCm(p: CatalogueProduct, size: string): string | undefined {
+  const v = p.variants.find((x) => x.attributes.size === size && x.printWmm != null && x.printHmm != null);
+  if (v?.printWmm == null || v.printHmm == null) return undefined;
+  const lo = Math.round(Math.min(v.printWmm, v.printHmm) / 10);
+  const hi = Math.round(Math.max(v.printWmm, v.printHmm) / 10);
+  return `${lo} × ${hi} cm`;
+}
+
 /** Every possible basket line id for a product (one per variant). */
 export const productLineIds = (p: CatalogueProduct): string[] => p.variants.map((v) => lineIdForSku(v.sku));
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BasketItem } from '@/lib/store';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
-import { filterCatalogue, lineIdForSku, matchesQuery, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
+import { filterCatalogue, lineIdForSku, matchesQuery, productQtyInBasket, sizeDimsCm, splitCatalogue } from '@/lib/catalogue-view';
 
 const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = false): CatalogueVariant => ({
   id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault, printWmm: 209, printHmm: 98,
@@ -62,6 +62,29 @@ describe('splitCatalogue — Most Popular + your picks', () => {
   it('a basketed ADDON is never a pick', () => {
     const { picks } = splitCatalogue(all, [line('cat-giftWrap', 1, 'giftWrap')]);
     expect(picks).toHaveLength(0);
+  });
+});
+
+describe('sizeDimsCm — physical size sub-label (the blanket buttons)', () => {
+  const bv = (size: string, orientation: string, wMm: number, hMm: number): CatalogueVariant => ({
+    id: `b-${size}-${orientation}`, sku: `blanket-${size}-${orientation}`, attributes: { size, orientation },
+    pricePence: 5795, isDefault: false, printWmm: wMm, printHmm: hMm,
+  });
+  const blanket = product('blanket', {
+    category: 'BLANKET', sizes: ['medium', 'large'],
+    variants: [bv('medium', 'portrait', 600, 1000), bv('medium', 'landscape', 1000, 600), bv('large', 'portrait', 1000, 1500)],
+  });
+  it('formats a size as min × max cm from the variant print mm', () => {
+    expect(sizeDimsCm(blanket, 'medium')).toBe('60 × 100 cm');
+    expect(sizeDimsCm(blanket, 'large')).toBe('100 × 150 cm');
+  });
+  it('is orientation-agnostic — the swapped landscape canvas reads the same nominal size', () => {
+    const landscapeOnly = product('blanket', { sizes: ['medium'], variants: [bv('medium', 'landscape', 1000, 600)] });
+    expect(sizeDimsCm(landscapeOnly, 'medium')).toBe('60 × 100 cm');
+  });
+  it('returns undefined when the size has no print mm', () => {
+    const noMm = product('x', { sizes: ['one'], variants: [{ id: 'x1', sku: 'x', attributes: { size: 'one' }, pricePence: 100, isDefault: true, printWmm: null, printHmm: null }] });
+    expect(sizeDimsCm(noMm, 'one')).toBeUndefined();
   });
 });
 
