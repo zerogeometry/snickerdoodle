@@ -163,6 +163,9 @@ export type BasketItem = {
   back?: string;
   /** GREETINGS-CARD inside message (card only) — absent = blank inside (write it by hand). */
   message?: CardMessage;
+  /** GREETINGS-CARD outside image span (card only): 'front' = the drawing on the front panel only
+   * (default); 'full' = it spans the whole outside across the fold. */
+  cardImageSpan?: 'full' | 'front';
 };
 type BasketState = {
   items: BasketItem[];
@@ -236,7 +239,7 @@ export const usePlacements = create<{
 // (so pressing "edit placement" then "save & return" no longer resets it to the
 // default), and lets the editor's orientation toggle write back so Customize
 // reflects it on return. In-memory: a demo selection, not durable state.
-export type Selection = { size?: string; colour?: string; orientation?: string; back?: string; message?: CardMessage };
+export type Selection = { size?: string; colour?: string; orientation?: string; back?: string; message?: CardMessage; cardImageSpan?: 'full' | 'front' };
 export const useSelection = create<{
   selections: Record<string, Selection>;
   setSelection: (productKey: string, patch: Selection) => void;
