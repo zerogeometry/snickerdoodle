@@ -83,6 +83,17 @@ export function ProductTile({
           px={128}
           lazy={lazy}
         />
+        {/* Tapping the preview opens the product — the SAME action as the customize button
+            below. A mouse/touch convenience only (tabIndex -1): keyboard + screen-reader users
+            use the labelled customize button, so this isn't a second tab stop. Sits under the
+            zoom badge (z-20) so zoom still wins where they overlap. */}
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={onCustomize}
+          aria-label={`customize ${p.label}`}
+          className="absolute inset-0 z-10 cursor-pointer"
+        />
         {enableZoom && onZoom ? (
           // Small badge, but the tap area is extended to ~44px via the ::before so it
           // meets the ≥44px touch-target rule without a big circle over the preview.
@@ -90,13 +101,14 @@ export function ProductTile({
             type="button"
             onClick={onZoom}
             aria-label={`Enlarge ${p.label} preview`}
-            className="absolute left-1.5 top-1.5 flex items-center justify-center rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm before:absolute before:-inset-[11px] before:content-[''] hover:text-cinnamon"
+            className="absolute left-1.5 top-1.5 z-20 flex items-center justify-center rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm before:absolute before:-inset-[11px] before:content-[''] hover:text-cinnamon"
           >
             <Icon icon={IconZoomScan} size={15} />
           </button>
         ) : null}
         {p.colours.length > 0 ? (
-          <div role="img" aria-label={`available colours: ${p.colours.join(', ')}`} className="absolute right-1.5 top-1.5 flex flex-col gap-1">
+          // Decorative — click-through (pointer-events-none) so tapping here still opens the product.
+          <div role="img" aria-label={`available colours: ${p.colours.join(', ')}`} className="pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col gap-1">
             {p.colours.map((c) => (
               <span key={c} title={c} aria-hidden className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c) }} />
             ))}
