@@ -6,7 +6,6 @@ import { getDb } from '@/db/client';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { setMockupTemplate, setMockupView } from '@/server/print/templates';
-import { shadeCushionFace, CUSHION_DOME_SIGMA, CUSHION_SEAM_SIGMA, CUSHION_FACE_DEFAULTS } from '@/server/print/cushionShade';
 
 /**
  * DEV template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -353,21 +352,23 @@ async function layeredJigsaw(dir: string, orientation: 'portrait' | 'landscape')
 }
 
 /**
- * Founder-layered cushion → a (blank, mask, window) triple. The shape layer (printmap.png /
- * printquad.png: a white shape on a transparent surround, at the print's true dimensions) is
- * the registration authority: its OPAQUE region is both the print quad (where the art lands)
- * and the silhouette mask (so a heart/round drawing clips to the cushion's outline). The stored
- * blank composites background → shadow → a SHADED fabric face (cushionShade.ts — plumpness,
- * seam, form light + weave baked from the silhouette so the compositor's LIGHT_FABRIC multiply
- * reads the art as plush printed fabric; display only). No overlay, no orientation — a cushion
- * is one square-on view (mirrors layeredJigsaw, minus the piece-lines and the rotate branch).
+ * Founder-layered cushion → a (blank, mask, overlay, window) bundle. The shape layer
+ * (printmap.png / printquad.png: a white shape on a transparent surround, at the print's true
+ * dimensions) is the registration authority: its OPAQUE region is both the print quad (where the
+ * art lands) and the silhouette mask (so a heart/round drawing clips to the cushion's outline).
+ * The stored blank composites background → shadow → the white face. plumpness.png — a founder-
+ * painted form-shadow (black at partial alpha on a transparent surround) — rides along as the
+ * compositor's FOREGROUND overlay: laid OVER the art (blend 'over' ⇒ darken-only), it gives the
+ * cushion its 3D plumpness and the art reads through it. Display only; Prodigi prints the child's
+ * real design. No orientation — a cushion is one square-on view.
  */
-const layeredCushionCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
-async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
+const layeredCushionCache = new Map<string, { blank: Buffer; mask: Buffer; overlay?: Buffer; window: Box; W: number; H: number }>();
+async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; window: Box; W: number; H: number }> {
   const shapeFile = existsSync(path.join(dir, 'printmap.png')) ? 'printmap.png' : 'printquad.png';
-  const files = ['background.png', 'shadow.png', shapeFile];
-  // 'fx1' tags the fabric-shading revision so a long-lived dev server re-derives when it bumps.
-  const key = dir + '|fx1|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hasPlump = existsSync(path.join(dir, 'plumpness.png'));
+  const files = ['background.png', 'shadow.png', shapeFile, ...(hasPlump ? ['plumpness.png'] : [])];
+  // 'plump1' tags the realism revision so a long-lived dev server re-derives when it bumps.
+  const key = dir + '|plump1|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
   const hit = layeredCushionCache.get(key);
   if (hit) return hit;
 
@@ -376,13 +377,10 @@ async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffe
   const { data, info } = await sharp(shapePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: W, height: H, channels: c } = info;
   const maskRaw = Buffer.alloc(W * H);
-  const alpha = Buffer.alloc(W * H); // the silhouette's own alpha → drives the fabric shading
   let mx0 = W, my0 = H, mx1 = -1, my1 = -1;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      const a = data[(y * W + x) * c + 3]!;
-      alpha[y * W + x] = a;
-      if (a >= 128) {
+      if (data[(y * W + x) * c + 3]! >= 128) {
         maskRaw[y * W + x] = 255;
         if (x < mx0) mx0 = x;
         if (x > mx1) mx1 = x;
@@ -400,19 +398,6 @@ async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffe
     throw new Error(`layered cushion ${dir}: shadow.png is ${sm.width}x${sm.height} but ${shapeFile} is ${W}x${H} — re-export on one canvas`);
   }
 
-  // TIER-B REALISM (display only): shade the flat white face from its OWN silhouette so the
-  // compositor's LIGHT_FABRIC multiply renders the art as plump printed fabric — plumpness from
-  // a broad dome, a sewn seam, top-left form light, a fine weave. Prodigi still prints the
-  // child's real design; this only touches the mockup blank. See cushionShade.ts.
-  const minD = Math.min(W, H);
-  const dome = await sharp(alpha, { raw: { width: W, height: H, channels: 1 } }).blur(CUSHION_DOME_SIGMA * minD).raw().toBuffer();
-  const seam = await sharp(alpha, { raw: { width: W, height: H, channels: 1 } }).blur(CUSHION_SEAM_SIGMA * minD).raw().toBuffer();
-  const faceRaw = shadeCushionFace(
-    { alpha, dome, seam, width: W, height: H },
-    { ...CUSHION_FACE_DEFAULTS, weavePx: Math.max(6, Math.round(minD / 280)) },
-  );
-  const face = await sharp(faceRaw, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer();
-
   const backdrop = await sharp(readFileSync(path.join(dir, 'background.png')))
     .flatten({ background: '#ffffff' }) // a transparent backdrop must not read as black
     .resize(W, H, { fit: 'cover' })
@@ -420,12 +405,19 @@ async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffe
   const blank = await sharp(backdrop)
     .composite([
       { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
-      { input: face, left: 0, top: 0 }, // the shaded fabric face is the print surface
+      { input: shapePng, left: 0, top: 0 }, // the white shape is the print surface
     ])
     .png()
     .toBuffer();
 
-  const out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+  // plumpness.png → the FOREGROUND overlay the compositor lays OVER the art. Normalise it onto
+  // the shape's canvas (strip the authored 300-dpi density) so it registers exactly and
+  // re-samples cleanly at working resolution.
+  const overlay = hasPlump
+    ? await sharp(readFileSync(path.join(dir, 'plumpness.png'))).resize(W, H, { fit: 'fill' }).ensureAlpha().png().toBuffer()
+    : undefined;
+
+  const out = { blank, mask, overlay, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
   layeredCushionCache.set(key, out);
   return out;
 }
@@ -650,7 +642,8 @@ export async function POST(req: Request): Promise<Response> {
     if (p.register === 'layered-cushion') {
       const d = await layeredCushion(p.dir);
       const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
+      // plumpness.png rides along as the compositor's foreground overlay (the 3D form over the art).
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
       authored++;
       const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
       registration.push({
