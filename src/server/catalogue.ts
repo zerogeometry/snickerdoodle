@@ -267,13 +267,16 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'fine jersey cotton', sleeves: 'long', care: 'machine washable' },
     variants: babyVariants(),
   },
+  // 7×5 portrait on Prodigi's Fedrigoni "classic" stock — the one built to print INSIDE and out
+  // (CLASSIC-GRE-FEDR-7X5). One premium stock (founder call). The print file is a 4-panel spread
+  // [outer rear | outer front | inside-left | inside-right]; wMm/hMm here are the FRONT panel
+  // (the design + mockup geometry) — fulfilment assembles the full spread, like the DUAL cushion.
   card: {
-    category: 'CARD', label: 'greetings card', blurb: 'a little card, a big smile', print: true,
-    description: "A folded greetings card with your little one's artwork on the front — ready to write in and give.",
-    specs: { material: '350gsm card', inside: 'blank for your message' },
+    category: 'CARD', label: 'greetings card', blurb: 'a little card, a big smile', print: true, visibleInShop: true,
+    description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
+    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message' },
     variants: [
-      { size: '7×5″', pricePence: 495, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'GLOBAL-GRE-GLOS-7X5-BLA' },
-      { size: '7×5″ premium', pricePence: 575, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'GLOBAL-GRE-MOH-7X5-BLA' },
+      { size: '7×5″', pricePence: 595, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   calendar: {

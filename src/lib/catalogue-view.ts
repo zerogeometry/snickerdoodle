@@ -23,7 +23,7 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
  *    the filled image to its silhouette, exactly as the frame clips to the aperture.
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket']);
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card']);
 export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 }

@@ -17,7 +17,7 @@
 export const SPINNABLE = [
   'mug',
   'sack',
-  'storybook', 'calendar', 'card', 'bauble',
+  'storybook', 'calendar', 'bauble',
 ] as const;
 
 export const has3D = (kind: string): boolean => (SPINNABLE as readonly string[]).includes(kind);

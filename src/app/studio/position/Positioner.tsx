@@ -203,6 +203,7 @@ export function Positioner({
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
       : variant.productKey === 'blanket' ? 'on the blanket'
+      : variant.productKey === 'card' ? 'on the card'
       : isJigsaw ? 'on the board'
       : 'in the frame';
   // A FRAME DEFAULTS to cover-filled (scale 1 = "1.0×", no margins), but the shopper CAN
