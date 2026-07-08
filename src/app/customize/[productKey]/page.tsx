@@ -11,7 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
-import { defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, cushionBackHex, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -72,11 +72,16 @@ export default function CustomizePage() {
   const [mockupView, setMockupView] = useState<'primary' | 'tin'>('primary');
   // Colour thumbnail strip paging (3 visible at a time).
   const [thumbIdx, setThumbIdx] = useState(0);
+  // CUSHION back (double-sided-capable squares): 'both' = the same image both sides, or a
+  // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
+  const [back, setBack] = useState<string>(CUSHION_BACK_MATCH);
+  const [showBack, setShowBack] = useState(false);
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
     setMockupView('primary');
     setThumbIdx(0);
+    setShowBack(false);
   }, [productKey]);
 
   useEffect(() => {
@@ -110,6 +115,7 @@ export default function CustomizePage() {
       size: lv.attributes.size,
       colour: lv.attributes.colour,
       orientation: lv.attributes.orientation ?? 'portrait',
+      back: line.back, // a cushion line carries its back choice
     });
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
@@ -125,6 +131,7 @@ export default function CustomizePage() {
     setSize(saved?.size ?? def.attributes.size ?? null);
     setColour(saved?.colour ?? def.attributes.colour ?? null);
     setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
+    setBack(saved?.back ?? CUSHION_BACK_MATCH);
     if (saved?.orientation) {
       orientationLockedRef.current = true; // synchronous → the auto-default effect below sees it this same flush
       setOrientationTouched(true); // an explicit/restored choice isn't overridden by the image-aspect auto-default
@@ -135,8 +142,21 @@ export default function CustomizePage() {
   // return) and the editor can read/reflect the chosen orientation.
   useEffect(() => {
     if (!product) return;
-    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation });
-  }, [product, size, colour, orientation]);
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, back });
+  }, [product, size, colour, orientation, back]);
+
+  // CUSHION back: only the DUAL squares offer a colour / both-sides back; heart + round show a
+  // white reverse. `backFill` drives the "turn it around" preview — undefined = the image (both
+  // sides, or the front); a hex = a plain coloured/white back rendered plush via the fill mode.
+  const supportsBack = product?.key === 'cushion' && cushionSupportsBack(size);
+  const backFill: string | undefined =
+    product?.key !== 'cushion'
+      ? undefined
+      : !supportsBack
+        ? '#FFFFFF' // heart / round: plain white reverse
+        : back === CUSHION_BACK_MATCH
+          ? undefined // both sides = the image itself
+          : cushionBackHex(back) ?? undefined;
 
   // Colours actually available for the selected size — the matrix can be SPARSE (e.g.
   // an 11oz mug in 3 colours but 15oz in white only), so never offer an unavailable combo.
@@ -264,7 +284,8 @@ export default function CustomizePage() {
       toast('that size + colour isn’t available — pick another');
       return;
     }
-    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join(' · ') || undefined;
+    const backLabel = supportsBack ? (back === CUSHION_BACK_MATCH ? 'both sides' : `${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`) : null;
+    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel].filter(Boolean).join(' · ') || undefined;
     const fields = {
       name: product.label,
       product: product.key as ProductKey,
@@ -273,6 +294,7 @@ export default function CustomizePage() {
       pricePence: variant.pricePence,
       sub,
       artwork: { assetId: activeAssetId, transform: placement, sourceObjectId: activeSource },
+      back: supportsBack ? back : undefined, // cushion back choice (the DUAL squares only)
     };
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
@@ -299,6 +321,7 @@ export default function CustomizePage() {
             size="zoom"
             sourceObjectId={activeSource ?? null}
             view={mockupView === 'tin' ? 'tin' : undefined}
+            fill={showBack ? backFill : undefined}
             px={720}
           />
         </div>
@@ -344,6 +367,7 @@ export default function CustomizePage() {
                   size="zoom"
                   sourceObjectId={activeSource ?? null}
                   view={mockupView === 'tin' ? 'tin' : undefined}
+                  fill={showBack ? backFill : undefined}
                   px={360}
                 />
                 <button
@@ -359,6 +383,23 @@ export default function CustomizePage() {
           </div>
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+          ) : null}
+          {/* Cushion "turn it around" — flip the preview between the image side and the back
+              (the chosen colour, or the plain white reverse for heart/round). */}
+          {product.key === 'cushion' ? (
+            <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="turn it around">
+              {([['the front', false], ['the back', true]] as const).map(([label, b]) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => setShowBack(b)}
+                  aria-pressed={showBack === b}
+                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${showBack === b ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           ) : null}
           {/* Jigsaw: two small thumbnails beneath the preview — the puzzle itself and the
               drawing on the keepsake tin — that switch the main preview when tapped. */}
@@ -503,6 +544,46 @@ export default function CustomizePage() {
             />
           ) : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}
+
+          {/* CUSHION back: the DUAL squares choose 'image both sides' or a plain colour back;
+              heart + round are single-sided (a plain white reverse). Tapping flips the preview. */}
+          {product.key === 'cushion' && supportsBack ? (
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setBack(CUSHION_BACK_MATCH); setShowBack(true); }}
+                  aria-pressed={back === CUSHION_BACK_MATCH}
+                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${back === CUSHION_BACK_MATCH ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  image both sides
+                </button>
+                {CUSHION_BACK_COLOURS.map((c) => (
+                  <button
+                    key={c.token}
+                    type="button"
+                    onClick={() => { setBack(c.token); setShowBack(true); }}
+                    aria-pressed={back === c.token}
+                    aria-label={`${c.label} back`}
+                    title={c.label}
+                    className={`h-8 w-8 rounded-full border-2 ${back === c.token ? 'border-cinnamon ring-2 ring-cinnamon/30' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
+                {back === CUSHION_BACK_MATCH
+                  ? 'your image, printed on both sides'
+                  : `your image on the front · ${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`}
+              </p>
+            </div>
+          ) : product.key === 'cushion' ? (
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
+              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">your image on the front · plain white back</p>
+            </div>
+          ) : null}
 
           {/* collapsible, scrollable-in-container description */}
           {product.description ? (
