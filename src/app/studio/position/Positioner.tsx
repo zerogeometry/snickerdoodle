@@ -199,6 +199,9 @@ export function Positioner({
 
   const t = variant.template;
   const isJigsaw = variant.productKey === 'jigsaw';
+  // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
+  const onProductLabel =
+    variant.productKey === 'cushion' ? 'on the cushion' : isJigsaw ? 'on the board' : 'in the frame';
   // A FRAME DEFAULTS to cover-filled (scale 1 = "1.0×", no margins), but the shopper CAN
   // zoom out to 0.5× if they want a border (founder call 2026-07-07). So its zoom floors
   // at 0.5 of cover — below the fit-centred model other products use.
@@ -823,7 +826,7 @@ export function Positioner({
                 aria-pressed={viewMode === 'product'}
                 className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'product' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
               >
-                {isJigsaw ? 'on the board' : 'in the frame'}
+                {onProductLabel}
               </button>
             </div>
           ) : null}
@@ -1076,6 +1079,13 @@ export function Positioner({
               {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
             </Button>
           )}
+          {/* Why the button is greyed — right where the friction is (the DPI badge + its one-tap
+              "zoom out to fix" sits under the canvas, easy to miss next to a disabled save). */}
+          {assess?.decision === 'BLOCK' ? (
+            <p className="mt-2 text-center text-[11px] font-semibold text-berry">
+              zoom out a touch to save — it’d print soft at this size
+            </p>
+          ) : null}
           <button
             type="button"
             onClick={generate}
