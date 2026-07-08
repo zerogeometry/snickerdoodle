@@ -18,6 +18,7 @@ type VariantDef = {
   size?: string; // display size, e.g. 'A4', '11oz', '30 pieces'; omit for one-size
   colour?: string; // display colour
   orientation?: 'portrait' | 'landscape'; // frames: how it hangs (landscape = swapped canvas)
+  sides?: 'single' | 'double'; // cushions: 'double' = the DUAL SKU (one double-wide front|back print file)
   pricePence: number;
   wMm: number;
   hMm: number;
@@ -209,10 +210,17 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A plump cushion with their artwork on it — heart, round or square, a keepsake you can actually hug.',
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
+      // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
       { size: 'heart', pricePence: 2295, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
       { size: '18″ round', pricePence: 2995, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
-      { size: '12″ square', pricePence: 3250, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
-      { size: '22″ square', pricePence: 4250, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-SUE-DUAL' },
+      // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
+      // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]
+      // print file. wMm/hMm here is the per-FACE size: the mockup shows one face either way, and
+      // the DUAL fulfilment assembles the side-by-side double-wide from two face renders.
+      { size: '12″ square', sides: 'single', pricePence: 2995, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
+      { size: '12″ square', sides: 'double', pricePence: 3495, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
+      { size: '22″ square', sides: 'single', pricePence: 3995, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
+      { size: '22″ square', sides: 'double', pricePence: 4495, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
     ],
   },
   storybook: {
@@ -324,7 +332,7 @@ function variantSku(productKey: string, v: VariantDef, isDefault: boolean): stri
   if (isDefault) return productKey;
   // orientation appears in the sku ONLY for landscape — portrait skus keep their
   // pre-orientation names (no churn in baskets, orders or tests).
-  return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join('-');
+  return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double' : null].filter(Boolean).join('-');
 }
 
 /**
@@ -459,7 +467,8 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       if (v.size) attributes.size = v.size;
       if (v.colour) attributes.colour = v.colour;
       if (v.orientation) attributes.orientation = v.orientation;
-      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null].filter(Boolean).join(' · ');
+      if (v.sides) attributes.sides = v.sides;
+      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null].filter(Boolean).join(' · ');
 
       const [variant] = await db
         .insert(productVariants)
