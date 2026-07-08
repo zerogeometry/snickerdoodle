@@ -31,6 +31,8 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
   let db: DbHandle;
   let ids: SeededIds;
   let variantId = '';
+  let cushionDualVariantId = '';
+  let cushionSingleVariantId = '';
   const keys: string[] = [];
 
   beforeAll(async () => {
@@ -40,6 +42,10 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     await seedCatalogue(db);
     const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     variantId = v!.id;
+    const [cd] = await db.select().from(productVariants).where(eq(productVariants.sku, 'cushion-12square-double'));
+    const [cs] = await db.select().from(productVariants).where(eq(productVariants.sku, 'cushion-12square'));
+    cushionDualVariantId = cd!.id;
+    cushionSingleVariantId = cs!.id;
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     const bleedPx = mmToPx(tpl!.bleedMm, tpl!.requiredDpi);
     CANVAS_W = tpl!.printWidthPx + 2 * bleedPx;
@@ -173,5 +179,65 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
       await db.update(printTemplates).set({ lightingObjectId: tplBefore?.lightingObjectId ?? null }).where(eq(printTemplates.variantId, variantId));
       await db.delete(templateAssets).where(eq(templateAssets.id, oa!.id));
     }
+  });
+
+  // ── DUAL cushion fulfilment (task #123). A double-sided square cushion prints TWO square faces
+  // into ONE double-wide file [front | back], both upright — Prodigi's single "default" print area
+  // (their template is a 2:1 artboard, front left). The `back` selects the second face ONLY on a
+  // DUAL variant (its `sides` attribute is authoritative); a `back` on any other SKU is ignored.
+  const DESIGN = [200, 120, 60] as const; // the src() fill
+  const BERRY = [0xe8, 0x78, 0x6e] as const; // CUSHION_BACK_COLOURS berry #E8786E
+  const nearTo = (got: readonly number[], want: readonly number[]) =>
+    Math.abs(got[0]! - want[0]!) + Math.abs(got[1]! - want[1]!) + Math.abs(got[2]! - want[2]!);
+  async function facePixels(printObjectId: string) {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const grant = await getStorageObjectGrant(db, printObjectId, sam);
+    const { data, info } = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
+    return {
+      w: info.width!,
+      h: info.height!,
+      at: (x: number, y: number) => {
+        const i = (Math.round(y) * info.width! + Math.round(x)) * info.channels!;
+        return [data[i]!, data[i + 1]!, data[i + 2]!] as const;
+      },
+    };
+  }
+
+  it('DUAL + colour back → double-wide [image | colour], front left, back right, both upright', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await ingest(await src(2400, 2400)); // fills a 12″-square face at 150dpi, no upscale
+    const res = await renderPrintFile(db, sam, { assetId, variantId: cushionDualVariantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, back: 'berry' });
+    keys.push(res.key);
+    expect(res.widthPx).toBe(res.heightPx * 2); // two SQUARE faces side by side
+    const px = await facePixels(res.printObjectId);
+    expect(px.w).toBe(px.h * 2);
+    expect(nearTo(px.at(px.w * 0.25, px.h * 0.5), DESIGN), 'left face is the image').toBeLessThan(60);
+    expect(nearTo(px.at(px.w * 0.75, px.h * 0.5), BERRY), 'right face is the berry back').toBeLessThan(60);
+  });
+
+  it('DUAL + "both" (or junk/forged) → the SAME image on both faces (safe default, never a broken face)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    for (const back of ['both', 'periwinkle-not-a-real-token']) {
+      const assetId = await ingest(await src(2400, 2400));
+      const res = await renderPrintFile(db, sam, { assetId, variantId: cushionDualVariantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, back });
+      keys.push(res.key);
+      const px = await facePixels(res.printObjectId);
+      expect(px.w).toBe(px.h * 2);
+      expect(nearTo(px.at(px.w * 0.25, px.h * 0.5), DESIGN), `left face is the image (back=${back})`).toBeLessThan(60);
+      expect(nearTo(px.at(px.w * 0.75, px.h * 0.5), DESIGN), `right face is ALSO the image (back=${back})`).toBeLessThan(60);
+    }
+  });
+
+  it('SINGLE cushion is untouched — a forged colour back is IGNORED (one square face, never doubled)', async () => {
+    // The variant's `sides` attribute (server, from the DB) is authoritative, NOT the client-supplied
+    // back: a colour back on the single-sided SKU must never smuggle in a second face.
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await ingest(await src(2400, 2400));
+    const res = await renderPrintFile(db, sam, { assetId, variantId: cushionSingleVariantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, back: 'berry' });
+    keys.push(res.key);
+    expect(res.widthPx).toBe(res.heightPx); // ONE square face, not double-wide
+    const px = await facePixels(res.printObjectId);
+    expect(px.w).toBe(px.h);
+    expect(nearTo(px.at(px.w * 0.5, px.h * 0.5), DESIGN), 'the single face is the image').toBeLessThan(60);
   });
 });

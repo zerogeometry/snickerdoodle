@@ -11,7 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -74,7 +74,7 @@ export default function CustomizePage() {
   const [thumbIdx, setThumbIdx] = useState(0);
   // CUSHION back (double-sided-capable squares): 'both' = the same image both sides, or a
   // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
-  const [back, setBack] = useState<string>(CUSHION_BACK_MATCH);
+  const [back, setBack] = useState<string>(CUSHION_BACK_WHITE);
   const [showBack, setShowBack] = useState(false);
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
@@ -131,7 +131,7 @@ export default function CustomizePage() {
     setSize(saved?.size ?? def.attributes.size ?? null);
     setColour(saved?.colour ?? def.attributes.colour ?? null);
     setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
-    setBack(saved?.back ?? CUSHION_BACK_MATCH);
+    setBack(saved?.back ?? CUSHION_BACK_WHITE);
     if (saved?.orientation) {
       orientationLockedRef.current = true; // synchronous → the auto-default effect below sees it this same flush
       setOrientationTouched(true); // an explicit/restored choice isn't overridden by the image-aspect auto-default
@@ -155,8 +155,10 @@ export default function CustomizePage() {
       : !supportsBack
         ? CUSHION_SUEDE_BACK_HEX // heart / round: fixed faux-suede stone reverse
         : back === CUSHION_BACK_MATCH
-          ? undefined // both sides = the image itself
-          : cushionBackHex(back) ?? undefined;
+          ? undefined // image both sides = the image itself
+          : back === CUSHION_BACK_WHITE
+            ? '#FFFFFF' // plain white back (single-sided linen)
+            : cushionBackHex(back) ?? undefined; // a plain colour back (double-sided)
 
   // Colours actually available for the selected size — the matrix can be SPARSE (e.g.
   // an 11oz mug in 3 colours but 15oz in white only), so never offer an unavailable combo.
@@ -225,15 +227,19 @@ export default function CustomizePage() {
   // default, which would order + charge the WRONG variant. null ⇒ not available.
   const variant = useMemo(() => {
     if (!product) return null;
+    // Cushion squares carry a `sides` axis (single vs double-sided); the back choice picks which
+    // SKU (+ price). Heart/round + every other product have no sides attribute → match undefined.
+    const wantSides = product.key === 'cushion' && cushionSupportsBack(size) ? cushionSidesForBack(back) : undefined;
     return (
       product.variants.find(
         (v) =>
           (product.sizes.length === 0 || v.attributes.size === size) &&
           (product.colours.length === 0 || v.attributes.colour === colour) &&
-          (product.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === orientation),
+          (product.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === orientation) &&
+          (v.attributes.sides ?? undefined) === wantSides,
       ) ?? null
     );
-  }, [product, size, colour, orientation]);
+  }, [product, size, colour, orientation, back]);
 
   if (products && !product) {
     return (
@@ -284,7 +290,13 @@ export default function CustomizePage() {
       toast('that size + colour isn’t available — pick another');
       return;
     }
-    const backLabel = supportsBack ? (back === CUSHION_BACK_MATCH ? 'both sides' : `${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`) : null;
+    const backLabel = supportsBack
+      ? back === CUSHION_BACK_WHITE
+        ? 'white back'
+        : back === CUSHION_BACK_MATCH
+          ? 'both sides'
+          : `${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`
+      : null;
     const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel].filter(Boolean).join(' · ') || undefined;
     const fields = {
       name: product.label,
@@ -553,6 +565,14 @@ export default function CustomizePage() {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
+                  onClick={() => { setBack(CUSHION_BACK_WHITE); setShowBack(true); }}
+                  aria-pressed={back === CUSHION_BACK_WHITE}
+                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${back === CUSHION_BACK_WHITE ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                >
+                  plain white
+                </button>
+                <button
+                  type="button"
                   onClick={() => { setBack(CUSHION_BACK_MATCH); setShowBack(true); }}
                   aria-pressed={back === CUSHION_BACK_MATCH}
                   className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${back === CUSHION_BACK_MATCH ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
@@ -573,9 +593,11 @@ export default function CustomizePage() {
                 ))}
               </div>
               <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
-                {back === CUSHION_BACK_MATCH
-                  ? 'your image, printed on both sides'
-                  : `your image on the front · ${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back`}
+                {back === CUSHION_BACK_WHITE
+                  ? 'plain white back · single-sided'
+                  : back === CUSHION_BACK_MATCH
+                    ? 'your image, printed on both sides · double-sided'
+                    : `image on the front · ${CUSHION_BACK_COLOURS.find((c) => c.token === back)?.label ?? ''} back · double-sided`}
               </p>
             </div>
           ) : product.key === 'cushion' ? (

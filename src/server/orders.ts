@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
+import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import type { DbHandle, Tx } from './db';
@@ -20,7 +21,7 @@ function newRef(): string {
 export interface PlaceLine {
   productKey: string;
   qty: number;
-  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string };
+  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string };
 }
 
 export interface PlaceOrderResult {
@@ -95,7 +96,7 @@ export async function placeOrder(
   // template snapshot + a server-clamped transform). A bad placement fails here,
   // not half-way through inserting an order.
   const artworkByIndex = new Map<number, {
-    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null;
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null;
   }>();
   for (let i = 0; i < valid.length; i++) {
     const art = valid[i]!.artwork;
@@ -142,6 +143,7 @@ export async function placeOrder(
         printHeightPx: tpl.printHeightPx,
       },
       transform: clampTransform(art.transform), // server-authoritative
+      back: normalizeCushionBack(art.back), // coerced to a known token or null
     });
   }
 
@@ -186,6 +188,7 @@ export async function placeOrder(
         templateSnapshot: art.templateSnapshot,
         transform: art.transform,
         sourceObjectId: art.sourceObjectId,
+        back: art.back,
         status: 'PENDING',
       });
     }

@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
+import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
 import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
@@ -38,6 +39,10 @@ export async function renderPrintFile(
     sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE';
     /** Render from a SPECIFIC stored object (e.g. a bg-removed cutout) — must belong to the asset. */
     sourceObjectId?: string;
+    /** CUSHION back choice, honoured ONLY on a double-sided (DUAL) cushion variant: 'both' (or
+     * null/unknown) = the same image on both faces; a CUSHION_BACK_COLOURS token = image front +
+     * that plain-colour back. Ignored entirely on any non-DUAL variant (the SKU is authoritative). */
+    back?: string;
   },
 ): Promise<RenderResult> {
   await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
@@ -81,6 +86,11 @@ export async function renderPrintFile(
   const orientation = ((variantRow?.attributes as Record<string, string>) ?? {}).orientation;
   const nativeOri = (variantRow?.key ? PRODIGI_NATIVE_ORIENTATION[variantRow.key] : undefined) ?? 'portrait';
   const landscape = !!orientation && orientation !== nativeOri; // "landscape" = "needs the 90° rotate"
+  // A double-sided (DUAL) cushion prints TWO square faces into one double-wide file [front | back],
+  // both upright — Prodigi's single "default" print area (their template is a 2:1 artboard). The
+  // SKU's `sides` attribute is authoritative here; a `back` on any other variant is ignored. Cushion
+  // faces are square, so DUAL never rotates.
+  const dual = ((variantRow?.attributes as Record<string, string>) ?? {}).sides === 'double';
 
   const rect = computeLayerRect(geom, src, transform);
   // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
@@ -95,14 +105,38 @@ export async function renderPrintFile(
   const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
   const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
   const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
-  let out = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
+  // The child's image placed on ONE opaque white face — the single-sided print file, and the
+  // FRONT (left) face of a DUAL cushion.
+  const face = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
     .composite([{ input: part, left: ox, top: oy }])
-    .flatten({ background: '#ffffff' })
     .png()
-    .withMetadata({ density: tpl.requiredDpi })
     .toBuffer();
-  if (landscape) {
-    out = await sharp(out).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+
+  let out: Buffer;
+  let outW = rect.canvasWidth;
+  let outH = rect.canvasHeight;
+  if (dual) {
+    // BACK (right) face: a known palette colour → a solid fill; 'both' / null / unknown → the same
+    // image again (image-both-sides), the safe default so the customer always gets their artwork.
+    const back = normalizeCushionBack(input.back);
+    const backColour = back && back !== CUSHION_BACK_MATCH ? cushionBackHex(back) : null;
+    const backFace = backColour
+      ? await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: backColour } }).png().toBuffer()
+      : face;
+    outW = rect.canvasWidth * 2;
+    out = await sharp({ create: { width: outW, height: outH, channels: 3, background: '#ffffff' } })
+      .composite([{ input: face, left: 0, top: 0 }, { input: backFace, left: rect.canvasWidth, top: 0 }])
+      .flatten({ background: '#ffffff' })
+      .png()
+      .withMetadata({ density: tpl.requiredDpi })
+      .toBuffer();
+  } else {
+    out = await sharp(face).flatten({ background: '#ffffff' }).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+    if (landscape) {
+      out = await sharp(out).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+      outW = rect.canvasHeight;
+      outH = rect.canvasWidth;
+    }
   }
 
   const key = derivativeKey(input.assetId, `printfile-${input.variantId}`);
@@ -133,7 +167,7 @@ export async function renderPrintFile(
     renderedDpi: tpl.requiredDpi, // the file's embedded density
     effectiveDpi: assess.effectiveDpi, // the real source resolution at this placement
     upscaled: assess.decision === 'UPSCALE',
-    widthPx: landscape ? rect.canvasHeight : rect.canvasWidth,
-    heightPx: landscape ? rect.canvasWidth : rect.canvasHeight,
+    widthPx: outW, // DUAL = 2× a face; landscape = swapped; else the single face
+    heightPx: outH,
   };
 }

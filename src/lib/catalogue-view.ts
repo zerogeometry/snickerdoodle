@@ -35,9 +35,10 @@ export function defaultTransformFor(productKey: string): { scale: number; offset
  * round are single-sided (a white back), so they ignore this. It never changes the SKU or
  * the price — only what we render (preview) and print (the back file).
  */
-export const CUSHION_BACK_MATCH = 'both';
+export const CUSHION_BACK_MATCH = 'both'; // squares: the same image on both sides (a DUAL upgrade)
+export const CUSHION_BACK_WHITE = 'white'; // squares: plain white back = single-sided (the default)
 export const CUSHION_BACK_COLOURS: { token: string; label: string; hex: string }[] = [
-  { token: 'white', label: 'white', hex: '#FFFFFF' },
+  // White is NOT here — it's the single-sided default; every colour below is a DUAL upgrade.
   { token: 'oat', label: 'oat', hex: '#FBF5E9' },
   { token: 'honey', label: 'honey', hex: '#F2A640' },
   { token: 'cinnamon', label: 'cinnamon', hex: '#C8623A' },
@@ -49,6 +50,18 @@ export const CUSHION_BACK_COLOURS: { token: string; label: string; hex: string }
 /** The hex for a back-colour token, or null (unknown token / the 'both' image option). */
 export const cushionBackHex = (token: string | null | undefined): string | null =>
   CUSHION_BACK_COLOURS.find((c) => c.token === token)?.hex ?? null;
+/** Coerce an untrusted back value to a KNOWN token (both | white | a palette colour) or null —
+ * guards what we persist at order time AND what the fulfilment renderer will act on, so a forged
+ * or stale value can never drive the print. The SINGLE source of "what's a valid back". */
+export const normalizeCushionBack = (back: string | null | undefined): string | null => {
+  if (!back) return null;
+  if (back === CUSHION_BACK_MATCH || back === CUSHION_BACK_WHITE) return back;
+  return CUSHION_BACK_COLOURS.some((c) => c.token === back) ? back : null;
+};
+/** Which SKU a square's back choice needs: white = single-sided (the default); image-both-sides
+ * or a colour = the double-sided DUAL SKU (the paid upgrade). */
+export const cushionSidesForBack = (back: string | null | undefined): 'single' | 'double' =>
+  !back || back === CUSHION_BACK_WHITE ? 'single' : 'double';
 /** Only the square cushions (the DUAL SKUs) offer a back choice; heart + round are single-sided. */
 export const cushionSupportsBack = (size: string | null | undefined): boolean => !!size && /square/i.test(size);
 /** The faux-suede heart + round cushions ship with a fixed STONE back (Prodigi "Single Sided

@@ -674,6 +674,11 @@ export const orderItemArtwork = pgTable(
       .references(() => accounts.id),
     templateSnapshot: jsonb('template_snapshot').notNull(), // {printWidthMm,…,requiredDpi} FROZEN at order time
     transform: jsonb('transform').notNull(), // {scale,offsetX,offsetY,rotationDeg} normalised, server-clamped
+    // CUSHION back side, frozen at order time. Only meaningful on a double-sided (DUAL) cushion
+    // variant: 'both' = the same image on both faces; a CUSHION_BACK_COLOURS token = image front +
+    // that plain-colour back. Null / any non-DUAL variant = single-sided (renderer ignores it).
+    // The SKU (not this) is authoritative for single-vs-double + price; this only picks the back.
+    back: text('back'),
     sourceObjectId: uuid('source_object_id').references(() => storageObjects.id),
     printObjectId: uuid('print_object_id').references(() => storageObjects.id),
     renderedDpi: integer('rendered_dpi'),

@@ -226,6 +226,36 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(art!.status).toBe('PENDING'); // awaiting the fulfilment worker; the PAID order is the enqueue
   });
 
+  it('a DUAL cushion line freezes the chosen back onto the artwork (junk → null); the SKU sets sides', async () => {
+    const [asset] = await db
+      .insert(assets)
+      .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
+      .returning();
+    const [dual] = await db.select().from(productVariants).where(eq(productVariants.sku, 'cushion-12square-double'));
+
+    // The chosen back is frozen onto the artwork so the fulfilment renderer can assemble the DUAL
+    // print file [front | back]. The DUAL sku itself — not the back — is what makes it two-sided.
+    const backOf = async (back: string) => {
+      const res = await placeOrder(db, {
+        items: [{ productKey: 'cushion-12square-double', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, back } }],
+        account: { id: ids.samId },
+        joinProvenance: null,
+      });
+      await track(res);
+      const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+      const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
+      const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
+      return { variantId: art!.variantId, back: art!.back };
+    };
+
+    const berry = await backOf('berry');
+    expect(berry.variantId).toBe(dual!.id); // the DUAL variant (sides = double), resolved server-side
+    expect(berry.back).toBe('berry'); // a real palette token is frozen verbatim
+
+    // A forged / unknown token is coerced to null server-side — junk can never drive the print.
+    expect((await backOf('not-a-real-token')).back).toBeNull();
+  });
+
   it('marking paid is atomic + idempotent — the PAID order is the fulfilment enqueue', async () => {
     const [asset] = await db
       .insert(assets)

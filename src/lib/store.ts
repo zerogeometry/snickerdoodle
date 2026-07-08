@@ -151,10 +151,11 @@ export type BasketItem = {
    * (+ an optional bg-removed cutout to render from). The server re-clamps + freezes
    * this at order time. */
   artwork?: { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
-  /** CUSHION back side (double-sided-capable squares only): 'both' = the same image on
-   * both sides, or a colour token from CUSHION_BACK_COLOURS = image front + that plain
-   * back. Absent / heart+round = single-sided (white back). Display + fulfilment read this;
-   * it never changes the SKU or the price. */
+  /** CUSHION back side (double-sided-capable squares only): 'white' = plain white back =
+   * SINGLE-sided (the default); 'both' = the same image on both sides; a colour token from
+   * CUSHION_BACK_COLOURS = image front + that plain back. Both non-white choices select the
+   * DUAL variant (a different SKU + price). Absent / heart+round = single-sided. Display, the
+   * variant resolver, AND the DUAL fulfilment renderer all read this. */
   back?: string;
 };
 type BasketState = {
