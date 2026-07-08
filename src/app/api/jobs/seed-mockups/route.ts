@@ -54,6 +54,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-jigsaw'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-cushion'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
+  | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
 );
 
 // Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
@@ -99,6 +100,16 @@ function layeredBlanketDir(colour: string): string | null {
   const dir = path.join(LAYERED, 'blanket', colour.replace(/\s+/g, '-'));
   const has = (f: string) => existsSync(path.join(dir, f));
   return has('printmap.png') && has('background.png') && has('shadow.png') ? dir : null;
+}
+
+// Founder-authored CARD "Single Card View" — the catalogue thumbnail: a card leaning on a kraft
+// envelope. background → envelopeshadow → envelope → cardshadow → [the child's front design,
+// warped onto printquad-front's angled face]. printquad-front is the print region (a slightly
+// rotated quad → PERSPECTIVE) AND the silhouette mask, exactly like the jigsaw tin lid.
+function layeredCardSingleDir(): string | null {
+  const dir = path.join(LAYERED, 'card', 'Single Card View');
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('background.png') && has('envelope.png') && has('cardshadow.png') && has('printquad-front.png') ? dir : null;
 }
 
 const FRAME: Record<string, string> = {
@@ -161,8 +172,13 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'prodigi-calendar-blank-assets/Blank Calendars/calendar blank.png', material: 'PAPER', register: 'face-cover', mask: false, rotate: 90 };
     case 'storybook': // derived from Prodigi's hardcover photo-book back shot (thumbnails in-painted, portrait crop)
       return { file: 'derived/storybook-blank.jpg', material: 'PAPER', register: 'face-cover', mask: false };
-    case 'card': // interim studio synth (flat 7×5 card, soft shadow) until real photography
+    case 'card': {
+      // Preferred: the founder's "Single Card View" (card-on-envelope) as the catalogue thumbnail.
+      const dir = layeredCardSingleDir();
+      if (dir) return { material: 'PAPER', register: 'layered-card-single', dir };
+      // Fallback: the interim studio synth (flat 7×5 card, soft shadow) until the layers land.
       return { file: 'derived/card-blank.png', material: 'PAPER', register: 'face-cover', mask: true };
+    }
     case 'bauble':
       return { file: 'prodigi-ceramic-christmas-tree-ornament-blank-asset/Prodigi-ceramic-christmas-ornament-blank.jpg', material: 'CERAMIC', register: 'face-cover', mask: true };
     case 'sack': // official panel 320×500mm on a 19×30″ (483mm-wide) sack, above the bottom seam
@@ -677,6 +693,47 @@ async function buildTinView(dir: string): Promise<{ blank: Buffer; quad: [number
   return { blank, quad };
 }
 
+/**
+ * Build the CARD "Single Card View" (catalogue thumbnail): blank = background → envelopeshadow →
+ * envelope → cardshadow; printQuad = printquad-front's four corners (a slightly-rotated face →
+ * PERSPECTIVE warp); mask = printquad-front's opaque region (so the design clips to the card face).
+ * Same construction as the tin lid — a photoreal, angled hero shot.
+ */
+const cardSingleCache = new Map<string, { blank: Buffer; mask: Buffer; quad: [number, number][]; W: number; H: number }>();
+async function buildCardSingle(dir: string): Promise<{ blank: Buffer; mask: Buffer; quad: [number, number][]; W: number; H: number } | null> {
+  const files = ['background.png', 'envelopeshadow.png', 'envelope.png', 'cardshadow.png', 'printquad-front.png'];
+  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = cardSingleCache.get(key);
+  if (hit) return hit;
+
+  const facePng = readFileSync(path.join(dir, 'printquad-front.png'));
+  const { data, info } = await sharp(facePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+  // mask = the card-face silhouette (opaque region of printquad-front)
+  const maskRaw = Buffer.alloc(W * H);
+  for (let i = 0; i < W * H; i++) maskRaw[i] = data[i * c + 3]! >= 128 ? 255 : 0;
+  const mask = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+
+  const quad = await detectQuadCorners(facePng);
+  if (!quad) return null;
+
+  // Stack the photoreal layers (each shares the canvas) into the blank; the envelope + shadows
+  // are display-only backdrop that the child's design must NEVER touch (mask + print path ignore).
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png'))).flatten({ background: '#ffffff' }).resize(W, H, { fit: 'cover' }).toBuffer();
+  const blank = await sharp(backdrop)
+    .composite([
+      { input: readFileSync(path.join(dir, 'envelopeshadow.png')), left: 0, top: 0 },
+      { input: readFileSync(path.join(dir, 'envelope.png')), left: 0, top: 0 },
+      { input: readFileSync(path.join(dir, 'cardshadow.png')), left: 0, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+
+  const out = { blank, mask, quad, W, H };
+  cardSingleCache.set(key, out);
+  return out;
+}
+
 export async function POST(req: Request): Promise<Response> {
   const denied = requireJobsSecret(req);
   if (denied) return denied;
@@ -757,6 +814,20 @@ export async function POST(req: Request): Promise<Response> {
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-blanket',
         quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
         driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
+    if (p.register === 'layered-card-single') {
+      const d = await buildCardSingle(p.dir);
+      if (!d) { skipped.push(r.key); continue; }
+      // The detected corners are a PERSPECTIVE quad (angled card face) — passed verbatim, NOT
+      // aspect-locked; the compositor auto-selects the perspective warp via isAxisAligned.
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask });
+      authored++;
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-card-single',
+        quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
       });
       continue;
     }
