@@ -51,6 +51,9 @@ export const cushionBackHex = (token: string | null | undefined): string | null 
   CUSHION_BACK_COLOURS.find((c) => c.token === token)?.hex ?? null;
 /** Only the square cushions (the DUAL SKUs) offer a back choice; heart + round are single-sided. */
 export const cushionSupportsBack = (size: string | null | undefined): boolean => !!size && /square/i.test(size);
+/** The faux-suede heart + round cushions ship with a fixed STONE back (Prodigi "Single Sided
+ * Stone"). Used to preview their reverse — a warm taupe sampled from Prodigi's rear shot. */
+export const CUSHION_SUEDE_BACK_HEX = '#bba585';
 
 /** Every possible basket line id for a product (one per variant). */
 export const productLineIds = (p: CatalogueProduct): string[] => p.variants.map((v) => lineIdForSku(v.sku));

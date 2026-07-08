@@ -11,7 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, cushionBackHex, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSupportsBack, defaultTransformFor, lineIdForSku } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -153,7 +153,7 @@ export default function CustomizePage() {
     product?.key !== 'cushion'
       ? undefined
       : !supportsBack
-        ? '#FFFFFF' // heart / round: plain white reverse
+        ? CUSHION_SUEDE_BACK_HEX // heart / round: fixed faux-suede stone reverse
         : back === CUSHION_BACK_MATCH
           ? undefined // both sides = the image itself
           : cushionBackHex(back) ?? undefined;
@@ -581,7 +581,7 @@ export default function CustomizePage() {
           ) : product.key === 'cushion' ? (
             <div className="mt-4">
               <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
-              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">your image on the front · plain white back</p>
+              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">your image on the front · soft stone back</p>
             </div>
           ) : null}
 
