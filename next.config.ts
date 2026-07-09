@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   // Allow an isolated build dir (e.g. e2e) so a production build can't clobber a
   // running `next dev`'s .next (they cannot safely share one). Defaults to .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
+  // Native/binary server-only deps must NOT be webpack-bundled — require them at runtime.
+  // @resvg/resvg-js ships a platform .node binary (the card's inside-message + back-badge print
+  // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
+  // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
+  serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
   // Security headers (CSP, app/gift noindex) are layered in with the trust-spine
   // and gift-link surfaces; marketing stays indexable.
   experimental: {
