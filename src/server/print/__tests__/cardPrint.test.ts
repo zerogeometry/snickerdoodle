@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sharp, { type OutputInfo } from 'sharp';
-import { assembleCardPrintSpread, CARD_SPREAD, CARD_PANEL_X, CARD_BACK_BADGE_WIDTH_PX } from '@/server/print/cardPrint';
+import { assembleCardPrintSpread, CARD_SPREAD, CARD_PANEL_X } from '@/server/print/cardPrint';
 import { renderCardBackBadge } from '@/server/print/cardBranding';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 
@@ -54,24 +54,25 @@ describe('card 4-panel print assembly', () => {
     expect(isGreen(at(p, centre(CARD_PANEL_X.outerFront), MIDY))).toBe(true);
   });
 
-  it('branding badge lands in the lower third of the outer-rear panel', async () => {
+  it('branding lands at the founder’s spot — bottom-left of the outer-rear panel', async () => {
     const p = await pixels(await assembleCardPrintSpread({ design: await green(), transform: tf, span: 'front', message: null, branding: await magenta() }));
-    const badgeY = Math.round(CARD_SPREAD.heightPx * 0.72); // the back-of-card mark's row
-    const [r, g, b] = at(p, centre(CARD_PANEL_X.outerRear), badgeY);
-    expect(r > 160 && b > 130 && g < 110).toBe(true); // magenta stand-in badge, centred-x + lower-third
-    expect(isWhite(at(p, centre(CARD_PANEL_X.outerRear), MIDY))).toBe(true); // rear vertical centre stays clear
+    const badgeX = Math.round(PANEL_W * 0.149); // logo centre: left side of the back panel…
+    const badgeY = Math.round(CARD_SPREAD.heightPx * 0.885); // …lower area
+    const [r, g, b] = at(p, badgeX, badgeY);
+    expect(r > 160 && b > 130 && g < 110).toBe(true); // magenta stand-in at the logo spot
+    expect(isWhite(at(p, centre(CARD_PANEL_X.outerRear), MIDY))).toBe(true); // rear centre stays clear
   });
 
-  it('the Snickerdoodle back badge renders at the requested width with the wordmark drawn', async () => {
-    const badge = await renderCardBackBadge(CARD_BACK_BADGE_WIDTH_PX);
+  it('the back logo is the founder’s asset — a transparent PNG with real ink', async () => {
+    const badge = renderCardBackBadge();
     const m = await sharp(badge).metadata();
-    expect(m.width).toBe(CARD_BACK_BADGE_WIDTH_PX);
+    expect(m.format).toBe('png');
     expect(m.hasAlpha).toBe(true); // transparent surround so it composites over any back
-    // dark wordmark ink present (not a blank chip)
+    // dark logo ink present (not a blank asset)
     const { data, info } = await sharp(badge).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
     let ink = 0;
-    for (let i = 0; i < data.length; i += info.channels) if (data[i + 3]! > 40 && data[i]! < 90) ink++;
-    expect(ink).toBeGreaterThan(500);
+    for (let i = 0; i < data.length; i += info.channels) if (data[i + 3]! > 40 && data[i]! < 120) ink++;
+    expect(ink).toBeGreaterThan(200);
   });
 
   it('a message prints the note on inside-front and the greeting/message/signature on inside-back', async () => {

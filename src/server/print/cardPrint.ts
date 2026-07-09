@@ -14,9 +14,9 @@ import type { ScreenedCardMessage } from '@/server/textSafety';
  */
 export const CARD_SPREAD = { widthPx: 6236, heightPx: 2220 } as const;
 const PANEL_W = CARD_SPREAD.widthPx / 4; // 1559 — even quarters (matches the template trim lines ±1px)
-/** The back-badge's native render width (60% of a panel) — the assembly fits it to this, so render
- * it here to avoid a resize. */
-export const CARD_BACK_BADGE_WIDTH_PX = Math.round(PANEL_W * 0.6);
+// The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
+// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel).
+const BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
 const H = CARD_SPREAD.heightPx;
 const REQUIRED_DPI = 300;
 
@@ -82,16 +82,15 @@ export async function assembleCardPrintSpread(input: CardPrintInput): Promise<Bu
     layers.push({ input: await placeDesign(design, transform, PANEL_W), left: CARD_PANEL_X.outerFront, top: 0 });
   }
 
-  // BACK branding mark — horizontally centred in the outer-rear panel, sitting in the lower third
-  // (the classic back-of-card publisher spot; over white for front-only, over the design's back
-  // portion for full-width).
+  // BACK logo — the Snickerdoodle mark at the founder's spot: bottom-left of the outer-rear panel
+  // (over white for front-only, over the design's back portion for full-width).
   if (branding) {
-    const badge = await sharp(branding).resize(Math.round(PANEL_W * 0.6), null, { fit: 'inside' }).png().toBuffer();
+    const badge = await sharp(branding).resize(Math.round(PANEL_W * BADGE.widthFrac), null, { fit: 'inside' }).png().toBuffer();
     const bm = await sharp(badge).metadata();
     layers.push({
       input: badge,
-      left: CARD_PANEL_X.outerRear + Math.round((PANEL_W - (bm.width ?? 0)) / 2),
-      top: Math.round(H * 0.72 - (bm.height ?? 0) / 2),
+      left: CARD_PANEL_X.outerRear + Math.round(PANEL_W * BADGE.cxFrac - (bm.width ?? 0) / 2),
+      top: Math.round(H * BADGE.cyFrac - (bm.height ?? 0) / 2),
     });
   }
 
