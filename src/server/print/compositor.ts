@@ -14,12 +14,11 @@ import { cylinderWarp } from './cylinder';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
-const MUG_VISIBLE_ARC_DEG = 168;
-const MUG_WRAP_DEG = 290;
-// Vertical realism: BOW (horizontal lines arc into a smile toward the edges) + edge foreshorten —
-// the cues that read as "printed on a round mug" rather than a flat sticker.
-const MUG_CURVE_Y = 0.06;
-const MUG_VSQUASH = 0.14;
+// The printmap spans ~40% of the circumference (founder), and the 209mm print wraps ~292° of an
+// 11oz mug (209mm on a ~258mm circumference). So the front shows the central ~144/292 ≈ 49% of the
+// upload; the rest wraps out of view. The curved printmap does the vertical bow — no synthetic one.
+const MUG_VISIBLE_ARC_DEG = 144;
+const MUG_PRINTED_ARC_DEG = 292;
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -53,7 +52,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r12'; // r12: mug cylinder bow flipped to a ∪ smile (shot-from-above wrap)
+const RENDER_REV = 'r13'; // r13: mug cylinder driven by the founder's PRINTMAP (full-height curved surface)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -298,7 +297,9 @@ async function renderAndPersist(
   // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
   // bbox) placement. Same secure spine either way.
   const perspective = !isAxisAligned(args.quad);
-  const cylinder = !perspective && args.materialClass === 'CERAMIC';
+  // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
+  // (the plain-white fallback blank) it falls through to FLAT.
+  const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.maskKey;
   const common = {
     blankBuf: await getObjectBytes(args.blankKey),
     // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
@@ -313,7 +314,7 @@ async function renderAndPersist(
   const out = perspective
     ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
     : cylinder
-      ? await renderCylinder({ ...common, back: args.mugBack ?? false })
+      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, back: args.mugBack ?? false, printmapBuf: await getObjectBytes(args.maskKey!) })
       : await renderFlat({
           ...common,
           maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
@@ -641,15 +642,16 @@ async function renderPerspective(args: {
  */
 async function renderCylinder(args: {
   blankBuf: Buffer;
+  /** The founder-authored PRINTMAP (alpha shape = the visible print surface on the photo). */
+  printmapBuf: Buffer;
   designBuf: Buffer;
-  quad: [number, number][];
   transform: Transform;
   workEdge: number;
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   back: boolean;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, designBuf, quad, transform, workEdge, outputEdge, print, back } = args;
+  const { blankBuf, printmapBuf, designBuf, transform, workEdge, outputEdge, print, back } = args;
 
   // Working photo (cap the longest edge; the quad is normalised so it scales with it). The BACK
   // view is the same mug flopped — handle to the left — and we wrap the reverse arc onto it.
@@ -693,17 +695,17 @@ async function renderCylinder(args: {
     .raw()
     .toBuffer();
 
-  // The visible print band on the (working, possibly flopped) photo. quadBboxPx gives it on the
-  // un-flopped frame; mirror the x for the flopped BACK photo so the band still covers the face.
-  const b = quadBboxPx(quad, WW, WH);
-  const band = { x: back ? WW - (b.x + b.w) : b.x, y: b.y, w: b.w, h: b.h };
+  // The PRINTMAP alpha at working res (flopped for the BACK view so it still covers the face) — a
+  // single channel where opaque = the visible printable surface. Its shape drives the whole wrap.
+  let pmPipe = sharp(printmapBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
+  if (back) pmPipe = pmPipe.flop();
+  const printAlpha = await pmPipe.ensureAlpha().extractChannel(3).raw().toBuffer();
 
   const warped = cylinderWarp({
-    design: wrap, srcW: dw, srcH: dh, band, canvasW: WW, canvasH: WH,
-    arcDeg: MUG_VISIBLE_ARC_DEG, wrapDeg: MUG_WRAP_DEG, centerDeg: back ? 180 : 0, mirror: back,
-    curveY: MUG_CURVE_Y, vSquash: MUG_VSQUASH,
+    design: wrap, srcW: dw, srcH: dh, printAlpha, pmW: WW, pmH: WH,
+    visibleArcDeg: MUG_VISIBLE_ARC_DEG, printedArcDeg: MUG_PRINTED_ARC_DEG, centerDeg: back ? 180 : 0, mirror: back,
   });
-  // Flatten the warped RGBA over white so alpha-0 (off-arc) is white → multiply identity → bare mug.
+  // Flatten the warped RGBA over white so alpha-0 (off-surface) is white → multiply identity → bare mug.
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();
 
   const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })

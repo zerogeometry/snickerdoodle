@@ -1,19 +1,20 @@
 /**
- * CYLINDER mockup tier — wrap a flat design around the visible face of a mug photographed
- * head-on, so the art curves with the ceramic (compresses toward the mug's edges) instead of
- * sitting flat. Pure pixel math (an orthographic cylinder projection), no I/O, so it's
- * exhaustively unit-testable and the child's design never leaves the process.
+ * CYLINDER mockup tier — wrap a flat design onto the visible print SURFACE of a mug, defined by a
+ * founder-authored PRINTMAP (an alpha shape on the product photo: full print height, curved
+ * top/bottom, spanning the visible front arc of the circumference). Pure pixel math, no I/O, so
+ * it's exhaustively unit-testable and the child's design never leaves the process.
  *
- * Geometry: the mug is a cylinder seen orthographically. A surface point at angle θ (θ=0 is the
- * point facing the camera) projects to screen x = cx + (bandW/2)·sin(θ)/sin(A), where the visible
- * front face spans the arc [−A, +A] and fills the band's width. Inverting per OUTPUT pixel:
- * sin(θ) = p·sin(A) with p the pixel's signed position across the band, θ = asin(...). The design
- * is the FULL printed wrap (its width = wrapDeg of circumference); the design column for a surface
- * angle is u = 0.5 + normalise(centerDeg + θ)/wrapDeg. Angles off the printed arc (the handle gap)
- * fall outside [0,1] → transparent, so the bare mug shows exactly where nothing prints.
+ * The printmap does the vertical work: at each output column the design fills the printmap's own
+ * top→bottom span, so a horizontal design line follows the mug's curved contour (a real cylinder
+ * bow, not a synthetic one) and foreshortens where the surface turns away. The horizontal work is
+ * the cylinder projection: a surface point at angle θ projects to screen x = sin(θ), so the design
+ * column for a screen position is found by inverting that (arcsin) — the art compresses toward the
+ * printmap's left/right edges exactly as it curves around the mug.
  *
- * The back view (centerDeg=180 on a horizontally-flopped photo, mirror=true so the art itself is
- * NOT mirrored) shows the two ends of the wrap meeting around the handle — physically honest.
+ * How much of the design shows: the printmap spans `visibleArcDeg` of the circumference while the
+ * full upload wraps `printedArcDeg` (209mm ≈ 292° on an 11oz mug), so the front shows the central
+ * visibleArcDeg/printedArcDeg of the design and the rest wraps out of view. The BACK view uses
+ * centerDeg=180 on the flopped photo (mirror keeps the art un-reversed).
  */
 
 export interface CylinderWarpInput {
@@ -21,91 +22,88 @@ export interface CylinderWarpInput {
   design: Buffer;
   srcW: number;
   srcH: number;
-  /** The visible print band on the product photo, in canvas px (axis-aligned). */
-  band: { x: number; y: number; w: number; h: number };
-  canvasW: number;
-  canvasH: number;
-  /** Visible front arc of the mug that the band spans, in degrees (e.g. 160). */
-  arcDeg: number;
-  /** Total arc the printed wrap covers, in degrees (e.g. 290 for a 209mm wrap). */
-  wrapDeg: number;
-  /** Which surface angle sits at the band centre: 0 = front, 180 = back. */
+  /** Printmap ALPHA (single channel, pmW × pmH, on the product-photo canvas): opaque = the visible
+   * printable surface. Its per-column vertical span is the cylinder's contour; its horizontal
+   * extent is the visible arc. */
+  printAlpha: Buffer;
+  pmW: number;
+  pmH: number;
+  /** Arc of the circumference the printmap spans (e.g. ~144° for ~40%). */
+  visibleArcDeg: number;
+  /** Arc the full printed wrap covers (e.g. ~292° for a 209mm print on an 11oz mug). */
+  printedArcDeg: number;
+  /** Which surface angle sits at the printmap centre: 0 = front, 180 = back. */
   centerDeg: number;
-  /** Mirror the horizontal parameter — used with a flopped photo so the BACK view's art
-   * reads the right way round (handle on the left) instead of being left-right reversed. */
+  /** Mirror the horizontal parameter — used with a flopped photo so the BACK view's art reads the
+   * right way round (handle on the left) instead of left-right reversed. */
   mirror?: boolean;
-  /** Vertical BOW depth (fraction of band height): horizontal lines arc into a smile as the
-   * surface curves toward the silhouette — the strongest "printed on a cylinder" cue. 0 = flat. */
-  curveY?: number;
-  /** Vertical foreshortening toward the silhouette edges (fraction): the band reads slightly
-   * shorter where the surface turns away. 0 = none. */
-  vSquash?: number;
 }
 
 /** Normalise an angle in degrees to (−180, 180]. */
 function norm180(deg: number): number {
-  let d = ((deg + 180) % 360 + 360) % 360 - 180;
+  let d = (((deg + 180) % 360) + 360) % 360 - 180;
   if (d <= -180) d += 360;
   return d;
 }
 
 /**
- * Warp the design onto the mug's visible face → a fresh RGBA raw buffer (canvasW × canvasH × 4),
- * transparent everywhere the design doesn't cover (off-arc, off-band). Iterates only the band's
- * bounding box; bilinear-samples the design.
+ * Warp the design onto the printmap surface → a fresh RGBA raw buffer (pmW × pmH × 4), transparent
+ * wherever the printmap is (off the printable surface, or off the printed arc). Bilinear-samples.
  */
 export function cylinderWarp(i: CylinderWarpInput): Buffer {
-  const { design, srcW, srcH, band, canvasW, canvasH, arcDeg, wrapDeg, centerDeg, mirror } = i;
-  const curveY = i.curveY ?? 0;
-  const vSquash = i.vSquash ?? 0;
-  const out = Buffer.alloc(canvasW * canvasH * 4); // all-zero = transparent
-  if (srcW < 2 || srcH < 2 || band.w < 2 || band.h < 2 || wrapDeg <= 0) return out;
+  const { design, srcW, srcH, printAlpha, pmW, pmH, visibleArcDeg, printedArcDeg, centerDeg, mirror } = i;
+  const out = Buffer.alloc(pmW * pmH * 4); // all-zero = transparent
+  if (srcW < 2 || srcH < 2 || pmW < 2 || pmH < 2 || printedArcDeg <= 0) return out;
 
-  const sinA = Math.sin((Math.min(179, Math.max(1, arcDeg)) / 2) * (Math.PI / 180));
-  const cx = band.x + band.w / 2;
-  const halfW = band.w / 2;
+  // Per-column vertical span of the printmap + its overall horizontal extent (one pass).
+  const top = new Int32Array(pmW).fill(-1);
+  const bot = new Int32Array(pmW).fill(-1);
+  let x0 = pmW, x1 = -1;
+  for (let x = 0; x < pmW; x++) {
+    let t = -1, b = -1;
+    for (let y = 0; y < pmH; y++) {
+      if (printAlpha[y * pmW + x]! > 24) { if (t < 0) t = y; b = y; }
+    }
+    top[x] = t; bot[x] = b;
+    if (t >= 0) { if (x < x0) x0 = x; if (x > x1) x1 = x; }
+  }
+  if (x1 < x0) return out; // empty printmap
 
-  const bx0 = Math.max(0, Math.floor(band.x));
-  const by0 = Math.max(0, Math.floor(band.y));
-  const bx1 = Math.min(canvasW, Math.ceil(band.x + band.w));
-  const by1 = Math.min(canvasH, Math.ceil(band.y + band.h));
+  const cx = (x0 + x1) / 2;
+  const halfW = Math.max(1, (x1 - x0) / 2);
+  const sinHalf = Math.sin((Math.min(179, Math.max(1, visibleArcDeg)) / 2) * (Math.PI / 180));
 
-  for (let x = bx0; x < bx1; x++) {
-    // Horizontal: screen x → surface angle θ (per column, so compute once).
-    let p = (x + 0.5 - cx) / halfW; // signed position across the band, −1..1
+  for (let x = x0; x <= x1; x++) {
+    const yt = top[x]!, yb = bot[x]!;
+    if (yt < 0) continue;
+    // Horizontal: screen x → surface angle θ → design column u (per column).
+    let p = (x - cx) / halfW; // −1..1 across the printmap
     if (mirror) p = -p;
-    const s = p * sinA;
-    if (s < -1 || s > 1) continue; // beyond the silhouette edge
+    const s = p * sinHalf;
+    if (s < -1 || s > 1) continue;
     const thetaDeg = Math.asin(s) * (180 / Math.PI);
-    const u = 0.5 + norm180(centerDeg + thetaDeg) / wrapDeg;
-    if (u < 0 || u > 1) continue; // off the printed arc (the handle gap) → bare mug shows
+    const u = 0.5 + norm180(centerDeg + thetaDeg) / printedArcDeg;
+    if (u < 0 || u > 1) continue; // off the printed arc (the handle gap)
     const fx = u * (srcW - 1);
     const ix = Math.floor(fx);
     const tx = fx - ix;
     const ix1 = ix + 1 < srcW ? ix + 1 : ix;
-    // How far this column has curved away from the front centre (0 at centre → 1 at the silhouette).
-    // Drives the vertical BOW (horizontal lines smile toward the edges) and the edge foreshorten.
-    const edge = Math.abs(p);
-    const bow = curveY * edge * edge; // the design shifts UP at the edges → horizontal lines SMILE
-    const squash = 1 - vSquash * edge * edge; // band a touch shorter where the surface turns away
 
-    for (let y = by0; y < by1; y++) {
-      // vertical: foreshorten toward the edges (squash about the band centre) + bow the column so a
-      // horizontal design line reads as a ∪ arc — centre low, sides high — as on a mug shot from
-      // slightly above (the strongest "wrapped round a cylinder" cue).
-      const v = 0.5 + ((y + 0.5 - band.y) / band.h - 0.5) / squash + bow;
-      if (v < 0 || v > 1) continue;
+    const h = yb - yt;
+    for (let y = yt; y <= yb; y++) {
+      // Vertical: fill this column's printmap span → the design follows the curved contour.
+      const v = h > 0 ? (y - yt) / h : 0;
       const fy = v * (srcH - 1);
       const iy = Math.floor(fy);
       const ty = fy - iy;
       const iy1 = iy + 1 < srcH ? iy + 1 : iy;
       const o00 = (iy * srcW + ix) * 4, o10 = (iy * srcW + ix1) * 4;
       const o01 = (iy1 * srcW + ix) * 4, o11 = (iy1 * srcW + ix1) * 4;
-      const o = (y * canvasW + x) * 4;
+      const o = (y * pmW + x) * 4;
       for (let ch = 0; ch < 4; ch++) {
-        const top = design[o00 + ch]! * (1 - tx) + design[o10 + ch]! * tx;
-        const bot = design[o01 + ch]! * (1 - tx) + design[o11 + ch]! * tx;
-        out[o + ch] = Math.round(top * (1 - ty) + bot * ty);
+        const tv = design[o00 + ch]! * (1 - tx) + design[o10 + ch]! * tx;
+        const bv = design[o01 + ch]! * (1 - tx) + design[o11 + ch]! * tx;
+        out[o + ch] = Math.round(tv * (1 - ty) + bv * ty);
       }
     }
   }

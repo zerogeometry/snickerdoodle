@@ -111,10 +111,12 @@ function layeredMugDir(colour: string): string | null {
   const has = (f: string) => existsSync(path.join(dir, f));
   return has('blank.png') && has('background.png') && has('shadow.png') ? dir : null;
 }
-// The visible printable FRONT face on the founder's mug canvas (full-canvas fractions, measured
-// from the blank's silhouette: body 0.22–0.625, held just inside the edges + below the rim / above
-// the base). Axis-aligned → the compositor treats CERAMIC as the cylinder wrap.
-const MUG_BAND: Box = { x0: 0.238, y0: 0.322, x1: 0.61, y1: 0.7 };
+// An axis-aligned routing quad (roughly the printmap bbox) — enough to send CERAMIC down the
+// cylinder path; the real geometry comes from the printmap mask, not this box.
+const MUG_BAND: Box = { x0: 0.217, y0: 0.268, x1: 0.615, y1: 0.78 };
+// The founder's PRINTMAP (the visible print surface, alpha shape) is authored once on the shared
+// mug geometry (in red/); a colour may override with its own printmap.png.
+const MUG_PRINTMAP = path.join(LAYERED, 'mug', 'red', 'printmap.png');
 
 // Founder-authored CARD "Single Card View" — the catalogue thumbnail: a card leaning on a kraft
 // envelope. background → envelopeshadow → envelope → cardshadow → [the child's front design,
@@ -548,13 +550,14 @@ async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'
   return out;
 }
 
-const layeredMugCache = new Map<string, { blank: Buffer; quad: Quad; W: number; H: number }>();
-/** Build a two-tone mug blank photo: background → shadow → the real coloured mug (blank.png). The
- * print band is the SHARED front-face rect (MUG_BAND) — every colour is registered identically, so
- * the compositor's single cylinder mapping wraps the art onto each. Cached on the layers' mtimes. */
-async function layeredMug(dir: string): Promise<{ blank: Buffer; quad: Quad; W: number; H: number }> {
-  const files = ['background.png', 'shadow.png', 'blank.png'];
-  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+const layeredMugCache = new Map<string, { blank: Buffer; mask: Buffer; quad: Quad; W: number; H: number }>();
+/** Build a two-tone mug blank photo (background → shadow → the real coloured mug) plus the founder's
+ * PRINTMAP (the alpha shape of the visible print surface). The compositor's CYLINDER tier warps the
+ * art onto that printmap — full print height, curved top/bottom, the visible front arc. The blank
+ * geometry is shared across colours, so ONE printmap (red's) serves every colour. Cached on mtimes. */
+async function layeredMug(dir: string): Promise<{ blank: Buffer; mask: Buffer; quad: Quad; W: number; H: number }> {
+  const pmPath = existsSync(path.join(dir, 'printmap.png')) ? path.join(dir, 'printmap.png') : MUG_PRINTMAP;
+  const key = dir + '|' + ['background.png', 'shadow.png', 'blank.png'].map((f) => statSync(path.join(dir, f)).mtimeMs).join('|') + '|' + statSync(pmPath).mtimeMs;
   const hit = layeredMugCache.get(key);
   if (hit) return hit;
   const mug = readFileSync(path.join(dir, 'blank.png'));
@@ -570,7 +573,9 @@ async function layeredMug(dir: string): Promise<{ blank: Buffer; quad: Quad; W: 
     ])
     .png()
     .toBuffer();
-  const out = { blank, quad: asQuad(MUG_BAND), W, H };
+  // The printmap is authored on the SHARED mug geometry (red's), so one map serves every colour.
+  const mask = await sharp(MUG_PRINTMAP).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const out = { blank, mask, quad: asQuad(MUG_BAND), W, H };
   layeredMugCache.set(key, out);
   return out;
 }
@@ -906,9 +911,9 @@ export async function POST(req: Request): Promise<Response> {
 
     if (p.register === 'layered-mug') {
       const d = await layeredMug(p.dir);
-      // The band is AXIS-ALIGNED and CERAMIC → the compositor wraps it as a cylinder (no aspect
-      // lock: the wrap is unlocked, like the old 'band' path).
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material });
+      // CERAMIC + axis-aligned + a MASK (the printmap) → the compositor's cylinder tier warps the
+      // art onto the printmap surface. The printmap rides along as the template mask.
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask });
       authored++;
       registration.push({
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
