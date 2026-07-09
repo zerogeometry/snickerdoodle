@@ -67,9 +67,13 @@ export default function SpinHarness() {
   if (process.env.NODE_ENV === 'production') notFound();
   const [img, setImg] = useState<string | null>(null);
   const [only, setOnly] = useState<string | null>(null);
+  const [view, setView] = useState<'spin' | 'front' | 'back'>('spin');
   useEffect(() => {
     setImg(sampleDrawing());
-    setOnly(new URLSearchParams(window.location.search).get('only'));
+    const q = new URLSearchParams(window.location.search);
+    setOnly(q.get('only'));
+    const v = q.get('view');
+    if (v === 'front' || v === 'back') setView(v);
   }, []);
   if (!img) return null;
   const keys = only ? SPINNABLE.filter((k) => k === only) : SPINNABLE;
@@ -87,6 +91,7 @@ export default function SpinHarness() {
                 printWmm={HARNESS[kind]!.mm[0]}
                 printHmm={HARNESS[kind]!.mm[1]}
                 attributes={HARNESS[kind]!.attrs}
+                view={view}
               />
             </div>
             <figcaption className="mt-1 text-center text-xs font-bold text-[#7A6A58]">{kind}</figcaption>

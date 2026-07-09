@@ -67,14 +67,16 @@ export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm:
   const group = new THREE.Group();
   const R = 41;
   const H = 96;
-  const body = new THREE.Mesh(
-    new THREE.CylinderGeometry(R, R, H, 96, 1, false),
-    new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.32, metalness: 0.02 }),
-  );
+  // Glazed ceramic: a clearcoat over a slightly rough body gives the sharp glaze highlight while the
+  // scene environment (Product3D) supplies the soft studio reflection — reads as real porcelain, not
+  // matte CGI. `glaze()` is shared by the body, handle and the printed decal so the sheen is uniform.
+  const glaze = (extra: THREE.MeshPhysicalMaterialParameters = {}) =>
+    new THREE.MeshPhysicalMaterial({ color: '#f7f5f1', roughness: 0.5, metalness: 0, clearcoat: 0.85, clearcoatRoughness: 0.16, envMapIntensity: 1, ...extra });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 96, 1, false), glaze());
   group.add(body);
   const handle = new THREE.Mesh(
     new THREE.TorusGeometry(24, 6.5, 24, 48, Math.PI),
-    new THREE.MeshStandardMaterial({ color: '#f6f4f0', roughness: 0.32, metalness: 0.02 }),
+    glaze(),
   );
   handle.rotation.z = -Math.PI / 2;
   handle.position.set(R + 3, 0, 0);
@@ -87,8 +89,10 @@ export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm:
   texture.offset.x = 1;
   const printH = Math.min(wrapHmm, H - 4);
   const decal = new THREE.Mesh(
-    new THREE.CylinderGeometry(R + 0.35, R + 0.35, printH, 96, 1, true, Math.PI / 2 - theta / 2, theta),
-    new THREE.MeshStandardMaterial({ map: texture, roughness: 0.3, metalness: 0.02 }),
+    // Centre the print band on +Z (facing the camera) so the FRONT view shows the art dead-centre
+    // with the handle to the side — not tucked behind the handle at +X. Display-only; print unaffected.
+    new THREE.CylinderGeometry(R + 0.35, R + 0.35, printH, 96, 1, true, -theta / 2, theta),
+    glaze({ map: texture, color: '#ffffff', roughness: 0.45 }), // white base so the art keeps its true colour
   );
   group.add(decal);
   return group;

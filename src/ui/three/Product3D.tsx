@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { paintPlacement } from './models';
 import { buildProduct } from './builders';
 import type { PlacementTransform } from '@/lib/store';
+
+/** A fixed camera azimuth (radians about Y) that faces a product's PRINTED side toward the camera.
+ * The 'back' still view adds π. Only products with a meaningful front/back need an entry. */
+const FRONT_YAW: Record<string, number> = { mug: 0 };
 
 /**
  * Tier-C interactive 3D preview (PREVIEW-state-of-the-art brief) — fully CLIENT-SIDE:
@@ -34,12 +39,15 @@ export interface Product3DProps {
   /** The chosen variant attributes (colour drives the frame finish / blanket back;
    * size drives the cushion shape). */
   attributes?: Record<string, string>;
+  /** 'spin' (default) = the interactive draggable view; 'front'/'back' = a FIXED still frame
+   * (no drag, one render) that faces the printed side (or its reverse). */
+  view?: 'spin' | 'front' | 'back';
   className?: string;
 }
 
 export { webglAvailable } from './models';
 
-export default function Product3D({ kind, image, fallbackImage, placement, printWmm, printHmm, attributes, className }: Product3DProps) {
+export default function Product3D({ kind, image, fallbackImage, placement, printWmm, printHmm, attributes, view = 'spin', className }: Product3DProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
 
@@ -83,6 +91,10 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       const texture = new THREE.CanvasTexture(paintPlacement(img, printWmm, printHmm, placement));
       const model = buildProduct(kind, texture, printWmm, printHmm, attributes ?? {});
       if (!model) return setFailed(true);
+      // A FIXED still frame (front/back): rotate the printed side to face the camera (back adds π),
+      // then render once with no controls/loop. 'spin' keeps the interactive orbit.
+      const still = view !== 'spin';
+      if (still) model.rotation.y = (FRONT_YAW[kind] ?? 0) + (view === 'back' ? Math.PI : 0);
       scene.add(model);
 
       // fit the camera to the model — near/far scale with it (a large blanket is
@@ -115,19 +127,22 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       renderer.setClearColor(0x000000, 0);
       host.appendChild(renderer.domElement);
 
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enablePan = false;
-      controls.enableDamping = !reducedMotion;
-      controls.minDistance = dist * 0.5;
-      controls.maxDistance = dist * 1.8;
-      controls.minPolarAngle = 0.6;
-      controls.maxPolarAngle = 2.2;
+      // A soft studio ENVIRONMENT so a glossy surface reflects real light instead of reading
+      // matte/CGI — the single biggest realism win for the ceramic mug. Scoped to the mug for now
+      // (other spin views are already tuned without it); PMREM-prefiltered RoomEnvironment, disposed
+      // on cleanup. ACES tone-mapping keeps the studio highlights from blowing out.
+      const enhance = kind === 'mug';
+      let pmrem: THREE.PMREMGenerator | null = null;
+      let envRT: { texture: THREE.Texture; dispose: () => void } | null = null;
+      if (enhance) {
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        pmrem = new THREE.PMREMGenerator(renderer);
+        envRT = pmrem.fromScene(new RoomEnvironment(), 0.04);
+        scene.environment = envRT.texture;
+      }
 
       const render = () => renderer && renderer.render(scene, camera);
-      // Always render on interaction too: in a background/throttled tab rAF never
-      // fires, and reduced-motion opts out of the loop entirely — 'change' covers both.
-      controls.addEventListener('change', render);
 
       // Track the host's size (orientation change, responsive relayout) — the canvas
       // is otherwise frozen at its mount-time dimensions.
@@ -141,15 +156,29 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
         render();
       });
       ro.observe(host);
-      cleanupResize = () => ro.disconnect();
-      if (!reducedMotion) {
-        const loop = () => {
-          if (disposed) return;
-          controls!.update();
-          render();
-          raf = requestAnimationFrame(loop);
-        };
-        loop();
+      cleanupResize = () => { ro.disconnect(); pmrem?.dispose(); envRT?.dispose(); };
+
+      // FIXED still frame: no controls, no loop — one render (below). Otherwise the interactive orbit.
+      if (!still) {
+        const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = false;
+        controls.enableDamping = !reducedMotion;
+        controls.minDistance = dist * 0.5;
+        controls.maxDistance = dist * 1.8;
+        controls.minPolarAngle = 0.6;
+        controls.maxPolarAngle = 2.2;
+        // Render on interaction too: a throttled tab never fires rAF, reduced-motion opts out.
+        controls.addEventListener('change', render);
+        if (!reducedMotion) {
+          const loop = () => {
+            if (disposed) return;
+            controls!.update();
+            render();
+            raf = requestAnimationFrame(loop);
+          };
+          loop();
+        }
       }
 
       // WebGL uploads from a tainted canvas throw at first render — catch → fallback
@@ -170,7 +199,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
         renderer.domElement.remove();
       }
     };
-  }, [kind, image, fallbackImage, placement, printWmm, printHmm, attributes]);
+  }, [kind, image, fallbackImage, placement, printWmm, printHmm, attributes, view]);
 
   if (failed) {
     return (
@@ -183,7 +212,11 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
     <div
       ref={hostRef}
       role="img"
-      aria-label="a 3D preview of your keepsake — drag to spin it around; the photo view remains the exact print preview"
+      aria-label={
+        view === 'spin'
+          ? 'a 3D preview of your keepsake — drag to spin it around; the photo view remains the exact print preview'
+          : `your keepsake shown from the ${view} — a preview of how it prints`
+      }
       className={`h-full w-full touch-none ${className ?? ''}`}
     />
   );
