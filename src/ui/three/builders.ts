@@ -230,7 +230,7 @@ export { has3D } from './spinnable';
 export function buildProduct(kind: string, texture: THREE.Texture, printWmm: number, printHmm: number, attrs: Record<string, string> = {}): THREE.Group | null {
   switch (kind) {
     case 'mug':
-      return buildMug(texture as THREE.CanvasTexture, printWmm, printHmm);
+      return buildMug(texture as THREE.CanvasTexture, printWmm, printHmm, attrs.colour ?? 'white');
     case 'framedPrint':
       return buildFrame(texture as THREE.CanvasTexture, printWmm, printHmm, attrs.colour ?? 'gold');
     case 'cushion':

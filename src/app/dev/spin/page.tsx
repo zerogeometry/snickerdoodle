@@ -12,7 +12,7 @@ const Product3D = dynamic(() => import('@/ui/three/Product3D'), { ssr: false });
 
 /** Display-only variant facts for the harness (mm + attrs mirror the defaults). */
 const HARNESS: Record<string, { mm: [number, number]; attrs?: Record<string, string> }> = {
-  mug: { mm: [209, 98] },
+  mug: { mm: [209, 98], attrs: { colour: 'white' } },
   framedPrint: { mm: [279, 356], attrs: { colour: 'gold' } },
   cushion: { mm: [280, 280], attrs: { size: 'heart' } },
   blanket: { mm: [600, 1000], attrs: { colour: 'pink' } },
@@ -68,12 +68,14 @@ export default function SpinHarness() {
   const [img, setImg] = useState<string | null>(null);
   const [only, setOnly] = useState<string | null>(null);
   const [view, setView] = useState<'spin' | 'front' | 'back'>('spin');
+  const [colour, setColour] = useState<string | null>(null);
   useEffect(() => {
     setImg(sampleDrawing());
     const q = new URLSearchParams(window.location.search);
     setOnly(q.get('only'));
     const v = q.get('view');
     if (v === 'front' || v === 'back') setView(v);
+    setColour(q.get('colour'));
   }, []);
   if (!img) return null;
   const keys = only ? SPINNABLE.filter((k) => k === only) : SPINNABLE;
@@ -90,7 +92,7 @@ export default function SpinHarness() {
                 placement={{ scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }}
                 printWmm={HARNESS[kind]!.mm[0]}
                 printHmm={HARNESS[kind]!.mm[1]}
-                attributes={HARNESS[kind]!.attrs}
+                attributes={colour ? { ...HARNESS[kind]!.attrs, colour } : HARNESS[kind]!.attrs}
                 view={view}
               />
             </div>

@@ -63,7 +63,20 @@ export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: n
   return canvas;
 }
 
-export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm: number): THREE.Group {
+/** The two-tone accent glaze per Prodigi colour (rim + handle + inside). White = no accent
+ * (a plain white mug); the rest are the coloured half of the tracked two-tone range. */
+const MUG_ACCENT: Record<string, string> = {
+  white: '#f7f5f1',
+  black: '#2b2724',
+  blue: '#2f6f9e',
+  green: '#3f7d4f',
+  orange: '#d2691e',
+  pink: '#d96a8f',
+  red: '#b5342f',
+  yellow: '#e8b23a',
+};
+
+export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm: number, colour = 'white'): THREE.Group {
   const group = new THREE.Group();
   const R = 41;
   const H = 96;
@@ -72,14 +85,35 @@ export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm:
   // matte CGI. `glaze()` is shared by the body, handle and the printed decal so the sheen is uniform.
   const glaze = (extra: THREE.MeshPhysicalMaterialParameters = {}) =>
     new THREE.MeshPhysicalMaterial({ color: '#f7f5f1', roughness: 0.5, metalness: 0, clearcoat: 0.85, clearcoatRoughness: 0.16, envMapIntensity: 1, ...extra });
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 96, 1, false), glaze());
+  const accent = MUG_ACCENT[colour] ?? MUG_ACCENT.white!;
+  // Two-tone: the outside wall is white; the RIM, HANDLE and INSIDE carry the chosen colour — the
+  // signature of the tracked two-tone range. Body is open-ended (hollow) so the coloured inner wall
+  // shows through the mouth; a coloured bottom disc closes it. For white the accent equals the body,
+  // so it reads as a plain white mug with no seams.
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 96, 1, true), glaze());
   group.add(body);
-  const handle = new THREE.Mesh(
-    new THREE.TorusGeometry(24, 6.5, 24, 48, Math.PI),
-    glaze(),
-  );
-  handle.rotation.z = -Math.PI / 2;
-  handle.position.set(R + 3, 0, 0);
+  const inner = new THREE.Mesh(new THREE.CylinderGeometry(R - 3, R - 3, H - 4, 96, 1, true), glaze({ color: accent, side: THREE.BackSide }));
+  group.add(inner);
+  const base = new THREE.Mesh(new THREE.CircleGeometry(R - 3, 96), glaze({ color: accent }));
+  base.rotation.x = -Math.PI / 2;
+  base.position.y = -(H / 2) + 2;
+  group.add(base);
+  // Coloured rim: a slim torus riding the lip, joining the white outside to the coloured inside.
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(R - 1.5, 2, 16, 96), glaze({ color: accent }));
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = H / 2 - 1;
+  group.add(rim);
+  // A proper connected EAR handle on the +X side: a tube swept along a D-curve whose two ends embed
+  // ~6mm into the mug wall (so it's fused to the body, not a floating ring). Bulges out to the right.
+  const hHalf = 27;
+  const handleCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(R - 6, hHalf, 0),
+    new THREE.Vector3(R + 18, hHalf * 0.85, 0),
+    new THREE.Vector3(R + 29, 0, 0),
+    new THREE.Vector3(R + 18, -hHalf * 0.85, 0),
+    new THREE.Vector3(R - 6, -hHalf, 0),
+  ]);
+  const handle = new THREE.Mesh(new THREE.TubeGeometry(handleCurve, 96, 5.6, 20, false), glaze({ color: accent }));
   group.add(handle);
   const theta = Math.min((wrapWmm / (2 * Math.PI * R)) * 2 * Math.PI, Math.PI * 1.96);
   texture.colorSpace = THREE.SRGBColorSpace;
