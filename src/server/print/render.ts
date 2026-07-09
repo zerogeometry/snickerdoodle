@@ -11,7 +11,8 @@ import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
 import { screenCardMessage } from '@/server/textSafety';
-import { assembleCardPrintSpread, CARD_SPREAD } from './cardPrint';
+import { assembleCardPrintSpread, CARD_BACK_BADGE_WIDTH_PX, CARD_SPREAD } from './cardPrint';
+import { renderCardBackBadge } from './cardBranding';
 
 export interface RenderResult {
   printObjectId: string;
@@ -116,7 +117,7 @@ export async function renderPrintFile(
       transform,
       span: input.cardSpan === 'full' ? 'full' : 'front',
       message: screen.value,
-      branding: null, // TODO(#133): Snickerdoodle back badge asset — blank white back until it lands
+      branding: await renderCardBackBadge(CARD_BACK_BADGE_WIDTH_PX), // Snickerdoodle mark on the outer rear
     });
     outW = CARD_SPREAD.widthPx;
     outH = CARD_SPREAD.heightPx;
