@@ -131,7 +131,7 @@ export default function CheckoutPage() {
       const res = await placeOrderAction({
         // Fold the per-print details (cushion back, card inside message) into the artwork payload
         // — the server freezes + screens them and the fulfilment renderer reads them. Harmless elsewhere.
-        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message } } : {}) })),
+        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) })),
         gift,
         subject: liveSubject ?? undefined,
       });

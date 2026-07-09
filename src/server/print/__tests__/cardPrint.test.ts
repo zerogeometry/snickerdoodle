@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import sharp from 'sharp';
+import sharp, { type OutputInfo } from 'sharp';
 import { assembleCardPrintSpread, CARD_SPREAD, CARD_PANEL_X } from '@/server/print/cardPrint';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 
@@ -15,14 +15,14 @@ const message = (over: Partial<ScreenedCardMessage> = {}): ScreenedCardMessage =
 async function pixels(png: Buffer) {
   return sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 }
-function at(buf: { data: Buffer; info: sharp.OutputInfo }, x: number, y: number): [number, number, number] {
+function at(buf: { data: Buffer; info: OutputInfo }, x: number, y: number): [number, number, number] {
   const i = (y * buf.info.width + x) * buf.info.channels;
   return [buf.data[i]!, buf.data[i + 1]!, buf.data[i + 2]!];
 }
 const isGreen = ([r, g, b]: number[]) => g! > 120 && r! < 120 && b! < 130;
 const isWhite = ([r, g, b]: number[]) => r! > 240 && g! > 240 && b! > 240;
 // dark ink anywhere in a vertical band (text present)
-function bandInk(buf: { data: Buffer; info: sharp.OutputInfo }, x0: number, x1: number): number {
+function bandInk(buf: { data: Buffer; info: OutputInfo }, x0: number, x1: number): number {
   let n = 0;
   for (let y = 40; y < buf.info.height - 40; y += 4) for (let x = x0 + 40; x < x1 - 40; x += 4) {
     const [r, g, b] = at(buf, x, y);

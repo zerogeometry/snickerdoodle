@@ -22,7 +22,7 @@ function newRef(): string {
 export interface PlaceLine {
   productKey: string;
   qty: number;
-  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown };
+  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string };
 }
 
 export interface PlaceOrderResult {
@@ -97,7 +97,7 @@ export async function placeOrder(
   // template snapshot + a server-clamped transform). A bad placement fails here,
   // not half-way through inserting an order.
   const artworkByIndex = new Map<number, {
-    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; message: ScreenedCardMessage | null;
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; message: ScreenedCardMessage | null; cardSpan: string | null;
   }>();
   for (let i = 0; i < valid.length; i++) {
     const art = valid[i]!.artwork;
@@ -152,6 +152,8 @@ export async function placeOrder(
         if (!screen.ok) throw new Error(`your card ${screen.field} can’t be printed — please reword it`);
         return screen.value;
       })(),
+      // Card outer span — only 'full' is meaningful; anything else (incl. non-card lines) = front default.
+      cardSpan: art.cardImageSpan === 'full' ? 'full' : null,
     });
   }
 
@@ -198,6 +200,7 @@ export async function placeOrder(
         sourceObjectId: art.sourceObjectId,
         back: art.back,
         message: art.message, // screened card message (card only), or null
+        cardSpan: art.cardSpan, // 'full' or null (front) — card only
         status: 'PENDING',
       });
     }

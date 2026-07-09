@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
+import { printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
@@ -256,5 +256,35 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     expect(l.heightPx).toBeGreaterThan(l.widthPx); // landscape variant rotated 90° back → also portrait
     expect(l.widthPx).toBe(p.widthPx); // identical Prodigi portrait canvas
     expect(l.heightPx).toBe(p.heightPx);
+  });
+
+  it('a GREETINGS CARD renders the flat 4-panel spread (6236×2220), not a single face', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [card] = await db
+      .select({ id: productVariants.id })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(eq(products.key, 'card'));
+    const assetId = await ingest(await src(1600, 2200)); // enough for a 5×7 panel at 300dpi
+    const msg = { greeting: 'Happy Birthday, Mabel!', message: 'Hope it is lovely.', signature: 'love, Mum x', note: 'for you', font: 'caveat', fontScale: 1 };
+    const res = await renderPrintFile(db, sam, { assetId, variantId: card!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, message: msg, cardSpan: 'full' });
+    keys.push(res.key);
+    // The card's own 4-panel artboard — NOT the single 5×7 face.
+    expect(res).toMatchObject({ widthPx: 6236, heightPx: 2220, renderedDpi: 300 });
+    const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
+    const meta = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).metadata();
+    expect(meta.width).toBe(6236);
+    expect(meta.height).toBe(2220);
+
+    // Defence in depth: an abusive inside message is REJECTED at the PRINT boundary too, not just at
+    // order time — the print renderer re-screens and refuses to lay it onto a keepsake.
+    await expect(
+      renderPrintFile(db, sam, {
+        assetId,
+        variantId: card!.id,
+        transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 },
+        message: { ...msg, message: 'you fucking idiot' },
+      }),
+    ).rejects.toThrow(/can’t be printed/);
   });
 });

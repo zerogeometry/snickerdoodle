@@ -22,6 +22,8 @@ interface ClaimedItem {
   transform: RawTransform;
   sourceObjectId: string | null;
   back: string | null; // cushion DUAL back choice (frozen at order time); null elsewhere
+  message: unknown; // greetings-card screened inside message (frozen); null = blank inside
+  cardSpan: string | null; // greetings-card outer span: 'full' or null (front); card only
 }
 
 /**
@@ -58,6 +60,8 @@ export async function processFulfilment(
         transform: orderItemArtwork.transform,
         sourceObjectId: orderItemArtwork.sourceObjectId,
         back: orderItemArtwork.back,
+        message: orderItemArtwork.message,
+        cardSpan: orderItemArtwork.cardSpan,
       })
       .from(orderItemArtwork)
       .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
@@ -115,6 +119,8 @@ async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promi
       transform: item.transform,
       sourceObjectId: item.sourceObjectId ?? undefined,
       back: item.back ?? undefined,
+      message: item.message ?? undefined,
+      cardSpan: item.cardSpan ?? undefined,
     });
   } catch (e) {
     return fail(db, item.artworkId, (e as Error).message);

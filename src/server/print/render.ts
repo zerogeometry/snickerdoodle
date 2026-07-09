@@ -10,6 +10,8 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { screenCardMessage } from '@/server/textSafety';
+import { assembleCardPrintSpread, CARD_SPREAD } from './cardPrint';
 
 export interface RenderResult {
   printObjectId: string;
@@ -43,6 +45,11 @@ export async function renderPrintFile(
      * null/unknown) = the same image on both faces; a CUSHION_BACK_COLOURS token = image front +
      * that plain-colour back. Ignored entirely on any non-DUAL variant (the SKU is authoritative). */
     back?: string;
+    /** GREETINGS-CARD frozen inside message (re-screened here) — the note + greeting/message/
+     * signature laid into the two inside panels. null/absent ⇒ a blank (write-by-hand) inside. */
+    message?: unknown;
+    /** GREETINGS-CARD outer span: 'full' = the design across rear+front; else the front panel. */
+    cardSpan?: string;
   },
 ): Promise<RenderResult> {
   await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
@@ -92,6 +99,30 @@ export async function renderPrintFile(
   // faces are square, so DUAL never rotates.
   const dual = ((variantRow?.attributes as Record<string, string>) ?? {}).sides === 'double';
 
+  let out: Buffer;
+  let outW: number;
+  let outH: number;
+
+  // A GREETINGS CARD prints as one flat 4-panel spread (Prodigi 'default' area), NOT the single
+  // face — [ outer rear (branding) | outer front (design) | inside front (note) | inside back
+  // (message) ]. The message is RE-SCREENED here (never trust the stored value) so the print can't
+  // carry text the screen would reject. In-VPC like every other render; the POD egress gate is the
+  // separate downstream chokepoint.
+  if (variantRow?.key === 'card') {
+    const screen = screenCardMessage(input.message as Parameters<typeof screenCardMessage>[0]);
+    if (!screen.ok) throw new Error(`the card ${screen.field} can’t be printed — please reword it`);
+    out = await assembleCardPrintSpread({
+      design: srcBuf,
+      transform,
+      span: input.cardSpan === 'full' ? 'full' : 'front',
+      message: screen.value,
+      branding: null, // TODO(#133): Snickerdoodle back badge asset — blank white back until it lands
+    });
+    outW = CARD_SPREAD.widthPx;
+    outH = CARD_SPREAD.heightPx;
+    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+  }
+
   const rect = computeLayerRect(geom, src, transform);
   // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
   // on a white canvas. Handles both regimes: cover/zoom (layer ≥ canvas → crop, offset 0,
@@ -112,9 +143,8 @@ export async function renderPrintFile(
     .png()
     .toBuffer();
 
-  let out: Buffer;
-  let outW = rect.canvasWidth;
-  let outH = rect.canvasHeight;
+  outW = rect.canvasWidth;
+  outH = rect.canvasHeight;
   if (dual) {
     // BACK (right) face: a known palette colour → a solid fill; 'both' / null / unknown → the same
     // image again (image-both-sides), the safe default so the customer always gets their artwork.
@@ -139,7 +169,24 @@ export async function renderPrintFile(
     }
   }
 
-  const key = derivativeKey(input.assetId, `printfile-${input.variantId}`);
+  return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+}
+
+/** Write the finished print file as a deterministic write-once DERIVATIVE (idempotent re-render
+ * overwrites the same key) and return the render result. Shared by every product path, so the
+ * card's 4-panel spread persists identically to a single-face print. */
+async function persistPrintFile(
+  db: DbHandle,
+  assetId: string,
+  variantId: string,
+  out: Buffer,
+  renderedDpi: number,
+  effectiveDpi: number,
+  upscaled: boolean,
+  widthPx: number,
+  heightPx: number,
+): Promise<RenderResult> {
+  const key = derivativeKey(assetId, `printfile-${variantId}`);
   await putObject(key, out, 'image/png');
   const sha256 = createHash('sha256').update(out).digest('hex');
   const { bucket } = getS3();
@@ -155,19 +202,11 @@ export async function renderPrintFile(
     // existing row can't double-insert — the loser no-ops and we re-read the winner.
     const [row] = await db
       .insert(storageObjects)
-      .values({ assetId: input.assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: out.byteLength, sha256, exifStripped: true, writeOnce: true })
+      .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: out.byteLength, sha256, exifStripped: true, writeOnce: true })
       .onConflictDoNothing({ target: storageObjects.key })
       .returning();
     printObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
   }
 
-  return {
-    printObjectId,
-    key,
-    renderedDpi: tpl.requiredDpi, // the file's embedded density
-    effectiveDpi: assess.effectiveDpi, // the real source resolution at this placement
-    upscaled: assess.decision === 'UPSCALE',
-    widthPx: outW, // DUAL = 2× a face; landscape = swapped; else the single face
-    heightPx: outH,
-  };
+  return { printObjectId, key, renderedDpi, effectiveDpi, upscaled, widthPx, heightPx };
 }
