@@ -481,22 +481,6 @@ export default function CustomizePage() {
                   </button>
                 ))}
               </div>
-              {/* Outside image span — only while viewing the outside. */}
-              {cardView === 'outside' ? (
-                <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="outside image">
-                  {([['front only', 'front'], ['full width', 'full']] as const).map(([label, span]) => (
-                    <button
-                      key={span}
-                      type="button"
-                      onClick={() => setCardSpan(span)}
-                      aria-pressed={cardSpan === span}
-                      className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${cardSpan === span ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </>
           ) : null}
           {/* Jigsaw: two small thumbnails beneath the preview — the puzzle itself and the
@@ -628,7 +612,8 @@ export default function CustomizePage() {
           <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant?.pricePence ?? product.fromPence)}</div>
           <p className="text-[11px] text-[#9C8E7E]">free tracked delivery</p>
 
-          {product.sizes.length > 0 ? (
+          {/* A single-size product needs no picker — the size lives in the product details. */}
+          {product.sizes.length > 1 ? (
             <Picker
               label="Size"
               options={product.sizes}
@@ -693,6 +678,30 @@ export default function CustomizePage() {
             <div className="mt-4">
               <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
               <p className="mt-1.5 text-[11px] text-[#9C8E7E]">your image on the front · soft stone back</p>
+            </div>
+          ) : null}
+
+          {/* CARD outside: the drawing on the front panel only, or spanning the whole outside. A
+              purchase option — picking one shows the outside view so the shopper sees the effect. */}
+          {product.key === 'card' ? (
+            <div className="mt-4">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The outside</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {([['front only', 'front'], ['full width', 'full']] as const).map(([label, span]) => (
+                  <button
+                    key={span}
+                    type="button"
+                    onClick={() => { setCardSpan(span); setCardView('outside'); }}
+                    aria-pressed={cardSpan === span}
+                    className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardSpan === span ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
+                {cardSpan === 'full' ? 'the drawing spans the whole outside, across the fold' : 'the drawing on the front; the back stays plain'}
+              </p>
             </div>
           ) : null}
 
