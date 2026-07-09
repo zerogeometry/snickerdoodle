@@ -37,11 +37,11 @@ describe('priceBasket — totals', () => {
     const q = priceBasket([
       { productKey: 'storybook', qty: 1 }, // 2595
       { productKey: 'framedPrint', qty: 2 }, // 13390
-      { productKey: 'card', qty: 3 }, // 1485
+      { productKey: 'card', qty: 3 }, // 1500
     ]);
-    expect(q.subtotalPence).toBe(2595 + 13390 + 1485);
+    expect(q.subtotalPence).toBe(2595 + 13390 + 1500);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(17470 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(17485 + DELIVERY_PENCE);
     expect(q.lines).toHaveLength(3);
     expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 6695, linePence: 13390 });
   });
@@ -75,13 +75,13 @@ describe('priceBasket — quantity hardening', () => {
   it('floors fractional quantities', () => {
     const q = priceBasket([{ productKey: 'card', qty: 2.9 }]);
     expect(q.lines[0]!.qty).toBe(2);
-    expect(q.subtotalPence).toBe(2 * 495);
+    expect(q.subtotalPence).toBe(2 * 500);
   });
 
   it('clamps absurd quantities to a sane max (no overflow)', () => {
     const q = priceBasket([{ productKey: 'card', qty: 10_000_000 }]);
     expect(q.lines[0]!.qty).toBe(99);
-    expect(q.subtotalPence).toBe(495 * 99);
+    expect(q.subtotalPence).toBe(500 * 99);
     expect(Number.isSafeInteger(q.totalPence)).toBe(true);
   });
 });
@@ -205,10 +205,10 @@ describe('join saving — applied to goods only, via quote()', () => {
   });
 
   it('saving rounds to the nearest penny', () => {
-    // Use an odd subtotal to exercise rounding: jigsaw 2795 + card 495 = 3290.
+    // Use an odd subtotal to exercise rounding: jigsaw 2795 + card 500 = 3295.
     const odd = quote([{ productKey: 'jigsaw', qty: 1 }, { productKey: 'card', qty: 1 }], {
       joinProvenance: provenance(),
-    }); // subtotal 3290 → 5% = 164.5 → Math.round → 165
+    }); // subtotal 3295 → 5% = 164.75 → Math.round → 165
     expect(odd.joinSavingPence).toBe(165);
   });
 

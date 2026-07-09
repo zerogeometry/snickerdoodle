@@ -49,7 +49,7 @@ export const CATALOGUE = {
   jigsaw: { pricePence: 2795, label: 'jigsaw' },
   blanket: { pricePence: 5795, label: 'fleece blanket' },
   babyBodysuit: { pricePence: 2195, label: 'baby bodysuit' },
-  card: { pricePence: 495, label: 'greetings card' },
+  card: { pricePence: 500, label: 'greetings card' },
   calendar: { pricePence: 1895, label: 'calendar' },
   adultTee: { pricePence: 3195, label: 'adult tee' },
   apron: { pricePence: 2495, label: 'apron' },

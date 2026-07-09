@@ -276,7 +276,7 @@ const DEFS: Record<string, ProductDef> = {
     description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message' },
     variants: [
-      { size: '7×5″', pricePence: 595, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: '7×5″', pricePence: 500, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   calendar: {

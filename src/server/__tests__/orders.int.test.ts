@@ -52,7 +52,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [
         { productKey: 'mug', qty: 2 }, // 3590
-        { productKey: 'card', qty: 1 }, // 595
+        { productKey: 'card', qty: 1 }, // 500
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
       account: null,
@@ -61,7 +61,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4185); // catalogue (2×1795 + 595), not the client
+    expect(order!.subtotalPence).toBe(4090); // catalogue (2×1795 + 500), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });
