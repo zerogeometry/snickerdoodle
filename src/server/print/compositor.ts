@@ -16,6 +16,10 @@ import { cylinderWarp } from './cylinder';
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
 const MUG_VISIBLE_ARC_DEG = 168;
 const MUG_WRAP_DEG = 290;
+// Vertical realism: BOW (horizontal lines arc into a smile toward the edges) + edge foreshorten —
+// the cues that read as "printed on a round mug" rather than a flat sticker.
+const MUG_CURVE_Y = 0.06;
+const MUG_VSQUASH = 0.14;
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -49,7 +53,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r10'; // r10: CYLINDER tier — mug art wrapped onto the real photo's curved face (front/back)
+const RENDER_REV = 'r12'; // r12: mug cylinder bow flipped to a ∪ smile (shot-from-above wrap)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -697,6 +701,7 @@ async function renderCylinder(args: {
   const warped = cylinderWarp({
     design: wrap, srcW: dw, srcH: dh, band, canvasW: WW, canvasH: WH,
     arcDeg: MUG_VISIBLE_ARC_DEG, wrapDeg: MUG_WRAP_DEG, centerDeg: back ? 180 : 0, mirror: back,
+    curveY: MUG_CURVE_Y, vSquash: MUG_VSQUASH,
   });
   // Flatten the warped RGBA over white so alpha-0 (off-arc) is white → multiply identity → bare mug.
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();

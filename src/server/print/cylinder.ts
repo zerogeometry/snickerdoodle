@@ -34,6 +34,12 @@ export interface CylinderWarpInput {
   /** Mirror the horizontal parameter — used with a flopped photo so the BACK view's art
    * reads the right way round (handle on the left) instead of being left-right reversed. */
   mirror?: boolean;
+  /** Vertical BOW depth (fraction of band height): horizontal lines arc into a smile as the
+   * surface curves toward the silhouette — the strongest "printed on a cylinder" cue. 0 = flat. */
+  curveY?: number;
+  /** Vertical foreshortening toward the silhouette edges (fraction): the band reads slightly
+   * shorter where the surface turns away. 0 = none. */
+  vSquash?: number;
 }
 
 /** Normalise an angle in degrees to (−180, 180]. */
@@ -50,6 +56,8 @@ function norm180(deg: number): number {
  */
 export function cylinderWarp(i: CylinderWarpInput): Buffer {
   const { design, srcW, srcH, band, canvasW, canvasH, arcDeg, wrapDeg, centerDeg, mirror } = i;
+  const curveY = i.curveY ?? 0;
+  const vSquash = i.vSquash ?? 0;
   const out = Buffer.alloc(canvasW * canvasH * 4); // all-zero = transparent
   if (srcW < 2 || srcH < 2 || band.w < 2 || band.h < 2 || wrapDeg <= 0) return out;
 
@@ -75,9 +83,17 @@ export function cylinderWarp(i: CylinderWarpInput): Buffer {
     const ix = Math.floor(fx);
     const tx = fx - ix;
     const ix1 = ix + 1 < srcW ? ix + 1 : ix;
+    // How far this column has curved away from the front centre (0 at centre → 1 at the silhouette).
+    // Drives the vertical BOW (horizontal lines smile toward the edges) and the edge foreshorten.
+    const edge = Math.abs(p);
+    const bow = curveY * edge * edge; // the design shifts UP at the edges → horizontal lines SMILE
+    const squash = 1 - vSquash * edge * edge; // band a touch shorter where the surface turns away
 
     for (let y = by0; y < by1; y++) {
-      const v = (y + 0.5 - band.y) / band.h; // linear vertical (the front face is near-straight)
+      // vertical: foreshorten toward the edges (squash about the band centre) + bow the column so a
+      // horizontal design line reads as a ∪ arc — centre low, sides high — as on a mug shot from
+      // slightly above (the strongest "wrapped round a cylinder" cue).
+      const v = 0.5 + ((y + 0.5 - band.y) / band.h - 0.5) / squash + bow;
       if (v < 0 || v > 1) continue;
       const fy = v * (srcH - 1);
       const iy = Math.floor(fy);

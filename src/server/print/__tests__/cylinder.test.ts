@@ -19,6 +19,7 @@ function columnRamp(w: number, h: number): Buffer {
 
 const alpha = (buf: Buffer, W: number, x: number, y: number) => buf[(y * W + x) * 4 + 3]!;
 const red = (buf: Buffer, W: number, x: number, y: number) => buf[(y * W + x) * 4]!;
+const green = (buf: Buffer, W: number, x: number, y: number) => buf[(y * W + x) * 4 + 1]!;
 
 describe('cylinderWarp', () => {
   const W = 100, H = 60;
@@ -64,6 +65,21 @@ describe('cylinderWarp', () => {
     const dNormal = red(normal, W, x, y) - 0.5 * (srcW - 1);
     const dMirror = red(mirrored, W, x, y) - 0.5 * (srcW - 1);
     expect(Math.sign(dNormal)).toBe(-Math.sign(dMirror));
+  });
+
+  it('curveY bows horizontal lines — an edge column samples a DIFFERENT design row than centre', () => {
+    // Design whose GREEN channel encodes the row, so a sampled pixel's green tells us which
+    // design row it came from. With curveY>0 the sampling shifts vertically toward the edges.
+    const tallSrc = 64; // enough rows to resolve the shift
+    const ramp = Buffer.alloc(srcW * tallSrc * 4);
+    for (let y = 0; y < tallSrc; y++) for (let x = 0; x < srcW; x++) { const o = (y * srcW + x) * 4; ramp[o + 1] = Math.round((y / (tallSrc - 1)) * 255); ramp[o + 3] = 255; }
+    const flat = cylinderWarp({ design: ramp, srcW, srcH: tallSrc, band, canvasW: W, canvasH: H, arcDeg: 180, wrapDeg: 360, centerDeg: 0, curveY: 0 });
+    const bowed = cylinderWarp({ design: ramp, srcW, srcH: tallSrc, band, canvasW: W, canvasH: H, arcDeg: 180, wrapDeg: 360, centerDeg: 0, curveY: 0.15 });
+    const y = band.y + Math.floor(band.h * 0.3); // upper third
+    const edgeX = band.x + Math.round(band.w * 0.9);
+    // Flat: edge and its own centre sample the same row. Bowed: the edge samples a LOWER row
+    // (green larger) because +bow lifts the design at the edges.
+    expect(green(bowed, W, edgeX, y)).toBeGreaterThan(green(flat, W, edgeX, y));
   });
 
   it('drops off the printed arc (the handle gap) → transparent, not clamped', () => {
