@@ -109,8 +109,9 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
   blanket: 'portrait', // Prodigi's fleece-blanket print file is fixed PORTRAIT (600×1000 / 1000×1500mm)
 };
 
-// Mug: the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is its
-// OWN Prodigi SKU — plus a 15oz white. White leads (default).
+// Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
+// its own Prodigi SKU. White leads (default). (The 15oz white was dropped 2026-07-09: the founder
+// wanted a single, focused mug; the 11oz two-tone is the hero.) £18 (round, whole-pound pricing).
 const MUG_TWOTONE = [
   { colour: 'white', sku: 'H-MUG-11OZ-W' }, { colour: 'black', sku: 'H-MUG-11OZ-WB' },
   { colour: 'blue', sku: 'H-MUG-11OZ-WBL' }, { colour: 'green', sku: 'H-MUG-11OZ-WG' },
@@ -118,12 +119,9 @@ const MUG_TWOTONE = [
   { colour: 'red', sku: 'H-MUG-11OZ-WR' }, { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
 ] as const;
 function mugVariants(): VariantDef[] {
-  // Print canvases from Prodigi's OFFICIAL templates (11oz: 2473×1157px @300dpi = 209×98mm;
-  // 15oz: 2563×1157px = 217×98mm) — the wrap the print file must fill.
-  return [
-    ...MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1795, wMm: 209, hMm: 98, prodigiSku: m.sku })),
-    { size: '15oz', colour: 'white', pricePence: 2295, wMm: 217, hMm: 98, prodigiSku: 'H-MUG-15OZ-W' },
-  ];
+  // Print canvas from Prodigi's OFFICIAL 11oz template (2473×1157px @300dpi = 209×98mm) — the
+  // wrap the print file must fill.
+  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, wMm: 209, hMm: 98, prodigiSku: m.sku }));
 }
 
 // Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of ONE SKU.
@@ -211,9 +209,9 @@ const DEFS: Record<string, ProductDef> = {
     variants: frameVariants(),
   },
   mug: {
-    category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true,
+    category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true, visibleInShop: true,
     description: "Their masterpiece wrapped around a sturdy two-tone mug — for the grown-up who'll treasure every sip.",
-    specs: { material: 'ceramic', care: 'dishwasher safe' },
+    specs: { material: 'ceramic', care: 'dishwasher safe · microwave safe' },
     variants: mugVariants(),
   },
   cushion: {

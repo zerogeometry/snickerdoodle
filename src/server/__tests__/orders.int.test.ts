@@ -51,7 +51,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('guest order: server-priced from the catalogue, marked paid (dev fallback)', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'mug', qty: 2 }, // 3590
+        { productKey: 'mug', qty: 2 }, // 3600
         { productKey: 'card', qty: 1 }, // 500
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],

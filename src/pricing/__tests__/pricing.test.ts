@@ -28,9 +28,9 @@ describe('priceBasket — totals', () => {
 
   it('single item, free delivery baked in', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }]);
-    expect(q.subtotalPence).toBe(1795);
+    expect(q.subtotalPence).toBe(1800);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE); // 0 — free delivery
-    expect(q.totalPence).toBe(1795 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(1800 + DELIVERY_PENCE);
   });
 
   it('multiple items + quantities sum correctly, free delivery', () => {
@@ -96,7 +96,7 @@ describe('priceBasket — unknown products', () => {
     expect(q.lines.map((l) => l.productKey)).toEqual(['mug']);
     expect(q.rejectedKeys).toContain('diamond-ring');
     expect(q.rejectedKeys).toContain('__proto__'); // prototype-pollution-style key is just rejected
-    expect(q.subtotalPence).toBe(1795);
+    expect(q.subtotalPence).toBe(1800);
   });
 });
 
@@ -289,7 +289,7 @@ describe('family-set saving — 3+ garments in one order', () => {
     const q = priceBasket([evil]);
     expect(q.familySetApplied).toBe(false);
     expect(q.familySetSavingPence).toBe(0);
-    expect(q.totalPence).toBe(1795);
+    expect(q.totalPence).toBe(1800);
   });
 
   it('composes with the join saving (both apply; total reflects both)', () => {
@@ -354,12 +354,12 @@ describe('priceBasket — delivery override', () => {
   it('a zero override yields free delivery on a non-empty basket', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 0 });
     expect(q.deliveryPence).toBe(0);
-    expect(q.totalPence).toBe(1795);
+    expect(q.totalPence).toBe(1800);
   });
   it('a custom override flows into the total', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 1 }], { deliveryPence: 1500 });
     expect(q.deliveryPence).toBe(1500);
-    expect(q.totalPence).toBe(1795 + 1500);
+    expect(q.totalPence).toBe(1800 + 1500);
   });
   it('the override is ignored on an empty basket (delivery stays zero)', () => {
     const q = priceBasket([], { deliveryPence: 1500 });
@@ -375,7 +375,7 @@ describe('priceBasket — duplicate product keys', () => {
       { productKey: 'mug', qty: 1 },
     ]);
     expect(q.lines).toHaveLength(2);
-    expect(q.subtotalPence).toBe(2 * 1795);
+    expect(q.subtotalPence).toBe(2 * 1800);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
   });
 });

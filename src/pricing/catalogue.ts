@@ -42,7 +42,7 @@ export interface CatalogueEntry {
 // fallback AND the sellable-key allowlist (isCatalogueKey). Prices are VAT-inc, free delivery.
 export const CATALOGUE = {
   framedPrint: { pricePence: 6500, label: 'framed print' },
-  mug: { pricePence: 1795, label: 'mug' },
+  mug: { pricePence: 1800, label: 'mug' },
   cushion: { pricePence: 2000, label: 'cushion' },
   storybook: { pricePence: 2595, label: 'storybook' },
   kidsTee: { pricePence: 2495, label: 'kids tee' },

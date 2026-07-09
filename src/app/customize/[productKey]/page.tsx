@@ -77,6 +77,9 @@ export default function CustomizePage() {
   // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
   const [back, setBack] = useState<string>(CUSHION_BACK_WHITE);
   const [showBack, setShowBack] = useState(false);
+  // MUG: two fixed 3D pictures — the printed front and the reverse — instead of a draggable spin
+  // (founder call: "two pictures of a mug, front and back"). No orbit, one render each.
+  const [mugSide, setMugSide] = useState<'front' | 'back'>('front');
   // GREETINGS CARD inside message (card only): null = blank inside (write it by hand).
   const [cardMessage, setCardMessage] = useState<CardMessage | null>(null);
   // Which card view the big preview shows — one hero + a thumbnail strip beneath (founder spec):
@@ -92,6 +95,7 @@ export default function CustomizePage() {
     setMockupView('primary');
     setThumbIdx(0);
     setShowBack(false);
+    setMugSide('front');
     setCardView('single');
     setCardSpan('front');
     setCardMessage(null);
@@ -358,6 +362,11 @@ export default function CustomizePage() {
   const activeSpanHalf: 'front' | undefined =
     product.key === 'card' && cardView !== 'outside' && cardSpan === 'full' ? 'front' : undefined;
 
+  // MUG: show the two fixed 3D pictures (front/back) as the primary preview instead of the
+  // draggable spin. Falls back to the 2D flat-lay photo when WebGL is unavailable.
+  const isMug = product.key === 'mug';
+  const mug3D = isMug && canSpin && !!previewImg && !!variant?.printWmm && !!variant?.printHmm;
+
   return (
     <Shell>
       {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
@@ -380,7 +389,7 @@ export default function CustomizePage() {
       <div className="grid gap-7 md:grid-cols-2 md:items-start">
         {/* Left: ONE photo preview (+20% vs the old view) with the colour strip under it */}
         <div>
-          {canSpin ? (
+          {canSpin && !isMug ? (
             <div className="mb-2 flex flex-wrap gap-1.5" role="group" aria-label="preview view">
               {(['photo', 'spin'] as const).map((m) => (
                 <button
@@ -396,7 +405,21 @@ export default function CustomizePage() {
             </div>
           ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
+            {mug3D ? (
+              // The mug's two fixed pictures — printed FRONT / reverse BACK, no drag.
+              <div className="h-96 w-full">
+                <Product3D
+                  kind={product.key}
+                  image={previewImg!}
+                  fallbackImage={upload?.dataUrl ?? null}
+                  placement={placement}
+                  printWmm={variant!.printWmm!}
+                  printHmm={variant!.printHmm!}
+                  attributes={variant!.attributes}
+                  view={mugSide}
+                />
+              </div>
+            ) : view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
               <div className="h-96 w-full">
                 <Product3D
                   kind={product.key}
@@ -439,6 +462,26 @@ export default function CustomizePage() {
           </div>
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+          ) : null}
+          {/* Mug "front / back" — flip between the two fixed pictures (the printed front and the
+              reverse). Only when the 3D pictures are actually showing. */}
+          {mug3D ? (
+            <>
+              <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="front or back">
+                {([['the front', 'front'], ['the back', 'back']] as const).map(([label, side]) => (
+                  <button
+                    key={side}
+                    type="button"
+                    onClick={() => setMugSide(side)}
+                    aria-pressed={mugSide === side}
+                    className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${mugSide === side ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">a preview of how your mug prints</p>
+            </>
           ) : null}
           {/* Cushion "turn it around" — flip the preview between the image side and the back
               (the chosen colour, or the plain white reverse for heart/round). */}
