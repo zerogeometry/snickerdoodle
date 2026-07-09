@@ -71,6 +71,11 @@ export interface ComposeMockupInput {
    * blank so it reads as plush fabric. Display only; the asset is still authz-gated + owns the
    * cached derivative. Absent ⇒ the real design. */
   fill?: string;
+  /** For a card shown 'full width' (the design spans the whole outside, front+back across the
+   * fold): the CLOSED card shows only one panel. Cover-fit the design into a double-wide spread,
+   * then keep this half — 'front' = the right panel of [back | front]. PERSPECTIVE views only
+   * (the closed-card hero); the flat outside-full view bakes the span into its box instead. */
+  spanHalf?: 'front' | 'back';
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
@@ -218,7 +223,11 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // colour caches separately and never collides with the real-design render.
   const fill = input.fill && /^#[0-9a-f]{6}$/i.test(input.fill) ? input.fill.toLowerCase() : undefined;
   const fillTag = fill ? `-fill${fill.slice(1)}` : '';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}-${srcObj.id}-${transformHash(t)}`);
+  // 'full width' closed-card half — only meaningful on a PERSPECTIVE view (the flat outside-full
+  // view carries its span in the box); ignored elsewhere so it never forks other products' keys.
+  const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
+  const spanTag = spanHalf ? `-span${spanHalf}` : '';
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}-${srcObj.id}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
@@ -238,6 +247,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       fillHex: fill,
       quad: tpl.printQuad,
       transform: t,
+      spanHalf,
       workEdge: tpl.mapResolutionPx,
       outputEdge: OUTPUT_EDGE[size],
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
@@ -265,7 +275,7 @@ async function renderAndPersist(
   db: DbHandle,
   args: {
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
-    transform: Transform; workEdge: number; outputEdge: number;
+    transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string;
   },
@@ -285,7 +295,7 @@ async function renderAndPersist(
     print: args.print,
   };
   const out = perspective
-    ? await renderPerspective(common)
+    ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
     : await renderFlat({
         ...common,
         maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
@@ -530,11 +540,12 @@ async function renderPerspective(args: {
   designBuf: Buffer;
   quad: [number, number][];
   transform: Transform;
+  spanHalf?: 'front' | 'back';
   workEdge: number;
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, designBuf, quad, transform, workEdge, outputEdge, print } = args;
+  const { blankBuf, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
   const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -552,25 +563,32 @@ async function renderPerspective(args: {
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
   const dw = Math.max(2, print.widthPx);
   const dh = Math.max(2, print.heightPx);
-  const layer = computeLayerRect({ printWidthPx: dw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
+  // 'full width' closed card: the design spans the whole outside (front+back), so cover-fit it
+  // into a DOUBLE-WIDE spread and keep just this panel — 'front' = the right half of [back|front].
+  const cw = spanHalf ? dw * 2 : dw;
+  const layer = computeLayerRect({ printWidthPx: cw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
   const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .rotate(transform.rotationDeg)
     .resize(layer.width, layer.height, { fit: 'fill' })
     .ensureAlpha()
     .toBuffer();
-  // Window the transformed layer onto the dw×dh canvas (handles cover-crop AND contain-centre).
+  // Window the transformed layer onto the cw×dh canvas (handles cover-crop AND contain-centre).
   const ix = Math.max(0, -layer.x);
   const iy = Math.max(0, -layer.y);
   const ox = Math.max(0, layer.x);
   const oy = Math.max(0, layer.y);
-  const iw = Math.max(1, Math.min(layer.width - ix, dw - ox));
+  const iw = Math.max(1, Math.min(layer.width - ix, cw - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
   const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
-  const designPng = await sharp({ create: { width: dw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  const spread = await sharp({ create: { width: cw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
     .composite([{ input: part, left: ox, top: oy }])
     .png()
     .toBuffer();
+  // Keep just the visible panel (front = right half) — a no-op for a normal single-panel view.
+  const designPng = spanHalf
+    ? await sharp(spread).extract({ left: spanHalf === 'front' ? dw : 0, top: 0, width: dw, height: dh }).png().toBuffer()
+    : spread;
 
   // If the print's aspect and the quad's OWN aspect are TRANSPOSED — e.g. the tin's landscape
   // lid print (869×674) shot in a portrait orientation — rotate the design −90° so it fills the

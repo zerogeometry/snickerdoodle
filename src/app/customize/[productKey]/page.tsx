@@ -343,6 +343,21 @@ export default function CustomizePage() {
     router.push('/start-creating');
   };
 
+  // The mockup view + span currently on screen — shared by the big preview AND the zoom modal so
+  // zooming shows what you're looking at (not always the single view). For a card: 'outside' → the
+  // flat spread ('outside-front'/'outside-full'); 'single'/'inside' → the primary card mockup. A
+  // full-width closed card shows only its FRONT panel of the double-wide design (spanHalf='front').
+  const activeMockupView =
+    product.key === 'card'
+      ? cardView === 'outside'
+        ? `outside-${cardSpan}`
+        : undefined
+      : mockupView === 'tin'
+        ? 'tin'
+        : undefined;
+  const activeSpanHalf: 'front' | undefined =
+    product.key === 'card' && cardView !== 'outside' && cardSpan === 'full' ? 'front' : undefined;
+
   return (
     <Shell>
       {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
@@ -355,7 +370,8 @@ export default function CustomizePage() {
             transform={placement}
             size="zoom"
             sourceObjectId={activeSource ?? null}
-            view={mockupView === 'tin' ? 'tin' : undefined}
+            view={activeMockupView}
+            spanHalf={activeSpanHalf}
             fill={showBack ? backFill : undefined}
             px={720}
           />
@@ -405,15 +421,8 @@ export default function CustomizePage() {
                   transform={placement}
                   size="zoom"
                   sourceObjectId={activeSource ?? null}
-                  view={
-                    product.key === 'card'
-                      ? cardView === 'outside'
-                        ? `outside-${cardSpan}`
-                        : undefined // 'single' → the primary card-on-envelope mockup
-                      : mockupView === 'tin'
-                        ? 'tin'
-                        : undefined
-                  }
+                  view={activeMockupView}
+                  spanHalf={activeSpanHalf}
                   fill={showBack ? backFill : undefined}
                   px={360}
                 />
@@ -474,6 +483,7 @@ export default function CustomizePage() {
                         size="thumb"
                         sourceObjectId={activeSource ?? null}
                         view={v === 'outside' ? `outside-${cardSpan}` : undefined}
+                        spanHalf={v === 'single' && cardSpan === 'full' ? 'front' : undefined}
                         px={120}
                         lazy
                       />

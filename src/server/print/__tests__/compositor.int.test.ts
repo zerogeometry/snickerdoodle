@@ -393,6 +393,57 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     }
   });
 
+  it('spanHalf=front (full-width CLOSED card): the front panel shows the design’s RIGHT half', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    // A design split blue (left half) | red (right half) so a horizontal crop is provable.
+    const strip = (rgb: { r: number; g: number; b: number }) => sharp({ create: { width: 600, height: 1500, channels: 3, background: rgb } }).png().toBuffer();
+    const split = await sharp({ create: { width: 1200, height: 1500, channels: 3, background: '#000000' } })
+      .composite([
+        { input: await strip({ r: 40, g: 90, b: 220 }), left: 0, top: 0 }, // left half → blue
+        { input: await strip({ r: 220, g: 70, b: 60 }), left: 600, top: 0 }, // right half → red
+      ])
+      .png()
+      .toBuffer();
+    const r = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: split, keptInHome: true });
+    keys.push(r.key);
+    designAssetIds.push(r.assetId);
+
+    // A skewed (PERSPECTIVE) portrait card-front view — the closed-card hero, like the greetings card.
+    const blank = await sharp({ create: { width: 600, height: 600, channels: 3, background: { r: 180, g: 180, b: 188 } } }).png().toBuffer();
+    const skewed: [number, number][] = [[0.30, 0.12], [0.72, 0.26], [0.60, 0.72], [0.20, 0.56]];
+    await setMockupView(db, { variantId, view: 'tin', blank, contentType: 'image/png', printQuad: skewed, printWidthPx: 400, printHeightPx: 560, materialClass: 'PAPER' });
+    try {
+      const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+      const full = await composeMockup(db, sam, { assetId: r.assetId, variantId, transform: tf, view: 'tin', size: 'zoom' });
+      const front = await composeMockup(db, sam, { assetId: r.assetId, variantId, transform: tf, view: 'tin', size: 'zoom', spanHalf: 'front' });
+      // The span forks the cache key → its own derivative; it never collides with the full render.
+      expect(front.key).not.toBe(full.key);
+      expect(front.mockupObjectId).not.toBe(full.mockupObjectId);
+      expect(front.tier).toBe('PERSPECTIVE');
+
+      const raw = async (id: string) => {
+        const grant = await getStorageObjectGrant(db, id, sam, 600);
+        const out = Buffer.from(await (await fetch(grant.url)).arrayBuffer());
+        return sharp(out).raw().toBuffer({ resolveWithObject: true });
+      };
+      const a = await raw(full.mockupObjectId);
+      const b = await raw(front.mockupObjectId);
+      const at = (buf: typeof a, x: number, y: number) => {
+        const i = (y * buf.info.width! + x) * buf.info.channels!;
+        return [buf.data[i]!, buf.data[i + 1]!, buf.data[i + 2]!] as const;
+      };
+      // Centroid of the skewed quad (~0.455, 0.415): for the FRONT half it lands on the RED (right)
+      // side; RED clearly dominates BLUE → the closed card really shows the design's right half.
+      const cx = Math.round(0.455 * 600), cy = Math.round(0.415 * 600);
+      const [rF, , bF] = at(b, cx, cy);
+      expect(rF).toBeGreaterThan(bF + 40);
+      // …and it is a genuinely different render from the full-design view (the crop moved pixels).
+      expect(Buffer.compare(a.data, b.data)).not.toBe(0);
+    } finally {
+      await db.delete(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, 'tin'))).catch(() => {});
+    }
+  });
+
   it('falls back (bounded memory, no OOM) for an extreme-aspect design', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const wide = await ingestOriginalAsset(db, sam, {
