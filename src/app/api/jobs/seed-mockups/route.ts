@@ -53,6 +53,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-frame'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-jigsaw'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-cushion'; dir: string }
+  | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
 );
@@ -101,6 +102,19 @@ function layeredBlanketDir(colour: string): string | null {
   const has = (f: string) => existsSync(path.join(dir, f));
   return has('printmap.png') && has('background.png') && has('shadow.png') ? dir : null;
 }
+
+// Founder-authored MUG layers, per colour: background → shadow → blank (the real Prodigi two-tone
+// mug photo, mug-only on transparent). The colours are consistently positioned (all on one canvas),
+// so ONE print band serves every colour — the compositor's CYLINDER tier wraps the art onto it.
+function layeredMugDir(colour: string): string | null {
+  const dir = path.join(LAYERED, 'mug', colour.replace(/\s+/g, '-'));
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('blank.png') && has('background.png') && has('shadow.png') ? dir : null;
+}
+// The visible printable FRONT face on the founder's mug canvas (full-canvas fractions, measured
+// from the blank's silhouette: body 0.22–0.625, held just inside the edges + below the rim / above
+// the base). Axis-aligned → the compositor treats CERAMIC as the cylinder wrap.
+const MUG_BAND: Box = { x0: 0.238, y0: 0.322, x1: 0.61, y1: 0.7 };
 
 // Founder-authored CARD "Single Card View" — the catalogue thumbnail: a card leaning on a kraft
 // envelope. background → envelopeshadow → envelope → cardshadow → [the child's front design,
@@ -198,11 +212,14 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'derived/tee-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.332, y0: 0.272, x1: 0.666, y1: 0.7 } };
     case 'babyBodysuit':
       return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
-    case 'mug': // cylinder: a near-square decal CENTRED on the visible front face (founder call:
-      // clarity over wrap fidelity on the tile; the Studio positioner stays exact on the wrap).
-      // NO mask: the white body reads as background locally (white-on-light-grey), so the
-      // silhouette bites into the decal — and the panel sits fully inside the body anyway.
+    case 'mug': {
+      // Founder's per-colour two-tone layers (background → shadow → real mug photo). One shared
+      // band; the compositor CYLINDER tier wraps the art onto the real ceramic.
+      const dir = layeredMugDir(colour);
+      if (dir) return { material: 'CERAMIC', register: 'layered-mug', dir };
+      // Flat-blank fallback (the plain white Prodigi blank) if the layers aren't present.
       return { file: 'prodigi-11oz-mug-blank-asset/Prodigi 11oz Mug blank.png', material: 'CERAMIC', register: 'band', mask: false, region: { x0: 0.11, y0: 0.25, x1: 0.57, y1: 0.75 } };
+    }
     default:
       return null; // giftWrap (no print) → keep SVG
   }
@@ -531,6 +548,33 @@ async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'
   return out;
 }
 
+const layeredMugCache = new Map<string, { blank: Buffer; quad: Quad; W: number; H: number }>();
+/** Build a two-tone mug blank photo: background → shadow → the real coloured mug (blank.png). The
+ * print band is the SHARED front-face rect (MUG_BAND) — every colour is registered identically, so
+ * the compositor's single cylinder mapping wraps the art onto each. Cached on the layers' mtimes. */
+async function layeredMug(dir: string): Promise<{ blank: Buffer; quad: Quad; W: number; H: number }> {
+  const files = ['background.png', 'shadow.png', 'blank.png'];
+  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = layeredMugCache.get(key);
+  if (hit) return hit;
+  const mug = readFileSync(path.join(dir, 'blank.png'));
+  const m = await sharp(mug).metadata();
+  const W = m.width!, H = m.height!;
+  // The mug (blank.png) is the canvas authority; cover-fit the flat backdrop, stack the shadow +
+  // mug on it exactly as authored (shadow is derived to match the mug, so it can't drift).
+  const blank = await sharp(readFileSync(path.join(dir, 'background.png')))
+    .resize(W, H, { fit: 'fill' })
+    .composite([
+      { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
+      { input: mug, left: 0, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+  const out = { blank, quad: asQuad(MUG_BAND), W, H };
+  layeredMugCache.set(key, out);
+  return out;
+}
+
 /**
  * The print WINDOW on a framed-print blank → normalised bbox. Preferred: the transparent hole
  * (exact). Fallback (frames shipped with an opaque white window): walk OUT from the centre until
@@ -856,6 +900,19 @@ export async function POST(req: Request): Promise<Response> {
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-blanket',
         quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
         driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
+    if (p.register === 'layered-mug') {
+      const d = await layeredMug(p.dir);
+      // The band is AXIS-ALIGNED and CERAMIC → the compositor wraps it as a cylinder (no aspect
+      // lock: the wrap is unlocked, like the old 'band' path).
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material });
+      authored++;
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
+        quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
       });
       continue;
     }

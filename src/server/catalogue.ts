@@ -110,18 +110,18 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
 };
 
 // Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
-// its own Prodigi SKU. White leads (default). (The 15oz white was dropped 2026-07-09: the founder
-// wanted a single, focused mug; the 11oz two-tone is the hero.) £18 (round, whole-pound pricing).
+// its own Prodigi SKU. (15oz white dropped 2026-07-09; PLAIN white dropped 2026-07-10 — the founder
+// wanted the coloured two-tones only. Blue leads.) £18 (round, whole-pound pricing).
 const MUG_TWOTONE = [
-  { colour: 'white', sku: 'H-MUG-11OZ-W' }, { colour: 'black', sku: 'H-MUG-11OZ-WB' },
-  { colour: 'blue', sku: 'H-MUG-11OZ-WBL' }, { colour: 'green', sku: 'H-MUG-11OZ-WG' },
-  { colour: 'orange', sku: 'H-MUG-11OZ-WO' }, { colour: 'pink', sku: 'H-MUG-11OZ-WP' },
-  { colour: 'red', sku: 'H-MUG-11OZ-WR' }, { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
+  { colour: 'blue', sku: 'H-MUG-11OZ-WBL', default: true }, { colour: 'black', sku: 'H-MUG-11OZ-WB' },
+  { colour: 'green', sku: 'H-MUG-11OZ-WG' }, { colour: 'orange', sku: 'H-MUG-11OZ-WO' },
+  { colour: 'pink', sku: 'H-MUG-11OZ-WP' }, { colour: 'red', sku: 'H-MUG-11OZ-WR' },
+  { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
 ] as const;
 function mugVariants(): VariantDef[] {
   // Print canvas from Prodigi's OFFICIAL 11oz template (2473×1157px @300dpi = 209×98mm) — the
   // wrap the print file must fill.
-  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, wMm: 209, hMm: 98, prodigiSku: m.sku }));
+  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, wMm: 209, hMm: 98, prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
 }
 
 // Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of ONE SKU.
