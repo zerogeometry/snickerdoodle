@@ -28,32 +28,37 @@ export type NameScreen =
 
 // ── Greetings-card inside message ────────────────────────────────────────────
 /** A screened, print-ready card message (trimmed, capped, font coerced to a known token). */
-export type ScreenedCardMessage = { greeting: string; message: string; signature: string; font: CardFontToken };
+export type ScreenedCardMessage = { greeting: string; message: string; signature: string; note: string; font: CardFontToken; fontScale: number };
 export type CardMessageScreen =
   | { ok: true; value: ScreenedCardMessage | null } // null = blank inside (nothing to print)
-  | { ok: false; field: 'greeting' | 'message' | 'signature' }; // abusive language in that field
+  | { ok: false; field: 'greeting' | 'message' | 'signature' | 'note' }; // abusive language in that field
 
-const CARD_FIELD_MAX = { greeting: 80, message: 600, signature: 80 } as const;
+const CARD_FIELD_MAX = { greeting: 80, message: 600, signature: 80, note: 200 } as const;
+const CARD_FONT_SCALE = { min: 0.7, max: 1.4, default: 1 } as const;
 
 /**
- * Screen the card's INSIDE message before it can print. Trims + length-caps each of the three
- * free-text fields, coerces the font to a known {@link normalizeCardFont} token, and REJECTS if
- * any field contains abusive language (the same deterministic screen as the name fields — the
- * text goes on a child's keepsake, and to a printer). All-empty ⇒ ok with null (a blank inside,
- * to write by hand). Reused by order placement AND the print renderer so they can't disagree.
+ * Screen the card's INSIDE message before it can print. Trims + length-caps the four free-text
+ * fields, coerces the font to a known {@link normalizeCardFont} token, clamps the size multiplier,
+ * and REJECTS if any field contains abusive language (the same deterministic screen as the name
+ * fields — the text goes on a child's keepsake, and to a printer). All-empty ⇒ ok with null (a
+ * blank inside, to write by hand). Reused by order placement AND the print renderer so they agree.
  */
 export function screenCardMessage(
-  raw: { greeting?: string; message?: string; signature?: string; font?: string } | null | undefined,
+  raw: { greeting?: string; message?: string; signature?: string; note?: string; font?: string; fontScale?: unknown } | null | undefined,
 ): CardMessageScreen {
   if (!raw) return { ok: true, value: null };
   const greeting = (raw.greeting ?? '').trim().slice(0, CARD_FIELD_MAX.greeting);
   const message = (raw.message ?? '').trim().slice(0, CARD_FIELD_MAX.message);
   const signature = (raw.signature ?? '').trim().slice(0, CARD_FIELD_MAX.signature);
-  if (!greeting && !message && !signature) return { ok: true, value: null };
+  const note = (raw.note ?? '').trim().slice(0, CARD_FIELD_MAX.note);
+  if (!greeting && !message && !signature && !note) return { ok: true, value: null };
   if (containsAbusiveText(greeting)) return { ok: false, field: 'greeting' };
   if (containsAbusiveText(message)) return { ok: false, field: 'message' };
   if (containsAbusiveText(signature)) return { ok: false, field: 'signature' };
-  return { ok: true, value: { greeting, message, signature, font: normalizeCardFont(raw.font) } };
+  if (containsAbusiveText(note)) return { ok: false, field: 'note' };
+  const n = typeof raw.fontScale === 'number' && Number.isFinite(raw.fontScale) ? raw.fontScale : CARD_FONT_SCALE.default;
+  const fontScale = Math.min(CARD_FONT_SCALE.max, Math.max(CARD_FONT_SCALE.min, n));
+  return { ok: true, value: { greeting, message, signature, note, font: normalizeCardFont(raw.font), fontScale } };
 }
 
 // A single first-name token: letters/marks (any script), apostrophe, hyphen.

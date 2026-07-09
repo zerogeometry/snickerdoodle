@@ -137,9 +137,11 @@ export function normalizeUpload(dataUrl: string, name: string): Promise<{ dataUr
 // ── basket ───────────────────────────────────────────────────────────────────
 export type PlacementTransform = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
 /** The greetings-card INSIDE message (optional — present only when the shopper chose "add a
- * message"). One `font` (a card-fonts token) for all three fields; each field is auto-fit into its
- * inside print zone at fulfilment. All three are abuse-screened server-side before they can print. */
-export type CardMessage = { greeting: string; message: string; signature: string; font: string };
+ * message"). Four fields → the card's four inside text quads: `greeting`/`message`/`signature` on
+ * the right page, `note` (a big centred line) on the left. One `font` (a card-fonts token) + one
+ * `fontScale` (a size multiplier, ~0.85–1.3) for all four. Every field is abuse-screened
+ * server-side before it can print. */
+export type CardMessage = { greeting: string; message: string; signature: string; note: string; font: string; fontScale?: number };
 export type BasketItem = {
   id: string;
   name: string;

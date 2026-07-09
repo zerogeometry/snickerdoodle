@@ -272,18 +272,21 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
       const [oi] = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
       const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
-      return art!.message as { greeting: string; message: string; signature: string; font: string } | null;
+      return art!.message as { greeting: string; message: string; signature: string; note: string; font: string; fontScale: number } | null;
     };
 
-    // A clean message is trimmed + frozen; an unknown font token normalises to the default (caveat).
-    const frozen = await orderCard({ greeting: '  Happy Birthday!  ', message: 'Have a lovely day', signature: 'love Mabel x', font: 'not-a-font' });
-    expect(frozen).toMatchObject({ greeting: 'Happy Birthday!', message: 'Have a lovely day', signature: 'love Mabel x', font: 'caveat' });
+    // A clean message is trimmed + frozen; the 4th (note) field rides along; an unknown font token
+    // normalises to the default (caveat); an out-of-range fontScale is clamped (5 → 1.4 max).
+    const frozen = await orderCard({ greeting: '  Happy Birthday!  ', message: 'Have a lovely day', signature: 'love Mabel x', note: '  for you  ', font: 'not-a-font', fontScale: 5 });
+    expect(frozen).toMatchObject({ greeting: 'Happy Birthday!', message: 'Have a lovely day', signature: 'love Mabel x', note: 'for you', font: 'caveat', fontScale: 1.4 });
 
-    // All-empty ⇒ null (blank inside, nothing to print).
-    expect(await orderCard({ greeting: '', message: '   ', signature: '', font: 'gochi' })).toBeNull();
+    // All-empty (incl. the note) ⇒ null (blank inside, nothing to print). A note-only message survives.
+    expect(await orderCard({ greeting: '', message: '   ', signature: '', note: '  ', font: 'gochi' })).toBeNull();
+    expect(await orderCard({ greeting: '', message: '', signature: '', note: 'just a note', font: 'gochi' })).toMatchObject({ note: 'just a note', fontScale: 1 });
 
-    // Abusive text in ANY field fails the order LOUDLY — it can never be frozen or printed.
-    await expect(orderCard({ greeting: 'hi', message: 'you fucking idiot', signature: '', font: 'baloo' })).rejects.toThrow(/can’t be printed/);
+    // Abusive text in ANY field — including the note — fails the order LOUDLY; it can never be frozen or printed.
+    await expect(orderCard({ greeting: 'hi', message: 'you fucking idiot', signature: '', note: '', font: 'baloo' })).rejects.toThrow(/can’t be printed/);
+    await expect(orderCard({ greeting: 'hi', message: '', signature: '', note: 'you fucking idiot', font: 'baloo' })).rejects.toThrow(/can’t be printed/);
   });
 
   it('marking paid is atomic + idempotent — the PAID order is the fulfilment enqueue', async () => {

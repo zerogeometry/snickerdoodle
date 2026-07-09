@@ -314,8 +314,8 @@ export default function CustomizePage() {
       : null;
     // CARD inside message — only attach if it actually has content (all-empty = blank inside).
     const cardMsg: CardMessage | undefined =
-      product.key === 'card' && cardMessage && (cardMessage.greeting.trim() || cardMessage.message.trim() || cardMessage.signature.trim())
-        ? { greeting: cardMessage.greeting.trim(), message: cardMessage.message.trim(), signature: cardMessage.signature.trim(), font: cardMessage.font }
+      product.key === 'card' && cardMessage && (cardMessage.greeting?.trim() || cardMessage.message?.trim() || cardMessage.signature?.trim() || cardMessage.note?.trim())
+        ? { greeting: cardMessage.greeting.trim(), message: cardMessage.message.trim(), signature: cardMessage.signature.trim(), note: (cardMessage.note ?? '').trim(), font: cardMessage.font, fontScale: cardMessage.fontScale ?? 1 }
         : undefined;
     const cardSpanLabel = product.key === 'card' && cardSpan === 'full' ? 'full-width' : null;
     const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, cardSpanLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
@@ -721,7 +721,7 @@ export default function CustomizePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setCardMessage((m) => m ?? { greeting: '', message: '', signature: '', font: CARD_FONT_DEFAULT }); setCardView('inside'); }}
+                  onClick={() => { setCardMessage((m) => m ?? { greeting: '', message: '', signature: '', note: '', font: CARD_FONT_DEFAULT, fontScale: 1 }); setCardView('inside'); }}
                   aria-pressed={cardMessage !== null}
                   className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardMessage !== null ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
                 >
@@ -736,6 +736,7 @@ export default function CustomizePage() {
                     ['Greeting', 'greeting', 'Happy Birthday!', 80, 2],
                     ['Message', 'message', 'Hope your special day is full of cake and fun…', 600, 4],
                     ['Signature', 'signature', 'love, Mabel x', 80, 2],
+                    ['Note (facing page)', 'note', 'write something wonderful', 200, 2],
                   ] as const).map(([label, key, placeholder, max, rows]) => (
                     <label key={key} className="block">
                       <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">{label}</span>
@@ -747,27 +748,46 @@ export default function CustomizePage() {
                         rows={rows}
                         maxLength={max}
                         className="mt-1 w-full resize-none rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2 text-sm text-cocoa placeholder:text-[#B7A890] focus:border-cinnamon focus:outline-none"
+                        style={{ fontFamily: cardFontCss(cardMessage.font) }}
                       />
                     </label>
                   ))}
-                  <div>
-                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Font</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                      {CARD_FONTS.map((f) => (
-                        <button
-                          key={f.token}
-                          type="button"
-                          onClick={() => setCardMessage({ ...cardMessage, font: f.token })}
-                          aria-pressed={cardMessage.font === f.token}
-                          className={`rounded-full border-2 px-3 py-1.5 text-base leading-none ${cardMessage.font === f.token ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
-                          style={{ fontFamily: f.css }}
-                        >
-                          {f.label}
-                        </button>
-                      ))}
+                  <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5">
+                    <div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Font</p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {CARD_FONTS.map((f) => (
+                          <button
+                            key={f.token}
+                            type="button"
+                            onClick={() => setCardMessage({ ...cardMessage, font: f.token })}
+                            aria-pressed={cardMessage.font === f.token}
+                            className={`rounded-full border-2 px-3 py-1.5 text-base leading-none ${cardMessage.font === f.token ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                            style={{ fontFamily: f.css }}
+                          >
+                            {f.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Size</p>
+                      <div className="mt-1.5 flex gap-1.5">
+                        {([['S', 0.8], ['M', 1], ['L', 1.25]] as const).map(([lbl, scale]) => (
+                          <button
+                            key={lbl}
+                            type="button"
+                            onClick={() => setCardMessage({ ...cardMessage, fontScale: scale })}
+                            aria-pressed={(cardMessage.fontScale ?? 1) === scale}
+                            className={`h-9 w-9 rounded-full border-2 text-xs font-bold ${(cardMessage.fontScale ?? 1) === scale ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                          >
+                            {lbl}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-[#9C8E7E]">screened before print · appears on the inside right</p>
+                  <p className="text-[11px] text-[#9C8E7E]">screened before print · greeting, message &amp; signature on the right page; the note on the left</p>
                 </div>
               )}
             </div>
@@ -820,27 +840,59 @@ export default function CustomizePage() {
  * preview for now; the photoreal inside mockup follows once the founder's card assets land and
  * the print renderer auto-fits each field to its real inside zone. Empty ⇒ a gentle placeholder.
  */
+/**
+ * The card INSIDE, as an open 2-page spread (10:7 landscape). Left = the facing page: the `note`
+ * centred both ways. Right = greeting (top, left-justified), message (centred), signature (bottom).
+ * Positions mirror the four print quads; `fontScale` (S/M/L) multiplies every line together.
+ * Display only — the flat 4-panel print file renders the same text server-side (#133).
+ */
 function CardInsidePreview({ message, compact = false }: { message: CardMessage | null; compact?: boolean }) {
-  const empty = !message || (!message.greeting.trim() && !message.message.trim() && !message.signature.trim());
+  const greeting = message?.greeting?.trim() ?? '';
+  const msg = message?.message?.trim() ?? '';
+  const signature = message?.signature?.trim() ?? '';
+  const note = message?.note?.trim() ?? '';
+  const empty = !greeting && !msg && !signature && !note;
+  const scale = message?.fontScale ?? 1;
+  // Sizes are in cqw (% of the spread's own width), so the text-to-card ratio is CONSTANT at every
+  // rendered size — what fits the big preview fits the thumbnail and (per #133) the real 7×5 print.
+  const fs = (cqw: number) => ({ fontSize: `${cqw * scale}cqw`, lineHeight: 1.3 });
   return (
-    <div className={`flex w-full items-center justify-center ${compact ? 'h-full' : 'h-96'}`}>
+    <div className={`flex w-full items-center justify-center ${compact ? 'h-full' : ''}`}>
+      {/* Width-driven so a landscape spread never overflows a narrow column; height comes from the
+          10:7 aspect. Capped on desktop; fills (and vertically centres in) the square thumbnail. A
+          container context lets the inside text scale with the spread (cqw). */}
       <div
-        className={`flex aspect-[5/7] max-h-full flex-col rounded-lg border border-[#EADFC9] bg-white text-cocoa ${compact ? 'px-1.5 py-2' : 'h-full px-5 py-6 shadow-[0_2px_10px_rgba(46,39,35,.08)]'}`}
+        className={`relative flex aspect-[10/7] w-full max-h-full overflow-hidden rounded-lg border border-[#EADFC9] bg-white text-cocoa [container-type:inline-size] ${compact ? '' : 'mx-auto max-w-[460px] shadow-[0_2px_10px_rgba(46,39,35,.08)]'}`}
         style={{ fontFamily: cardFontCss(message?.font) }}
       >
+        {/* centre fold */}
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#EFE5D3]" />
         {empty ? (
-          <div className="m-auto text-center text-sm text-[#B7A890]" style={{ fontFamily: 'var(--font-sans)' }}>
+          <div className="m-auto px-4 text-center text-[3.4cqw] text-[#B7A890]" style={{ fontFamily: 'var(--font-sans)' }}>
             your message will appear here
           </div>
         ) : (
           <>
-            {message!.greeting.trim() ? <p className="whitespace-pre-wrap break-words text-center text-2xl leading-snug">{message!.greeting}</p> : null}
-            {message!.message.trim() ? (
-              <p className="mt-3 flex-1 whitespace-pre-wrap break-words text-lg leading-snug">{message!.message}</p>
-            ) : (
-              <div className="flex-1" />
-            )}
-            {message!.signature.trim() ? <p className="mt-3 whitespace-pre-wrap break-words text-right text-xl leading-snug">{message!.signature}</p> : null}
+            {/* facing (left) page: the note, centred both ways */}
+            <div className="flex w-1/2 items-center justify-center p-[5cqw]">
+              {note ? (
+                <p className="whitespace-pre-wrap break-words text-center" style={fs(6.1)}>{note}</p>
+              ) : null}
+            </div>
+            {/* inside-right page: greeting top-left · message centred · signature bottom-left */}
+            <div className="flex w-1/2 flex-col p-[5cqw]">
+              {greeting ? (
+                <p className="whitespace-pre-wrap break-words" style={fs(4.8)}>{greeting}</p>
+              ) : null}
+              <div className="flex flex-1 items-center justify-center py-[2cqw]">
+                {msg ? (
+                  <p className="whitespace-pre-wrap break-words text-center" style={fs(3.5)}>{msg}</p>
+                ) : null}
+              </div>
+              {signature ? (
+                <p className="whitespace-pre-wrap break-words" style={fs(3.9)}>{signature}</p>
+              ) : null}
+            </div>
           </>
         )}
       </div>
