@@ -36,21 +36,21 @@ describe('priceBasket — totals', () => {
   it('multiple items + quantities sum correctly, free delivery', () => {
     const q = priceBasket([
       { productKey: 'storybook', qty: 1 }, // 2595
-      { productKey: 'framedPrint', qty: 2 }, // 13390
+      { productKey: 'framedPrint', qty: 2 }, // 13000
       { productKey: 'card', qty: 3 }, // 1500
     ]);
-    expect(q.subtotalPence).toBe(2595 + 13390 + 1500);
+    expect(q.subtotalPence).toBe(2595 + 13000 + 1500);
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(17485 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(17095 + DELIVERY_PENCE);
     expect(q.lines).toHaveLength(3);
-    expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 6695, linePence: 13390 });
+    expect(q.lines[1]).toMatchObject({ productKey: 'framedPrint', qty: 2, unitPricePence: 6500, linePence: 13000 });
   });
 
   it('uses the SERVER price even if the request smuggles a fake pricePence', () => {
     // The client tries to pay 1p for a blanket. Engine ignores the extra field.
     const evil = { productKey: 'blanket', qty: 1, pricePence: 1, unitPricePence: 1 } as unknown as RequestedLine;
     const q = priceBasket([evil]);
-    expect(q.lines[0]!.unitPricePence).toBe(CATALOGUE.blanket.pricePence); // 5795, not 1
+    expect(q.lines[0]!.unitPricePence).toBe(CATALOGUE.blanket.pricePence); // 6000, not 1
     expect(q.totalPence).toBe(CATALOGUE.blanket.pricePence + DELIVERY_PENCE);
   });
 });
@@ -167,22 +167,22 @@ describe('resolveJoinContext — only a genuine verified join earns the saving',
 describe('join saving — applied to goods only, via quote()', () => {
   const items: RequestedLine[] = [
     { productKey: 'storybook', qty: 1 }, // 2595
-    { productKey: 'framedPrint', qty: 1 }, // 6695
-  ]; // subtotal 9290
+    { productKey: 'framedPrint', qty: 1 }, // 6500
+  ]; // subtotal 9095
 
   it('valid join → 5% off the subtotal, delivery untouched', () => {
     const q = quote(items, { joinProvenance: provenance() });
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(465); // Math.round(5% of 9290) = 465
+    expect(q.joinSavingPence).toBe(455); // Math.round(5% of 9095) = 455
     expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(9290 - 465 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9095 - 455 + DELIVERY_PENCE);
   });
 
   it('guest (no provenance) → no saving', () => {
     const q = quote(items, {});
     expect(q.joinSavingApplied).toBe(false);
     expect(q.joinSavingPence).toBe(0);
-    expect(q.totalPence).toBe(9290 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9095 + DELIVERY_PENCE);
   });
 
   it('forged "I am joining" with no real provenance → no saving', () => {
@@ -190,7 +190,7 @@ describe('join saving — applied to goods only, via quote()', () => {
     // guest, so resolveJoinContext returns null and no discount is granted.
     const q = quote(items, { joinProvenance: provenance({ invite: null, membership: null }) });
     expect(q.joinSavingApplied).toBe(false);
-    expect(q.totalPence).toBe(9290 + DELIVERY_PENCE);
+    expect(q.totalPence).toBe(9095 + DELIVERY_PENCE);
   });
 
   it('existing active member (membership not from an invite) → no saving', () => {
@@ -205,19 +205,19 @@ describe('join saving — applied to goods only, via quote()', () => {
   });
 
   it('saving rounds to the nearest penny', () => {
-    // Use an odd subtotal to exercise rounding: jigsaw 2795 + card 500 = 3295.
-    const odd = quote([{ productKey: 'jigsaw', qty: 1 }, { productKey: 'card', qty: 1 }], {
+    // Use an odd subtotal to exercise rounding: storybook 2595 + card 500 = 3095.
+    const odd = quote([{ productKey: 'storybook', qty: 1 }, { productKey: 'card', qty: 1 }], {
       joinProvenance: provenance(),
-    }); // subtotal 3295 → 5% = 164.75 → Math.round → 165
-    expect(odd.joinSavingPence).toBe(165);
+    }); // subtotal 3095 → 5% = 154.75 → Math.round → 155
+    expect(odd.joinSavingPence).toBe(155);
   });
 
   it('gift AND a valid join compose (recipient prices hidden, payer pays the discounted total)', () => {
-    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9290
+    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9095
     expect(q.gift).toBe(true);
     expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(465);
-    expect(q.totalPence).toBe(9290 - 465 + DELIVERY_PENCE);
+    expect(q.joinSavingPence).toBe(455);
+    expect(q.totalPence).toBe(9095 - 455 + DELIVERY_PENCE);
     expect(recipientLineLabel(q.lines[0]!, q.gift)).toBe('gift');
   });
 });
@@ -262,11 +262,11 @@ describe('family-set saving — 3+ garments in one order', () => {
     const q = priceBasket([
       { productKey: 'kidsTee', qty: 2 }, // 4990
       { productKey: 'adultTee', qty: 1 }, // 3195 → garments 8185
-      { productKey: 'framedPrint', qty: 1 }, // 6695 — not a garment
+      { productKey: 'framedPrint', qty: 1 }, // 6500 — not a garment
     ]);
     expect(q.familySetApplied).toBe(true);
-    expect(q.familySetSavingPence).toBe(409); // Math.round(5% of 8185), NOT of 14880
-    expect(q.totalPence).toBe(14880 - 409 + DELIVERY_PENCE);
+    expect(q.familySetSavingPence).toBe(409); // Math.round(5% of 8185), NOT of 14685
+    expect(q.totalPence).toBe(14685 - 409 + DELIVERY_PENCE);
   });
 
   it('variant skus (kidsTee-34years-blue …) classify as garments too', () => {

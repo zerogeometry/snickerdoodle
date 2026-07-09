@@ -41,13 +41,13 @@ export interface CatalogueEntry {
 // getCatalogue() loads the full per-variant list from the DB; this constant is the pre-seed
 // fallback AND the sellable-key allowlist (isCatalogueKey). Prices are VAT-inc, free delivery.
 export const CATALOGUE = {
-  framedPrint: { pricePence: 6695, label: 'framed print' },
+  framedPrint: { pricePence: 6500, label: 'framed print' },
   mug: { pricePence: 1795, label: 'mug' },
-  cushion: { pricePence: 2295, label: 'cushion' },
+  cushion: { pricePence: 2000, label: 'cushion' },
   storybook: { pricePence: 2595, label: 'storybook' },
   kidsTee: { pricePence: 2495, label: 'kids tee' },
-  jigsaw: { pricePence: 2795, label: 'jigsaw' },
-  blanket: { pricePence: 5795, label: 'fleece blanket' },
+  jigsaw: { pricePence: 2500, label: 'jigsaw' },
+  blanket: { pricePence: 6000, label: 'fleece blanket' },
   babyBodysuit: { pricePence: 2195, label: 'baby bodysuit' },
   card: { pricePence: 500, label: 'greetings card' },
   calendar: { pricePence: 1895, label: 'calendar' },

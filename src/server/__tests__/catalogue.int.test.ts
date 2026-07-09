@@ -108,8 +108,8 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     }
     // price by SIZE (same both orientations); pink/blue SKUs are gone (deactivated)
     const priceOf = (size: string) => live.find((r) => (r.attrs as Record<string, string>).size === size)!.price;
-    expect(priceOf('medium')).toBe(5795);
-    expect(priceOf('large')).toBe(7595);
+    expect(priceOf('medium')).toBe(6000);
+    expect(priceOf('large')).toBe(7500);
     const pinkBlue = rows.filter((r) => r.active && /PINK|BLUE/i.test((r.attrs as Record<string, string>).colour ?? ''));
     expect(pinkBlue).toHaveLength(0);
   });

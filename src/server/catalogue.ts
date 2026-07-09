@@ -49,11 +49,11 @@ type ProductDef = {
 // Colour strings are Prodigi's exact `color` attribute values.
 const FRAME_COLOURS = ['gold', 'black', 'white', 'natural', 'brown', 'dark grey', 'light grey', 'silver'];
 const FRAME_SIZES = [
-  { size: '11×14″', sku: 'GLOBAL-CFP-11X14', wMm: 279, hMm: 356, dpi: 300, pricePence: 6695 },
-  { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 6995 },
-  { size: '18×24″', sku: 'GLOBAL-CFP-18X24', wMm: 457, hMm: 610, dpi: 150, pricePence: 8995 },
-  { size: '24×32″', sku: 'GLOBAL-CFP-24X32', wMm: 610, hMm: 813, dpi: 150, pricePence: 10995 },
-  { size: '28×40″', sku: 'GLOBAL-CFP-28X40', wMm: 711, hMm: 1016, dpi: 150, pricePence: 13995 },
+  { size: '11×14″', sku: 'GLOBAL-CFP-11X14', wMm: 279, hMm: 356, dpi: 300, pricePence: 6500 },
+  { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 7000 },
+  { size: '18×24″', sku: 'GLOBAL-CFP-18X24', wMm: 457, hMm: 610, dpi: 150, pricePence: 9000 },
+  { size: '24×32″', sku: 'GLOBAL-CFP-24X32', wMm: 610, hMm: 813, dpi: 150, pricePence: 10500 },
+  { size: '28×40″', sku: 'GLOBAL-CFP-28X40', wMm: 711, hMm: 1016, dpi: 150, pricePence: 13000 },
 ] as const;
 function frameVariants(): VariantDef[] {
   // Orientation is OURS, not Prodigi's: their frame print files are fixed-portrait
@@ -82,9 +82,9 @@ function frameVariants(): VariantDef[] {
 // Landscape leads (the native board) and is the default. NO colour — Prodigi fulfils one board
 // per size (there's no colour SKU), so faking a colour choice would misrepresent the product.
 const JIGSAW_SIZES = [
-  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2795 },
-  { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', wMm: 250, hMm: 200, dpi: 300, pricePence: 3250 },
-  { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', wMm: 375, hMm: 285, dpi: 300, pricePence: 3495 },
+  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2500 },
+  { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', wMm: 250, hMm: 200, dpi: 300, pricePence: 3000 },
+  { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', wMm: 375, hMm: 285, dpi: 300, pricePence: 3500 },
 ] as const;
 function jigsawVariants(): VariantDef[] {
   return JIGSAW_SIZES.flatMap((s) =>
@@ -184,8 +184,8 @@ function babyVariants(): VariantDef[] {
 // variant works on a swapped canvas and the fulfilment render rotates the finished file 90° back.
 // Portrait is native (leads + default). Each size+colour is its own Prodigi SKU (white baked in).
 const BLANKET_SIZES = [
-  { size: 'medium', wMm: 600, hMm: 1000, pricePence: 5795, sku: 'H-BLA-PBMWHITE' },
-  { size: 'large', wMm: 1000, hMm: 1500, pricePence: 7595, sku: 'H-BLA-PBLWHITE' },
+  { size: 'medium', wMm: 600, hMm: 1000, pricePence: 6000, sku: 'H-BLA-PBMWHITE' },
+  { size: 'large', wMm: 1000, hMm: 1500, pricePence: 7500, sku: 'H-BLA-PBLWHITE' },
 ] as const;
 function blanketVariants(): VariantDef[] {
   return BLANKET_SIZES.flatMap((s) =>
@@ -222,16 +222,16 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
       // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
-      { size: 'heart', pricePence: 2295, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
-      { size: '18″ round', pricePence: 2995, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
+      { size: 'heart', pricePence: 2000, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      { size: '18″ round', pricePence: 3000, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
       // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
       // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]
       // print file. wMm/hMm here is the per-FACE size: the mockup shows one face either way, and
       // the DUAL fulfilment assembles the side-by-side double-wide from two face renders.
-      { size: '12″ square', sides: 'single', pricePence: 2995, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
-      { size: '12″ square', sides: 'double', pricePence: 3495, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
-      { size: '22″ square', sides: 'single', pricePence: 3995, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
-      { size: '22″ square', sides: 'double', pricePence: 4495, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
+      { size: '12″ square', sides: 'single', pricePence: 3000, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
+      { size: '12″ square', sides: 'double', pricePence: 3500, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
+      { size: '22″ square', sides: 'single', pricePence: 4000, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
+      { size: '22″ square', sides: 'double', pricePence: 4500, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
     ],
   },
   storybook: {
