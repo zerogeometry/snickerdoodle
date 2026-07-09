@@ -347,6 +347,10 @@ export default function CustomizePage() {
     router.push('/start-creating');
   };
 
+  // MUG: two pictures of the REAL mug photo — the printed FRONT and the reverse BACK — with the
+  // child's art wrapped onto the ceramic (compositor CYLINDER tier). No 3D, no spin.
+  const isMug = product.key === 'mug';
+
   // The mockup view + span currently on screen — shared by the big preview AND the zoom modal so
   // zooming shows what you're looking at (not always the single view). For a card: 'outside' → the
   // flat spread ('outside-front'/'outside-full'); 'single'/'inside' → the primary card mockup. A
@@ -356,16 +360,15 @@ export default function CustomizePage() {
       ? cardView === 'outside'
         ? `outside-${cardSpan}`
         : undefined
-      : mockupView === 'tin'
-        ? 'tin'
-        : undefined;
+      : isMug
+        ? mugSide === 'back'
+          ? 'back'
+          : 'front'
+        : mockupView === 'tin'
+          ? 'tin'
+          : undefined;
   const activeSpanHalf: 'front' | undefined =
     product.key === 'card' && cardView !== 'outside' && cardSpan === 'full' ? 'front' : undefined;
-
-  // MUG: show the two fixed 3D pictures (front/back) as the primary preview instead of the
-  // draggable spin. Falls back to the 2D flat-lay photo when WebGL is unavailable.
-  const isMug = product.key === 'mug';
-  const mug3D = isMug && canSpin && !!previewImg && !!variant?.printWmm && !!variant?.printHmm;
 
   return (
     <Shell>
@@ -405,21 +408,7 @@ export default function CustomizePage() {
             </div>
           ) : null}
           <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
-            {mug3D ? (
-              // The mug's two fixed pictures — printed FRONT / reverse BACK, no drag.
-              <div className="h-96 w-full">
-                <Product3D
-                  kind={product.key}
-                  image={previewImg!}
-                  fallbackImage={upload?.dataUrl ?? null}
-                  placement={placement}
-                  printWmm={variant!.printWmm!}
-                  printHmm={variant!.printHmm!}
-                  attributes={variant!.attributes}
-                  view={mugSide}
-                />
-              </div>
-            ) : view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
+            {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
               <div className="h-96 w-full">
                 <Product3D
                   kind={product.key}
@@ -463,9 +452,9 @@ export default function CustomizePage() {
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
           ) : null}
-          {/* Mug "front / back" — flip between the two fixed pictures (the printed front and the
-              reverse). Only when the 3D pictures are actually showing. */}
-          {mug3D ? (
+          {/* Mug "front / back" — flip between the two pictures of the real mug (the printed front
+              and the reverse, art wrapped onto the ceramic). */}
+          {isMug ? (
             <>
               <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="front or back">
                 {([['the front', 'front'], ['the back', 'back']] as const).map(([label, side]) => (

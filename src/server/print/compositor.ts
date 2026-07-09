@@ -10,6 +10,12 @@ import type { DbHandle } from '@/server/db';
 import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 import { perspectiveWarp } from './perspective';
+import { cylinderWarp } from './cylinder';
+
+/** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
+ * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
+const MUG_VISIBLE_ARC_DEG = 168;
+const MUG_WRAP_DEG = 290;
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -43,7 +49,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r9'; // r9: perspective views + transpose-fit (rotate the design to a transposed quad, e.g. the tin lid)
+const RENDER_REV = 'r10'; // r10: CYLINDER tier — mug art wrapped onto the real photo's curved face (front/back)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -165,8 +171,11 @@ interface ResolvedTemplate {
   mapResolutionPx: number;
   templateVersion: number;
 }
+/** Views served off the PRIMARY template (not a mockup_views row): the plain primary, the AR
+ * 'board', and the mug's cylinder 'front'/'back' (both wrap the same front photo). */
+const PRIMARY_VIEWS = new Set(['primary', 'board', 'front', 'back']);
 async function loadResolvedTemplate(db: DbHandle, variantId: string, view: string | undefined): Promise<ResolvedTemplate | null> {
-  if (view && view !== 'primary' && view !== 'board') {
+  if (view && !PRIMARY_VIEWS.has(view)) {
     const [v] = await db.select().from(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, view)));
     if (!v?.blankObjectId || !v.printQuad) return null;
     // Display-only: no bleed (Prodigi prints from the primary geometry, never this view).
@@ -252,6 +261,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       outputEdge: OUTPUT_EDGE[size],
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
+      mugBack: input.view === 'back',
     }),
   );
   inFlight.set(key, p);
@@ -277,12 +287,14 @@ async function renderAndPersist(
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
-    materialClass: string;
+    materialClass: string; mugBack?: boolean;
   },
 ): Promise<MockupResult> {
-  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; else the FLAT
-  // (axis-aligned bbox) placement. Same secure spine either way.
+  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
+  // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
+  // bbox) placement. Same secure spine either way.
   const perspective = !isAxisAligned(args.quad);
+  const cylinder = !perspective && args.materialClass === 'CERAMIC';
   const common = {
     blankBuf: await getObjectBytes(args.blankKey),
     // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
@@ -296,12 +308,14 @@ async function renderAndPersist(
   };
   const out = perspective
     ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
-    : await renderFlat({
-        ...common,
-        maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
-        overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
-        materialClass: args.materialClass,
-      });
+    : cylinder
+      ? await renderCylinder({ ...common, back: args.mugBack ?? false })
+      : await renderFlat({
+          ...common,
+          maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
+          overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
+          materialClass: args.materialClass,
+        });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
   // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
@@ -602,6 +616,95 @@ async function renderPerspective(args: {
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
   const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
+    .toBuffer();
+
+  const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
+    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
+    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
+    .withMetadata({ icc: 'srgb' })
+    .webp({ quality: 82, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
+  return { buffer: out.data, width: out.info.width, height: out.info.height };
+}
+
+/**
+ * CYLINDER tier: wrap the design around the visible face of the REAL mug photo so it curves with
+ * the ceramic (cylinder.ts), then MULTIPLY it over the photo in linear light so the mug's own
+ * glaze highlights + shadows read through the print — the single biggest "it's really on a mug"
+ * lever. FRONT shows the design centred on the front arc; BACK flops the photo (handle to the
+ * left) and wraps the reverse arc (the two ends of the print meeting round the handle). Same
+ * secure spine as FLAT — the child's design never leaves the VPC.
+ */
+async function renderCylinder(args: {
+  blankBuf: Buffer;
+  designBuf: Buffer;
+  quad: [number, number][];
+  transform: Transform;
+  workEdge: number;
+  outputEdge: number;
+  print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+  back: boolean;
+}): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const { blankBuf, designBuf, quad, transform, workEdge, outputEdge, print, back } = args;
+
+  // Working photo (cap the longest edge; the quad is normalised so it scales with it). The BACK
+  // view is the same mug flopped — handle to the left — and we wrap the reverse arc onto it.
+  const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  const bw0 = bm.width ?? 0, bh0 = bm.height ?? 0;
+  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
+  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
+  const WW = Math.max(1, Math.round(bw0 * scale));
+  const WH = Math.max(1, Math.round(bh0 * scale));
+  let workingBlankPipe = sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
+  if (back) workingBlankPipe = workingBlankPipe.flop();
+  const workingBlank = await workingBlankPipe.toBuffer();
+
+  // Prepare the design as the FULL printed wrap on a print-aspect canvas (cover-fit + transform,
+  // zero bleed — this view is never printed), exactly as the print file lays the wrap out.
+  const dm = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  const src = { width: dm.width ?? 0, height: dm.height ?? 0 };
+  if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
+  const dw = Math.max(2, print.widthPx);
+  const dh = Math.max(2, print.heightPx);
+  const layer = computeLayerRect({ printWidthPx: dw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
+  if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
+  const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    .rotate(transform.rotationDeg)
+    .resize(layer.width, layer.height, { fit: 'fill' })
+    .ensureAlpha()
+    .toBuffer();
+  const ix = Math.max(0, -layer.x);
+  const iy = Math.max(0, -layer.y);
+  const ox = Math.max(0, layer.x);
+  const oy = Math.max(0, layer.y);
+  const iw = Math.max(1, Math.min(layer.width - ix, dw - ox));
+  const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
+  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  // Opaque WHITE wrap canvas (not transparent): multiply reads white as "no ink", so the unprinted
+  // margins are an identity op over the ceramic instead of a premultiplied-black edge line.
+  const wrap = await sharp({ create: { width: dw, height: dh, channels: 4, background: '#ffffff' } })
+    .composite([{ input: part, left: ox, top: oy }])
+    .flatten({ background: '#ffffff' })
+    .ensureAlpha()
+    .raw()
+    .toBuffer();
+
+  // The visible print band on the (working, possibly flopped) photo. quadBboxPx gives it on the
+  // un-flopped frame; mirror the x for the flopped BACK photo so the band still covers the face.
+  const b = quadBboxPx(quad, WW, WH);
+  const band = { x: back ? WW - (b.x + b.w) : b.x, y: b.y, w: b.w, h: b.h };
+
+  const warped = cylinderWarp({
+    design: wrap, srcW: dw, srcH: dh, band, canvasW: WW, canvasH: WH,
+    arcDeg: MUG_VISIBLE_ARC_DEG, wrapDeg: MUG_WRAP_DEG, centerDeg: back ? 180 : 0, mirror: back,
+  });
+  // Flatten the warped RGBA over white so alpha-0 (off-arc) is white → multiply identity → bare mug.
+  const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();
+
+  const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+    .pipelineColourspace('scrgb')
+    .composite([{ input: warpedPng, left: 0, top: 0, blend: 'multiply' }])
+    .toColourspace('srgb')
     .toBuffer();
 
   const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
