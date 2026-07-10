@@ -16,7 +16,12 @@ import sharp from 'sharp';
  */
 
 // Analysis resolution for the background flood (the mask is upsampled smoothly after).
-const ANALYSIS_EDGE = 700;
+const ANALYSIS_EDGE = 1000;
+// RGB² radius that counts as "the same background colour under different lighting" — generous
+// enough to merge a sheet of paper's bright→shadowed shades into ONE background, tight enough to
+// exclude a saturated drawing colour (e.g. white↔grey↔cream all fall well inside; cinnamon is far
+// outside). This is what stops a subject that touches the paper edge from being read as background.
+const MERGE_DIST2 = 118 * 118;
 
 export interface CutoutResult {
   buffer: Buffer;
@@ -26,63 +31,80 @@ export interface CutoutResult {
 }
 
 /**
- * Make the background transparent → an RGBA cutout. BORDER-CONNECTED flood fill with an
- * adaptive tolerance, so it handles ANY reasonably solid background colour (white paper,
- * a black poster, a wooden table) — not just near-white:
- *   1. sample the border ring → the background reference colours + their spread,
- *   2. flood inward from the border across colour-similar pixels (connected to the edge —
- *      whites INSIDE the subject are enclosed, so they survive),
- *   3. feather the mask edge and apply it to the full-resolution image.
- * Truly complex scenes (gradients, busy photos) are what the neural cutout worker swap is
- * for — this returns a small removedFraction there, and the caller reports it honestly.
+ * Make the background transparent → an RGBA cutout. A border-connected flood, hardened for real
+ * phone photos of drawings (grain, JPEG blocking, uneven lighting, subjects that run to the paper
+ * edge):
+ *   1. DENOISE the analysis copy (median) so photo grain can't inflate the tolerance or speckle it,
+ *   2. find the DOMINANT border colour and merge only its own lighting-shades into the background —
+ *      a subject touching the edge is a MINORITY border colour and is excluded, so it is NOT eaten
+ *      (the old top-4-buckets rule deleted edge-touching drawings); if NO colour dominates the
+ *      border the scene is ambiguous → return 0 and let the caller fail honestly,
+ *   3. flood inward across paper-coloured pixels (whites enclosed by the subject survive),
+ *   4. ERODE the keep-mask ~1px to bite off the JPEG/anti-alias halo fringe (the "white outline"),
+ *      then feather + cubic-upsample and multiply into the original alpha.
+ * Truly complex backgrounds (busy photos, patterned surfaces) remain the neural-cutout worker's job
+ * — this returns a small removedFraction there, reported honestly.
  */
 export async function removeBackground(input: Buffer): Promise<CutoutResult> {
-  const img = sharp(input).ensureAlpha();
-  const meta = await img.metadata();
+  const base = sharp(input).ensureAlpha();
+  const meta = await base.metadata();
   const fullW = meta.width ?? 0;
   const fullH = meta.height ?? 0;
   if (!fullW || !fullH) throw new Error('unreadable image');
+  const plain = async () => ({ buffer: await base.png().toBuffer(), removedFraction: 0 });
 
-  // Analysis copy (bounded work regardless of upload size).
+  // 1. Analysis copy (bounded work), median-denoised so grain doesn't destabilise the flood.
   const { data, info } = await sharp(input)
     .flatten({ background: '#ffffff' }) // existing transparency reads as white for analysis
     .resize(ANALYSIS_EDGE, ANALYSIS_EDGE, { fit: 'inside', withoutEnlargement: true })
+    .median(3)
     .raw()
     .toBuffer({ resolveWithObject: true });
   const { width: W, height: H, channels: c } = info;
 
-  // 1. Border ring → reference colours (coarse 32-bucket quantisation, top buckets) +
-  //    tolerance adapted to how uniform the border actually is.
+  // Border ring pixel indices.
   const ring: number[] = [];
-  for (let x = 0; x < W; x++) { ring.push((0 * W + x) * c, ((H - 1) * W + x) * c); }
-  for (let y = 0; y < H; y++) { ring.push((y * W + 0) * c, (y * W + W - 1) * c); }
+  for (let x = 0; x < W; x++) { ring.push(x * c, ((H - 1) * W + x) * c); }
+  for (let y = 0; y < H; y++) { ring.push(y * W * c, (y * W + W - 1) * c); }
+
+  // 2. Quantised border colours → the DOMINANT one, plus only the buckets within a lighting-radius
+  //    of it (the paper's own shadows/highlights). Edge-touching subject colours sit outside and
+  //    are dropped.
   const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
   for (const i of ring) {
     const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!;
-    const key = (Math.round(r / 32) << 8) | (Math.round(g / 32) << 4) | Math.round(b / 32);
+    const key = ((r >> 5) << 10) | ((g >> 5) << 5) | (b >> 5);
     const e = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
     e.n++; e.r += r; e.g += g; e.b += b;
     buckets.set(key, e);
   }
-  const refs = [...buckets.values()]
-    .sort((a, b) => b.n - a.n)
-    .slice(0, 4)
-    .filter((e) => e.n >= ring.length * 0.04) // ignore rare border colours (subject touching the edge)
-    .map((e) => ({ r: e.r / e.n, g: e.g / e.n, b: e.b / e.n }));
-  if (refs.length === 0) return { buffer: await img.png().toBuffer(), removedFraction: 0 };
+  const means = [...buckets.values()]
+    .map((e) => ({ n: e.n, r: e.r / e.n, g: e.g / e.n, b: e.b / e.n }))
+    .sort((a, b) => b.n - a.n);
+  if (means.length === 0) return plain();
+  const dom = means[0]!;
+  const refs = means.filter((m) => (m.r - dom.r) ** 2 + (m.g - dom.g) ** 2 + (m.b - dom.b) ** 2 <= MERGE_DIST2);
+  const bgCoverage = refs.reduce((s, m) => s + m.n, 0) / ring.length;
+  // No single colour owns the border ⇒ busy/ambiguous background ⇒ don't guess.
+  if (bgCoverage < 0.45) return plain();
 
-  // Spread of the border around its refs → adaptive tolerance (squared distance space).
-  let sumD = 0;
+  // Tolerances. `domTol` = how far a pixel can stray from the dominant paper colour and still count
+  // as CORE paper — kept tight (from the paper's own spread) so it doesn't swallow pale drawing
+  // colours. `LOCAL_TOL` = the max step between neighbouring pixels the flood will walk — small, so
+  // it follows a SMOOTH lighting gradient across the paper but STOPS at the sharp edge of a drawn
+  // shape. `MERGE_DIST2` is the hard family bound: the flood can never leave the paper colour family,
+  // so a saturated subject (even a pale one that a gradient reaches) is never eaten wholesale.
+  let sumD = 0, nPaper = 0;
   for (const i of ring) {
-    let best = Infinity;
-    for (const f of refs) {
-      const d = (data[i]! - f.r) ** 2 + (data[i + 1]! - f.g) ** 2 + (data[i + 2]! - f.b) ** 2;
-      if (d < best) best = d;
-    }
-    sumD += Math.sqrt(best);
+    const d = (data[i]! - dom.r) ** 2 + (data[i + 1]! - dom.g) ** 2 + (data[i + 2]! - dom.b) ** 2;
+    if (d <= MERGE_DIST2) { sumD += Math.sqrt(d); nPaper++; }
   }
-  const spread = sumD / ring.length;
-  const tol = Math.min(72, Math.max(30, spread * 2.5));
+  const spread = nPaper ? sumD / nPaper : 0;
+  // Tolerance kept CONSERVATIVE (capped) and measured from the paper's own spread: enough to clear
+  // shaded paper, but not so wide it swallows pale drawing colours that sit near the paper tone. A
+  // pale shape that IS colourimetrically inside the paper's lighting range is the residual case a
+  // colour method can't fully separate — the neural-cutout worker swap is for that (and busy scenes).
+  const tol = Math.min(50, Math.max(22, spread * 1.9 + 11));
   const tol2 = tol * tol;
   const isBg = (i: number) => {
     for (const f of refs) {
@@ -91,18 +113,19 @@ export async function removeBackground(input: Buffer): Promise<CutoutResult> {
     return false;
   };
 
-  // 2. Flood from every border pixel across background-coloured pixels.
+  // 3. Border-connected flood across paper-coloured pixels (refs are only the dominant colour's own
+  //    shades, so a subject that touches the edge is never a reference and is not eaten).
   const bg = new Uint8Array(W * H);
-  const queue: number[] = [];
+  const stack: number[] = [];
   const push = (x: number, y: number) => {
     const p = y * W + x;
-    if (!bg[p] && isBg(p * c)) { bg[p] = 1; queue.push(p); }
+    if (!bg[p] && isBg(p * c)) { bg[p] = 1; stack.push(p); }
   };
   for (let x = 0; x < W; x++) { push(x, 0); push(x, H - 1); }
   for (let y = 0; y < H; y++) { push(0, y); push(W - 1, y); }
   let removed = 0;
-  while (queue.length) {
-    const p = queue.pop()!;
+  while (stack.length) {
+    const p = stack.pop()!;
     removed++;
     const x = p % W, y = (p - x) / W;
     if (x > 0) push(x - 1, y);
@@ -111,13 +134,20 @@ export async function removeBackground(input: Buffer): Promise<CutoutResult> {
     if (y < H - 1) push(x, y + 1);
   }
 
-  // 3. Keep-mask (255 = subject) → slight blur for a soft edge → upsample to full res →
-  //    multiply into the original alpha.
+  // 4. Keep-mask (255 = subject) → ERODE ~1px (blur then high threshold) to remove the halo fringe →
+  //    feather + cubic-upsample to full res → multiply into the original alpha.
   const keepRaw = Buffer.alloc(W * H);
   for (let p = 0; p < W * H; p++) keepRaw[p] = bg[p] ? 0 : 255;
-  const keepFull = await sharp(keepRaw, { raw: { width: W, height: H, channels: 1 } })
-    .blur(0.8)
-    .resize(fullW, fullH, { fit: 'fill' })
+  const eroded = await sharp(keepRaw, { raw: { width: W, height: H, channels: 1 } })
+    .blur(1.4)
+    .toColourspace('b-w')
+    .raw()
+    .toBuffer();
+  const shrunk = Buffer.alloc(W * H);
+  for (let p = 0; p < W * H; p++) shrunk[p] = eroded[p]! >= 200 ? 255 : 0; // keep only strongly-inside ⇒ erosion
+  const keepFull = await sharp(shrunk, { raw: { width: W, height: H, channels: 1 } })
+    .blur(1.0)
+    .resize(fullW, fullH, { fit: 'fill', kernel: 'cubic' })
     .toColourspace('b-w')
     .raw()
     .toBuffer();

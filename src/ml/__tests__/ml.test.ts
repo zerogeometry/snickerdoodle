@@ -60,6 +60,37 @@ describe('self-hosted image ops (the magic edits)', () => {
     expect(px(50, 50).a).toBe(255); // the white HOLE inside the red frame survives
   });
 
+  it('KEEPS a subject that runs to the paper edge (never treats an edge-touching drawing as background)', async () => {
+    // A red block touching the TOP edge — the old top-buckets rule read its colour as "background"
+    // off the border ring and flooded the whole drawing away. The dominant-colour rule keeps it.
+    const block = await sharp({ create: { width: 40, height: 55, channels: 3, background: { r: 204, g: 34, b: 34 } } }).png().toBuffer();
+    const img = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+      .composite([{ input: block, left: 30, top: 0 }]) // touches the top border
+      .png()
+      .toBuffer();
+    const res = await removeBackground(img);
+    const px = await pixels(res.buffer);
+    expect(px(50, 6).a).toBe(255); // inside the edge-touching block → kept opaque, not eaten
+    expect(px(2, 50).a).toBe(0); // the white to the side is still removed
+    expect(res.removedFraction).toBeLessThan(0.9); // the block survived (not flooded to ~everything)
+  });
+
+  it('fails honestly (removedFraction 0) on a busy background with no dominant colour', async () => {
+    // Four different strong colours quartering the border → no single colour owns it → don't guess.
+    const q = (r: number, g: number, b: number) => sharp({ create: { width: 50, height: 50, channels: 3, background: { r, g, b } } }).png().toBuffer();
+    const img = await sharp({ create: { width: 100, height: 100, channels: 3, background: '#000000' } })
+      .composite([
+        { input: await q(220, 30, 30), left: 0, top: 0 },
+        { input: await q(30, 160, 40), left: 50, top: 0 },
+        { input: await q(40, 60, 200), left: 0, top: 50 },
+        { input: await q(230, 200, 30), left: 50, top: 50 },
+      ])
+      .png()
+      .toBuffer();
+    const res = await removeBackground(img);
+    expect(res.removedFraction).toBe(0); // ambiguous ⇒ honest no-op (caller's gate then reports failure)
+  });
+
   it('reports a tiny removedFraction when there is no clean background (honesty signal)', async () => {
     // A full-bleed solid: the border IS the subject → the flood would erase everything.
     const solid = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 204, g: 34, b: 34 } } }).png().toBuffer();
