@@ -20,8 +20,11 @@ import { cylinderWarp } from './cylinder';
 // left ~half. The printcircumference ellipse (measured from red/printcircumference.png) gives the
 // exact screen-x → surface-angle projection.
 const MUG_PRINTED_ARC_DEG = 292;
-const MUG_ELLIPSE_CX = 0.423; // normalised centre-x of the projected circumference
-const MUG_ELLIPSE_A = 0.207; // normalised half-width (projected radius)
+const MUG_ELLIPSE_CX = 0.423; // front/back photo: normalised centre-x of the projected circumference
+const MUG_ELLIPSE_A = 0.207; // normalised half-width (projected radius) — same for both photos
+// The CENTRE view is a separate head-on photo (handle hidden behind) with the mug centred, so its
+// circumference ellipse is centred too. Measured from red/centerprintcircumference.png.
+const MUG_CENTRE_ELLIPSE_CX = 0.499;
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -55,7 +58,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r14'; // r14: mug wrap spans the full printed circumference (ellipse projection; front=right half, back=left half)
+const RENDER_REV = 'r15'; // r15: mug 'centre' view (design middle head-on) alongside front/back
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -267,7 +270,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       outputEdge: OUTPUT_EDGE[size],
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
-      mugBack: input.view === 'back',
+      mugMode: input.view === 'back' ? 'back' : input.view === 'centre' ? 'centre' : 'front',
     }),
   );
   inFlight.set(key, p);
@@ -293,7 +296,7 @@ async function renderAndPersist(
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
-    materialClass: string; mugBack?: boolean;
+    materialClass: string; mugMode?: 'front' | 'back' | 'centre';
   },
 ): Promise<MockupResult> {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
@@ -317,7 +320,7 @@ async function renderAndPersist(
   const out = perspective
     ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
     : cylinder
-      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, back: args.mugBack ?? false, printmapBuf: await getObjectBytes(args.maskKey!) })
+      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await getObjectBytes(args.maskKey!) })
       : await renderFlat({
           ...common,
           maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
@@ -652,9 +655,11 @@ async function renderCylinder(args: {
   workEdge: number;
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
-  back: boolean;
+  mode: 'front' | 'back' | 'centre';
+  ellipseCx: number;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, printmapBuf, designBuf, transform, workEdge, outputEdge, print, back } = args;
+  const { blankBuf, printmapBuf, designBuf, transform, workEdge, outputEdge, print, mode, ellipseCx } = args;
+  const back = mode === 'back';
 
   // Working photo (cap the longest edge; the quad is normalised so it scales with it). The BACK
   // view is the same mug flopped — handle to the left — and we wrap the reverse arc onto it.
@@ -707,8 +712,8 @@ async function renderCylinder(args: {
   const warped = cylinderWarp({
     design: wrap, srcW: dw, srcH: dh, printAlpha, pmW: WW, pmH: WH,
     // The photo + printmap are flopped for the BACK, so the ellipse centre mirrors with them.
-    ellipseCx: back ? 1 - MUG_ELLIPSE_CX : MUG_ELLIPSE_CX, ellipseA: MUG_ELLIPSE_A,
-    printedArcDeg: MUG_PRINTED_ARC_DEG, back,
+    ellipseCx: back ? 1 - ellipseCx : ellipseCx, ellipseA: MUG_ELLIPSE_A,
+    printedArcDeg: MUG_PRINTED_ARC_DEG, mode,
   });
   // Flatten the warped RGBA over white so alpha-0 (off-surface) is white → multiply identity → bare mug.
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();

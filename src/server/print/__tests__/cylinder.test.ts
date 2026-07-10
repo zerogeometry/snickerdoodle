@@ -38,7 +38,7 @@ describe('cylinderWarp (printmap + ellipse, full-circumference wrap)', () => {
   // real angles inside ±90°. Printmap opaque columns 40..160, rows 20..60.
   const ellipseCx = 0.5, ellipseA = 0.42;
   const rectMap = printmap(pmW, pmH, (x) => (x >= 40 && x <= 160 ? [20, 60] : null));
-  const base = { design, srcW, srcH, printAlpha: rectMap, pmW, pmH, ellipseCx, ellipseA, printedArcDeg: 292 };
+  const base = { design, srcW, srcH, printAlpha: rectMap, pmW, pmH, ellipseCx, ellipseA, printedArcDeg: 292, mode: 'front' as const };
 
   const rowSpan = (out: Buffer, x: number): [number, number] => {
     let t = -1, b = -1;
@@ -61,8 +61,17 @@ describe('cylinderWarp (printmap + ellipse, full-circumference wrap)', () => {
     expect(R(out, pmW, 159, y)).toBeGreaterThan(R(out, pmW, 100, y));
   });
 
+  it('CENTRE puts the design middle (u=0.5) at the front centre', () => {
+    const out = cylinderWarp({ ...base, mode: 'centre' });
+    // centre column samples design centre (red≈128); it stays under 1.0 at the edges (not anchored).
+    expect(R(out, pmW, 100, 40)).toBeGreaterThan(118);
+    expect(R(out, pmW, 100, 40)).toBeLessThan(138);
+    expect(R(out, pmW, 41, 40)).toBeLessThan(120); // left of centre → u<0.5
+    expect(R(out, pmW, 159, 40)).toBeGreaterThan(135); // right of centre → u>0.5
+  });
+
   it('BACK shows the design LEFT portion (anchored u=0 at its near-handle edge)', () => {
-    const out = cylinderWarp({ ...base, back: true, ellipseCx: 1 - ellipseCx });
+    const out = cylinderWarp({ ...base, mode: 'back', ellipseCx: 1 - ellipseCx });
     const y = 40;
     // Back anchors u=0 at the printmap's left (near-handle, flopped) edge → low red there.
     expect(R(out, pmW, 41, y)).toBeLessThan(20);

@@ -80,6 +80,8 @@ export function ProductTile({
           transform={tf}
           size="thumb"
           sourceObjectId={upload?.cutout?.sourceObjectId}
+          // The mug's hero is its centred wrap (design middle, handle hidden), not the handle-right front.
+          view={p.key === 'mug' ? 'centre' : undefined}
           px={128}
           lazy={lazy}
         />

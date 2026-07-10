@@ -114,9 +114,19 @@ function layeredMugDir(colour: string): string | null {
 // An axis-aligned routing quad (roughly the printmap bbox) — enough to send CERAMIC down the
 // cylinder path; the real geometry comes from the printmap mask, not this box.
 const MUG_BAND: Box = { x0: 0.217, y0: 0.268, x1: 0.615, y1: 0.78 };
+const MUG_CENTRE_BAND: Box = { x0: 0.293, y0: 0.261, x1: 0.705, y1: 0.778 };
 // The founder's PRINTMAP (the visible print surface, alpha shape) is authored once on the shared
 // mug geometry (in red/); a colour may override with its own printmap.png.
 const MUG_PRINTMAP = path.join(LAYERED, 'mug', 'red', 'printmap.png');
+// CENTRE view — a separate head-on photo (handle hidden) per colour (centre.png/center.png), with
+// the print surface + shadow authored once on red's centred geometry.
+const MUG_CENTRE_PRINTMAP = path.join(LAYERED, 'mug', 'red', 'centerprintmap.png');
+const MUG_CENTRE_SHADOW = path.join(LAYERED, 'mug', 'red', 'centershadow.png');
+/** The centre mug photo in a colour dir (spelling varies: centre.png | center.png). */
+function mugCentrePhoto(dir: string): string | null {
+  for (const f of ['centre.png', 'center.png']) if (existsSync(path.join(dir, f))) return path.join(dir, f);
+  return null;
+}
 
 // Founder-authored CARD "Single Card View" — the catalogue thumbnail: a card leaning on a kraft
 // envelope. background → envelopeshadow → envelope → cardshadow → [the child's front design,
@@ -580,6 +590,32 @@ async function layeredMug(dir: string): Promise<{ blank: Buffer; mask: Buffer; q
   return out;
 }
 
+const layeredMugCentreCache = new Map<string, { blank: Buffer; mask: Buffer; quad: Quad } | null>();
+/** Build the CENTRE view: the head-on centre photo (handle hidden) over background → centre shadow,
+ * plus the centred printmap (both shared from red's geometry). The compositor wraps the design's
+ * MIDDLE onto it. Returns null if a colour has no centre photo (the view is then skipped). */
+async function layeredMugCentre(dir: string): Promise<{ blank: Buffer; mask: Buffer; quad: Quad } | null> {
+  const photo = mugCentrePhoto(dir);
+  if (!photo || !existsSync(MUG_CENTRE_PRINTMAP) || !existsSync(MUG_CENTRE_SHADOW)) return null;
+  const key = dir + '|c|' + [photo, MUG_CENTRE_SHADOW, MUG_CENTRE_PRINTMAP, path.join(dir, 'background.png')].map((f) => statSync(f).mtimeMs).join('|');
+  if (layeredMugCentreCache.has(key)) return layeredMugCentreCache.get(key)!;
+  const mug = readFileSync(photo);
+  const m = await sharp(mug).metadata();
+  const W = m.width!, H = m.height!;
+  const blank = await sharp(readFileSync(path.join(dir, 'background.png')))
+    .resize(W, H, { fit: 'fill' })
+    .composite([
+      { input: await sharp(MUG_CENTRE_SHADOW).resize(W, H, { fit: 'fill' }).toBuffer(), left: 0, top: 0 },
+      { input: mug, left: 0, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+  const mask = await sharp(MUG_CENTRE_PRINTMAP).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  const out = { blank, mask, quad: asQuad(MUG_CENTRE_BAND) };
+  layeredMugCentreCache.set(key, out);
+  return out;
+}
+
 /**
  * The print WINDOW on a framed-print blank → normalised bbox. Preferred: the transparent hole
  * (exact). Fallback (frames shipped with an opaque white window): walk OUT from the centre until
@@ -843,6 +879,7 @@ export async function POST(req: Request): Promise<Response> {
   const windows = new Map<string, Box>();
   const dims = new Map<string, { W: number; H: number }>();
   let authored = 0;
+  let authoredViews = 0; // alternate mockup views (the jigsaw tin, the mug centre)
   const skipped: string[] = [];
   const registration: { sku: string; print: string; mode: string; quadAspect: number | null; printAspect: number; driftPct: number | null }[] = [];
 
@@ -915,6 +952,13 @@ export async function POST(req: Request): Promise<Response> {
       // art onto the printmap surface. The printmap rides along as the template mask.
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask });
       authored++;
+      // CENTRE view (head-on, design middle) as a mockup_view — same cylinder tier, centred photo.
+      const c = await layeredMugCentre(p.dir);
+      if (c) {
+        const pw = Math.round((r.printWmm * 300) / 25.4), ph = Math.round((r.printHmm * 300) / 25.4);
+        await setMockupView(db, { variantId: r.id, view: 'centre', blank: c.blank, contentType: 'image/png', printQuad: c.quad, printWidthPx: pw, printHeightPx: ph, materialClass: 'CERAMIC', mask: c.mask });
+        authoredViews++;
+      }
       registration.push({
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
         quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
@@ -1016,7 +1060,6 @@ export async function POST(req: Request): Promise<Response> {
   // Alternate view — the jigsaw TIN (perspective). One tin, authored for every jigsaw variant
   // (the customer's placement is warped onto the lid at compose time). Display-only: never a
   // print file, so it lives in mockup_views, not print_templates.
-  let authoredViews = 0;
   if (existsSync(path.join(TIN_DIR, 'tin.png')) && existsSync(path.join(TIN_DIR, 'printmap.png'))) {
     const tin = await buildTinView(TIN_DIR);
     if (tin) {

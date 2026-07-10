@@ -34,9 +34,11 @@ export interface CylinderWarpInput {
   ellipseA: number;
   /** Arc the full printed wrap covers (e.g. ~292° for a 209mm print on an 11oz mug). */
   printedArcDeg: number;
-  /** BACK view: the photo + printmap are flopped (handle to the left); anchor u=0 at the near-handle
-   * (left) edge so the back shows the design's LEFT half. FRONT anchors u=1 at the right edge. */
-  back?: boolean;
+  /** Which wrap view:
+   *  • 'front'  — anchor u=1 at the printmap's right (near-handle) edge → shows the design's RIGHT half.
+   *  • 'back'   — the photo/printmap are flopped (handle left); anchor u=0 at the left edge → LEFT half.
+   *  • 'centre' — the design MIDDLE (u=0.5) faces the viewer at the front centre (θ=0), handle hidden. */
+  mode: 'front' | 'back' | 'centre';
 }
 
 /** Surface angle (deg) of a screen column via the ellipse projection: x = cx + a·sinθ. */
@@ -51,7 +53,7 @@ function thetaAt(xPx: number, cxPx: number, aPx: number): number | null {
  * wherever the printmap is off / the design has wrapped out of view. Bilinear-samples.
  */
 export function cylinderWarp(i: CylinderWarpInput): Buffer {
-  const { design, srcW, srcH, printAlpha, pmW, pmH, ellipseCx, ellipseA, printedArcDeg, back } = i;
+  const { design, srcW, srcH, printAlpha, pmW, pmH, ellipseCx, ellipseA, printedArcDeg, mode } = i;
   const out = Buffer.alloc(pmW * pmH * 4); // all-zero = transparent
   if (srcW < 2 || srcH < 2 || pmW < 2 || pmH < 2 || printedArcDeg <= 0 || ellipseA <= 0) return out;
 
@@ -71,12 +73,13 @@ export function cylinderWarp(i: CylinderWarpInput): Buffer {
 
   const cxPx = ellipseCx * pmW;
   const aPx = ellipseA * pmW;
-  // Anchor: the design's near-handle EDGE sits at the printmap's boundary on the handle side.
-  // FRONT → the right edge is u=1; BACK (flopped) → the left edge is u=0. u steps back by real arc.
-  const anchorX = back ? x0 : x1;
-  const anchorTheta = thetaAt(anchorX + 0.5, cxPx, aPx);
+  // Anchor the design in u-space. CENTRE puts the design middle (u=0.5) at the front centre (θ=0).
+  // FRONT/BACK anchor the design's near-handle EDGE at the printmap's boundary on the handle side
+  // (front → right edge u=1; back, flopped → left edge u=0) and step back by real arc.
+  const anchorX = mode === 'back' ? x0 : x1;
+  const anchorTheta = mode === 'centre' ? 0 : thetaAt(anchorX + 0.5, cxPx, aPx);
   if (anchorTheta === null) return out;
-  const anchorU = back ? 0 : 1;
+  const anchorU = mode === 'centre' ? 0.5 : mode === 'back' ? 0 : 1;
 
   for (let x = x0; x <= x1; x++) {
     const yt = top[x]!, yb = bot[x]!;

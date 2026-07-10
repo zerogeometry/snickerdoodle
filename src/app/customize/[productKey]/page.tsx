@@ -77,9 +77,9 @@ export default function CustomizePage() {
   // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
   const [back, setBack] = useState<string>(CUSHION_BACK_WHITE);
   const [showBack, setShowBack] = useState(false);
-  // MUG: two fixed 3D pictures — the printed front and the reverse — instead of a draggable spin
-  // (founder call: "two pictures of a mug, front and back"). No orbit, one render each.
-  const [mugSide, setMugSide] = useState<'front' | 'back'>('front');
+  // MUG: three real-photo wrap views — the centred hero (design middle, handle hidden), the front
+  // (right side of the image) and the back (left side). Centre leads.
+  const [mugSide, setMugSide] = useState<'centre' | 'front' | 'back'>('centre');
   // GREETINGS CARD inside message (card only): null = blank inside (write it by hand).
   const [cardMessage, setCardMessage] = useState<CardMessage | null>(null);
   // Which card view the big preview shows — one hero + a thumbnail strip beneath (founder spec):
@@ -95,7 +95,7 @@ export default function CustomizePage() {
     setMockupView('primary');
     setThumbIdx(0);
     setShowBack(false);
-    setMugSide('front');
+    setMugSide('centre');
     setCardView('single');
     setCardSpan('front');
     setCardMessage(null);
@@ -361,9 +361,7 @@ export default function CustomizePage() {
         ? `outside-${cardSpan}`
         : undefined
       : isMug
-        ? mugSide === 'back'
-          ? 'back'
-          : 'front'
+        ? mugSide // 'centre' | 'front' | 'back'
         : mockupView === 'tin'
           ? 'tin'
           : undefined;
@@ -452,12 +450,12 @@ export default function CustomizePage() {
           {view === 'spin' && canSpin ? (
             <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
           ) : null}
-          {/* Mug "front / back" — flip between the two pictures of the real mug (the printed front
-              and the reverse, art wrapped onto the ceramic). */}
+          {/* Mug "centre / front / back" — the real mug photographed three ways, the art wrapped
+              onto the ceramic: centre (design middle, handle hidden), front (right side), back (left). */}
           {isMug ? (
             <>
-              <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="front or back">
-                {([['the front', 'front'], ['the back', 'back']] as const).map(([label, side]) => (
+              <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="mug view">
+                {([['the centre', 'centre'], ['the front', 'front'], ['the back', 'back']] as const).map(([label, side]) => (
                   <button
                     key={side}
                     type="button"
