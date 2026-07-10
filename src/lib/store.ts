@@ -23,12 +23,16 @@ export const gbp = formatPence;
 // termsVersion). The conspicuous upload-step notice is the transparency. See DECISIONS.md.
 // `opaqueBg` = the image has NO transparent pixels (detected client-side after upload) —
 // used to nudge "remove background" only when it would actually do something.
-export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; cutout?: { url: string; sourceObjectId: string } } | null;
+// `aspect` = the drawing's width/height (detected client-side after upload) — lets the catalogue
+// tiles auto-orient (a wide drawing → a landscape frame/jigsaw thumbnail) BEFORE the shopper opens
+// the customize page, mirroring the customize-page auto-orient. Absent until measured.
+export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string } } | null;
 export const useUpload = create<{
   upload: Upload;
   setUpload: (u: Upload) => void;
   setAssetId: (id: string) => void;
   setOpaqueBg: (opaque: boolean) => void;
+  setAspect: (aspect: number) => void;
   setCutout: (c: { url: string; sourceObjectId: string }) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 }>((set) => ({
@@ -36,9 +40,24 @@ export const useUpload = create<{
   setUpload: (upload) => set({ upload }),
   setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
   setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
+  setAspect: (aspect) => set((s) => (s.upload ? { upload: { ...s.upload, aspect } } : {})),
   setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
   resetUpload: () => set({ upload: null }),
 }));
+
+/**
+ * The image's width/height (aspect ratio) — for auto-orienting catalogue tiles. Decodes only
+ * to read natural dimensions. Resolves undefined on any decode failure (tiles fall back to the
+ * product default orientation — never a wrong guess).
+ */
+export function detectAspect(dataUrl: string): Promise<number | undefined> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth > 0 && img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : undefined);
+    img.onerror = () => resolve(undefined);
+    img.src = dataUrl;
+  });
+}
 
 /**
  * Does the image contain any transparency? Downsampled alpha scan (≤128px) so it's

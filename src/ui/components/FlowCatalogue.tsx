@@ -14,10 +14,10 @@ import { ProductGrid } from '@/ui/components/ProductGrid';
 import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
-import { basketCount, basketSubtotal, gbp, toast, useBasket, useUpload } from '@/lib/store';
+import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
 import { FAMILY_SET_PRODUCT_KEYS } from '@/pricing';
 import { startGuestUpload } from '@/app/actions/guestUpload';
-import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 function variantSub(v: CatalogueVariant): string | undefined {
@@ -124,11 +124,12 @@ export function FlowCatalogue({
     if (upload && !upload.assetId) void ensureAsset();
   }, [upload, ensureAsset]);
 
-  const defaultVariant = (p: CatalogueProduct) => p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
   const qtyOf = useCallback((p: CatalogueProduct) => productQtyInBasket(items, p), [items]);
 
   const quickAdd = async (p: CatalogueProduct, delta: number) => {
-    const def = defaultVariant(p);
+    // Add EXACTLY what the tile shows (the shared resolver): an explicit selection, else the
+    // aspect-oriented variant, else the default — never a landscape tile that adds a portrait SKU.
+    const def = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: useSelection.getState().selections[p.key] });
     const defId = lineIdForSku(def.sku);
     // Decrement is purely local — always allowed (never gated by an in-flight ingest).
     // Take one off the DEFAULT quick-add line first; otherwise the most-recently-added
@@ -347,7 +348,9 @@ export function FlowCatalogue({
               <MockupPreview
                 productKey={zoom.key as ProductKey}
                 assetId={upload?.assetId}
-                variantId={defaultVariant(zoom).id}
+                // Match the tile: the enlargement shows the same auto-oriented variant, not the
+                // fixed default (so a landscape tile doesn't open a portrait close-up).
+                variantId={resolveDisplayVariant(zoom, { aspect: upload?.aspect, selection: useSelection.getState().selections[zoom.key] }).id}
                 transform={defaultTransformFor(zoom.key)}
                 size="zoom"
                 sourceObjectId={upload?.cutout?.sourceObjectId}

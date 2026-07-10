@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BasketItem } from '@/lib/store';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
-import { filterCatalogue, lineIdForSku, matchesQuery, productQtyInBasket, sizeDimsCm, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultTransformFor, filterCatalogue, lineIdForSku, matchesQuery, orientationForAspect, productQtyInBasket, resolveDisplayVariant, sizeDimsCm, splitCatalogue } from '@/lib/catalogue-view';
 
 const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = false): CatalogueVariant => ({
   id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault, printWmm: 209, printHmm: 98,
@@ -103,3 +103,62 @@ describe('search', () => {
     expect(filterCatalogue([tee, giftWrap], 'tee')).toEqual([tee]);
   });
 });
+
+describe('defaultTransformFor — the mug fills the full wrap width by default', () => {
+  it('the mug defaults to COVER (scale 1) so the drawing fills the full print width', () => {
+    // founder 2026-07-10: fill the wide 2.14:1 wrap surface's WIDTH, not contain-letterbox to height.
+    expect(defaultTransformFor('mug').scale).toBe(1);
+  });
+  it('the other cover products still default filled', () => {
+    for (const k of ['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card']) {
+      expect(defaultTransformFor(k).scale).toBe(1);
+    }
+  });
+  it('an un-listed product still contains (scale 0 sentinel)', () => {
+    expect(defaultTransformFor('storybook').scale).toBe(0);
+  });
+});
+
+describe('orientationForAspect — tile auto-orientation from the upload shape', () => {
+  it('a wide drawing suggests landscape', () => expect(orientationForAspect(1.6)).toBe('landscape'));
+  it('a tall drawing suggests portrait', () => expect(orientationForAspect(0.7)).toBe('portrait'));
+  it('a square drawing suggests portrait (not landscape)', () => expect(orientationForAspect(1)).toBe('portrait'));
+  it('an unknown/invalid aspect returns null → caller keeps the product default', () => {
+    expect(orientationForAspect(undefined)).toBeNull();
+    expect(orientationForAspect(null)).toBeNull();
+    expect(orientationForAspect(0)).toBeNull();
+    expect(orientationForAspect(Number.NaN)).toBeNull();
+    expect(orientationForAspect(Number.POSITIVE_INFINITY)).toBeNull();
+  });
+});
+
+describe('resolveDisplayVariant — tile, quick-add, and enlarge share ONE variant', () => {
+  const frame = product('framedPrint', {
+    category: 'PRINT', sizes: ['11x14'], colours: ['gold', 'black'], orientations: ['portrait', 'landscape'],
+    variants: [
+      variant('framedPrint', { size: '11x14', colour: 'gold', orientation: 'portrait' }, true),
+      variant('framedPrint-l', { size: '11x14', colour: 'gold', orientation: 'landscape' }),
+      variant('framedPrint-black', { size: '11x14', colour: 'black', orientation: 'portrait' }),
+    ],
+  });
+
+  it('a wide drawing (no selection) picks the LANDSCAPE variant — what the tile shows is what "+" adds', () => {
+    expect(resolveDisplayVariant(frame, { aspect: 1.6 }).sku).toBe('framedPrint-l');
+  });
+  it('a tall drawing (no selection) keeps the portrait default', () => {
+    expect(resolveDisplayVariant(frame, { aspect: 0.7 }).sku).toBe('framedPrint');
+  });
+  it('an unknown aspect falls back to the default', () => {
+    expect(resolveDisplayVariant(frame, {}).sku).toBe('framedPrint');
+    expect(resolveDisplayVariant(frame, { aspect: undefined }).sku).toBe('framedPrint');
+  });
+  it('an EXPLICIT selection always wins over the aspect guess', () => {
+    // wide drawing, but the shopper explicitly chose portrait → respect it
+    expect(resolveDisplayVariant(frame, { aspect: 1.6, selection: { size: '11x14', colour: 'gold', orientation: 'portrait' } }).sku).toBe('framedPrint');
+    // and a colour selection swaps colour, keeping the chosen orientation
+    expect(resolveDisplayVariant(frame, { selection: { size: '11x14', colour: 'black', orientation: 'portrait' } }).sku).toBe('framedPrint-black');
+  });
+  it('a product with NO orientation axis ignores aspect (the mug)', () => {
+    expect(resolveDisplayVariant(mug, { aspect: 1.6 }).sku).toBe('mug');
+  });
+})

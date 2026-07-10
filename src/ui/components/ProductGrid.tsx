@@ -5,7 +5,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
 import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
-import { MUG_SWATCH, defaultTransformFor } from '@/lib/catalogue-view';
+import { MUG_SWATCH, defaultTransformFor, resolveDisplayVariant } from '@/lib/catalogue-view';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const SWATCH: Record<string, string> = {
@@ -14,10 +14,6 @@ const SWATCH: Record<string, string> = {
   brown: '#6B4A32', 'dark grey': '#4D4C4A', 'light grey': '#CFCDC8', silver: '#B9B6AE',
 };
 const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || SWATCH[name] || '#E0C7A8';
-
-function defaultVariant(p: CatalogueProduct) {
-  return p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
-}
 
 /**
  * One catalogue tile — the real photoreal preview, a from-price, a quick +/− stepper
@@ -52,22 +48,16 @@ export function ProductTile({
   onCustomize: () => void;
   onZoom?: () => void;
 }) {
-  const def = defaultVariant(p);
   // Reflect the shopper's OWN choices so the tile shows what they set — not the defaults.
   // Placement (zoom/position) is carried in usePlacements, keyed by (asset, product) to
   // match what add-to-basket stores; the chosen size/colour/orientation in useSelection.
   const savedTf = usePlacements((s) => (upload?.assetId ? s.placements[`${upload.assetId}-${p.key}`] : undefined));
   const tf = savedTf ?? defaultTransformFor(p.key);
   const sel = useSelection((s) => s.selections[p.key]);
-  const chosen = sel
-    ? p.variants.find(
-        (v) =>
-          (p.sizes.length === 0 || v.attributes.size === sel.size) &&
-          (p.colours.length === 0 || v.attributes.colour === sel.colour) &&
-          (p.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === sel.orientation),
-      )
-    : undefined;
-  const shownVariant = chosen ?? def;
+  // The ONE resolver the tile, the quick-add "+", and the enlarge modal all share (catalogue-view),
+  // so the tile can never show a landscape frame while "+" quietly adds the portrait default:
+  // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
+  const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: sel });
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)] @container">
       {/* SQUARE image area (the product photos are square-ish): the preview is contained

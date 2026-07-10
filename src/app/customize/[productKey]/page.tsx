@@ -12,6 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
+import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
@@ -893,9 +894,15 @@ function CardInsidePreview({ message, compact = false }: { message: CardMessage 
   const note = message?.note?.trim() ?? '';
   const empty = !greeting && !msg && !signature && !note;
   const scale = message?.fontScale ?? 1;
-  // Sizes are in cqw (% of the spread's own width), so the text-to-card ratio is CONSTANT at every
-  // rendered size — what fits the big preview fits the thumbnail and (per #133) the real 7×5 print.
-  const fs = (cqw: number) => ({ fontSize: `${cqw * scale}cqw`, lineHeight: 1.3 });
+  // ONE base size for every field, then shrink-to-fit — the SAME model the print renderer uses
+  // (cardText.ts), so the S/M/L control is consistent across every panel and a long verse fits
+  // instead of clipping, and what the shopper sees is what prints. Sizes are cqw (% of the spread's
+  // width): each page is 50cqw wide, the 10:7 spread 70cqw tall, with p-[5cqw] padding ⇒ a padded
+  // page box of 40×60 cqw. base = BODY(0.085)×50 cqw × S/M/L; keep BODY in sync with cardText.ts.
+  const base = 0.085 * 50 * scale;
+  const leftCqw = fitCardFontSize([note], 40, 60, base, { lineHeight: 1.3 });
+  const rightCqw = fitCardFontSize([greeting, msg, signature], 40, 60, base, { lineHeight: 1.3, gapLines: 1 });
+  const cqw = (v: number) => ({ fontSize: `${v}cqw`, lineHeight: 1.3 });
   return (
     <div className={`flex w-full items-center justify-center ${compact ? 'h-full' : ''}`}>
       {/* Width-driven so a landscape spread never overflows a narrow column; height comes from the
@@ -913,24 +920,25 @@ function CardInsidePreview({ message, compact = false }: { message: CardMessage 
           </div>
         ) : (
           <>
-            {/* facing (left) page: the note, centred both ways */}
+            {/* facing (left) page: the note, centred both ways — one fitted size */}
             <div className="flex w-1/2 items-center justify-center p-[5cqw]">
               {note ? (
-                <p className="whitespace-pre-wrap break-words text-center" style={fs(6.1)}>{note}</p>
+                <p className="whitespace-pre-wrap break-words text-center" style={cqw(leftCqw)}>{note}</p>
               ) : null}
             </div>
-            {/* inside-right page: greeting top-left · message centred · signature bottom-left */}
+            {/* inside-right page: greeting top-left · message centred · signature bottom-left — the
+                three share ONE fitted size (rightCqw) so the page reads evenly. */}
             <div className="flex w-1/2 flex-col p-[5cqw]">
               {greeting ? (
-                <p className="whitespace-pre-wrap break-words" style={fs(4.8)}>{greeting}</p>
+                <p className="whitespace-pre-wrap break-words" style={cqw(rightCqw)}>{greeting}</p>
               ) : null}
               <div className="flex flex-1 items-center justify-center py-[2cqw]">
                 {msg ? (
-                  <p className="whitespace-pre-wrap break-words text-center" style={fs(3.5)}>{msg}</p>
+                  <p className="whitespace-pre-wrap break-words text-center" style={cqw(rightCqw)}>{msg}</p>
                 ) : null}
               </div>
               {signature ? (
-                <p className="whitespace-pre-wrap break-words" style={fs(3.9)}>{signature}</p>
+                <p className="whitespace-pre-wrap break-words" style={cqw(rightCqw)}>{signature}</p>
               ) : null}
             </div>
           </>

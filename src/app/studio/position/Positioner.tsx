@@ -214,7 +214,13 @@ export function Positioner({
   // zoom out to 0.5× if they want a border (founder call 2026-07-07). So its zoom floors
   // at 0.5 of cover — below the fit-centred model other products use.
   const filledDefault = defaultTransformFor(variant.productKey).scale === 1;
-  const scaleFloor = filledDefault ? 0.5 : MIN_SCALE;
+  // A frame is cover-LOCKED: it defaults filled AND can't go below cover (0.5 floor) so it never
+  // shows white margins. The MUG also defaults filled (fill-width, founder 2026-07-10) but is NOT
+  // locked — the shopper must be able to zoom DOWN through contain to reveal the drawing's full
+  // height. So `lockToCover` drives every no-letterbox floor/snap/slider-mode below, while
+  // `filledDefault` still drives the RESET target (double-tap / F → back to fill-width).
+  const lockToCover = filledDefault && !isMug;
+  const scaleFloor = lockToCover ? 0.5 : MIN_SCALE;
   const canvas = canvasSizePx(t);
   const aspect = canvas.width / canvas.height;
   const previewH = Math.round(previewW / aspect);
@@ -237,7 +243,7 @@ export function Positioner({
     // Prefer full print-ready; from BLOCK, falling back to the enhanceable tier
     // (required/2 → classical resample) still un-blocks the order honestly. The
     // 0.995 nudges the landing safely inside the boundary against px rounding.
-    const floor = filledDefault ? scaleFloor : Math.max(fitScale / 2, MIN_SCALE);
+    const floor = lockToCover ? scaleFloor : Math.max(fitScale / 2, MIN_SCALE);
     const scaleFor = (d: number) => zoomValue * (assess.effectiveDpi / d) * 0.995;
     const ok = scaleFor(assess.requiredDpi);
     const enhance = scaleFor(assess.requiredDpi / 2);
@@ -248,9 +254,10 @@ export function Positioner({
           ? { scale: enhance, kind: 'enhance' as const }
           : null;
     if (!pick) return null; // unreachable — the honest advice stays "smaller product"
-    // never snap a filled product to the contain sentinel (that would letterbox it)
-    return { ...pick, scale: !filledDefault && Math.abs(pick.scale - fitScale) < fitScale * FIT_SNAP ? 0 : pick.scale };
-  }, [assess, zoomValue, fitScale, filledDefault, scaleFloor]);
+    // never snap a cover-LOCKED product to the contain sentinel (that would letterbox it); the
+    // mug is filled-by-default but may contain, so it CAN snap.
+    return { ...pick, scale: !lockToCover && Math.abs(pick.scale - fitScale) < fitScale * FIT_SNAP ? 0 : pick.scale };
+  }, [assess, zoomValue, fitScale, lockToCover, scaleFloor]);
 
   // Load the product context whenever the variant changes (photoreal products only).
   useEffect(() => {
@@ -299,7 +306,7 @@ export function Positioner({
     update((prev) => {
       const s0 = prev.scale === 0 ? fitScale : prev.scale;
       const next = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * factor));
-      if (!filledDefault && Math.abs(next - fitScale) < fitScale * FIT_SNAP) return { scale: 0 };
+      if (!lockToCover && Math.abs(next - fitScale) < fitScale * FIT_SNAP) return { scale: 0 };
       return { scale: next };
     });
   };
@@ -498,7 +505,7 @@ export function Positioner({
 
     const s0 = g.base.scale === 0 ? fitScale : g.base.scale;
     let nextScale: number = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
-    if (!filledDefault && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+    if (!lockToCover && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
 
     // Pan against the slack AT THE NEW SCALE (the range grows as you zoom in).
     const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: nextScale });
@@ -725,7 +732,7 @@ export function Positioner({
     clearLive();
     const s0 = h.base.scale === 0 ? fitScale : h.base.scale;
     let nextScale = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
-    if (!filledDefault && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+    if (!lockToCover && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
     setResult(null);
     const next = clampTransform({ ...h.base, scale: nextScale });
     if (!sameTf(next, h.base)) pushHistory(h.base);
@@ -753,9 +760,9 @@ export function Positioner({
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-    // zoomBy closes over fitScale/scaleFloor; re-bind when they change so the floor is
-    // current, and when viewMode flips (the canvas element itself swaps).
-  }, [fitScale, scaleFloor, filledDefault, viewMode]);
+    // zoomBy closes over fitScale/scaleFloor/lockToCover; re-bind when they change so the floor
+    // is current, and when viewMode flips (the canvas element itself swaps).
+  }, [fitScale, scaleFloor, lockToCover, viewMode]);
 
   const canvasInteractionProps = {
     ref: canvasElRef,
@@ -1014,11 +1021,15 @@ export function Positioner({
             <ZoomSlider
               fit={fitScale}
               value={zoomValue}
+              // A cover-DEFAULT product reads its default (cover, scale 1) as "1.0×" — true for the
+              // frame AND the mug (fill-width). What lets the mug still zoom DOWN to contain is the
+              // FLOOR (scaleFloor = MIN_SCALE for the mug), not the readout model — so `filled` uses
+              // filledDefault while the floor uses lockToCover.
               filled={filledDefault}
               floor={scaleFloor}
               onChange={(v) =>
                 filledDefault
-                  ? update({ scale: Math.max(scaleFloor, v) }) // frame: never below cover (no margins)
+                  ? update({ scale: Math.max(scaleFloor, v) }) // frame: floor at cover; mug: floor at MIN_SCALE (can reach contain)
                   : update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })
               }
             />
@@ -1123,8 +1134,10 @@ export function Positioner({
 
 /**
  * Zoom slider. Two modes:
- *  - FILLED (a frame): linear from cover (`floor`, shown as 1.0× — the frame is full)
- *    up to 4×. It never goes below cover, so the frame can't letterbox.
+ *  - FILLED (a cover-default product — frame or mug): linear from `floor` up to 4×, and the reading
+ *    is the raw scale, so the product's cover (scale 1 = fill) reads 1.0×. The frame's floor IS
+ *    cover (0.5) so it can't letterbox; the mug's floor is MIN_SCALE, so it can zoom DOWN through
+ *    contain (which reads ~0.4–0.5×) to reveal the drawing's full height.
  *  - otherwise: "fit the whole image" sits at the CENTRE of the track — left half
  *    fit/2 → fit (more margin), right half fit → 4× (crop). Shown relative to fit.
  */

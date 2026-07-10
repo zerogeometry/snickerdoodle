@@ -11,7 +11,7 @@ import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
-import { detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
+import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -22,6 +22,7 @@ export default function StartCreatingPage() {
   const setUpload = useUpload((s) => s.setUpload);
   const setAssetId = useUpload((s) => s.setAssetId);
   const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
+  const setAspect = useUpload((s) => s.setAspect);
   const setCutout = useUpload((s) => s.setCutout);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -51,6 +52,8 @@ export default function StartCreatingPage() {
     void normalizeUpload(dataUrl, name).then(({ dataUrl: d, name: n }) => {
       setUpload({ dataUrl: d, name: n });
       void detectOpaqueBg(d, n).then(setOpaqueBg);
+      // Aspect drives the catalogue tiles' auto-orientation (wide → landscape frame/jigsaw).
+      void detectAspect(d).then((a) => { if (a) setAspect(a); });
     });
   };
 

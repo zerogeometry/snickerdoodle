@@ -4,13 +4,19 @@ import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 import { loadCardFontWoff } from '@/server/print/cardFonts';
+import { fitCardFontSize } from '@/lib/cardTextFit';
 
 const COCOA = '#2E2723'; // brand text colour (never pure black)
 
-// Font sizes + padding as FRACTIONS of one panel's width, derived from the on-screen preview's cqw
-// units (which are % of the 2-panel spread) doubled to per-panel — so print matches what the shopper
-// saw. `fontScale` (the S/M/L control, clamped in screenCardMessage) multiplies every line together.
-const FRAC = { pad: 0.1, note: 0.122, greeting: 0.096, message: 0.07, signature: 0.078 } as const;
+// ONE base font size for EVERY inside field — a fraction of one panel's width — so the S/M/L
+// control (`fontScale`) is the ONLY thing that changes size, and it changes every panel EQUALLY
+// (no field is arbitrarily larger than another — the founder's "consistent across each printmap").
+// A field, or the right page's three fields together, then shrinks BELOW this base only when it
+// would overflow its panel (fitCardFontSize), so a long verse fits instead of clipping. The preview
+// (CardInsidePreview) uses the SAME base fraction and the SAME fit — expressed in cqw — so what the
+// shopper saw is what prints.
+const BODY = 0.085; // per-panel-width fraction (preview mirror = BODY×50 cqw)
+const PAD = 0.1; // padding, per-panel-width fraction
 const LINE = 1.3;
 
 async function whitePanel(w: number, h: number): Promise<Buffer> {
@@ -40,8 +46,15 @@ export async function renderCardInsidePanels(msg: ScreenedCardMessage, geom: Car
   const { panelWidthPx: w, panelHeightPx: h } = geom;
   const woff = loadCardFontWoff(msg.font);
   const k = msg.fontScale; // clamped [0.7,1.4] upstream
-  const px = (frac: number) => Math.round(w * frac * k);
-  const pad = Math.round(w * FRAC.pad);
+  const pad = Math.round(w * PAD);
+  const innerW = w - 2 * pad;
+  const innerH = h - 2 * pad;
+  const base = w * BODY * k;
+  // The note owns the whole left page; the right page's three fields share one page, so they fit as
+  // a GROUP (one size for all three) with a line of slack between them. Short text stays at `base`
+  // (so every panel matches); long text shrinks just enough to fit — never clips.
+  const leftPx = Math.round(fitCardFontSize([msg.note], innerW, innerH, base, { lineHeight: LINE }));
+  const rightPx = Math.round(fitCardFontSize([msg.greeting, msg.message, msg.signature], innerW, innerH, base, { lineHeight: LINE, gapLines: 1 }));
   const font = { fontFamily: msg.font, color: COCOA } as const;
 
   // LEFT / facing page — the note, centred vertically + horizontally.
@@ -50,7 +63,7 @@ export async function renderCardInsidePanels(msg: ScreenedCardMessage, geom: Car
         el(
           'div',
           { style: { display: 'flex', width: w, height: h, padding: pad, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', ...font } },
-          el('div', { style: { display: 'flex', textAlign: 'center', lineHeight: LINE, fontSize: px(FRAC.note) } }, msg.note),
+          el('div', { style: { display: 'flex', textAlign: 'center', lineHeight: LINE, fontSize: leftPx } }, msg.note),
         ),
         msg.font,
         woff,
@@ -60,15 +73,16 @@ export async function renderCardInsidePanels(msg: ScreenedCardMessage, geom: Car
     : await whitePanel(w, h);
 
   // RIGHT page — greeting top-left · message centred · signature bottom-left (empty fields collapse).
+  // All three share ONE fitted size (rightPx) so the page reads evenly.
   const right =
     msg.greeting || msg.message || msg.signature
       ? await rasterise(
           el(
             'div',
             { style: { display: 'flex', flexDirection: 'column', width: w, height: h, padding: pad, backgroundColor: 'white', lineHeight: LINE, ...font } },
-            el('div', { style: { display: 'flex', fontSize: px(FRAC.greeting) } }, msg.greeting || ''),
-            el('div', { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: px(FRAC.message) } }, msg.message || ''),
-            el('div', { style: { display: 'flex', fontSize: px(FRAC.signature) } }, msg.signature || ''),
+            el('div', { style: { display: 'flex', fontSize: rightPx } }, msg.greeting || ''),
+            el('div', { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: rightPx } }, msg.message || ''),
+            el('div', { style: { display: 'flex', fontSize: rightPx } }, msg.signature || ''),
           ),
           msg.font,
           woff,

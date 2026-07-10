@@ -1,5 +1,5 @@
 import type { BasketItem } from '@/lib/store';
-import type { CatalogueProduct } from '@/server/catalogue';
+import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
  * Pure, framework-free helpers for the shopper-facing catalogue views (the
@@ -21,11 +21,64 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
  *    a puzzle is printed edge-to-edge, and a cushion/blanket face is the print; the image fills
  *    the board/aperture/shape/face (founder calls 2026-07). A shaped cushion (heart/round) clips
  *    the filled image to its silhouette, exactly as the frame clips to the aperture.
+ *  - mug: COVER (scale 1) too — the drawing fills the FULL WIDTH of the wide wrap print surface
+ *    (209×98mm ≈ 2.14:1) by default, rather than contain-letterboxing to its own height (founder
+ *    2026-07-10). Unlike a frame the mug is NOT cover-locked in the editor: the shopper can still
+ *    zoom DOWN through contain to reveal the whole drawing's height (see Positioner `lockToCover`).
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card']);
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'mug']);
 export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+}
+
+/**
+ * The orientation an uploaded image suggests, from its aspect (w/h). Wide → landscape, tall/square
+ * → portrait. Returns null when the aspect is unknown, so a caller falls back to the product's
+ * default orientation rather than guessing. Mirrors the customize page's auto-orient so the
+ * catalogue TILE shows the same orientation the shopper gets when they open the product.
+ */
+export function orientationForAspect(aspect: number | undefined | null): 'landscape' | 'portrait' | null {
+  if (!aspect || !Number.isFinite(aspect) || aspect <= 0) return null;
+  return aspect > 1 ? 'landscape' : 'portrait';
+}
+
+/**
+ * The variant a catalogue surface should DISPLAY and ADD for a product — the ONE resolver shared by
+ * the tile preview, the quick-add "+", and the enlarge modal, so what the shopper sees is exactly
+ * what lands in the basket (never a landscape tile that quietly adds the portrait default).
+ * Precedence: an explicit shopper selection wins; else, for a product with an orientation axis, the
+ * variant whose orientation matches the uploaded drawing's aspect (keeping the default's size +
+ * colour); else the product's plain default.
+ */
+export function resolveDisplayVariant(
+  p: CatalogueProduct,
+  opts?: { aspect?: number | null; selection?: { size?: string; colour?: string; orientation?: string } | null },
+): CatalogueVariant {
+  const def = p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
+  const sel = opts?.selection;
+  if (sel) {
+    const chosen = p.variants.find(
+      (v) =>
+        (p.sizes.length === 0 || v.attributes.size === sel.size) &&
+        (p.colours.length === 0 || v.attributes.colour === sel.colour) &&
+        (p.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === sel.orientation),
+    );
+    if (chosen) return chosen;
+  }
+  if (p.orientations.length > 0) {
+    const want = orientationForAspect(opts?.aspect);
+    if (want) {
+      const oriented = p.variants.find(
+        (v) =>
+          (p.sizes.length === 0 || v.attributes.size === def.attributes.size) &&
+          (p.colours.length === 0 || v.attributes.colour === def.attributes.colour) &&
+          (v.attributes.orientation ?? 'portrait') === want,
+      );
+      if (oriented) return oriented;
+    }
+  }
+  return def;
 }
 
 /**
