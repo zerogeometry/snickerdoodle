@@ -199,6 +199,10 @@ export function Positioner({
 
   const t = variant.template;
   const isJigsaw = variant.productKey === 'jigsaw';
+  // The MUG is a wrap product: an "on the product" view here would paint the art FLAT on the band
+  // (misleading). Edit placement stays the flat print layout; the real front/back wrap lives on the
+  // product page. So suppress the on-product toggle for the mug.
+  const isMug = variant.productKey === 'mug';
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
@@ -814,7 +818,7 @@ export function Positioner({
         {/* Canvas — the image ON the product (photo backdrop) when a template exists;
             the flat print canvas otherwise (or on request). Same shared geometry either way. */}
         <div>
-          {bd && ctx && ctx.ok ? (
+          {!isMug && bd && ctx && ctx.ok ? (
             <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
               <button
                 type="button"
@@ -834,7 +838,7 @@ export function Positioner({
               </button>
             </div>
           ) : null}
-          {bd && ctx && ctx.ok && viewMode === 'product' ? (
+          {!isMug && bd && ctx && ctx.ok && viewMode === 'product' ? (
             <div
               {...canvasInteractionProps}
               className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
