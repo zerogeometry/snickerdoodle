@@ -920,25 +920,28 @@ function CardInsidePreview({ message, compact = false }: { message: CardMessage 
           </div>
         ) : (
           <>
-            {/* facing (left) page: the note, centred both ways — one fitted size */}
-            <div className="flex w-1/2 items-center justify-center p-[5cqw]">
+            {/* facing (left) page: the note, centred both ways — one fitted size. `min-w-0` +
+                overflow-wrap:anywhere so a long UNBROKEN string (no spaces) wraps inside the page
+                instead of sprawling across the spread (flexbox min-width:auto otherwise grows the
+                item to the unbreakable word). */}
+            <div className="flex w-1/2 min-w-0 items-center justify-center p-[5cqw]">
               {note ? (
-                <p className="whitespace-pre-wrap break-words text-center" style={cqw(leftCqw)}>{note}</p>
+                <p className="w-full min-w-0 whitespace-pre-wrap text-center [overflow-wrap:anywhere]" style={cqw(leftCqw)}>{note}</p>
               ) : null}
             </div>
             {/* inside-right page: greeting top-left · message centred · signature bottom-left — the
                 three share ONE fitted size (rightCqw) so the page reads evenly. */}
-            <div className="flex w-1/2 flex-col p-[5cqw]">
+            <div className="flex w-1/2 min-w-0 flex-col p-[5cqw]">
               {greeting ? (
-                <p className="whitespace-pre-wrap break-words" style={cqw(rightCqw)}>{greeting}</p>
+                <p className="w-full min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]" style={cqw(rightCqw)}>{greeting}</p>
               ) : null}
-              <div className="flex flex-1 items-center justify-center py-[2cqw]">
+              <div className="flex min-w-0 flex-1 items-center justify-center py-[2cqw]">
                 {msg ? (
-                  <p className="whitespace-pre-wrap break-words text-center" style={cqw(rightCqw)}>{msg}</p>
+                  <p className="w-full min-w-0 whitespace-pre-wrap text-center [overflow-wrap:anywhere]" style={cqw(rightCqw)}>{msg}</p>
                 ) : null}
               </div>
               {signature ? (
-                <p className="whitespace-pre-wrap break-words" style={cqw(rightCqw)}>{signature}</p>
+                <p className="w-full min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]" style={cqw(rightCqw)}>{signature}</p>
               ) : null}
             </div>
           </>

@@ -57,13 +57,14 @@ export async function renderCardInsidePanels(msg: ScreenedCardMessage, geom: Car
   const rightPx = Math.round(fitCardFontSize([msg.greeting, msg.message, msg.signature], innerW, innerH, base, { lineHeight: LINE, gapLines: 1 }));
   const font = { fontFamily: msg.font, color: COCOA } as const;
 
-  // LEFT / facing page — the note, centred vertically + horizontally.
+  // LEFT / facing page — the note, centred vertically + horizontally. maxWidth + wordBreak so a long
+  // UNBROKEN string wraps within the panel (matching the preview) instead of sprawling off it.
   const left = msg.note
     ? await rasterise(
         el(
           'div',
           { style: { display: 'flex', width: w, height: h, padding: pad, backgroundColor: 'white', alignItems: 'center', justifyContent: 'center', ...font } },
-          el('div', { style: { display: 'flex', textAlign: 'center', lineHeight: LINE, fontSize: leftPx } }, msg.note),
+          el('div', { style: { display: 'flex', maxWidth: innerW, textAlign: 'center', lineHeight: LINE, wordBreak: 'break-word', fontSize: leftPx } }, msg.note),
         ),
         msg.font,
         woff,
@@ -73,16 +74,16 @@ export async function renderCardInsidePanels(msg: ScreenedCardMessage, geom: Car
     : await whitePanel(w, h);
 
   // RIGHT page — greeting top-left · message centred · signature bottom-left (empty fields collapse).
-  // All three share ONE fitted size (rightPx) so the page reads evenly.
+  // All three share ONE fitted size (rightPx) so the page reads evenly. maxWidth + wordBreak as above.
   const right =
     msg.greeting || msg.message || msg.signature
       ? await rasterise(
           el(
             'div',
             { style: { display: 'flex', flexDirection: 'column', width: w, height: h, padding: pad, backgroundColor: 'white', lineHeight: LINE, ...font } },
-            el('div', { style: { display: 'flex', fontSize: rightPx } }, msg.greeting || ''),
-            el('div', { style: { display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center', textAlign: 'center', fontSize: rightPx } }, msg.message || ''),
-            el('div', { style: { display: 'flex', fontSize: rightPx } }, msg.signature || ''),
+            el('div', { style: { display: 'flex', maxWidth: innerW, wordBreak: 'break-word', fontSize: rightPx } }, msg.greeting || ''),
+            el('div', { style: { display: 'flex', maxWidth: innerW, flexGrow: 1, alignItems: 'center', justifyContent: 'center', textAlign: 'center', wordBreak: 'break-word', fontSize: rightPx } }, msg.message || ''),
+            el('div', { style: { display: 'flex', maxWidth: innerW, wordBreak: 'break-word', fontSize: rightPx } }, msg.signature || ''),
           ),
           msg.font,
           woff,
