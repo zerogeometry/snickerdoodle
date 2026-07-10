@@ -384,10 +384,12 @@ async function submitOne(
         // The print file IS the full bleed canvas (renderer output) — fill exactly.
         sizing: 'fillPrintArea',
         ...(cfg?.prodigiAttrs ? { attributes: cfg.prodigiAttrs } : {}),
-        // ⚠️ DOUBLE-SIDED CUSHIONS: this hard-codes ONE 'default' area. The DUAL square SKUs
-        // (…-LIN-DUAL / …-SUE-DUAL) likely expose separate front/back print areas — verify against
-        // Prodigi's real spec and make this per-variant before selling them double-sided. See
-        // project-office/briefs/DUAL-CUSHION-fulfilment.md (+ the /api/dev/prodigi verify route).
+        // One 'default' print area. VERIFIED correct for every current SKU incl. the double-sided
+        // cushions: GLOBAL-CUSH-{12X12-LIN,22X22-SUE}-DUAL each expose only { default: required }
+        // (not front/back), and their template is 2:1 double-wide — so the renderer's double-wide
+        // [front|back] file fills the one 'default' area. Verified against the sandbox product spec
+        // 2026-07-10; see project-office/briefs/DUAL-CUSHION-fulfilment.md. Revisit only if a future
+        // SKU reports multiple required print areas.
         assets: [{ printArea: 'default', url: await presignProviderIngest(key) }],
       });
     }

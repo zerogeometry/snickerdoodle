@@ -217,6 +217,23 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     }
   });
 
+  it('a DOUBLE-SIDED cushion submits ONE asset to the single "default" print area (verified vs Prodigi spec)', async () => {
+    // Verified against the real sandbox product spec (2026-07-10): GLOBAL-CUSH-12X12-LIN-DUAL and
+    // GLOBAL-CUSH-22X22-SUE-DUAL each expose exactly { default: { required: true } } — NOT separate
+    // front/back areas — and their double-sided template is 2:1 double-wide. So the renderer's
+    // double-wide [front|back] file goes to the ONE 'default' area (like single-sided). See
+    // project-office/briefs/DUAL-CUSHION-fulfilment.md. This locks that contract.
+    const { orderId } = await paidOrder('cushion-12square-double');
+    await renderUntilReady(orderId);
+    const transport = fakeTransport();
+    const summary = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId] });
+    expect(summary.submitted).toBe(1);
+    const item = transport.created[0]!.items[0]!;
+    expect(item.sku).toBe('GLOBAL-CUSH-12X12-LIN-DUAL'); // the DUAL SKU
+    expect(item.assets).toHaveLength(1); // ONE asset…
+    expect(item.assets[0]!.printArea).toBe('default'); // …to the single required 'default' area
+  });
+
   it('re-asserts the GATE at the egress moment — a child image never reaches the transport', async () => {
     const { orderId, assetId } = await paidOrder('framedPrint', 'DRAWING');
     await renderUntilReady(orderId); // READY (non-child at render time)
