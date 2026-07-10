@@ -14,11 +14,14 @@ import { cylinderWarp } from './cylinder';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
-// The printmap spans ~40% of the circumference (founder), and the 209mm print wraps ~292° of an
-// 11oz mug (209mm on a ~258mm circumference). So the front shows the central ~144/292 ≈ 49% of the
-// upload; the rest wraps out of view. The curved printmap does the vertical bow — no synthetic one.
-const MUG_VISIBLE_ARC_DEG = 144;
+// The 209mm print wraps ~292° of an 11oz mug (209mm of a ~258mm circumference = π·82mm); the
+// remaining ~68° is the handle gap. The design's right edge anchors at the printmap's handle-side
+// edge and steps back by real arc, so the FRONT shows the design's right ~half and the BACK its
+// left ~half. The printcircumference ellipse (measured from red/printcircumference.png) gives the
+// exact screen-x → surface-angle projection.
 const MUG_PRINTED_ARC_DEG = 292;
+const MUG_ELLIPSE_CX = 0.423; // normalised centre-x of the projected circumference
+const MUG_ELLIPSE_A = 0.207; // normalised half-width (projected radius)
 
 /**
  * The in-VPC product-mockup compositor (proposal/04 + the compositor design spec).
@@ -52,7 +55,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r13'; // r13: mug cylinder driven by the founder's PRINTMAP (full-height curved surface)
+const RENDER_REV = 'r14'; // r14: mug wrap spans the full printed circumference (ellipse projection; front=right half, back=left half)
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -703,7 +706,9 @@ async function renderCylinder(args: {
 
   const warped = cylinderWarp({
     design: wrap, srcW: dw, srcH: dh, printAlpha, pmW: WW, pmH: WH,
-    visibleArcDeg: MUG_VISIBLE_ARC_DEG, printedArcDeg: MUG_PRINTED_ARC_DEG, centerDeg: back ? 180 : 0, mirror: back,
+    // The photo + printmap are flopped for the BACK, so the ellipse centre mirrors with them.
+    ellipseCx: back ? 1 - MUG_ELLIPSE_CX : MUG_ELLIPSE_CX, ellipseA: MUG_ELLIPSE_A,
+    printedArcDeg: MUG_PRINTED_ARC_DEG, back,
   });
   // Flatten the warped RGBA over white so alpha-0 (off-surface) is white → multiply identity → bare mug.
   const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();
