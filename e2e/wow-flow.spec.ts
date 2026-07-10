@@ -24,12 +24,17 @@ test('wow flow: upload → personalised range → add → checkout → personali
 
   // The personalised range renders with real products.
   await expect(page.getByRole('heading', { name: /your masterpiece, made real/i })).toBeVisible({ timeout: 30_000 });
-  const addFramed = page.getByRole('button', { name: /add a framed print/i });
-  await expect(addFramed).toBeVisible();
 
-  // Add it — this ingests the upload server-side; the basket line carries the artwork.
-  await addFramed.click();
-  await expect(page.getByRole('link', { name: /basket.*1 item/i })).toBeVisible({ timeout: 30_000 });
+  // The Start-Creating range adds via "+ customize" (basket-sidebar model — there is no
+  // direct per-tile add). Open the framed print, then add to basket; this ingests the
+  // upload server-side and the basket line carries the artwork.
+  await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+  await expect(page).toHaveURL(/\/customize\/framedPrint(\?|$)/);
+  await page.getByRole('button', { name: /add to basket/ }).click();
+
+  // Adding returns to the range with the item in the basket.
+  await expect(page).toHaveURL(/\/start-creating/);
+  await expect(page.getByText(/1 item added to your basket/i)).toBeVisible({ timeout: 30_000 });
 
   // Checkout — the basket persists across navigation (sessionStorage).
   await page.goto('/checkout');
