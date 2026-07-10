@@ -12,7 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -676,7 +676,7 @@ export default function CustomizePage() {
               }}
             />
           ) : null}
-          {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch /> : null}
+          {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch swatchFor={product.key} /> : null}
 
           {/* CUSHION back: pick a back colour (white is the single-sided default; any other colour
               is a double-sided upgrade) or 'image both sides'. heart + round are single-sided.
@@ -946,6 +946,7 @@ function Picker({
   value,
   onChange,
   swatch = false,
+  swatchFor,
   describe,
 }: {
   label: string;
@@ -953,6 +954,8 @@ function Picker({
   value: string | null;
   onChange: (v: string) => void;
   swatch?: boolean;
+  /** Product key so swatches resolve product-specific colours (the mug's real two-tone hexes). */
+  swatchFor?: string;
   /** Optional small sub-label under an option (e.g. a size's dimensions). */
   describe?: (o: string) => string | undefined;
 }) {
@@ -971,7 +974,7 @@ function Picker({
                 value === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'
               }`}
             >
-              {swatch ? <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: swatchColour(o) }} /> : null}
+              {swatch ? <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: swatchColour(o, swatchFor) }} /> : null}
               {sub ? (
                 <span className="flex flex-col items-start leading-tight">
                   <span>{o}</span>
@@ -988,7 +991,8 @@ function Picker({
   );
 }
 
-function swatchColour(name: string): string {
+function swatchColour(name: string, productKey?: string): string {
+  if (productKey === 'mug' && MUG_SWATCH[name]) return MUG_SWATCH[name];
   const map: Record<string, string> = {
     oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
     natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',

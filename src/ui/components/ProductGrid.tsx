@@ -5,7 +5,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
 import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
-import { defaultTransformFor } from '@/lib/catalogue-view';
+import { MUG_SWATCH, defaultTransformFor } from '@/lib/catalogue-view';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const SWATCH: Record<string, string> = {
@@ -13,7 +13,7 @@ const SWATCH: Record<string, string> = {
   natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
   brown: '#6B4A32', 'dark grey': '#4D4C4A', 'light grey': '#CFCDC8', silver: '#B9B6AE',
 };
-const swatch = (name: string) => SWATCH[name] ?? '#E0C7A8';
+const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || SWATCH[name] || '#E0C7A8';
 
 function defaultVariant(p: CatalogueProduct) {
   return p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
@@ -112,7 +112,7 @@ export function ProductTile({
           // Decorative — click-through (pointer-events-none) so tapping here still opens the product.
           <div role="img" aria-label={`available colours: ${p.colours.join(', ')}`} className="pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col gap-1">
             {p.colours.map((c) => (
-              <span key={c} title={c} aria-hidden className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c) }} />
+              <span key={c} title={c} aria-hidden className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c, p.key) }} />
             ))}
           </div>
         ) : null}
