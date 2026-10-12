@@ -9,6 +9,9 @@ import { BottomTabBar } from '@/ui/components/BottomTabBar';
 import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { AccountActions } from './AccountActions';
+import { ReferralCard } from './ReferralCard';
+import { getDb } from '@/db/client';
+import { getCreditBalance, getOrCreateReferralCode } from '@/server/referrals';
 
 export default async function AccountPage() {
   // Auth-gated server-side: a guest is sent to log in.
@@ -16,6 +19,8 @@ export default async function AccountPage() {
   if (!account) redirect('/login');
 
   const displayName = account.name ?? account.email.split('@')[0];
+  const db = getDb();
+  const [referralCode, creditPence] = await Promise.all([getOrCreateReferralCode(db, account), getCreditBalance(db, account.id)]);
   const initial = (account.name ?? account.email).charAt(0).toUpperCase();
 
   async function logout() {
@@ -33,25 +38,27 @@ export default async function AccountPage() {
         </h1>
 
         {/* Profile — the real signed-in identity */}
-        <section className="mt-5 rounded-2xl border border-[#EADFC9] bg-white p-4">
+        <section className="mt-5 rounded-2xl border border-line bg-white p-4">
           <div className="flex items-center gap-3.5">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-cinnamon font-display text-base font-bold text-cta-text">
               {initial}
             </span>
             <div className="min-w-0">
               <div className="text-[15px] font-bold text-cocoa">{displayName}</div>
-              <div className="flex items-center gap-1.5 text-xs text-[#9C8E7E]">
+              <div className="flex items-center gap-1.5 text-xs text-ink-faint">
                 <Icon icon={IconMail} size={13} /> {account.email}
               </div>
             </div>
           </div>
         </section>
 
+        <ReferralCard code={referralCode} creditPence={creditPence} />
+
         {/* Your data — see / download / delete (trust-critical; one-tap per CLAUDE.md) */}
         <section className="mt-4">
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Your data, your rules</p>
+          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Your data, your rules</p>
           <AccountActions />
-          <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#9C8E7E]">
+          <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-faint">
             <Icon icon={IconUser} size={14} className="mt-0.5 shrink-0 text-green-save" />
             Originals are sacred — your untouched upload is always recoverable, and deletable on demand.
           </p>
@@ -63,7 +70,7 @@ export default async function AccountPage() {
           </Button>
         </form>
 
-        <p className="mt-4 text-center text-xs text-[#9C8772]">
+        <p className="mt-4 text-center text-xs text-ink-faint">
           Questions about your data?{' '}
           <Link href="/trust/privacy" className="font-bold text-cinnamon">
             read our privacy promise

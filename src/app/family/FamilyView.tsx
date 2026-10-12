@@ -12,7 +12,8 @@ import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import type { AccessLevel } from '@/domain/types';
 import type { FamilyData } from '@/server/family';
 
-const AVATAR_COLORS = ['#C8623A', '#84BBD0', '#E8786E', '#93B97C', '#F2A640'];
+// Scrapbook sticker colours, from the tokens (white initials ≥3:1 at this size).
+const AVATAR_COLORS = ['var(--color-tomato)', 'var(--color-cobalt)', 'var(--color-green-save)', 'var(--color-cta-deep)', 'var(--color-cobalt-deep)'];
 
 const ACCESS_LABEL: Record<AccessLevel, string> = {
   VIEW: 'view',
@@ -47,31 +48,31 @@ export function FamilyView({ data }: { data: FamilyData }) {
       <AppDesktopNav active="Family" />
 
       <main id="main" className="flex-1">
-        <div className="bg-honey-band px-6 py-6 text-center">
-          <CaveatNote className="text-lg">the whole gang</CaveatNote>
-          <h1 className="mt-1 font-display text-2xl font-semibold leading-tight md:text-3xl">{data.familyName}</h1>
-          <p className="mt-1 text-[13px] text-[#9C8772]">{peopleCount} in your circle · you decide who sees what</p>
+        <div className="bg-honey-band px-6 py-7 text-center">
+          <CaveatNote className="pop-in -rotate-2 text-xl">the whole gang</CaveatNote>
+          <h1 className="pop-in mt-1 font-display text-[30px] leading-tight md:text-4xl" style={{ ['--i' as string]: 1 }}>{data.familyName}</h1>
+          <p className="pop-in mt-1 text-[13px] text-ink-soft" style={{ ['--i' as string]: 2 }}>{peopleCount} in your circle · you decide who sees what</p>
         </div>
 
         <div className="mx-auto w-full max-w-4xl px-6">
           {/* Members + keepsake subjects */}
           <section className="py-6">
-            <p className="flex items-center gap-2 font-display text-lg font-semibold text-cocoa">
-              <Icon icon={IconUsers} size={18} className="text-cinnamon" /> Members
-            </p>
+            <h2 className="flex items-center gap-2 font-display text-xl text-cocoa">
+              <Icon icon={IconUsers} size={20} className="text-cinnamon" /> Members
+            </h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {data.children.map((c, i) => (
-                <div key={`c-${c.id}`} className="flex items-center gap-3 rounded-2xl border border-[#EFE6D6] bg-white p-3">
+                <div key={`c-${c.id}`} className="pop-in flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3" style={{ ['--i' as string]: i }}>
                   <MemberAvatar initial={c.firstName.charAt(0).toUpperCase()} name="" color={AVATAR_COLORS[i % AVATAR_COLORS.length]!} />
                   <div className="min-w-0">
                     <div className="text-[13px] font-bold text-cocoa">{c.firstName}</div>
-                    <div className="truncate text-[11px] text-[#9C8E7E]">little one</div>
-                    <span className="mt-1 inline-block rounded-full bg-[#EFE6D6] px-2 py-0.5 text-[10px] font-bold text-[#7A6A58]">keepsake subject</span>
+                    <div className="truncate text-[11px] text-ink-soft">little one</div>
+                    <span className="sticker mt-1.5 inline-block -rotate-2 whitespace-nowrap rounded-pill bg-honey px-2 py-0.5 text-[10px] font-extrabold text-cocoa">keepsake subject</span>
                   </div>
                 </div>
               ))}
               {data.members.map((m, i) => (
-                <div key={m.accountId} className="flex items-center gap-3 rounded-2xl border border-[#EFE6D6] bg-white p-3">
+                <div key={m.accountId} className="pop-in flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3" style={{ ['--i' as string]: i + data.children.length }}>
                   <MemberAvatar
                     initial={m.initial}
                     name=""
@@ -79,10 +80,10 @@ export function FamilyView({ data }: { data: FamilyData }) {
                   />
                   <div className="min-w-0">
                     <div className="text-[13px] font-bold text-cocoa">{m.isYou ? `${m.name} (you)` : m.name}</div>
-                    <div className="truncate text-[11px] text-[#9C8E7E]">{m.isOwner ? 'owner' : ACCESS_LABEL[m.accessLevel]}</div>
+                    <div className="truncate text-[11px] text-ink-soft">{m.isOwner ? 'owner' : ACCESS_LABEL[m.accessLevel]}</div>
                     <span
-                      className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                        m.circle === 'FAMILY' ? 'bg-[#FBE4DA] text-cinnamon' : 'bg-[#E8F0DF] text-green-save'
+                      className={`sticker mt-1.5 inline-block rounded-pill px-2 py-0.5 text-[10px] font-extrabold text-cocoa ${
+                        m.circle === 'FAMILY' ? 'rotate-2 bg-berry-pale' : '-rotate-2 bg-leaf-pale'
                       }`}
                     >
                       {m.circle === 'FAMILY' ? 'Family' : 'Extended'}
@@ -93,7 +94,7 @@ export function FamilyView({ data }: { data: FamilyData }) {
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-2xl border-[1.5px] border-dashed border-[#E0A268] bg-[#FCF1E3] text-cinnamon"
+                className="press flex min-h-[78px] flex-col items-center justify-center gap-1.5 rounded-[18px] border-2 border-dashed border-tomato bg-paper-2 text-cinnamon"
               >
                 <Icon icon={IconPlus} size={22} />
                 <span className="text-xs font-bold">add or invite</span>
@@ -103,36 +104,36 @@ export function FamilyView({ data }: { data: FamilyData }) {
 
           {/* Occasions */}
           <section className="pb-6">
-            <p className="flex items-center gap-2 font-display text-lg font-semibold text-cocoa">
-              <Icon icon={IconCalendarHeart} size={18} className="text-cinnamon" /> Birthdays &amp; occasions
-            </p>
+            <h2 className="flex items-center gap-2 font-display text-xl text-cocoa">
+              <Icon icon={IconCalendarHeart} size={20} className="text-cinnamon" /> Birthdays &amp; occasions
+            </h2>
             {occasions.length > 0 ? (
               <>
-                <p className="mt-1 text-xs text-[#9C8E7E]">We&apos;ll give you a gentle nudge before each one.</p>
+                <p className="mt-1 text-xs text-ink-soft">We&apos;ll give you a gentle nudge before each one.</p>
                 <div className="mt-4 space-y-2.5">
-                  {occasions.map((o) => (
-                    <div key={o.child.id} className="flex items-center gap-3.5 rounded-2xl border border-[#EFE6D6] bg-white p-3.5">
-                      <div className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl border-2 border-honey bg-[#FFFDF8] leading-none">
-                        <span className="text-[10px] font-bold text-cinnamon">{o.b.label.split(' ')[1]?.toUpperCase() ?? ''}</span>
-                        <span className="font-display text-base font-semibold text-cocoa">{o.b.label.split(' ')[0]}</span>
+                  {occasions.map((o, i) => (
+                    <div key={o.child.id} className="pop-in flex items-center gap-3.5 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3.5" style={{ ['--i' as string]: i }}>
+                      <div className="sticker flex h-12 w-12 shrink-0 -rotate-3 flex-col items-center justify-center rounded-[12px] bg-honey-band leading-none">
+                        <span className="text-[10px] font-extrabold text-cinnamon">{o.b.label.split(' ')[1]?.toUpperCase() ?? ''}</span>
+                        <span className="font-display text-lg text-cocoa">{o.b.label.split(' ')[0]}</span>
                       </div>
                       <div className="flex-1">
                         <div className="text-[13px] font-bold text-cocoa">{o.child.firstName}&apos;s birthday</div>
-                        <div className="text-[11px] text-[#9C8E7E]">{o.b.when}</div>
+                        <div className="text-[11px] text-ink-soft">{o.b.when}</div>
                       </div>
                     </div>
                   ))}
                 </div>
               </>
             ) : (
-              <div className="mt-3 rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-4 text-center text-xs text-[#7A6A58]">
+              <div className="mt-3 rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper p-5 text-center text-sm text-ink-soft">
                 Add a birthday to a little one and we&apos;ll nudge you before each special day.
               </div>
             )}
           </section>
         </div>
 
-        <div className="flex items-center justify-center gap-2 bg-[#F1E7D4] px-6 py-3.5 text-center text-xs text-green-save">
+        <div className="flex items-center justify-center gap-2 bg-leaf-pale px-6 py-3.5 text-center text-xs font-semibold text-green-save">
           <Icon icon={IconLock} size={15} />
           You&apos;re the controller. Children are keepsake subjects, never account holders — and you can change or remove
           anyone, any time.

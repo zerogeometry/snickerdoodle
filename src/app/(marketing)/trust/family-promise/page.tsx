@@ -12,11 +12,11 @@ export default function FamilyPromisePage() {
   return (
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl text-center">
-        <CaveatNote className="text-2xl">they&apos;re only little once</CaveatNote>
-        <h1 className="mt-2 font-display text-4xl font-semibold leading-tight md:text-5xl">
+        <CaveatNote className="pop-in -rotate-2 text-[28px] leading-none">they&apos;re only little once</CaveatNote>
+        <h1 className="pop-in mt-2 font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl" style={{ ['--i' as string]: 1 }}>
           Looking after your family&apos;s magic
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-[#5F564C]">
+        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft">
           Your child&apos;s drawings, their funny little photos, their name and their birthday — these are about the
           most precious things you could hand anyone. We don&apos;t take that lightly. So here&apos;s exactly how we
           look after them, in plain English. No legalese, no small-print games.
@@ -70,7 +70,7 @@ export default function FamilyPromisePage() {
           to you. You can always go to the regulator too, but we&apos;d love the chance to put it right first.
         </p>
 
-        <p className="text-[13px] text-[#9C8E7E]">
+        <p className="text-[13px] text-ink-faint">
           The plain-English promises here are the friendly face of the proper, boring, important stuff — you can read
           the full <Link href="/trust/privacy">Privacy Notice</Link> any time. They&apos;re only little once.
           We&apos;ll look after the magic.

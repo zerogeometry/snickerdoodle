@@ -26,7 +26,7 @@ function variantSub(v: CatalogueVariant): string | undefined {
 }
 
 function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={`mb-2 font-display text-base font-semibold text-cocoa ${className}`}>{children}</h2>;
+  return <h2 className={`mb-1 font-display text-lg text-cocoa ${className}`}>{children}</h2>;
 }
 
 /**
@@ -192,9 +192,9 @@ export function FlowCatalogue({
   const flatShown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
 
   const gridClassName = compact
-    ? 'grid grid-cols-2 gap-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
-    : 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4';
-  const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto pr-2 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
+    ? 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
+    : 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3 sm:grid-cols-3 md:grid-cols-4 md:gap-x-5';
+  const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto px-1.5 pb-3 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]' : undefined;
   // Sections (Start-Creating) uses the basket-sidebar model: the catalogue tiles just
   // "+ customize", and quantity lives in the basket — so no per-tile stepper.
   const gridProps = {
@@ -220,7 +220,7 @@ export function FlowCatalogue({
               When the shopper has picks from the full catalogue the title steps aside to
               "your range" and the two sections are labelled inside the scroll instead. */}
           <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-display text-xl font-semibold text-cocoa">{picks.length > 0 ? 'your range' : popular.length === 1 && picks.length === 0 ? 'your keepsake' : 'most popular'}</h2>
+            <h2 className="font-display text-xl text-cocoa">{picks.length > 0 ? 'your range' : popular.length === 1 && picks.length === 0 ? 'your keepsake' : 'most popular'}</h2>
             {hasMoreThanShown ? (
               <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
                 full catalogue <Icon icon={IconChevronRight} size={15} />
@@ -232,20 +232,20 @@ export function FlowCatalogue({
             <button
               type="button"
               onClick={() => { if (guardUpload()) setFamilyOpen(true); }}
-              className="mb-3 flex w-full items-center gap-3 rounded-2xl border border-[#F0DDBC] bg-honey-band p-3.5 text-left transition-colors hover:border-honey"
+              className="press mb-3 flex w-full items-center gap-3 rounded-[18px] border-2 border-cocoa bg-honey-band p-3.5 text-left shadow-[0_3px_0_var(--color-cocoa)] active:shadow-none"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70">
-                <Icon icon={IconShirt} size={20} className="text-cinnamon" />
+              <span className="wiggle flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-honey">
+                <Icon icon={IconShirt} size={20} className="text-cocoa" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="font-display text-base font-semibold text-cocoa">dress the whole family</span>
-                <span className="block text-[12px] text-[#7A6A58]">matching organic tees + a bodysuit for the littlest — 3+ pieces saves 5%</span>
+                <span className="block font-display text-base text-cocoa">dress the whole family</span>
+                <span className="block text-[12px] text-ink-soft">matching organic tees + a bodysuit for the littlest — 3+ pieces saves 5%</span>
               </span>
-              <Icon icon={IconChevronRight} size={18} className="shrink-0 text-[#B3985F]" />
+              <Icon icon={IconChevronRight} size={18} className="shrink-0 text-cocoa" />
             </button>
           ) : null}
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
-          <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto pr-1 md:h-auto">
+          <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (
               <>
                 <SectionLabel>your picks</SectionLabel>
@@ -259,7 +259,7 @@ export function FlowCatalogue({
               </>
             ) : picks.length === 0 ? (
               // success-but-empty: never a bare heading over a void
-              <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-6 text-center text-sm text-[#6F6358]">
+              <div className="mt-3 rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper p-6 text-center text-sm text-ink-soft">
                 {hasMoreThanShown ? (
                   <>tap <b className="text-cinnamon">full catalogue</b> to browse the whole range.</>
                 ) : (
@@ -274,7 +274,7 @@ export function FlowCatalogue({
       ) : (
         <>
           {showCategories ? (
-            <div className="mb-3 flex gap-2 overflow-x-auto pb-1">
+            <div className="-mx-1 mb-1 flex gap-2 overflow-x-auto px-1 pb-2 pt-1" role="group" aria-label="filter the range">
               {flatCategories.map((c) => (
                 <Chip key={c} active={category === c} onClick={() => setCategory(c)}>
                   {c}
@@ -289,14 +289,14 @@ export function FlowCatalogue({
       )}
 
       {/* Footer: basket count (so "Create another" clearly keeps the basket) + total + actions */}
-      <div className="mt-4 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-4">
+      <div className="mt-4 rounded-[18px] border-2 border-cocoa bg-paper p-4 shadow-[0_3px_0_var(--color-cocoa)]">
         <div className="flex items-center justify-between gap-3">
           <span className="text-[13px] font-bold text-cocoa">
             {count > 0 ? `${count} item${count === 1 ? '' : 's'} added to your basket` : 'nothing added yet'}
           </span>
           <div className="text-right">
-            <div className="font-display text-xl font-semibold text-cocoa">{gbp(subtotal)}</div>
-            <div className="text-[11px] text-[#9C8E7E]">free tracked delivery</div>
+            <div className="font-display text-xl text-cocoa">{gbp(subtotal)}</div>
+            <div className="text-[11px] font-semibold text-green-save">free tracked delivery</div>
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
@@ -344,7 +344,7 @@ export function FlowCatalogue({
       <Modal open={!!zoom} onClose={() => setZoom(null)} size="xl" fill title={zoom?.label ?? ''} subtitle={zoom ? `from ${gbp(zoom.fromPence)}` : undefined}>
         {zoom ? (
           <div className="flex h-full flex-col items-center gap-3 py-2">
-            <div className="flex w-full flex-1 items-center justify-center overflow-hidden rounded-2xl bg-[#FBF5E9] p-3">
+            <div className="flex w-full flex-1 items-center justify-center overflow-hidden rounded-2xl bg-paper-2 p-3">
               <MockupPreview
                 productKey={zoom.key as ProductKey}
                 assetId={upload?.assetId}

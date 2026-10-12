@@ -162,6 +162,55 @@
       "when": 1783588686316,
       "tag": "0022_brown_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1791819120750,
+      "tag": "0023_talented_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791819535826,
+      "tag": "0024_serious_nextwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791823597948,
+      "tag": "0025_rainy_richard_fisk",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791827729923,
+      "tag": "0026_overconfident_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1791828470484,
+      "tag": "0027_black_skin",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1791828853139,
+      "tag": "0028_new_magma",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1791841763245,
+      "tag": "0029_lumpy_purple_man",
+      "breakpoints": true
     }
   ]
 }

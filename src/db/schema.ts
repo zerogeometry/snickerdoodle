@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
   check,
@@ -104,6 +105,8 @@ export const auditEvent = pgEnum('audit_event', [
   'PURGE_EXECUTED',
   'RIGHTS_REQUEST_RECEIVED',
   'RIGHTS_REQUEST_COMPLETED',
+  'CHILD_ADDED',
+  'FAMILY_RENAMED',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
@@ -150,6 +153,8 @@ export const invites = pgTable('invites', {
   relationship: relationship('relationship').notNull(),
   circle: circle('circle').notNull(),
   accessLevel: accessLevel('access_level').notNull(),
+  /** The parent's "share the family calendar" choice for this invitee (pre-ticked in the UI). */
+  shareOccasions: boolean('share_occasions').notNull().default(false),
   token: text('token').notNull().unique(),
   status: inviteStatus('status').notNull().default('PENDING'),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -171,6 +176,10 @@ export const memberships = pgTable(
     relationship: relationship('relationship').notNull(),
     circle: circle('circle').notNull(),
     accessLevel: accessLevel('access_level').notNull(),
+    /** Sees the family calendar (children's first names' birthdays → "coming up" + reminders).
+     * Copied from the invite the parent sent; the parent can change it any time. Default off
+     * for safety — only an explicit invite choice turns it on. */
+    seesOccasions: boolean('sees_occasions').notNull().default(false),
     status: membershipStatus('status').notNull().default('ACTIVE'),
     isOwner: boolean('is_owner').notNull().default(false),
     // NOT NULL for invited members — a membership exists only for the owner or
@@ -371,6 +380,21 @@ export const orders = pgTable(
     totalPence: integer('total_pence').notNull(),
     currency: text('currency').notNull().default('GBP'),
     isGift: boolean('is_gift').notNull().default(false),
+    /** Bought THROUGH this gift link (ticks the item off the list). The link itself is the FK
+     * target so a revoked link keeps its history; deleting the link just unlinks. */
+    giftLinkId: uuid('gift_link_id').references((): AnyPgColumn => giftLinks.id, { onDelete: 'set null' }),
+    /** Who it's from, as the buyer chose to sign it (shown ONLY to the family's parent, on
+     * the list sticker + the "it's been bought" note). Screened text, first-name-ish, ≤40. */
+    giftFromName: text('gift_from_name'),
+    /** A promo / partner code used on this order (server-resolved), what it took off the
+     * goods, and what the partner (influencer / PTA / referrer) earns once it's PAID. */
+    promoCodeId: uuid('promo_code_id').references((): AnyPgColumn => promoCodes.id, { onDelete: 'set null' }),
+    promoSavingPence: integer('promo_saving_pence').notNull().default(0),
+    partnerCommissionPence: integer('partner_commission_pence').notNull().default(0),
+    /** Who paid (signed-in account's email, else the email Stripe collected) — referral checks. */
+    buyerEmail: text('buyer_email'),
+    /** Account credit (referral rewards) spent on this order; debited in the ledger once PAID. */
+    creditAppliedPence: integer('credit_applied_pence').notNull().default(0),
     stripeSessionId: text('stripe_session_id'),
     paidAt: timestamp('paid_at', { withTimezone: true }),
     // ── POD submission (Prodigi) ──
@@ -535,6 +559,10 @@ export const productVariants = pgTable(
     // Size / colour / finish axes (Prodigi-shaped, e.g. { size: 'A4', colour: 'oak' }).
     attributes: jsonb('attributes').$type<Record<string, string>>(),
     pricePence: integer('price_pence').notNull(), // PRICE lives here — pricing reads this
+    /** What one unit costs US, landed: supplier product cost + the baked-in delivery, ex-VAT
+     * (from the Prodigi sheets via scripts/discount-headroom.mjs --write-costs). Drives the
+     * promo margin guard. null ⇒ unknown ⇒ that line is never discounted. Never sent to clients. */
+    unitCostPence: integer('unit_cost_pence'),
     currency: text('currency').notNull().default('GBP'),
     isDefault: boolean('is_default').notNull().default(false), // the variant a quick-add uses
     sortOrder: integer('sort_order').notNull().default(0),
@@ -745,4 +773,106 @@ export const verificationTokens = pgTable(
     expires: timestamp('expires', { withTimezone: true }).notNull(),
   },
   (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+);
+
+// ── reminder_sends — one row per occasion reminder actually sent. Drives the
+// one-per-occasion rule and the frequency cap (src/server/reminders/planner.ts). Holds ids
+// and a date only — never the child's name or anything inferred about them.
+export const reminderSends = pgTable(
+  'reminder_sends',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    childId: uuid('child_id')
+      .notNull()
+      .references(() => children.id, { onDelete: 'cascade' }),
+    occasionYear: integer('occasion_year').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [uniqueIndex('reminder_once_per_occasion').on(t.accountId, t.childId, t.occasionYear), index('reminder_account_idx').on(t.accountId, t.sentAt)],
+);
+
+// ── promo_codes — discount + partner codes (D15). Priced ONLY server-side (src/pricing/promo.ts):
+// the client sends a code string, never an amount. A code may be a customer discount (PERCENT /
+// FIXED, optional minimum spend), a partner code that earns a commission (influencer, PTA,
+// referral), or both. The margin guard caps discount + commission per order.
+export const promoKind = pgEnum('promo_kind', ['PERCENT', 'FIXED']);
+export const partnerType = pgEnum('partner_type', ['INFLUENCER', 'PTA', 'REFERRAL', 'CAMPAIGN']);
+export const promoCodes = pgTable(
+  'promo_codes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    code: text('code').notNull(), // stored UPPER-CASE; matched case-insensitively
+    kind: promoKind('kind').notNull(),
+    /** PERCENT: basis points off eligible goods (1000 = 10%). FIXED: pence off. 0 = attribution only. */
+    value: integer('value').notNull(),
+    minSpendPence: integer('min_spend_pence').notNull().default(0),
+    /** Partner who earns on PAID orders: basis points of the discounted ex-VAT goods. */
+    partnerName: text('partner_name'),
+    partnerType: partnerType('partner_type'),
+    commissionBps: integer('commission_bps').notNull().default(0),
+    /** PTA class codes roll up to one partner (partnerName) — e.g. "Year 2". */
+    classLabel: text('class_label'),
+    /** A parent's personal REFERRAL code: whose it is (can't use your own; rewards go to them). */
+    ownerAccountId: uuid('owner_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+    /** Only valid on the buyer's first paid order (referral codes). */
+    firstOrderOnly: boolean('first_order_only').notNull().default(false),
+    startsAt: timestamp('starts_at', { withTimezone: true }),
+    endsAt: timestamp('ends_at', { withTimezone: true }),
+    /** Max PAID orders that may use it (null = unlimited). */
+    maxRedemptions: integer('max_redemptions'),
+    active: boolean('active').notNull().default(true),
+    createdAt,
+  },
+  (t) => [uniqueIndex('promo_code_unique').on(t.code)],
+);
+
+// ── saved_designs — "+ Keepsake": a drawing ON a product, saved for later (D16). The exact
+// variant + placement a buyer will get, so a gift request sells precisely what was designed.
+// Belongs to a family + the account that saved it; visibility always derives from the ASSET
+// (authz), so a saved design can never show the art to anyone the asset hides it from.
+export const savedDesigns = pgTable(
+  'saved_designs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    createdByAccountId: uuid('created_by_account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => assets.id, { onDelete: 'cascade' }), // delete the drawing → its designs go too
+    variantSku: text('variant_sku').notNull(),
+    transform: jsonb('transform'),
+    sourceObjectId: uuid('source_object_id'),
+    back: text('back'),
+    createdAt,
+  },
+  (t) => [index('saved_design_family_idx').on(t.familyId, t.createdAt)],
+);
+
+// ── account_credits — an append-only ledger of credit owed to an account (referral rewards)
+// and spent from it. Balance = SUM(delta). One row per (order, reason) so a webhook retry can
+// never double-credit or double-spend.
+export const creditReason = pgEnum('credit_reason', ['REFERRAL_REWARD', 'SPENT', 'ADJUSTMENT']);
+export const accountCredits = pgTable(
+  'account_credits',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    deltaPence: integer('delta_pence').notNull(),
+    reason: creditReason('reason').notNull(),
+    orderId: uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+    createdAt,
+  },
+  (t) => [
+    index('credit_account_idx').on(t.accountId),
+    uniqueIndex('credit_once_per_order_reason').on(t.orderId, t.reason, t.accountId),
+  ],
 );

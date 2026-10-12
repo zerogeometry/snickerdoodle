@@ -13,7 +13,12 @@ const SWATCH: Record<string, string> = {
   natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
   brown: '#6B4A32', 'dark grey': '#4D4C4A', 'light grey': '#CFCDC8', silver: '#B9B6AE',
 };
-const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || SWATCH[name] || '#E0C7A8';
+// SWATCH above holds the REAL product material colours (a black frame, an oak frame…) — product
+// data, not brand styling, so they stay literal. Unknown colours fall back to a token.
+const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || SWATCH[name] || 'var(--color-line)';
+
+// Washi-tape colours, cycled by index so a grid looks hand-stuck but never random (no layout shift).
+const TAPES = ['honey', 'sky', 'berry', 'leaf'].map((t) => `color-mix(in srgb, var(--color-${t}) 80%, transparent)`);
 
 /**
  * One catalogue tile — the real photoreal preview, a from-price, a quick +/− stepper
@@ -33,9 +38,12 @@ export function ProductTile({
   onSub,
   onCustomize,
   onZoom,
+  index = 0,
 }: {
   p: CatalogueProduct;
   qty: number;
+  /** Position in the grid — varies the resting tilt + tape colour, deterministically. */
+  index?: number;
   upload: Upload;
   lazy?: boolean;
   enableZoom?: boolean;
@@ -59,10 +67,20 @@ export function ProductTile({
   // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
   const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: sel });
   return (
-    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] shadow-[0_2px_6px_rgba(46,39,35,.06)] @container">
+    // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
+    // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape
+    // can sit proud of the top edge; the preview area clips its own contents.
+    <div
+      className="polaroid tape lift group relative flex h-full flex-col @container"
+      style={{
+        ['--tilt' as string]: index % 3 === 0 ? '-1.4deg' : index % 3 === 1 ? '1.1deg' : '-0.5deg',
+        ['--tape' as string]: TAPES[index % TAPES.length],
+        ['--tape-rot' as string]: index % 2 ? '4deg' : '-3deg',
+      }}
+    >
       {/* SQUARE image area (the product photos are square-ish): the preview is contained
           inside it, so the name/price row + controls below are never covered. */}
-      <div className="relative aspect-square w-full overflow-hidden bg-[#FBF5E9] p-2">
+      <div className="relative aspect-square w-full overflow-hidden bg-paper-2 p-2">
         <MockupPreview
           productKey={p.key as ProductKey}
           assetId={upload?.assetId}
@@ -93,7 +111,7 @@ export function ProductTile({
             type="button"
             onClick={onZoom}
             aria-label={`Enlarge ${p.label} preview`}
-            className="absolute left-1.5 top-1.5 z-20 flex items-center justify-center rounded-full bg-white/85 p-1 text-[#7A6A58] shadow-sm before:absolute before:-inset-[11px] before:content-[''] hover:text-cinnamon"
+            className="absolute left-1.5 top-1.5 z-20 flex items-center justify-center rounded-full border-2 border-cocoa bg-paper p-0.5 text-cocoa before:absolute before:-inset-[11px] before:content-[''] hover:text-cinnamon"
           >
             <Icon icon={IconZoomScan} size={15} />
           </button>
@@ -102,16 +120,16 @@ export function ProductTile({
           // Decorative — click-through (pointer-events-none) so tapping here still opens the product.
           <div role="img" aria-label={`available colours: ${p.colours.join(', ')}`} className="pointer-events-none absolute right-1.5 top-1.5 z-20 flex flex-col gap-1">
             {p.colours.map((c) => (
-              <span key={c} title={c} aria-hidden className="h-2.5 w-2.5 rounded-full border border-black/15 shadow-sm" style={{ backgroundColor: swatch(c, p.key) }} />
+              <span key={c} title={c} aria-hidden className="h-2.5 w-2.5 rounded-full border border-cocoa/30" style={{ backgroundColor: swatch(c, p.key) }} />
             ))}
           </div>
         ) : null}
       </div>
 
-      <div className="flex flex-1 flex-col gap-2 border-t border-[#EFE6D6] px-3 py-2.5">
+      <div className="flex flex-1 flex-col gap-2 px-1 pb-0.5 pt-2.5">
         <div className="flex items-baseline justify-between gap-1">
-          <span className="min-w-0 truncate text-sm font-bold text-cocoa">{p.label}</span>
-          <span className="shrink-0 whitespace-nowrap text-xs text-[#9C8E7E]">from {gbp(p.fromPence)}</span>
+          <span className="min-w-0 truncate text-sm font-extrabold text-cocoa">{p.label}</span>
+          <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-soft">from {gbp(p.fromPence)}</span>
         </div>
         {/* Controls stack on a narrow tile (so each meets the 44px tap target without
             overflowing) and sit on one row once the TILE itself is wide enough. Uses a
@@ -119,17 +137,17 @@ export function ProductTile({
             column stay narrow even on a wide screen. Falls back to stacked if unsupported. */}
         <div className="mt-auto flex flex-col gap-2 @[14rem]:flex-row @[14rem]:items-center @[14rem]:justify-between">
           {showStepper ? (
-            <div className="flex items-center self-start rounded-full border border-[#E6D8BE] bg-white @[14rem]:self-auto">
-              <button type="button" aria-label={`one fewer ${p.label}`} onClick={onSub} disabled={qty === 0} className="flex min-h-11 min-w-10 items-center justify-center text-[#7A6A58] disabled:opacity-30">
+            <div className="flex items-center self-start rounded-full border-2 border-cocoa/25 bg-paper @[14rem]:self-auto">
+              <button type="button" aria-label={`one fewer ${p.label}`} onClick={onSub} disabled={qty === 0} className="press flex min-h-11 min-w-11 items-center justify-center text-cocoa disabled:opacity-30">
                 <Icon icon={IconMinus} size={14} />
               </button>
               <span className="min-w-4 text-center text-xs font-bold text-cocoa">{qty}</span>
-              <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="flex min-h-11 min-w-10 items-center justify-center text-cinnamon">
+              <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="press flex min-h-11 min-w-11 items-center justify-center text-cinnamon">
                 <Icon icon={IconPlus} size={14} />
               </button>
             </div>
           ) : null}
-          <button type="button" onClick={onCustomize} className={`inline-flex min-h-11 items-center justify-center rounded-full border border-[#E6D8BE] bg-white px-3 text-[11px] font-bold text-cocoa hover:border-honey ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
+          <button type="button" onClick={onCustomize} className={`press inline-flex min-h-11 items-center justify-center rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
             {customizeLabel}
           </button>
         </div>
@@ -147,7 +165,7 @@ export function ProductGrid({
   enableZoom = true,
   showStepper = true,
   customizeLabel = 'customize',
-  gridClassName = 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4',
+  gridClassName = 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3 sm:grid-cols-3 md:grid-cols-4',
   onAdd,
   onSub,
   onCustomize,
@@ -168,10 +186,13 @@ export function ProductGrid({
 }) {
   return (
     <div className={gridClassName}>
-      {products.map((p) => (
+      {products.map((p, i) => (
+        // Staggered sticker-slap entrance on a WRAPPER — .pop-in's fill would otherwise pin the
+        // tile's transform and cancel its .lift hover.
+        <div key={p.key} className="pop-in" style={{ ['--i' as string]: Math.min(i, 12) }}>
         <ProductTile
-          key={p.key}
           p={p}
+          index={i}
           qty={qtyOf(p)}
           upload={upload}
           lazy={lazy}
@@ -183,6 +204,7 @@ export function ProductGrid({
           onCustomize={() => onCustomize(p)}
           onZoom={onZoom ? () => onZoom(p) : undefined}
         />
+        </div>
       ))}
     </div>
   );

@@ -47,42 +47,42 @@ export function AccountActions() {
   };
 
   return (
-    <div className="divide-y divide-[#F2EADB] overflow-hidden rounded-2xl border border-[#EADFC9] bg-white">
+    <div className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-white">
       <button
         type="button"
         onClick={download}
         disabled={pending}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-[#FBF8F1] disabled:opacity-60"
+        className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-paper-2 disabled:opacity-60"
       >
         <Icon icon={IconDownload} size={18} className="shrink-0 text-cinnamon" />
         <span className="flex-1">
           <span className="block text-[13px] font-bold text-cocoa">{pending ? 'preparing your download…' : 'Download your data'}</span>
-          <span className="block text-[11px] text-[#9C8E7E]">Every keepsake and detail we hold — yours to keep.</span>
+          <span className="block text-[11px] text-ink-faint">Every keepsake and detail we hold — yours to keep.</span>
         </span>
       </button>
 
-      <Link href="/home" className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-[#FBF8F1]">
+      <Link href="/home" className="flex w-full items-center gap-3 px-4 py-3.5 text-left hover:bg-paper-2">
         <Icon icon={IconShieldCheck} size={18} className="shrink-0 text-green-save" />
         <span className="flex-1">
           <span className="block text-[13px] font-bold text-cocoa">See what we hold</span>
-          <span className="block text-[11px] text-[#9C8E7E]">Your keepsakes, your circle, your originals.</span>
+          <span className="block text-[11px] text-ink-faint">Your keepsakes, your circle, your originals.</span>
         </span>
       </Link>
 
-      <div className="px-4 py-3.5 hover:bg-[#FCEEEA]">
+      <div className="px-4 py-3.5 hover:bg-berry-pale">
         <button type="button" onClick={del} disabled={pending} className="flex w-full items-center gap-3 text-left disabled:opacity-60">
           <Icon icon={IconTrash} size={18} className="shrink-0 text-berry" />
           <span className="flex-1">
             <span className="block text-[13px] font-bold text-berry">
               {confirmDelete ? 'tap again — delete everything for good' : 'Delete all your keepsakes'}
             </span>
-            <span className="block text-[11px] text-[#9C8E7E]">
+            <span className="block text-[11px] text-ink-faint">
               {confirmDelete ? 'this can’t be undone.' : 'Really deleted — from our store, our processors and our backups.'}
             </span>
           </span>
         </button>
         {confirmDelete ? (
-          <button type="button" onClick={() => setConfirmDelete(false)} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-[#7A6A58] hover:text-cinnamon">
+          <button type="button" onClick={() => setConfirmDelete(false)} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-cinnamon">
             <Icon icon={IconX} size={12} /> keep my keepsakes
           </button>
         ) : null}

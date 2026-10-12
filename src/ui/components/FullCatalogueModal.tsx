@@ -81,19 +81,19 @@ export function FullCatalogueModal({
       }
     >
       {/* sticky search + category chips — bleed to the modal edges so content scrolls cleanly under */}
-      <div className="sticky top-0 z-10 -mx-5 -mt-2 mb-1 border-b border-[#F2EADB] bg-[#FFFDF8] px-5 pb-2.5 pt-3">
-        <div className="flex items-center gap-2 rounded-full border border-[#E6D8BE] bg-white px-3 py-2 focus-within:border-honey">
-          <Icon icon={IconSearch} size={16} className="shrink-0 text-[#A2937F]" />
+      <div className="sticky top-0 z-10 -mx-5 -mt-2 mb-1 border-b border-line bg-paper px-5 pb-2.5 pt-3">
+        <div className="flex items-center gap-2 rounded-full border border-line bg-white px-3 py-2 focus-within:border-honey">
+          <Icon icon={IconSearch} size={16} className="shrink-0 text-ink-faint" />
           <input
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="search the range — mug, tee, blanket…"
             aria-label="Search the full catalogue"
-            className="min-w-0 flex-1 bg-transparent text-sm text-cocoa outline-none placeholder:text-[#B3A491]"
+            className="min-w-0 flex-1 bg-transparent text-sm text-cocoa outline-none placeholder:text-ink-faint"
           />
           {q ? (
-            <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="shrink-0 rounded-full p-0.5 text-[#B3A491] hover:text-cinnamon">
+            <button type="button" onClick={() => setQ('')} aria-label="Clear search" className="shrink-0 rounded-full p-0.5 text-ink-faint hover:text-cinnamon">
               <Icon icon={IconX} size={15} />
             </button>
           ) : null}
@@ -120,7 +120,7 @@ export function FullCatalogueModal({
           onZoom={onZoom}
         />
       ) : (
-        <p className="py-12 text-center text-sm text-[#6F6358]">
+        <p className="py-12 text-center text-sm text-ink-soft">
           no keepsakes match “{q}”. <button type="button" onClick={() => { setQ(''); setCat('all'); }} className="font-bold text-cinnamon">clear search</button>
         </p>
       )}

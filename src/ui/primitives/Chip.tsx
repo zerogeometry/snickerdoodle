@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../cn';
 
-/** Filter / relationship / tab chip. Matches the mockups' pill chips. */
+/** Filter / relationship / tab chip — a little sticker that jiggles when tapped. */
 export function Chip({
   active = false,
   className,
@@ -13,10 +13,10 @@ export function Chip({
       type="button"
       aria-pressed={active}
       className={cn(
-        'inline-flex flex-none items-center rounded-pill border-[1.5px] px-3.5 py-1.5 text-xs font-bold transition-colors',
+        'wiggle inline-flex min-h-9 flex-none items-center rounded-pill border-2 px-3.5 py-1.5 text-[13px] font-bold transition-colors',
         active
-          ? 'border-cinnamon bg-cinnamon text-cta-text'
-          : 'border-[#E0C7A8] bg-transparent text-[#7A6A58] hover:bg-honey-band',
+          ? 'border-cocoa bg-cocoa text-paper'
+          : 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa',
         className,
       )}
       {...rest}

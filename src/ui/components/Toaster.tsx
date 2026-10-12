@@ -12,7 +12,7 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto rounded-full bg-cocoa px-4 py-2.5 text-[13px] font-semibold text-oat shadow-[0_8px_24px_rgba(46,39,35,.28)]"
+          className="pointer-events-auto rounded-full bg-cocoa px-4 py-2.5 text-[13px] font-semibold text-oat shadow-[0_8px_24px_color-mix(in_srgb,var(--color-cocoa)_28%,transparent)]"
         >
           {t.message}
         </div>

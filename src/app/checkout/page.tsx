@@ -13,7 +13,7 @@ import { basketSubtotal, DELIVERY_PENCE, gbp, SUBJECT_KEY, toast, useBasket } fr
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
-import type { Quote } from '@/pricing';
+import type { ClientQuote } from '@/app/actions/quote';
 
 const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
   { id: 'addon-card', product: 'card', name: 'card', pricePence: 400 },
@@ -31,7 +31,10 @@ export default function CheckoutPage() {
 
   const [gift, setGift] = useState(false);
   const [email, setEmail] = useState('');
-  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quote, setQuote] = useState<ClientQuote | null>(null);
+  // A discount / partner code: the server resolves + prices it; we only hold the text.
+  const [codeInput, setCodeInput] = useState('');
+  const [promoCode, setPromoCode] = useState<string | undefined>(undefined);
   const [placing, setPlacing] = useState(false);
   const [subject, setSubject] = useState<string | null>(null);
 
@@ -98,19 +101,38 @@ export default function CheckoutPage() {
       setQuote(null);
       return;
     }
-    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty })), gift }).then((q) => {
+    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty })), gift, promoCode }).then((q) => {
       if (live) setQuote(q);
     });
     return () => {
       live = false;
     };
-  }, [items, gift, empty]);
+  }, [items, gift, empty, promoCode]);
+
+  // What to tell the customer about their code — plain, friendly, never a dead end.
+  const promoMessage = (() => {
+    if (!promoCode || !quote) return null;
+    if (quote.promoError === 'unknown') return { ok: false, text: 'we don’t recognise that code — check the spelling?' };
+    if (quote.promoError === 'expired') return { ok: false, text: 'that code has finished, sorry' };
+    if (quote.promoError === 'not-started') return { ok: false, text: 'that code isn’t live yet' };
+    if (quote.promoError === 'used-up') return { ok: false, text: 'that code has been fully used' };
+    if (quote.promoError === 'own-code') return { ok: false, text: 'that’s your own code — share it with a friend instead ✦' };
+    if (quote.promoError === 'first-order-only') return { ok: false, text: 'that code is for a first order — your credit still applies' };
+    const p = quote.promo;
+    if (!p) return null;
+    if (p.applied) return { ok: true, text: p.capped ? `${p.code} applied — this basket’s maximum saving` : `${p.code} applied ✦` };
+    if (p.reason === 'min-spend') return { ok: false, text: `${p.code} works on orders over ${gbp(p.minSpendPence ?? 0)}` };
+    if (p.reason === 'better-saving-applied') return { ok: true, text: `you’re already getting a better saving — we’ve kept that one` };
+    return { ok: false, text: `${p.code} doesn’t apply to these items` };
+  })();
 
   // Optimistic client figures until the server quote lands (then it governs).
   const subtotalPence = quote?.subtotalPence ?? basketSubtotal(items);
   const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
   const savingPence = quote?.joinSavingPence ?? 0;
   const setSavingPence = quote?.familySetSavingPence ?? 0;
+  const promoSavingPence = quote?.promoSavingPence ?? 0;
+  const creditPence = quote?.creditPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
 
   // Place a REAL order: the server re-prices and persists it. With Stripe
@@ -134,12 +156,18 @@ export default function CheckoutPage() {
         items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) })),
         gift,
         subject: liveSubject ?? undefined,
+        promoCode,
       });
       if (res.needsAuth) {
         // a personalised order needs the controlling parent — keep + order after sign-up.
         // basket + "who's this for" persist (sessionStorage) across the magic-link round-trip.
         toast('a quick sign-up keeps your keepsake safe');
         router.push('/login?next=/checkout');
+        return;
+      }
+      if (!res.ok && res.reason === 'too-small') {
+        toast('one of your drawings is too small to print well at that size — tap customize to pick a size that works');
+        setPlacing(false);
         return;
       }
       if (!res.ok) {
@@ -162,8 +190,42 @@ export default function CheckoutPage() {
     }
   };
 
+  const promoBox = (where: 'mobile' | 'desktop') => (
+    <form
+      className="mt-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        setPromoCode(codeInput.trim() || undefined);
+      }}
+    >
+      <label htmlFor={`promo-code-${where}`} className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
+        got a code?
+      </label>
+      <div className="flex gap-2">
+        <input
+          id={`promo-code-${where}`}
+          value={codeInput}
+          onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
+          autoCapitalize="characters"
+          autoComplete="off"
+          maxLength={32}
+          placeholder="e.g. WELCOME10"
+          className="min-h-11 min-w-0 flex-1 rounded-lg border-2 border-line bg-paper px-3 text-sm font-bold tracking-wide text-cocoa placeholder:font-normal placeholder:text-ink-faint"
+        />
+        <button type="submit" className="press min-h-11 rounded-lg border-2 border-cocoa bg-paper px-4 text-sm font-extrabold text-cocoa">
+          apply
+        </button>
+      </div>
+      {promoMessage ? (
+        <p role="status" className={'mt-1.5 text-[12px] font-semibold ' + (promoMessage.ok ? 'text-green-save' : 'text-ink-soft')}>
+          {promoMessage.text}
+        </p>
+      ) : null}
+    </form>
+  );
+
   const summaryRows = (
-    <dl className="mt-3 space-y-2 text-[13px] text-[#5F564C]">
+    <dl className="mt-3 space-y-2 text-[13px] text-ink-soft">
       <div className="flex justify-between">
         <dt>Subtotal</dt>
         <dd>{gbp(subtotalPence)}</dd>
@@ -180,11 +242,23 @@ export default function CheckoutPage() {
           <dd>−{gbp(setSavingPence)}</dd>
         </div>
       ) : null}
+      {creditPence > 0 ? (
+        <div className="pop-in flex justify-between font-semibold text-green-save">
+          <dt>Your credit</dt>
+          <dd>−{gbp(creditPence)}</dd>
+        </div>
+      ) : null}
+      {promoSavingPence > 0 && quote?.promo ? (
+        <div className="pop-in flex justify-between font-semibold text-green-save">
+          <dt>Code {quote.promo.code}</dt>
+          <dd>−{gbp(promoSavingPence)}</dd>
+        </div>
+      ) : null}
       <div className="flex justify-between">
         <dt>Delivery</dt>
         <dd>{deliveryPence === 0 ? <span className="font-semibold text-green-save">Free</span> : gbp(deliveryPence)}</dd>
       </div>
-      <div className="flex justify-between border-t border-[#EDE2CD] pt-2 text-base font-extrabold text-cocoa">
+      <div className="flex justify-between border-t border-line pt-2 text-base font-extrabold text-cocoa">
         <dt>Total</dt>
         <dd>{gbp(total)}</dd>
       </div>
@@ -193,14 +267,14 @@ export default function CheckoutPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-40 md:pb-0">
-      <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3.5">
+      <header className="flex items-center justify-between border-b border-line px-6 py-3.5">
         <div className="flex items-center gap-2.5">
           <Link href="/start-creating" aria-label="Back to your range">
-            <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
+            <Icon icon={IconArrowLeft} size={20} className="text-ink-soft" />
           </Link>
           <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
         </div>
-        <span className="flex items-center gap-1.5 text-xs text-[#6F6358]">
+        <span className="flex items-center gap-1.5 text-xs text-ink-soft">
           <Icon icon={IconLock} size={14} className="text-green-save" /> secure checkout
         </span>
       </header>
@@ -208,11 +282,11 @@ export default function CheckoutPage() {
       {empty ? (
         // ── Empty basket ──
         <main id="main" className="flex flex-1 flex-col items-center justify-center px-6 py-16 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#F3E8D6]">
-            <Icon icon={IconShieldCheck} size={34} className="text-[#C9B79B]" />
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-paper-2">
+            <Icon icon={IconShieldCheck} size={34} className="text-line" />
           </div>
           <h1 className="mt-5 font-display text-2xl font-semibold text-cocoa">Your basket&apos;s empty</h1>
-          <p className="mt-1.5 max-w-xs text-sm text-[#6F6358]">
+          <p className="mt-1.5 max-w-xs text-sm text-ink-soft">
             Pop a drawing on something lovely and it&apos;ll show up here.
           </p>
           <Button href="/start-creating" size="lg" className="mt-6">
@@ -226,14 +300,14 @@ export default function CheckoutPage() {
             <div>
               <h1 className="font-display text-xl font-semibold text-cocoa">Your basket</h1>
               {subject ? (
-                <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[#9C8772]">
+                <p className="mt-0.5 flex items-center gap-1 text-[13px] text-ink-faint">
                   <Icon icon={IconHeart} size={13} className="text-cinnamon" /> a keepsake for {subject}
                 </p>
               ) : null}
               <div className="mt-3 space-y-2.5">
                 {items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#FBF5E9]">
+                  <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line bg-paper p-3">
+                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-oat">
                       {/* The ACTUAL creation — this drawing, on this variant, at its saved
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {item.artwork && item.variantId ? (
@@ -254,10 +328,10 @@ export default function CheckoutPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
-                      {item.sub ? <div className="text-[11px] text-[#9C8E7E]">{item.sub}</div> : null}
+                      {item.sub ? <div className="text-[11px] text-ink-faint">{item.sub}</div> : null}
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="flex items-center rounded-full border border-[#E6D8BE] bg-white">
-                          <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-[#7A6A58]">
+                        <div className="flex items-center rounded-full border border-line bg-white">
+                          <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-ink-soft">
                             <Icon icon={IconMinus} size={12} />
                           </button>
                           <span className="min-w-4 text-center text-xs font-bold text-cocoa">{item.qty}</span>
@@ -265,21 +339,21 @@ export default function CheckoutPage() {
                             <Icon icon={IconPlus} size={12} />
                           </button>
                         </div>
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}`)} className="rounded-full border border-[#E6D8BE] bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
                           customize
                         </button>
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
                       <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(item.pricePence * item.qty)}</div>
-                      <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-[#B3A491] hover:text-berry">remove</button>
+                      <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-ink-faint hover:text-berry">remove</button>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Gift fork */}
-              <div className="mt-3 rounded-2xl border border-dashed border-[#E2A86C] bg-[#FBEFE0] p-3.5">
+              <div className="mt-3 rounded-2xl border border-dashed border-tomato bg-paper-2 p-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="flex items-center gap-1.5 text-[13px] font-bold text-cocoa">
                     <Icon icon={IconGift} size={16} className="text-cinnamon" /> Sending this as a gift?
@@ -288,13 +362,13 @@ export default function CheckoutPage() {
                 </div>
                 {gift ? (
                   <div className="mt-2.5">
-                    <p className="text-[11px] leading-relaxed text-[#8A6F52]">
+                    <p className="text-[11px] leading-relaxed text-ink-faint">
                       We&apos;ll wrap it and tuck the prices away, so the only surprise is the lovely one.
                     </p>
                     <textarea
                       placeholder="add a little note (optional)"
                       rows={2}
-                      className="mt-2 w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2 text-xs text-cocoa placeholder:text-[#A89B8C]"
+                      className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs text-cocoa placeholder:text-ink-faint"
                     />
                   </div>
                 ) : null}
@@ -304,7 +378,7 @@ export default function CheckoutPage() {
               </div>
 
               {/* Add-ons */}
-              <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Add a little something</p>
+              <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Add a little something</p>
               <div className="mt-2 flex gap-2.5 overflow-x-auto pb-1">
                 {ADDONS.map((a) => (
                   <button
@@ -314,22 +388,29 @@ export default function CheckoutPage() {
                       add({ id: a.id, name: a.name, product: a.product, pricePence: a.pricePence });
                       toast(`${a.name} added`);
                     }}
-                    className="flex w-24 shrink-0 flex-col items-center rounded-xl border border-[#EFE6D6] bg-white p-2.5 text-center hover:border-honey"
+                    className="flex w-24 shrink-0 flex-col items-center rounded-xl border border-line bg-white p-2.5 text-center hover:border-honey"
                   >
                     <ProductArt product={a.product} size={40} />
                     <span className="mt-1 text-[11px] font-bold text-cocoa">{a.name}</span>
-                    <span className="text-[11px] text-[#9C8E7E]">{gbp(a.pricePence)}</span>
+                    <span className="text-[11px] text-ink-faint">{gbp(a.pricePence)}</span>
                   </button>
                 ))}
+              </div>
+
+              {/* Phones: the code box + breakdown live in the flow (the sticky bar shows the total) */}
+              <div className="mt-5 rounded-2xl border border-line bg-paper p-4 md:hidden">
+                {promoBox('mobile')}
+                {summaryRows}
               </div>
             </div>
 
             {/* Order summary (desktop) */}
             <aside className="hidden self-start md:block">
-              <div className="rounded-2xl border border-[#EADFC9] bg-white p-4">
+              <div className="rounded-2xl border border-line bg-white p-4">
                 <h2 className="font-display text-base font-semibold text-cocoa">Order summary</h2>
-                {summaryRows}
-                <label htmlFor="email-d" className="mt-4 block text-[11px] font-bold text-[#6F6358]">
+                {promoBox('desktop')}
+{summaryRows}
+                <label htmlFor="email-d" className="mt-4 block text-[11px] font-bold text-ink-soft">
                   email for your receipt
                 </label>
                 <input
@@ -338,12 +419,12 @@ export default function CheckoutPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="mt-1 w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2.5 text-xs text-cocoa placeholder:text-[#A89B8C]"
+                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
                 />
                 <Button size="lg" className="mt-3 w-full" onClick={placeOrder} disabled={placing}>
                   {placing ? 'placing your order…' : 'checkout'}
                 </Button>
-                <p className="mt-3 text-center text-[11px] text-[#7A6A58]">
+                <p className="mt-3 text-center text-[11px] text-ink-soft">
                   {hasPersonalised ? (
                     <>
                       A quick <b>magic-link sign-up</b> keeps your keepsake safe — no password. already signed up?{' '}
@@ -356,7 +437,7 @@ export default function CheckoutPage() {
                     </>
                   )}
                 </p>
-                <p className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-[#EAF1E4] px-2 py-2 text-[11px] text-green-save">
+                <p className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-leaf-pale px-2 py-2 text-[11px] text-green-save">
                   <Icon icon={IconShieldCheck} size={14} /> Your data is yours. Nothing shared, ever.
                 </p>
               </div>
@@ -367,17 +448,17 @@ export default function CheckoutPage() {
 
       {/* Mobile pinned total + checkout */}
       {!empty ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#EFE6D6] bg-oat px-4 pb-5 pt-3 md:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-oat px-4 pb-5 pt-3 md:hidden">
           <div className="mb-2 flex items-end justify-between">
-            <span className="text-[13px] text-[#6F6358]">
-              Total <span className="text-[11px] text-[#9C8E7E]">incl. delivery</span>
+            <span className="text-[13px] text-ink-soft">
+              Total <span className="text-[11px] text-ink-faint">incl. delivery</span>
             </span>
             <span className="text-base font-extrabold text-cocoa">{gbp(total)}</span>
           </div>
           <Button size="lg" className="w-full" onClick={placeOrder} disabled={placing}>
             {placing ? 'placing…' : 'checkout'}
           </Button>
-          <p className="mt-2 text-center text-[11px] text-[#7A6A58]">
+          <p className="mt-2 text-center text-[11px] text-ink-soft">
             {hasPersonalised ? (
               <>a quick sign-up keeps your keepsake safe — no password</>
             ) : (

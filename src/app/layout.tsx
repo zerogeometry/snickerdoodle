@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
 // Self-hosted brand fonts, bundled via @fontsource (no build-time or runtime fetch
-// to Google — GDPR-clean and works offline). Families: "Fraunces Variable",
-// "Mulish Variable", "Caveat Variable" — wired into the tokens in globals.css.
-import '@fontsource-variable/fraunces';
-import '@fontsource-variable/mulish';
-import '@fontsource-variable/caveat';
+// to Google — GDPR-clean and works offline). Scrapbook direction (D12): "Bricolage
+// Grotesque Variable" (display + UI) and Gaegu (the one handwritten moment, latin only).
+import '@fontsource-variable/bricolage-grotesque';
+import '@fontsource/gaegu/latin-700.css';
 // The greetings-card message fonts — casual/friendly, offered in the "add a message" picker.
 // Self-hosted via @fontsource too (no CDN). See src/lib/card-fonts.ts for the shared registry.
+import '@fontsource-variable/caveat';
 import '@fontsource/patrick-hand';
 import '@fontsource/gochi-hand';
 import '@fontsource/shadows-into-light';
@@ -20,16 +20,21 @@ export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
   description:
     "Turn your little one's drawings into beautiful things you'll treasure forever — cards, prints, mugs, tees, and a storybook they're the hero of.",
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
+  icons: { icon: '/brand/snickerdoodle-badge.png', apple: '/brand/snickerdoodle-badge.png' },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#FBF5E9',
+  themeColor: '#EBDDC6',
+  // App-like on phones: draw under the notch/home indicator (safe-area padding in the shell).
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-dvh font-sans">
+      <body className="kraft min-h-dvh font-sans">
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:bg-cta focus:px-4 focus:py-2 focus:text-cta-text"

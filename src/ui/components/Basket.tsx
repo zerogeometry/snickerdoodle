@@ -16,7 +16,7 @@ import { gbp, useBasket, type BasketItem } from '@/lib/store';
  * the column stays narrow. Tapping the thumbnail re-opens Customize to edit that line.
  * Quantity lives here, not on the catalogue tiles; dropping below 1 removes the line.
  */
-function BasketRow({ item }: { item: BasketItem }) {
+function BasketRow({ item, index }: { item: BasketItem; index: number }) {
   const setQty = useBasket((s) => s.setQty);
   const router = useRouter();
   const [infoOpen, setInfoOpen] = useState(false);
@@ -28,8 +28,8 @@ function BasketRow({ item }: { item: BasketItem }) {
   // the CTA to "update basket".
   const edit = () => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`);
   return (
-    <li className="rounded-xl border border-[#EFE6D6] bg-[#FFFDF8] p-1.5">
-      <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-[#FBF5E9]">
+    <li className="pop-in rounded-[14px] border-2 border-cocoa/20 bg-paper p-1.5" style={{ ['--i' as string]: Math.min(index, 6) }}>
+      <div className="relative aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
         {personalised ? (
           <MockupPreview
             productKey={item.product}
@@ -56,7 +56,7 @@ function BasketRow({ item }: { item: BasketItem }) {
             setInfoOpen((o) => !o);
           }}
           aria-label={label}
-          className="peer/info absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/85 text-[#7A6A58] shadow-sm hover:text-cinnamon"
+          className="peer/info absolute right-1 top-1 z-10 flex h-6 w-6 items-center justify-center rounded-full border-[1.5px] border-cocoa bg-paper text-cocoa before:absolute before:-inset-[10px] before:content-[''] hover:text-cinnamon"
         >
           <Icon icon={IconInfoCircle} size={14} />
         </button>
@@ -65,19 +65,19 @@ function BasketRow({ item }: { item: BasketItem }) {
           aria-hidden
           className={`pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-cocoa/85 px-2 text-center opacity-0 transition-opacity duration-150 peer-hover/info:opacity-100 peer-focus/info:opacity-100 ${infoOpen ? '!opacity-100' : ''}`}
         >
-          <span className="text-[11px] font-bold leading-tight text-oat">{item.name}</span>
-          {item.sub ? <span className="text-[10px] leading-tight text-oat/85">{item.sub}</span> : null}
+          <span className="text-[11px] font-bold leading-tight text-paper">{item.name}</span>
+          {item.sub ? <span className="text-[10px] leading-tight text-paper">{item.sub}</span> : null}
         </div>
       </div>
       {/* −qty+ and price beneath, spanning the thumbnail width. − at 1 removes the line.
           The buttons fill the row height (44px) and split its width, so the tap targets
           stay ≥44px tall even though the basket column is deliberately slim. */}
-      <div className="mt-1.5 flex items-stretch rounded-full border border-[#E6D8BE] bg-white">
+      <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
         <button
           type="button"
           aria-label={`one fewer ${item.name}`}
           onClick={() => setQty(item.id, item.qty - 1)}
-          className="flex h-11 flex-1 items-center justify-center rounded-l-full text-[#7A6A58]"
+          className="press flex h-11 flex-1 items-center justify-center rounded-l-full text-cocoa"
         >
           <Icon icon={IconMinus} size={14} />
         </button>
@@ -86,12 +86,12 @@ function BasketRow({ item }: { item: BasketItem }) {
           type="button"
           aria-label={`one more ${item.name}`}
           onClick={() => setQty(item.id, item.qty + 1)}
-          className="flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
+          className="press flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
         >
           <Icon icon={IconPlus} size={14} />
         </button>
       </div>
-      <div className="mt-1 text-center text-[11px] font-bold text-cocoa">{gbp(item.pricePence * item.qty)}</div>
+      <div className="mt-1 text-center text-xs font-extrabold text-cocoa">{gbp(item.pricePence * item.qty)}</div>
     </li>
   );
 }
@@ -99,19 +99,24 @@ function BasketRow({ item }: { item: BasketItem }) {
 export function Basket({ className = '' }: { className?: string }) {
   const items = useBasket((s) => s.items);
   return (
-    <aside className={`flex flex-col overflow-hidden rounded-2xl border border-[#EADFC9] bg-[#FBF7EE] ${className}`} aria-label="your basket">
-      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b border-[#EADFC9] px-3 py-2.5">
-        <h2 className="font-display text-sm font-semibold text-cocoa">your basket</h2>
-        <span className="text-[11px] text-[#9C8E7E]">{items.length} item{items.length === 1 ? '' : 's'}</span>
+    <aside className={`flex flex-col overflow-hidden rounded-[18px] border-2 border-cocoa bg-paper-2 shadow-[0_3px_0_var(--color-cocoa)] ${className}`} aria-label="your basket">
+      <div className="flex shrink-0 items-baseline justify-between gap-2 border-b-2 border-cocoa/10 bg-honey-band px-3 py-2.5">
+        <h2 className="font-display text-sm text-cocoa">your basket</h2>
+        <span className="text-[11px] font-semibold text-ink-soft">{items.length} item{items.length === 1 ? '' : 's'}</span>
       </div>
       {items.length === 0 ? (
-        <p className="px-3 py-6 text-center text-[12px] leading-relaxed text-[#9C8772]">
-          nothing added yet — tap <b className="text-cinnamon">+ customize</b> to place your art and it&apos;ll appear here.
-        </p>
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-3 py-6 text-center">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-dashed border-cocoa/30 text-ink-soft" aria-hidden>
+            <Icon icon={IconPlus} size={18} />
+          </span>
+          <p className="text-[12px] leading-relaxed text-ink-soft">
+            nothing added yet — tap <b className="text-cinnamon">+ customize</b> to place your art and it&apos;ll appear here.
+          </p>
+        </div>
       ) : (
         <ul className="brand-scroll min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-          {items.map((item) => (
-            <BasketRow key={item.id} item={item} />
+          {items.map((item, i) => (
+            <BasketRow key={item.id} item={item} index={i} />
           ))}
         </ul>
       )}

@@ -1,12 +1,13 @@
 'use client';
 
-import { IconArrowLeft, IconMail, IconShieldCheck, IconSparkles } from '@tabler/icons-react';
+import { IconMail, IconShieldCheck, IconSparkles } from '@tabler/icons-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
+import { FlowHeader } from '@/ui/components/FlowHeader';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -37,44 +38,37 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center gap-3 border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/" aria-label="Back to home">
-          <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
-        </Link>
-        <Link href="/" className="font-display text-xl font-semibold text-cocoa">
-          snickerdoodle
-        </Link>
-      </header>
+      <FlowHeader back={{ href: '/', label: 'Back to home' }} />
 
-      <main id="main" className="flex flex-1 items-center justify-center px-6 py-12">
+      <main id="main" className="flex flex-1 items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm">
           {sent ? (
-            <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#EAF1E4]">
+            <div role="status" className="pop-in tape rounded-[22px] border-2 border-cocoa bg-paper p-7 text-center shadow-[0_4px_0_var(--color-cocoa)]">
+              <div className="sticker mx-auto flex h-16 w-16 -rotate-6 items-center justify-center rounded-full bg-leaf-pale">
                 <Icon icon={IconMail} size={30} className="text-green-save" />
               </div>
-              <h1 className="mt-4 font-display text-2xl font-semibold text-cocoa">Check your email</h1>
-              <p className="mt-2 text-sm text-[#6F6358]">
+              <h1 className="mt-4 font-display text-[28px] leading-tight text-cocoa">Check your email</h1>
+              <p className="mt-2 text-sm text-ink-soft">
                 We&apos;ve sent a magic link to <b className="text-cocoa">{email}</b>. Tap it and you&apos;re in — no
                 password to remember.
               </p>
               <button
                 type="button"
                 onClick={() => setSent(false)}
-                className="mt-5 text-xs font-bold text-cinnamon hover:underline"
+                className="mt-4 inline-flex min-h-11 items-center text-xs font-bold text-cinnamon hover:underline"
               >
                 use a different email
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-[#EADFC9] bg-white p-7">
-              <CaveatNote className="text-center text-lg">welcome back</CaveatNote>
-              <h1 className="mt-1 text-center font-display text-2xl font-semibold text-cocoa">Log in to your keepsake home</h1>
-              <p className="mt-2 text-center text-sm text-[#6F6358]">
-                Pop in your email and we&apos;ll send a one-tap link. No passwords here.
+            <div className="pop-in tape rounded-[22px] border-2 border-cocoa bg-paper p-7 shadow-[0_4px_0_var(--color-cocoa)]">
+              <CaveatNote className="-rotate-2 text-center text-xl">hello there</CaveatNote>
+              <h1 className="mt-1 text-center font-display text-[28px] leading-tight text-cocoa">Your keepsake home, one tap away</h1>
+              <p className="mt-2 text-center text-sm text-ink-soft">
+                New or coming back — pop in your email and we&apos;ll send a one-tap link. No passwords here.
               </p>
               <form onSubmit={submit} className="mt-5">
-                <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
+                <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
                   Email
                 </label>
                 <input
@@ -84,19 +78,19 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-3 text-sm text-cocoa placeholder:text-[#A89B8C]"
+                  className="min-h-12 w-full rounded-[14px] border-2 border-cocoa/25 bg-paper px-3.5 py-3 text-base text-cocoa placeholder:text-ink-faint focus:border-cocoa"
                 />
                 <Button type="submit" size="lg" className="mt-3 w-full" disabled={busy}>
                   <Icon icon={IconSparkles} size={16} /> {busy ? 'sending…' : 'email me a magic link'}
                 </Button>
                 {error ? (
-                  <p className="mt-2 text-center text-xs text-berry">Something went wrong — please try again.</p>
+                  <p role="alert" className="mt-2 text-center text-xs font-semibold text-cinnamon">Something went wrong — please try again.</p>
                 ) : null}
               </form>
-              <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] text-green-save">
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">
                 <Icon icon={IconShieldCheck} size={13} /> Your data is yours. We never sell it, ever.
               </p>
-              <p className="mt-3 text-center text-xs text-[#7A6A58]">
+              <p className="mt-3 text-center text-xs text-ink-soft">
                 New here?{' '}
                 <Link href="/start-creating" className="font-bold text-cinnamon">
                   start creating

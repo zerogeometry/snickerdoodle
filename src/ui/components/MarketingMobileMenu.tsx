@@ -20,7 +20,7 @@ export function MarketingMobileMenu() {
   return (
     <div className="md:hidden">
       <button type="button" aria-label="Open menu" aria-expanded={open} onClick={() => setOpen(true)}>
-        <Icon icon={IconMenu2} size={26} className="text-[#7A6A58]" />
+        <Icon icon={IconMenu2} size={26} className="text-ink-soft" />
       </button>
 
       {open ? (
@@ -35,7 +35,7 @@ export function MarketingMobileMenu() {
             <div className="flex items-center justify-between">
               <span className="font-display text-xl font-semibold text-cocoa">snickerdoodle</span>
               <button type="button" aria-label="Close menu" onClick={() => setOpen(false)}>
-                <Icon icon={IconX} size={24} className="text-[#7A6A58]" />
+                <Icon icon={IconX} size={24} className="text-ink-soft" />
               </button>
             </div>
             <div className="mt-8 flex flex-col gap-1">

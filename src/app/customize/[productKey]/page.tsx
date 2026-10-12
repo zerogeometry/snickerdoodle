@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
+import { IconAlertTriangle, IconHeartPlus, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
@@ -10,20 +10,23 @@ import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
+import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
+import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
+import { assessResolution, clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
 
 // Tier-C 3D spin view — lazy, so three.js never loads unless someone opens it.
 // (The framed print deliberately has NO 3D/wall views — founder call 2026-07-07:
 // one perfect photo view; the spin stays for other products' curation.)
 const Product3D = dynamic(() => import('@/ui/three/Product3D'), {
   ssr: false,
-  loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-[#9C8E7E]">warming up the spin view…</div>,
+  loading: () => <div className="flex h-full w-full items-center justify-center text-xs text-ink-faint">warming up the spin view…</div>,
 });
 
 function webglOk(): boolean {
@@ -261,19 +264,45 @@ export default function CustomizePage() {
     );
   }, [product, size, colour, orientation, back]);
 
+  // The pixel size of the image this line will print from (the cutout if chosen) — fed to the
+  // SAME assessResolution the server's order-time gate runs, so the badge can't disagree with it.
+  const printSrc = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const [srcSize, setSrcSize] = useState<{ width: number; height: number } | null>(null);
+  const [saving, setSaving] = useState(false); // "+ Keepsake" in flight (declared before any early return)
+  useEffect(() => {
+    if (!printSrc) return setSrcSize(null);
+    const img = new window.Image();
+    img.onload = () => setSrcSize(img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null);
+    img.src = printSrc;
+  }, [printSrc]);
+
   if (products && !product) {
     return (
       <Shell>
-        <p className="py-16 text-center text-sm text-[#6F6358]">
-          That product isn’t available. <Link href="/start-creating" className="font-bold text-cinnamon">back to the range</Link>.
-        </p>
+        <div className="pop-in mx-auto mt-10 max-w-sm rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper p-7 text-center text-sm text-ink-soft">
+          That product isn’t available. <Link href="/start-creating" className="font-bold text-cinnamon underline">back to the range</Link>.
+        </div>
       </Shell>
     );
   }
   if (!product) {
     return (
       <Shell>
-        <div className="py-16 text-center text-sm text-[#9C8E7E]">loading…</div>
+        <div role="status" aria-label="loading" className="grid animate-pulse gap-7 md:grid-cols-2">
+          <div className="polaroid tape mt-3" style={{ ['--tilt' as string]: '-1deg', ['--tape' as string]: 'color-mix(in srgb, var(--color-line) 75%, transparent)' }}>
+            <div className="aspect-square w-full bg-paper-2" />
+          </div>
+          <div className="space-y-3 pt-3">
+            <div className="h-9 w-2/3 rounded-full bg-paper-2" />
+            <div className="h-4 w-full rounded-full bg-paper-2" />
+            <div className="h-10 w-28 rounded-[12px] bg-paper-2" />
+            <div className="flex gap-2 pt-3">
+              <div className="h-11 w-20 rounded-pill bg-paper-2" />
+              <div className="h-11 w-20 rounded-pill bg-paper-2" />
+              <div className="h-11 w-20 rounded-pill bg-paper-2" />
+            </div>
+          </div>
+        </div>
       </Shell>
     );
   }
@@ -284,6 +313,25 @@ export default function CustomizePage() {
   const activeAssetId = edit?.assetId ?? upload?.assetId ?? null;
   const activeSource = edit?.sourceObjectId ?? upload?.cutout?.sourceObjectId;
   const placement = (activeAssetId && placements[`${activeAssetId}-${product.key}`]) || defaultTransformFor(product.key);
+
+  // Print-readiness (Studio spec §15 / docs/04: never silently under-resolve).
+  const assessFor = (v: (typeof product.variants)[number] | null | undefined): ResolutionAssessment | null =>
+    v?.printGeom && srcSize ? assessResolution(v.printGeom, srcSize, clampTransform(placement)) : null;
+  const quality = assessFor(variant);
+  const blocked = quality?.decision === 'BLOCK';
+  // One-tap fix: the LARGEST size (same colour + orientation) that still prints well.
+  const fitSize = blocked
+    ? [...product.sizes].reverse().find((sz) => {
+        const v = product.variants.find(
+          (x) =>
+            x.attributes.size === sz &&
+            (product.colours.length === 0 || x.attributes.colour === colour) &&
+            (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
+        );
+        const a = assessFor(v);
+        return a !== null && a.decision !== 'BLOCK';
+      }) ?? null
+    : null;
 
   const editPlacement = () => {
     if (!activeAssetId) {
@@ -299,6 +347,30 @@ export default function CustomizePage() {
     // it resume=1 so we DON'T re-seed over the placement the positioner just saved.
     const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`;
     router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}&return=${encodeURIComponent(ret)}`);
+  };
+
+  // "+ Keepsake": save THIS design (drawing + exact variant + placement) for later — into the
+  // Keepsake Home, ready to add to a gift request. Signed-in only (like checkout).
+  const saveForLater = async () => {
+    if (!activeAssetId || !variant || saving) return;
+    setSaving(true);
+    try {
+      const res = await saveDesignAction({
+        assetId: activeAssetId,
+        variantSku: variant.sku,
+        transform: placement,
+        sourceObjectId: activeSource,
+        back: supportsBack ? back : undefined,
+      });
+      if (res.needsAuth) {
+        toast('a quick sign-up keeps your keepsakes safe');
+        router.push(`/login?next=${encodeURIComponent(`/customize/${product.key}`)}`);
+        return;
+      }
+      toast(res.ok ? 'saved to your keepsakes ♥' : 'couldn’t save that one — try again');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const addToBasket = () => {
@@ -373,7 +445,7 @@ export default function CustomizePage() {
     <Shell>
       {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
       <Modal open={zoomOpen} onClose={() => setZoomOpen(false)} size="xl" fill title={product.label} subtitle={gbp(variant?.pricePence ?? product.fromPence)}>
-        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-[#FBF5E9] p-3">
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-oat p-3">
           <MockupPreview
             productKey={product.key as ProductKey}
             assetId={activeAssetId}
@@ -399,14 +471,15 @@ export default function CustomizePage() {
                   type="button"
                   onClick={() => setView(m)}
                   aria-pressed={view === m}
-                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${view === m ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  className={`${OPT_SM} ${view === m ? OPT_ON : OPT_OFF}`}
                 >
                   {m === 'photo' ? 'photo' : 'spin it around'}
                 </button>
               ))}
             </div>
           ) : null}
-          <div className="relative flex items-center justify-center rounded-3xl border border-[#EADFC9] bg-[#FBF5E9] p-4">
+          <div className="polaroid tape relative mt-3">
+            <div className="flex w-full items-center justify-center bg-paper-2 p-3">
             {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
               <div className="h-96 w-full">
                 <Product3D
@@ -441,15 +514,16 @@ export default function CustomizePage() {
                   type="button"
                   onClick={() => setZoomOpen(true)}
                   aria-label={`Enlarge ${product.label} preview`}
-                  className="absolute left-2.5 top-2.5 flex items-center justify-center rounded-full bg-white/85 p-1.5 text-[#7A6A58] shadow-sm before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon"
+                  className="press absolute left-4 top-4 flex items-center justify-center rounded-full border-2 border-cocoa bg-paper p-1.5 text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[6px] before:content-[''] hover:text-cinnamon"
                 >
                   <Icon icon={IconZoomScan} size={17} />
                 </button>
               </>
             )}
+            </div>
           </div>
           {view === 'spin' && canSpin ? (
-            <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">drag to spin · the photo view shows the exact print</p>
+            <p className="mt-1.5 text-center text-[11px] text-ink-faint">drag to spin · the photo view shows the exact print</p>
           ) : null}
           {/* Mug "centre / front / back" — the real mug photographed three ways, the art wrapped
               onto the ceramic: centre (design middle, handle hidden), front (right side), back (left). */}
@@ -462,13 +536,13 @@ export default function CustomizePage() {
                     type="button"
                     onClick={() => setMugSide(side)}
                     aria-pressed={mugSide === side}
-                    className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${mugSide === side ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                    className={`${OPT_SM} ${mugSide === side ? OPT_ON : OPT_OFF}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="mt-1.5 text-center text-[11px] text-[#9C8E7E]">a preview of how your mug prints</p>
+              <p className="mt-1.5 text-center text-[11px] text-ink-faint">a preview of how your mug prints</p>
             </>
           ) : null}
           {/* Cushion "turn it around" — flip the preview between the image side and the back
@@ -481,7 +555,7 @@ export default function CustomizePage() {
                   type="button"
                   onClick={() => setShowBack(b)}
                   aria-pressed={showBack === b}
-                  className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${showBack === b ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  className={`${OPT_SM} ${showBack === b ? OPT_ON : OPT_OFF}`}
                 >
                   {label}
                 </button>
@@ -501,7 +575,7 @@ export default function CustomizePage() {
                     onClick={() => setCardView(v)}
                     aria-pressed={cardView === v}
                     aria-label={v === 'single' ? 'single card' : v === 'outside' ? 'outside of the card' : 'inside of the card'}
-                    className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${cardView === v ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                    className={`${THUMB} ${cardView === v ? THUMB_ON : THUMB_OFF}`}
                   >
                     {v === 'inside' ? (
                       <CardInsidePreview message={cardMessage} compact />
@@ -535,7 +609,7 @@ export default function CustomizePage() {
                   onClick={() => setMockupView(v)}
                   aria-pressed={mockupView === v}
                   aria-label={label}
-                  className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${mockupView === v ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                  className={`${THUMB} ${mockupView === v ? THUMB_ON : THUMB_OFF}`}
                 >
                   <MockupPreview
                     productKey={product.key as ProductKey}
@@ -564,7 +638,7 @@ export default function CustomizePage() {
                   onClick={() => { if (cushionShapeOf(size) !== e.shape) setSize(e.size); }}
                   aria-pressed={cushionShapeOf(size) === e.shape}
                   aria-label={`${e.shape} cushion`}
-                  className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${cushionShapeOf(size) === e.shape ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                  className={`${THUMB} ${cushionShapeOf(size) === e.shape ? THUMB_ON : THUMB_OFF}`}
                 >
                   <MockupPreview
                     productKey={product.key as ProductKey}
@@ -589,7 +663,7 @@ export default function CustomizePage() {
                 onClick={() => setThumbIdx((i) => Math.max(0, i - 1))}
                 disabled={thumbIdx === 0}
                 aria-label="previous colours"
-                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EFE6D6] bg-white text-[#7A6A58] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+                className="press relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
               >
                 <Icon icon={IconChevronLeft} size={17} />
               </button>
@@ -613,7 +687,7 @@ export default function CustomizePage() {
                         onClick={() => setColour(c)}
                         aria-label={`${c} ${product.label}`}
                         aria-pressed={colour === c}
-                        className={`aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-xl border-2 bg-[#FBF5E9] p-1 ${colour === c ? 'border-cinnamon' : 'border-[#EFE6D6] hover:border-[#E0C7A8]'}`}
+                        className={`${THUMB} ${colour === c ? THUMB_ON : THUMB_OFF}`}
                       >
                         <MockupPreview
                           productKey={product.key as ProductKey}
@@ -635,7 +709,7 @@ export default function CustomizePage() {
                 onClick={() => setThumbIdx((i) => Math.min(Math.max(0, coloursForSize.length - 3), i + 1))}
                 disabled={thumbIdx >= coloursForSize.length - 3}
                 aria-label="more colours"
-                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#EFE6D6] bg-white text-[#7A6A58] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+                className="press relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
               >
                 <Icon icon={IconChevronRight} size={17} />
               </button>
@@ -648,10 +722,14 @@ export default function CustomizePage() {
 
         {/* Right: options → description → add to basket (bottom-right) */}
         <div className="flex flex-col">
-          <h1 className="font-display text-3xl font-semibold text-cocoa">{product.label}</h1>
-          {product.blurb ? <p className="mt-1 text-sm text-[#6F6358]">{product.blurb}</p> : null}
-          <div className="mt-2 font-display text-2xl font-semibold text-cinnamon">{gbp(variant?.pricePence ?? product.fromPence)}</div>
-          <p className="text-[11px] text-[#9C8E7E]">free tracked delivery</p>
+          <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">{product.label}</h1>
+          {product.blurb ? <p className="mt-1 text-sm text-ink-soft">{product.blurb}</p> : null}
+          <div className="mt-2 flex flex-wrap items-center gap-2.5">
+            <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">
+              {gbp(variant?.pricePence ?? product.fromPence)}
+            </span>
+            <span className="text-xs font-semibold text-green-save">free tracked delivery</span>
+          </div>
 
           {/* A single-size product needs no picker — the size lives in the product details. */}
           {product.sizes.length > 1 ? (
@@ -684,7 +762,7 @@ export default function CustomizePage() {
               Tapping flips the preview. */}
           {product.key === 'cushion' && supportsBack ? (
             <div className="mt-4">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">The back</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {CUSHION_BACK_SWATCHES.map((c) => (
                   <button
@@ -694,7 +772,7 @@ export default function CustomizePage() {
                     aria-pressed={back === c.token}
                     aria-label={`${c.label} back`}
                     title={c.label}
-                    className={`h-8 w-8 rounded-full border-2 ${back === c.token ? 'border-cinnamon ring-2 ring-cinnamon/30' : 'border-[#D9CDB8] hover:border-[#E0C7A8]'}`}
+                    className={`press relative h-9 w-9 rounded-full border-2 before:absolute before:-inset-[4px] before:content-[''] ${back === c.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/30'}`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -702,12 +780,12 @@ export default function CustomizePage() {
                   type="button"
                   onClick={() => { setBack(CUSHION_BACK_MATCH); setShowBack(true); }}
                   aria-pressed={back === CUSHION_BACK_MATCH}
-                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${back === CUSHION_BACK_MATCH ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  className={`${OPT} ${back === CUSHION_BACK_MATCH ? OPT_ON : OPT_OFF}`}
                 >
                   image both sides
                 </button>
               </div>
-              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
+              <p className="mt-1.5 text-[11px] text-ink-faint">
                 {back === CUSHION_BACK_WHITE
                   ? 'white back · single-sided'
                   : back === CUSHION_BACK_MATCH
@@ -717,8 +795,8 @@ export default function CustomizePage() {
             </div>
           ) : product.key === 'cushion' ? (
             <div className="mt-4">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The back</p>
-              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">your image on the front · soft stone back</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">The back</p>
+              <p className="mt-1.5 text-[11px] text-ink-faint">your image on the front · soft stone back</p>
             </div>
           ) : null}
 
@@ -726,7 +804,7 @@ export default function CustomizePage() {
               purchase option — picking one shows the outside view so the shopper sees the effect. */}
           {product.key === 'card' ? (
             <div className="mt-4">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The outside</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">The outside</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 {([['front only', 'front'], ['full width', 'full']] as const).map(([label, span]) => (
                   <button
@@ -734,13 +812,13 @@ export default function CustomizePage() {
                     type="button"
                     onClick={() => { setCardSpan(span); setCardView('outside'); }}
                     aria-pressed={cardSpan === span}
-                    className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardSpan === span ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                    className={`${OPT} ${cardSpan === span ? OPT_ON : OPT_OFF}`}
                   >
                     {label}
                   </button>
                 ))}
               </div>
-              <p className="mt-1.5 text-[11px] text-[#9C8E7E]">
+              <p className="mt-1.5 text-[11px] text-ink-faint">
                 {cardSpan === 'full' ? 'the drawing spans the whole outside, across the fold' : 'the drawing on the front; the back stays plain'}
               </p>
             </div>
@@ -750,13 +828,13 @@ export default function CustomizePage() {
               (greeting / message / signature) in a chosen font, auto-fit to the card inside. */}
           {product.key === 'card' ? (
             <div className="mt-4">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">The inside</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">The inside</p>
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <button
                   type="button"
                   onClick={() => setCardMessage(null)}
                   aria-pressed={cardMessage === null}
-                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardMessage === null ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  className={`${OPT} ${cardMessage === null ? OPT_ON : OPT_OFF}`}
                 >
                   leave it blank
                 </button>
@@ -764,13 +842,13 @@ export default function CustomizePage() {
                   type="button"
                   onClick={() => { setCardMessage((m) => m ?? { greeting: '', message: '', signature: '', note: '', font: CARD_FONT_DEFAULT, fontScale: 1 }); setCardView('inside'); }}
                   aria-pressed={cardMessage !== null}
-                  className={`rounded-full border-2 px-3 py-1.5 text-xs font-bold ${cardMessage !== null ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                  className={`${OPT} ${cardMessage !== null ? OPT_ON : OPT_OFF}`}
                 >
                   add a message
                 </button>
               </div>
               {cardMessage === null ? (
-                <p className="mt-1.5 text-[11px] text-[#9C8E7E]">left blank for you to write in by hand</p>
+                <p className="mt-1.5 text-[11px] text-ink-faint">left blank for you to write in by hand</p>
               ) : (
                 <div className="mt-3 space-y-2.5">
                   {([
@@ -780,7 +858,7 @@ export default function CustomizePage() {
                     ['Note (facing page)', 'note', 'write something wonderful', 200, 2],
                   ] as const).map(([label, key, placeholder, max, rows]) => (
                     <label key={key} className="block">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">{label}</span>
+                      <span className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{label}</span>
                       <textarea
                         value={cardMessage[key]}
                         onChange={(e) => setCardMessage({ ...cardMessage, [key]: e.target.value.slice(0, max) })}
@@ -788,14 +866,14 @@ export default function CustomizePage() {
                         placeholder={placeholder}
                         rows={rows}
                         maxLength={max}
-                        className="mt-1 w-full resize-none rounded-xl border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2 text-sm text-cocoa placeholder:text-[#B7A890] focus:border-cinnamon focus:outline-none"
+                        className="mt-1 w-full resize-none rounded-[14px] border-2 border-cocoa/20 bg-paper px-3 py-2 text-sm text-cocoa placeholder:text-ink-faint focus:border-cocoa"
                         style={{ fontFamily: cardFontCss(cardMessage.font) }}
                       />
                     </label>
                   ))}
                   <div className="flex flex-wrap items-start gap-x-5 gap-y-2.5">
                     <div>
-                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Font</p>
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Font</p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
                         {CARD_FONTS.map((f) => (
                           <button
@@ -803,7 +881,7 @@ export default function CustomizePage() {
                             type="button"
                             onClick={() => setCardMessage({ ...cardMessage, font: f.token })}
                             aria-pressed={cardMessage.font === f.token}
-                            className={`rounded-full border-2 px-3 py-1.5 text-base leading-none ${cardMessage.font === f.token ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                            className={`${OPT} !text-base !font-normal leading-none ${cardMessage.font === f.token ? OPT_ON : OPT_OFF}`}
                             style={{ fontFamily: f.css }}
                           >
                             {f.label}
@@ -812,7 +890,7 @@ export default function CustomizePage() {
                       </div>
                     </div>
                     <div>
-                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Size</p>
+                      <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Size</p>
                       <div className="mt-1.5 flex gap-1.5">
                         {([['S', 0.8], ['M', 1], ['L', 1.25]] as const).map(([lbl, scale]) => (
                           <button
@@ -820,7 +898,7 @@ export default function CustomizePage() {
                             type="button"
                             onClick={() => setCardMessage({ ...cardMessage, fontScale: scale })}
                             aria-pressed={(cardMessage.fontScale ?? 1) === scale}
-                            className={`h-9 w-9 rounded-full border-2 text-xs font-bold ${(cardMessage.fontScale ?? 1) === scale ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                            className={`${OPT} w-11 justify-center !px-0 ${(cardMessage.fontScale ?? 1) === scale ? OPT_ON : OPT_OFF}`}
                           >
                             {lbl}
                           </button>
@@ -828,7 +906,7 @@ export default function CustomizePage() {
                       </div>
                     </div>
                   </div>
-                  <p className="text-[11px] text-[#9C8E7E]">screened before print · greeting, message &amp; signature on the right page; the note on the left</p>
+                  <p className="text-[11px] text-ink-faint">screened before print · greeting, message &amp; signature on the right page; the note on the left</p>
                 </div>
               )}
             </div>
@@ -836,24 +914,24 @@ export default function CustomizePage() {
 
           {/* collapsible, scrollable-in-container description */}
           {product.description ? (
-            <div className="mt-5 rounded-xl border border-[#EFE6D6] bg-white">
+            <div className="mt-5 rounded-[16px] border-2 border-cocoa/15 bg-paper">
               <button
                 type="button"
                 onClick={() => setDescOpen((o) => !o)}
                 aria-expanded={descOpen}
-                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-bold text-cocoa"
+                className="flex min-h-11 w-full items-center justify-between px-4 py-3 text-left text-sm font-extrabold text-cocoa"
               >
                 product details
-                <Icon icon={IconChevronDown} size={16} className={`text-[#9C8E7E] transition-transform ${descOpen ? 'rotate-180' : ''}`} />
+                <Icon icon={IconChevronDown} size={16} className={`text-ink-faint transition-transform ${descOpen ? 'rotate-180' : ''}`} />
               </button>
               {descOpen ? (
-                <div className="brand-scroll max-h-44 overflow-y-auto border-t border-[#EFE6D6] px-4 py-3 text-[13px] leading-relaxed text-[#6F6358]">
+                <div className="brand-scroll max-h-44 overflow-y-auto border-t-2 border-cocoa/10 px-4 py-3 text-[13px] leading-relaxed text-ink-soft">
                   <p>{product.description}</p>
                   {Object.keys(product.specs).length > 0 ? (
                     <dl className="mt-3 space-y-1">
                       {Object.entries(product.specs).map(([k, v]) => (
                         <div key={k} className="flex gap-2">
-                          <dt className="min-w-20 font-semibold capitalize text-[#8A7C6A]">{k}</dt>
+                          <dt className="min-w-20 font-bold capitalize text-cocoa">{k}</dt>
                           <dd>{v}</dd>
                         </div>
                       ))}
@@ -864,8 +942,41 @@ export default function CustomizePage() {
             </div>
           ) : null}
 
-          <div className="mt-6 flex justify-end">
-            <Button size="lg" className="w-full sm:w-auto" onClick={addToBasket} disabled={!variant}>
+          {quality ? (
+            blocked ? (
+              <div role="status" className="mt-5 rounded-[16px] border-2 border-cocoa bg-berry-pale p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
+                <p className="flex items-start gap-2 font-semibold">
+                  <Icon icon={IconAlertTriangle} size={16} className="mt-0.5 shrink-0 text-cinnamon" />
+                  this drawing is too small to print well at {size || 'this size'} — it would come out blurry.
+                </p>
+                {fitSize ? (
+                  <Button variant="secondary" size="md" className="mt-2.5 w-full" onClick={() => setSize(fitSize)}>
+                    make it {fitSize} — prints beautifully
+                  </Button>
+                ) : (
+                  <p className="mt-1.5 text-xs text-ink-soft">try a smaller product, or a bigger photo of the drawing.</p>
+                )}
+              </div>
+            ) : (
+              <p role="status" className="mt-5 flex items-center gap-1.5 text-[13px] font-semibold text-green-save">
+                <Icon icon={IconCircleCheck} size={16} />
+                {quality.decision === 'OK'
+                  ? 'print-ready at this size'
+                  : quality.tier === 0
+                    ? 'print-ready — we’ll gently sharpen it up for print'
+                    : 'it’ll print, a touch softer at this size — a bigger photo (or a smaller size) is crisper'}
+              </p>
+            )
+          ) : null}
+
+          {/* Primary actions: a thumb-zone dock on phones (kraft, like the landing's), inline from md. */}
+          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 flex gap-2.5 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-6 md:justify-end md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
+            {product.key !== 'card' && !edit ? (
+              <Button variant="secondary" size="lg" className="shrink-0 !px-4 md:!px-8" onClick={saveForLater} disabled={!variant || !activeAssetId || saving}>
+                <Icon icon={IconHeartPlus} size={17} /> {saving ? 'saving…' : '+ keepsake'}
+              </Button>
+            ) : null}
+            <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap !px-3 !text-[15px] md:flex-none md:!px-8 md:!text-base" onClick={addToBasket} disabled={!variant || blocked}>
               <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
@@ -909,13 +1020,13 @@ function CardInsidePreview({ message, compact = false }: { message: CardMessage 
           10:7 aspect. Capped on desktop; fills (and vertically centres in) the square thumbnail. A
           container context lets the inside text scale with the spread (cqw). */}
       <div
-        className={`relative flex aspect-[10/7] w-full max-h-full overflow-hidden rounded-lg border border-[#EADFC9] bg-white text-cocoa [container-type:inline-size] ${compact ? '' : 'mx-auto max-w-[460px] shadow-[0_2px_10px_rgba(46,39,35,.08)]'}`}
+        className={`relative flex aspect-[10/7] w-full max-h-full overflow-hidden rounded-lg border border-line bg-white text-cocoa [container-type:inline-size] ${compact ? '' : 'mx-auto max-w-[460px] shadow-[0_2px_10px_color-mix(in_srgb,var(--color-cocoa)_8%,transparent)]'}`}
         style={{ fontFamily: cardFontCss(message?.font) }}
       >
         {/* centre fold */}
-        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-[#EFE5D3]" />
+        <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-line" />
         {empty ? (
-          <div className="m-auto px-4 text-center text-[3.4cqw] text-[#B7A890]" style={{ fontFamily: 'var(--font-sans)' }}>
+          <div className="m-auto px-4 text-center text-[3.4cqw] text-ink-faint" style={{ fontFamily: 'var(--font-sans)' }}>
             your message will appear here
           </div>
         ) : (
@@ -951,6 +1062,17 @@ function CardInsidePreview({ message, compact = false }: { message: CardMessage 
   );
 }
 
+// Scrapbook option chips (D12): ≥44px stickers — ink outline; the chosen one fills with ink.
+const OPT = 'press inline-flex min-h-11 items-center rounded-pill border-2 px-3.5 text-xs font-bold';
+// Compact view toggles under the preview: visually 36px, the ::before extends the tap area to 44px.
+const OPT_SM = "press relative inline-flex min-h-9 items-center rounded-pill border-2 px-3.5 text-xs font-bold before:absolute before:-inset-[4px] before:content-['']";
+const OPT_ON = 'border-cocoa bg-cocoa text-paper shadow-[0_2px_0_var(--color-cocoa)]';
+const OPT_OFF = 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa';
+// Preview thumbnails (views, shapes, colours): little polaroid squares; the chosen one is inked.
+const THUMB = 'press aspect-square w-[calc((100%-1rem)/3)] shrink-0 overflow-hidden rounded-[14px] border-2 bg-paper-2 p-1';
+const THUMB_ON = 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]';
+const THUMB_OFF = 'border-cocoa/15 hover:border-cocoa/50';
+
 function Picker({
   label,
   options,
@@ -972,7 +1094,7 @@ function Picker({
 }) {
   return (
     <div className="mt-5">
-      <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">{label}</p>
+      <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{label}</p>
       <div className="mt-2 flex flex-wrap gap-2">
         {options.map((o) => {
           const sub = describe?.(o);
@@ -981,15 +1103,14 @@ function Picker({
               key={o}
               type="button"
               onClick={() => onChange(o)}
-              className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                value === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'
-              }`}
+              aria-pressed={value === o}
+              className={`${OPT} gap-1.5 ${value === o ? OPT_ON : OPT_OFF}`}
             >
-              {swatch ? <span className="h-3.5 w-3.5 rounded-full border border-black/10" style={{ backgroundColor: swatchColour(o, swatchFor) }} /> : null}
+              {swatch ? <span className="h-4 w-4 rounded-full border-2 border-paper outline outline-1 outline-cocoa/30" style={{ backgroundColor: swatchColour(o, swatchFor) }} /> : null}
               {sub ? (
                 <span className="flex flex-col items-start leading-tight">
                   <span>{o}</span>
-                  <span className="text-[10px] font-medium text-[#A2937F]">{sub}</span>
+                  <span className={`text-[10px] font-semibold ${value === o ? 'text-paper' : 'text-ink-soft'}`}>{sub}</span>
                 </span>
               ) : (
                 o
@@ -1009,19 +1130,15 @@ function swatchColour(name: string, productKey?: string): string {
     natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
     brown: '#6B4A32', 'dark grey': '#4D4C4A', 'light grey': '#CFCDC8', silver: '#B9B6AE',
   };
-  return map[name] ?? '#E0C7A8';
+  return map[name] ?? 'var(--color-line)';
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center gap-3 border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/start-creating" aria-label="Back to your range">
-          <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
-        </Link>
-        <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
-      </header>
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-6 py-7">{children}</main>
+      <FlowHeader back={{ href: '/start-creating', label: 'Back to your range' }} />
+      {/* pb-36 on phones clears the fixed thumb-zone action dock. */}
+      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-36 pt-6 md:px-6 md:pb-10">{children}</main>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, isFamilySetKey, type PricedCatalogue } from './catalogue';
 import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
+import { evaluatePromo, type PromoRule } from './promo';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -30,6 +31,23 @@ export interface Quote {
   familySetApplied: boolean;
   /** Client-supplied keys we don't sell — dropped, never priced, surfaced for honesty. */
   rejectedKeys: string[];
+  /** Pence a promo code took off the goods (0 if none / not used). */
+  promoSavingPence: number;
+  /** What happened to the code the customer entered (null if none). Safe to show. */
+  promo: null | { code: string; applied: boolean; reason?: 'min-spend' | 'nothing-eligible' | 'better-saving-applied'; minSpendPence?: number; capped?: boolean };
+  /** SERVER-ONLY: what the code's partner earns. Strip before returning to a client. */
+  partnerCommissionPence: number;
+  /** Account credit (e.g. referral rewards) applied to this order. */
+  creditPence: number;
+}
+
+/** A card charge can't be tiny — credit always leaves at least this much to pay. */
+export const MIN_CHARGE_PENCE = 50;
+
+/** How much of an account's credit an order can use: all of it, but never below the minimum charge. */
+export function applicableCredit(totalBeforeCreditPence: number, availablePence: number): number {
+  if (!(availablePence > 0)) return 0;
+  return Math.max(0, Math.min(Math.floor(availablePence), totalBeforeCreditPence - MIN_CHARGE_PENCE));
 }
 
 const MAX_QTY = 99;
@@ -60,6 +78,10 @@ export interface PriceOpts {
   /** The price list to price against — the server passes the DB-loaded one; defaults
    * to the static catalogue. The client never supplies it. */
   catalogue?: PricedCatalogue;
+  /** A code the SERVER resolved + validated (never a client-built object). */
+  promo?: PromoRule | null;
+  /** The buyer's credit balance, resolved SERVER-side from the ledger (never the client). */
+  creditAvailablePence?: number;
 }
 
 /**
@@ -113,19 +135,53 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence - joinSavingPence)
     : 0;
 
-  const totalPence = Math.max(0, subtotalPence - joinSavingPence - familySetSavingPence + deliveryPence);
+  // Promo code — best single saving, margin-guarded (src/pricing/promo.ts).
+  let promoSavingPence = 0;
+  let partnerCommissionPence = 0;
+  let promo: Quote['promo'] = null;
+  let finalJoin = joinSavingPence;
+  let finalSet = familySetSavingPence;
+  if (opts.promo && lines.length > 0) {
+    const outcome = evaluatePromo(
+      opts.promo,
+      lines.map((l) => {
+        const cost = catalogue[l.productKey]?.unitCostPence;
+        return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
+      }),
+      joinSavingPence + familySetSavingPence,
+    );
+    if (outcome.applied) {
+      promoSavingPence = outcome.discountPence;
+      partnerCommissionPence = outcome.commissionPence;
+      if (outcome.replacesOtherSavings) {
+        finalJoin = 0;
+        finalSet = 0;
+      }
+      promo = { code: opts.promo.code, applied: true, capped: outcome.capped };
+    } else {
+      promo = { code: opts.promo.code, applied: false, reason: outcome.reason, minSpendPence: outcome.minSpendPence };
+    }
+  }
+
+  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - promoSavingPence + deliveryPence);
+  const creditPence = lines.length > 0 ? applicableCredit(beforeCredit, opts.creditAvailablePence ?? 0) : 0;
+  const totalPence = beforeCredit - creditPence;
 
   return {
     lines,
     subtotalPence,
     deliveryPence,
-    joinSavingPence,
-    familySetSavingPence,
+    joinSavingPence: finalJoin,
+    familySetSavingPence: finalSet,
     totalPence,
     gift,
-    joinSavingApplied,
-    familySetApplied,
+    joinSavingApplied: joinSavingApplied && finalJoin > 0,
+    familySetApplied: familySetApplied && finalSet > 0,
     rejectedKeys,
+    promoSavingPence,
+    promo,
+    partnerCommissionPence,
+    creditPence,
   };
 }
 
@@ -135,10 +191,10 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
  */
 export function quote(
   requested: readonly RequestedLine[],
-  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue } = {},
+  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
 ): Quote {
   const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
-  return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue });
+  return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
 }
 
 /**

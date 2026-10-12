@@ -1,15 +1,38 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { assertCanViewAsset } from '@/authz';
+import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
-import { clampQty, inCatalogue, quote, type JoinProvenance } from '@/pricing';
-import { clampTransform, type RawTransform } from '@/server/print/geometry';
+import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
+import { assessResolution, clampTransform, type RawTransform } from '@/server/print/geometry';
+import { getObjectBytes } from '@/storage';
+import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
 import { resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
+import { notifyGiftListPurchase } from './giftListNotify';
+import { settlePaidOrderCredits } from './referrals';
+
+/** Pixel size of the image a line will print from (the bg-removed cutout if chosen,
+ * else the ORIGINAL) — read from the stored bytes' header, in-VPC. null if unreadable,
+ * in which case the renderer's own gate still applies. */
+async function sourceDimensions(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<{ width: number; height: number } | null> {
+  const [obj] = sourceObjectId
+    ? await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, sourceObjectId))
+    : await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!obj) return null;
+  try {
+    const meta = await sharp(await getObjectBytes(obj.key)).metadata();
+    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+  } catch {
+    return null;
+  }
+}
 
 function newRef(): string {
   const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
@@ -27,7 +50,9 @@ export interface PlaceLine {
 
 export interface PlaceOrderResult {
   ok: boolean;
-  reason?: 'empty';
+  reason?: 'empty' | 'too-small';
+  /** For 'too-small': which line (product key) can't print well at its size. */
+  productKey?: string;
   ref?: string;
   checkoutUrl?: string;
 }
@@ -48,13 +73,27 @@ export async function placeOrder(
      * resolved by the caller (the action) from the session, never the request. */
     account: { id: string } | null;
     joinProvenance: JoinProvenance | null;
+    /** A gift-link purchase: personalised lines are authorised by the link's CAPABILITY
+     * (canPurchaseViaGiftLink) instead of the buyer's membership — so a guest can buy the
+     * exact keepsakes a parent shared, and nothing else. Resolved server-side from the token. */
+    giftLink?: GiftLinkGrant | null;
+    /** App path Stripe's "back" returns to (default: the basket). */
+    cancelPath?: string;
+    /** Bought through a gift link: which link (ticks items off) + who it's from (screened). */
+    giftMeta?: { linkId: string; fromName: string | null } | null;
+    /** A code resolved + validated server-side (resolvePromo) — never built from the request. */
+    promo?: PromoRule | null;
+    /** The signed-in buyer's credit balance (server-resolved from the ledger). */
+    creditAvailablePence?: number;
+    /** The signed-in buyer's email (referral checks); guests get theirs from Stripe at payment. */
+    buyerEmail?: string | null;
   },
 ): Promise<PlaceOrderResult> {
   const { account, joinProvenance } = input;
   const catalogue = await getCatalogue(db);
   const q = quote(
     input.items.map((l) => ({ productKey: l.productKey, qty: l.qty })),
-    { gift: input.gift, joinProvenance, catalogue },
+    { gift: input.gift, joinProvenance, catalogue, promo: input.promo ?? null, creditAvailablePence: account ? (input.creditAvailablePence ?? 0) : 0 },
   );
   if (q.lines.length === 0) return { ok: false, reason: 'empty' };
 
@@ -102,19 +141,26 @@ export async function placeOrder(
   for (let i = 0; i < valid.length; i++) {
     const art = valid[i]!.artwork;
     if (!art) continue;
-    if (!account) throw new Error('must be signed in to order a personalised item');
+    if (!account && !input.giftLink) throw new Error('must be signed in to order a personalised item');
     const variantId = variantByKey.get(valid[i]!.productKey);
     if (!variantId) continue; // not a printable product
     const [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
     if (!asset) throw new Error('keepsake not found');
-    const viewer = await resolveViewerContext(db, account.id, asset.familyId);
-    assertCanViewAsset(
-      { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
-      viewer,
-    ); // ← the gate; throws on deny
-    // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
-    if (asset.moderationStatus !== 'CLEAR') {
-      throw new Error('keepsake is not cleared for printing');
+    if (input.giftLink) {
+      // Capability path: the parent's link names this keepsake (and is live) — the buyer's
+      // membership is irrelevant. Content-safety is part of the capability check (D8).
+      const decision = canPurchaseViaGiftLink(input.giftLink, asset, new Date());
+      if (!decision.allowed) throw new AuthzError(decision);
+    } else {
+      const viewer = await resolveViewerContext(db, account!.id, asset.familyId);
+      assertCanViewAsset(
+        { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
+        viewer,
+      ); // ← the gate; throws on deny
+      // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
+      if (asset.moderationStatus !== 'CLEAR') {
+        throw new Error('keepsake is not cleared for printing');
+      }
     }
     // An orderable keepsake is a real, adopted asset (never an ephemeral draft).
     if (!asset.controllerAccountId) throw new Error('keepsake has no controller');
@@ -128,6 +174,17 @@ export async function placeOrder(
         .from(storageObjects)
         .where(and(eq(storageObjects.id, art.sourceObjectId), eq(storageObjects.assetId, art.assetId)));
       if (so) sourceObjectId = so.id;
+    }
+    // Print-quality gate BEFORE any money moves: a placement that can't reach the
+    // product's DPI even with upscaling is refused here, not discovered at render time
+    // after payment (the same assessResolution the positioner + renderer use).
+    const transform = clampTransform(art.transform);
+    const srcDims = await sourceDimensions(db, art.assetId, sourceObjectId);
+    if (srcDims) {
+      const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
+      if (assessResolution(geom, srcDims, transform).decision === 'BLOCK') {
+        return { ok: false, reason: 'too-small', productKey: valid[i]!.productKey };
+      }
     }
     artworkByIndex.set(i, {
       assetId: art.assetId,
@@ -143,7 +200,7 @@ export async function placeOrder(
         printWidthPx: tpl.printWidthPx,
         printHeightPx: tpl.printHeightPx,
       },
-      transform: clampTransform(art.transform), // server-authoritative
+      transform, // server-authoritative (clamped above)
       back: normalizeCushionBack(art.back), // coerced to a known token or null
       message: (() => {
         // Card inside message — SCREENED here (abuse) + normalised (trim/cap/font) before it can be
@@ -170,6 +227,14 @@ export async function placeOrder(
       familySetSavingPence: q.familySetSavingPence,
       totalPence: q.totalPence,
       isGift: q.gift,
+      familyId: input.giftLink?.familyId ?? null,
+      giftLinkId: input.giftMeta?.linkId ?? null,
+      promoCodeId: q.promo?.applied && input.promo ? input.promo.id : null,
+      promoSavingPence: q.promoSavingPence,
+      partnerCommissionPence: q.partnerCommissionPence,
+      creditAppliedPence: q.creditPence,
+      buyerEmail: input.buyerEmail ?? null,
+      giftFromName: input.giftMeta?.fromName ?? null,
     })
     .returning();
 
@@ -213,6 +278,9 @@ export async function placeOrder(
       deliveryPence: q.deliveryPence,
       joinSavingPence: q.joinSavingPence,
       familySetSavingPence: q.familySetSavingPence,
+      promoSavingPence: q.promoSavingPence + q.creditPence, // credit rides the same one-off coupon
+      promoLabel: q.promo?.applied ? q.promo.code : undefined,
+      cancelPath: input.cancelPath,
     });
     await db.update(orders).set({ stripeSessionId: session.id }).where(eq(orders.id, order!.id));
     return { ok: true, ref, checkoutUrl: session.url ?? undefined };
@@ -234,17 +302,28 @@ export async function placeOrder(
  * enqueue write — that's the exact double-fire footgun §6 warns about.
  */
 export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void> {
-  await db.transaction(async (tx) => {
+  const flipped = await db.transaction(async (tx) => {
     const [updated] = await tx
       .update(orders)
       .set({ status: 'PAID', paidAt: new Date() })
       .where(and(eq(orders.id, orderId), eq(orders.status, 'PENDING')))
       .returning();
-    if (!updated) return; // already paid / unknown → no-op (idempotent)
+    if (!updated) return null; // already paid / unknown → no-op (idempotent)
     if (updated.joinSavingPence > 0 && updated.accountId) {
       await consumeJoinSaving(tx, updated.accountId);
     }
+    return updated;
   });
+  // AFTER commit, and only on the real PENDING→PAID transition (so a webhook retry never
+  // re-sends): a gift-list purchase tells the family it's been ticked off. A mail failure
+  // must never undo or block the payment.
+  if (flipped?.giftLinkId) {
+    await notifyGiftListPurchase(db, flipped.id).catch((e) => console.error('gift-list notify failed', (e as Error).message));
+  }
+  // Credit spent on this order + any referral reward — settled exactly once, after commit.
+  if (flipped) {
+    await settlePaidOrderCredits(db, flipped.id).catch((e) => console.error('credit settle failed', (e as Error).message));
+  }
 }
 
 async function consumeJoinSaving(db: DbHandle | Tx, accountId: string): Promise<void> {

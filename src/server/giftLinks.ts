@@ -1,30 +1,50 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, inArray } from 'drizzle-orm';
-import { AuthzError, canManageFamily, canViewAsset, type ViewerContext } from '@/authz';
-import { assets, auditRecords, families, giftLinks, invites, storageObjects } from '@/db/schema';
-import { CATALOGUE } from '@/pricing';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import { AuthzError, canManageFamily, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
+import { products, productVariants, savedDesigns } from '@/db/schema';
+import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
+import { containsAbusiveText } from './textSafety';
+import type { JoinProvenance } from '@/pricing';
+import { getCatalogue, loadCatalogue } from './catalogue';
 import { presignDownload } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
 import { createInvite } from './invites';
+import { familyNameForRelatives } from './onboarding';
+import { placeOrder, type PlaceOrderResult } from './orders';
+import type { RawTransform } from './print/geometry';
+import { appUrl, sendMail } from './mail';
 
 const GIFT_LINK_TTL_DAYS = 30;
-const GIFT_PRODUCT = 'framedPrint'; // each shared keepsake is offered as a framed print
+const DEFAULT_GIFT_PRODUCT = 'framedPrint';
+/** Products a keepsake can be shared as on a gift link: printable, on show in the shop, and
+ * needing no extra buyer input (a card needs its inside message, so it isn't giftable here). */
+const NOT_GIFTABLE = new Set(['card']);
 
 /** A frozen line in a gift link — immutable once the link is created. */
 export interface GiftItem {
   assetId: string;
+  /** A product key (default variant) OR, for a saved design, the exact variant sku. */
   productKey: string;
   label: string;
   unitPricePence: number;
+  /** Saved-design items carry the exact placement/back the parent designed (frozen). */
+  designId?: string;
+  transform?: unknown;
+  sourceObjectId?: string | null;
+  back?: string | null;
 }
 
 export interface CreateGiftLinkInput {
   familyId: string;
   assetIds: string[];
+  /** "+ Keepsake" saved designs to include, sold exactly as designed (variant + placement). */
+  designIds?: string[];
   title?: string | null;
+  /** What the keepsakes are offered as (default framed print) — validated server-side. */
+  productKey?: string | null;
   /** Optionally embed a family invite so the recipient can join (and earn the 5%). */
-  invite?: { email: string; relationship: Relationship; accessLevel: AccessLevel } | null;
+  invite?: { email: string; relationship: Relationship; accessLevel: AccessLevel; shareOccasions?: boolean } | null;
 }
 
 /**
@@ -40,9 +60,17 @@ export async function createGiftLink(
   if (creator.accountId === null || !canManageFamily(creator.membership) || creator.membership!.familyId !== input.familyId) {
     throw new AuthzError({ allowed: false, reason: 'only the family owner can create a gift link' });
   }
-  if (input.assetIds.length === 0) {
+  if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0) {
     throw new AuthzError({ allowed: false, reason: 'pick at least one keepsake to share' });
   }
+
+  // The product is the parent's choice but never trusted: it must be live in the shop.
+  const shop = await loadCatalogue(db);
+  const productKey = input.productKey ?? DEFAULT_GIFT_PRODUCT;
+  const product = shop.find((p) => p.key === productKey && !NOT_GIFTABLE.has(p.key));
+  if (!product) throw new AuthzError({ allowed: false, reason: 'that product can’t be shared on a gift link' });
+  const priced = (await getCatalogue(db))[productKey];
+  if (!priced) throw new AuthzError({ allowed: false, reason: 'that product isn’t priced' });
 
   // Freeze a snapshot from the chosen keepsakes the creator can actually see + has kept.
   const rows = await db.select().from(assets).where(inArray(assets.id, input.assetIds));
@@ -58,10 +86,39 @@ export async function createGiftLink(
     if (a.moderationStatus !== 'CLEAR') continue;
     items.push({
       assetId: a.id,
-      productKey: GIFT_PRODUCT,
-      label: 'framed keepsake print',
-      unitPricePence: CATALOGUE[GIFT_PRODUCT].pricePence,
+      productKey,
+      label: product.label,
+      unitPricePence: priced.pricePence,
     });
+  }
+  // Saved designs: the creator's own, in this family, on a live giftable product, art still
+  // kept + cleared + visible to them. Priced from the design's exact variant.
+  if (input.designIds?.length) {
+    const designs = await db
+      .select({ d: savedDesigns, a: assets, v: productVariants, p: products })
+      .from(savedDesigns)
+      .innerJoin(assets, eq(assets.id, savedDesigns.assetId))
+      .innerJoin(productVariants, eq(productVariants.sku, savedDesigns.variantSku))
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(and(inArray(savedDesigns.id, input.designIds), eq(savedDesigns.createdByAccountId, creator.accountId!)));
+    const prices = await getCatalogue(db);
+    for (const { d, a, v, p } of designs) {
+      if (d.familyId !== input.familyId || a.familyId !== input.familyId || !a.keptInHome || a.moderationStatus !== 'CLEAR') continue;
+      if (!canViewAsset({ id: a.id, familyId: a.familyId, uploaderAccountId: a.uploaderAccountId, controllerAccountId: a.controllerAccountId, visibility: a.visibility }, creator).allowed) continue;
+      if (!p.visibleInShop || !p.active || !v.active || NOT_GIFTABLE.has(p.key) || !prices[v.sku]) continue;
+      const attrs = (v.attributes as Record<string, string>) ?? {};
+      const detail = [attrs.size, attrs.colour].filter(Boolean).join(' · ');
+      items.push({
+        assetId: a.id,
+        productKey: v.sku,
+        label: detail ? `${p.label} · ${detail}` : p.label,
+        unitPricePence: prices[v.sku]!.pricePence,
+        designId: d.id,
+        transform: d.transform,
+        sourceObjectId: d.sourceObjectId,
+        back: d.back,
+      });
+    }
   }
   if (items.length === 0) {
     throw new AuthzError({ allowed: false, reason: 'none of those keepsakes can be shared' });
@@ -74,6 +131,7 @@ export async function createGiftLink(
       email: input.invite.email,
       relationship: input.invite.relationship,
       accessLevel: input.invite.accessLevel,
+      shareOccasions: input.invite.shareOccasions === true,
     });
     inviteId = inv.inviteId;
   }
@@ -106,10 +164,14 @@ export type GiftLinkView =
   | {
       state: 'active';
       id: string;
-      familyName: string;
+      /** Server-side only (never rendered): used to scope the join saving to this family. */
+      familyId: string;
+      /** null ⇒ the parent hasn't named the family yet (pages use neutral wording). */
+      familyName: string | null;
       title: string | null;
       inviteToken: string | null;
-      items: (GiftItem & { imageUrl: string | null })[];
+      /** `purchased` = already bought by someone (NEVER who — only the parent sees that). */
+      items: (GiftItem & { imageUrl: string | null; purchased: boolean })[];
     };
 
 /**
@@ -137,10 +199,12 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
     .where(and(inArray(storageObjects.assetId, assetIds), eq(storageObjects.objectClass, 'ORIGINAL')));
   for (const o of objs) keyByAsset.set(o.assetId, o.key);
 
+  const bought = await purchasedItems(db, link.id);
   const withImages = await Promise.all(
     items.map(async (i) => ({
       ...i,
       imageUrl: keyByAsset.has(i.assetId) ? await presignDownload(keyByAsset.get(i.assetId)!, 300) : null,
+      purchased: bought.has(itemKey(i)),
     })),
   );
 
@@ -154,7 +218,8 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   return {
     state: 'active',
     id: link.id,
-    familyName: family?.name ?? 'a family',
+    familyId: link.familyId,
+    familyName: familyNameForRelatives(family?.name),
     title: link.title,
     inviteToken,
     items: withImages,
@@ -178,4 +243,218 @@ export async function revokeGiftLink(db: DbHandle, owner: ViewerContext, giftLin
     targetId: giftLinkId,
   });
   return { ok: true };
+}
+
+/**
+ * Buy a gift link's frozen snapshot — SERVER-SIDE from the token, never via the client
+ * basket (which can't carry the keepsake and would sell an unprintable order). Each line
+ * is the snapshotted keepsake on its snapshotted product, at the default (whole-drawing)
+ * placement; price/variant/geometry are resolved by placeOrder as for any order. The
+ * buyer may be a guest: authorisation is the link's capability (canPurchaseViaGiftLink,
+ * re-checked per line inside placeOrder), not membership. A buyer who JOINED via the
+ * link's invite gets the one-time 5% from their server-resolved join provenance.
+ */
+export async function placeGiftLinkOrder(
+  db: DbHandle,
+  input: {
+    token: string;
+    account: { id: string; name?: string | null; email?: string } | null;
+    joinProvenance: JoinProvenance | null;
+    /** How the buyer signs it ("Granny") — shown to the family's parent only. */
+    fromName?: string | null;
+  },
+): Promise<PlaceOrderResult & { unavailable?: boolean; allBought?: boolean }> {
+  const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, input.token));
+  if (!link) return { ok: false, unavailable: true };
+  const items = link.items as GiftItem[];
+  const grant: GiftLinkGrant = {
+    familyId: link.familyId,
+    status: link.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED',
+    expiresAt: link.expiresAt,
+    assetIds: items.map((i) => i.assetId),
+  };
+  if (grant.status !== 'ACTIVE' || grant.expiresAt <= new Date()) return { ok: false, unavailable: true };
+
+  // The list keeps tabs: anything already bought is ticked off and not sold again.
+  const bought = await purchasedItems(db, link.id);
+  const remaining = items.filter((i) => !bought.has(itemKey(i)));
+  if (remaining.length === 0) return { ok: false, allBought: true };
+
+  // Only honour a join saving earned in THIS link's family (not another family's invite).
+  const joinProvenance = input.joinProvenance?.invite?.familyId === link.familyId ? input.joinProvenance : null;
+
+  try {
+    return await placeOrder(db, {
+      // Saved designs are sold exactly as designed; plain keepsakes at the whole-drawing default.
+      items: remaining.map((i) => ({
+        productKey: i.productKey,
+        qty: 1,
+        artwork: {
+          assetId: i.assetId,
+          transform: (i.transform as RawTransform | undefined) ?? { scale: 0 },
+          sourceObjectId: i.sourceObjectId ?? undefined,
+          back: i.back ?? undefined,
+        },
+      })),
+      gift: true,
+      account: input.account,
+      joinProvenance,
+      giftLink: grant,
+      cancelPath: `/g/${input.token}`,
+      giftMeta: { linkId: link.id, fromName: screenFromName(input.fromName) ?? defaultFromName(input.account) },
+    });
+  } catch (e) {
+    if (e instanceof AuthzError) return { ok: false, unavailable: true };
+    throw e;
+  }
+}
+
+/** A gift-list line's identity within its link: the keepsake on its product. */
+function itemKey(i: { assetId: string; productKey: string }): string {
+  return `${i.assetId}|${i.productKey}`;
+}
+
+/** "Who's it from?" — trimmed, ≤40 chars, no abuse; else null (we fall back or stay anonymous). */
+export function screenFromName(raw: string | null | undefined): string | null {
+  const v = (raw ?? '').trim().replace(/\s+/g, ' ');
+  if (!v || v.length > 40 || containsAbusiveText(v)) return null;
+  return v;
+}
+
+function defaultFromName(account: { name?: string | null; email?: string } | null): string | null {
+  if (!account) return null;
+  return screenFromName(account.name) ?? screenFromName(account.email?.split('@')[0]);
+}
+
+/**
+ * Which items of a gift link have been bought (a PAID-or-later order placed through the link),
+ * with who it's from and when. The list "keeps tabs" from this — no separate counter to drift.
+ */
+export async function purchasedItems(
+  db: DbHandle,
+  linkId: string,
+): Promise<Map<string, { fromName: string | null; at: Date }>> {
+  const rows = await db
+    .select({
+      assetId: orderItemArtwork.assetId,
+      productKey: orderItems.productKey,
+      fromName: orders.giftFromName,
+      paidAt: orders.paidAt,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .innerJoin(orderItemArtwork, eq(orderItemArtwork.orderItemId, orderItems.id))
+    .where(and(eq(orders.giftLinkId, linkId), inArray(orders.status, ['PAID', 'FULFILLING', 'SHIPPED'])));
+  const out = new Map<string, { fromName: string | null; at: Date }>();
+  for (const r of rows) {
+    if (!r.assetId) continue;
+    const k = itemKey({ assetId: r.assetId, productKey: r.productKey });
+    if (!out.has(k)) out.set(k, { fromName: r.fromName, at: r.paidAt ?? new Date(0) });
+  }
+  return out;
+}
+
+export interface OwnerGiftList {
+  id: string;
+  token: string;
+  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  createdAtISO: string;
+  items: { assetId: string; label: string; imageUrl: string | null; boughtBy: string | null; bought: boolean }[];
+}
+
+/**
+ * The parent's view of their gift lists: every item, and — for the parent ONLY — a sticker
+ * saying who bought it. Owner-only (the same check as creating a link).
+ */
+export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, familyId: string): Promise<OwnerGiftList[]> {
+  if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) return [];
+  const links = await db.select().from(giftLinks).where(eq(giftLinks.familyId, familyId)).orderBy(desc(giftLinks.createdAt)).limit(10);
+  if (links.length === 0) return [];
+  const allIds = [...new Set(links.flatMap((l) => (l.items as GiftItem[]).map((i) => i.assetId)))];
+  const objs = await db
+    .select({ assetId: storageObjects.assetId, key: storageObjects.key })
+    .from(storageObjects)
+    .where(and(inArray(storageObjects.assetId, allIds), eq(storageObjects.objectClass, 'ORIGINAL')));
+  const keyByAsset = new Map(objs.map((o) => [o.assetId, o.key]));
+  const now = new Date();
+  return Promise.all(
+    links.map(async (l) => {
+      const bought = await purchasedItems(db, l.id);
+      return {
+        id: l.id,
+        token: l.token,
+        status: l.status === 'REVOKED' ? 'REVOKED' : l.expiresAt <= now ? 'EXPIRED' : 'ACTIVE',
+        createdAtISO: l.createdAt.toISOString(),
+        items: await Promise.all(
+          (l.items as GiftItem[]).map(async (i) => {
+            const b = bought.get(itemKey(i));
+            return {
+              assetId: i.assetId,
+              label: i.label,
+              imageUrl: keyByAsset.has(i.assetId) ? await presignDownload(keyByAsset.get(i.assetId)!, 300) : null,
+              bought: !!b,
+              boughtBy: b ? (b.fromName ?? 'someone special') : null,
+            };
+          }),
+        ),
+      } satisfies OwnerGiftList;
+    }),
+  );
+}
+
+/**
+ * Send a gift request: email the link to people the parent picks — family members (by account,
+ * resolved to their email server-side, ACTIVE members of THIS family only) and/or any addresses
+ * typed in. Owner-only. The link itself is the same private, revocable, tick-off-able list.
+ */
+export async function sendGiftRequest(
+  db: DbHandle,
+  owner: ViewerContext,
+  input: { familyId: string; linkId: string; memberAccountIds: string[]; emails: string[]; note?: string | null },
+): Promise<{ sent: number }> {
+  if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== input.familyId) {
+    throw new AuthzError({ allowed: false, reason: 'only the family owner can send a gift request' });
+  }
+  const [link] = await db.select().from(giftLinks).where(and(eq(giftLinks.id, input.linkId), eq(giftLinks.familyId, input.familyId)));
+  if (!link || link.status !== 'ACTIVE') return { sent: 0 };
+
+  const to = new Set<string>();
+  if (input.memberAccountIds.length) {
+    const rows = await db
+      .select({ email: accounts.email })
+      .from(memberships)
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(and(eq(memberships.familyId, input.familyId), eq(memberships.status, 'ACTIVE'), inArray(memberships.accountId, input.memberAccountIds)));
+    for (const r of rows) to.add(r.email.toLowerCase());
+  }
+  for (const e of input.emails) {
+    const v = e.trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 254) to.add(v);
+  }
+  const [fam] = await db.select({ name: families.displayName }).from(families).where(eq(families.id, input.familyId));
+  const from = familyNameForRelatives(fam?.name) ?? 'your family';
+  const note = screenFromName(input.note ?? null); // ≤40 chars, abuse-screened — reused for the short note
+  let sent = 0;
+  for (const email of [...to].slice(0, 20)) {
+    await sendMail({
+      kind: 'gift-list',
+      to: email,
+      subject: `a gift request from ${from} ✦`,
+      text:
+        `${from} has put together a little gift request — keepsakes made from the children's own drawings.` +
+        (note ? `\n\n"${note}"` : '') +
+        `\n\nHave a look (it's private, and ticks itself off so nobody doubles up):\n${appUrl(`/g/${link.token}`)}`,
+    });
+    sent++;
+  }
+  await db.insert(auditRecords).values({
+    familyId: input.familyId,
+    actorAccountId: owner.accountId,
+    actorType: 'MEMBER',
+    event: 'GIFT_LINK_CREATED',
+    targetType: 'gift_link',
+    targetId: link.id,
+    metadata: { sentTo: sent },
+  });
+  return { sent };
 }

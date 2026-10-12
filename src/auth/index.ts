@@ -1,13 +1,13 @@
 import NextAuth from 'next-auth';
 import type { EmailConfig } from 'next-auth/providers';
 import { DrizzleAccountsAdapter } from './adapter';
+import { sendMail } from '@/server/mail';
 
 /**
  * Passwordless magic-link auth (Auth.js v5) over our `accounts` table.
  *
- * Dev transport: the link is logged to the server console — no SMTP, no
- * credentials. Wire a real no-retention email sub-processor (and a branded
- * template) before launch; only `sendVerificationRequest` changes.
+ * Delivery goes through the app's Mailer port (src/server/mail): the console in dev,
+ * the chosen no-retention ESP in production (decision D7) — one adapter to add.
  */
 const magicLink: EmailConfig = {
   id: 'email',
@@ -19,12 +19,12 @@ const magicLink: EmailConfig = {
   server: undefined as unknown as EmailConfig['server'],
   options: {},
   async sendVerificationRequest({ identifier, url }) {
-    // eslint-disable-next-line no-console
-    console.log(
-      `\n┌─────────────────────────────────────────────────────────────\n` +
-        `│ ✉️  magic link for ${identifier}\n│ ${url}\n` +
-        `└─────────────────────────────────────────────────────────────\n`,
-    );
+    await sendMail({
+      kind: 'magic-link',
+      to: identifier,
+      subject: 'your one-tap link to snickerdoodle',
+      text: `Here's your one-tap link — it works once, for 24 hours:\n${url}\n\nDidn't ask for this? You can safely ignore it.`,
+    });
   },
 };
 

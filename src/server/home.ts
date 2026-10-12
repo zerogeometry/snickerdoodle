@@ -1,12 +1,15 @@
-import { and, desc, eq } from 'drizzle-orm';
-import { canViewAsset, type AssetRef } from '@/authz';
-import { accounts, assets, children, families, memberships, storageObjects } from '@/db/schema';
+import { and, desc, eq, gt } from 'drizzle-orm';
+import { canSetAssetVisibility, canViewAsset, type AssetRef } from '@/authz';
+import { accounts, assets, children, families, invites, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
 import type { Circle, VisibilityTier } from '@/domain/types';
-import { ensureHomeFamily } from './onboarding';
+import { listActiveFamilies, resolveHomeFamily, type FamilyChoice } from './onboarding';
 import { resolveViewerContext } from './assets';
 import { getCurrentAccount } from './session';
+import { hasReminderConsent } from './reminders';
+import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
+import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
 
 export interface HomeMember {
   accountId: string;
@@ -15,6 +18,8 @@ export interface HomeMember {
   circle: Circle;
   isOwner: boolean;
   isYou: boolean;
+  /** Sees the family calendar (birthdays). Only meaningful for non-owners. */
+  seesOccasions: boolean;
 }
 
 export interface HomeKeepsake {
@@ -23,18 +28,40 @@ export interface HomeKeepsake {
   createdAtISO: string;
   imageUrl: string | null;
   childSubjectId: string | null;
+  /** The viewer controls this keepsake (may change who sees it / delete it) — authz-derived. */
+  canManage: boolean;
+}
+
+export interface HomePendingInvite {
+  id: string;
+  email: string;
+  circle: Circle;
 }
 
 export interface HomeChild {
   id: string;
   firstName: string;
+  /** ISO date (YYYY-MM-DD) or null — only ever used for the gentle "coming up" nudge. */
+  birthday: string | null;
 }
 
 export interface HomeData {
   account: { id: string; email: string; name: string | null };
   familyId: string;
   familyName: string;
+  /** The viewer owns (controls) this family — only owners invite, share gift links, add children. */
+  isOwner: boolean;
+  /** Every family the viewer is in, for the switcher (length 1 = no switcher). */
+  families: FamilyChoice[];
   members: HomeMember[];
+  /** The viewer's current birthday-reminder email consent (PECR). */
+  remindersOn: boolean;
+  /** The viewer's "+ Keepsake" saved designs in this family. */
+  savedDesigns: SavedDesignView[];
+  /** The owner's gift lists with what's been bought + by whom (owner only; [] otherwise). */
+  giftLists: OwnerGiftList[];
+  /** Invites still waiting to be accepted — shown to the owner only. */
+  pendingInvites: HomePendingInvite[];
   children: HomeChild[];
   keepsakes: HomeKeepsake[];
 }
@@ -50,12 +77,13 @@ function refOf(row: typeof assets.$inferSelect): AssetRef {
 }
 
 /** Everything the keepsake home needs for the signed-in account — null for a guest. */
-export async function loadHome(): Promise<HomeData | null> {
+export async function loadHome(requestedFamilyId?: string | null): Promise<HomeData | null> {
   const account = await getCurrentAccount();
   if (!account) return null;
 
   const db = getDb();
-  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  const familyId = await resolveHomeFamily(db, account.id, account.name, requestedFamilyId);
+  const familyChoices = await listActiveFamilies(db, account.id);
 
   const [family] = await db.select().from(families).where(eq(families.id, familyId));
 
@@ -74,6 +102,7 @@ export async function loadHome(): Promise<HomeData | null> {
       circle: m.circle,
       isOwner: m.isOwner,
       isYou: a.id === account.id,
+      seesOccasions: m.seesOccasions,
     };
   });
 
@@ -102,22 +131,50 @@ export async function loadHome(): Promise<HomeData | null> {
       createdAtISO: r.asset.createdAt.toISOString(),
       imageUrl: r.key ? await presignDownload(r.key, 300) : null,
       childSubjectId: r.asset.childSubjectId,
+      canManage: canSetAssetVisibility(refOf(r.asset), viewer),
     })),
   );
 
   // The family's children (keepsake subjects), so the home can file keepsakes into
   // each little one's corner.
   const childRows = await db
-    .select({ id: children.id, firstName: children.firstName })
+    .select({ id: children.id, firstName: children.firstName, birthday: children.birthday })
     .from(children)
     .where(eq(children.familyId, familyId));
+
+  const isOwner = familyChoices.find((f) => f.familyId === familyId)?.isOwner ?? false;
+  const seesCalendar = memberRows.some(({ m }) => m.accountId === account.id && m.seesOccasions);
+  const pendingInvites: HomePendingInvite[] = isOwner
+    ? (
+        await db
+          .select({ id: invites.id, email: invites.email, circle: invites.circle })
+          .from(invites)
+          .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date())))
+          .orderBy(desc(invites.createdAt))
+      )
+    : [];
 
   return {
     account,
     familyId,
-    familyName: family?.displayName ?? 'Your family',
+    // The owner sees their family's own name (or the "Your family" placeholder they can
+    // rename); a joined relative sees the name as they know it ("Sam's family").
+    familyName: isOwner ? (family?.displayName ?? 'Your family') : (familyChoices.find((f) => f.familyId === familyId)?.name ?? 'the family'),
+    isOwner,
+    giftLists: isOwner ? await listGiftListsForOwner(db, viewer, familyId) : [],
+    savedDesigns: await listSavedDesigns(db, account.id, familyId),
+    remindersOn: await hasReminderConsent(db, account.id),
+    families: familyChoices,
     members,
-    children: childRows,
+    pendingInvites,
+    // A child's birthday is their personal data: the parent (owner) always sees it; a relative
+    // only when the parent shared the family calendar with them (the pre-ticked invite choice,
+    // changeable per member any time). Everyone else sees first names only.
+    children: childRows.map((c) => ({
+      id: c.id,
+      firstName: c.firstName,
+      birthday: (isOwner || seesCalendar) && c.birthday ? String(c.birthday).slice(0, 10) : null,
+    })),
     keepsakes,
   };
 }

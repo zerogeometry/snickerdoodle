@@ -71,17 +71,17 @@ export function ImageStudio({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-cocoa/50 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label="Edit in studio" className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)]">
+      <div role="dialog" aria-modal="true" aria-label="Edit in studio" className="relative z-10 flex max-h-[92vh] w-full max-w-md flex-col overflow-y-auto rounded-2xl bg-paper shadow-[0_20px_50px_color-mix(in_srgb,var(--color-cocoa)_28%,transparent)]">
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
           <h2 className="font-display text-lg font-semibold text-cocoa">Edit in studio</h2>
-          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-full p-1 text-[#B3A491] hover:bg-[#F2EADB]">
+          <button type="button" onClick={onClose} aria-label="Close" className="-mr-1 rounded-full p-1 text-ink-faint hover:bg-line">
             <Icon icon={IconX} size={18} />
           </button>
         </div>
-        <p className="px-5 text-xs text-[#9C8E7E]">Edits here apply to your drawing on every product.</p>
+        <p className="px-5 text-xs text-ink-faint">Edits here apply to your drawing on every product.</p>
 
         <div className="px-5 py-3">
-          <div className="flex h-64 items-center justify-center overflow-hidden rounded-xl bg-[#FBF5E9]">
+          <div className="flex h-64 items-center justify-center overflow-hidden rounded-xl bg-oat">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={image}
@@ -92,20 +92,20 @@ export function ImageStudio({
           </div>
 
           <div className="mt-3 flex items-center justify-center gap-2">
-            <button type="button" onClick={() => rotateBy(-90)} className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey">
+            <button type="button" onClick={() => rotateBy(-90)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey">
               <Icon icon={IconRotate2} size={15} /> rotate left
             </button>
-            <button type="button" onClick={() => rotateBy(90)} className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey">
+            <button type="button" onClick={() => rotateBy(90)} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey">
               <Icon icon={IconRotateClockwise2} size={15} /> rotate right
             </button>
           </div>
 
           <div className="mt-4">
             <div className="flex items-center justify-between">
-              <label htmlFor="brightness" className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
+              <label htmlFor="brightness" className="text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
                 Brightness
               </label>
-              <span className="text-[11px] font-bold text-[#7A6A58]" aria-hidden>
+              <span className="text-[11px] font-bold text-ink-soft" aria-hidden>
                 {Math.round(brightness * 100)}%
               </span>
             </div>
@@ -123,8 +123,8 @@ export function ImageStudio({
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2 border-t border-[#F2EADB] px-5 pb-5 pt-3">
-          <button type="button" onClick={() => { setRotation(0); setBrightness(1); }} className="text-xs font-bold text-[#9C8772] hover:text-cinnamon">
+        <div className="flex items-center justify-between gap-2 border-t border-line px-5 pb-5 pt-3">
+          <button type="button" onClick={() => { setRotation(0); setBrightness(1); }} className="text-xs font-bold text-ink-faint hover:text-cinnamon">
             reset
           </button>
           <Button size="lg" onClick={apply} disabled={busy}>

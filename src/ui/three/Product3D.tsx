@@ -203,7 +203,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
 
   if (failed) {
     return (
-      <div className={`flex items-center justify-center rounded-2xl bg-[#FBF5E9] p-6 text-center text-xs text-[#9C8E7E] ${className ?? ''}`}>
+      <div className={`flex items-center justify-center rounded-2xl bg-oat p-6 text-center text-xs text-ink-faint ${className ?? ''}`}>
         the spin-around view isn’t available here — the photo preview shows exactly what prints
       </div>
     );

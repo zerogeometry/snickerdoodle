@@ -226,7 +226,7 @@ export function MockupPreview({
         // deliberately never the SVG stand-in (founder call).
         <div
           aria-hidden
-          className={`h-full w-full rounded-lg bg-[#F5EDDC] ${resting ? '' : 'motion-safe:animate-pulse'}`}
+          className={`h-full w-full rounded-lg bg-line ${resting ? '' : 'motion-safe:animate-pulse'}`}
           style={{ minHeight: Math.min(px, 220) }}
         />
       )}

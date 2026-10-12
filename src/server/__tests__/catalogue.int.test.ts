@@ -69,23 +69,23 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'))).toHaveLength(1);
   });
 
-  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + cushion + jigsaw + blanket + card); the curation view sees everything', async () => {
+  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + mug + cushion + jigsaw + blanket + card); the curation view sees everything', async () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'cushion', 'jigsaw', 'blanket', 'card']);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'jigsaw', 'blanket', 'card']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
     expect(all.length).toBeGreaterThan(10);
-    expect(all.some((p) => p.key === 'mug')).toBe(true);
+    expect(all.some((p) => p.key === 'adultTee')).toBe(true); // a hidden product
 
     // hidden ≠ inactive: hidden products remain fully priceable in the backend
     // (display curation only — `active` stays the sellable axis)
     const cat = await getCatalogue(db);
-    expect(cat.mug!.pricePence).toBeGreaterThan(0);
+    expect(cat.adultTee!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'cushion', 'jigsaw', 'blanket', 'card']);
+    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'jigsaw', 'blanket', 'card']);
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));

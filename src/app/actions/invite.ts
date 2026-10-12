@@ -5,17 +5,18 @@ import { resolveViewerContext } from '@/server/assets';
 import { createInvite } from '@/server/invites';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
+import { appUrl, sendMail } from '@/server/mail';
 import type { AccessLevel, Relationship } from '@/domain/types';
 
 /**
- * Send a family invite. Parent-initiated only (the server checks ownership). In
- * dev the join link is logged to the server console; production emails it via a
- * no-retention email sub-processor.
+ * Send a family invite. Parent-initiated only (the server checks ownership). Delivered
+ * through the Mailer port (console in dev; the chosen no-retention ESP in production).
  */
 export async function createInviteAction(input: {
   email: string;
   relationship: Relationship;
   accessLevel: AccessLevel;
+  shareOccasions?: boolean;
 }): Promise<{ ok: boolean; needsAuth?: boolean }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
@@ -30,9 +31,17 @@ export async function createInviteAction(input: {
       email: input.email,
       relationship: input.relationship,
       accessLevel: input.accessLevel,
+      shareOccasions: input.shareOccasions === true,
     });
-    // eslint-disable-next-line no-console
-    console.log(`\n┌─ family invite for ${input.email.trim().toLowerCase()}\n│ http://localhost:3000/join/${token}\n└─\n`);
+    await sendMail({
+      kind: 'family-invite',
+      to: input.email.trim().toLowerCase(),
+      subject: 'you’re invited to a family keepsake box',
+      text:
+        `You've been invited to join a family's private keepsake box on snickerdoodle.\n\n` +
+        `Tap to join (it's just for you, and lasts 14 days):\n${appUrl(`/join/${token}`)}\n\n` +
+        `Nothing is ever public — only the family you join can see what's inside.`,
+    });
     return { ok: true };
   } catch {
     return { ok: false };

@@ -5,10 +5,11 @@ import { cn } from '../cn';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'design' | 'designOutline';
 type Size = 'sm' | 'md' | 'lg';
 
-// ≥44px tap target (min-h-11). The gentle hover tilt is the "CTA wobble";
-// the global prefers-reduced-motion rule neutralises it.
+// ≥44px tap target (min-h-11). Scrapbook buttons are chunky, rounded "stickers" that sit on a
+// solid offset shadow and squash down onto it when pressed (.press). The global
+// prefers-reduced-motion rule neutralises all of it.
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-pill font-extrabold leading-none transition-transform duration-200 hover:-rotate-[1.2deg] focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-60';
+  'press inline-flex items-center justify-center gap-2 rounded-[16px] font-extrabold leading-none focus-visible:outline-2 disabled:pointer-events-none disabled:opacity-60';
 
 const sizes: Record<Size, string> = {
   sm: 'min-h-11 px-4 text-sm',
@@ -17,13 +18,14 @@ const sizes: Record<Size, string> = {
 };
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-cta text-cta-text shadow-sm hover:bg-cinnamon',
-  secondary: 'border-[1.5px] border-[#E0C7A8] bg-transparent text-cinnamon hover:bg-honey-band',
+  primary: 'bg-cta text-cta-text shadow-[0_4px_0_var(--color-cta-deep)] active:shadow-[0_1px_0_var(--color-cta-deep)]',
+  secondary:
+    'border-2 border-cocoa bg-paper text-cocoa shadow-[0_3px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-[0_0_0_var(--color-cocoa)]',
   ghost: 'bg-transparent text-cinnamon hover:bg-honey-band',
-  // Design / creative tools (sky) — visually distinct from the cinnamon TRANSACTION
+  // Design / creative tools (cobalt) — visually distinct from the tomato TRANSACTION
   // CTAs so "magic edits" never read as a buy action.
-  design: 'bg-[#84BBD0] text-cocoa shadow-sm hover:bg-[#74AFC6]',
-  designOutline: 'border-[1.5px] border-[#A9D2E0] bg-transparent text-[#3C7E97] hover:bg-[#EAF3F6]',
+  design: 'bg-cobalt text-white shadow-[0_4px_0_var(--color-cobalt-deep)] active:shadow-[0_1px_0_var(--color-cobalt-deep)]',
+  designOutline: 'border-2 border-cobalt bg-paper text-cobalt hover:bg-sky-pale',
 };
 
 type BaseProps = {

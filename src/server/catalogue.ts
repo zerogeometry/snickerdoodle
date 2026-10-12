@@ -356,16 +356,16 @@ function variantSku(productKey: string, v: VariantDef, isDefault: boolean): stri
  */
 export async function getCatalogue(db: DbHandle): Promise<PricedCatalogue> {
   const rows = await db
-    .select({ productKey: products.key, productActive: products.active, sku: productVariants.sku, label: productVariants.label, pricePence: productVariants.pricePence, isDefault: productVariants.isDefault, variantActive: productVariants.active })
+    .select({ productKey: products.key, productActive: products.active, sku: productVariants.sku, label: productVariants.label, pricePence: productVariants.pricePence, unitCostPence: productVariants.unitCostPence, isDefault: productVariants.isDefault, variantActive: productVariants.active })
     .from(productVariants)
     .innerJoin(products, eq(products.id, productVariants.productId));
 
   const map: PricedCatalogue = {};
   for (const r of rows) {
     if (!r.productActive || !r.variantActive) continue;
-    map[r.sku] = { pricePence: r.pricePence, label: r.label };
+    map[r.sku] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
     if (r.isDefault && !Object.prototype.hasOwnProperty.call(map, r.productKey)) {
-      map[r.productKey] = { pricePence: r.pricePence, label: r.label };
+      map[r.productKey] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
     }
   }
   return Object.keys(map).length > 0 ? map : CATALOGUE;
@@ -383,6 +383,9 @@ export interface CatalogueVariant {
    * The print pipeline still resolves its own server-side template at order time. */
   printWmm: number | null;
   printHmm: number | null;
+  /** The print template's pixel geometry — so the client runs the SAME DPI assessment
+   * (assessResolution) the server's order-time gate does. null ⇒ not a printed product. */
+  printGeom?: { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number } | null;
 }
 export interface CatalogueProduct {
   key: string;
@@ -414,6 +417,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
       key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
       vId: productVariants.id, vSku: productVariants.sku, vAttrs: productVariants.attributes, vPrice: productVariants.pricePence, vDefault: productVariants.isDefault, vSort: productVariants.sortOrder,
       tWmm: printTemplates.printWidthMm, tHmm: printTemplates.printHeightMm,
+      tWpx: printTemplates.printWidthPx, tHpx: printTemplates.printHeightPx, tBleed: printTemplates.bleedMm, tDpi: printTemplates.requiredDpi,
     })
     .from(products)
     .innerJoin(productVariants, eq(productVariants.productId, products.id))
@@ -429,7 +433,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
-    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null });
+    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null, printGeom: r.tWpx && r.tHpx && r.tDpi ? { printWidthPx: r.tWpx, printHeightPx: r.tHpx, bleedMm: r.tBleed ?? 0, requiredDpi: r.tDpi } : null });
     p.fromPence = Math.min(p.fromPence, r.vPrice);
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);

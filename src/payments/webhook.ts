@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { orders, webhookEvents } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { markOrderPaid } from '@/server/orders';
@@ -50,6 +50,11 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
               },
             })
             .where(eq(orders.id, order.id));
+        }
+        // The payer's email (guests have no account) — used for referral first-order checks.
+        const payerEmail = session.customer_details?.email ?? null;
+        if (payerEmail) {
+          await db.update(orders).set({ buyerEmail: payerEmail.toLowerCase() }).where(and(eq(orders.id, order.id), isNull(orders.buyerEmail)));
         }
         await markOrderPaid(db, order.id);
         handled = true;

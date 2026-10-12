@@ -65,7 +65,8 @@ export type CatalogueKey = keyof typeof CATALOGUE;
  * static {@link CATALOGUE} is one (the default / seed / fallback); the server can
  * pass a DB-loaded one instead. Either way the CLIENT never supplies prices.
  */
-export type PricedCatalogue = Record<string, { pricePence: number; label: string }>;
+/** `unitCostPence` (server-only, landed ex-VAT cost) feeds the promo margin guard; absent ⇒ never discounted. */
+export type PricedCatalogue = Record<string, { pricePence: number; label: string; unitCostPence?: number | null }>;
 
 /** Narrowing guard — is this client-supplied string something we actually sell? */
 export function isCatalogueKey(key: string): key is CatalogueKey {

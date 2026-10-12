@@ -4,6 +4,11 @@ import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { getDb } from '@/db/client';
 import { getGiftLink } from '@/server/giftLinks';
+import { getCatalogue } from '@/server/catalogue';
+import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
+import { quote } from '@/pricing';
+import { getCurrentAccount } from '@/server/session';
+import { screenFromName } from '@/server/giftLinks';
 import { Icon } from '@/ui/primitives/Icon';
 import { GiftCheckout } from './GiftCheckout';
 
@@ -16,11 +21,11 @@ export const metadata: Metadata = {
 function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center justify-between border-b border-[#EDE2CD] px-6 py-3">
+      <header className="flex items-center justify-between border-b border-line px-6 py-3">
         <Link href="/" className="font-display text-lg font-semibold text-cocoa">
           snickerdoodle
         </Link>
-        <span className="flex items-center gap-1.5 text-xs text-[#6F6358]">
+        <span className="flex items-center gap-1.5 text-xs text-ink-soft">
           <Icon icon={IconLock} size={14} className="text-green-save" /> secure gift link
         </span>
       </header>
@@ -45,35 +50,55 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
     return (
       <Shell>
         <main id="main" className="flex flex-1 items-center justify-center px-6 py-16">
-          <div className="max-w-sm rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
+          <div className="max-w-sm rounded-2xl border border-line bg-white p-7 text-center">
             <Icon icon={IconAlertTriangle} size={28} className="mx-auto text-honey" />
             <h1 className="mt-3 font-display text-xl font-semibold text-cocoa">{msg.title}</h1>
-            <p className="mt-2 text-sm text-[#6F6358]">{msg.body}</p>
+            <p className="mt-2 text-sm text-ink-soft">{msg.body}</p>
           </div>
         </main>
       </Shell>
     );
   }
 
+  // Totals are the SERVER's quote for this viewer — the same engine placeGiftLinkOrder
+  // charges with. A buyer who joined via this family's invite sees their 5% here.
+  const db = getDb();
+  const provenance = await resolveSessionJoinProvenance();
+  const joinProvenance = provenance?.invite?.familyId === view.familyId ? provenance : null;
+  const q = quote(
+    view.items.filter((i) => !i.purchased).map((i) => ({ productKey: i.productKey, qty: 1 })), // ticked-off items aren't sold again
+    { gift: true, joinProvenance, catalogue: await getCatalogue(db) },
+  );
+  const pricing = { subtotalPence: q.subtotalPence, deliveryPence: q.deliveryPence, joinSavingPence: q.joinSavingPence, totalPence: q.totalPence };
+  const viewer = await getCurrentAccount();
+  const defaultFrom = viewer ? (screenFromName(viewer.name) ?? screenFromName(viewer.email.split('@')[0]) ?? '') : '';
+
   return (
     <Shell>
       <div className="flex items-center gap-3.5 bg-honey-band px-6 py-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-honey bg-[#FFFDF8]">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-honey bg-paper">
           <Icon icon={IconGift} size={24} className="text-cinnamon" />
         </div>
         <div>
           <h1 className="font-display text-lg font-semibold leading-tight text-cocoa">
-            {view.title ?? `A gift list from ${view.familyName}`}
+            {view.title ?? (view.familyName ? `A gift list from ${view.familyName}` : 'A little gift list for you')}
           </h1>
-          <p className="text-[11px] text-[#8A6F52]">A ready-to-buy cart — check out and it&apos;s on its way.</p>
+          <p className="text-[11px] text-ink-faint">A ready-to-buy cart — check out and it&apos;s on its way.</p>
         </div>
       </div>
 
       <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
-        <GiftCheckout token={token} items={view.items} inviteToken={view.inviteToken} familyName={view.familyName} />
+        <GiftCheckout
+          token={token}
+          items={view.items.map(({ assetId, productKey, label, unitPricePence, imageUrl, purchased }) => ({ assetId, productKey, label, unitPricePence, imageUrl, purchased }))}
+          defaultFrom={defaultFrom}
+          inviteToken={view.inviteToken}
+          familyName={view.familyName}
+          pricing={pricing}
+        />
       </main>
 
-      <div className="flex items-center justify-center gap-1.5 bg-[#F1E7D4] px-6 py-2.5 text-center text-[11px] text-green-save">
+      <div className="flex items-center justify-center gap-1.5 bg-paper-2 px-6 py-2.5 text-center text-[11px] text-green-save">
         <Icon icon={IconShieldCheck} size={14} /> Secure. Your details are yours — never shared, never sold.
       </div>
     </Shell>

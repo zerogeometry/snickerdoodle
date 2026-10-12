@@ -11,8 +11,8 @@ export default function PrivacyNoticePage() {
   return (
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-4xl font-semibold leading-tight md:text-5xl">Privacy Notice</h1>
-        <p className="mt-2 text-[13px] text-[#9C8E7E]">Last updated: [date] · A draft for review before publication.</p>
+        <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Privacy Notice</h1>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: [date] · A draft for review before publication.</p>
       </div>
 
       <Prose className="mt-8">
@@ -120,7 +120,7 @@ export default function PrivacyNoticePage() {
           If we change how we use your data, we&apos;ll update this notice and, where it matters, tell you directly.
         </p>
 
-        <p className="text-[13px] text-[#9C8E7E]">
+        <p className="text-[13px] text-ink-faint">
           Contact: <a href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a> · Launch Mode Ltd,
           [address] · ICO registration [number].
         </p>

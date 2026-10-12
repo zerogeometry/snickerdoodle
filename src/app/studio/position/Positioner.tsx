@@ -1,11 +1,11 @@
 'use client';
 
-import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconArrowLeft, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
-import Link from 'next/link';
+import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
+import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection } from '@/lib/store';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { ProductKey } from '@/ui/components/ProductArt';
@@ -185,7 +185,7 @@ export function Positioner({
   if (!keepsake || !variant) {
     return (
       <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
-        <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-8 text-center text-sm text-[#6F6358]">
+        <div className="pop-in mx-auto max-w-md rounded-[22px] border-2 border-dashed border-cocoa/25 bg-paper p-8 text-center text-sm text-ink-soft">
           Keep a drawing in your keepsake home first — then you can place it on a product here.
           <div className="mt-4">
             <Button href="/start-creating" size="md">
@@ -810,7 +810,7 @@ export function Positioner({
                 {...handleProps}
                 role="button"
                 aria-label="drag to resize the drawing"
-                className="absolute z-20 h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-cinnamon bg-white shadow-[0_1px_3px_rgba(46,39,35,.35)] before:absolute before:-inset-[11px] before:content-['']"
+                className="absolute z-20 h-[22px] w-[22px] -translate-x-1/2 -translate-y-1/2 touch-none rounded-full border-2 border-cinnamon bg-white shadow-[0_1px_3px_color-mix(in_srgb,var(--color-cocoa)_35%,transparent)] before:absolute before:-inset-[11px] before:content-['']"
                 style={{ left: x, top: y, cursor: cur }}
               />
             ))
@@ -831,7 +831,7 @@ export function Positioner({
                 type="button"
                 onClick={() => setViewMode('flat')}
                 aria-pressed={viewMode === 'flat'}
-                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'flat' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                className={`${OPT_SM} ${viewMode === 'flat' ? OPT_ON : OPT_OFF}`}
               >
                 print layout
               </button>
@@ -839,7 +839,7 @@ export function Positioner({
                 type="button"
                 onClick={() => setViewMode('product')}
                 aria-pressed={viewMode === 'product'}
-                className={`relative rounded-full border px-3 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-[''] ${viewMode === 'product' ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'}`}
+                className={`${OPT_SM} ${viewMode === 'product' ? OPT_ON : OPT_OFF}`}
               >
                 {onProductLabel}
               </button>
@@ -848,7 +848,7 @@ export function Positioner({
           {!isMug && bd && ctx && ctx.ok && viewMode === 'product' ? (
             <div
               {...canvasInteractionProps}
-              className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
+              className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: bd.pvH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -885,7 +885,7 @@ export function Positioner({
           ) : (
             <div
               {...canvasInteractionProps}
-              className={`relative overflow-hidden rounded-lg border border-[#EADFC9] bg-[#FBF5E9] ${canvasInteractionClass}`}
+              className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: previewH }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -904,7 +904,7 @@ export function Positioner({
               {renderSelection({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale })}
             </div>
           )}
-          <p className="mt-2 text-center text-[11px] text-[#9C8772]">
+          <p className="mt-2 text-center text-[11px] text-ink-faint">
             the <b className="text-cinnamon">outlined box</b> is what shows in the frame · drag a corner to resize · keep faces &amp; words a little in from the edges
           </p>
 
@@ -912,12 +912,12 @@ export function Positioner({
               offered right where the warning is, never a dead end. */}
           {assess ? (
             <div
-              className={`mt-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-[12px] font-semibold ${
+              className={`mt-3 flex flex-wrap items-center gap-2 rounded-[14px] border-2 px-3 py-2 text-[12px] font-semibold ${
                 assess.decision === 'OK'
-                  ? 'bg-[#EAF1E4] text-green-save'
+                  ? 'border-leaf bg-leaf-pale text-green-save'
                   : assess.decision === 'UPSCALE'
-                    ? 'bg-honey-band text-[#8A5B22]'
-                    : 'bg-[#FBE4DA] text-berry'
+                    ? 'border-sunshine bg-honey-band text-cocoa'
+                    : 'border-cocoa bg-berry-pale text-cocoa'
               }`}
             >
               <Icon icon={assess.decision === 'BLOCK' ? IconAlertTriangle : IconCircleCheck} size={15} />
@@ -934,7 +934,7 @@ export function Positioner({
                 <button
                   type="button"
                   onClick={() => update({ scale: dpiFix.scale })}
-                  className="relative rounded-full border border-current px-2.5 py-1 text-[11px] font-bold before:absolute before:-inset-[6px] before:content-['']"
+                  className="press relative min-h-9 rounded-pill border-2 border-cocoa bg-paper px-3 text-[11px] font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[4px] before:content-['']"
                 >
                   {dpiFix.kind === 'ok' ? 'zoom out to print-ready' : 'zoom out to fix'}
                 </button>
@@ -945,9 +945,9 @@ export function Positioner({
 
         {/* Controls */}
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Product</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Product</p>
           {/* Scoped to the ONE creation being customized — never a catalogue in here. */}
-          <p className="mt-2 inline-flex rounded-full border border-cinnamon bg-[#FBEFE0] px-3 py-1.5 text-xs font-semibold text-cocoa">
+          <p className="sticker mt-2 inline-flex -rotate-1 rounded-pill bg-honey px-3 py-1.5 text-xs font-extrabold text-cocoa">
             {variant.label} · {gbp(variant.pricePence)}
           </p>
 
@@ -955,7 +955,7 @@ export function Positioner({
               2026-07-07). Switching flips the canvas aspect to the sibling's template. */}
           {orientations.length > 1 ? (
             <div className="mt-4">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Orientation</p>
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Orientation</p>
               <div className="mt-2 flex gap-1.5" role="group" aria-label="orientation">
                 {orientations.map((o) => (
                   <button
@@ -963,9 +963,7 @@ export function Positioner({
                     type="button"
                     onClick={() => switchOrientation(o)}
                     aria-pressed={variant.orientation === o}
-                    className={`relative rounded-full border px-3 py-1.5 text-xs font-bold before:absolute before:-inset-[6px] before:content-[''] ${
-                      variant.orientation === o ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58]'
-                    }`}
+                    className={`${OPT_SM} ${variant.orientation === o ? OPT_ON : OPT_OFF}`}
                   >
                     {o}
                   </button>
@@ -976,14 +974,16 @@ export function Positioner({
 
           {data.keepsakes.length > 1 ? (
             <>
-              <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Keepsake</p>
+              <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Keepsake</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {data.keepsakes.map((k, i) => (
                   <button
                     key={k.id}
                     type="button"
                     onClick={() => { setAssetIdx(i); setNatural(null); setResult(null); setCutout(null); }}
-                    className={`h-12 w-12 overflow-hidden rounded-lg border-2 ${i === assetIdx ? 'border-cinnamon' : 'border-[#EFE6D6]'}`}
+                    aria-pressed={i === assetIdx}
+                    aria-label={`keepsake ${i + 1}`}
+                    className={`press h-12 w-12 overflow-hidden rounded-[12px] border-2 ${i === assetIdx ? 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]' : 'border-cocoa/15'}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={k.imageUrl} alt="" className="h-full w-full object-cover" />
@@ -994,14 +994,14 @@ export function Positioner({
           ) : null}
 
           <div className="mt-5 flex items-center justify-between">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Position</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Position</p>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 onClick={undo}
                 disabled={undoRef.current.length === 0}
                 aria-label="undo placement change"
-                className="relative rounded-full p-1.5 text-[#7A6A58] before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+                className="relative rounded-full p-1.5 text-ink-soft before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
               >
                 <Icon icon={IconArrowBackUp} size={16} />
               </button>
@@ -1010,13 +1010,13 @@ export function Positioner({
                 onClick={redo}
                 disabled={redoRef.current.length === 0}
                 aria-label="redo placement change"
-                className="relative rounded-full p-1.5 text-[#7A6A58] before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
+                className="relative rounded-full p-1.5 text-ink-soft before:absolute before:-inset-[8px] before:content-[''] hover:text-cinnamon disabled:opacity-35"
               >
                 <Icon icon={IconArrowForwardUp} size={16} />
               </button>
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-[#9C8E7E]">drag the drawing to move it · drag a corner (or scroll / pinch) to resize · double-tap to reset</p>
+          <p className="mt-1 text-[11px] text-ink-faint">drag the drawing to move it · drag a corner (or scroll / pinch) to resize · double-tap to reset</p>
           <div className="mt-2 space-y-3">
             <ZoomSlider
               fit={fitScale}
@@ -1058,50 +1058,53 @@ export function Positioner({
             <button
               type="button"
               onClick={setRot}
-              className="inline-flex items-center gap-1.5 rounded-full border border-[#E6D8BE] bg-white px-3 py-1.5 text-xs font-bold text-cocoa hover:border-honey"
+              className="press inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-cocoa/25 bg-paper px-3.5 text-xs font-bold text-cocoa hover:border-cocoa"
             >
               <Icon icon={IconRotateClockwise} size={14} /> rotate ({tf.rotationDeg}°)
             </button>
           </div>
 
-          <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Magic</p>
+          <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Magic</p>
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
               onClick={removeBg}
               disabled={removing}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${
-                cutout ? 'border-meadow bg-[#EAF1E4] text-green-save' : 'border-[#E6D8BE] bg-white text-cocoa hover:border-honey'
+              className={`press inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 px-3.5 text-xs font-bold disabled:opacity-50 ${
+                cutout ? 'border-leaf bg-leaf-pale text-green-save' : 'border-cobalt bg-paper text-cobalt hover:bg-sky-pale'
               }`}
             >
-              <Icon icon={cutout ? IconCircleCheck : IconSparkles} size={14} className={cutout ? '' : 'text-cinnamon'} />
+              <Icon icon={cutout ? IconCircleCheck : IconSparkles} size={14} />
               {removing ? 'removing…' : cutout ? 'background removed' : 'remove background'}
             </button>
             {cutout ? (
               <button
                 type="button"
                 onClick={() => { setCutout(null); setResult(null); }}
-                className="inline-flex items-center gap-1 text-xs font-bold text-[#9C8772] hover:text-cinnamon"
+                className="inline-flex min-h-11 items-center gap-1 px-1 text-xs font-bold text-ink-soft hover:text-cinnamon"
               >
                 <Icon icon={IconX} size={13} /> undo
               </button>
             ) : null}
           </div>
 
+          {/* Primary action: a thumb-zone dock on phones (kraft, like the landing's), inline from md. */}
+          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-5 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
           {returnTo ? (
-            <Button size="lg" className="mt-5 w-full" onClick={saveReturn} disabled={assess?.decision === 'BLOCK'}>
+            <Button size="lg" className="w-full" onClick={saveReturn} disabled={assess?.decision === 'BLOCK'}>
               <Icon icon={IconArrowBackUp} size={16} /> save &amp; return
             </Button>
           ) : (
-            <Button size="lg" className="mt-5 w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
+            <Button size="lg" className="w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
               <Icon icon={IconShoppingBag} size={16} />{' '}
               {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
             </Button>
           )}
+          </div>
           {/* Why the button is greyed — right where the friction is (the DPI badge + its one-tap
               "zoom out to fix" sits under the canvas, easy to miss next to a disabled save). */}
           {assess?.decision === 'BLOCK' ? (
-            <p className="mt-2 text-center text-[11px] font-semibold text-berry">
+            <p role="status" className="mt-2 text-center text-[11px] font-semibold text-cinnamon">
               zoom out a touch or upload another. the image quality is too low at this size.
             </p>
           ) : null}
@@ -1109,22 +1112,22 @@ export function Positioner({
             type="button"
             onClick={generate}
             disabled={rendering || assess?.decision === 'BLOCK'}
-            className="mt-2 w-full text-center text-xs font-bold text-cinnamon disabled:opacity-50"
+            className="mt-2 min-h-11 w-full text-center text-xs font-bold text-cinnamon disabled:opacity-50"
           >
             {rendering ? 'rendering…' : 'preview the exact print file'}
           </button>
 
           {result && result.ok ? (
-            <div className="mt-4 rounded-2xl border border-[#EADFC9] bg-white p-3">
+            <div className="pop-in polaroid tape mt-6" style={{ ['--tilt' as string]: '-1deg' }}>
               <p className="mb-2 text-[11px] font-bold text-green-save">your print file — exactly what gets made</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={result.url} alt="rendered print file" className="w-full rounded-lg border border-[#EFE6D6]" />
-              <p className="mt-2 text-[11px] text-[#9C8E7E]">
+              <img src={result.url} alt="rendered print file" className="w-full border border-line" />
+              <p className="mt-2 text-[11px] text-ink-soft">
                 {result.widthPx}×{result.heightPx}px · {result.renderedDpi} dpi{result.upscaled ? ' · gently enhanced' : ''}
               </p>
             </div>
           ) : result && !result.ok && result.blocked ? (
-            <p className="mt-3 text-center text-xs text-berry">That placement is too low-res to print — zoom out or choose a smaller product.</p>
+            <p role="alert" className="mt-3 text-center text-xs font-semibold text-cinnamon">That placement is too low-res to print — zoom out or choose a smaller product.</p>
           ) : null}
         </div>
       </div>
@@ -1152,7 +1155,7 @@ function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; valu
   const shown = filled ? value : value / fit; // filled: cover (scale 1) reads as 1.0×
   return (
     <label className="flex items-center gap-2">
-      <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">Zoom</span>
+      <span className="w-[78px] shrink-0 text-[11px] text-ink-soft">Zoom</span>
       <input
         type="range"
         min={0}
@@ -1163,7 +1166,7 @@ function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; valu
         onChange={(e) => onChange(fromT(Number(e.target.value)))}
         className="h-1.5 flex-1 accent-cinnamon"
       />
-      <span className="w-8 shrink-0 text-right text-[11px] text-[#9C8E7E]">{`${shown.toFixed(1)}×`}</span>
+      <span className="w-8 shrink-0 text-right text-[11px] text-ink-faint">{`${shown.toFixed(1)}×`}</span>
     </label>
   );
 }
@@ -1192,7 +1195,7 @@ function Slider({
 }) {
   return (
     <label className={`flex items-center gap-2 ${disabled ? 'opacity-45' : ''}`} title={disabled ? disabledHint : undefined}>
-      <span className="w-[78px] shrink-0 text-[11px] text-[#6F6358]">{label}</span>
+      <span className="w-[78px] shrink-0 text-[11px] text-ink-soft">{label}</span>
       <input
         type="range"
         min={min}
@@ -1204,22 +1207,23 @@ function Slider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="h-1.5 flex-1 accent-cinnamon"
       />
-      <span className="w-8 shrink-0 text-right text-[11px] text-[#9C8E7E]">{format(value)}</span>
+      <span className="w-8 shrink-0 text-right text-[11px] text-ink-faint">{format(value)}</span>
     </label>
   );
 }
 
+// Scrapbook option chips (D12): ink-outlined stickers; the chosen one fills with ink. 36px visual,
+// the ::before extends each tap area to 44px.
+const OPT_SM = "press relative inline-flex min-h-9 items-center rounded-pill border-2 px-3.5 text-xs font-bold before:absolute before:-inset-[4px] before:content-['']";
+const OPT_ON = 'border-cocoa bg-cocoa text-paper shadow-[0_2px_0_var(--color-cocoa)]';
+const OPT_OFF = 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa';
+
 function Shell({ children, back = '/home' }: { children: React.ReactNode; back?: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center gap-3 border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href={back} aria-label="Back">
-          <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
-        </Link>
-        <Link href="/" className="font-display text-lg font-semibold text-cocoa">snickerdoodle</Link>
-        <span className="rounded-full bg-[#EFE4D0] px-2 py-0.5 text-[11px] font-bold text-[#7A6A58]">studio</span>
-      </header>
-      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+      <FlowHeader back={{ href: back, label: 'Back' }} tag="studio" />
+      {/* pb-32 on phones clears the fixed thumb-zone action dock. */}
+      <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-6 md:px-6 md:pb-8">
         {children}
       </main>
     </div>

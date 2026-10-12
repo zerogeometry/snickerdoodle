@@ -1,7 +1,6 @@
 'use client';
 
 import {
-  IconArrowLeft,
   IconBrandWhatsapp,
   IconCheck,
   IconCopy,
@@ -14,11 +13,14 @@ import {
   IconShieldCheck,
   IconSparkles,
 } from '@tabler/icons-react';
-import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
+import { FlowHeader } from '@/ui/components/FlowHeader';
+
+// The paper card each state sits on (Scrapbook D12).
+const CARD = 'pop-in tape rounded-[22px] border-2 border-cocoa bg-paper p-7 shadow-[0_4px_0_var(--color-cocoa)]';
 import { SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { createWishAction } from '@/app/actions/wish';
 
@@ -143,25 +145,24 @@ export default function ShareWishPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center gap-3 border-b border-[#EDE2CD] px-6 py-3.5">
-        <Link href="/catalogue" aria-label="Back to the range">
-          <Icon icon={IconArrowLeft} size={20} className="text-[#7A6A58]" />
-        </Link>
-        <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
-      </header>
+      <FlowHeader back={{ href: '/catalogue', label: 'Back to the range' }} />
 
-      <main id="main" className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-10">
+      <main id="main" className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10">
         {state === 'minting' ? (
-          <div className="rounded-2xl border border-[#EADFC9] bg-white p-8 text-center">
-            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#EADFC9] border-t-cinnamon" />
-            <p className="mt-4 text-sm text-[#6F6358]">tucking these into your keepsake box…</p>
+          // Loading: a gently pulsing gift sticker on its card — never a bare spinner.
+          <div role="status" className={`${CARD} text-center`}>
+            <div className="sticker mx-auto flex h-16 w-16 -rotate-6 animate-pulse items-center justify-center rounded-full bg-honey">
+              <Icon icon={IconGift} size={30} className="text-cocoa" />
+            </div>
+            <p className="mt-4 text-sm text-ink-soft">tucking these into your keepsake box…</p>
+            <div className="mx-auto mt-4 h-11 w-full animate-pulse rounded-[14px] bg-paper-2" aria-hidden />
           </div>
         ) : null}
 
         {state === 'empty' ? (
-          <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-7 text-center">
-            <h1 className="font-display text-xl font-semibold text-cocoa">Nothing to share yet</h1>
-            <p className="mt-2 text-sm text-[#6F6358]">Add a creation to your basket first, then share it as a ready-to-buy wish.</p>
+          <div className="pop-in rounded-[22px] border-2 border-dashed border-cocoa/25 bg-paper p-7 text-center">
+            <h1 className="font-display text-2xl leading-tight text-cocoa">Nothing to share yet</h1>
+            <p className="mt-2 text-sm text-ink-soft">Add a creation to your basket first, then share it as a ready-to-buy wish.</p>
             <Button size="lg" className="mt-5 w-full" onClick={() => (window.location.href = '/catalogue')}>
               back to the range
             </Button>
@@ -169,9 +170,9 @@ export default function ShareWishPage() {
         ) : null}
 
         {state === 'error' ? (
-          <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
-            <h1 className="font-display text-xl font-semibold text-cocoa">That didn’t work</h1>
-            <p className="mt-2 text-sm text-[#6F6358]">We couldn’t make your wish link just now. Give it another go.</p>
+          <div role="alert" className={`${CARD} text-center`}>
+            <h1 className="font-display text-2xl leading-tight text-cocoa">That didn’t work</h1>
+            <p className="mt-2 text-sm text-ink-soft">We couldn’t make your wish link just now. Give it another go.</p>
             <Button size="lg" className="mt-5 w-full" onClick={() => { ran.current = false; void mint(); }}>
               try again
             </Button>
@@ -179,9 +180,9 @@ export default function ShareWishPage() {
         ) : null}
 
         {state === 'badName' ? (
-          <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
-            <h1 className="font-display text-xl font-semibold text-cocoa">Just a first name, please</h1>
-            <p className="mt-2 text-sm text-[#6F6358]">
+          <div className={`${CARD} text-center`}>
+            <h1 className="font-display text-2xl leading-tight text-cocoa">Just a first name, please</h1>
+            <p className="mt-2 text-sm text-ink-soft">
               We keep little ones safe by storing their <b>first name only</b> — no surnames. Pop back and pick who it’s
               for again.
             </p>
@@ -193,29 +194,29 @@ export default function ShareWishPage() {
 
         {state === 'needsAuth' ? (
           sent ? (
-            <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#EAF1E4]">
+            <div role="status" className={`${CARD} text-center`}>
+              <div className="sticker mx-auto flex h-16 w-16 -rotate-6 items-center justify-center rounded-full bg-leaf-pale">
                 <Icon icon={IconMail} size={30} className="text-green-save" />
               </div>
-              <h1 className="mt-4 font-display text-2xl font-semibold text-cocoa">Check your email</h1>
-              <p className="mt-2 text-sm text-[#6F6358]">
+              <h1 className="mt-4 font-display text-[28px] leading-tight text-cocoa">Check your email</h1>
+              <p className="mt-2 text-sm text-ink-soft">
                 Tap the magic link we sent to <b className="text-cocoa">{email}</b> and your wish link will be ready —
                 your basket&apos;s saved.
               </p>
-              <button type="button" onClick={() => setSent(false)} className="mt-5 text-xs font-bold text-cinnamon hover:underline">
+              <button type="button" onClick={() => setSent(false)} className="mt-4 inline-flex min-h-11 items-center text-xs font-bold text-cinnamon hover:underline">
                 use a different email
               </button>
             </div>
           ) : (
-            <div className="rounded-2xl border border-[#EADFC9] bg-white p-7">
-              <h1 className="font-display text-2xl font-semibold text-cocoa">
+            <div className={CARD}>
+              <h1 className="font-display text-[28px] leading-tight text-cocoa">
                 {subject ? `Let’s save ${subject}’s wish` : 'Let’s save your wish'}
               </h1>
-              <p className="mt-2 text-sm text-[#6F6358]">
+              <p className="mt-2 text-sm text-ink-soft">
                 A quick sign-up keeps these creations safe in your private keepsake box, and gives you a link family can
                 buy from. No passwords — just a one-tap magic link.
               </p>
-              <ul className="mt-3 space-y-1.5 text-[13px] text-[#5C5249]">
+              <ul className="mt-3 space-y-1.5 text-[13px] text-ink-soft">
                 {['Your creations, kept safe & private', 'A ready-to-buy link to share', 'Family can join & save 5%'].map((b) => (
                   <li key={b} className="flex items-center gap-2">
                     <Icon icon={IconCheck} size={14} className="text-green-save" /> {b}
@@ -223,7 +224,7 @@ export default function ShareWishPage() {
                 ))}
               </ul>
               <form onSubmit={signUp} className="mt-4">
-                <label htmlFor="wish-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Email</label>
+                <label htmlFor="wish-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Email</label>
                 <input
                   id="wish-email"
                   type="email"
@@ -231,13 +232,13 @@ export default function ShareWishPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
-                  className="w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-3 text-sm text-cocoa placeholder:text-[#A89B8C]"
+                  className="min-h-12 w-full rounded-[14px] border-2 border-cocoa/25 bg-paper px-3.5 py-3 text-base text-cocoa placeholder:text-ink-faint focus:border-cocoa"
                 />
                 <Button type="submit" size="lg" className="mt-3 w-full" disabled={busy}>
                   <Icon icon={IconSparkles} size={16} /> {busy ? 'sending…' : 'sign up & make my link'}
                 </Button>
               </form>
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-green-save">
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">
                 <Icon icon={IconShieldCheck} size={13} /> Your data is yours. We never sell it, ever.
               </p>
             </div>
@@ -245,19 +246,19 @@ export default function ShareWishPage() {
         ) : null}
 
         {state === 'ready' ? (
-          <div className="rounded-2xl border border-[#EADFC9] bg-white p-7 text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#FBEFE0]">
-              <Icon icon={IconGift} size={30} className="text-cinnamon" />
+          <div role="status" className={`${CARD} text-center`}>
+            <div className="sticker wiggle mx-auto flex h-16 w-16 -rotate-6 items-center justify-center rounded-full bg-honey">
+              <Icon icon={IconGift} size={30} className="text-cocoa" />
             </div>
-            <h1 className="mt-4 font-display text-2xl font-semibold text-cocoa">
+            <h1 className="mt-4 font-display text-[28px] leading-tight text-cocoa">
               {subject ? `${subject}’s wish is ready ✦` : 'Your wish is ready ✦'}
             </h1>
-            <p className="mt-2 text-sm text-[#6F6358]">Kept safe in your keepsake box. Share this link and family can buy it as a gift.</p>
+            <p className="mt-2 text-sm text-ink-soft">Kept safe in your keepsake box. Share this link and family can buy it as a gift.</p>
 
-            <div className="mt-4 flex items-center gap-2 rounded-lg border border-[#E6D8BE] bg-[#F6F0E4] px-3 py-2.5 text-left">
-              <Icon icon={IconLink} size={15} className="shrink-0 text-[#9C8E7E]" />
-              <span className="flex-1 truncate text-xs text-[#6F6358]">{fullUrl.replace(/^https?:\/\//, '')}</span>
-              <button type="button" onClick={copy} className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-cinnamon">
+            <div className="mt-4 flex items-center gap-2 rounded-[14px] border-2 border-dashed border-cocoa/25 bg-paper-2 py-1 pl-3 pr-1 text-left">
+              <Icon icon={IconLink} size={15} className="shrink-0 text-ink-soft" />
+              <span className="flex-1 truncate text-xs text-ink-soft">{fullUrl.replace(/^https?:\/\//, '')}</span>
+              <button type="button" onClick={copy} className="press flex min-h-11 shrink-0 items-center gap-1 rounded-[12px] border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
                 <Icon icon={copied ? IconCheck : IconCopy} size={13} /> {copied ? 'copied' : 'copy'}
               </button>
             </div>
@@ -267,14 +268,14 @@ export default function ShareWishPage() {
                   key={s.label}
                   type="button"
                   onClick={() => share(s.label, s.href(fullUrl))}
-                  className="flex flex-col items-center gap-1 rounded-lg border border-[#EFE6D6] bg-[#FBF8F1] py-2 text-[11px] font-semibold text-[#7A6A58] hover:border-honey"
+                  className="press flex min-h-14 flex-col items-center justify-center gap-1 rounded-[14px] border-2 border-cocoa/20 bg-paper py-2 text-[11px] font-bold text-cocoa hover:border-cocoa"
                 >
                   <Icon icon={s.icon} size={17} className="text-cinnamon" />
                   {s.label}
                 </button>
               ))}
             </div>
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] text-green-save">
+            <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">
               <Icon icon={IconShieldCheck} size={13} /> Private &amp; unguessable. Revoke it any time from your keepsakes.
             </p>
             <Button variant="secondary" size="lg" className="mt-4 w-full" onClick={() => (window.location.href = '/home?new=1')}>

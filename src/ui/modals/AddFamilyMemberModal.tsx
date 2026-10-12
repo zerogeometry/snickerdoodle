@@ -16,6 +16,8 @@ import { Modal } from '@/ui/primitives/Modal';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { toast } from '@/lib/store';
 import { createInviteAction } from '@/app/actions/invite';
+import { addChildAction } from '@/app/actions/family';
+import { useRouter } from 'next/navigation';
 import type { AccessLevel, Relationship } from '@/domain/types';
 
 type Rel = 'Child' | 'Parent' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
@@ -42,10 +44,14 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
   const [access, setAccess] = useState('view_buy');
+  // The family calendar is the point of inviting family — pre-ticked, visible, changeable later.
+  const [shareCalendar, setShareCalendar] = useState(true);
   const [photo, setPhoto] = useState<string | null>(null);
   const photoRef = useRef<HTMLInputElement>(null);
 
   const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   const circle = relOf(rel).circle;
   const isChild = circle === 'subject';
@@ -64,6 +70,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
     setBirthday('');
     setPhoto(null);
     setRel('Grandparent');
+    setShareCalendar(true);
   };
 
   const submit = () => {
@@ -75,11 +82,27 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
     const first = trimmed.split(' ')[0] ?? trimmed;
 
     if (isChild) {
-      // A child is a keepsake subject, not an invitee — full child profiles are a
-      // follow-up; for now we don't send them an invite.
-      toast(`child profiles are coming soon`);
-      reset();
-      onClose();
+      // A child is a keepsake SUBJECT, not an invitee: no email, no account, first name only.
+      startTransition(async () => {
+        const res = await addChildAction({ firstName: trimmed, birthday: birthday || null });
+        if (res.needsAuth) return toast('log in to add your little one');
+        if (!res.ok) {
+          setError(
+            res.reason === 'surname'
+              ? 'just their first name, please — we never keep a little one’s surname'
+              : res.reason === 'birthday'
+                ? 'that birthday doesn’t look quite right'
+                : res.reason === 'not-owner'
+                  ? 'only the family’s parent can add little ones'
+                  : 'letters only for a first name, please',
+          );
+          return;
+        }
+        toast(`${res.firstName} is in the family ✦`);
+        reset();
+        onClose();
+        router.refresh();
+      });
       return;
     }
     if (!email.trim()) {
@@ -92,6 +115,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
         email: email.trim(),
         relationship: relOf(rel).enum,
         accessLevel: ACCESS_ENUM[access] ?? 'VIEW_BUY',
+        shareOccasions: shareCalendar,
       });
       if (res.needsAuth) {
         toast('log in to invite family');
@@ -104,6 +128,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
       toast(`invite sent to ${first} — they’ll appear once they join`);
       reset();
       onClose();
+      router.refresh(); // the pending invite shows in the circle
     });
   };
 
@@ -126,7 +151,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
         <button
           type="button"
           onClick={() => photoRef.current?.click()}
-          className="flex h-[62px] w-[62px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-[#D7B894] bg-[#FCF6EC] text-cinnamon"
+          className="flex h-[62px] w-[62px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-line bg-paper text-cinnamon"
         >
           {photo ? (
             <img src={photo} alt="" className="h-full w-full object-cover" />
@@ -137,7 +162,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
             </>
           )}
         </button>
-        <p className="text-xs leading-relaxed text-[#7A6A58]">
+        <p className="text-xs leading-relaxed text-ink-soft">
           <b className="block text-[13px] text-cocoa">Add a photo</b>So everyone knows who&apos;s who in the circle.
           Change it any time.
         </p>
@@ -145,20 +170,30 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
 
       {/* Name */}
       <label className="mb-3 block">
-        <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Name</span>
+        <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Name</span>
         <input
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setError(null);
+          }}
           placeholder="First name"
-          className="w-full rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2.5 text-[13px] text-cocoa placeholder:text-[#A89B8C]"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'add-member-error' : undefined}
+          className="w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-[13px] text-cocoa placeholder:text-ink-faint"
         />
+        {error ? (
+          <span id="add-member-error" role="alert" className="mt-1.5 block border-l-2 border-berry pl-2 text-xs font-semibold text-cocoa">
+            {error}
+          </span>
+        ) : null}
       </label>
 
       {/* Relationship */}
       <div className="mb-3">
-        <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
-          Relationship <span className="font-normal normal-case text-[#B3A491]">· sets which keepsakes they&apos;ll see</span>
+        <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
+          Relationship <span className="font-normal normal-case text-ink-faint">· sets which keepsakes they&apos;ll see</span>
         </p>
         <div className="flex flex-wrap gap-1.5">
           {RELS.map((r) => (
@@ -167,22 +202,22 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
             </Chip>
           ))}
         </div>
-        <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-[#BFD6A8] bg-[#E8F0DF] px-3 py-2.5">
+        <div className="mt-2.5 flex items-start gap-2 rounded-lg border border-leaf bg-leaf-pale px-3 py-2.5">
           <Icon icon={IconUsers} size={16} className="mt-0.5 shrink-0 text-green-save" />
-          <p className="text-xs leading-relaxed text-[#46402F]">
+          <p className="text-xs leading-relaxed text-ink-soft">
             {isChild ? (
               <>
-                Added as one of your little ones — a <b className="text-[#3F6E29]">keepsake subject</b>, not an account
+                Added as one of your little ones — a <b className="text-green-save">keepsake subject</b>, not an account
                 holder.
               </>
             ) : circle === 'Family' ? (
               <>
-                Joins your <b className="text-[#3F6E29]">Family</b> — they&apos;ll see keepsakes you share with your
+                Joins your <b className="text-green-save">Family</b> — they&apos;ll see keepsakes you share with your
                 family, and your Extended ones too.
               </>
             ) : (
               <>
-                Joins your <b className="text-[#3F6E29]">Extended family</b> — they&apos;ll see keepsakes you share with
+                Joins your <b className="text-green-save">Extended family</b> — they&apos;ll see keepsakes you share with
                 Extended family, never your Family-only or private ones.
               </>
             )}
@@ -192,11 +227,11 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
 
       {/* Birthday */}
       <div className="mb-3">
-        <label htmlFor="member-bday" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">
-          Birthday <span className="font-normal normal-case text-[#B3A491]">· optional</span>
+        <label htmlFor="member-bday" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
+          Birthday <span className="font-normal normal-case text-ink-faint">· optional</span>
         </label>
-        <div className="flex items-center gap-2.5 rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3 py-2.5">
-          <Icon icon={IconCake} size={15} className="text-[#9C8E7E]" />
+        <div className="flex items-center gap-2.5 rounded-lg border border-line bg-paper px-3 py-2.5">
+          <Icon icon={IconCake} size={15} className="text-ink-faint" />
           <input
             id="member-bday"
             type="date"
@@ -209,7 +244,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
 
       {/* Invite (hidden for a child — a subject, not an invitee) */}
       {!isChild ? (
-        <div className="rounded-xl border border-[#F0CF9C] bg-honey-band p-3">
+        <div className="rounded-xl border border-sunshine bg-honey-band p-3">
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-[13px] font-bold text-cocoa">
               <Icon icon={IconMailShare} size={15} className="text-cinnamon" /> Invite to the family workspace
@@ -223,10 +258,10 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="their email"
-                className="mt-2.5 w-full rounded-lg border border-[#E6CCA6] bg-[#FFFDF8] px-3 py-2.5 text-xs text-cocoa placeholder:text-[#A89B8C]"
+                className="mt-2.5 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
               />
-              <label className="mt-2 flex items-center justify-between rounded-lg border border-[#EAD9BE] bg-white px-3 py-2 text-xs">
-                <span className="text-[#5F564C]">They can</span>
+              <label className="mt-2 flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-xs">
+                <span className="text-ink-soft">They can</span>
                 <select
                   value={access}
                   onChange={(e) => setAccess(e.target.value)}
@@ -237,7 +272,21 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
                   <option value="contribute">view, buy &amp; add</option>
                 </select>
               </label>
-              <p className="mt-2 text-[11px] leading-relaxed text-[#8A6F52]">
+              <label className="mt-2.5 flex min-h-[44px] items-start gap-2.5 text-xs text-cocoa">
+                <input
+                  type="checkbox"
+                  checked={shareCalendar}
+                  onChange={(e) => setShareCalendar(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-cta"
+                />
+                <span>
+                  <b>share the family calendar</b>
+                  <span className="block text-[11px] text-ink-soft">
+                    they&apos;ll see your little ones&apos; birthdays coming up, so they never miss one. change it any time.
+                  </span>
+                </span>
+              </label>
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
                 We&apos;ll email them a link to join. Once they verify it&apos;s them, they&apos;ll see your family
                 workspace at the level you set.
               </p>
@@ -246,7 +295,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
         </div>
       ) : null}
 
-      <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-[#9C8E7E]">
+      <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-ink-faint">
         <Icon icon={IconLock} size={14} className="text-green-save" /> You&apos;re always in control — change a
         relationship, access, or remove anyone, any time.
       </p>

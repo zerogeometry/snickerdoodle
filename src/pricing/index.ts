@@ -15,9 +15,12 @@ export {
 export { formatPence } from './format';
 export { computeRetailPence, marginAtPrice, roundUpToX9Pence, RETAIL, type RetailParams } from './retail';
 export { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
+export { evaluatePromo, normalisePromoCode, PROMO_ECONOMICS, type PromoRule, type PromoOutcome } from './promo';
 export {
   priceBasket,
   quote,
+  applicableCredit,
+  MIN_CHARGE_PENCE,
   clampQty,
   inCatalogue,
   recipientLineLabel,

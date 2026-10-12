@@ -106,10 +106,10 @@ export function CameraCapture({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-cocoa/50 backdrop-blur-[2px]" onClick={close} aria-hidden />
-      <div role="dialog" aria-modal="true" aria-label="Take a photo" className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-[#FFFDF8] shadow-[0_20px_50px_rgba(46,39,35,.28)]">
+      <div role="dialog" aria-modal="true" aria-label="Take a photo" className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-paper shadow-[0_20px_50px_color-mix(in_srgb,var(--color-cocoa)_28%,transparent)]">
         <div className="flex items-center justify-between px-5 pb-1 pt-4">
           <h2 className="font-display text-lg font-semibold text-cocoa">Take a photo</h2>
-          <button type="button" onClick={close} aria-label="Close" className="-mr-1 rounded-full p-1 text-[#B3A491] hover:bg-[#F2EADB]">
+          <button type="button" onClick={close} aria-label="Close" className="-mr-1 rounded-full p-1 text-ink-faint hover:bg-line">
             <Icon icon={IconX} size={18} />
           </button>
         </div>
@@ -117,7 +117,7 @@ export function CameraCapture({
         <div className="px-5 py-2">
           <div className="relative aspect-[4/3] w-full overflow-hidden rounded-xl bg-cocoa">
             {error ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-[#FBF5E9]">
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-oat">
                 <Icon icon={IconCamera} size={28} className="opacity-70" />
                 <p>{error}</p>
               </div>
@@ -130,7 +130,7 @@ export function CameraCapture({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-[#F2EADB] px-5 pb-5 pt-3">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-line px-5 pb-5 pt-3">
           {error ? (
             <Button size="lg" onClick={() => { close(); onUploadInstead(); }}>
               <Icon icon={IconUpload} size={16} /> upload instead

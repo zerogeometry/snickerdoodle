@@ -6,13 +6,14 @@ import { MarketingMobileMenu } from '@/ui/components/MarketingMobileMenu';
 /** Marketing surface (logged-out): nav + footer, goal is "start creating". */
 export default function MarketingLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-x-hidden bg-oat">
-      <header className="relative z-10 bg-oat/80 backdrop-blur-sm">
+    <div className="kraft relative flex min-h-dvh flex-col overflow-x-hidden">
+      <header className="pt-safe relative z-10">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
-          <Link href="/" className="font-display text-3xl font-semibold text-cocoa">
-            snickerdoodle
+          <Link href="/" className="flex items-center gap-2.5" aria-label="snickerdoodle home">
+            <img src="/brand/snickerdoodle-badge.png" alt="" width={44} height={44} className="rounded-full" />
+            <span className="font-display text-2xl text-cocoa shadow-[inset_0_-8px_0_var(--color-honey)] md:text-3xl">snickerdoodle</span>
           </Link>
-          <div className="hidden items-center gap-7 text-sm text-[#5F564C] md:flex">
+          <div className="hidden items-center gap-7 text-sm text-ink-soft md:flex">
             <Link href="/how-it-works" className="hover:text-cinnamon">
               how it works
             </Link>
@@ -37,7 +38,7 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
         {children}
       </main>
 
-      <footer className="relative z-10 bg-[#F1E7D4] px-6 py-5 text-xs text-[#6F6358]">
+      <footer className="relative z-10 bg-paper-2 px-6 py-5 text-xs text-ink-soft">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <span>snickerdoodle · made with care in the UK</span>
           <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">

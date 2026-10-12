@@ -12,6 +12,9 @@ export {
 
 export {
   canBuyFromGiftList,
+  canPurchaseViaGiftLink,
+  type GiftLinkAssetRef,
+  type GiftLinkGrant,
   canContributeCreations,
   canDeleteAsset,
   canManageFamily,

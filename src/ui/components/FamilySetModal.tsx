@@ -37,9 +37,10 @@ function shortSize(s: string): string {
   return s.replace(' years', 'y').replace(' months', 'm');
 }
 
+// Real garment colours (product data, not brand styling) — kept literal; unknown → a token.
 function swatchColour(name: string): string {
   const map: Record<string, string> = { white: '#F7F2E8', blue: '#84BBD0', pink: '#E8A6B8' };
-  return map[name] ?? '#E0C7A8';
+  return map[name] ?? 'var(--color-line)';
 }
 
 /**
@@ -157,7 +158,7 @@ export function FamilySetModal({
       <div ref={rowsRef} className="space-y-2.5">
         {rows.length === 0 ? (
           // success-but-empty: never a bare footer over a void
-          <div className="rounded-2xl border border-dashed border-[#E0C7A8] bg-[#FBF8F1] p-5 text-center text-sm text-[#6F6358]">
+          <div className="rounded-2xl border border-dashed border-line bg-paper-2 p-5 text-center text-sm text-ink-soft">
             add someone below to start the set.
           </div>
         ) : null}
@@ -166,8 +167,8 @@ export function FamilySetModal({
           if (!product) return null;
           const who = garments.find((g) => g.product.key === m.key)?.who;
           return (
-            <div key={m.uid} data-row={m.uid} className="flex items-start gap-3 rounded-2xl border border-[#EADFC9] bg-[#FFFDF8] p-3">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#FBF5E9] p-1">
+            <div key={m.uid} data-row={m.uid} className="flex items-start gap-3 rounded-2xl border border-line bg-paper p-3">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-oat p-1">
                 <MockupPreview
                   productKey={product.key as ProductKey}
                   assetId={upload?.assetId ?? null}
@@ -180,7 +181,7 @@ export function FamilySetModal({
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline justify-between gap-2">
                   <span className="text-sm font-bold text-cocoa">
-                    {product.label} <span className="text-[11px] font-semibold text-[#7A6A58]">{who}</span>
+                    {product.label} <span className="text-[11px] font-semibold text-ink-soft">{who}</span>
                   </span>
                   <span className="shrink-0 text-sm font-bold text-cocoa">{variant ? gbp(variant.pricePence) : '—'}</span>
                 </div>
@@ -221,7 +222,7 @@ export function FamilySetModal({
                 data-remove
                 onClick={() => removeMember(m.uid)}
                 aria-label={`remove this ${product.label}`}
-                className="relative shrink-0 rounded-full p-1.5 text-[#B3A491] before:absolute before:-inset-[8px] before:content-[''] hover:text-berry"
+                className="relative shrink-0 rounded-full p-1.5 text-ink-faint before:absolute before:-inset-[8px] before:content-[''] hover:text-berry"
               >
                 <Icon icon={IconX} size={16} />
               </button>
@@ -241,8 +242,8 @@ export function FamilySetModal({
         {/* Totals + the honest saving line. The CTA shows the UNDISCOUNTED sum (what the
             basket footer will show); the saving is applied — and shown — at checkout,
             counted across the whole order, so the figures always agree screen to screen. */}
-        <div className="rounded-2xl border border-[#EADFC9] bg-white p-3.5">
-          <div className="flex items-center justify-between text-[13px] text-[#5F564C]">
+        <div className="rounded-2xl border border-line bg-white p-3.5">
+          <div className="flex items-center justify-between text-[13px] text-ink-soft">
             <span>
               {count} piece{count === 1 ? '' : 's'}
             </span>
@@ -251,7 +252,7 @@ export function FamilySetModal({
           {qualifies ? (
             <p className="mt-1 text-[13px] font-semibold text-green-save">5% family set saving comes off all garments at checkout</p>
           ) : count > 0 ? (
-            <p className="mt-1 flex items-center gap-1.5 text-[12px] text-[#7A6A58]">
+            <p className="mt-1 flex items-center gap-1.5 text-[12px] text-ink-soft">
               <Icon icon={IconShirt} size={14} className="text-honey" />
               add {stillNeeded} more piece{stillNeeded === 1 ? '' : 's'} and 5% comes off the whole set
             </p>
@@ -259,7 +260,7 @@ export function FamilySetModal({
           <Button size="lg" className="mt-3 w-full" onClick={addSet} disabled={!allResolved || adding}>
             {adding ? 'adding your set…' : `add the set to basket · ${gbp(totalPence)}`}
           </Button>
-          <p className="mt-2 text-center text-[11px] text-[#6F6358]">organic cotton · free tracked delivery · savings confirmed at checkout</p>
+          <p className="mt-2 text-center text-[11px] text-ink-soft">organic cotton · free tracked delivery · savings confirmed at checkout</p>
         </div>
       </div>
     </Modal>

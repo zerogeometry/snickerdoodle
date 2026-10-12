@@ -4,7 +4,7 @@ export function MemberAvatar({
   name,
   sub,
   color,
-  textColor = '#FFF6E9',
+  textColor = 'var(--color-cta-text)',
   size = 46,
 }: {
   initial: string;
@@ -17,14 +17,14 @@ export function MemberAvatar({
   return (
     <div className="flex flex-col items-center text-center">
       <div
-        className="flex items-center justify-center rounded-full font-display font-bold"
+        className="wiggle flex items-center justify-center rounded-full border-[3px] border-paper font-display font-extrabold shadow-[0_2px_0_color-mix(in_srgb,var(--color-cocoa)_25%,transparent)]"
         style={{ width: size, height: size, background: color, color: textColor, fontSize: Math.round(size * 0.4) }}
         aria-hidden
       >
         {initial}
       </div>
       <div className="mt-1.5 text-xs font-bold text-cocoa">{name}</div>
-      {sub ? <div className="text-[11px] text-[#9C8E7E]">{sub}</div> : null}
+      {sub ? <div className="text-[11px] text-ink-faint">{sub}</div> : null}
     </div>
   );
 }

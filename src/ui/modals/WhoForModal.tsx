@@ -62,7 +62,7 @@ export function WhoForModal({
     >
       {members.length > 0 ? (
         <>
-          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Your little ones</p>
+          <p className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Your little ones</p>
           <div className="mb-4 flex flex-wrap gap-2">
             {members.map((m) => {
               const on = selected === m.name;
@@ -76,7 +76,7 @@ export function WhoForModal({
                     setName('');
                   }}
                   className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                    on ? 'border-cinnamon bg-[#FBEFE0] text-cocoa' : 'border-[#EFE6D6] bg-white text-[#7A6A58] hover:border-honey'
+                    on ? 'border-cinnamon bg-paper-2 text-cocoa' : 'border-line bg-white text-ink-soft hover:border-honey'
                   }`}
                 >
                   <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold" style={{ backgroundColor: m.color, color: m.textColor ?? '#fff' }}>
@@ -87,13 +87,13 @@ export function WhoForModal({
               );
             })}
           </div>
-          <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">…or someone new</p>
+          <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">…or someone new</p>
         </>
       ) : (
-        <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-[#A2937F]">Their first name</p>
+        <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Their first name</p>
       )}
 
-      <div className="flex items-center gap-2 rounded-lg border border-[#E0C7A8] bg-[#FFFDF8] px-3">
+      <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-3">
         <Icon icon={IconHeart} size={16} className="shrink-0 text-cinnamon" />
         <input
           type="text"
@@ -104,7 +104,7 @@ export function WhoForModal({
             setSelected(null);
           }}
           placeholder="e.g. Mia"
-          className="w-full bg-transparent py-2.5 text-sm text-cocoa placeholder:text-[#A89B8C] focus:outline-none"
+          className="w-full bg-transparent py-2.5 text-sm text-cocoa placeholder:text-ink-faint focus:outline-none"
         />
       </div>
       <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-green-save">

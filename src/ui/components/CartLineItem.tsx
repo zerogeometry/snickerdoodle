@@ -17,13 +17,13 @@ export function CartLineItem({
   onRemove?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-[#EADFC9] bg-white px-3 py-2.5">
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#EADFC9] bg-oat">
+    <div className="flex items-center gap-3 rounded-[14px] border-2 border-cocoa/10 bg-paper px-3 py-2.5">
+      <div className="flex h-11 w-11 shrink-0 -rotate-2 items-center justify-center rounded-[10px] border-2 border-cocoa/15 bg-paper-2">
         <ProductArt product={product} size={30} />
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[13px] font-bold text-cocoa">{name}</div>
-        {sub ? <div className="truncate text-[11px] text-[#9C8E7E]">{sub}</div> : null}
+        {sub ? <div className="truncate text-[11px] text-ink-soft">{sub}</div> : null}
       </div>
       <span className="text-[13px] font-bold text-cocoa">{price}</span>
       {onRemove ? (
@@ -31,7 +31,7 @@ export function CartLineItem({
           type="button"
           onClick={onRemove}
           aria-label={`Remove ${name}`}
-          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[#B3A491] hover:bg-[#F3E8D6] hover:text-cinnamon"
+          className="press relative ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-cocoa/20 text-cocoa before:absolute before:-inset-[6px] before:content-[''] hover:text-cinnamon"
         >
           <Icon icon={IconX} size={15} />
         </button>

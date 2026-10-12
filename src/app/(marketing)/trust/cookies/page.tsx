@@ -11,7 +11,7 @@ export default function CookiesPage() {
   return (
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-4xl font-semibold leading-tight md:text-5xl">Cookies</h1>
+        <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Cookies</h1>
       </div>
 
       <Prose className="mt-8">

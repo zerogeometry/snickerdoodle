@@ -212,7 +212,7 @@ export default function WallView({ image, fallbackImage, placement, printWmm, pr
 
   if (failed) {
     return (
-      <div className={`flex items-center justify-center rounded-2xl bg-[#FBF5E9] p-6 text-center text-xs text-[#9C8E7E] ${className ?? ''}`}>
+      <div className={`flex items-center justify-center rounded-2xl bg-oat p-6 text-center text-xs text-ink-faint ${className ?? ''}`}>
         the room view isn’t available here — the photo preview shows exactly what prints
       </div>
     );
@@ -236,18 +236,18 @@ export default function WallView({ image, fallbackImage, placement, printWmm, pr
               type="button"
               onClick={launchAr}
               disabled={arState === 'loading'}
-              className="rounded-full border border-cinnamon bg-[#FBEFE0] px-4 py-1.5 text-xs font-bold text-cocoa disabled:opacity-60"
+              className="rounded-full border border-cinnamon bg-paper-2 px-4 py-1.5 text-xs font-bold text-cocoa disabled:opacity-60"
             >
               {arState === 'loading' ? 'getting it ready…' : 'view on your real wall'}
             </button>
             {arState === 'unsupported' ? (
-              <p className="text-[11px] text-[#9C8E7E]">your device can’t open the live wall view — the room preview above is true-to-size</p>
+              <p className="text-[11px] text-ink-faint">your device can’t open the live wall view — the room preview above is true-to-size</p>
             ) : null}
           </>
         ) : (
-          <p className="text-[11px] text-[#9C8E7E]">open snickerdoodle on your phone to place it on your real wall</p>
+          <p className="text-[11px] text-ink-faint">open snickerdoodle on your phone to place it on your real wall</p>
         )}
-        <p className="text-[11px] text-[#9C8E7E]">shown true-to-size · the photo view is the exact print</p>
+        <p className="text-[11px] text-ink-faint">shown true-to-size · the photo view is the exact print</p>
       </div>
     </div>
   );

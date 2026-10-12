@@ -1,4 +1,4 @@
-import { activeMembershipFor, type AssetRef, type Membership, type ViewerContext } from './policy';
+import { activeMembershipFor, type AssetRef, type Decision, type Membership, type ViewerContext } from './policy';
 
 /**
  * Action checks. Circle decides what you can SEE (see policy.ts); ACCESS LEVEL
@@ -55,4 +55,40 @@ export function canDeleteAsset(asset: AssetRef, viewer: ViewerContext): boolean 
     viewer.accountId !== null &&
     viewer.accountId === asset.controllerAccountId
   );
+}
+
+/** The frozen gift link, as authz needs it (resolved server-side from the token). */
+export interface GiftLinkGrant {
+  familyId: string;
+  status: 'ACTIVE' | 'REVOKED';
+  expiresAt: Date;
+  /** The asset ids frozen into the link's snapshot at creation. */
+  assetIds: readonly string[];
+}
+
+/** The keepsake a gift-link line would print, as stored now. */
+export interface GiftLinkAssetRef {
+  id: string;
+  /** null for a never-kept ephemeral draft — which can never match a link's family. */
+  familyId: string | null;
+  moderationStatus: string;
+}
+
+/**
+ * Buy a keepsake THROUGH a gift link — a capability, not a membership. The parent
+ * shared an unguessable token naming specific keepsakes; holding it lets anyone
+ * (a guest grandparent included) buy exactly those, and nothing else:
+ *  - the link must be ACTIVE and unexpired (revocation bites immediately);
+ *  - the asset must be in the link's frozen snapshot AND still in the link's family
+ *    (so a token can never be widened to another family's art);
+ *  - the asset must still be content-cleared (D8 — never print FLAGGED/BLOCKED).
+ * It grants PURCHASE only: it never widens who can VIEW the asset in the home.
+ */
+export function canPurchaseViaGiftLink(link: GiftLinkGrant, asset: GiftLinkAssetRef, now: Date): Decision {
+  if (link.status !== 'ACTIVE') return { allowed: false, reason: 'gift link revoked' };
+  if (link.expiresAt.getTime() <= now.getTime()) return { allowed: false, reason: 'gift link expired' };
+  if (!link.assetIds.includes(asset.id)) return { allowed: false, reason: 'keepsake not in this gift link' };
+  if (asset.familyId !== link.familyId) return { allowed: false, reason: 'keepsake not in the gift link family' };
+  if (asset.moderationStatus !== 'CLEAR') return { allowed: false, reason: 'keepsake not cleared for printing' };
+  return { allowed: true, reason: 'gift link grants purchase of this keepsake' };
 }

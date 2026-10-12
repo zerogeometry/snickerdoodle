@@ -61,7 +61,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4090); // catalogue (2×1795 + 500), not the client
+    expect(order!.subtotalPence).toBe(4100); // catalogue (2×1800 + 500), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });

@@ -5,6 +5,7 @@ import { auditRecords, families, invites, memberships } from '@/db/schema';
 import { defaultCircleFor } from '@/domain/relationships';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
+import { familyNameForRelatives } from './onboarding';
 
 const INVITE_TTL_DAYS = 14;
 
@@ -13,6 +14,9 @@ export interface CreateInviteInput {
   email: string;
   relationship: Relationship;
   accessLevel: AccessLevel;
+  /** Share the family calendar (children's birthdays) with them — the parent's explicit
+   * choice (pre-ticked in the invite form). Absent ⇒ not shared. */
+  shareOccasions?: boolean;
 }
 
 /**
@@ -48,6 +52,7 @@ export async function createInvite(
       relationship: input.relationship,
       circle,
       accessLevel: input.accessLevel,
+      shareOccasions: input.shareOccasions === true,
       token,
       status: 'PENDING',
       expiresAt,
@@ -61,7 +66,7 @@ export async function createInvite(
     event: 'INVITE_SENT',
     targetType: 'invite',
     targetId: invite!.id,
-    metadata: { email, circle, accessLevel: input.accessLevel },
+    metadata: { email, circle, accessLevel: input.accessLevel, shareOccasions: input.shareOccasions === true },
   });
 
   return { inviteId: invite!.id, token, email };
@@ -69,7 +74,8 @@ export async function createInvite(
 
 export interface InviteDisplay {
   email: string;
-  familyName: string;
+  /** null ⇒ unnamed family (neutral wording on the join page). */
+  familyName: string | null;
   status: string;
   expired: boolean;
 }
@@ -84,7 +90,7 @@ export async function getInviteForDisplay(db: DbHandle, token: string): Promise<
   if (!row) return null;
   return {
     email: row.invite.email,
-    familyName: row.familyName,
+    familyName: familyNameForRelatives(row.familyName),
     status: row.invite.status,
     expired: row.invite.expiresAt <= new Date(),
   };
@@ -133,6 +139,7 @@ export async function acceptInvite(
       relationship: invite.relationship,
       circle: invite.circle,
       accessLevel: invite.accessLevel,
+      seesOccasions: invite.shareOccasions,
       status: 'ACTIVE',
       isOwner: false,
       inviteId: invite.id,
@@ -146,4 +153,41 @@ export async function acceptInvite(
 
   await db.update(invites).set({ status: 'VERIFIED', verifiedAt: new Date() }).where(eq(invites.id, invite.id));
   return { ok: true, familyId: invite.familyId };
+}
+
+/**
+ * The parent turns the family calendar (children's birthdays) on or off for one member.
+ * Owner-only; audited as an access change; takes effect on the member's next page load.
+ */
+export async function setMemberSeesOccasions(
+  db: DbHandle,
+  owner: ViewerContext,
+  input: { familyId: string; memberAccountId: string; on: boolean },
+): Promise<{ ok: boolean }> {
+  if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== input.familyId) {
+    throw new AuthzError({ allowed: false, reason: 'only the family owner can change who sees the family calendar' });
+  }
+  const updated = await db
+    .update(memberships)
+    .set({ seesOccasions: input.on })
+    .where(
+      and(
+        eq(memberships.familyId, input.familyId),
+        eq(memberships.accountId, input.memberAccountId),
+        eq(memberships.status, 'ACTIVE'),
+        eq(memberships.isOwner, false),
+      ),
+    )
+    .returning({ id: memberships.id });
+  if (!updated[0]) return { ok: false };
+  await db.insert(auditRecords).values({
+    familyId: input.familyId,
+    actorAccountId: owner.accountId,
+    actorType: 'MEMBER',
+    event: 'MEMBERSHIP_ACCESS_CHANGED',
+    targetType: 'account',
+    targetId: input.memberAccountId,
+    metadata: { seesOccasions: input.on },
+  });
+  return { ok: true };
 }

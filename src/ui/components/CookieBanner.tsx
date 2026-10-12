@@ -38,9 +38,9 @@ export function CookieBanner() {
     <div
       role="dialog"
       aria-label="Cookie choices"
-      className="fixed inset-x-0 bottom-0 z-[55] border-t border-[#EAD9BE] bg-oat/95 px-4 py-4 backdrop-blur-sm motion-safe:animate-[slideup_.25s_ease] md:inset-x-auto md:bottom-4 md:left-4 md:max-w-sm md:rounded-2xl md:border md:shadow-xl"
+      className="fixed inset-x-0 bottom-0 z-[55] border-t border-line bg-oat/95 px-4 py-4 backdrop-blur-sm motion-safe:animate-[slideup_.25s_ease] md:inset-x-auto md:bottom-4 md:left-4 md:max-w-sm md:rounded-2xl md:border md:shadow-xl"
     >
-      <p className="text-[13px] leading-relaxed text-[#5F564C]">
+      <p className="text-[13px] leading-relaxed text-ink-soft">
         <b className="text-cocoa">A quick word on cookies.</b> We only use what we need to make the site work. Anything
         extra is up to you. <Link href="/trust/cookies" className="font-bold text-cinnamon underline">read more</Link>
       </p>

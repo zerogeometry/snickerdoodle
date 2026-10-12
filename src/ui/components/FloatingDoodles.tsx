@@ -10,10 +10,11 @@ import type { CSSProperties, ReactElement } from 'react';
  */
 type Tone = 'warm' | 'cool' | 'dark';
 
+// Token names only (globals.css) — the doodles colour themselves via CSS custom properties.
 const PALETTES: Record<Tone, { colors: string[]; baseOpacity: number }> = {
-  warm: { colors: ['#E8786E', '#F2A640', '#84BBD0', '#93B97C', '#C8623A'], baseOpacity: 0.24 },
-  cool: { colors: ['#FFFFFF', '#F2A640', '#E8786E', '#3E7585', '#5C8A3F'], baseOpacity: 0.34 },
-  dark: { colors: ['#FFF6E9', '#F2A640', '#FBEEDB', '#F2D7C4', '#84BBD0'], baseOpacity: 0.5 },
+  warm: { colors: ['berry', 'sunshine', 'sky', 'leaf', 'tomato'].map((t) => `var(--color-${t})`), baseOpacity: 0.24 },
+  cool: { colors: ['paper', 'sunshine', 'berry', 'cobalt-deep', 'green-save'].map((t) => `var(--color-${t})`), baseOpacity: 0.34 },
+  dark: { colors: ['paper', 'sunshine', 'honey-band', 'berry-pale', 'sky'].map((t) => `var(--color-${t})`), baseOpacity: 0.5 },
 };
 
 type ShapeFn = (color: string, scale: number) => ReactElement;
@@ -103,7 +104,7 @@ export function FloatingDoodles({ tone = 'warm' }: { tone?: Tone }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {LAYOUT.map((it, i) => {
-        const color = pal.colors[it.ci % pal.colors.length] ?? '#000';
+        const color = pal.colors[it.ci % pal.colors.length] ?? 'currentColor';
         const Shape = SHAPES[it.shape];
         const style = {
           top: it.top,

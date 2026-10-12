@@ -30,8 +30,8 @@ export function ProductCard({
     <Tag
       {...(onClick ? { type: 'button' as const, onClick } : {})}
       className={cn(
-        'block w-full overflow-hidden rounded-2xl border bg-[#FFFDF8] text-left shadow-[0_2px_6px_rgba(46,39,35,.06)] transition-transform hover:-translate-y-0.5',
-        featured ? 'border-2 border-honey' : 'border-[#EADFC9]',
+        'block w-full overflow-hidden rounded-2xl border bg-paper text-left shadow-[0_2px_6px_color-mix(in_srgb,var(--color-cocoa)_6%,transparent)] transition-transform hover:-translate-y-0.5',
+        featured ? 'border-2 border-honey' : 'border-line',
         className,
       )}
     >
@@ -46,9 +46,9 @@ export function ProductCard({
           <ProductArt product={product} size={72} />
         )}
       </div>
-      <div className="flex items-center justify-between gap-2 border-t border-[#EFE6D6] px-3 py-2.5">
+      <div className="flex items-center justify-between gap-2 border-t border-line px-3 py-2.5">
         <span className="text-sm font-bold text-cocoa">{name}</span>
-        <span className="text-sm text-[#9C8E7E]">{price}</span>
+        <span className="text-sm text-ink-faint">{price}</span>
       </div>
     </Tag>
   );

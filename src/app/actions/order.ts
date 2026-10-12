@@ -4,6 +4,8 @@ import { getDb } from '@/db/client';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { keepAndFileCreations } from '@/server/keepsakes';
 import { placeOrder, type PlaceLine } from '@/server/orders';
+import { resolvePromo } from '@/server/promos';
+import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 
@@ -23,7 +25,9 @@ export async function placeOrderAction(input: {
   items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string } }[];
   gift?: boolean;
   subject?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string }> {
+  /** What the customer typed; resolved + priced server-side. */
+  promoCode?: string;
+}): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string; reason?: 'too-small'; productKey?: string }> {
   const items: PlaceLine[] = (input.items ?? []).map((i) => ({
     productKey: String(i.productKey),
     qty: Number(i.qty),
@@ -57,14 +61,21 @@ export async function placeOrderAction(input: {
   }
 
   const joinProvenance = account ? await resolveSessionJoinProvenance() : null;
+  const resolved = input.promoCode
+    ? await resolvePromo(db, input.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
+    : null;
+  const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   try {
     const res = await placeOrder(db, {
+      promo: resolved?.ok ? resolved.rule : null,
+      creditAvailablePence,
+      buyerEmail: account?.email ?? null,
       items,
       gift: input.gift ?? false,
       account: account ? { id: account.id } : null,
       joinProvenance,
     });
-    if (!res.ok) return { ok: false };
+    if (!res.ok) return res.reason === 'too-small' ? { ok: false, reason: 'too-small', productKey: res.productKey } : { ok: false };
     return { ok: true, ref: res.ref, checkoutUrl: res.checkoutUrl };
   } catch {
     return { ok: false }; // e.g. a personalised line the buyer may not order

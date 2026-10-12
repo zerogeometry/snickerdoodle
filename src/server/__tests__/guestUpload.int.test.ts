@@ -17,8 +17,9 @@ import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
-const png = () => sharp({ create: { width: 40, height: 40, channels: 3, background: { r: 255, g: 255, b: 255 } } })
-  .composite([{ input: { create: { width: 16, height: 16, channels: 3, background: { r: 40, g: 120, b: 200 } } }, left: 12, top: 12 }])
+// Big enough to print on a framed print (the order-time DPI gate refuses anything that can't).
+const png = () => sharp({ create: { width: 1200, height: 1200, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+  .composite([{ input: { create: { width: 480, height: 480, channels: 3, background: { r: 40, g: 120, b: 200 } } }, left: 360, top: 360 }])
   .png()
   .toBuffer();
 

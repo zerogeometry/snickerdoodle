@@ -84,7 +84,7 @@ export default function SpinHarness() {
       <h1 className="mb-4 font-display text-2xl font-semibold">spin views — dev harness</h1>
       <div className={only ? 'mx-auto max-w-2xl' : 'grid grid-cols-2 gap-4 md:grid-cols-4'}>
         {keys.map((kind) => (
-          <figure key={kind} className="rounded-2xl border border-[#EADFC9] bg-[#FBF5E9] p-2">
+          <figure key={kind} className="rounded-2xl border border-line bg-oat p-2">
             <div className={only ? 'h-[540px] w-full' : 'h-72 w-full'} data-spin={kind}>
               <Product3D
                 kind={kind}
@@ -96,7 +96,7 @@ export default function SpinHarness() {
                 view={view}
               />
             </div>
-            <figcaption className="mt-1 text-center text-xs font-bold text-[#7A6A58]">{kind}</figcaption>
+            <figcaption className="mt-1 text-center text-xs font-bold text-ink-soft">{kind}</figcaption>
           </figure>
         ))}
       </div>

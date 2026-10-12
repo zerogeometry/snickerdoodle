@@ -1,34 +1,64 @@
 @import 'tailwindcss';
 
 /*
- * Brand tokens — the "good crayon box" (docs/02). These drive Tailwind utilities:
- * --color-oat -> bg-oat/text-oat, --font-display -> font-display, etc.
- * CTAs are the cinnamon orange #D2691E with cream text.
+ * Brand tokens — the SCRAPBOOK direction (decision D12, 2026-10-12): kraft paper, tape,
+ * stickers, bold crayon colour. EVERY colour in the app comes from here — components use
+ * these names, never raw hex — so the look is changed in one place.
+ *
+ * Semantic roles: oat = the kraft page · paper / paper-2 = cards + soft fills · line = hairlines
+ * · cocoa = ink · ink-soft / ink-faint = secondary + caption text (both ≥4.5:1 on paper AND
+ * kraft) · cta = the tomato CTA (white text, 4.6:1) · cinnamon = tomato for TEXT/links on kraft
+ * · honey = sunshine yellow (fills only, never text) · cobalt = the second accent.
+ * Legacy names (oat, cocoa, cinnamon, honey…) are kept and re-pointed so nothing breaks.
  */
 @theme {
-  --color-oat: #fbf5e9;
-  --color-cocoa: #2e2723;
-  --color-honey: #f2a640;
-  --color-cinnamon: #c8623a;
-  --color-cta: #d2691e;
-  --color-cta-text: #fff6e9;
-  --color-sky: #84bbd0;
+  --color-oat: #ebddc6;
+  --color-paper: #fffbf2;
+  --color-paper-2: #f6eedf;
+  --color-line: #d9c7a9;
+  --color-cocoa: #2b2118;
+  --color-ink-soft: #5a4a3a;
+  --color-ink-faint: #6e5d4b;
+
+  --color-cta: #c8402a;
+  --color-cta-deep: #8e2a1a;
+  --color-cta-text: #ffffff;
+  --color-tomato: #c8402a;
+  --color-cinnamon: #a8331f;
+
+  --color-honey: #f6c445;
+  --color-sunshine: #f6c445;
+  --color-sunshine-deep: #c99a1e;
+  --color-honey-band: #fbe9b7;
+
+  --color-cobalt: #2f5da8;
+  --color-cobalt-deep: #1f4280;
+  --color-sky: #8fb5d6;
+  --color-sky-pale: #e3edf6;
   --color-berry: #e8786e;
-  --color-meadow: #93b97c;
-  --color-green-save: #5c8a3f;
-  --color-honey-band: #fbeedb;
+  --color-berry-pale: #fce6e1;
+  --color-meadow: #7fa65e;
+  --color-leaf: #7fa65e;
+  --color-leaf-pale: #e6efdc;
+  --color-green-save: #3f6e29;
 
-  /* Fonts — self-hosted via @fontsource (imported in layout.tsx). */
-  --font-sans: 'Mulish Variable', system-ui, sans-serif;
-  --font-display: 'Fraunces Variable', Georgia, serif;
-  --font-hand: 'Caveat Variable', ui-rounded, cursive;
+  /* Fonts — self-hosted via @fontsource (imported in layout.tsx). Bricolage Grotesque for
+     display + UI; Gaegu is the ONE handwritten moment per view. */
+  --font-sans: 'Bricolage Grotesque Variable', ui-rounded, system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', ui-rounded, system-ui, sans-serif;
+  --font-hand: 'Gaegu', ui-rounded, cursive;
 
-  /* Generous radii. */
+  /* Generous, sticker-like radii. */
   --radius-pill: 999px;
+  --radius-card: 18px;
+  --radius-sheet: 26px;
 }
 
 :root {
   color-scheme: light;
+  /* The single motion vocabulary: a springy overshoot for "pop", a soft settle for moves. */
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 body {
@@ -37,6 +67,202 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* App feel on phones: no grey tap flash, no rubber-band reveal of a white page edge. */
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+/* Display headings get the chunky, tight Scrapbook set. */
+.font-display {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* ── Scrapbook materials ─────────────────────────────────────────────────────
+   Small, reusable "paper" pieces. Pure CSS — no images, nothing to download. */
+
+/* A strip of washi tape across the top of a card/photo. --tape sets its colour. */
+.tape {
+  position: relative;
+}
+.tape::before {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  width: 64px;
+  height: 18px;
+  translate: -50% 0;
+  rotate: var(--tape-rot, -3deg);
+  background: var(--tape, rgb(246 196 69 / 0.78));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* A polaroid-ish photo card: white border, soft drop shadow, a resting tilt. */
+.polaroid {
+  background: #ffffff;
+  padding: 8px 8px 10px;
+  box-shadow: 0 6px 14px rgb(43 33 24 / 0.16);
+  rotate: var(--tilt, 0deg);
+}
+
+/* A sticker: chunky ink outline + offset "lifted" shadow. */
+.sticker {
+  border: 2px solid var(--color-cocoa);
+  box-shadow: 0 3px 0 var(--color-cocoa);
+}
+
+/* Kraft paper grain — a whisper of texture from a tiny inline SVG noise (≈300 bytes). */
+.kraft {
+  background-color: var(--color-oat);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Motion system ───────────────────────────────────────────────────────────
+   Character without cost: ONLY transform/opacity (compositor-only, no layout or paint),
+   CSS-only (no JS animation library, no timers), short durations, and every one switched
+   off under prefers-reduced-motion by the global rule below. */
+
+/* Pop in: things arrive like a sticker slapped onto the page. Stagger with --i. */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94) rotate(var(--pop-rot, -2deg));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  /* `backwards`, not `both`: hold the start frame during the stagger delay, then hand the
+     transform back — so .lift / .press on the same element still work after it lands. */
+  animation: pop-in 0.42s var(--ease-pop) backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+/* Page enter: every route change fades in (app/template.tsx). OPACITY ONLY on purpose — a
+   transform on this wrapper would make it the containing block for position:fixed children
+   (the tab bar, sheets) mid-animation. Movement comes from .pop-in inside each screen. */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.page-enter {
+  animation: page-enter 0.28s var(--ease-settle) both;
+}
+
+/* Press: buttons squash down onto their shadow — tactile, like pressing a sticker. */
+.press {
+  transition:
+    transform 0.12s var(--ease-settle),
+    box-shadow 0.12s var(--ease-settle);
+}
+.press:active {
+  transform: translateY(3px) scale(0.985);
+}
+
+/* Lift: photos and tiles straighten up and rise on hover/focus (their resting tilt undone). */
+.lift {
+  transition:
+    transform 0.25s var(--ease-pop),
+    rotate 0.25s var(--ease-pop),
+    box-shadow 0.25s var(--ease-settle);
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-4px);
+    rotate: 0deg;
+    box-shadow: 0 12px 24px rgb(43 33 24 / 0.2);
+  }
+}
+.lift:focus-visible {
+  transform: translateY(-4px);
+  rotate: 0deg;
+}
+
+/* Wiggle: a quick sticker jiggle — on hover for pointers, on tap for touch. */
+@keyframes wiggle {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+  75% {
+    transform: rotate(-1.5deg);
+  }
+}
+@media (hover: hover) {
+  .wiggle:hover {
+    animation: wiggle 0.45s var(--ease-settle);
+  }
+}
+.wiggle:active {
+  animation: wiggle 0.45s var(--ease-settle);
+}
+
+/* Bounce: the active tab icon hops once when selected. */
+@keyframes hop {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-5px) scale(1.08);
+  }
+  70% {
+    transform: translateY(1px) scale(0.98);
+  }
+}
+.hop {
+  animation: hop 0.5s var(--ease-pop);
+}
+
+/* Scribble: a hand-drawn underline that draws itself in (SVG stroke, once). */
+@keyframes scribble {
+  from {
+    stroke-dashoffset: var(--len, 300);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.scribble {
+  stroke-dasharray: var(--len, 300);
+  animation: scribble 0.9s 0.35s var(--ease-settle) both;
+}
+
+/* Sheet: bottom sheets rise on phones (Modal). */
+@keyframes sheet-up {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.sheet-up {
+  animation: sheet-up 0.32s var(--ease-pop) both;
+}
+
+/* Safe-area padding for the installed (standalone) app on notched phones. */
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
 }
 
 /* Accessibility: visible focus, and honour reduced motion everywhere (NN7). */
@@ -50,6 +276,7 @@ body {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
@@ -191,20 +418,20 @@ body {
 /* Brand-styled scrollbar for in-container scroll areas (the catalogue range). */
 .brand-scroll {
   scrollbar-width: thin;
-  scrollbar-color: #D2691E #F1E7D4;
+  scrollbar-color: var(--color-cta) var(--color-paper-2);
 }
 .brand-scroll::-webkit-scrollbar {
   width: 10px;
 }
 .brand-scroll::-webkit-scrollbar-track {
-  background: #F1E7D4;
+  background: var(--color-paper-2);
   border-radius: 9999px;
 }
 .brand-scroll::-webkit-scrollbar-thumb {
-  background: #D2691E;
+  background: var(--color-cta);
   border-radius: 9999px;
-  border: 2px solid #F1E7D4;
+  border: 2px solid var(--color-paper-2);
 }
 .brand-scroll::-webkit-scrollbar-thumb:hover {
-  background: #C8623A;
+  background: var(--color-cta-deep);
 }

@@ -4,6 +4,7 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
+import { ExampleWall } from '@/ui/components/ExampleWall';
 
 export const metadata: Metadata = {
   title: 'gifts',
@@ -23,11 +24,11 @@ export default function GiftsPage() {
       <FloatingDoodles tone="warm" />
       <div className="relative mx-auto max-w-4xl px-6 py-14 md:py-20">
         <div className="text-center">
-          <CaveatNote className="text-2xl">the easiest present, sorted</CaveatNote>
-          <h1 className="mt-1 font-display text-4xl font-semibold leading-tight text-cocoa md:text-5xl">
+          <CaveatNote className="pop-in -rotate-2 text-[28px] leading-none">the easiest present, sorted</CaveatNote>
+          <h1 className="pop-in mt-2 font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl" style={{ ['--i' as string]: 1 }}>
             Gifts the whole family can give
           </h1>
-          <p className="mx-auto mt-3 max-w-xl text-[15px] leading-relaxed text-[#5F564C]">
+          <p className="pop-in mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
             Turn a drawing into a present, then share a ready-to-buy link. Grandparents tap it, the cart&apos;s already
             filled, and something lovely is on its way.
           </p>
@@ -35,22 +36,22 @@ export default function GiftsPage() {
 
         <div className="mt-12 grid items-center gap-8 md:grid-cols-2">
           <ul className="space-y-3">
-            {POINTS.map((p) => (
-              <li key={p} className="flex items-start gap-3 rounded-2xl border border-[#EFE6D6] bg-[#FFFDF8] p-4">
-                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-meadow text-white">
-                  <Icon icon={IconCheck} size={14} />
+            {POINTS.map((p, i) => (
+              <li key={p} className="pop-in flex items-start gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-4" style={{ ['--i' as string]: i + 3 }}>
+                <span className="sticker mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-leaf-pale text-green-save">
+                  <Icon icon={IconCheck} size={15} />
                 </span>
-                <span className="text-sm leading-relaxed text-[#46402F]">{p}</span>
+                <span className="text-sm leading-relaxed text-cocoa">{p}</span>
               </li>
             ))}
           </ul>
 
-          <div className="rounded-2xl border border-[#F0CF9C] bg-honey-band p-6 text-center">
-            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-honey bg-[#FFFDF8] text-cinnamon">
+          <div className="pop-in tape rounded-[22px] border-2 border-cocoa bg-honey-band p-6 text-center shadow-[0_4px_0_var(--color-cocoa)]" style={{ ['--i' as string]: 4, rotate: '1deg' }}>
+            <span className="sticker wiggle mx-auto flex h-14 w-14 -rotate-6 items-center justify-center rounded-full bg-paper text-cinnamon">
               <Icon icon={IconGift} size={26} />
             </span>
-            <h2 className="mt-3 font-display text-xl font-semibold text-cocoa">A gift list for the big day</h2>
-            <p className="mt-2 text-sm leading-relaxed text-[#7A5B33]">
+            <h2 className="mt-3 font-display text-2xl text-cocoa">A gift list for the big day</h2>
+            <p className="mt-2 text-sm leading-relaxed text-ink-soft">
               Set one up in seconds and share it however you like — WhatsApp, email or text.
             </p>
             <div className="mt-4 flex flex-col gap-2">
@@ -64,7 +65,15 @@ export default function GiftsPage() {
           </div>
         </div>
 
-        <p className="mx-auto mt-10 flex max-w-md items-center justify-center gap-2 text-center text-xs text-green-save">
+        {/* The main visual: real keepsakes made from children's drawings, taped to the wall. */}
+        <section aria-labelledby="gift-examples" className="mt-16">
+          <h2 id="gift-examples" className="text-center font-display text-3xl text-cocoa md:text-4xl">
+            Little drawings, <span className="text-cinnamon">made real</span>
+          </h2>
+          <ExampleWall limit={8} className="mt-8" />
+        </section>
+
+        <p className="mx-auto mt-12 flex max-w-md items-center justify-center gap-2 text-center text-xs font-semibold text-green-save">
           <Icon icon={IconShieldCheck} size={15} /> Gift links are private, unguessable and never indexed — and you can
           revoke one any time.
         </p>

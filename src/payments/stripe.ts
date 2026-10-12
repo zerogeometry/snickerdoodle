@@ -37,6 +37,13 @@ export async function createCheckoutSession(args: {
   // Required (not optional) on purpose: dropping it at a call-site must be a compile
   // error, or Stripe would charge more than the order total it is meant to mirror.
   familySetSavingPence: number;
+  /** Required for the same reason: a code's saving must reach Stripe or we over-charge. */
+  promoSavingPence: number;
+  /** The code's name on the receipt, when a code was used. */
+  promoLabel?: string;
+  /** Where Stripe's "back" goes (an app path). Default: the basket. A gift-link order
+   * returns to its gift list — a grandparent never lands in a basket they didn't fill. */
+  cancelPath?: string;
 }): Promise<{ id: string; url: string | null }> {
   const stripe = getStripe();
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = args.lines.map((l) => ({
@@ -59,9 +66,10 @@ export async function createCheckoutSession(args: {
   // Checkout Session allows a single discount) so Stripe's total always equals
   // our authoritative order total.
   const discounts: Stripe.Checkout.SessionCreateParams.Discount[] = [];
-  const savingPence = args.joinSavingPence + args.familySetSavingPence;
+  const savingPence = args.joinSavingPence + args.familySetSavingPence + args.promoSavingPence;
   if (savingPence > 0) {
-    const coupon = await stripe.coupons.create({ amount_off: savingPence, currency: 'gbp', duration: 'once', name: 'Family saving' });
+    const name = args.promoLabel && args.promoSavingPence > 0 ? `Code ${args.promoLabel}` : 'Family saving';
+    const coupon = await stripe.coupons.create({ amount_off: savingPence, currency: 'gbp', duration: 'once', name });
     discounts.push({ coupon: coupon.id });
   }
 
@@ -74,7 +82,7 @@ export async function createCheckoutSession(args: {
     // never build address forms (or store card data) ourselves. UK-only at launch.
     shipping_address_collection: { allowed_countries: ['GB'] },
     success_url: `${appUrl()}/checkout/confirmation?ref=${args.ref}`,
-    cancel_url: `${appUrl()}/checkout`,
+    cancel_url: `${appUrl()}${args.cancelPath ?? '/checkout'}`,
   });
   return { id: session.id, url: session.url };
 }
