@@ -12,6 +12,7 @@ Warm · plain · playful-with-a-wink · quietly reassuring. Non-corporate. Lower
 
 - **Lexicon / CTAs:** "start creating", "keep the magic", "they're only little once", "made real", "your keepsake box", "share a ready-to-buy link", "join family & checkout".
 - **Anti-patterns:** corporate stiffness; pushy upsell; shouting about "AI"; anything that makes a parent feel a child's data is exposed; anything that reads as a social network.
+- **Product naming — "Studio" (decision D9):** there is **one** Studio, a single creative surface that *grows and improves* over time (mirroring the Keepsake Home that grows with the child). It is never renamed and never split into a separate "Editor". Future power capability — end-to-end / create-from-scratch / standalone generative design — arrives as an **upgraded mode within Studio ("Studio Plus")**, not a new product. The free/paid line is depth of capability in one place, never a different room — and never a wall in front of keeping or viewing a family's own keepsakes.
 
 ## Design tokens (required values)
 

@@ -1,5 +1,7 @@
 # 00 — Design Fidelity (read before building any UI)
 
+> **Update 2026-10-12 (decision D12):** the founder chose the **Scrapbook** visual direction. For LOOK & FEEL (colour, type, materials, motion) the Scrapbook direction and the tokens in `src/app/globals.css` now win; the mockups below remain binding for **layout, flow and copy**. See CLAUDE.md "Design fidelity".
+
 > **The mockups are the design. Reproduce them — do not reinterpret them.** They are a binding reference implementation, not loose inspiration. The founder has approved this UI; the build must match it.
 
 ## The rule

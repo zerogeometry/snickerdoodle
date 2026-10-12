@@ -25,6 +25,12 @@
 
 **Motion:** restrained and meaningful (hero draw-in, product-morph, gentle CTA wobble). Never gratuitous; always reduced-motion safe.
 
+**Content safety (behavioural — see `docs/05` content-moderation; decision D8)**
+- **On upload:** every image is hash-checked (CSAM) and run through the moderation classifier **before** it can reach a print order. The common path is invisible (no friction). A **flagged** item enters an "under review" state — kind, non-accusatory copy ("we just need a quick look at this one"), never a cold rejection, and **never silently binned**. A confirmed-illegal match is handled by the back-end runbook, not surfaced as a normal error.
+- **Report / takedown:** a one-tap "report this / something's wrong" affordance is present wherever a creation or gift link is viewed; it routes to a fast removal path wired to real deletion.
+- **Copyright framing (S3-b):** Start Creating, Catalogue and Studio copy steer toward the child's **own original drawing** ("frame the wonky bits in gold"), with a plain, warm note that we can't make products of other people's characters or logos. The rights-warranty lives at the keep/checkout step, in brand voice — informative, not a legalistic wall.
+- **Text fields** (Studio text, gift message, member name) screen for abuse and enforce **child first name only, never surname**.
+
 ---
 
 ## Screens
@@ -52,6 +58,7 @@
 
 ### 4. Studio (governed by the Studio functional spec)
 - **Purpose:** create/edit a keepsake and apply it to products. The make-or-break creative core.
+- **Naming / evolution (decision D9):** one Studio that **grows and improves** — never renamed, never split into a separate "Editor". Today it is upload-led (you bring a drawing/photo and make it real). Future end-to-end / create-from-scratch / standalone generative capability arrives as **"Studio Plus"**, an upgraded mode *within* the same surface, not a separate product. Near term, **all generative use is in pursuit of a purchasable product** (it's a COGS line, priced in); standalone generation-for-its-own-sake is a Studio Plus concern, deferred. Keep the budget/abuse cap regardless.
 - **Must contain (summary; full list in the Studio spec):** canvas with product-tied dimensions, bleed/safe guides; layers (visibility/opacity/lock/reorder); brush + eraser with **size, smoothness, opacity**; transform/scale/crop; text; stickers/frames; colour adjustments; preset filters; **magic edits** (remove background, tidy lines, brighten, style, **upscale-to-print**); **per-asset visibility control** (Only me / Family / Extended, default Family); product application + live preview + switch products; **print-readiness/DPI indicator + one-tap upscale**; undo/redo, autosave, recoverable original; save to Keepsake Home / add to basket.
 - **Mobile (required pattern):** full-bleed canvas; **floating brush HUD** (size/colour) on the canvas; active tool's options as a **draggable bottom sheet**; tools as a **scrolling bottom bar**. Must be usable by **finger and stylus** (pressure→size/opacity, palm rejection, stylus-only mode) per spec §19a.
 - **Acceptance:** see the Studio spec's MVP cut; minimally — upload, edit (incl. one magic edit), set visibility, save; original recoverable; usable by finger and stylus on a phone; low-res image triggers the DPI warning and upscale resolves it.
