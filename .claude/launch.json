@@ -11,7 +11,7 @@
     {
       "name": "preview",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["cross-env", "NEXT_DIST_DIR=.next-preview", "next", "dev", "-p", "3007"],
+      "runtimeArgs": ["cross-env", "NEXT_DIST_DIR=.next-preview", "APP_URL=http://localhost:3007", "AUTH_URL=http://localhost:3007", "next", "dev", "-p", "3007"],
       "port": 3007,
       "autoPort": false
     },
