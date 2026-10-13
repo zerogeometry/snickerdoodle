@@ -8,9 +8,8 @@ export const metadata: Metadata = {
   description: 'Raise a data-protection complaint directly with Snickerdoodle. We acknowledge within 30 days.',
 };
 
-// The DUAA s.164A complaints channel. Submissions are wired to the rights-request
-// intake (the trust-spine backend) once auth + persistence land; the 30-day
-// acknowledgement workflow runs from there.
+// The DUAA s.164A complaints channel: submissions go to the rights-request intake
+// (src/server/rights.ts) — recorded with a due date and acknowledged by email on receipt.
 export default function DataComplaintPage() {
   return (
     <div className="px-6 py-12 md:py-16">

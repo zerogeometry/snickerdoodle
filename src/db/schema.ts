@@ -342,6 +342,10 @@ export const rightsRequests = pgTable('rights_requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   subjectAccountId: uuid('subject_account_id').references(() => accounts.id),
   subjectEmail: text('subject_email'),
+  /** How the requester signed it, and what they told us (a complaint's own words). Personal data:
+   * kept only as long as the request + the accountability schedule need. */
+  requesterName: text('requester_name'),
+  details: text('details'),
   type: rightsReqType('type').notNull(),
   status: rightsReqStatus('status').notNull().default('RECEIVED'),
   receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),

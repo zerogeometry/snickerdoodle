@@ -9,7 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { purgeExpiredAssets } from '@/server/retention';
+import { purgeExpiredAssets, RETENTION_DAYS, startRetentionClockForOrder } from '@/server/retention';
 import { seedCatalogue } from '@/server/catalogue';
 import { deleteObject, derivativeKey, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -103,5 +103,46 @@ describe.skipIf(!DB || !S3)('phase 0 fixes — derivative grant + purge guard (i
     // the artwork row survives with its assetId nulled (frozen spec kept)
     const [artwork] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, item!.id));
     expect(artwork!.assetId).toBeNull();
+  });
+
+  it('shipping starts the post-fulfilment clock: unkept sources get fulfilment + 30d, kept ones are untouched', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const unkept = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: false });
+    const kept = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
+    keys.push(unkept.key, kept.key);
+    // uploaded long ago: its upload-time window has already run out
+    await db.update(assets).set({ purgeAfter: new Date(Date.now() - 86_400_000) }).where(eq(assets.id, unkept.assetId));
+
+    const [variant] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
+    const [order] = await db
+      .insert(orders)
+      .values({ ref: `SNK-clock-${ids.nonce}`, accountId: ids.samId, status: 'FULFILLING', subtotalPence: 4400, deliveryPence: 0, totalPence: 4400 })
+      .returning();
+    orderIds.push(order!.id);
+    for (const a of [unkept, kept]) {
+      const [item] = await db
+        .insert(orderItems)
+        .values({ orderId: order!.id, productKey: 'framedPrint', variantId: variant!.id, qty: 1, unitPricePence: 2200, linePence: 2200 })
+        .returning();
+      await db.insert(orderItemArtwork).values({ orderItemId: item!.id, assetId: a.assetId, variantId: variant!.id, controllerAccountId: ids.samId, templateSnapshot: {}, transform: {} });
+    }
+
+    const shippedAt = new Date();
+    expect(await startRetentionClockForOrder(db, order!.id, shippedAt)).toBe(1);
+    await db.update(orders).set({ status: 'SHIPPED' }).where(eq(orders.id, order!.id));
+
+    const [u] = await db.select().from(assets).where(eq(assets.id, unkept.assetId));
+    expect(u!.fulfilledAt?.getTime()).toBe(shippedAt.getTime());
+    expect(u!.purgeAfter!.getTime()).toBe(shippedAt.getTime() + RETENTION_DAYS * 86_400_000);
+    const [k] = await db.select().from(assets).where(eq(assets.id, kept.assetId));
+    expect(k!.purgeAfter).toBeNull();
+    expect(k!.fulfilledAt).toBeNull();
+
+    // the source is NOT purged the moment the order ships (its upload-time window had lapsed)
+    expect((await purgeExpiredAssets(db)).purgedAssetIds).not.toContain(unkept.assetId);
+    // idempotent: a second terminal transition doesn't push the date out again
+    await startRetentionClockForOrder(db, order!.id, new Date(shippedAt.getTime() + 5 * 86_400_000));
+    const [u2] = await db.select().from(assets).where(eq(assets.id, unkept.assetId));
+    expect(u2!.fulfilledAt?.getTime()).toBe(shippedAt.getTime());
   });
 });

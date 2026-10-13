@@ -6,6 +6,7 @@ import { isStripeConfigured, getStripe } from '@/payments/stripe';
 import { presignProviderIngest } from '@/storage';
 import type { DbHandle, Tx } from '@/server/db';
 import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
+import { startRetentionClockForOrder } from '@/server/retention';
 
 /**
  * POD ORDER SUBMISSION — the READY → SUBMITTED step (proposal/04 §6, the last leg of
@@ -497,6 +498,7 @@ export async function syncSubmittedOrders(
             .set({ status: 'SHIPPED', submitError: null, tracking: { carrier, number: shipment?.tracking?.number ?? null, url: shipment?.tracking?.url ?? null } })
             .where(eq(orders.id, row.id));
           await setArtworkStatus(tx, row.id, 'SHIPPED');
+          await startRetentionClockForOrder(tx, row.id); // source upload: fulfilment + 30d unless kept
         });
         summary.shipped++;
         summary.orders.push({ ref: row.ref, stage });
@@ -504,6 +506,7 @@ export async function syncSubmittedOrders(
         await db.transaction(async (tx) => {
           await tx.update(orders).set({ status: 'CANCELLED', submitError: issues.join('; ').slice(0, 500) || 'cancelled at provider' }).where(eq(orders.id, row.id));
           await setArtworkStatus(tx, row.id, 'CANCELLED');
+          await startRetentionClockForOrder(tx, row.id);
         });
         summary.cancelled++;
         summary.orders.push({ ref: row.ref, stage, note: issues.join('; ') || undefined });

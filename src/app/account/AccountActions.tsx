@@ -1,17 +1,35 @@
 'use client';
 
-import { IconDownload, IconShieldCheck, IconTrash, IconX } from '@tabler/icons-react';
+import { IconDoorExit, IconDownload, IconShieldCheck, IconTrash, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 import { toast } from '@/lib/store';
-import { deleteAllMyKeepsakesAction, exportMyDataAction } from '@/app/actions/data';
+import { closeMyAccountAction, deleteAllMyKeepsakesAction, exportMyDataAction } from '@/app/actions/data';
 
 /** The "your data, your rules" controls — download / see / delete, wired to the real
  * data-rights actions (NN8). Delete is two-tap to confirm and really cascades. */
 export function AccountActions() {
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const close = () => {
+    if (!confirmClose) {
+      setConfirmClose(true);
+      return;
+    }
+    startTransition(async () => {
+      const res = await closeMyAccountAction();
+      setConfirmClose(false);
+      if (!res.ok) {
+        toast(res.reason === 'order-in-flight' ? 'we’re still making an order for you — you can close your account once it’s on its way' : 'couldn’t close it just now — try again');
+        return;
+      }
+      toast('your account is closed — everything’s been deleted');
+      window.location.assign('/');
+    });
+  };
 
   const download = () =>
     startTransition(async () => {
@@ -77,13 +95,34 @@ export function AccountActions() {
               {confirmDelete ? 'tap again — delete everything for good' : 'Delete all your keepsakes'}
             </span>
             <span className="block text-[11px] text-ink-faint">
-              {confirmDelete ? 'this can’t be undone.' : 'Really deleted — from our store, our processors and our backups.'}
+              {confirmDelete ? 'this can’t be undone.' : 'Really deleted — the files themselves, not just hidden.'}
             </span>
           </span>
         </button>
         {confirmDelete ? (
           <button type="button" onClick={() => setConfirmDelete(false)} className="mt-2 inline-flex items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-cinnamon">
             <Icon icon={IconX} size={12} /> keep my keepsakes
+          </button>
+        ) : null}
+      </div>
+
+      <div className="px-4 py-3.5 hover:bg-berry-pale">
+        <button type="button" onClick={close} disabled={pending} className="flex w-full items-center gap-3 text-left disabled:opacity-60">
+          <Icon icon={IconDoorExit} size={18} className="shrink-0 text-berry" />
+          <span className="flex-1">
+            <span className="block text-[13px] font-bold text-berry">
+              {confirmClose ? 'tap again — close my account for good' : 'Close your account'}
+            </span>
+            <span className="block text-[11px] text-ink-faint">
+              {confirmClose
+                ? 'your family, keepsakes and little ones are deleted, and everyone you invited loses access. we keep only the money side of past orders, with your details removed.'
+                : 'Everything goes — your family, keepsakes, little ones and invites.'}
+            </span>
+          </span>
+        </button>
+        {confirmClose ? (
+          <button type="button" onClick={() => setConfirmClose(false)} className="mt-2 inline-flex min-h-11 items-center gap-1 text-[11px] font-bold text-ink-soft hover:text-cinnamon">
+            <Icon icon={IconX} size={12} /> keep my account
           </button>
         ) : null}
       </div>

@@ -248,8 +248,21 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
     throw denied('only the controlling parent may delete this keepsake');
   }
 
+  await eraseAsset(db, row, { accountId: viewer.accountId, actorType: 'MEMBER' });
+}
+
+/**
+ * The erase steps themselves, with NO authorisation check — callers authorise first (deleteAsset
+ * via canDeleteAsset; account closure for everything the closing parent controls).
+ */
+export async function eraseAsset(
+  db: DbHandle,
+  row: { id: string; familyId: string | null },
+  actor: { accountId: string | null; actorType: 'MEMBER' | 'SYSTEM' },
+  metadata?: Record<string, unknown>,
+): Promise<void> {
   // 1. bytes first — never drop the DB record while bytes might linger.
-  const objects = await db.select().from(storageObjects).where(eq(storageObjects.assetId, assetId));
+  const objects = await db.select().from(storageObjects).where(eq(storageObjects.assetId, row.id));
   for (const o of objects) {
     await deleteObjectConfirmed(o.key);
   }
@@ -257,13 +270,14 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
   // 2. append-only audit while the family link is still valid.
   await db.insert(auditRecords).values({
     familyId: row.familyId,
-    actorAccountId: viewer.accountId,
-    actorType: 'MEMBER',
+    actorAccountId: actor.accountId,
+    actorType: actor.actorType,
     event: 'ASSET_DELETED',
     targetType: 'asset',
-    targetId: assetId,
+    targetId: row.id,
+    ...(metadata ? { metadata } : {}),
   });
 
   // 3. drop the row — cascades storage_object rows; nulls order/ML asset links.
-  await db.delete(assets).where(eq(assets.id, assetId));
+  await db.delete(assets).where(eq(assets.id, row.id));
 }

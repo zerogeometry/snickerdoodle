@@ -225,6 +225,13 @@
       "when": 1791878345512,
       "tag": "0031_open_scorpion",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1791879045275,
+      "tag": "0032_striped_bloodscream",
+      "breakpoints": true
     }
   ]
 }

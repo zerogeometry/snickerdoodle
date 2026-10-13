@@ -1,7 +1,7 @@
-import { and, eq, inArray, isNotNull, lte, ne, notExists } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, lte, ne, notExists, sql } from 'drizzle-orm';
 import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { deleteObjectConfirmed } from '@/storage';
-import type { DbHandle } from './db';
+import type { DbHandle, Tx } from './db';
 
 // An order in one of these states still needs its source art (render is pending
 // or in production). Once SHIPPED/CANCELLED the source follows normal retention.
@@ -85,4 +85,30 @@ export async function purgeExpiredAssets(
   }
 
   return { scanned: due.length, purged, failed, purgedAssetIds };
+}
+
+/**
+ * Start the post-fulfilment clock (CLAUDE.md: "delete the source upload after fulfilment + 30d
+ * UNLESS kept"). Called when an order reaches a terminal state (SHIPPED / CANCELLED): every
+ * UN-kept source asset on it is stamped fulfilledAt = now and its purgeAfter moved to
+ * now + RETENTION_DAYS — never earlier than an existing later date. A kept keepsake is untouched
+ * (Postgres stays the source of truth for "kept"). Idempotent; run inside the status-change
+ * transaction so the two can't drift.
+ */
+export async function startRetentionClockForOrder(db: DbHandle | Tx, orderId: string, now = new Date()): Promise<number> {
+  const until = new Date(now.getTime() + RETENTION_DAYS * 86_400_000);
+  const onOrder = db
+    .select({ assetId: orderItemArtwork.assetId })
+    .from(orderItemArtwork)
+    .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
+    .where(and(eq(orderItems.orderId, orderId), isNotNull(orderItemArtwork.assetId)));
+  const updated = await db
+    .update(assets)
+    .set({
+      fulfilledAt: sql`coalesce(${assets.fulfilledAt}, ${now.toISOString()}::timestamptz)`,
+      purgeAfter: sql`greatest(coalesce(${assets.purgeAfter}, ${until.toISOString()}::timestamptz), ${until.toISOString()}::timestamptz)`,
+    })
+    .where(and(inArray(assets.id, onOrder), eq(assets.keptInHome, false)))
+    .returning({ id: assets.id });
+  return updated.length;
 }

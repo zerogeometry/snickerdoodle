@@ -2,13 +2,14 @@
 
 import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
-import { assets, auditRecords } from '@/db/schema';
+import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { deleteAsset, resolveViewerContext } from '@/server/assets';
 import { loadHome } from '@/server/home';
 import { ensureHomeFamily } from '@/server/onboarding';
-import { getOrdersForAccount } from '@/server/orders';
 import { getCurrentAccount } from '@/server/session';
+import { closeAccount } from '@/server/accountClosure';
+import { collectAccountData } from '@/server/exportData';
 
 /**
  * Download-your-data (a portable subject-access export). Returns everything we hold
@@ -24,22 +25,26 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
   const home = await loadHome();
   if (!home) return { ok: false };
 
-  const orders = await getOrdersForAccount(getDb(), account.id);
+  const everything = await collectAccountData(getDb(), account.id);
 
   const data = {
     exportedAtISO: nowISO,
-    account: home.account,
-    family: { id: home.familyId, name: home.familyName, members: home.members, children: home.children },
-    keepsakes: home.keepsakes,
-    orders,
+    about:
+      'Everything Snickerdoodle holds about you. Keepsake image links work for a few minutes after download — save the images you want straight away.',
+    // what you see in your keepsake home (with short-lived image links)
+    home: {
+      family: { id: home.familyId, name: home.familyName, members: home.members, children: home.children },
+      keepsakes: home.keepsakes,
+    },
+    ...everything,
   };
   return { ok: true, filename: `snickerdoodle-your-data.json`, json: JSON.stringify(data, null, 2) };
 }
 
 /**
  * Erase everything the account controls — every keepsake the controlling parent
- * holds is really deleted (bytes confirmed-gone + DB row), audited per item, and an
- * ACCOUNT_CLOSED record is written. NN8 + children's-data rules: a child's data is
+ * holds is really deleted (bytes confirmed-gone + DB row), audited per item. (Closing the
+ * whole account is closeMyAccountAction.) NN8 + children's-data rules: a child's data is
  * removable on demand. (The login record + financial order history are retained per
  * the legal-basis schedule with the child image already cascaded out of any order.)
  */
@@ -66,16 +71,22 @@ export async function deleteAllMyKeepsakesAction(nowISO: string): Promise<{ ok: 
     }
   }
 
-  await db.insert(auditRecords).values({
-    familyId,
-    actorAccountId: account.id,
-    actorType: 'MEMBER',
-    event: 'ACCOUNT_CLOSED',
-    targetType: 'account',
-    targetId: account.id,
-    metadata: { keepsakesDeleted: deleted, atISO: nowISO },
-  });
+  // (each keepsake is audited as ASSET_DELETED by deleteAsset — this is not an account closure)
 
   revalidatePath('/home');
   return { ok: true, deleted };
+}
+
+/**
+ * Close the account for good (right to erasure). Everything the account owns or controls is
+ * erased — see closeAccount for exactly what goes and what (anonymised) money records stay.
+ * Their sessions are deleted, so they're signed out everywhere on the next request.
+ */
+export async function closeMyAccountAction(): Promise<{ ok: boolean; reason?: 'order-in-flight' }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false };
+  const res = await closeAccount(getDb(), account.id);
+  if (!res.ok) return res.reason === 'order-in-flight' ? { ok: false, reason: 'order-in-flight' } : { ok: false };
+  revalidatePath('/', 'layout');
+  return { ok: true };
 }
