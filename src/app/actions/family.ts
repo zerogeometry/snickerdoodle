@@ -5,7 +5,11 @@ import { auditRecords, families } from '@/db/schema';
 import { canManageFamily } from '@/authz';
 import { eq } from 'drizzle-orm';
 import { resolveViewerContext } from '@/server/assets';
-import { addChild } from '@/server/children';
+import { addChild, deleteChild, updateChild } from '@/server/children';
+import { leaveFamily, removeMember, revokeInvite, setMemberAccess } from '@/server/members';
+import { revokeGiftLink } from '@/server/giftLinks';
+import { revalidatePath } from 'next/cache';
+import type { AccessLevel, Circle } from '@/domain/types';
 import { setMemberSeesOccasions } from '@/server/invites';
 import { listActiveFamilies } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
@@ -74,4 +78,86 @@ export async function setMemberCalendarAction(memberAccountId: string, on: boole
   } catch {
     return { ok: false };
   }
+}
+
+// ── Parent controls (owner-only; every check is server-side in src/server/members + children) ──
+
+async function asOwner<T>(fn: (ctx: NonNullable<Awaited<ReturnType<typeof ownedFamily>>>, accountId: string) => Promise<T>, fallback: T): Promise<T> {
+  const account = await getCurrentAccount();
+  if (!account) return fallback;
+  const ctx = await ownedFamily(account.id);
+  if (!ctx) return fallback;
+  try {
+    const res = await fn(ctx, account.id);
+    revalidatePath('/family');
+    revalidatePath('/home');
+    return res;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Remove a member from the family — they lose access at once and are signed out. */
+export async function removeMemberAction(memberAccountId: string): Promise<{ ok: boolean }> {
+  return asOwner((ctx) => removeMember(ctx.db, ctx.viewer, { familyId: ctx.familyId, memberAccountId: String(memberAccountId) }), { ok: false });
+}
+
+/** Change what a member sees (circle) and/or can do (access). */
+export async function setMemberAccessAction(memberAccountId: string, change: { circle?: Circle; accessLevel?: AccessLevel }): Promise<{ ok: boolean }> {
+  return asOwner(
+    (ctx) =>
+      setMemberAccess(ctx.db, ctx.viewer, {
+        familyId: ctx.familyId,
+        memberAccountId: String(memberAccountId),
+        circle: change?.circle,
+        accessLevel: change?.accessLevel,
+      }),
+    { ok: false },
+  );
+}
+
+/** Cancel an invite that hasn't been accepted yet. */
+export async function revokeInviteAction(inviteId: string): Promise<{ ok: boolean }> {
+  return asOwner((ctx) => revokeInvite(ctx.db, ctx.viewer, { familyId: ctx.familyId, inviteId: String(inviteId) }), { ok: false });
+}
+
+/** Correct a little one's first name / birthday (null clears the birthday). */
+export async function updateChildAction(
+  childId: string,
+  change: { firstName?: string; birthday?: string | null },
+): Promise<{ ok: boolean; reason?: 'not-owner' | 'surname' | 'invalid' | 'birthday' | 'taken' }> {
+  return asOwner(
+    (ctx) =>
+      updateChild(ctx.db, ctx.viewer, {
+        familyId: ctx.familyId,
+        childId: String(childId),
+        firstName: change?.firstName === undefined ? undefined : String(change.firstName),
+        birthday: change?.birthday === undefined ? undefined : change.birthday ? String(change.birthday) : null,
+      }),
+    { ok: false, reason: 'not-owner' as const },
+  );
+}
+
+/** Remove a little one; optionally delete every keepsake filed under them too. */
+export async function deleteChildAction(childId: string, alsoDeleteKeepsakes: boolean): Promise<{ ok: boolean; keepsakesDeleted: number }> {
+  return asOwner(
+    (ctx) => deleteChild(ctx.db, ctx.viewer, { familyId: ctx.familyId, childId: String(childId), alsoDeleteKeepsakes: alsoDeleteKeepsakes === true }),
+    { ok: false, keepsakesDeleted: 0 },
+  );
+}
+
+/** Turn a gift link off — the link stops working for everyone at once. */
+export async function revokeGiftLinkAction(giftLinkId: string): Promise<{ ok: boolean }> {
+  return asOwner((ctx) => revokeGiftLink(ctx.db, ctx.viewer, String(giftLinkId)), { ok: false });
+}
+
+/** A member leaves a family they were invited into (never their own). */
+export async function leaveFamilyAction(familyId: string): Promise<{ ok: boolean }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false };
+  const db = getDb();
+  const viewer = await resolveViewerContext(db, account.id, String(familyId));
+  const res = await leaveFamily(db, viewer, { familyId: String(familyId) });
+  revalidatePath('/home');
+  return res;
 }

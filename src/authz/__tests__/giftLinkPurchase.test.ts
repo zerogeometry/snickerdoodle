@@ -14,7 +14,7 @@ function link(over: Partial<GiftLinkGrant> = {}): GiftLinkGrant {
 }
 
 function asset(over: Partial<GiftLinkAssetRef> = {}): GiftLinkAssetRef {
-  return { id: 'asset-1', familyId: 'fam-A', moderationStatus: 'CLEAR', ...over };
+  return { id: 'asset-1', familyId: 'fam-A', moderationStatus: 'CLEAR', visibility: 'FAMILY', ...over };
 }
 
 describe('canPurchaseViaGiftLink (a capability, not a membership)', () => {
@@ -42,6 +42,16 @@ describe('canPurchaseViaGiftLink (a capability, not a membership)', () => {
   for (const status of ['PENDING', 'FLAGGED', 'BLOCKED']) {
     it(`content not cleared (${status}) -> denied (D8)`, () => {
       expect(canPurchaseViaGiftLink(link(), asset({ moderationStatus: status }), NOW).allowed).toBe(false);
+    });
+  }
+
+  it('the parent pulled the keepsake back to ONLY_ME after sharing -> denied', () => {
+    expect(canPurchaseViaGiftLink(link(), asset({ visibility: 'ONLY_ME' }), NOW).allowed).toBe(false);
+  });
+
+  for (const visibility of ['FAMILY', 'EXTENDED']) {
+    it(`shared tier (${visibility}) stays purchasable through the link`, () => {
+      expect(canPurchaseViaGiftLink(link(), asset({ visibility }), NOW).allowed).toBe(true);
     });
   }
 });

@@ -107,6 +107,8 @@ export const auditEvent = pgEnum('audit_event', [
   'RIGHTS_REQUEST_COMPLETED',
   'CHILD_ADDED',
   'FAMILY_RENAMED',
+  'CHILD_UPDATED',
+  'CHILD_DELETED',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();

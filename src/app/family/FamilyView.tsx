@@ -1,7 +1,8 @@
 'use client';
 
-import { IconCalendarHeart, IconLock, IconPlus, IconUsers } from '@tabler/icons-react';
-import { useState } from 'react';
+import { IconCalendarHeart, IconChevronRight, IconLock, IconMailForward, IconPlus, IconUsers } from '@tabler/icons-react';
+import { useRouter } from 'next/navigation';
+import { useState, useTransition } from 'react';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { BottomTabBar } from '@/ui/components/BottomTabBar';
@@ -9,6 +10,10 @@ import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
 import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
+import { ManageChildModal, type ManagedChild } from '@/ui/modals/ManageChildModal';
+import { ManageMemberModal, type ManagedMember } from '@/ui/modals/ManageMemberModal';
+import { revokeInviteAction } from '@/app/actions/family';
+import { toast } from '@/lib/store';
 import type { AccessLevel } from '@/domain/types';
 import type { FamilyData } from '@/server/family';
 
@@ -35,6 +40,18 @@ function nextBirthday(iso: string): { label: string; when: string; sortKey: numb
 
 export function FamilyView({ data }: { data: FamilyData }) {
   const [addOpen, setAddOpen] = useState(false);
+  const [managing, setManaging] = useState<ManagedMember | null>(null);
+  const [managingChild, setManagingChild] = useState<ManagedChild | null>(null);
+  const [cancelling, startCancel] = useTransition();
+  const router = useRouter();
+  const owner = data.viewerIsOwner;
+  const cancelInvite = (id: string, email: string) =>
+    startCancel(async () => {
+      const res = await revokeInviteAction(id);
+      if (!res.ok) return toast('couldn’t cancel that — try again');
+      toast(`invite to ${email.split('@')[0]} cancelled — the link no longer works`);
+      router.refresh();
+    });
 
   // Children (keepsake subjects) lead; then the people in the circle.
   const peopleCount = data.members.length + data.children.length;
@@ -61,33 +78,77 @@ export function FamilyView({ data }: { data: FamilyData }) {
               <Icon icon={IconUsers} size={20} className="text-cinnamon" /> Members
             </h2>
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {data.children.map((c, i) => (
-                <div key={`c-${c.id}`} className="pop-in flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3" style={{ ['--i' as string]: i }}>
-                  <MemberAvatar initial={c.firstName.charAt(0).toUpperCase()} name="" color={AVATAR_COLORS[i % AVATAR_COLORS.length]!} />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-bold text-cocoa">{c.firstName}</div>
-                    <div className="truncate text-[11px] text-ink-soft">little one</div>
-                    <span className="sticker mt-1.5 inline-block -rotate-2 whitespace-nowrap rounded-pill bg-honey px-2 py-0.5 text-[10px] font-extrabold text-cocoa">keepsake subject</span>
+              {data.children.map((c, i) => {
+                const body = (
+                  <>
+                    <MemberAvatar initial={c.firstName.charAt(0).toUpperCase()} name="" color={AVATAR_COLORS[i % AVATAR_COLORS.length]!} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-bold text-cocoa">{c.firstName}</div>
+                      <div className="truncate text-[11px] text-ink-soft">little one</div>
+                      <span className="sticker mt-1.5 inline-block -rotate-2 whitespace-nowrap rounded-pill bg-honey px-2 py-0.5 text-[10px] font-extrabold text-cocoa">keepsake subject</span>
+                    </div>
+                    {owner ? <Icon icon={IconChevronRight} size={14} className="absolute right-2 top-2 text-ink-faint" /> : null}
+                  </>
+                );
+                const cls = 'pop-in relative flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3 text-left';
+                return owner ? (
+                  <button key={`c-${c.id}`} type="button" onClick={() => setManagingChild(c)} aria-label={`edit or remove ${c.firstName}`} className={`${cls} press`} style={{ ['--i' as string]: i }}>
+                    {body}
+                  </button>
+                ) : (
+                  <div key={`c-${c.id}`} className={cls} style={{ ['--i' as string]: i }}>
+                    {body}
                   </div>
-                </div>
-              ))}
-              {data.members.map((m, i) => (
-                <div key={m.accountId} className="pop-in flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3" style={{ ['--i' as string]: i + data.children.length }}>
-                  <MemberAvatar
-                    initial={m.initial}
-                    name=""
-                    color={AVATAR_COLORS[(i + data.children.length) % AVATAR_COLORS.length]!}
-                  />
-                  <div className="min-w-0">
-                    <div className="text-[13px] font-bold text-cocoa">{m.isYou ? `${m.name} (you)` : m.name}</div>
-                    <div className="truncate text-[11px] text-ink-soft">{m.isOwner ? 'owner' : ACCESS_LABEL[m.accessLevel]}</div>
-                    <span
-                      className={`sticker mt-1.5 inline-block rounded-pill px-2 py-0.5 text-[10px] font-extrabold text-cocoa ${
-                        m.circle === 'FAMILY' ? 'rotate-2 bg-berry-pale' : '-rotate-2 bg-leaf-pale'
-                      }`}
+                );
+              })}
+              {data.members.map((m, i) => {
+                const manageable = owner && !m.isOwner && !m.isYou;
+                const body = (
+                  <>
+                    <MemberAvatar initial={m.initial} name="" color={AVATAR_COLORS[(i + data.children.length) % AVATAR_COLORS.length]!} />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-[13px] font-bold text-cocoa">{m.isYou ? `${m.name} (you)` : m.name}</div>
+                      <div className="truncate text-[11px] text-ink-soft">{m.isOwner ? 'owner' : ACCESS_LABEL[m.accessLevel]}</div>
+                      <span
+                        className={`sticker mt-1.5 inline-block rounded-pill px-2 py-0.5 text-[10px] font-extrabold text-cocoa ${
+                          m.circle === 'FAMILY' ? 'rotate-2 bg-berry-pale' : '-rotate-2 bg-leaf-pale'
+                        }`}
+                      >
+                        {m.circle === 'FAMILY' ? 'Family' : 'Extended'}
+                      </span>
+                    </div>
+                    {manageable ? <Icon icon={IconChevronRight} size={14} className="absolute right-2 top-2 text-ink-faint" /> : null}
+                  </>
+                );
+                const cls = 'pop-in relative flex items-center gap-3 rounded-[18px] border-2 border-cocoa/15 bg-paper p-3 text-left';
+                const style = { ['--i' as string]: i + data.children.length };
+                return manageable ? (
+                  <button key={m.accountId} type="button" onClick={() => setManaging(m)} aria-label={`manage ${m.name}`} className={`${cls} press`} style={style}>
+                    {body}
+                  </button>
+                ) : (
+                  <div key={m.accountId} className={cls} style={style}>
+                    {body}
+                  </div>
+                );
+              })}
+              {data.pendingInvites.map((inv, i) => (
+                <div key={inv.id} className="pop-in flex items-center gap-3 rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper-2 p-3" style={{ ['--i' as string]: i + data.children.length + data.members.length }}>
+                  <span className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-line bg-paper text-ink-faint">
+                    <Icon icon={IconMailForward} size={18} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[13px] font-bold text-cocoa">{inv.email.split('@')[0]}</div>
+                    <div className="text-[11px] text-ink-soft">invited · {inv.circle === 'FAMILY' ? 'family' : 'extended'}</div>
+                    <button
+                      type="button"
+                      onClick={() => cancelInvite(inv.id, inv.email)}
+                      disabled={cancelling}
+                      aria-label={`cancel the invite to ${inv.email}`}
+                      className="-ml-1 inline-flex min-h-11 items-center px-1 text-[12px] font-bold text-cinnamon underline disabled:opacity-60"
                     >
-                      {m.circle === 'FAMILY' ? 'Family' : 'Extended'}
-                    </span>
+                      cancel invite
+                    </button>
                   </div>
                 </div>
               ))}
@@ -142,6 +203,8 @@ export function FamilyView({ data }: { data: FamilyData }) {
 
       <BottomTabBar tabs={APP_TABS} active="Family" />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
+      <ManageMemberModal member={managing} onClose={() => setManaging(null)} />
+      <ManageChildModal child={managingChild} onClose={() => setManagingChild(null)} />
     </div>
   );
 }

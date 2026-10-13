@@ -72,6 +72,8 @@ export interface GiftLinkAssetRef {
   /** null for a never-kept ephemeral draft — which can never match a link's family. */
   familyId: string | null;
   moderationStatus: string;
+  /** The keepsake's CURRENT tier — the parent can pull an item back to "only me" after sharing. */
+  visibility: string;
 }
 
 /**
@@ -81,7 +83,8 @@ export interface GiftLinkAssetRef {
  *  - the link must be ACTIVE and unexpired (revocation bites immediately);
  *  - the asset must be in the link's frozen snapshot AND still in the link's family
  *    (so a token can never be widened to another family's art);
- *  - the asset must still be content-cleared (D8 — never print FLAGGED/BLOCKED).
+ *  - the asset must still be content-cleared (D8 — never print FLAGGED/BLOCKED);
+ *  - the parent must not have since made it ONLY_ME (pulling it back closes the link for it).
  * It grants PURCHASE only: it never widens who can VIEW the asset in the home.
  */
 export function canPurchaseViaGiftLink(link: GiftLinkGrant, asset: GiftLinkAssetRef, now: Date): Decision {
@@ -90,5 +93,6 @@ export function canPurchaseViaGiftLink(link: GiftLinkGrant, asset: GiftLinkAsset
   if (!link.assetIds.includes(asset.id)) return { allowed: false, reason: 'keepsake not in this gift link' };
   if (asset.familyId !== link.familyId) return { allowed: false, reason: 'keepsake not in the gift link family' };
   if (asset.moderationStatus !== 'CLEAR') return { allowed: false, reason: 'keepsake not cleared for printing' };
+  if (asset.visibility === 'ONLY_ME') return { allowed: false, reason: 'keepsake made private by the parent' };
   return { allowed: true, reason: 'gift link grants purchase of this keepsake' };
 }

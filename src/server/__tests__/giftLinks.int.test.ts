@@ -8,7 +8,7 @@ import { assets, giftLinks } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
-import { createGiftLink, getGiftLink, revokeGiftLink } from '@/server/giftLinks';
+import { GIFT_PREVIEW_MAX_PX, createGiftLink, getGiftLink, giftLinkPreview, giftPreviewPath, revokeGiftLink } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { deleteObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -16,7 +16,7 @@ import type { DbHandle } from '@/server/db';
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
 
-const png = () => sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer();
+const png = (size = 8) => sharp({ create: { width: size, height: size, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer();
 
 describe.skipIf(!DB || !S3)('gift links — integration', () => {
   let client: ReturnType<typeof postgres>;
@@ -37,9 +37,9 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     await client.end();
   });
 
-  async function keptAsset() {
+  async function keptAsset(size = 8) {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const r = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
+    const r = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(size), keptInHome: true });
     keys.push(r.key);
     return r.assetId;
   }
@@ -54,7 +54,9 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     if (view.state !== 'active') return;
     expect(view.items).toHaveLength(1);
     expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 6500 });
-    expect(view.items[0]!.imageUrl).toMatch(/^http/); // a signed URL
+    // the holder gets the link's own preview route — never a signed URL to the original
+    expect(view.items[0]!.imageUrl).toBe(giftPreviewPath(token, assetId));
+    expect(view.items[0]!.imageUrl).not.toMatch(/^http/);
   });
 
   it('a non-owner cannot create or revoke a link', async () => {
@@ -123,5 +125,46 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     await db.update(assets).set({ moderationStatus: 'BLOCKED' }).where(eq(assets.id, assetId));
     const view = await getGiftLink(db, token);
     expect(view.state).toBe('gone'); // the token holder gets no bytes
+  });
+
+  it('the preview is small + re-encoded, never the original', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await keptAsset(2000);
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const img = await giftLinkPreview(db, token, assetId);
+    expect(img).not.toBeNull();
+    const meta = await sharp(img!).metadata();
+    expect(meta.format).toBe('webp');
+    expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(GIFT_PREVIEW_MAX_PX);
+    expect(meta.exif).toBeUndefined();
+  });
+
+  it('no preview for an asset outside the snapshot, a revoked link, or an unknown token', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const inLink = await keptAsset();
+    const other = await keptAsset();
+    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [inLink] });
+    expect(await giftLinkPreview(db, token, other)).toBeNull(); // the token is never widened
+    expect(await giftLinkPreview(db, 'no-such-token', inLink)).toBeNull();
+    await revokeGiftLink(db, sam, id);
+    expect(await giftLinkPreview(db, token, inLink)).toBeNull();
+  });
+
+  it('a keepsake pulled back to ONLY_ME drops off the list and serves no preview', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const kept = await keptAsset();
+    const hidden = await keptAsset();
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [kept, hidden] });
+    await db.update(assets).set({ visibility: 'ONLY_ME' }).where(eq(assets.id, hidden));
+
+    const view = await getGiftLink(db, token);
+    expect(view.state).toBe('active');
+    if (view.state !== 'active') return;
+    expect(view.items.map((i) => i.assetId)).toEqual([kept]);
+    expect(await giftLinkPreview(db, token, hidden)).toBeNull();
+
+    // and if every item is pulled back, the link has nothing left to show
+    await db.update(assets).set({ visibility: 'ONLY_ME' }).where(eq(assets.id, kept));
+    expect((await getGiftLink(db, token)).state).toBe('gone');
   });
 });

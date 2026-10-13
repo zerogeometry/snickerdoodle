@@ -17,7 +17,7 @@ import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
 import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
-import { renameFamilyAction, setMemberCalendarAction, setReminderConsentAction } from '@/app/actions/family';
+import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction, setMemberCalendarAction, setReminderConsentAction } from '@/app/actions/family';
 import { Chip } from '@/ui/primitives/Chip';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
 import { gbp } from '@/lib/store';
@@ -112,6 +112,23 @@ export function HomeView({ data }: { data: HomeData }) {
     const res = await setMemberCalendarAction(accountId, on);
     if (!res.ok) return toast('couldn’t change that — try again');
     toast(on ? `${name} can see the family calendar` : `${name} no longer sees birthdays`);
+    router.refresh();
+  };
+  // Switching a gift request off asks once first (it stops working for everyone holding the link).
+  const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const revokeList = async (id: string) => {
+    const res = await revokeGiftLinkAction(id);
+    setConfirmRevoke(null);
+    if (!res.ok) return toast('couldn’t switch that off — try again');
+    toast('switched off — that link no longer works');
+    router.refresh();
+  };
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const leave = async () => {
+    const res = await leaveFamilyAction(data.familyId);
+    if (!res.ok) return toast('couldn’t do that — try again');
+    toast(`you’ve left ${data.familyName}`);
+    router.push('/home');
     router.refresh();
   };
   const [renaming, setRenaming] = useState(false);
@@ -489,12 +506,58 @@ export function HomeView({ data }: { data: HomeData }) {
                       </li>
                     ))}
                   </ul>
+                  {gl.status === 'ACTIVE' ? (
+                    confirmRevoke === gl.id ? (
+                      <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border-2 border-berry bg-berry-pale p-3 sm:flex-row sm:items-center">
+                        <p className="flex-1 text-xs text-cocoa">switch this link off? anyone holding it won&apos;t be able to open it any more.</p>
+                        <div className="flex gap-2">
+                          <Button variant="secondary" size="sm" onClick={() => setConfirmRevoke(null)}>
+                            keep it
+                          </Button>
+                          <Button size="sm" onClick={() => revokeList(gl.id)}>
+                            switch off
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRevoke(gl.id)}
+                        className="mt-3 inline-flex min-h-11 items-center px-1 text-xs font-bold text-ink-soft underline hover:text-cinnamon"
+                      >
+                        switch this link off
+                      </button>
+                    )
+                  ) : null}
                 </div>
               );
             })}
           </section>
           ) : null}
         </div>
+
+        {!data.isOwner ? (
+          <div className="mx-auto w-full max-w-5xl px-6 pb-6 text-center">
+            {confirmLeave ? (
+              <div role="alert" className="mx-auto max-w-sm rounded-xl border-2 border-berry bg-berry-pale p-3.5 text-left">
+                <p className="text-[13px] font-bold text-cocoa">leave {data.familyName}?</p>
+                <p className="mt-1 text-xs text-ink-soft">you&apos;ll stop seeing their keepsakes straight away. they can invite you again.</p>
+                <div className="mt-3 flex gap-2">
+                  <Button variant="secondary" size="sm" className="flex-1" onClick={() => setConfirmLeave(false)}>
+                    stay
+                  </Button>
+                  <Button size="sm" className="flex-1" onClick={leave}>
+                    yes, leave
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setConfirmLeave(true)} className="inline-flex min-h-11 items-center px-2 text-xs font-bold text-ink-soft underline hover:text-cinnamon">
+                leave this family
+              </button>
+            )}
+          </div>
+        ) : null}
 
         <div className="flex items-center justify-center gap-2 bg-paper-2 px-6 py-3.5 text-center text-xs text-green-save">
           <Icon icon={IconLock} size={15} />

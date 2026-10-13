@@ -1,12 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { AuthzError, canManageFamily, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
+import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { products, productVariants, savedDesigns } from '@/db/schema';
 import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { containsAbusiveText } from './textSafety';
 import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
-import { presignDownload } from '@/storage';
+import sharp from 'sharp';
+import { getObjectBytes, presignDownload } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
 import { createInvite } from './invites';
@@ -192,21 +193,20 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   // uncleared/CSAM-blocked bytes to a token holder outside the family (D8).
   if (present.length < assetIds.length || present.some((a) => a.moderationStatus !== 'CLEAR')) return { state: 'gone' };
 
-  const keyByAsset = new Map<string, string>();
-  const objs = await db
-    .select()
-    .from(storageObjects)
-    .where(and(inArray(storageObjects.assetId, assetIds), eq(storageObjects.objectClass, 'ORIGINAL')));
-  for (const o of objs) keyByAsset.set(o.assetId, o.key);
+  // A keepsake the parent has since pulled back to "only me" drops off the list (and can't be
+  // bought or previewed — canPurchaseViaGiftLink denies it too).
+  const privateIds = new Set(present.filter((a) => a.visibility === 'ONLY_ME').map((a) => a.id));
+  const shown = items.filter((i) => !privateIds.has(i.assetId));
+  if (shown.length === 0) return { state: 'gone' };
 
   const bought = await purchasedItems(db, link.id);
-  const withImages = await Promise.all(
-    items.map(async (i) => ({
-      ...i,
-      imageUrl: keyByAsset.has(i.assetId) ? await presignDownload(keyByAsset.get(i.assetId)!, 300) : null,
-      purchased: bought.has(itemKey(i)),
-    })),
-  );
+  const withImages = shown.map((i) => ({
+    ...i,
+    // A small, re-encoded preview served through the link's own capability check — the token
+    // holder never gets the original file (see giftLinkPreview).
+    imageUrl: giftPreviewPath(token, i.assetId),
+    purchased: bought.has(itemKey(i)),
+  }));
 
   const [family] = await db.select({ name: families.displayName }).from(families).where(eq(families.id, link.familyId));
   let inviteToken: string | null = null;
@@ -224,6 +224,43 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
     inviteToken,
     items: withImages,
   };
+}
+
+/** Where a gift link serves an item's preview (same-origin; noindex; the token is the capability). */
+export function giftPreviewPath(token: string, assetId: string): string {
+  return `/api/gift/${encodeURIComponent(token)}/preview/${encodeURIComponent(assetId)}`;
+}
+
+/** Longest edge of a gift-link preview — plenty for a phone screen, nowhere near print quality. */
+export const GIFT_PREVIEW_MAX_PX = 720;
+
+/**
+ * The preview a gift-link holder sees: the keepsake re-encoded small (≤720px WebP, metadata
+ * stripped) — never the original. Gated by the SAME capability as buying (live link, item in the
+ * frozen snapshot, same family, content-cleared, not pulled back to ONLY_ME). null ⇒ 404.
+ */
+export async function giftLinkPreview(db: DbHandle, token: string, assetId: string): Promise<Buffer | null> {
+  const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
+  if (!link) return null;
+  const grant: GiftLinkGrant = {
+    familyId: link.familyId,
+    status: link.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED',
+    expiresAt: link.expiresAt,
+    assetIds: (link.items as GiftItem[]).map((i) => i.assetId),
+  };
+  const [asset] = await db.select().from(assets).where(eq(assets.id, assetId));
+  if (!asset || !canPurchaseViaGiftLink(grant, asset, new Date()).allowed) return null;
+  const [obj] = await db
+    .select({ key: storageObjects.key })
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!obj) return null;
+  const bytes = await getObjectBytes(obj.key);
+  return sharp(bytes)
+    .rotate()
+    .resize({ width: GIFT_PREVIEW_MAX_PX, height: GIFT_PREVIEW_MAX_PX, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 78 })
+    .toBuffer(); // sharp drops metadata unless asked to keep it
 }
 
 /** Revoke a gift link (owner-only). Audited. */
@@ -277,7 +314,12 @@ export async function placeGiftLinkOrder(
 
   // The list keeps tabs: anything already bought is ticked off and not sold again.
   const bought = await purchasedItems(db, link.id);
-  const remaining = items.filter((i) => !bought.has(itemKey(i)));
+  const privateRows = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(and(inArray(assets.id, grant.assetIds as string[]), eq(assets.visibility, 'ONLY_ME')));
+  const privateIds = new Set(privateRows.map((r) => r.id));
+  const remaining = items.filter((i) => !bought.has(itemKey(i)) && !privateIds.has(i.assetId));
   if (remaining.length === 0) return { ok: false, allBought: true };
 
   // Only honour a join saving earned in THIS link's family (not another family's invite).

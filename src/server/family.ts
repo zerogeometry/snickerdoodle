@@ -1,5 +1,5 @@
-import { and, eq } from 'drizzle-orm';
-import { accounts, children, families, memberships } from '@/db/schema';
+import { and, desc, eq, gt } from 'drizzle-orm';
+import { accounts, children, families, invites, memberships } from '@/db/schema';
 import { getDb } from '@/db/client';
 import type { AccessLevel, Circle } from '@/domain/types';
 import { ensureHomeFamily } from './onboarding';
@@ -13,6 +13,13 @@ export interface FamilyMember {
   accessLevel: AccessLevel;
   isOwner: boolean;
   isYou: boolean;
+  seesOccasions: boolean;
+}
+
+export interface FamilyPendingInvite {
+  id: string;
+  email: string;
+  circle: Circle;
 }
 
 export interface FamilyChild {
@@ -26,6 +33,10 @@ export interface FamilyData {
   familyName: string;
   members: FamilyMember[];
   children: FamilyChild[];
+  /** The signed-in account owns this family (and so sees the parent controls). */
+  viewerIsOwner: boolean;
+  /** Invites still waiting to be accepted — owner only. */
+  pendingInvites: FamilyPendingInvite[];
 }
 
 /** The real family circle + keepsake subjects for the signed-in account (null for a guest). */
@@ -53,6 +64,7 @@ export async function loadFamily(): Promise<FamilyData | null> {
       accessLevel: m.accessLevel,
       isOwner: m.isOwner,
       isYou: a.id === account.id,
+      seesOccasions: m.seesOccasions,
     };
   });
 
@@ -66,5 +78,14 @@ export async function loadFamily(): Promise<FamilyData | null> {
     birthdayISO: k.birthday ? String(k.birthday) : null,
   }));
 
-  return { familyId, familyName: family?.displayName ?? 'Your family', members, children: childList };
+  const viewerIsOwner = members.some((m) => m.isYou && m.isOwner);
+  const pendingInvites: FamilyPendingInvite[] = viewerIsOwner
+    ? await db
+        .select({ id: invites.id, email: invites.email, circle: invites.circle })
+        .from(invites)
+        .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date())))
+        .orderBy(desc(invites.createdAt))
+    : [];
+
+  return { familyId, familyName: family?.displayName ?? 'Your family', members, children: childList, viewerIsOwner, pendingInvites };
 }
