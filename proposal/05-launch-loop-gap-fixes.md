@@ -45,10 +45,34 @@
 | G8 | ✅ real people per tier | `PerAssetVisibilityModal` |
 | G9 | ✅ truthful confirmation; neutral login; rename family; neutral wording for relatives of unnamed families | |
 | G10 | ✅ coming-up card; consented reminders (off by default), once per occasion, 7-day cap; daily job `POST /api/jobs/reminders` | `server/reminders` |
-| G11 | ⚠ founder decision | — |
+| G11 | ✅ closed 2026-10-13 (`abaf57c`): every upload is a child image at the POD gate; only `is_brand_safe_fixture` assets reach the sandbox | `fulfillment/gate.ts`, migration `0030` |
 | G14 | ✅ founder call (2026-10-12): the **family calendar** is a per-invite choice, **pre-ticked** in both invite forms (add-member + gift-link), stored per membership (`memberships.sees_occasions`, from `invites.share_occasions`), changeable any time from Home ("family calendar shared with"), audited. Relatives with it see birthdays + "coming up" and may opt into their own reminders. DB default stays off (only an explicit choice shares). 🧑‍⚖️ note for the DPIA: a pre-ticked share of children's birthdays with parent-invited adults. | `invites.ts`, `home.ts`, `reminders/index.ts`, migration `0025` |
 | G12 | ⚠ compliance (non-code) | `LAUNCH-GATES.md` |
 | also | Stripe "back" returns a gift buyer to the gift list; stale catalogue/price test expectations updated | |
+
+
+### Compliance pass (2026-10-13)
+
+| # | Gap found | Status | Where |
+|---|---|---|---|
+| C1 | Screening passed everything when not configured; stub reachable in production | ✅ fails closed in production (FLAGGED `screening-not-configured`); `MODERATION_PROVIDER=real` refuses the stub | `moderation/` (`abaf57c`) |
+| C2 | Originals not on a separate KMS key; claim-cookie secret had a guessable default | ✅ production refuses without `S3_KMS_KEY_ALIAS_ORIGINALS` / a ≥32-char `AUTH_SECRET` | `storage/objects.ts`, `uploadClaims.ts` |
+| C3 | No way for a parent to remove a member, change access, cancel an invite, edit/remove a child; members couldn't leave | ✅ Family-page sheets + Home; removal kills sessions at once; all audited | `server/members.ts`, `children.ts`, `ManageMemberModal`, `ManageChildModal` (`2eca7d3`) |
+| C4 | Gift-link holders got a signed URL to the ORIGINAL; items pulled back to "only me" still served/sold; no revoke button | ✅ ≤720px re-encoded preview via `/api/gift/[token]/preview`; ONLY_ME denied by the capability; "switch this link off" on Home | `giftLinks.ts`, `authz/actions.ts` |
+| C5 | "Delete" only removed keepsakes; no real account closure | ✅ `closeAccount` — owned family + everything in it erased, own uploads elsewhere erased, orders anonymised, account row anonymised; waits on in-flight orders | `server/accountClosure.ts` (`fc040f8`) |
+| C6 | Complaint form stored nothing | ✅ rights_requests intake, due date, ack email on receipt, audited without content, rate-limited | `server/rights.ts`, migration `0032` |
+| C7 | Data export missed most categories | ✅ memberships, little ones, invites, gift lists, controlled keepsakes, saved designs, orders, consents, credits, referral codes, nudges, requests | `server/exportData.ts` |
+| C8 | `fulfilled_at` never stamped; clock ran from upload, not fulfilment | ✅ SHIPPED/CANCELLED stamps it; purge date = fulfilment + 30d unless kept | `retention.ts` `startRetentionClockForOrder` |
+| C9 | Guest claim cookie held 12 drafts — older basket thumbnails vanished | ✅ 140 claims, packed UUIDs | `uploadClaims.ts` (`eca2d59`) |
+
+Still open — founder decision or infra, not code:
+- **Provider deletion:** ask Prodigi to delete print files after dispatch (ops request + their retention terms) — record in the sub-processor register.
+- **Backups:** originals excluded from / crypto-shredded in long-lived backups (bucket lifecycle + backup config).
+- **Auto-keep at purchase (OQ-9):** today a bought drawing is filed + kept (`keepAndFileCreations`), so it never enters the 30-day clock. Keep, or keep only if the parent ticks it?
+- **Child's birth year shared with the family calendar (OQ-4):** relatives with the calendar see the full date (and so age). Day + month only?
+- **Append-only audit vs erasure:** audit rows hold ids + event names only (no names, no content) and survive erasure as the accountability trail — confirm with the DP professional.
+- **Card / gift-wrap add-ons:** charged at checkout but not yet sent to the printer as their own lines — fix before launch or hide them.
+- **Account closure closes the owner's whole family:** relatives' own uploads in that family are erased with it (the more private option) — confirm that's the behaviour you want.
 
 Migrations: `0023` (audit events `CHILD_ADDED`, `FAMILY_RENAMED`), `0024` (`reminder_sends`).
 Tests: 483 pass (incl. 9 new launch-loop integration tests, 8 planner, 4 mail, 9 authz).
