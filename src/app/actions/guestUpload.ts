@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { getDb } from '@/db/client';
 import { ingestEphemeralUpload } from '@/server/ingest';
 import { RETENTION_DAYS } from '@/server/retention';
-import { UPLOAD_CLAIM_COOKIE, signClaims, verifyClaims } from '@/server/uploadClaims';
+import { UPLOAD_CLAIM_COOKIE, appendClaim, signClaims, verifyClaims } from '@/server/uploadClaims';
 
 /** The terms version a guest accepts at the upload moment. Bump on any change so
  * the recorded consent always points at the exact terms that were shown. */
@@ -38,7 +38,7 @@ export async function startGuestUpload(
 
   const jar = await cookies();
   const claims = verifyClaims(jar.get(UPLOAD_CLAIM_COOKIE)?.value);
-  jar.set(UPLOAD_CLAIM_COOKIE, signClaims([...claims, claimId].slice(-12)), {
+  jar.set(UPLOAD_CLAIM_COOKIE, signClaims(appendClaim(claims, claimId)), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
