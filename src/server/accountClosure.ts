@@ -11,6 +11,7 @@ import {
   invites,
   memberships,
   orders,
+  profileImages,
   promoCodes,
   reminderSends,
   savedDesigns,
@@ -19,6 +20,7 @@ import {
 import { eraseAsset } from './assets';
 import { appUrl, sendMail } from './mail';
 import { recordErasure } from './erasureLedger';
+import { eraseProfileImage } from './profile';
 import type { DbHandle } from './db';
 
 /** Orders still being made — closing waits for these (their source art is needed to print). */
@@ -85,6 +87,8 @@ export async function closeAccount(
       await eraseAsset(db, row, actor, { reason: 'account-closed' }, ledger);
       keepsakesDeleted++;
     }
+    const [banner] = await db.select().from(profileImages).where(and(eq(profileImages.familyId, familyId), eq(profileImages.kind, 'FAMILY_BANNER')));
+    if (banner) await eraseProfileImage(db, banner, ledger);
     await db.delete(savedDesigns).where(eq(savedDesigns.familyId, familyId));
     await db.delete(memberships).where(eq(memberships.familyId, familyId)); // everyone loses access now
     await db.delete(giftLinks).where(eq(giftLinks.familyId, familyId)); // orders keep history (FK set null)
@@ -135,6 +139,8 @@ export async function closeAccount(
   }
 
   // ── 3. Account-level data ──────────────────────────────────────────────────────
+  const ownImages = await db.select().from(profileImages).where(and(eq(profileImages.accountId, accountId), inArray(profileImages.kind, ['AVATAR', 'ACCOUNT_HEADER'])));
+  for (const img of ownImages) await eraseProfileImage(db, img, ledger); // picture + header
   await db.delete(sessions).where(eq(sessions.userId, accountId));
   await db.delete(savedDesigns).where(eq(savedDesigns.createdByAccountId, accountId));
   await db.delete(accountCredits).where(eq(accountCredits.accountId, accountId));

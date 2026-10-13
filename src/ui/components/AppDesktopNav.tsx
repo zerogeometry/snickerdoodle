@@ -5,6 +5,31 @@ import Link from 'next/link';
 import { Icon } from '../primitives/Icon';
 import { APP_NAV } from './appTabs';
 import { basketCount, useBasket } from '@/lib/store';
+import { useEffect, useState } from 'react';
+import { myAvatarAction } from '@/app/actions/session';
+
+/** The account sticker — your own profile picture once you've added one, else the person icon. */
+function AccountSticker() {
+  const [avatar, setAvatar] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    myAvatarAction()
+      .then((u) => live && setAvatar(u))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  return (
+    <Link
+      href="/account"
+      aria-label="Your account"
+      className="press flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-cocoa bg-honey text-cocoa"
+    >
+      {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <Icon icon={IconUser} size={18} />}
+    </Link>
+  );
+}
 
 /** The founder's badge logo (small sizes only until a hi-res original exists). */
 function Badge({ size }: { size: number }) {
@@ -44,13 +69,7 @@ export function AppDesktopNav({ active }: { active: string }) {
         </Link>
         <div className="flex items-center gap-2">
           <BasketLink count={count} size={20} />
-          <Link
-            href="/account"
-            aria-label="Your account"
-            className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa"
-          >
-            <Icon icon={IconUser} size={18} />
-          </Link>
+<AccountSticker />
         </div>
       </header>
 
@@ -74,13 +93,7 @@ export function AppDesktopNav({ active }: { active: string }) {
           <span className="ml-2">
             <BasketLink count={count} size={20} />
           </span>
-          <Link
-            href="/account"
-            aria-label="Your account"
-            className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa"
-          >
-            <Icon icon={IconUser} size={18} />
-          </Link>
+<AccountSticker />
         </nav>
       </header>
     </>

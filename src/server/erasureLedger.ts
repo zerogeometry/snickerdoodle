@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { and, eq, like, not } from 'drizzle-orm';
-import { accounts, assets, children, memberships } from '@/db/schema';
+import { accounts, assets, children, memberships, profileImages } from '@/db/schema';
 import { ensureBucket, getObjectBytes, getS3 } from '@/storage';
 import type { DbHandle } from './db';
 
@@ -19,6 +19,7 @@ import type { DbHandle } from './db';
 export type ErasureEntry =
   | { kind: 'asset'; id: string }
   | { kind: 'child'; id: string }
+  | { kind: 'profile-image'; id: string }
   | { kind: 'membership'; familyId: string; accountId: string; status: 'REMOVED' | 'LEFT' }
   | { kind: 'account'; id: string; handOver?: { familyId: string; newOwnerAccountId: string } | null };
 
@@ -95,6 +96,14 @@ export async function reapplyErasuresSince(db: DbHandle, since: Date, now = new 
         }
         await db.update(assets).set({ childSubjectId: null }).where(eq(assets.childSubjectId, row.id));
         await db.delete(children).where(eq(children.id, row.id));
+      } else if (entry.kind === 'profile-image') {
+        const [row] = await db.select().from(profileImages).where(eq(profileImages.id, entry.id));
+        if (!row) {
+          summary.alreadyGone++;
+          continue;
+        }
+        const { eraseProfileImage } = await import('./profile');
+        await eraseProfileImage(db, row, { skipLedger: true });
       } else if (entry.kind === 'membership') {
         const res = await db
           .update(memberships)

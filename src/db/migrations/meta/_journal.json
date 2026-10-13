@@ -246,6 +246,13 @@
       "when": 1791890294733,
       "tag": "0034_audit_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1791912799390,
+      "tag": "0035_gigantic_power_pack",
+      "breakpoints": true
     }
   ]
 }

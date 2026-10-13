@@ -10,7 +10,7 @@
  * who never receives their sign-in link is a broken product, and a missing invite email
  * is a broken family loop.
  */
-export type MailKind = 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover';
+export type MailKind = 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover' | 'email-change';
 
 export interface MailMessage {
   kind: MailKind;

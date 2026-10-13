@@ -9,6 +9,7 @@ import { BottomTabBar } from '@/ui/components/BottomTabBar';
 import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
+import { FamilyBanner } from '@/ui/components/FamilyBanner';
 import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { ManageChildModal, type ManagedChild } from '@/ui/modals/ManageChildModal';
 import { ManageMemberModal, type ManagedMember } from '@/ui/modals/ManageMemberModal';
@@ -65,10 +66,12 @@ export function FamilyView({ data }: { data: FamilyData }) {
       <AppDesktopNav active="Family" />
 
       <main id="main" className="flex-1">
+        {data.bannerUrl ? <FamilyBanner url={data.bannerUrl} canEdit={owner} familyName={data.familyName} /> : null}
         <div className="bg-honey-band px-6 py-7 text-center">
           <CaveatNote className="pop-in -rotate-2 text-xl">the whole gang</CaveatNote>
           <h1 className="pop-in mt-1 font-display text-[30px] leading-tight md:text-4xl" style={{ ['--i' as string]: 1 }}>{data.familyName}</h1>
           <p className="pop-in mt-1 text-[13px] text-ink-soft" style={{ ['--i' as string]: 2 }}>{peopleCount} in your circle · you decide who sees what</p>
+          {!data.bannerUrl && owner ? <FamilyBanner url={null} canEdit familyName={data.familyName} /> : null}
         </div>
 
         <div className="mx-auto w-full max-w-4xl px-6">
@@ -105,7 +108,7 @@ export function FamilyView({ data }: { data: FamilyData }) {
                 const manageable = owner && !m.isOwner && !m.isYou;
                 const body = (
                   <>
-                    <MemberAvatar initial={m.initial} name="" color={AVATAR_COLORS[(i + data.children.length) % AVATAR_COLORS.length]!} />
+                    <MemberAvatar initial={m.initial} name="" color={AVATAR_COLORS[(i + data.children.length) % AVATAR_COLORS.length]!} imageUrl={m.avatarUrl} />
                     <div className="min-w-0 flex-1">
                       <div className="text-[13px] font-bold text-cocoa">{m.isYou ? `${m.name} (you)` : m.name}</div>
                       <div className="truncate text-[11px] text-ink-soft">{m.isOwner ? 'owner' : ACCESS_LABEL[m.accessLevel]}</div>

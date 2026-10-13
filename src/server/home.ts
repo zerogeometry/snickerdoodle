@@ -10,6 +10,7 @@ import { getCurrentAccount } from './session';
 import { hasReminderConsent } from './reminders';
 import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
 import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
+import { familyBannerFor, profileImagesFor } from './profile';
 
 export interface HomeMember {
   accountId: string;
@@ -20,6 +21,8 @@ export interface HomeMember {
   isYou: boolean;
   /** Sees the family calendar (birthdays). Only meaningful for non-owners. */
   seesOccasions: boolean;
+  /** Their profile picture, if the viewer may see it (else the initial is shown). */
+  avatarUrl: string | null;
 }
 
 export interface HomeKeepsake {
@@ -54,6 +57,8 @@ export interface HomeData {
   /** Every family the viewer is in, for the switcher (length 1 = no switcher). */
   families: FamilyChoice[];
   members: HomeMember[];
+  /** The family banner (members only, via the authz-gated image route). */
+  bannerUrl: string | null;
   /** The viewer's current birthday-reminder email consent (PECR). */
   remindersOn: boolean;
   /** The viewer's "+ Keepsake" saved designs in this family. */
@@ -103,8 +108,11 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
       isOwner: m.isOwner,
       isYou: a.id === account.id,
       seesOccasions: m.seesOccasions,
+      avatarUrl: null,
     };
   });
+  const pictures = await profileImagesFor(db, account.id, members.map((m) => m.accountId));
+  for (const m of members) m.avatarUrl = pictures.get(m.accountId)?.avatarUrl ?? null;
 
   const viewer = await resolveViewerContext(db, account.id, familyId);
 
@@ -166,6 +174,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     remindersOn: await hasReminderConsent(db, account.id),
     families: familyChoices,
     members,
+    bannerUrl: await familyBannerFor(db, account.id, familyId),
     pendingInvites,
     // A child's birthday is their personal data: the parent (owner) always sees it; a relative
     // only when the parent shared the family calendar with them (the pre-ticked invite choice,

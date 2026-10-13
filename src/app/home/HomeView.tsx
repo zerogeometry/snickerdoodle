@@ -12,6 +12,7 @@ import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { KeepsakeTile } from '@/ui/components/KeepsakeTile';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
+import { FamilyBanner } from '@/ui/components/FamilyBanner';
 import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
@@ -199,7 +200,8 @@ export function HomeView({ data }: { data: HomeData }) {
       <AppDesktopNav active="Home" />
 
       <main id="main" className="flex-1">
-        {/* Family header */}
+        {/* Family header — the family's banner (if any) above the welcome */}
+        {data.bannerUrl ? <FamilyBanner url={data.bannerUrl} canEdit={data.isOwner} familyName={data.familyName} /> : null}
         <div className="bg-honey-band px-6 py-6 text-center">
           <CaveatNote className="text-lg">welcome back, {greetingName}</CaveatNote>
           {renaming ? (
@@ -258,6 +260,7 @@ export function HomeView({ data }: { data: HomeData }) {
               ))}
             </nav>
           ) : null}
+          {!data.bannerUrl && data.isOwner ? <FamilyBanner url={null} canEdit familyName={data.familyName} /> : null}
           <p className="mt-1 text-[13px] text-ink-faint">
             your family&apos;s private keepsake box · {data.keepsakes.length}{' '}
             {data.keepsakes.length === 1 ? 'keepsake' : 'keepsakes'} kept
@@ -278,6 +281,7 @@ export function HomeView({ data }: { data: HomeData }) {
                     name={m.isYou ? `${m.name} (you)` : m.name}
                     sub={m.isOwner ? 'owner' : m.circle === 'FAMILY' ? 'family' : 'extended'}
                     color={AVATAR_COLORS[i % AVATAR_COLORS.length]!}
+                    imageUrl={m.avatarUrl}
                   />
                 </div>
               ))}

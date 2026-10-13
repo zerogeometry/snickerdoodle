@@ -111,6 +111,8 @@ export const auditEvent = pgEnum('audit_event', [
   'CHILD_DELETED',
   'FAMILY_HANDED_OVER',
   'KEEP_CHOICE_MADE',
+  'PROFILE_UPDATED',
+  'EMAIL_CHANGED',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
@@ -891,3 +893,51 @@ export const accountCredits = pgTable(
     uniqueIndex('credit_once_per_order_reason').on(t.orderId, t.reason, t.accountId),
   ],
 );
+
+// ── profile_images — a person's profile picture + profile header, and a family's banner.
+// They may well show children, so they are treated like any upload: private bucket, metadata
+// stripped (re-encoded), screened (CSAM hash + classifier) before anyone else sees them, and
+// served only through /api/profile-image after the authz check (canViewProfileImage). One
+// current image per (account, kind) / per family banner; replacing erases the old one for real.
+export const profileImageKind = pgEnum('profile_image_kind', ['AVATAR', 'ACCOUNT_HEADER', 'FAMILY_BANNER']);
+export const profileImages = pgTable(
+  'profile_images',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    kind: profileImageKind('kind').notNull(),
+    /** Whose it is (AVATAR / ACCOUNT_HEADER), or who uploaded it (FAMILY_BANNER). */
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** FAMILY_BANNER only. */
+    familyId: uuid('family_id').references(() => families.id, { onDelete: 'cascade' }),
+    key: text('key').notNull().unique(),
+    contentType: text('content_type').notNull(),
+    width: integer('width'),
+    height: integer('height'),
+    byteSize: integer('byte_size'),
+    moderationStatus: moderationStatus('moderation_status').notNull().default('PENDING'),
+    moderatedAt: timestamp('moderated_at', { withTimezone: true }),
+    moderationDetail: jsonb('moderation_detail'),
+    createdAt,
+  },
+  (t) => [
+    uniqueIndex('profile_image_one_per_account_kind').on(t.accountId, t.kind).where(sql`${t.kind} <> 'FAMILY_BANNER'`),
+    uniqueIndex('profile_image_one_banner_per_family').on(t.familyId).where(sql`${t.kind} = 'FAMILY_BANNER'`),
+    check('profile_image_banner_has_family', sql`(${t.kind} = 'FAMILY_BANNER') = (${t.familyId} IS NOT NULL)`),
+  ],
+);
+
+// ── email_change_requests — "change my email": confirmed by a link sent to the NEW address
+// (proves they own it). Only a hash of the token is stored; one live request per account.
+export const emailChangeRequests = pgTable('email_change_requests', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  accountId: uuid('account_id')
+    .notNull()
+    .unique()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  newEmail: text('new_email').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt,
+});

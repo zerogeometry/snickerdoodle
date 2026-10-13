@@ -20,3 +20,5 @@ export {
   canManageFamily,
   canSetAssetVisibility,
 } from './actions';
+
+export { canViewProfileImage, type ProfileImageRef, type ProfileViewer } from './profileImages';

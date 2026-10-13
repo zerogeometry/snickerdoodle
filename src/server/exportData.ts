@@ -17,6 +17,7 @@ import {
   savedDesigns,
 } from '@/db/schema';
 import type { DbHandle } from './db';
+import { profileDataFor } from './profile';
 
 /**
  * Everything we hold ABOUT one account, beyond what the Keepsake Home already shows (the
@@ -114,8 +115,11 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     .from(rightsRequests)
     .where(and(eq(rightsRequests.subjectAccountId, accountId)));
 
+  const profile = await profileDataFor(db, accountId);
+
   return {
     account: account ?? null,
+    profileImages: profile.images,
     familyMemberships: myMemberships,
     littleOnes,
     invitesSent,

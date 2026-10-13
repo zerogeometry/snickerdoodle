@@ -4,6 +4,7 @@ import { getDb } from '@/db/client';
 import type { AccessLevel, Circle } from '@/domain/types';
 import { ensureHomeFamily } from './onboarding';
 import { getCurrentAccount } from './session';
+import { familyBannerFor, profileImagesFor } from './profile';
 
 export interface FamilyMember {
   accountId: string;
@@ -14,6 +15,7 @@ export interface FamilyMember {
   isOwner: boolean;
   isYou: boolean;
   seesOccasions: boolean;
+  avatarUrl: string | null;
 }
 
 export interface FamilyPendingInvite {
@@ -35,6 +37,8 @@ export interface FamilyData {
   children: FamilyChild[];
   /** The signed-in account owns this family (and so sees the parent controls). */
   viewerIsOwner: boolean;
+  /** The family banner, if set (members only, via the authz-gated image route). */
+  bannerUrl: string | null;
   /** Invites still waiting to be accepted — owner only. */
   pendingInvites: FamilyPendingInvite[];
 }
@@ -65,8 +69,11 @@ export async function loadFamily(): Promise<FamilyData | null> {
       isOwner: m.isOwner,
       isYou: a.id === account.id,
       seesOccasions: m.seesOccasions,
+      avatarUrl: null as string | null,
     };
   });
+  const pictures = await profileImagesFor(db, account.id, members.map((m) => m.accountId));
+  for (const m of members) m.avatarUrl = pictures.get(m.accountId)?.avatarUrl ?? null;
 
   const kidRows = await db
     .select({ id: children.id, firstName: children.firstName, birthday: children.birthday })
@@ -87,5 +94,6 @@ export async function loadFamily(): Promise<FamilyData | null> {
         .orderBy(desc(invites.createdAt))
     : [];
 
-  return { familyId, familyName: family?.displayName ?? 'Your family', members, children: childList, viewerIsOwner, pendingInvites };
+  const bannerUrl = await familyBannerFor(db, account.id, familyId);
+  return { familyId, familyName: family?.displayName ?? 'Your family', members, children: childList, viewerIsOwner, pendingInvites, bannerUrl };
 }
