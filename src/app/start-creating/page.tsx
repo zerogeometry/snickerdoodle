@@ -14,7 +14,8 @@ import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
-import { TileSkeletonGrid } from '@/ui/components/TileSkeleton';
+import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
+import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
 import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -46,6 +47,27 @@ export default function StartCreatingPage() {
       .catch(() => setLoadError(true));
   };
   useEffect(loadCatalogue, []);
+
+  // Hold the "making your range" loader over the catalogue until the first couple of real
+  // mockups have painted (tiles compose in the background underneath), so the shopper never
+  // stares at a grid of blank tiles. A safety timeout lifts it regardless.
+  const [rangeReady, setRangeReady] = useState(false);
+  const drawingKey = upload?.dataUrl ?? null;
+  useEffect(() => {
+    if (!drawingKey) return;
+    setRangeReady(false);
+    let painted = 0;
+    const onReady = () => {
+      painted += 1;
+      if (painted >= 2) setRangeReady(true);
+    };
+    window.addEventListener(MOCKUP_READY_EVENT, onReady);
+    const safety = setTimeout(() => setRangeReady(true), 15000);
+    return () => {
+      window.removeEventListener(MOCKUP_READY_EVENT, onReady);
+      clearTimeout(safety);
+    };
+  }, [drawingKey]);
 
   /** Set the upload, then detect whether its background is opaque (drives the
    * "remove background" nudge — only shown when removing would actually do something). */
@@ -247,10 +269,21 @@ export default function StartCreatingPage() {
                       try again
                     </Button>
                   </div>
-                ) : products ? (
-                  <FlowCatalogue products={products} mode="sections" compact scrollable />
                 ) : (
-                  <TileSkeletonGrid count={4} label="loading your range" className="grid grid-cols-2 gap-x-4 gap-y-7 pt-3 md:grid-cols-3" />
+                  <div className="relative">
+                    {/* The range composes underneath (invisible but laid out, so lazy tiles still
+                        start) while the loader plays on top; then it fades in. */}
+                    {products ? (
+                      <div inert={!rangeReady} className={`transition-opacity duration-500 ${rangeReady ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+                        <FlowCatalogue products={products} mode="sections" compact scrollable />
+                      </div>
+                    ) : (
+                      <div className="h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />
+                    )}
+                    {!rangeReady || !products ? (
+                      <MakingRangeLoader drawing={previewImg} className="absolute inset-0" />
+                    ) : null}
+                  </div>
                 )}
               </div>
             </div>

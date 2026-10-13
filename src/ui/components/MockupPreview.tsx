@@ -6,6 +6,9 @@ import type { PlacementTransform } from '@/lib/store';
 
 // The POST /api/mockup response shape (kept in sync with the route handler). Defined
 // locally so this client component never imports the server-only route module.
+/** Fired on window whenever a mockup photo has actually painted (see MakingRangeLoader). */
+export const MOCKUP_READY_EVENT = 'sd:mockup-ready';
+
 type MockupPreviewResult =
   | { ok: true; url: string; tier: 'FLAT' | 'PERSPECTIVE'; widthPx?: number; heightPx?: number }
   | { ok: false; needsAuth?: boolean; fallback: true };
@@ -210,6 +213,8 @@ export function MockupPreview({
           width={px}
           height={px}
           className="h-auto max-h-full w-full rounded-lg object-contain"
+          // tells the create page's "making your range" loader that real pixels are on screen
+          onLoad={() => window.dispatchEvent(new Event(MOCKUP_READY_EVENT))}
           onError={() => {
             // an expired signed URL: drop the dead image and recompose (fresh URL)
             setCurrent(null);

@@ -415,6 +415,73 @@ body {
   }
 }
 
+/* Making-your-range loader: little keepsakes pop out of the drawing and tuck back in, the
+   polaroid bobs, the crayon scribbles, the copy line fades up. Base styles are the resting pose,
+   so under reduced motion everything simply sits in place. */
+.loader-pop {
+  transform: translate(-50%, -50%) translate(var(--x), var(--y)) rotate(var(--r));
+  animation: loader-pop 3.4s var(--ease-pop) var(--d, 0s) infinite both;
+}
+@keyframes loader-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--x), var(--y)) rotate(var(--r)) scale(1.12);
+  }
+  24%,
+  78% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--x), var(--y)) rotate(var(--r)) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+}
+.loader-bob {
+  animation: loader-bob 2.6s ease-in-out infinite;
+}
+@keyframes loader-bob {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+  50% {
+    translate: 0 -6px;
+  }
+}
+.loader-crayon {
+  animation: loader-crayon 0.9s ease-in-out infinite;
+}
+@keyframes loader-crayon {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  25% {
+    transform: translate(-5px, 2px) rotate(-12deg);
+  }
+  50% {
+    transform: translate(2px, -2px) rotate(6deg);
+  }
+  75% {
+    transform: translate(-3px, 3px) rotate(-8deg);
+  }
+}
+.loader-line {
+  animation: page-enter 0.4s var(--ease-settle) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .loader-pop,
+  .loader-bob,
+  .loader-crayon {
+    animation: none !important;
+  }
+}
+
 /* Brand-styled scrollbar for in-container scroll areas (the catalogue range). */
 .brand-scroll {
   scrollbar-width: thin;
