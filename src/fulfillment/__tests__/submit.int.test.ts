@@ -390,12 +390,13 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
   });
 
   it('parks a manual-only order (gift wrap) out of the batch, loudly once', async () => {
-    const res = await placeOrder(db, {
-      items: [{ productKey: 'giftWrap', qty: 1 }],
-      account: { id: ids.samId },
-      joinProvenance: null,
-    });
-    const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+    // Gift wrap is paused in the shop (not orderable), so build a historic manual-only order
+    // directly — the worker must still park any such order rather than block the batch.
+    const [o] = await db
+      .insert(orders)
+      .values({ ref: `SNK-manual-${ids.nonce}`, accountId: ids.samId, status: 'PAID', subtotalPence: 300, deliveryPence: 0, totalPence: 300 })
+      .returning({ id: orders.id });
+    await db.insert(orderItems).values({ orderId: o!.id, productKey: 'giftWrap', qty: 1, unitPricePence: 300, linePence: 300 });
     orderIds.push(o!.id);
 
     const transport = fakeTransport();

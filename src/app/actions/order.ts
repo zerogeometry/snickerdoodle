@@ -52,12 +52,14 @@ export async function placeOrderAction(input: {
 
   const db = getDb();
 
-  // Keep the basket's creations into the family + file them under the child, so the
+  // File the basket's creations into the family + under the child, so the
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
     const assetIds = items.map((i) => i.artwork?.assetId).filter((x): x is string => !!x);
-    await keepAndFileCreations(db, account, claims, assetIds, input.subject);
+    // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
+    // keep it in their keepsake box, or have it erased as soon as the order ships.
+    await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });
   }
 
   const joinProvenance = account ? await resolveSessionJoinProvenance() : null;

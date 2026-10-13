@@ -15,12 +15,6 @@ import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { ClientQuote } from '@/app/actions/quote';
 
-const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
-  // Only real products at their real (catalogue) prices — the server re-prices anyway, so a
-  // tile must never show a number the total won't honour.
-  { id: 'addon-card', product: 'card', name: 'card', pricePence: 500 },
-  { id: 'addon-wrap', product: 'giftWrap', name: 'gift wrap', pricePence: 300 },
-];
 
 export default function CheckoutPage() {
   const items = useBasket((s) => s.items);
@@ -376,26 +370,6 @@ export default function CheckoutPage() {
                 <Link href="/home" className="mt-2.5 inline-flex items-center gap-1.5 text-[11px] font-bold text-cinnamon">
                   <Icon icon={IconHeart} size={13} /> or add to a wishlist to share with family →
                 </Link>
-              </div>
-
-              {/* Add-ons */}
-              <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Add a little something</p>
-              <div className="mt-2 flex gap-2.5 overflow-x-auto pb-1">
-                {ADDONS.map((a) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => {
-                      add({ id: a.id, name: a.name, product: a.product, pricePence: a.pricePence });
-                      toast(`${a.name} added`);
-                    }}
-                    className="flex w-24 shrink-0 flex-col items-center rounded-xl border border-line bg-white p-2.5 text-center hover:border-honey"
-                  >
-                    <ProductArt product={a.product} size={40} />
-                    <span className="mt-1 text-[11px] font-bold text-cocoa">{a.name}</span>
-                    <span className="text-[11px] text-ink-faint">{gbp(a.pricePence)}</span>
-                  </button>
-                ))}
               </div>
 
               {/* Phones: the code box + breakdown live in the flow (the sticky bar shows the total) */}

@@ -6,6 +6,9 @@ import { Icon } from '@/ui/primitives/Icon';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { isStripeConfigured } from '@/payments/stripe';
 import { getCurrentAccount } from '@/server/session';
+import { getDb } from '@/db/client';
+import { listUndecidedCreations } from '@/server/keepChoice';
+import { KeepChoiceCard } from './KeepChoiceCard';
 
 export const metadata: Metadata = { title: 'thank you', robots: { index: false, follow: false } };
 
@@ -20,6 +23,8 @@ export default async function ConfirmationPage({ searchParams }: { searchParams:
   const ref = typeof raw === 'string' && /^SNK-\d{6}$/.test(raw) ? raw : null;
   const account = await getCurrentAccount();
   const preview = !isStripeConfigured();
+  // The buyer's own drawings on this order that aren't kept yet → ask "keep these?"
+  const undecided = account && ref ? await listUndecidedCreations(getDb(), account.id, ref) : [];
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
@@ -42,6 +47,7 @@ export default async function ConfirmationPage({ searchParams }: { searchParams:
             <Icon icon={IconMail} size={14} className="text-cinnamon" /> order {ref}
           </p>
         ) : null}
+        {ref && undecided.length > 0 ? <KeepChoiceCard orderRef={ref} creations={undecided} /> : null}
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           {account ? (
             <Button href="/home?new=1" size="lg">

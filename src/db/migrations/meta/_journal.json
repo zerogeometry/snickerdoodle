@@ -232,6 +232,13 @@
       "when": 1791879045275,
       "tag": "0032_striped_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1791888115324,
+      "tag": "0033_steady_toad_men",
+      "breakpoints": true
     }
   ]
 }

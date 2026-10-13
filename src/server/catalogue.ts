@@ -39,6 +39,9 @@ type ProductDef = {
    * product stays active/priceable/workable in the backend and graduates by flipping
    * this + reseeding. */
   visibleInShop?: boolean;
+  /** Not on sale at all right now (founder, 2026-10-13: no card / gift-wrap add-ons for now).
+   * Seeded INACTIVE, so it can't be priced or ordered — not just hidden. */
+  paused?: boolean;
   variants: VariantDef[]; // the FIRST is the default unless one sets `default: true`
 };
 
@@ -316,7 +319,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: [{ size: 'one size', pricePence: 3495, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
   giftWrap: {
-    category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false,
+    category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false, paused: true,
     description: "We'll wrap it beautifully and tuck in a handwritten-style note.",
     specs: {},
     variants: [{ pricePence: 300, wMm: 0, hMm: 0 }], // no Prodigi SKU ⇒ MANUAL
@@ -463,8 +466,8 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     const visibleInShop = def.visibleInShop ?? false;
     const [product] = await db
       .insert(products)
-      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank, visibleInShop })
-      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: true, sortOrder: order, popularRank, visibleInShop } })
+      .values({ key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: !def.paused, sortOrder: order, popularRank, visibleInShop })
+      .onConflictDoUpdate({ target: products.key, set: { category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: def.specs, active: !def.paused, sortOrder: order, popularRank, visibleInShop } })
       .returning();
 
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));

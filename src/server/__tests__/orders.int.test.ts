@@ -340,4 +340,9 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       }),
     ).rejects.toThrow(/cleared for printing/);
   });
+
+  it('paused add-ons (gift wrap) cannot be ordered, even by a hand-crafted request', async () => {
+    const res = await placeOrder(db, { items: [{ productKey: 'giftWrap', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
+    expect(res.ok).toBe(false);
+  });
 });

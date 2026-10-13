@@ -109,6 +109,7 @@ export async function adoptEphemeralDraft(
   familyId: string,
   assetId: string,
   uploadClaims: string[],
+  opts: { keep: boolean } = { keep: true },
 ): Promise<void> {
   const viewer = await resolveAssetViewer(db, assetId, accountId, uploadClaims);
   await getViewableAssetOrThrow(db, assetId, viewer); // gate: claim holder (draft) or owner
@@ -124,8 +125,10 @@ export async function adoptEphemeralDraft(
         uploaderAccountId: accountId,
         controllerAccountId: accountId,
         ephemeralClaimId: null, // retire the claim — single-use
-        keptInHome: true,
-        purgeAfter: null, // kept: no longer on the retention clock
+        // keep: in the keepsake box, off the retention clock. Not kept (a purchase, before the
+        // parent has chosen): filed into the family so the order can use it, but still on the
+        // clock — the post-purchase "keep it?" choice decides (see keepChoice.ts).
+        ...(opts.keep ? { keptInHome: true, purgeAfter: null } : {}),
       })
       .where(and(eq(assets.id, assetId), eq(assets.ephemeralClaimId, row.ephemeralClaimId))); // race guard
   } else if (row.controllerAccountId !== accountId) {

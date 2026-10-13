@@ -109,6 +109,8 @@ export const auditEvent = pgEnum('audit_event', [
   'FAMILY_RENAMED',
   'CHILD_UPDATED',
   'CHILD_DELETED',
+  'FAMILY_HANDED_OVER',
+  'KEEP_CHOICE_MADE',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
@@ -250,6 +252,10 @@ export const assets = pgTable(
     moderationDetail: jsonb('moderation_detail'),
     // The single source of truth for retention (the purge job JOINs the DB).
     keptInHome: boolean('kept_in_home').notNull().default(false),
+    /** The parent said "no thanks" to keeping a purchased drawing (so we don't ask again): it is
+     * held only while its order needs it — making, delivery, and the 30-day reprint window after
+     * dispatch — then erased by the normal purge. */
+    keepDeclinedAt: timestamp('keep_declined_at', { withTimezone: true }),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
     createdAt,

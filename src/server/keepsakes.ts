@@ -24,6 +24,8 @@ export async function keepAndFileCreations(
   uploadClaims: string[],
   assetIds: string[],
   subject?: string | null,
+  /** keep:false = file for an order without keeping yet (the parent chooses after purchase). */
+  opts: { keep: boolean } = { keep: true },
 ): Promise<{ familyId: string | null; childId: string | null }> {
   const ids = [...new Set((assetIds ?? []).filter((x): x is string => !!x))];
   if (ids.length === 0) return { familyId: null, childId: null };
@@ -33,7 +35,7 @@ export async function keepAndFileCreations(
   const adopted: string[] = [];
   for (const id of ids) {
     try {
-      await adoptEphemeralDraft(db, account.id, familyId, id, uploadClaims);
+      await adoptEphemeralDraft(db, account.id, familyId, id, uploadClaims, { keep: opts.keep });
       adopted.push(id);
     } catch {
       // not ours to keep / blocked / already gone
