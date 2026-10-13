@@ -504,6 +504,27 @@ body {
   }
 }
 
+/* Create page, desktop: the drawing's stage takes the left column's spare height (it's a size
+   container, so it never pushes the row taller), and the polaroid fills it at the drawing's own
+   aspect — limited by whichever of width/height runs out first. 26px/16px = the polaroid's
+   padding + a little room for the tape and tilt. Mobile keeps the image's natural sizing. */
+@media (min-width: 48rem) {
+  .art-stage {
+    flex: 1 1 0;
+    min-height: 14rem;
+    container-type: size;
+    align-items: center;
+  }
+  .art-stage .art-fit {
+    width: min(calc(100cqw - 16px), calc((100cqh - 36px) * var(--art-aspect) + 16px));
+  }
+  .art-stage .art-fit img {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+}
+
 /* Brand-styled scrollbar for in-container scroll areas (the catalogue range). */
 .brand-scroll {
   scrollbar-width: thin;

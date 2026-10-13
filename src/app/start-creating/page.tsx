@@ -152,6 +152,7 @@ export default function StartCreatingPage() {
       />
 
       <FlowHeader
+        wide={!!upload}
         middle={
           <span className="text-xs text-ink-soft">
             <b className={upload ? '' : 'text-cinnamon'}>upload</b> · <b className={upload ? 'text-cinnamon' : ''}>your range</b> · checkout
@@ -213,15 +214,21 @@ export default function StartCreatingPage() {
       ) : (
         // ── Made-real state — fits one viewport; only the range + basket scroll ──
         // Wider than before to seat the new basket sidebar beside the range (founder layout).
-        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-6 py-5 md:overflow-hidden">
-          <div className="grid gap-8 md:grid-cols-5 md:items-start">
+        <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-6 py-5 md:overflow-hidden 2xl:max-w-[1600px]">
+          {/* Desktop: both columns share the row height (set by the range on the right), and the
+              drawing grows into the left column's spare height — so the two sides end level. */}
+          <div className="grid gap-8 md:grid-cols-5 md:items-stretch">
             {/* Left: the drawing, large, with change / remove background / terms — all equal width */}
             <div className="flex flex-col md:col-span-2">
               {/* The honey frame HUGS the drawing's own aspect ratio (inline-block sized by
                   the image) instead of a fixed full-width box with white slabs inside. */}
-              <div className="flex w-full justify-center pt-3">
-                {/* A taped polaroid that HUGS the drawing's own aspect (sized by the image). */}
-                <div className="pop-in polaroid tape inline-block max-w-full" style={{ ['--tilt' as string]: '-1.5deg' }}>
+              <div className="art-stage flex w-full justify-center pt-3">
+                {/* A taped polaroid that HUGS the drawing's own aspect (sized by the image). On
+                    desktop, once the aspect is known, .art-fit sizes it to fill the stage. */}
+                <div
+                  className={`pop-in polaroid tape inline-block max-w-full ${upload.aspect ? 'art-fit' : ''}`}
+                  style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
+                >
                   <div className="overflow-hidden bg-paper-2">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewImg ?? ''} alt="your drawing" className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />

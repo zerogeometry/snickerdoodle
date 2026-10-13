@@ -15,16 +15,19 @@ export function FlowHeader({
   middle,
   right,
   tag,
+  wide = false,
 }: {
   back?: { href: string; label: string };
   middle?: ReactNode;
   right?: ReactNode;
   /** A small sticker beside the wordmark, e.g. "studio". */
   tag?: string;
+  /** Match a page whose content widens on big screens (the made-real create page). */
+  wide?: boolean;
 }) {
   return (
     <header className="pt-safe kraft sticky top-0 z-30 border-b-2 border-cocoa/10">
-      <div className="mx-auto flex min-h-[60px] w-full max-w-7xl items-center justify-between gap-3 px-4 py-2 md:px-6">
+      <div className={`mx-auto flex min-h-[60px] w-full max-w-7xl items-center${wide ? ' 2xl:max-w-[1600px]' : ''} justify-between gap-3 px-4 py-2 md:px-6`}>
         <div className="flex min-w-0 items-center gap-2.5">
           {back ? (
             <Link
