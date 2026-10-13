@@ -2,9 +2,13 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { MarketingMobileMenu } from '@/ui/components/MarketingMobileMenu';
+import { AccountNav } from '@/ui/components/AccountNav';
+import { getCurrentAccount } from '@/server/session';
 
-/** Marketing surface (logged-out): nav + footer, goal is "start creating". */
-export default function MarketingLayout({ children }: { children: ReactNode }) {
+/** Marketing surface: nav + footer, goal is "start creating". A signed-in parent also gets a way
+ * back to their keepsakes + account (never a dead-end "log in"). */
+export default async function MarketingLayout({ children }: { children: ReactNode }) {
+  const signedIn = (await getCurrentAccount()) !== null;
   return (
     <div className="kraft relative flex min-h-dvh flex-col overflow-x-hidden">
       <header className="pt-safe relative z-10">
@@ -23,14 +27,12 @@ export default function MarketingLayout({ children }: { children: ReactNode }) {
             <Link href="/our-story" className="hover:text-cinnamon">
               our story
             </Link>
-            <Link href="/login" className="hover:text-cinnamon">
-              log in
-            </Link>
+            <AccountNav signedIn={signedIn} />
             <Button href="/start-creating" size="md" className="ml-3">
               start creating
             </Button>
           </div>
-          <MarketingMobileMenu />
+          <MarketingMobileMenu signedIn={signedIn} />
         </nav>
       </header>
 

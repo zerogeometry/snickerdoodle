@@ -14,6 +14,7 @@ import { CameraCapture } from '@/ui/components/CameraCapture';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
+import { AccountNav } from '@/ui/components/AccountNav';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
 import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
 import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
@@ -161,9 +162,7 @@ export default function StartCreatingPage() {
         right={
           <>
             <BasketButton />
-            <Link href="/login" className="inline-flex min-h-11 items-center px-1 text-xs font-bold text-ink-soft hover:text-cinnamon">
-              log in
-            </Link>
+            <AccountNav compact />
           </>
         }
       />

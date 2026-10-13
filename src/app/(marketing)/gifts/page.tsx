@@ -15,7 +15,7 @@ const POINTS = [
   'Pick the pieces, share one private link',
   'Family checkout as a guest in under a minute',
   "Or they join the family — 5% off, and they never miss a birthday",
-  'Gift wrap and a handwritten-style note, prices tucked away',
+  'Ticked off the list once it’s bought — no doubling up',
 ];
 
 export default function GiftsPage() {

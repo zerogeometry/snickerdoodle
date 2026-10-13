@@ -10,11 +10,13 @@ const LINKS = [
   { href: '/how-it-works', label: 'how it works' },
   { href: '/gifts', label: 'gifts' },
   { href: '/our-story', label: 'our story' },
-  { href: '/login', label: 'log in' },
 ];
 
 /** The mobile marketing menu — a hamburger that opens an accessible drawer. */
-export function MarketingMobileMenu() {
+export function MarketingMobileMenu({ signedIn = false }: { signedIn?: boolean }) {
+  const links = signedIn
+    ? [{ href: '/home', label: 'your keepsakes' }, { href: '/account', label: 'your account' }, ...LINKS]
+    : [...LINKS, { href: '/login', label: 'log in' }];
   const [open, setOpen] = useState(false);
 
   return (
@@ -39,7 +41,7 @@ export function MarketingMobileMenu() {
               </button>
             </div>
             <div className="mt-8 flex flex-col gap-1">
-              {LINKS.map((l) => (
+              {links.map((l) => (
                 <Link
                   key={l.href}
                   href={l.href}
