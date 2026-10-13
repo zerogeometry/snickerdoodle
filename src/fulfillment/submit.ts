@@ -134,10 +134,10 @@ export async function releaseBlockedArtwork(db: DbHandle, opts?: { env?: GateEnv
   let released = 0;
   for (const row of rows) {
     if (!row.assetId) continue; // unresolvable asset stays blocked — deny by default
-    const [a] = await db.select({ childSubjectId: assets.childSubjectId, kind: assets.kind }).from(assets).where(eq(assets.id, row.assetId));
+    const [a] = await db.select({ childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture }).from(assets).where(eq(assets.id, row.assetId));
     if (!a) continue;
     try {
-      await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind }, env);
+      await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind, isBrandSafeFixture: a.isBrandSafeFixture }, env);
     } catch (e) {
       if (e instanceof GateError) continue; // still red — correctly waiting
       throw e;
@@ -278,7 +278,7 @@ async function submitOne(
   const assetIds = [...new Set(fulfillable.map((l) => l.assetId).filter((id): id is string => Boolean(id)))];
   const assetRows =
     assetIds.length > 0
-      ? await db.select({ id: assets.id, childSubjectId: assets.childSubjectId, kind: assets.kind }).from(assets).where(inArray(assets.id, assetIds))
+      ? await db.select({ id: assets.id, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture }).from(assets).where(inArray(assets.id, assetIds))
       : [];
   if (missingAsset.length > 0 || assetRows.length !== assetIds.length) {
     const affected = fulfillable.filter((l) => !l.assetId || !assetRows.some((a) => a.id === l.assetId)).map((l) => l.artworkId!);
@@ -292,7 +292,7 @@ async function submitOne(
   // render time; the env (POD_MODE / LG3) may have changed since.
   for (const a of assetRows) {
     try {
-      await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind }, env);
+      await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind, isBrandSafeFixture: a.isBrandSafeFixture }, env);
     } catch (e) {
       if (e instanceof GateError) {
         const blockedArtwork = fulfillable.filter((l) => l.assetId === a.id).map((l) => l.artworkId!);

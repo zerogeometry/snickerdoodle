@@ -42,13 +42,17 @@ const stubClassifier: ClassifierProvider = {
  * Resolve the configured providers. Real providers slot in here (read creds from
  * the secret store) once LG6 is closed; until then, the stub.
  */
-export function defaultProviders(): ModerationProviders {
+export function defaultProviders(env: Record<string, string | undefined> = process.env): ModerationProviders {
   // TODO(LG6): when MODERATION_PROVIDER === 'real', return the IWF + Rekognition
   // providers built from credentials in the secret store.
+  if (env.MODERATION_PROVIDER === 'real') {
+    // Never let "real" quietly mean the pass-everything stub.
+    throw new Error('MODERATION_PROVIDER=real but the real providers are not wired yet (LG6)');
+  }
   return { hash: stubHash, classifier: stubClassifier };
 }
 
 /** Go-live guard: true only when the REAL providers are configured. */
-export function isModerationConfigured(): boolean {
-  return process.env.MODERATION_PROVIDER === 'real';
+export function isModerationConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return env.MODERATION_PROVIDER === 'real';
 }

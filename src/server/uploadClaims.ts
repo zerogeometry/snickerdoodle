@@ -10,8 +10,17 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
  */
 export const UPLOAD_CLAIM_COOKIE = 'sd_upload_claims';
 
+/** The signing secret. Production REFUSES to run without a real one — a guessable default
+ * would let anyone forge an upload claim and adopt someone else's child's drawing. */
+export function claimSecret(env: Record<string, string | undefined> = process.env): string {
+  const s = env.AUTH_SECRET;
+  if (s && s.length >= 32) return s;
+  if (env.NODE_ENV === 'production') throw new Error('AUTH_SECRET (≥32 chars) is required in production');
+  return s || 'dev-insecure-secret';
+}
+
 function secret(): string {
-  return process.env.AUTH_SECRET ?? 'dev-insecure-secret';
+  return claimSecret();
 }
 
 function sign(payload: string): string {

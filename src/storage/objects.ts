@@ -41,18 +41,34 @@ export function derivativeKey(assetId: string, kind: string): string {
 export async function putObject(key: string, body: Buffer, contentType: string): Promise<void> {
   const { client, bucket } = getS3();
   await ensureBucket();
-  const kmsKeyAlias = process.env.S3_KMS_KEY_ALIAS;
   await client.send(
     new PutObjectCommand({
       Bucket: bucket,
       Key: key,
       Body: body,
       ContentType: contentType,
-      // At-rest KMS encryption in production (separate key for originals); MinIO
-      // dev has no KMS, so this is only set when an alias is configured.
-      ...(kmsKeyAlias ? { ServerSideEncryption: 'aws:kms' as const, SSEKMSKeyId: kmsKeyAlias } : {}),
+      ...encryptionFor(key),
     }),
   );
+}
+
+/**
+ * At-rest encryption for an object. ORIGINALS use their own KMS key (tightest policy,
+ * independent rotation — CLAUDE.md "separate keys for originals"); everything else the general
+ * key. In PRODUCTION a missing key is a hard error, never a silently unencrypted child's image.
+ * Local MinIO has no KMS, so dev without aliases writes plain objects.
+ */
+export function encryptionFor(
+  key: string,
+  env: Record<string, string | undefined> = process.env,
+): { ServerSideEncryption?: 'aws:kms'; SSEKMSKeyId?: string } {
+  const isOriginal = /\/original$/.test(key);
+  const alias = isOriginal ? env.S3_KMS_KEY_ALIAS_ORIGINALS : env.S3_KMS_KEY_ALIAS;
+  if (alias) return { ServerSideEncryption: 'aws:kms', SSEKMSKeyId: alias };
+  if (env.NODE_ENV === 'production') {
+    throw new Error(`${isOriginal ? 'S3_KMS_KEY_ALIAS_ORIGINALS' : 'S3_KMS_KEY_ALIAS'} is required in production — refusing to store unencrypted`);
+  }
+  return {};
 }
 
 /** Read an object's bytes server-side (e.g. to render a print file from it). */

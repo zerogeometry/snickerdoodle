@@ -237,6 +237,9 @@ export const assets = pgTable(
     // moment (the processing info lives in the terms). Travels with the asset.
     termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
     termsVersion: text('terms_version'),
+    /** A brand-safe TEST image (not a child's) — the only thing the POD egress gate lets reach
+     * the provider sandbox. Set ONLY by ingest outside production (DEV_UPLOADS_ARE_BRAND_SAFE_FIXTURES). */
+    isBrandSafeFixture: boolean('is_brand_safe_fixture').notNull().default(false),
     // Privacy-by-default at the DB level: no insert path can default wider.
     visibility: visibilityTier('visibility').notNull().default('FAMILY'),
     // Content-safety gate (D8). An asset cannot reach a print order unless CLEAR.

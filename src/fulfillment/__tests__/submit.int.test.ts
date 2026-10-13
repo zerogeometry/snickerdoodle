@@ -120,6 +120,9 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
   async function paidOrder(productKey: string, kind: 'DRAWING' | 'PHOTO' = 'DRAWING') {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const ing = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind, buffer: await src(3000, 4200), keptInHome: true });
+    // Test art: under G11 only an explicitly brand-safe fixture may reach the POD sandbox;
+    // these suites use DRAWING = brand-safe test art and PHOTO = a child's image.
+    if (kind === 'DRAWING') await db.update(schema.assets).set({ isBrandSafeFixture: true }).where(eq(schema.assets.id, ing.assetId));
     keys.push(ing.key);
     assetIds.push(ing.assetId);
     const res = await placeOrder(db, {
@@ -238,8 +241,9 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     const { orderId, assetId } = await paidOrder('framedPrint', 'DRAWING');
     await renderUntilReady(orderId); // READY (non-child at render time)
 
-    // The asset becomes a child image between render and submit (e.g. filed under a child).
-    await db.update(assets).set({ kind: 'PHOTO' }).where(eq(assets.id, assetId));
+    // The asset becomes a child image between render and submit (it's no longer a brand-safe
+    // fixture — under G11 every non-fixture upload is a child's image).
+    await db.update(assets).set({ isBrandSafeFixture: false }).where(eq(assets.id, assetId));
 
     const transport = fakeTransport();
     const summary = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId] });

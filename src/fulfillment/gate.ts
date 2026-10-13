@@ -27,6 +27,8 @@ export class GateError extends Error {
 export interface EgressAsset {
   childSubjectId: string | null;
   kind: 'DRAWING' | 'PHOTO';
+  /** A brand-safe test image (set only outside production — see ingest). Default false. */
+  isBrandSafeFixture?: boolean;
 }
 
 export interface GateEnv {
@@ -46,13 +48,13 @@ export function gateEnv(): GateEnv {
 }
 
 /**
- * Is this a child's image? Resolved server-side from the asset. A linked child subject
- * is conclusive; a PHOTO is treated CONSERVATIVELY as a child image even when unlinked
- * (childSubjectId = null) — a photo of a child can carry no subject link, and that's the
- * exact slip the gate must not allow (proposal §7 failure (d)).
+ * Is this a child's image? EVERY user upload is treated as one (G11 / DPIA OQ-7): every
+ * upload path labels its asset DRAWING and plenty are never filed under a named child, so
+ * "linked subject or PHOTO" let real children's art through. The ONLY exception is an image
+ * explicitly marked a brand-safe test fixture — which can only happen outside production.
  */
 export function isChildImage(asset: EgressAsset): boolean {
-  return asset.childSubjectId !== null || asset.kind === 'PHOTO';
+  return asset.isBrandSafeFixture !== true;
 }
 
 /**

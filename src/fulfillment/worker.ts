@@ -104,7 +104,7 @@ async function fail(db: DbHandle, artworkId: string, note: string): Promise<{ st
 async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promise<{ status: string; note?: string }> {
   if (!item.assetId) return fail(db, item.artworkId, 'no source asset (purged?)');
   const [asset] = await db
-    .select({ id: assets.id, familyId: assets.familyId, childSubjectId: assets.childSubjectId, kind: assets.kind })
+    .select({ id: assets.id, familyId: assets.familyId, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture })
     .from(assets)
     .where(eq(assets.id, item.assetId));
   if (!asset) return fail(db, item.artworkId, 'source asset not found');
@@ -132,7 +132,7 @@ async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promi
 
   // GATE — the single chokepoint that authorises bytes → POD.
   try {
-    await assertPodEgressAllowed(db, { childSubjectId: asset.childSubjectId, kind: asset.kind }, env);
+    await assertPodEgressAllowed(db, { childSubjectId: asset.childSubjectId, kind: asset.kind, isBrandSafeFixture: asset.isBrandSafeFixture }, env);
   } catch (e) {
     if (e instanceof GateError) {
       await db.update(orderItemArtwork).set({ status: 'BLOCKED_GATE', renderError: e.message }).where(eq(orderItemArtwork.id, item.artworkId));

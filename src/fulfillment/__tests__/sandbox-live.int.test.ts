@@ -62,6 +62,9 @@ describe.skipIf(!DB || !S3 || !GO)('Prodigi SANDBOX live smoke — one real orde
   it('submits a brand-safe order to the real sandbox and gets an ord_… id back', { timeout: 60_000 }, async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const ing = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await src(), keptInHome: true });
+    // Test art: under G11 only an explicitly brand-safe fixture may reach the POD sandbox;
+    // these suites use DRAWING = brand-safe test art and PHOTO = a child's image.
+    await db.update(schema.assets).set({ isBrandSafeFixture: true }).where(eq(schema.assets.id, ing.assetId));
     keys.push(ing.key);
     assetIds.push(ing.assetId);
     const res = await placeOrder(db, {

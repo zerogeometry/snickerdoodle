@@ -1,0 +1,1 @@
+ALTER TABLE "assets" ADD COLUMN "is_brand_safe_fixture" boolean DEFAULT false NOT NULL;

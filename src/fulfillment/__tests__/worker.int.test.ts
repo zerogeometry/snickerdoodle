@@ -54,6 +54,9 @@ describe.skipIf(!DB || !S3)('fulfilment worker — claim → render → gate (in
   async function paidOrder(kind: 'DRAWING' | 'PHOTO') {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const ing = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind, buffer: await src(3000, 4200), keptInHome: true });
+    // Test art: under G11 only an explicitly brand-safe fixture may reach the POD sandbox;
+    // these suites use DRAWING = brand-safe test art and PHOTO = a child's image.
+    if (kind === 'DRAWING') await db.update(schema.assets).set({ isBrandSafeFixture: true }).where(eq(schema.assets.id, ing.assetId));
     keys.push(ing.key);
     assetIds.push(ing.assetId);
     const res = await placeOrder(db, {

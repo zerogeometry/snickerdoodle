@@ -8,6 +8,15 @@ import { moderateAndRecord, type ModerationState } from './moderation';
 import { RETENTION_DAYS } from './retention';
 
 /** Matches the `asset_kind` enum in the schema. */
+/**
+ * Dev/sandbox testing only: a developer can mark THEIR OWN test uploads as brand-safe
+ * fixtures so the POD sandbox loop stays testable. Hard-off in production, whatever the
+ * env says — real families' uploads are always treated as children's images (G11).
+ */
+export function devUploadsAreFixtures(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NODE_ENV !== 'production' && env.DEV_UPLOADS_ARE_BRAND_SAFE_FIXTURES === 'true';
+}
+
 export type AssetKind = 'DRAWING' | 'PHOTO';
 
 export interface IngestInput {
@@ -82,6 +91,7 @@ export async function ingestOriginalAsset(
     controllerAccountId,
     visibility: 'FAMILY', // privacy by default
     keptInHome: kept,
+    isBrandSafeFixture: devUploadsAreFixtures(),
     purgeAfter,
   });
 
@@ -102,7 +112,7 @@ export async function ingestOriginalAsset(
   // Content-safety gate (D8): run BEFORE this asset can ever reach a print order.
   // The bytes are already stored (BLOCKED content is preserved for the runbook);
   // the verdict gates ordering + viewing downstream.
-  const verdict = await moderateAndRecord(db, { assetId, familyId: input.familyId, buffer: sanitised.buffer, sha256: sanitised.sha256 });
+  const verdict = await moderateAndRecord(db, { assetId, familyId: input.familyId, buffer: sanitised.buffer, sha256: sanitised.sha256, originalBuffer: input.buffer });
 
   return { assetId, key, sha256: sanitised.sha256, byteSize: sanitised.byteSize, contentType: sanitised.contentType, moderationStatus: verdict.status };
 }
@@ -143,6 +153,7 @@ export async function ingestEphemeralUpload(
     ephemeralClaimId: claimId,
     visibility: 'FAMILY', // privacy by default (moot until adopted)
     keptInHome: false,
+    isBrandSafeFixture: devUploadsAreFixtures(),
     purgeAfter: new Date(now.getTime() + RETENTION_DAYS * 86_400_000),
     termsAcceptedAt: now,
     termsVersion: input.termsVersion,
@@ -162,6 +173,6 @@ export async function ingestEphemeralUpload(
     kmsKeyAlias: process.env.S3_KMS_KEY_ALIAS ?? null,
   });
 
-  const verdict = await moderateAndRecord(db, { assetId, familyId: null, buffer: sanitised.buffer, sha256: sanitised.sha256 });
+  const verdict = await moderateAndRecord(db, { assetId, familyId: null, buffer: sanitised.buffer, sha256: sanitised.sha256, originalBuffer: input.buffer });
   return { assetId, claimId, key, moderationStatus: verdict.status };
 }
