@@ -85,11 +85,13 @@ export default function PrivacyNoticePage() {
 
         <h2>8. How long we keep it</h2>
         <ul>
-          <li><strong>Drawings and photos you upload:</strong> only as long as we need them to make your order, plus a short reprint window — then we delete them, <strong>unless</strong> you keep them in your Keepsake Home.</li>
+          <li><strong>Drawings and photos you upload:</strong> only as long as we need them to make and send your order, plus 30 days after it&apos;s sent in case anything needs reprinting — then we delete them, <strong>unless</strong> you choose to keep them in your Keepsake Home (we ask after you order).</li>
           <li><strong>Keepsake Home items:</strong> for as long as you want them. Delete any time.</li>
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
           <li><strong>Account data:</strong> until you close your account.</li>
           <li><strong>Marketing choices:</strong> until you change them.</li>
+          <li><strong>Backups:</strong> when we delete something it&apos;s gone from our live systems straight away, and from our backups within 14 days. Backups are only ever used to recover from a fault — never for anything else — and if we ever restore one, we re-apply every deletion made since.</li>
+          <li><strong>A record of what we did:</strong> a minimal log of actions — for example &ldquo;a keepsake was deleted&rdquo; — with no names, pictures or words in it, kept for six years so we can show we did what we said.</li>
         </ul>
 
         <h2>9. Your rights</h2>

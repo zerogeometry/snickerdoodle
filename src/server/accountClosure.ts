@@ -18,6 +18,7 @@ import {
 } from '@/db/schema';
 import { eraseAsset } from './assets';
 import { appUrl, sendMail } from './mail';
+import { recordErasure } from './erasureLedger';
 import type { DbHandle } from './db';
 
 /** Orders still being made — closing waits for these (their source art is needed to print). */
@@ -51,8 +52,9 @@ export async function closeAccount(
   db: DbHandle,
   accountId: string,
   now = new Date(),
-  opts: { handOver?: { familyId: string; newOwnerAccountId: string } | null } = {},
+  opts: { handOver?: { familyId: string; newOwnerAccountId: string } | null; skipLedger?: boolean } = {},
 ): Promise<CloseAccountResult> {
+  const ledger = { skipLedger: opts.skipLedger === true };
   const [account] = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, accountId));
   if (!account) return { ok: false, reason: 'not-found' };
 
@@ -68,7 +70,7 @@ export async function closeAccount(
   // ── 0. Optional: hand one owned family to another member, so it carries on ──────
   let handedOver: string | null = null;
   if (opts.handOver) {
-    const res = await handOverFamily(db, accountId, opts.handOver, now);
+    const res = await handOverFamily(db, accountId, opts.handOver, now, ledger);
     if (!res.ok) return { ok: false, reason: 'bad-handover' };
     keepsakesDeleted += res.privateErased;
     handedOver = opts.handOver.familyId;
@@ -80,7 +82,7 @@ export async function closeAccount(
     await db.update(children).set({ avatarAssetId: null }).where(eq(children.familyId, familyId)); // unpin before erasing
     const rows = await db.select({ id: assets.id, familyId: assets.familyId }).from(assets).where(eq(assets.familyId, familyId));
     for (const row of rows) {
-      await eraseAsset(db, row, actor, { reason: 'account-closed' });
+      await eraseAsset(db, row, actor, { reason: 'account-closed' }, ledger);
       keepsakesDeleted++;
     }
     await db.delete(savedDesigns).where(eq(savedDesigns.familyId, familyId));
@@ -110,7 +112,7 @@ export async function closeAccount(
     await db.update(children).set({ avatarAssetId: null }).where(inArray(children.avatarAssetId, elsewhere.map((r) => r.id)));
   }
   for (const row of elsewhere) {
-    await eraseAsset(db, row, actor, { reason: 'account-closed' });
+    await eraseAsset(db, row, actor, { reason: 'account-closed' }, ledger);
     keepsakesDeleted++;
   }
   const left = await db
@@ -168,6 +170,7 @@ export async function closeAccount(
     metadata: { keepsakesDeleted, familiesClosed: owned.length, atISO: now.toISOString() },
   });
 
+  if (!opts.skipLedger) await recordErasure({ kind: 'account', id: accountId, handOver: opts.handOver ?? null }, now);
   return { ok: true, keepsakesDeleted, familiesClosed: owned.length };
 }
 
@@ -187,6 +190,7 @@ export async function handOverFamily(
   outgoingAccountId: string,
   input: { familyId: string; newOwnerAccountId: string },
   now = new Date(),
+  ledger: { skipLedger?: boolean } = {},
 ): Promise<{ ok: boolean; privateErased: number }> {
   if (input.newOwnerAccountId === outgoingAccountId) return { ok: false, privateErased: 0 };
   const [family] = await db.select().from(families).where(and(eq(families.id, input.familyId), eq(families.ownerAccountId, outgoingAccountId)));
@@ -205,7 +209,7 @@ export async function handOverFamily(
   if (privateRows.length) {
     await db.update(children).set({ avatarAssetId: null }).where(inArray(children.avatarAssetId, privateRows.map((r) => r.id)));
   }
-  for (const row of privateRows) await eraseAsset(db, row, { accountId: outgoingAccountId, actorType: 'MEMBER' }, { reason: 'account-closed-private' });
+  for (const row of privateRows) await eraseAsset(db, row, { accountId: outgoingAccountId, actorType: 'MEMBER' }, { reason: 'account-closed-private' }, ledger);
 
   await db.update(families).set({ ownerAccountId: input.newOwnerAccountId }).where(eq(families.id, family.id));
   await db

@@ -3,6 +3,7 @@ import { auditRecords, invites, memberships, sessions } from '@/db/schema';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import type { AccessLevel, Circle } from '@/domain/types';
 import type { DbHandle } from './db';
+import { recordErasure } from './erasureLedger';
 
 /**
  * The parent's controls over who is in the family (parent-is-controller). Every change is
@@ -47,6 +48,7 @@ export async function removeMember(
   if (!updated[0]) return { ok: false };
   // "Removal invalidates sessions immediately" (CLAUDE.md): sign them out everywhere.
   await db.delete(sessions).where(eq(sessions.userId, input.memberAccountId));
+  await recordErasure({ kind: 'membership', familyId: input.familyId, accountId: input.memberAccountId, status: 'REMOVED' });
   await db.insert(auditRecords).values({
     familyId: input.familyId,
     actorAccountId: ownerId,
@@ -156,6 +158,7 @@ export async function leaveFamily(db: DbHandle, member: ViewerContext, input: { 
     )
     .returning({ id: memberships.id });
   if (!updated[0]) return { ok: false };
+  await recordErasure({ kind: 'membership', familyId: input.familyId, accountId: member.accountId, status: 'LEFT' });
   await db.insert(auditRecords).values({
     familyId: input.familyId,
     actorAccountId: member.accountId,

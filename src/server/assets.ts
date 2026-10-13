@@ -13,6 +13,7 @@ import {
 } from '@/authz';
 import type { VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
+import { recordErasure } from './erasureLedger';
 
 /**
  * The server-data layer for assets. EVERY read of an asset leaves this module
@@ -263,6 +264,7 @@ export async function eraseAsset(
   row: { id: string; familyId: string | null },
   actor: { accountId: string | null; actorType: 'MEMBER' | 'SYSTEM' },
   metadata?: Record<string, unknown>,
+  opts: { skipLedger?: boolean } = {},
 ): Promise<void> {
   // 1. bytes first — never drop the DB record while bytes might linger.
   const objects = await db.select().from(storageObjects).where(eq(storageObjects.assetId, row.id));
@@ -283,4 +285,7 @@ export async function eraseAsset(
 
   // 3. drop the row — cascades storage_object rows; nulls order/ML asset links.
   await db.delete(assets).where(eq(assets.id, row.id));
+
+  // 4. outside the DB, so a backup restore can't bring it back (erasureLedger.ts)
+  if (!opts.skipLedger) await recordErasure({ kind: 'asset', id: row.id });
 }

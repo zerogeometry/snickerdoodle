@@ -3,6 +3,7 @@ import { assets, auditRecords, children } from '@/db/schema';
 import { canManageFamily, type ViewerContext } from '@/authz';
 import { screenChildFirstName } from '@/server/textSafety';
 import { deleteAsset } from './assets';
+import { recordErasure } from './erasureLedger';
 import type { DbHandle } from './db';
 
 export interface ChildSubject {
@@ -168,6 +169,7 @@ export async function deleteChild(
   }
   await db.update(children).set({ avatarAssetId: null }).where(eq(children.id, child.id));
   await db.delete(children).where(eq(children.id, child.id));
+  await recordErasure({ kind: 'child', id: child.id });
   await db.insert(auditRecords).values({
     familyId: input.familyId,
     actorAccountId: owner.accountId,

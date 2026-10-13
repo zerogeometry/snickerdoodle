@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNotNull, lte, ne, notExists, sql } from 'drizzle-orm';
 import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { deleteObjectConfirmed } from '@/storage';
+import { recordErasure } from './erasureLedger';
 import type { DbHandle, Tx } from './db';
 
 // An order in one of these states still needs its source art (render is pending
@@ -77,6 +78,7 @@ export async function purgeExpiredAssets(
         targetId: asset.id,
         metadata: { reason: 'retention', purgeAfter: asset.purgeAfter?.toISOString() ?? null },
       });
+      await recordErasure({ kind: 'asset', id: asset.id });
       purged++;
       purgedAssetIds.push(asset.id);
     } catch {
@@ -111,4 +113,24 @@ export async function startRetentionClockForOrder(db: DbHandle | Tx, orderId: st
     .where(and(inArray(assets.id, onOrder), eq(assets.keptInHome, false)))
     .returning({ id: assets.id });
   return updated.length;
+}
+
+/** How long the audit trail is kept: 6 years (the limitation period for contract claims). The DB
+ * trigger enforces the same floor (migration 0034) — this constant must not be shorter. */
+export const AUDIT_RETENTION_YEARS = 6;
+
+/**
+ * Drop audit rows older than the retention period. The audit trail holds ids, event names, dates
+ * and counts only (no names, no content) and is our proof that we did what we said — including
+ * deletions — so it outlives the data it describes, but not forever. Runs in one transaction that
+ * opts in to the trigger's narrow purge exception; nothing younger can be touched.
+ */
+export async function purgeExpiredAuditRecords(db: DbHandle, now = new Date()): Promise<{ purged: number }> {
+  const cutoff = new Date(now);
+  cutoff.setUTCFullYear(cutoff.getUTCFullYear() - AUDIT_RETENTION_YEARS);
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select set_config('snickerdoodle.audit_purge', 'on', true)`);
+    const gone = await tx.delete(auditRecords).where(lte(auditRecords.createdAt, cutoff)).returning({ id: auditRecords.id });
+    return { purged: gone.length };
+  });
 }
