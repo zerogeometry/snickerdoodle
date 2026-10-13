@@ -471,8 +471,30 @@ body {
     transform: translate(-3px, 3px) rotate(-8deg);
   }
 }
+/* Copy lines share one grid cell and take turns: 7 lines × 2.2s = a 15.4s cycle, each line owning
+   1/7 (~14.3%) of it. Update the duration + percentages if LINES in MakingRangeLoader changes. */
 .loader-line {
-  animation: page-enter 0.4s var(--ease-settle) both;
+  opacity: 0;
+  animation: loader-line 15.4s linear calc(var(--k) * 2.2s) infinite backwards;
+}
+.loader-line:first-child {
+  opacity: 1;
+}
+@keyframes loader-line {
+  0% {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  2%,
+  12.5% {
+    opacity: 1;
+    transform: none;
+  }
+  14.3%,
+  100% {
+    opacity: 0;
+    transform: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .loader-pop,

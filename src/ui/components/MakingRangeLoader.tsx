@@ -1,7 +1,4 @@
-'use client';
-
 import { IconCards, IconCup, IconPhoto, IconHeart, IconPencil, IconPuzzle } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 
 /**
@@ -9,10 +6,12 @@ import { Icon } from '@/ui/primitives/Icon';
  * grey tiles, the child's own drawing sits taped in a polaroid while a crayon scribbles and little
  * keepsakes pop out around it, with a line of playful copy that changes every couple of seconds.
  *
- * CSS only (transform/opacity) — see `.loader-*` in globals.css; under prefers-reduced-motion
- * everything sits still and the copy simply stays on its first line. The changing line is
+ * CSS only (transform/opacity, no JS timers) — see `.loader-*` in globals.css. The copy lines are
+ * stacked in one grid cell and take turns fading in; under prefers-reduced-motion everything sits
+ * still and only the first line shows. The changing line is
  * aria-hidden; screen readers hear one calm status ("making your range…") instead of a ticker.
  */
+// 7 lines — the .loader-line cycle in globals.css is timed for exactly this many.
 const LINES = [
   'warming up the crayons…',
   'framing the wonky bits in gold…',
@@ -34,13 +33,6 @@ const ORBIT = [
 ];
 
 export function MakingRangeLoader({ drawing, className = '' }: { drawing?: string | null; className?: string }) {
-  const [line, setLine] = useState(0);
-  useEffect(() => {
-    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
-    const id = setInterval(() => setLine((l) => (l + 1) % LINES.length), 2200);
-    return () => clearInterval(id);
-  }, []);
-
   return (
     <div role="status" className={`flex flex-col items-center justify-center px-4 py-10 text-center ${className}`}>
       <div className="relative mx-auto mt-10 w-[44%] max-w-[170px]">
@@ -68,8 +60,12 @@ export function MakingRangeLoader({ drawing, className = '' }: { drawing?: strin
       </div>
 
       <p className="mt-12 font-display text-xl text-cocoa">making your range</p>
-      <p aria-hidden key={line} className="loader-line mt-1.5 min-h-[1.5em] text-[15px] text-ink-soft">
-        {LINES[line]}
+      <p aria-hidden className="mt-1.5 grid text-[15px] text-ink-soft">
+        {LINES.map((l, i) => (
+          <span key={l} className="loader-line col-start-1 row-start-1" style={{ ['--k' as string]: i }}>
+            {l}
+          </span>
+        ))}
       </p>
       <span className="sr-only">making your range…</span>
     </div>
