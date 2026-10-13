@@ -71,8 +71,8 @@ export default function LandingPage() {
             {/* Phones: the keepsakes come straight after the headline — no scrolling to see the magic */}
             <div className="mx-auto mt-6 w-full max-w-[300px] md:hidden">{heroVisual}</div>
             <p className="pop-in mt-7 max-w-md text-lg leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
-              Turn your little one&apos;s drawings into beautiful things you&apos;ll treasure forever — cards, prints,
-              mugs, tees, and a storybook they&apos;re the hero of.
+              Turn your little one&apos;s drawings into beautiful things you&apos;ll treasure forever — framed prints,
+              mugs, cushions, jigsaws, blankets and cards.
             </p>
             <div className="hidden md:block">
               <div className="pop-in mt-9" style={{ ['--i' as string]: 3 }}>

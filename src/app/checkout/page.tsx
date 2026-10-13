@@ -16,9 +16,10 @@ import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { ClientQuote } from '@/app/actions/quote';
 
 const ADDONS: { id: string; product: ProductKey; name: string; pricePence: number }[] = [
-  { id: 'addon-card', product: 'card', name: 'card', pricePence: 400 },
+  // Only real products at their real (catalogue) prices — the server re-prices anyway, so a
+  // tile must never show a number the total won't honour.
+  { id: 'addon-card', product: 'card', name: 'card', pricePence: 500 },
   { id: 'addon-wrap', product: 'giftWrap', name: 'gift wrap', pricePence: 300 },
-  { id: 'addon-mini', product: 'framedPrint', name: 'mini print', pricePence: 800 },
 ];
 
 export default function CheckoutPage() {

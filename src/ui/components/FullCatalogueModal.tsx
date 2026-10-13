@@ -88,7 +88,7 @@ export function FullCatalogueModal({
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="search the range — mug, tee, blanket…"
+            placeholder="search the range — mug, cushion, blanket…"
             aria-label="Search the full catalogue"
             className="min-w-0 flex-1 bg-transparent text-sm text-cocoa outline-none placeholder:text-ink-faint"
           />

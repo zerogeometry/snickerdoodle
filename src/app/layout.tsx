@@ -19,7 +19,7 @@ import { CookieBanner } from '@/ui/components/CookieBanner';
 export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
   description:
-    "Turn your little one's drawings into beautiful things you'll treasure forever — cards, prints, mugs, tees, and a storybook they're the hero of.",
+    "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
   icons: { icon: '/brand/snickerdoodle-badge.png', apple: '/brand/snickerdoodle-badge.png' },

@@ -30,8 +30,8 @@ export default function OurStoryPage() {
           </p>
           <p>
             We thought: what if the wonky bits could be kept properly? Not tidied into something a grown-up would draw,
-            but <b className="text-cocoa">framed in gold exactly as they are</b> — on a mug for Grandad, a tee for the
-            holidays, a storybook where your little one is the hero.
+            but <b className="text-cocoa">framed in gold exactly as they are</b> — on a mug for Grandad, a cushion for
+            the sofa, a blanket for snuggling under.
           </p>
           <p>
             So we built snickerdoodle: a warm, private home for the magic, that grows with the child. Because childhood

@@ -20,7 +20,7 @@ const STEPS = [
   {
     icon: IconWand,
     title: 'Watch it made real',
-    body: 'In moments you see the same wonky, wonderful drawing on cards, prints, mugs, tees and a storybook they star in.',
+    body: 'In moments you see the same wonky, wonderful drawing on framed prints, mugs, cushions, jigsaws, blankets and cards.',
   },
   {
     icon: IconHeart,
