@@ -33,6 +33,14 @@ export function RangeHero({ className = '' }: { className?: string }) {
         <img src="/examples/range/drawing.webp" alt="A child's painting of their family holding hands outside a yellow house, with the dog" width={600} height={600} fetchPriority="high" decoding="async" className="aspect-square w-full object-cover" />
         <figcaption className="mt-1.5 text-center text-[13px] font-extrabold text-cocoa">one painting…</figcaption>
       </div>
+      {/* …and the payoff, arriving last, after the products have popped in */}
+      <span
+        aria-hidden
+        className="pop-in absolute bottom-[-3%] left-1/2 z-20 -translate-x-1/2 whitespace-nowrap rounded-pill bg-cobalt px-4 py-2 text-sm font-extrabold text-white shadow-[0_4px_0_var(--color-cobalt-deep)]"
+        style={{ rotate: '3deg', ['--i' as string]: 9, ['--pop-rot' as string]: '8deg' }}
+      >
+        …a whole range ✦
+      </span>
     </figure>
   );
 }
