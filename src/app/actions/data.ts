@@ -8,7 +8,7 @@ import { deleteAsset, resolveViewerContext } from '@/server/assets';
 import { loadHome } from '@/server/home';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
-import { closeAccount } from '@/server/accountClosure';
+import { closeAccount, closurePreview, type ClosurePreview } from '@/server/accountClosure';
 import { collectAccountData } from '@/server/exportData';
 
 /**
@@ -82,11 +82,22 @@ export async function deleteAllMyKeepsakesAction(nowISO: string): Promise<{ ok: 
  * erased — see closeAccount for exactly what goes and what (anonymised) money records stay.
  * Their sessions are deleted, so they're signed out everywhere on the next request.
  */
-export async function closeMyAccountAction(): Promise<{ ok: boolean; reason?: 'order-in-flight' }> {
+export async function closeMyAccountAction(
+  handOver?: { familyId: string; newOwnerAccountId: string } | null,
+): Promise<{ ok: boolean; reason?: 'order-in-flight' | 'bad-handover' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
-  const res = await closeAccount(getDb(), account.id);
-  if (!res.ok) return res.reason === 'order-in-flight' ? { ok: false, reason: 'order-in-flight' } : { ok: false };
+  const res = await closeAccount(getDb(), account.id, new Date(), {
+    handOver: handOver ? { familyId: String(handOver.familyId), newOwnerAccountId: String(handOver.newOwnerAccountId) } : null,
+  });
+  if (!res.ok) return res.reason === 'not-found' ? { ok: false } : { ok: false, reason: res.reason };
   revalidatePath('/', 'layout');
   return { ok: true };
+}
+
+/** What closing would do for the signed-in account — shown before they confirm. */
+export async function closurePreviewAction(): Promise<ClosurePreview | null> {
+  const account = await getCurrentAccount();
+  if (!account) return null;
+  return closurePreview(getDb(), account.id);
 }
