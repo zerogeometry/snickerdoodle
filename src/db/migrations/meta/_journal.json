@@ -253,6 +253,13 @@
       "when": 1791912799390,
       "tag": "0035_gigantic_power_pack",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1792058645635,
+      "tag": "0036_broad_sasquatch",
+      "breakpoints": true
     }
   ]
 }

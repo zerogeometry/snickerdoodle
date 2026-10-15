@@ -33,7 +33,8 @@ export const useUpload = create<{
   setAssetId: (id: string) => void;
   setOpaqueBg: (opaque: boolean) => void;
   setAspect: (aspect: number) => void;
-  setCutout: (c: { url: string; sourceObjectId: string }) => void;
+  /** The DESIGN products render from (bg-removed / studio-edited); null = the original. */
+  setCutout: (c: { url: string; sourceObjectId: string } | null) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 }>((set) => ({
   upload: null,
@@ -41,7 +42,7 @@ export const useUpload = create<{
   setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
   setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
   setAspect: (aspect) => set((s) => (s.upload ? { upload: { ...s.upload, aspect } } : {})),
-  setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout } } : {})),
+  setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout: cutout ?? undefined } } : {})),
   resetUpload: () => set({ upload: null }),
 }));
 

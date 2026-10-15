@@ -3,6 +3,7 @@
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
+import { cleanGeometry, saveStudio, studioStateForAsset, type StudioGeometry } from '@/server/studio-doc';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 
 /**
@@ -60,6 +61,47 @@ export async function saveCutoutMaskAction(input: { assetId: string; mask: strin
     const res = await applyCutoutMask(db, viewer, String(input.assetId), Buffer.from(m[1]!, 'base64'));
     const grant = await getStorageObjectGrant(db, res.objectId, viewer, 600);
     return { ok: true, url: grant.url, sourceObjectId: res.objectId };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Reopen the Studio: the saved recipe + the current transparency mask (data URL, or null). */
+export async function studioStateAction(input: { assetId: string }): Promise<{ ok: true; geometry: StudioGeometry; mask: string | null } | { ok: false }> {
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const db = getDb();
+  const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+  try {
+    const st = await studioStateForAsset(db, viewer, String(input.assetId));
+    return { ok: true, geometry: st.geometry, mask: st.mask ? `data:image/png;base64,${st.mask.toString('base64')}` : null };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Save the Studio (mask data URL or null, geometry) → the design products are made from. */
+export async function saveStudioAction(input: {
+  assetId: string;
+  mask: string | null;
+  geometry: StudioGeometry;
+  clearCutout?: boolean;
+}): Promise<{ ok: true; design: { url: string; sourceObjectId: string } | null; aspect: number } | { ok: false }> {
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const db = getDb();
+  const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+  let mask: Buffer | null = null;
+  if (input.mask) {
+    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(input.mask));
+    if (!m) return { ok: false };
+    mask = Buffer.from(m[1]!, 'base64');
+  }
+  try {
+    const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), clearCutout: input.clearCutout === true });
+    if (!res.sourceObjectId) return { ok: true, design: null, aspect: res.aspect };
+    const grant = await getStorageObjectGrant(db, res.sourceObjectId, viewer, 600);
+    return { ok: true, design: { url: grant.url, sourceObjectId: res.sourceObjectId }, aspect: res.aspect };
   } catch {
     return { ok: false };
   }

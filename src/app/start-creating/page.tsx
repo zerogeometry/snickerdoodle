@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCamera, IconCircleCheck, IconLock, IconPencil, IconRefresh, IconSparkles, IconUpload } from '@tabler/icons-react';
+import { IconCamera, IconCircleCheck, IconLock, IconPencil, IconRefresh, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -11,33 +11,23 @@ import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
-import { CutoutTouchUp } from '@/ui/components/CutoutTouchUp';
-import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
 import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
-import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
-import { startGuestUpload } from '@/app/actions/guestUpload';
-import { removeBackgroundAction } from '@/app/actions/magic';
+import { detectAspect, detectOpaqueBg, normalizeUpload, useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
   const setUpload = useUpload((s) => s.setUpload);
-  const setAssetId = useUpload((s) => s.setAssetId);
   const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
   const setAspect = useUpload((s) => s.setAspect);
-  const setCutout = useUpload((s) => s.setCutout);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [removingBg, setRemovingBg] = useState(false);
-  // The touch-up tool: opened to refine a cutout, or straight away when there's no plain paper.
-  const [touchUp, setTouchUp] = useState<{ assetId: string; intro?: string } | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [studioOpen, setStudioOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -95,52 +85,6 @@ export default function StartCreatingPage() {
     reader.readAsDataURL(file);
   };
 
-  // Ingest the upload as an ephemeral draft (once), so magic edits + the order have
-  // a real, content-safety-checked asset. Gated by the terms consent.
-  const ensureAsset = async (): Promise<string | null> => {
-    if (upload?.assetId) return upload.assetId;
-    if (!upload) return null;
-    try {
-      const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-      const fd = new FormData();
-      fd.append('image', blob, upload.name || 'drawing.png');
-      fd.append('termsAccepted', 'true');
-      const res = await startGuestUpload(fd);
-      if (res.ok && res.assetId) {
-        setAssetId(res.assetId);
-        return res.assetId;
-      }
-      toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
-      return null;
-    } catch {
-      toast('that didn’t upload — try again, or a smaller image');
-      return null;
-    }
-  };
-
-  // Fast-track: remove the background right here, without opening Customize.
-  const removeBg = async () => {
-    if (removingBg) return;
-    setRemovingBg(true);
-    try {
-      const assetId = await ensureAsset();
-      if (!assetId) return;
-      // Already cut out → refine it by hand.
-      if (upload?.cutout) return setTouchUp({ assetId });
-      const res = await removeBackgroundAction({ assetId });
-      if (res.ok) {
-        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
-        toast('background removed ✨');
-      } else if (res.reason === 'budget') toast('that’s all your magic edits for now');
-      // No plain paper to lift the art off (e.g. a painted background) — that's the parent's call:
-      // open the touch-up so they can tap the colour they'd like gone.
-      else if (res.reason === 'nochange') setTouchUp({ assetId, intro: 'no plain paper on this one — tap the colour you’d like gone' });
-      else toast('couldn’t do that — try again');
-    } finally {
-      setRemovingBg(false);
-    }
-  };
-
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
 
   return (
@@ -152,24 +96,6 @@ export default function StartCreatingPage() {
         onCapture={(dataUrl, name) => applyUpload(dataUrl, name)}
         onUploadInstead={() => fileRef.current?.click()}
       />
-      {upload ? (
-        <CutoutTouchUp
-          open={!!touchUp}
-          onClose={() => setTouchUp(null)}
-          assetId={touchUp?.assetId ?? null}
-          imageDataUrl={upload.dataUrl}
-          hasCutout={!!upload.cutout}
-          intro={touchUp?.intro}
-          onSaved={(c) => setCutout(c)}
-        />
-      ) : null}
-      <ImageStudio
-        open={studioOpen}
-        image={upload?.dataUrl ?? null}
-        onClose={() => setStudioOpen(false)}
-        onApply={(edited) => applyUpload(edited, upload?.name ?? 'drawing.png')}
-      />
-
       <FlowHeader
         wide={!!upload}
         middle={
@@ -260,17 +186,12 @@ export default function StartCreatingPage() {
                   variant="design"
                   size="lg"
                   className="w-full"
-                  onClick={removeBg}
-                  disabled={removingBg}
-                  // Nudge (same wobble as start-creating) ONLY when removing would do something:
-                  // the upload is detected as fully opaque and hasn't been bg-removed yet.
-                  attention={!removingBg && !upload.cutout && upload.opaqueBg === true}
+                  onClick={() => router.push('/studio')}
+                  // Nudge (same wobble as start-creating) when the photo still has its paper/background.
+                  attention={!upload.cutout && upload.opaqueBg === true}
                 >
-                  <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
-                  {removingBg ? 'removing…' : upload.cutout ? 'background removed · touch up' : 'remove background'}
-                </Button>
-                <Button variant="design" size="lg" className="w-full" onClick={() => setStudioOpen(true)}>
-                  <Icon icon={IconPencil} size={16} /> edit in studio
+                  <Icon icon={upload.cutout ? IconCircleCheck : IconPencil} size={16} />
+                  {upload.cutout ? 'edited · back to studio' : 'edit in studio'}
                 </Button>
               </div>
               <div className="mt-4 flex w-full items-start gap-2.5 rounded-[14px] border-2 border-leaf bg-leaf-pale p-3">

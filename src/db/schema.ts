@@ -258,6 +258,9 @@ export const assets = pgTable(
      * held only while its order needs it — making, delivery, and the 30-day reprint window after
      * dispatch — then erased by the normal purge. */
     keepDeclinedAt: timestamp('keep_declined_at', { withTimezone: true }),
+    /** The Studio's non-destructive recipe for this drawing: { rotate, flipH, flipV, crop }. The
+     * pixels it produces live in the 'design' derivative; the original is never changed. */
+    studioDoc: jsonb('studio_doc'),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
     createdAt,
