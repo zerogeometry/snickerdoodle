@@ -11,7 +11,7 @@ import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { mmToPx, seedCatalogue } from '@/server/catalogue';
 import { renderPrintFile } from '@/server/print/render';
-import { deleteObject, getS3, putObject } from '@/storage';
+import { deleteObject, getObjectBytes, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -286,5 +286,48 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
         message: { ...msg, message: 'you fucking idiot' },
       }),
     ).rejects.toThrow(/can’t be printed/);
+  });
+
+  describe('tees print from a SEE-THROUGH file (never a white rectangle); coloured tees get firm edges', () => {
+    // a cut-out: an opaque red square, a faint band (alpha 100) and a strong band (alpha 200)
+    const cutout = () =>
+      sharp({ create: { width: 1500, height: 1500, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+        .composite([
+          { input: { create: { width: 600, height: 600, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 1 } } }, left: 450, top: 450 },
+          { input: { create: { width: 1500, height: 100, channels: 4, background: { r: 30, g: 30, b: 200, alpha: 100 / 255 } } }, left: 0, top: 100 },
+          { input: { create: { width: 1500, height: 100, channels: 4, background: { r: 30, g: 30, b: 200, alpha: 200 / 255 } } }, left: 0, top: 1300 },
+        ])
+        .png()
+        .toBuffer();
+    const variant = async (sku: string) => (await db.select().from(productVariants).where(eq(productVariants.sku, sku)))[0]!.id;
+    const alphaAt = async (key: string) => {
+      const { data, info } = await sharp(await getObjectBytes(key)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      return (fx: number, fy: number) => data[(Math.round(fy * (info.height - 1)) * info.width + Math.round(fx * (info.width - 1))) * 4 + 3]!;
+    };
+
+    it('a navy tee: transparent around the art, faint pixels dropped, strong ones solid', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const assetId = await ingest(await cutout());
+      const res = await renderPrintFile(db, sam, { assetId, variantId: await variant('kidsTee-34years-frenchnavy'), transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+      keys.push(res.key);
+      // no trim on a garment: the file IS Prodigi's 3070×3070 front print area, at half scale (150dpi)
+      expect([res.widthPx, res.heightPx]).toEqual([1535, 1535]);
+      const a = await alphaAt(res.key);
+      expect(a(0.02, 0.5)).toBe(0); // no paper, no rectangle
+      expect(a(0.5, 0.5)).toBe(255); // the art
+      expect(a(0.5, 0.1)).toBe(0); // faint band: wouldn't print cleanly → not at all
+      expect(a(0.5, 0.9)).toBe(255); // strong band: solid
+    });
+
+    it('a white tee: still see-through around the art, soft edges kept (ink only, no underbase)', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const assetId = await ingest(await cutout());
+      const res = await renderPrintFile(db, sam, { assetId, variantId: await variant('kidsTee'), transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+      keys.push(res.key);
+      const a = await alphaAt(res.key);
+      expect(a(0.02, 0.5)).toBe(0);
+      expect(a(0.5, 0.1)).toBeGreaterThan(60);
+      expect(a(0.5, 0.1)).toBeLessThan(140);
+    });
   });
 });

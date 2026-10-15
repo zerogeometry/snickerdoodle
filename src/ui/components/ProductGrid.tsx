@@ -6,6 +6,7 @@ import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
 import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
 import { MUG_SWATCH, defaultTransformFor, resolveDisplayVariant } from '@/lib/catalogue-view';
+import { garmentHex, isGarmentKey } from '@/lib/garments';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const SWATCH: Record<string, string> = {
@@ -15,7 +16,7 @@ const SWATCH: Record<string, string> = {
 };
 // SWATCH above holds the REAL product material colours (a black frame, an oak frame…) — product
 // data, not brand styling, so they stay literal. Unknown colours fall back to a token.
-const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || SWATCH[name] || 'var(--color-line)';
+const swatch = (name: string, productKey?: string) => (productKey === 'mug' && MUG_SWATCH[name]) || (isGarmentKey(productKey) && garmentHex(name)) || SWATCH[name] || 'var(--color-line)';
 
 // Washi-tape colours, cycled by index so a grid looks hand-stuck but never random (no layout shift).
 const TAPES = ['honey', 'sky', 'berry', 'leaf'].map((t) => `color-mix(in srgb, var(--color-${t}) 80%, transparent)`);

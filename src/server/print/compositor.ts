@@ -9,6 +9,7 @@ import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
+import { firmEdges } from './apparel';
 import { perspectiveWarp } from './perspective';
 import { cylinderWarp } from './cylinder';
 
@@ -58,7 +59,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r16'; // r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r17'; // r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -432,7 +433,8 @@ async function renderFlat(args: {
     .toBuffer();
 
   const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
-  let designLayer = windowed;
+  // A coloured garment prints firm edges (see apparel.ts) — show exactly that.
+  let designLayer = materialClass === 'DARK_FABRIC' ? await firmEdges(windowed) : windowed;
   if (fx.blend === 'multiply') {
     // MULTIPLY reads white as "no ink" — flatten the window over white IMMEDIATELY.
     // The composite's premultiply round-trip leaves alpha-0 margins with BLACK rgb,
@@ -445,8 +447,8 @@ async function renderFlat(args: {
     // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a
     // background-removal can leave. Robust: if anything is off, fall back to the raw layer.
     try {
-      const rgb = await sharp(windowed).removeAlpha().toBuffer();
-      const alpha = await sharp(windowed).ensureAlpha().extractChannel(3).blur(0.8).toBuffer();
+      const rgb = await sharp(designLayer).removeAlpha().toBuffer();
+      const alpha = await sharp(designLayer).ensureAlpha().extractChannel(3).blur(0.8).toBuffer();
       designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
     } catch {
       // keep `windowed`

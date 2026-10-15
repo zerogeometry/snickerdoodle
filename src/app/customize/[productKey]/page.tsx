@@ -15,6 +15,7 @@ import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type Car
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
+import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -944,6 +945,22 @@ export default function CustomizePage() {
             </div>
           ) : null}
 
+          {isGarmentKey(product.key) ? (
+            <div className="mt-5 space-y-2">
+              {isDarkGarment(colour) && upload?.opaqueBg && !upload?.cutout ? (
+                <div role="status" className="rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
+                  <p className="font-semibold">on a coloured tee, the paper prints too — you’d get a pale square behind the drawing.</p>
+                  <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => router.push('/studio')}>
+                    <Icon icon={IconPencil} size={15} /> lift it off the paper in the studio
+                  </Button>
+                </div>
+              ) : null}
+              <p className="text-xs leading-relaxed text-ink-soft">
+                printed straight onto organic cotton, at the size shown — colours come out a touch softer than on screen.
+              </p>
+            </div>
+          ) : null}
+
           {quality ? (
             blocked ? (
               <div role="status" className="mt-5 rounded-[16px] border-2 border-cocoa bg-berry-pale p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
@@ -1144,6 +1161,7 @@ function Picker({
 
 function swatchColour(name: string, productKey?: string): string {
   if (productKey === 'mug' && MUG_SWATCH[name]) return MUG_SWATCH[name];
+  if (isGarmentKey(productKey)) return garmentHex(name) ?? 'var(--color-line)';
   const map: Record<string, string> = {
     oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
     natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',

@@ -10,6 +10,8 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
+import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
 import { assembleCardPrintSpread, CARD_SPREAD } from './cardPrint';
 import { renderCardBackBadge } from './cardBranding';
@@ -136,7 +138,23 @@ export async function renderPrintFile(
   const oy = Math.max(0, rect.y);
   const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
   const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
-  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).png().toBuffer();
+
+  outW = rect.canvasWidth;
+  outH = rect.canvasHeight;
+  // A garment (DTG) prints from a SEE-THROUGH file — never flattened, or a coloured tee gets a white
+  // rectangle — and on a coloured garment the edges are firm, exactly as the preview shows them.
+  if (variantRow?.key && DTG_GARMENT_KEYS.has(variantRow.key)) {
+    const colour = ((variantRow.attributes as Record<string, string>) ?? {}).colour;
+    const ink = isDarkGarment(colour) ? await firmEdges(part) : part;
+    out = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: ink, left: ox, top: oy }])
+      .png()
+      .withMetadata({ density: tpl.requiredDpi })
+      .toBuffer();
+    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+  }
+
   // The child's image placed on ONE opaque white face — the single-sided print file, and the
   // FRONT (left) face of a DUAL cushion.
   const face = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
@@ -144,8 +162,6 @@ export async function renderPrintFile(
     .png()
     .toBuffer();
 
-  outW = rect.canvasWidth;
-  outH = rect.canvasHeight;
   if (dual) {
     // BACK (right) face: a known palette colour → a solid fill; 'both' / null / unknown → the same
     // image again (image-both-sides), the safe default so the customer always gets their artwork.

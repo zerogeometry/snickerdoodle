@@ -6,6 +6,7 @@ import { getDb } from '@/db/client';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { setMockupTemplate, setMockupView } from '@/server/print/templates';
+import { ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, isDarkGarment, KIDS_TEE_CHEST_MM, KIDS_TEE_PRINT_MM, teePrintRegion } from '@/lib/garments';
 
 /**
  * DEV template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -218,10 +219,21 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     // fractions: print at its true physical ratio (kids 260mm on the 330mm 3-4y torso =
     // 78.8%; adult 396mm on 555mm M = 71.4%, same photo; bodysuit capped at 80% pending
     // the Rabbit Skins chart). Re-run the script if the sources change.
+    // Tees: the photo in the variant's OWN colour (derived per colour from the real packshot), and
+    // the print at its TRUE physical size for THAT size — the print is fixed (26×26 / 40×50cm),
+    // the tee isn't, so it fills more of a 3–4y than a 12–14y (src/lib/garments.ts). White prints
+    // ink only (multiply); coloured tees print on a white underbase, so the art sits OVER the
+    // fabric — paper left round a drawing shows as the pale rectangle it would print as.
     case 'kidsTee':
-      return { file: 'derived/tee-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.314, y0: 0.272, x1: 0.683, y1: 0.703 } };
-    case 'adultTee':
-      return { file: 'derived/tee-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.332, y0: 0.272, x1: 0.666, y1: 0.7 } };
+    case 'adultTee': {
+      const kids = key === 'kidsTee';
+      const chest = (kids ? KIDS_TEE_CHEST_MM : ADULT_TEE_CHEST_MM)[size] ?? (kids ? 330 : 555);
+      const file = !colour || colour === 'white' ? 'derived/tee-photo.png' : `derived/tee-photo-${colour.replace(/\s+/g, '-')}.png`;
+      return {
+        file, material: isDarkGarment(colour) ? 'DARK_FABRIC' : 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas',
+        region: teePrintRegion(kids ? KIDS_TEE_PRINT_MM : ADULT_TEE_PRINT_MM, chest),
+      };
+    }
     case 'babyBodysuit':
       return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
     case 'mug': {

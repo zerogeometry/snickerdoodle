@@ -14,11 +14,17 @@
 // (no white-on-white detection). Prints the measured chest-region fractions that
 // seed-mockups/route.ts hardcodes — re-run this script if the sources change.
 //
-// Run: node scripts/derive-garment-photo-blanks.mjs
+// COLOURED tees: the same packshot re-coloured per garment colour (src/lib/garments.ts) — the
+// fold shading is kept as a multiplier on the fabric colour, the background stays white, so every
+// colour a parent picks is previewed on a real tee shape. Approximate until the Stanley/Stella
+// colour packshots are in hand (to-do: project-office/todo/PRODIGI-APPAREL-CHECKS.md).
+//
+// Run: npx tsx scripts/derive-garment-photo-blanks.mjs   (tsx: it reads the garment colours)
 
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
+import { ADULT_TEE_COLOURS, KIDS_TEE_COLOURS } from '../src/lib/garments.ts';
 
 const SRC = path.join(process.cwd(), '.prodigi-assets', 'blanks', 'prodigi-garment-photos');
 const OUT = path.join(process.cwd(), '.prodigi-assets', 'blanks', 'derived');
@@ -63,7 +69,7 @@ async function measure(file, dominant, others) {
  * Derive the white blank: dominant channel as luminance (+lift), crop to garment
  * + margin, and report the chest-region fractions of the CROPPED canvas.
  */
-async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTopFrac }) {
+async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTopFrac, colours = [] }) {
   const m = await measure(file, dominant, others);
   const bw = m.bbox.x1 - m.bbox.x0;
   const bh = m.bbox.y1 - m.bbox.y0;
@@ -84,6 +90,49 @@ async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTop
   const white = await sharp(grey).png().toBuffer();
   await sharp(white).extract({ left, top, width, height }).png().toFile(path.join(OUT, out));
 
+  // Coloured versions: garment mask from the coloured source (soft-edged), fold shading as a
+  // multiplier around the chest median (contrast softened), the target colour times that —
+  // with a little lift toward white on highlights so dark fabric still reads its folds.
+  if (colours.length) {
+    const { data, info } = await sharp(path.join(SRC, file)).raw().toBuffer({ resolveWithObject: true });
+    const { width: W, height: H, channels: C } = info;
+    const mask = Buffer.alloc(W * H);
+    for (let k = 0; k < W * H; k++) {
+      const i = k * C;
+      const d = data[i + dominant];
+      const gap = Math.min(...others.map((o) => d - data[i + o]));
+      mask[k] = Math.max(0, Math.min(255, Math.round(((gap - 10) / 30) * 255)));
+    }
+    const blurred = await sharp(mask, { raw: { width: W, height: H, channels: 1 } }).blur(0.8).raw().toBuffer({ resolveWithObject: true });
+    const mc = blurred.info.channels; // sharp may hand back more than one channel — read the first
+    const softMask = (k) => blurred.data[k * mc];
+    let seed = 12345;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+    for (const c of colours) {
+      if (c.name === 'white') continue;
+      const T = [1, 3, 5].map((o) => parseInt(c.hex.slice(o, o + 2), 16));
+      const heather = c.name.includes('heather');
+      const outBuf = Buffer.alloc(W * H * 3);
+      for (let k = 0; k < W * H; k++) {
+        const i = k * C;
+        const sh = 1 + ((data[i + dominant] / m.median) - 1) * 0.85;
+        const s1 = Math.max(0.45, Math.min(1.3, sh));
+        const fleck = heather ? (rand() - 0.5) * 34 : 0;
+        const a = softMask(k) / 255;
+        for (let ch = 0; ch < 3; ch++) {
+          let v = T[ch] * Math.min(1, s1) + (255 - T[ch]) * Math.max(0, s1 - 1) * 0.5 + fleck;
+          v = Math.max(0, Math.min(255, v));
+          outBuf[k * 3 + ch] = Math.round(v * a + 255 * (1 - a));
+        }
+      }
+      const slug = c.name.replace(/\s+/g, '-');
+      await sharp(outBuf, { raw: { width: W, height: H, channels: 3 } })
+        .extract({ left, top, width, height })
+        .png()
+        .toFile(path.join(OUT, out.replace('.png', `-${slug}.png`)));
+    }
+  }
+
   // Chest region in cropped-canvas fractions: the print canvas width at its TRUE
   // physical ratio to the measured torso (printWmm / torsoMm), centred on the torso.
   const torsoPx = m.torso.x1 - m.torso.x0;
@@ -98,6 +147,8 @@ async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTop
   };
   const r4 = (n) => Math.round(n * 1000) / 1000;
   console.log(`${out}: ${width}x${height}  torso ${torsoPx}px  region { x0: ${r4(region.x0)}, y0: ${r4(region.y0)}, x1: ${r4(region.x1)}, y1: ${r4(region.y1)} }`);
+  // → src/lib/garments.ts TEE_PHOTO (the size-true preview regions are computed from these)
+  console.log(`  TEE_PHOTO = { torsoFrac: ${r4(torsoPx / width)}, centreX: ${r4(torsoCx / width)}, panelTop: ${r4(panelTop / height)}, aspect: ${r4(width / height)} }`);
 }
 
 // Kids/adult tee — Mini Creator blue flat packshot; kids 3-4y torso 330mm carries the
@@ -106,6 +157,7 @@ await derive({
   file: 'mini-creator-blue-flat.webp', out: 'tee-photo.png',
   dominant: 2, others: [0],
   printWmm: 260, torsoMm: 330, panelTopFrac: 0.24,
+  colours: [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS.filter((a) => !KIDS_TEE_COLOURS.some((k) => k.name === a.name))],
 });
 // Baby bodysuit — LAT 4411 red flat packshot; NB torso ≈190mm carries the 180mm print
 // capped at 80% (pending Rabbit Skins chart / Prodigi support confirmation).

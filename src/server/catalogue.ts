@@ -4,6 +4,7 @@ import { printTemplates, productVariantProviders, productVariants, products } fr
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
 import type { DbHandle } from './db';
+import { ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES } from '@/lib/garments';
 
 export { mmToPx };
 
@@ -26,6 +27,8 @@ type VariantDef = {
   prodigiSku?: string; // the live Prodigi SKU (absent ⇒ MANUAL-fulfilled, e.g. add-ons)
   prodigiAttrs?: Record<string, string>; // attributes to send to Prodigi at order time
   default?: boolean; // mark the default variant when it isn't the first (e.g. size M of XS–2XL)
+  /** Trim margin around the print (default 3mm). Garments have NO trim — the file IS the print area. */
+  bleedMm?: number;
 };
 type ProductDef = {
   category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON';
@@ -127,38 +130,33 @@ function mugVariants(): VariantDef[] {
   return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, wMm: 209, hMm: 98, prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
 }
 
-// Kids tee: Stanley/Stella Mini Creator — size AND colour are Prodigi attributes of ONE SKU.
-// Values are the exact Prodigi attribute strings. White is the cheaper tier; colours a touch more.
-// Print canvas 260×260mm: Prodigi's API printAreaSizes = 3070×3070px (@300dpi = 259.9mm),
-// IDENTICAL for every size — verified via GET /v4.0/products/TEE-SS-STTK909, 2026-07-07.
-const KTEE_SIZES = ['3-4 years', '5-6 years', '7-8 years', '9-11 years', '12-14 years'];
-const KTEE_COLOURS = [
-  { colour: 'white', attr: 'white', pricePence: 2495 },
-  { colour: 'blue', attr: 'caribbean blue', pricePence: 2695 },
-  { colour: 'pink', attr: 'cotton pink', pricePence: 2695 },
-];
+// Kids tee: Stanley/Stella Mini Creator 2.0 — size AND colour are Prodigi attributes of ONE SKU.
+// Every colour Prodigi offers (src/lib/garments.ts); white is the cheaper tier (£8 cost vs £9).
+// Print canvas 260×260mm: Prodigi's printAreaSizes = 3070×3070px (@300dpi), IDENTICAL for every
+// size — re-verified via GET /v4.0/products/TEE-SS-STTK909, 2026-10-15 (GB lab uk9).
 function kidsTeeVariants(): VariantDef[] {
-  return KTEE_SIZES.flatMap((size) =>
-    KTEE_COLOURS.map((c) => ({
-      size, colour: c.colour, pricePence: c.pricePence, wMm: 260, hMm: 260, dpi: 150,
+  return KIDS_TEE_SIZES.flatMap((size) =>
+    KIDS_TEE_COLOURS.map((c) => ({
+      size, colour: c.name, pricePence: c.name === 'white' ? 2495 : 2695, wMm: KIDS_TEE_PRINT_MM.w, hMm: KIDS_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
       prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr },
     })),
   );
 }
 
 // Adult tee: Stanley/Stella Sparker 2.0 (STTU171) — a UNISEX organic heavy tee, the grown-up
-// sibling of the kids' Mini Creator. ONE SKU for everyone (the Bella+Canvas womens tee was
-// dropped 2026-07-03: not organic, and unisex S/S keeps the family matching set in one garment
-// family). Size is a Prodigi attribute; £12 flat cost across XS–2XL, GB-fulfilled, tracked.
-// Print canvas 396×498mm: Prodigi's API printAreaSizes = 4677×5881px (@300dpi — the
-// standard 16×20″ DTG platen), IDENTICAL for every size — verified via
-// GET /v4.0/products/TEE-SS-STTM559, 2026-07-07.
+// sibling of the kids' Mini Creator (the family matching set stays in one garment family).
+// Size + colour are Prodigi attributes; £12 cost in every colour, GB lab uk9.
+// Print canvas 396×498mm: Prodigi's printAreaSizes = 4677×5881px (@300dpi — the full 16×20″
+// DTG platen), IDENTICAL for every size — re-verified via GET /v4.0/products/TEE-SS-STTM559,
+// 2026-10-15.
 function adultTeeVariants(): VariantDef[] {
-  return ['XS', 'S', 'M', 'L', 'XL', '2XL'].map((s) => ({
-    size: s, colour: 'white', pricePence: 3195, wMm: 396, hMm: 498, dpi: 150,
-    prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: 'white' },
-    default: s === 'M', // sizes display XS→2XL; M is the sane default
-  }));
+  return ADULT_TEE_SIZES.flatMap((s) =>
+    ADULT_TEE_COLOURS.map((c) => ({
+      size: s, colour: c.name, pricePence: 3195, wMm: ADULT_TEE_PRINT_MM.w, hMm: ADULT_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
+      prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: c.attr },
+      ...(s === 'M' && c.name === 'white' ? { default: true } : {}), // sizes display XS→2XL; M is the sane default
+    })),
+  );
 }
 
 // Baby bodysuit: Rabbit Skins LONG-sleeve 4411. The short-sleeve 4424 is GB-fulfilled only in
@@ -175,7 +173,7 @@ function adultTeeVariants(): VariantDef[] {
 function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
     size, colour: 'white', pricePence: 2195,
-    wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150,
+    wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150, bleedMm: 0,
     prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' },
   }));
 }
@@ -245,9 +243,9 @@ const DEFS: Record<string, ProductDef> = {
     ],
   },
   kidsTee: {
-    category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true,
+    category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true, visibleInShop: true,
     description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
-    specs: { material: 'organic cotton', care: 'wash at 30°' },
+    specs: { material: '100% organic cotton', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out' },
     variants: kidsTeeVariants(),
   },
   jigsaw: {
@@ -290,9 +288,9 @@ const DEFS: Record<string, ProductDef> = {
     ],
   },
   adultTee: {
-    category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true,
+    category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,
     description: "The grown-up version of the kids tee — the same organic cotton, sized up, with your little one's artwork on the front. A relaxed unisex fit for mums, dads and anyone in their fan club.",
-    specs: { material: 'organic cotton', fit: 'unisex, XS–2XL', care: 'wash at 30°' },
+    specs: { material: '100% organic cotton, heavyweight', fit: 'unisex, XS–2XL', print: 'up to 40 × 50 cm on the front', care: 'wash at 30°, inside out' },
     variants: adultTeeVariants(),
   },
   apron: {
@@ -330,7 +328,7 @@ const DEFS: Record<string, ProductDef> = {
 // lives only in the Full Catalogue — so the founder's incoming big list defaults to
 // full-catalogue-only until promoted here. Founder-curated for now; ready to be
 // driven by real order counts later. Order in this array = the popular rank.
-const POPULAR_ORDER = ['framedPrint', 'storybook', 'cushion', 'mug', 'jigsaw', 'kidsTee', 'blanket', 'babyBodysuit', 'card'];
+const POPULAR_ORDER = ['framedPrint', 'storybook', 'cushion', 'mug', 'jigsaw', 'kidsTee', 'adultTee', 'blanket', 'babyBodysuit', 'card'];
 function popularRankOf(key: string): number | null {
   const i = POPULAR_ORDER.indexOf(key);
   return i === -1 ? null : i + 1;
@@ -503,7 +501,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
         const hPx = mmToPx(v.hMm, dpi);
         const tpl = {
           orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
-          printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx,
+          printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,
           aspectMilli: Math.round((v.wMm / v.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
         };
         await db.insert(printTemplates).values({ variantId: variant!.id, ...tpl }).onConflictDoUpdate({ target: printTemplates.variantId, set: tpl });

@@ -15,7 +15,6 @@ import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
-import { FAMILY_SET_PRODUCT_KEYS } from '@/pricing';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
@@ -175,7 +174,8 @@ export function FlowCatalogue({
   // three garments are actually purchasable (an unseeded/partial catalogue would
   // otherwise open a dead-end set builder). With the curated storefront this also
   // parks the whole family-set flow until the garments graduate back on show.
-  const familySetAvailable = FAMILY_SET_PRODUCT_KEYS.every((k) => products.some((p) => p.key === k));
+  // the set needs the two tees; the (white-only) bodysuit joins when it's in the shop
+  const familySetAvailable = ['kidsTee', 'adultTee'].every((k) => products.some((p) => p.key === k));
 
   // "Full catalogue" earns its place only when it holds something beyond the sections
   // already on screen — a one-product storefront must not open a modal of the same tile.
@@ -239,7 +239,7 @@ export function FlowCatalogue({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block font-display text-base text-cocoa">dress the whole family</span>
-                <span className="block text-[12px] text-ink-soft">matching organic tees + a bodysuit for the littlest — 3+ pieces saves 5%</span>
+                <span className="block text-[12px] text-ink-soft">matching organic tees, one colour for everyone — 3+ pieces saves 5%</span>
               </span>
               <Icon icon={IconChevronRight} size={18} className="shrink-0 text-cocoa" />
             </button>
