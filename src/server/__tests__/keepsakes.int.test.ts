@@ -4,9 +4,9 @@ import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { assets, children } from '@/db/schema';
+import { accounts, assets, children, pendingKeeps } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
-import { keepAndFileCreations, keepUpload } from '@/server/keepsakes';
+import { finishPendingKeeps, keepAndFileCreations, keepUpload, purgeExpiredPendingKeeps, rememberKeepForEmail } from '@/server/keepsakes';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -127,6 +127,52 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
       const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
       expect([row!.familyId, row!.keptInHome]).toEqual([null, false]);
       expect(row!.purgeAfter).not.toBeNull();
+    });
+  });
+
+  describe('a guest’s "+ keepsake", finished after they sign in (any device)', () => {
+    const samAccount = async () => {
+      const [a] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, ids.samId));
+      return { id: ids.samId, name: 'Sam', email: a!.email! };
+    };
+
+    it('remembered at sign-in (claim-checked, email hashed), kept once that person signs in', async () => {
+      const a = await draft();
+      const sam = await samAccount();
+      expect(await rememberKeepForEmail(db, { assetId: a.assetId, email: `  ${sam.email.toUpperCase()} `, uploadClaims: [a.claimId] })).toBe(true);
+      const [req] = await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId));
+      expect(req!.emailHash).not.toContain('@'); // never the address itself
+      // signs in on another device: no cookie, no claims — the server finishes it anyway
+      expect(await finishPendingKeeps(db, sam)).toEqual([a.assetId]);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect([row!.controllerAccountId, row!.keptInHome, row!.purgeAfter]).toEqual([ids.samId, true, null]);
+      expect(await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId))).toHaveLength(0);
+    });
+
+    it('only the uploader can ask: without the draft’s claim nothing is remembered', async () => {
+      const a = await draft();
+      expect(await rememberKeepForEmail(db, { assetId: a.assetId, email: 'someone@example.com', uploadClaims: ['not-the-claim'] })).toBe(false);
+      expect(await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId))).toHaveLength(0);
+    });
+
+    it('a different person signing in keeps nothing', async () => {
+      const a = await draft();
+      await rememberKeepForEmail(db, { assetId: a.assetId, email: 'grandma@example.com', uploadClaims: [a.claimId] });
+      expect(await finishPendingKeeps(db, await samAccount())).toEqual([]);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect(row!.keptInHome).toBe(false);
+      await db.delete(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId));
+    });
+
+    it('a request nobody came back for expires: not kept, and cleaned up', async () => {
+      const a = await draft();
+      const sam = await samAccount();
+      const then = new Date(Date.now() - 2 * 86_400_000);
+      await rememberKeepForEmail(db, { assetId: a.assetId, email: sam.email, uploadClaims: [a.claimId], now: then });
+      expect(await purgeExpiredPendingKeeps(db)).toBeGreaterThanOrEqual(1);
+      expect(await finishPendingKeeps(db, sam)).toEqual([]);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect(row!.keptInHome).toBe(false);
     });
   });
 });

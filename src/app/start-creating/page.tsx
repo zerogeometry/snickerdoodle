@@ -16,7 +16,9 @@ import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
 import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
-import { detectAspect, detectOpaqueBg, normalizeUpload, useUpload } from '@/lib/store';
+import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
+import { takePendingKeep } from '@/lib/pending-keep';
+import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
@@ -48,6 +50,23 @@ export default function StartCreatingPage() {
   // stares at a grid of blank tiles. A safety timeout lifts it regardless.
   const [rangeReady, setRangeReady] = useState(false);
   const drawingKey = upload?.dataUrl ?? null;
+  // Back from signing in after a guest's "+ keepsake": put their drawing back on screen (same
+  // browser) and finish the keep (server-side — works on any device the link was opened on).
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('resume') !== 'keep') return;
+    void (async () => {
+      const saved = await takePendingKeep();
+      if (saved && !useUpload.getState().upload) setUpload(saved);
+      const res = await finishPendingKeepsAction();
+      const now = useUpload.getState().upload;
+      if (res.ok && now?.assetId && res.kept.includes(now.assetId)) setUpload({ ...now, kept: true });
+      if (res.kept.length) toast('kept in your keepsake box ♥');
+      else if (!res.ok) toast('sign in to keep your drawing');
+      router.replace('/start-creating');
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (!drawingKey) return;
     setRangeReady(false);

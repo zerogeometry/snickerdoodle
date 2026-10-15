@@ -3,7 +3,8 @@
 import { IconMail, IconShieldCheck, IconSparkles } from '@tabler/icons-react';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { rememberKeepAction } from '@/app/actions/keep';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
@@ -14,6 +15,9 @@ export default function LoginPage() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  // a guest's "+ keepsake": the drawing to keep once they're signed in
+  const [keepId, setKeepId] = useState<string | null>(null);
+  useEffect(() => setKeepId(new URLSearchParams(window.location.search).get('keep')), []);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,6 +31,9 @@ export default function LoginPage() {
       const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/home';
       // Auth.js emails (here: logs) a one-tap magic link; identity is verified
       // when they open it. We stay on the page and show the "check your email" state.
+      // ask the server to keep the drawing for THIS email (claim-checked) — it finishes on whichever
+      // device the link is opened on. Best-effort: sign-in goes ahead regardless.
+      if (keepId) await rememberKeepAction(keepId, email.trim()).catch(() => null);
       await signIn('email', { email: email.trim(), redirect: false, callbackUrl: next });
       setSent(true);
     } catch {
@@ -67,6 +74,11 @@ export default function LoginPage() {
               <p className="mt-2 text-center text-sm text-ink-soft">
                 New or coming back — pop in your email and we&apos;ll send a one-tap link. No passwords here.
               </p>
+              {keepId ? (
+                <p className="mt-3 rounded-[14px] bg-leaf-pale px-3 py-2 text-center text-xs font-semibold text-green-save">
+                  tap the link and your drawing goes straight into your keepsake box ♥
+                </p>
+              ) : null}
               <form onSubmit={submit} className="mt-5">
                 <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
                   Email

@@ -7,7 +7,7 @@ import { getDb } from '@/db/client';
 import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { ensureHomeFamily } from '@/server/onboarding';
-import { keepUpload } from '@/server/keepsakes';
+import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { VisibilityTier } from '@/domain/types';
 
@@ -52,6 +52,21 @@ export async function keepUploadAction(assetId: string): Promise<{ ok: boolean; 
   if (!(await keepUpload(getDb(), account, await getUploadClaims(), assetId))) return { ok: false };
   revalidatePath('/home');
   return { ok: true };
+}
+
+/** On the sign-in page: a guest's "+ keepsake" — keep it once THIS email signs in (claim-checked). */
+export async function rememberKeepAction(assetId: string, email: string): Promise<{ ok: boolean }> {
+  if (typeof assetId !== 'string' || typeof email !== 'string') return { ok: false };
+  return { ok: await rememberKeepForEmail(getDb(), { assetId, email, uploadClaims: await getUploadClaims() }) };
+}
+
+/** Back from signing in: finish any keep they asked for as a guest. */
+export async function finishPendingKeepsAction(): Promise<{ ok: boolean; kept: string[] }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, kept: [] };
+  const kept = await finishPendingKeeps(getDb(), account);
+  if (kept.length) revalidatePath('/home');
+  return { ok: true, kept };
 }
 
 /** Change a keepsake's visibility (controller-only; re-checked server-side). */

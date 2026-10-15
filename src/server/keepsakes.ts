@@ -1,5 +1,6 @@
-import { and, eq, inArray } from 'drizzle-orm';
-import { assets } from '@/db/schema';
+import { createHash } from 'node:crypto';
+import { and, eq, gt, inArray, lte, or } from 'drizzle-orm';
+import { assets, pendingKeeps } from '@/db/schema';
 import { adoptEphemeralDraft } from '@/server/assets';
 import { resolveChildSubject } from '@/server/children';
 import { ensureHomeFamily } from '@/server/onboarding';
@@ -65,4 +66,46 @@ export async function keepUpload(db: DbHandle, account: { id: string; name: stri
     .where(and(eq(assets.id, assetId), eq(assets.controllerAccountId, account.id)))
     .returning({ id: assets.id });
   return !!row;
+}
+
+// ── "+ keepsake" by a guest, finished after sign-in ─────────────────────────────────────────────
+
+const PENDING_KEEP_HOURS = 24;
+const emailHash = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+
+/**
+ * A guest tapped "+ keepsake", then asked to sign in with this email: remember to keep the drawing
+ * once that person is signed in. Only the uploader can ask (their claim must still match the
+ * draft); only a hash of the email is stored; it expires after a day.
+ */
+export async function rememberKeepForEmail(
+  db: DbHandle,
+  input: { assetId: string; email: string; uploadClaims: string[]; now?: Date },
+): Promise<boolean> {
+  const email = input.email?.trim();
+  if (!email || !email.includes('@')) return false;
+  const [row] = await db.select({ claim: assets.ephemeralClaimId }).from(assets).where(eq(assets.id, input.assetId));
+  if (!row?.claim || !input.uploadClaims.includes(row.claim)) return false; // not their draft (or already kept)
+  const now = input.now ?? new Date();
+  const hash = emailHash(email);
+  await db.delete(pendingKeeps).where(and(eq(pendingKeeps.assetId, input.assetId), eq(pendingKeeps.emailHash, hash)));
+  await db.insert(pendingKeeps).values({ assetId: input.assetId, claimId: row.claim, emailHash: hash, expiresAt: new Date(now.getTime() + PENDING_KEEP_HOURS * 3_600_000) });
+  return true;
+}
+
+/** Signed in: keep whatever this person asked to keep as a guest (any device). Returns the kept ids. */
+export async function finishPendingKeeps(db: DbHandle, account: { id: string; name: string | null; email: string }, now = new Date()): Promise<string[]> {
+  const hash = emailHash(account.email);
+  const rows = await db.select().from(pendingKeeps).where(and(eq(pendingKeeps.emailHash, hash), gt(pendingKeeps.expiresAt, now)));
+  const kept: string[] = [];
+  for (const r of rows) if (await keepUpload(db, account, [r.claimId], r.assetId)) kept.push(r.assetId);
+  // consumed or expired — either way, gone
+  await db.delete(pendingKeeps).where(or(eq(pendingKeeps.emailHash, hash), lte(pendingKeeps.expiresAt, now)));
+  return kept;
+}
+
+/** Retention: drop keep requests nobody came back for. */
+export async function purgeExpiredPendingKeeps(db: DbHandle, now = new Date()): Promise<number> {
+  const gone = await db.delete(pendingKeeps).where(lte(pendingKeeps.expiresAt, now)).returning({ id: pendingKeeps.id });
+  return gone.length;
 }

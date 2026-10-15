@@ -944,3 +944,20 @@ export const emailChangeRequests = pgTable('email_change_requests', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt,
 });
+
+// ── pending_keeps — "+ keepsake" tapped by a GUEST, finished after they sign in. ─────────────────
+// Recorded when the guest submits their email on the sign-in page, AFTER their upload claim is
+// verified (so only the uploader can ask). Holds a HASH of the email, never the address. Consumed
+// (deleted) when that person signs in — on any device, since the magic link often opens in an
+// email app's own browser — and expires after a day either way. The asset cascade means erasing
+// the drawing erases the request too.
+export const pendingKeeps = pgTable('pending_keeps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  assetId: uuid('asset_id')
+    .notNull()
+    .references(() => assets.id, { onDelete: 'cascade' }),
+  claimId: uuid('claim_id').notNull(),
+  emailHash: text('email_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt,
+});

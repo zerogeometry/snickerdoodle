@@ -18,6 +18,7 @@ import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
+import { savePendingKeep } from '@/lib/pending-keep';
 import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -72,7 +73,7 @@ export function FlowCatalogue({
   // "+ keepsake": keep THIS drawing in the family's keepsake box (signed-in; no second upload)
   const [keeping, setKeeping] = useState(false);
   const [keptId, setKeptId] = useState<string | null>(null);
-  const kept = !!upload?.assetId && keptId === upload.assetId;
+  const kept = !!upload?.assetId && (keptId === upload.assetId || upload.kept === true);
   // A single in-flight ingest, shared across clicks — so a slow first ingest can't
   // deadlock the catalogue (the previous global "busy" flag froze every button).
   const ingestRef = useRef<Promise<string | null> | null>(null);
@@ -121,9 +122,11 @@ export function FlowCatalogue({
       if (!id) return;
       const res = await keepUploadAction(id);
       if (res.needsAuth) {
-        // same as "+ keepsake" on a product page: keeping needs an account (the parent controls it)
-        toast('a quick sign-up keeps your keepsakes safe');
-        router.push(`/login?next=${encodeURIComponent('/start-creating')}`);
+        // keeping needs an account (the parent controls it): sign in, then we finish the keep —
+        // the drawing comes back on screen, and the server keeps it whichever device they sign in on
+        if (upload) await savePendingKeep({ ...upload, assetId: id });
+        toast('a quick sign-in and it’s kept');
+        router.push(`/login?next=${encodeURIComponent('/start-creating?resume=keep')}&keep=${encodeURIComponent(id)}`);
         return;
       }
       if (res.ok) setKeptId(id);
