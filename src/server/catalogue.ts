@@ -27,6 +27,9 @@ type VariantDef = {
   dpi?: number;
   prodigiSku?: string; // the live Prodigi SKU (absent ⇒ MANUAL-fulfilled, e.g. add-ons)
   prodigiAttrs?: Record<string, string>; // attributes to send to Prodigi at order time
+  /** Prodigi print areas the print file fills (default ['default']). Garments print to 'front';
+   * a jigsaw needs BOTH 'jigsaw' and its tin 'lid'. Frozen onto every order with the spec. */
+  printTo?: string[];
   default?: boolean; // mark the default variant when it isn't the first (e.g. size M of XS–2XL)
   /** Trim margin around the print (default 3mm). Garments have NO trim — the file IS the print area. */
   bleedMm?: number;
@@ -102,6 +105,7 @@ function jigsawVariants(): VariantDef[] {
       hMm: orientation === 'portrait' ? s.wMm : s.hMm,
       dpi: s.dpi,
       prodigiSku: s.sku,
+      printTo: ['jigsaw', 'lid'], // Prodigi REQUIRES both: the puzzle and the tin lid (same picture)
     })),
   );
 }
@@ -139,7 +143,7 @@ function kidsTeeVariants(): VariantDef[] {
   return KIDS_TEE_SIZES.flatMap((size) =>
     KIDS_TEE_COLOURS.map((c) => ({
       size, colour: c.name, pricePence: c.name === 'white' ? 2495 : 2695, wMm: KIDS_TEE_PRINT_MM.w, hMm: KIDS_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
-      prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr },
+      prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr }, printTo: ['front'],
     })),
   );
 }
@@ -154,7 +158,7 @@ function adultTeeVariants(): VariantDef[] {
   return ADULT_TEE_SIZES.flatMap((s) =>
     ADULT_TEE_COLOURS.map((c) => ({
       size: s, colour: c.name, pricePence: 3195, wMm: ADULT_TEE_PRINT_MM.w, hMm: ADULT_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
-      prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: c.attr },
+      prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: c.attr }, printTo: ['front'],
       ...(s === 'M' && c.name === 'white' ? { default: true } : {}), // sizes display XS→2XL; M is the sane default
     })),
   );
@@ -175,7 +179,7 @@ function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
     size, colour: 'white', pricePence: 2195,
     wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150, bleedMm: 0,
-    prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' },
+    prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' }, printTo: ['front'],
   }));
 }
 
@@ -510,7 +514,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       // placeholder), then upsert the correct one.
       const provider = v.prodigiSku ? 'PRODIGI' : 'MANUAL';
       const providerSku = v.prodigiSku ?? sku;
-      const providerConfig = v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : null;
+      const providerConfig = v.prodigiAttrs || v.printTo ? { ...(v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : {}), ...(v.printTo ? { printTo: v.printTo } : {}) } : null;
       await db
         .delete(productVariantProviders)
         .where(and(eq(productVariantProviders.variantId, variant!.id), ne(productVariantProviders.provider, provider)));

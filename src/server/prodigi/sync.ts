@@ -97,8 +97,11 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
     const warnings: string[] = [];
     // The order-time Prodigi attributes (size/colour for SKUs shared across variants)
     // are the only per-variant disambiguator — PRESERVE them across every sync write.
-    const prodigiAttrs = (r.providerConfig as { prodigiAttrs?: Record<string, string> } | null)?.prodigiAttrs;
-    const keepAttrs = prodigiAttrs ? { prodigiAttrs } : {};
+    const cfg = r.providerConfig as { prodigiAttrs?: Record<string, string>; printTo?: string[] } | null;
+    const prodigiAttrs = cfg?.prodigiAttrs;
+    // …and which print areas we fill (the order submission reads it): preserved too.
+    const printTo = cfg?.printTo;
+    const keepAttrs = { ...(prodigiAttrs ? { prodigiAttrs } : {}), ...(printTo ? { printTo } : {}) };
 
     let product: ProdigiProduct | null = null;
     try {
@@ -120,6 +123,13 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
 
     const shipsToGB = (product.variants ?? []).some((v) => v.shipsTo?.includes('GB'));
     if (!shipsToGB) warnings.push('does not ship to GB');
+
+    // Every REQUIRED print area must get our file, and we must only send areas that exist — or
+    // Prodigi rejects the order at submission (how the garments + jigsaw slipped through once).
+    const areas = product.printAreas ?? {};
+    const sendTo = printTo ?? ['default'];
+    for (const [name, a] of Object.entries(areas)) if (a?.required && !sendTo.includes(name)) warnings.push(`required print area "${name}" is not filled — set printTo in the catalogue`);
+    for (const name of sendTo) if (!(name in areas)) warnings.push(`print area "${name}" doesn't exist on Prodigi (has: ${Object.keys(areas).join(', ')})`);
 
     // Resolve Prodigi's colour axis ONCE (either spelling) — used for both the warning
     // and the snapshot, so they can never disagree.

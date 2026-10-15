@@ -377,7 +377,8 @@ async function submitOne(
       const key = keyByObjectId.get(l.printObjectId!);
       if (!key) throw new Error(`print object ${l.printObjectId} has no storage key`);
       const spec = l.spec as NonNullable<LineSpec>;
-      const cfg = (spec.providerConfig ?? null) as { prodigiAttrs?: Record<string, string> } | null;
+      const cfg = (spec.providerConfig ?? null) as { prodigiAttrs?: Record<string, string>; printTo?: string[] } | null;
+      const url = await presignProviderIngest(key);
       items.push({
         merchantReference: l.itemId,
         sku: spec.providerSku!,
@@ -385,13 +386,12 @@ async function submitOne(
         // The print file IS the full bleed canvas (renderer output) — fill exactly.
         sizing: 'fillPrintArea',
         ...(cfg?.prodigiAttrs ? { attributes: cfg.prodigiAttrs } : {}),
-        // One 'default' print area. VERIFIED correct for every current SKU incl. the double-sided
-        // cushions: GLOBAL-CUSH-{12X12-LIN,22X22-SUE}-DUAL each expose only { default: required }
-        // (not front/back), and their template is 2:1 double-wide — so the renderer's double-wide
-        // [front|back] file fills the one 'default' area. Verified against the sandbox product spec
-        // 2026-07-10; see project-office/briefs/DUAL-CUSHION-fulfilment.md. Revisit only if a future
-        // SKU reports multiple required print areas.
-        assets: [{ printArea: 'default', url: await presignProviderIngest(key) }],
+        // The print areas this SKU needs, from the FROZEN spec (catalogue `printTo`): 'default' for
+        // most (incl. the DUAL cushions' one 2:1 double-wide area — DUAL-CUSHION-fulfilment.md),
+        // 'front' for the garments, and BOTH 'jigsaw' + 'lid' for a jigsaw (same picture; Prodigi
+        // fills each). Re-verified for every SKU against the sandbox product specs, 2026-10-15; the
+        // catalogue sync warns if a SKU gains a required area we don't fill.
+        assets: (cfg?.printTo?.length ? cfg.printTo : ['default']).map((printArea) => ({ printArea, url })),
       });
     }
 

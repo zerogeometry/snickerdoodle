@@ -237,6 +237,26 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     expect(item.assets[0]!.printArea).toBe('default'); // …to the single required 'default' area
   });
 
+  it('a TEE prints to its required "front" area (garments have no "default" — Prodigi would reject it)', async () => {
+    const { orderId } = await paidOrder('kidsTee');
+    await renderUntilReady(orderId);
+    const transport = fakeTransport();
+    expect((await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId] })).submitted).toBe(1);
+    const item = transport.created[0]!.items[0]!;
+    expect(item.sku).toBe('TEE-SS-STTK909');
+    expect(item.assets.map((a) => a.printArea)).toEqual(['front']);
+  });
+
+  it('a JIGSAW fills BOTH required areas — the puzzle and the tin lid — with the same picture', async () => {
+    const { orderId } = await paidOrder('jigsaw');
+    await renderUntilReady(orderId);
+    const transport = fakeTransport();
+    expect((await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId] })).submitted).toBe(1);
+    const item = transport.created[0]!.items[0]!;
+    expect(item.assets.map((a) => a.printArea)).toEqual(['jigsaw', 'lid']);
+    expect(item.assets[0]!.url).toBe(item.assets[1]!.url);
+  });
+
   it('re-asserts the GATE at the egress moment — a child image never reaches the transport', async () => {
     const { orderId, assetId } = await paidOrder('framedPrint', 'DRAWING');
     await renderUntilReady(orderId); // READY (non-child at render time)
