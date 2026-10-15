@@ -50,14 +50,6 @@ import {
   type Work,
 } from '@/ui/studio/engine';
 
-const BACKDROPS: { name: string; value: string }[] = [
-  { name: 'see-through', value: 'checker' },
-  { name: 'white', value: '#ffffff' },
-  { name: 'black', value: '#111111' },
-  { name: 'navy', value: '#1f2b4d' },
-  { name: 'red', value: '#b3262a' },
-  { name: 'kraft', value: '#c8a57a' },
-];
 const HISTORY_CAP = 25;
 
 interface Snapshot {
@@ -103,7 +95,6 @@ export default function StudioPage() {
   const [everywhere, setEverywhere] = useState(true);
   const [fussy, setFussy] = useState(28);
   const [brush, setBrush] = useState(36);
-  const [backdrop, setBackdrop] = useState('checker');
   const [keepWhite, setKeepWhite] = useState(false);
   const [hadCutout, setHadCutout] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -264,7 +255,7 @@ export default function StudioPage() {
     if (g.background && !comparing) {
       ctx.fillStyle = g.background;
       ctx.fillRect(content.x, content.y, content.w, content.h);
-    } else if (backdrop === 'checker' || !(transparent || comparing)) {
+    } else {
       const tile = 12 / V.a;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(content.x, content.y, content.w, content.h);
@@ -272,9 +263,6 @@ export default function StudioPage() {
       for (let y = content.y; y < content.y + content.h; y += tile) {
         for (let x = content.x + (Math.floor((y - content.y) / tile) % 2 ? tile : 0); x < content.x + content.w; x += tile * 2) ctx.fillRect(x, y, tile, tile);
       }
-    } else {
-      ctx.fillStyle = backdrop;
-      ctx.fillRect(content.x, content.y, content.w, content.h);
     }
     const G = geometryMatrix(work.w, work.h, g);
     ctx.transform(G.a, G.b, G.c, G.d, G.e, G.f);
@@ -345,7 +333,7 @@ export default function StudioPage() {
         ctx.stroke();
       }
     }
-  }, [tick, stageSize, view, geo, shownGeo, backdrop, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen]);
 
   // ── history ──
   const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite });
@@ -654,7 +642,6 @@ export default function StudioPage() {
         await readMask(m.mask, workRef.current.alpha, workRef.current.w, workRef.current.h);
         setHadCutout(true);
         setKeepWhite(keep);
-        if (backdrop === 'checker') setBackdrop('#1f2b4d');
         setTick((t) => t + 1);
         toast('background removed ✨');
       }
@@ -686,7 +673,6 @@ export default function StudioPage() {
     setSelectedId(null);
     setHadCutout(false);
     setKeepWhite(false);
-    setBackdrop('checker');
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -781,7 +767,7 @@ export default function StudioPage() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -811,8 +797,6 @@ export default function StudioPage() {
   }
 
   const disabled: Partial<Record<ToolId, string>> = {};
-  if (geo.background) disabled.seeOn = 'the background is filled in';
-  else if (!transparent) disabled.seeOn = 'remove the background first';
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
@@ -850,8 +834,6 @@ export default function StudioPage() {
       setFussy={setFussy}
       brush={brush}
       setBrush={setBrush}
-      backdrop={backdrop}
-      setBackdrop={setBackdrop}
       onFlip={(axis) => {
         pushUndo();
         setGeo((g) => flipGeometry(g, axis));
@@ -1010,8 +992,6 @@ function ToolOptions(p: {
   setFussy: (v: number) => void;
   brush: number;
   setBrush: (v: number) => void;
-  backdrop: string;
-  setBackdrop: (v: string) => void;
   onFlip: (axis: 'h' | 'v') => void;
   onResetCrop: () => void;
   onDoneCrop: () => void;
@@ -1080,27 +1060,6 @@ function ToolOptions(p: {
             <p className="text-[11px] text-ink-soft">pinch or scroll to zoom in for the fiddly bits.</p>
           </Section>
           <Section label="switch to">{p.tool === 'erase' ? <div className="flex">{jump('restore', 'bring back')}</div> : <div className="flex">{jump('erase', 'eraser')}</div>}</Section>
-        </Stack>
-      );
-    case 'seeOn':
-      return (
-        <Stack>
-          <Section label="preview on">
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] justify-items-center gap-1.5" role="group" aria-label="preview on a colour">
-              {BACKDROPS.map((b) => (
-                <button
-                  key={b.value}
-                  type="button"
-                  aria-label={b.name}
-                  aria-pressed={p.backdrop === b.value}
-                  onClick={() => p.setBackdrop(b.value)}
-                  className={`h-11 w-11 rounded-full border-2 ${p.backdrop === b.value ? 'border-cocoa ring-2 ring-honey' : 'border-cocoa/30'}`}
-                  style={b.value === 'checker' ? { background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 12px 12px' } : { background: b.value }}
-                />
-              ))}
-            </div>
-            <p className="text-[11px] text-ink-soft">just a preview — it doesn’t change your design.</p>
-          </Section>
         </Stack>
       );
     case 'background':

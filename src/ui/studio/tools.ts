@@ -5,7 +5,6 @@ import {
   IconEraser,
   IconEye,
   IconFlipVertical,
-  IconPalette,
   IconRestore,
   IconRotateClockwise,
   IconBrush,
@@ -17,7 +16,7 @@ import {
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -88,7 +87,7 @@ export const TOOLS: ToolDef[] = [
     icon: IconColorPicker,
     kind: 'mode',
     key: 'C',
-    info: 'Tap a colour to make it see-through, everywhere it appears. Switch on “only the patch I tap” to remove just the patch you touch — handy when the same colour is in the drawing too.',
+    info: 'Tap a colour to make it see-through, everywhere it appears. Choose “just that patch” to remove only the patch you touch — handy when the same colour is in the drawing too.',
   },
   {
     id: 'text',
@@ -169,16 +168,6 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'K',
     info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
-  },
-  {
-    id: 'seeOn',
-    group: 'colour',
-    hint: 'preview it on the colours it might be printed on.',
-    label: 'see it on',
-    icon: IconPalette,
-    kind: 'mode',
-    key: 'S',
-    info: 'Preview your cut-out on the colours it might be printed on — a white mug, a navy tee, kraft paper. Available once something is see-through.',
   },
   {
     id: 'compare',

@@ -21,7 +21,7 @@ export function StudioToolbar({
   hidden = [],
 }: {
   active: ToolId | null;
-  /** Tools that can't be used right now (e.g. "see it on" before anything is see-through). */
+  /** Tools that can't be used right now (e.g. "background" before anything is see-through). */
   disabled: Partial<Record<ToolId, string>>;
   onTool: (id: ToolId) => void;
   /** Press-and-hold tools (compare). */
