@@ -97,4 +97,16 @@ describe('liftInk — lifting children’s art off the paper', () => {
     expect(Math.min(...rgb(300, 240))).toBeGreaterThan(245); // …as clean white, not shadowed grey
     expect(at(20, 20)).toBe(0); // outside still cleared
   });
+
+  it('handles a SMALL image (a screenshot / thumbnail) instead of declining', async () => {
+    const small = await sharp({ create: { width: 60, height: 60, channels: 3, background: { r: 255, g: 255, b: 255 } } })
+      .composite([{ input: { create: { width: 20, height: 20, channels: 3, background: { r: 30, g: 120, b: 200 } } }, left: 20, top: 20 }])
+      .png()
+      .toBuffer();
+    const res = await liftInk(small);
+    expect(res).not.toBeNull();
+    const { data, info } = await sharp(res!.buffer).raw().toBuffer({ resolveWithObject: true });
+    expect(data[(2 * info.width + 2) * 4 + 3]).toBe(0); // paper
+    expect(data[(30 * info.width + 30) * 4 + 3]).toBe(255); // the square
+  });
 });

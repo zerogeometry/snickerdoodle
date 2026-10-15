@@ -49,7 +49,7 @@ export interface InkLiftResult {
 }
 
 const ANALYSIS_EDGE = 900; // paper-model resolution (the field is smooth, so this is plenty)
-const GRID = 24; // paper-field cells along the longer side
+const GRID = 24; // paper-field cells along the longer side (fewer for small images — see gridFor)
 const MAX_PIXELS = 40_000_000;
 
 type RGB = [number, number, number];
@@ -131,7 +131,9 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
   };
 
   // ── Paper field: per-cell median of paper pixels, holes diffused from neighbours, smoothed ──
-  const cell = Math.max(W, H) / GRID;
+  // Each cell needs enough pixels to measure the paper: ~12px+ per cell, so a small image gets a
+  // coarser field instead of declining for lack of samples.
+  const cell = Math.max(W, H) / Math.max(2, Math.min(GRID, Math.floor(Math.max(W, H) / 12)));
   const GW = Math.ceil(W / cell);
   const GH = Math.ceil(H / cell);
   const field: (RGB | null)[] = new Array(GW * GH).fill(null);
@@ -151,7 +153,7 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
         }
       }
       const area = ((x1 - x0) * (y1 - y0)) / 4;
-      if (rs.length >= Math.max(6, area * 0.08)) {
+      if (rs.length >= Math.max(4, area * 0.08)) {
         // upper-median: paper is the BRIGHT end of what's left (ink only ever darkens it)
         const q = (a: number[]) => a.sort((p, n) => p - n)[Math.floor(a.length * 0.6)]!;
         field[gy * GW + gx] = [q(rs), q(gs), q(bs)];
