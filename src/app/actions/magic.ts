@@ -3,7 +3,8 @@
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
-import { cleanGeometry, saveStudio, studioStateForAsset, type StudioGeometry } from '@/server/studio-doc';
+import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
+import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 
 /**
@@ -67,14 +68,14 @@ export async function saveCutoutMaskAction(input: { assetId: string; mask: strin
 }
 
 /** Reopen the Studio: the saved recipe + the current transparency mask (data URL, or null). */
-export async function studioStateAction(input: { assetId: string }): Promise<{ ok: true; geometry: StudioGeometry; mask: string | null } | { ok: false }> {
+export async function studioStateAction(input: { assetId: string }): Promise<{ ok: true; geometry: StudioGeometry; objects: StudioObject[]; mask: string | null } | { ok: false }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
   const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
   try {
     const st = await studioStateForAsset(db, viewer, String(input.assetId));
-    return { ok: true, geometry: st.geometry, mask: st.mask ? `data:image/png;base64,${st.mask.toString('base64')}` : null };
+    return { ok: true, geometry: st.geometry, objects: st.objects, mask: st.mask ? `data:image/png;base64,${st.mask.toString('base64')}` : null };
   } catch {
     return { ok: false };
   }
@@ -85,8 +86,9 @@ export async function saveStudioAction(input: {
   assetId: string;
   mask: string | null;
   geometry: StudioGeometry;
+  objects?: StudioObject[];
   clearCutout?: boolean;
-}): Promise<{ ok: true; design: { url: string; sourceObjectId: string } | null; aspect: number } | { ok: false }> {
+}): Promise<{ ok: true; design: { url: string; sourceObjectId: string } | null; aspect: number } | { ok: false; reason?: 'text' }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
@@ -98,11 +100,13 @@ export async function saveStudioAction(input: {
     mask = Buffer.from(m[1]!, 'base64');
   }
   try {
-    const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), clearCutout: input.clearCutout === true });
+    const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, clearCutout: input.clearCutout === true });
     if (!res.sourceObjectId) return { ok: true, design: null, aspect: res.aspect };
     const grant = await getStorageObjectGrant(db, res.sourceObjectId, viewer, 600);
     return { ok: true, design: { url: grant.url, sourceObjectId: res.sourceObjectId }, aspect: res.aspect };
-  } catch {
+  } catch (e) {
+    if (e instanceof StudioTextError) return { ok: false, reason: 'text' };
+    console.warn('[studio] save failed:', e instanceof Error ? e.message : e);
     return { ok: false };
   }
 }

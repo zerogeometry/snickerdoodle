@@ -25,6 +25,10 @@ import { startGuestUpload } from '@/app/actions/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
+import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
+import { boxOf, drawObject, drawStroke, hits, moveObject, scaleObject, type Frame } from '@/ui/studio/objects-canvas';
+import { CARD_FONTS } from '@/lib/card-fonts';
+import { flipObjects, rotateObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import type { ToolId } from '@/ui/studio/tools';
 import {
   IDENTITY,
@@ -59,7 +63,10 @@ const HISTORY_CAP = 25;
 interface Snapshot {
   alpha: Uint8ClampedArray;
   geo: Geometry;
+  objects: StudioObject[];
 }
+const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
+const newId = () => Math.random().toString(36).slice(2, 10);
 
 /**
  * The Studio (Phase 1: the image tools). Full screen, app-like; the original upload is never
@@ -102,6 +109,15 @@ export default function StudioPage() {
   const [confirmStart, setConfirmStart] = useState(false);
   const [, setHistoryTick] = useState(0);
   const lastBgPush = useRef(0);
+  // ── added things (phase 2) ──
+  const [objects, setObjects] = useState<StudioObject[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false });
+  const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118' });
+  const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', outline: true });
+  const liveStroke = useRef<number[] | null>(null);
+  const lastEditPush = useRef(0);
+  const selected = objects.find((o) => o.id === selectedId) ?? null;
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -138,6 +154,7 @@ export default function StudioPage() {
         const st = await studioStateAction({ assetId: id });
         if (st.ok) {
           g = st.geometry;
+          setObjects(st.objects);
           if (st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
@@ -159,6 +176,11 @@ export default function StudioPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upload?.dataUrl]);
+
+  // canvas text needs the card fonts loaded first
+  useEffect(() => {
+    void Promise.all(CARD_FONTS.map((f) => document.fonts.load(`40px ${f.css}`).catch(() => null))).then(() => setTick((t) => t + 1));
+  }, []);
 
   // ── stage size ──
   useEffect(() => {
@@ -250,6 +272,50 @@ export default function StudioPage() {
     ctx.drawImage(pic, 0, 0);
     ctx.restore();
 
+    // added things — in geometry px (no G matrix), clipped to the picture
+    if (!comparing) {
+      const f: Frame = { gw, gh };
+      ctx.save();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.transform(V.a, V.b, V.c, V.d, V.e, V.f);
+      ctx.beginPath();
+      ctx.rect(content.x, content.y, content.w, content.h);
+      ctx.clip();
+      for (const o of objects) drawObject(ctx, o, f);
+      if (liveStroke.current) drawStroke(ctx, { colour: pen.colour, width: pen.width, points: liveStroke.current }, f);
+      ctx.restore();
+
+      // selection: dashed box, corner resize handle, top turn handle (screen space)
+      const sel = tool === 'select' || tool === 'text' ? objects.find((o) => o.id === selectedId) : null;
+      if (sel) {
+        const b = boxOf(sel, f);
+        const a = (b.rotation * Math.PI) / 180;
+        const pt = (lx: number, ly: number) => V.transformPoint(new DOMPoint(b.cx + lx * Math.cos(a) - ly * Math.sin(a), b.cy + lx * Math.sin(a) + ly * Math.cos(a)));
+        const pad = 6 / V.a;
+        const c = [pt(-b.w / 2 - pad, -b.h / 2 - pad), pt(b.w / 2 + pad, -b.h / 2 - pad), pt(b.w / 2 + pad, b.h / 2 + pad), pt(-b.w / 2 - pad, b.h / 2 + pad)];
+        ctx.save();
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.strokeStyle = '#2b2118';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        c.forEach((q, i) => (i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)));
+        ctx.closePath();
+        ctx.stroke();
+        ctx.setLineDash([]);
+        const handle = (q: DOMPoint, fill: string) => {
+          ctx.beginPath();
+          ctx.arc(q.x, q.y, 10, 0, Math.PI * 2);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.stroke();
+        };
+        handle(c[2]!, '#f6c445'); // resize
+        if (sel.type !== 'stroke') handle(pt(0, -b.h / 2 - pad - 28 / V.a), '#8fb5d6'); // turn
+        ctx.restore();
+      }
+    }
+
     // crop overlay: dim outside the box, chunky corner handles
     if (cropping) {
       const c = geo.crop;
@@ -274,10 +340,10 @@ export default function StudioPage() {
         ctx.stroke();
       }
     }
-  }, [tick, stageSize, view, geo, shownGeo, backdrop, transparent, comparing, cropping, viewMatrix, ready]);
+  }, [tick, stageSize, view, geo, shownGeo, backdrop, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen]);
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -288,6 +354,8 @@ export default function StudioPage() {
   const restore = (s: Snapshot) => {
     workRef.current!.alpha.set(s.alpha);
     setGeo(s.geo);
+    setObjects(s.objects);
+    if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
   const undo = () => {
@@ -309,7 +377,7 @@ export default function StudioPage() {
 
   // ── pointer handling: tools, pinch-zoom, pan ──
   const pointers = useRef(new Map<number, { x: number; y: number; type: string }>());
-  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop'; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
+  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn'; obj?: StudioObject; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
 
   const local = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -334,6 +402,11 @@ export default function StudioPage() {
 
     // two fingers → pinch / pan (cancel any half-done stroke)
     if (pointers.current.size === 2) {
+      if (gesture.current?.kind === 'stroke' && liveStroke.current) {
+        liveStroke.current = null; // a pinch started mid-line: drop the half-drawn stroke
+        undoStack.current.pop();
+        setTick((t) => t + 1);
+      }
       if (gesture.current?.kind === 'paint' && gesture.current.startSnap) {
         workRef.current.alpha.set(gesture.current.startSnap.alpha);
         undoStack.current.pop();
@@ -344,6 +417,61 @@ export default function StudioPage() {
       return;
     }
 
+    const frame = (): Frame => {
+      const [gw, gh] = rotatedSize(workRef.current!.w, workRef.current!.h, geo.rotate);
+      return { gw, gh };
+    };
+    if (tool === 'draw' && !(pen.stylusOnly && e.pointerType === 'touch')) {
+      const f = frame();
+      const [gx, gy] = toGeoSpace(sx, sy);
+      pushUndo();
+      liveStroke.current = [gx / f.gw, gy / f.gh, e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5];
+      gesture.current = { kind: 'stroke', smooth: [gx, gy] };
+      setTick((t) => t + 1);
+      return;
+    }
+    if (tool === 'select' || tool === 'text') {
+      const f = frame();
+      const [gx, gy] = toGeoSpace(sx, sy);
+      const sel = objects.find((o) => o.id === selectedId);
+      if (sel) {
+        // the handles first
+        const b = boxOf(sel, f);
+        const a = (b.rotation * Math.PI) / 180;
+        const V = viewMatrix(geo);
+        const pt = (lx: number, ly: number) => V.transformPoint(new DOMPoint(b.cx + lx * Math.cos(a) - ly * Math.sin(a), b.cy + lx * Math.sin(a) + ly * Math.cos(a)));
+        const pad = 6 / V.a;
+        const rz = pt(b.w / 2 + pad, b.h / 2 + pad);
+        const tn = pt(0, -b.h / 2 - pad - 28 / V.a);
+        if (Math.hypot(rz.x - sx, rz.y - sy) < 24) {
+          pushUndo();
+          gesture.current = { kind: 'scale', obj: sel, startDist: Math.hypot(gx - b.cx, gy - b.cy) };
+          return;
+        }
+        if (sel.type !== 'stroke' && Math.hypot(tn.x - sx, tn.y - sy) < 24) {
+          pushUndo();
+          gesture.current = { kind: 'turn', obj: sel, startAngle: Math.atan2(gy - b.cy, gx - b.cx) };
+          return;
+        }
+      }
+      const slop = 10 / viewMatrix(geo).a;
+      const hit = [...objects].reverse().find((o) => (tool === 'text' ? o.type === 'text' : true) && hits(o, f, gx, gy, slop));
+      if (hit) {
+        setSelectedId(hit.id);
+        pushUndo();
+        gesture.current = { kind: 'move', obj: hit, g0: [gx, gy] };
+        return;
+      }
+      if (tool === 'text') {
+        // a new text box where they tapped
+        pushUndo();
+        const o: StudioObject = { id: newId(), type: 'text', text: 'your words', font: textStyle.font, colour: textStyle.colour, size: 0.12, x: gx / f.gw, y: gy / f.gh, rotation: 0 };
+        setObjects((os) => [...os, o]);
+        setSelectedId(o.id);
+        return;
+      }
+      setSelectedId(null);
+    }
     if (tool === 'removeColour') {
       const [ix, iy] = toImage(sx, sy);
       if (ix < 0 || iy < 0 || ix >= workRef.current.w || iy >= workRef.current.h) return;
@@ -402,6 +530,40 @@ export default function StudioPage() {
       setView({ zoom, panX: mid[0] - cx - k * (gst.m0![0] - cx - gst.pan0![0]), panY: mid[1] - cy - k * (gst.m0![1] - cy - gst.pan0![1]) });
       return;
     }
+    if (gst.kind === 'stroke' && liveStroke.current) {
+      const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+      const [gx, gy] = toGeoSpace(sx, sy);
+      // smoothing: follow the pointer with a little lag, which irons out wobble
+      const k = 1 - pen.smooth * 0.85;
+      const [px0, py0] = gst.smooth!;
+      const nx = px0 + (gx - px0) * k, ny = py0 + (gy - py0) * k;
+      const last = liveStroke.current;
+      const lx = last[last.length - 3]! * gw, ly = last[last.length - 2]! * gh;
+      if (Math.hypot(nx - lx, ny - ly) >= 0.6 && last.length < 4000 * 3) {
+        last.push(nx / gw, ny / gh, e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5);
+      }
+      gst.smooth = [nx, ny];
+      setTick((t) => t + 1);
+      return;
+    }
+    if ((gst.kind === 'move' || gst.kind === 'scale' || gst.kind === 'turn') && gst.obj) {
+      const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+      const f: Frame = { gw, gh };
+      const [gx, gy] = toGeoSpace(sx, sy);
+      const o0 = gst.obj;
+      let next: StudioObject;
+      if (gst.kind === 'move') next = moveObject(o0, f, gx - gst.g0![0], gy - gst.g0![1]);
+      else if (gst.kind === 'scale') {
+        const b = boxOf(o0, f);
+        next = scaleObject(o0, f, Math.hypot(gx - b.cx, gy - b.cy) / Math.max(1, gst.startDist!));
+      } else {
+        const b = boxOf(o0, f);
+        const deg = ((Math.atan2(gy - b.cy, gx - b.cx) - gst.startAngle!) * 180) / Math.PI;
+        next = o0.type === 'stroke' ? o0 : { ...o0, rotation: Math.round((o0.rotation + deg) * 2) / 2 };
+      }
+      setObjects((os) => os.map((o) => (o.id === o0.id ? next : o)));
+      return;
+    }
     if (gst.kind === 'pan') {
       setView((v) => ({ ...v, panX: gst.pan0![0] + sx - gst.m0![0], panY: gst.pan0![1] + sy - gst.m0![1] }));
       return;
@@ -439,6 +601,11 @@ export default function StudioPage() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (gesture.current?.kind === 'stroke' && liveStroke.current) {
+      const points = liveStroke.current;
+      liveStroke.current = null;
+      setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points }]);
+    }
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 0) gesture.current = null;
   };
@@ -492,8 +659,10 @@ export default function StudioPage() {
     if (id === 'rotate') {
       pushUndo();
       setGeo((g) => rotateGeometry(g));
+      setObjects((os) => rotateObjects(os));
       return;
     }
+    if (!ADDING.includes(id)) setSelectedId(null);
     if (id === 'startAgain') return setConfirmStart(true);
     setTool((t) => (t === id ? null : id));
     if (id === 'removeBg' && !hadCutout && !busy) void runRemoveBg(keepWhite);
@@ -504,6 +673,8 @@ export default function StudioPage() {
     pushUndo();
     workRef.current.alpha.set(sourceAlpha.current);
     setGeo(IDENTITY);
+    setObjects([]);
+    setSelectedId(null);
     setHadCutout(false);
     setKeepWhite(false);
     setBackdrop('checker');
@@ -521,8 +692,8 @@ export default function StudioPage() {
     setBusy('saving…');
     try {
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, clearCutout: !see });
-      if (!res.ok) return toast('that didn’t save — try again');
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: !see });
+      if (!res.ok) return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
       setCutout(res.design);
       setAspect(res.aspect);
       setDirty(false);
@@ -533,6 +704,49 @@ export default function StudioPage() {
     }
   };
   const backToRange = () => router.push('/start-creating');
+
+  // ── added-thing actions ──
+  const updateSelected = (patch: Partial<StudioObject>, group = false) => {
+    if (!selectedId) return;
+    if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
+    lastEditPush.current = Date.now();
+    setObjects((os) => os.map((o) => (o.id === selectedId ? ({ ...o, ...patch } as StudioObject) : o)));
+  };
+  const deleteSelected = () => {
+    if (!selectedId) return;
+    pushUndo();
+    setObjects((os) => os.filter((o) => o.id !== selectedId));
+    setSelectedId(null);
+  };
+  const duplicateSelected = () => {
+    const o = objects.find((x) => x.id === selectedId);
+    if (!o || !workRef.current) return;
+    pushUndo();
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const copy = { ...moveObject(o, { gw, gh }, Math.min(gw, gh) * 0.04, Math.min(gw, gh) * 0.04), id: newId() } as StudioObject;
+    setObjects((os) => [...os, copy]);
+    setSelectedId(copy.id);
+  };
+  const reorder = (dir: 1 | -1) => {
+    const i = objects.findIndex((o) => o.id === selectedId);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= objects.length) return;
+    pushUndo();
+    const next = objects.slice();
+    [next[i], next[j]] = [next[j]!, next[i]!];
+    setObjects(next);
+  };
+  const addShape = (shape: ShapeKind) => {
+    if (!workRef.current) return;
+    pushUndo();
+    // in the middle of what's on screen
+    const [cxG, cyG] = toGeoSpace(stageSize.w / 2, stageSize.h / 2);
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const o: StudioObject = { id: newId(), type: 'shape', shape, fill: shapeStyle.fill, outline: shapeStyle.outline, x: cxG / gw, y: cyG / gh, w: 0.25, h: 0.25, rotation: 0 };
+    setObjects((os) => [...os, o]);
+    setSelectedId(o.id);
+    setTool('select');
+  };
   const onBack = () => (dirty ? setLeaving(true) : backToRange());
 
   // ── keyboard (desktop) ──
@@ -550,11 +764,15 @@ export default function StudioPage() {
         return redo();
       }
       if (mod) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+        e.preventDefault();
+        return deleteSelected();
+      }
       if (e.key === ' ') {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
       if (id) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -589,7 +807,24 @@ export default function StudioPage() {
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
-  const options = (
+  const options = tool && ADDING.includes(tool) ? (
+    <AddedOptions
+      tool={tool}
+      pen={pen}
+      setPen={setPen}
+      textStyle={textStyle}
+      setTextStyle={setTextStyle}
+      shapeStyle={shapeStyle}
+      setShapeStyle={setShapeStyle}
+      selected={tool === 'text' && selected?.type !== 'text' ? null : selected}
+      onUpdate={updateSelected}
+      onAddShape={addShape}
+      onDelete={deleteSelected}
+      onDuplicate={duplicateSelected}
+      onForward={() => reorder(1)}
+      onBack={() => reorder(-1)}
+    />
+  ) : (
     <ToolOptions
       tool={tool}
       hadCutout={hadCutout}
@@ -608,6 +843,7 @@ export default function StudioPage() {
       onFlip={(axis) => {
         pushUndo();
         setGeo((g) => flipGeometry(g, axis));
+        setObjects((os) => flipObjects(os, axis));
       }}
       onResetCrop={() => {
         pushUndo();
@@ -669,7 +905,7 @@ export default function StudioPage() {
               onWheel={onWheel}
               aria-label="your drawing — use the tools to edit it"
               className="absolute inset-0 touch-none select-none"
-              style={{ cursor: tool === 'removeColour' ? 'crosshair' : tool === 'erase' || tool === 'restore' ? 'cell' : 'grab' }}
+              style={{ cursor: tool === 'removeColour' || tool === 'draw' ? 'crosshair' : tool === 'erase' || tool === 'restore' ? 'cell' : tool === 'text' ? 'text' : tool === 'select' ? 'move' : 'grab' }}
             />
           ) : (
             <div role="status" className="flex h-full items-center justify-center text-sm text-ink-soft">

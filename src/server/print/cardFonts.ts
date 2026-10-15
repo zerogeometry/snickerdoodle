@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createRequire } from 'node:module';
 import type { CardFontToken } from '@/lib/card-fonts';
 
@@ -21,9 +22,14 @@ const FONT_FILES: Record<CardFontToken, string> = {
   baloo: '@fontsource/baloo-2/files/baloo-2-latin-400-normal.woff',
 };
 
-// Resolve relative to THIS module (works in dev, vitest and the traced server bundle), then cache
-// the bytes — a card render must never hit the filesystem more than once per font per process.
+// Find the font file: first from the app's own node_modules (what the Next.js server bundle needs —
+// inside it, module-relative resolution of these asset paths fails), then module-relative (vitest,
+// scripts). Cache the bytes — a render must never hit the filesystem more than once per font.
 const req = createRequire(import.meta.url);
+function resolveFontFile(spec: string): string {
+  const fromCwd = path.join(process.cwd(), 'node_modules', spec);
+  return existsSync(fromCwd) ? fromCwd : req.resolve(spec);
+}
 const cache = new Map<CardFontToken, Buffer>();
 
 /** The raw WOFF bytes for a card font token, read once and cached. Throws if the face is missing
@@ -31,7 +37,7 @@ const cache = new Map<CardFontToken, Buffer>();
 export function loadCardFontWoff(token: CardFontToken): Buffer {
   const hit = cache.get(token);
   if (hit) return hit;
-  const buf = readFileSync(req.resolve(FONT_FILES[token]));
+  const buf = readFileSync(resolveFontFile(FONT_FILES[token]));
   cache.set(token, buf);
   return buf;
 }

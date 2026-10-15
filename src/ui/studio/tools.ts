@@ -10,10 +10,14 @@ import {
   IconRotateClockwise,
   IconBrush,
   IconBucketDroplet,
+  IconPencil,
+  IconPointer,
+  IconShape,
+  IconTypography,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'background' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export interface ToolDef {
   id: ToolId;
@@ -76,6 +80,38 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'K',
     info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
+  },
+  {
+    id: 'draw',
+    label: 'draw',
+    icon: IconPencil,
+    kind: 'mode',
+    key: 'P',
+    info: 'Draw on top with a finger, mouse or stylus — pressing harder with a stylus makes a thicker line. Turn on “stylus only” so a resting hand doesn’t leave marks.',
+  },
+  {
+    id: 'text',
+    label: 'add text',
+    icon: IconTypography,
+    kind: 'mode',
+    key: 'T',
+    info: 'Tap where you’d like words — a name, a date, a little message — then type. Pick a font, size and colour.',
+  },
+  {
+    id: 'shapes',
+    label: 'shapes',
+    icon: IconShape,
+    kind: 'mode',
+    key: 'H',
+    info: 'Add a heart, star, sun, cloud and more. Then drag to move it and use the corner to resize.',
+  },
+  {
+    id: 'select',
+    label: 'move & size',
+    icon: IconPointer,
+    kind: 'mode',
+    key: 'V',
+    info: 'Tap anything you’ve added to move it, resize it from the corner, turn it with the top handle, change it, or delete it.',
   },
   {
     id: 'rotate',

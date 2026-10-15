@@ -9,7 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { IDENTITY_GEOMETRY, saveStudio, studioStateForAsset } from '@/server/studio-doc';
+import { IDENTITY_GEOMETRY, saveStudio, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
 import { derivativeKey, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -93,5 +93,34 @@ describe.skipIf(!DB || !S3)('studio save — non-destructive design', () => {
     expect(at(40, 50)[3]).toBe(255);
     const st = await studioStateForAsset(db, sam, a.assetId);
     expect(st.geometry.background).toBe('#2f5da8');
+  });
+
+  it('added words + shapes are drawn into the design at full size and reopen as editable objects', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const objects = [
+      { id: 's', type: 'shape', shape: 'square', fill: '#d7352c', outline: false, x: 0.75, y: 0.5, w: 0.3, h: 0.3, rotation: 0 },
+      { id: 't', type: 'text', text: 'Mia', font: 'baloo', colour: '#2b2118', size: 0.2, x: 0.5, y: 0.2, rotation: 0 },
+    ];
+    const res = await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects });
+    expect(res.sourceObjectId).not.toBeNull();
+    const { data, info } = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect(info.width).toBeGreaterThanOrEqual(600); // small designs are upscaled so overlays print crisp
+    const at = (fx: number, fy: number) => {
+      const i = (Math.round(fy * info.height) * info.width + Math.round(fx * info.width)) * 4;
+      return [...data.subarray(i, i + 3)];
+    };
+    expect(at(0.75, 0.5)).toEqual([215, 53, 44]); // the red square
+    const st = await studioStateForAsset(db, sam, a.assetId);
+    expect(st.objects.map((o) => o.type)).toEqual(['shape', 'text']);
+  });
+
+  it('abusive words never reach a design', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const objects = [{ id: 't', type: 'text', text: 'a shit message', font: 'caveat', colour: '#2b2118', size: 0.1, x: 0.5, y: 0.5, rotation: 0 }];
+    await expect(saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects })).rejects.toBeInstanceOf(StudioTextError);
+    const derivs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, a.assetId));
+    expect(derivs.map((d) => d.objectClass)).toEqual(['ORIGINAL']);
   });
 });

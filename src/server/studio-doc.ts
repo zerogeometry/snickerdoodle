@@ -7,6 +7,13 @@ import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject 
 import { getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
 import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
+import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
+import { renderStudioObjects } from './print/studioOverlay';
+import { containsAbusiveText } from './textSafety';
+
+/** Small designs are scaled up to this longest edge before added things are drawn, so text and
+ * pen lines are crisp on big prints (the print path would upscale the picture anyway). */
+const OVERLAY_EDGE = 3000;
 
 /**
  * The Studio's non-destructive recipe (Studio spec §16 "always-recoverable original"). Geometry is
@@ -74,12 +81,16 @@ export async function studioStateForAsset(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-): Promise<{ geometry: StudioGeometry; mask: Buffer | null }> {
+): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; mask: Buffer | null }> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
   const geometry = row?.doc ? cleanGeometry(row.doc) : IDENTITY_GEOMETRY;
-  return { geometry, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
+  const objects = row?.doc ? cleanObjects((row.doc as { objects?: unknown }).objects) : [];
+  return { geometry, objects, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
 }
+
+/** Typed words that fail the abuse screen (user text is screened before it can print). */
+export class StudioTextError extends Error {}
 
 export interface StudioSaveResult {
   /** The design to render products from (null = the untouched original). */
@@ -99,24 +110,26 @@ export async function saveStudio(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
 ): Promise<StudioSaveResult> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
+  const objects = cleanObjects(input.objects);
+  if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: g }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: { ...g, objects } }).where(eq(assets.id, assetId));
 
   const cut = input.clearCutout ? null : await bytesOf(db, assetId, 'cutout');
   const source = cut ?? (await bytesOf(db, assetId, 'ORIGINAL'));
   if (!source) throw new Error('no original to edit');
 
-  if (!cut && isIdentity(g)) {
+  if (!cut && isIdentity(g) && objects.length === 0) {
     await dropDerivative(db, assetId, 'design'); // back to the plain original — no stale design left behind
     const meta = await sharp(source).rotate().metadata();
     return { sourceObjectId: null, objectKey: null, aspect: (meta.width ?? 1) / (meta.height ?? 1) };
   }
-  if (cut && isIdentity(g)) {
+  if (cut && isIdentity(g) && objects.length === 0) {
     const key = derivativeKey(assetId, 'cutout');
     const [o] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
     const meta = await sharp(cut).metadata();
@@ -124,11 +137,27 @@ export async function saveStudio(
   }
 
   const base = cut ?? (await sharp(source).rotate().png().toBuffer()); // originals: honour orientation first
+  const baseMeta = await sharp(base).metadata();
+  const [GW, GH] = g.rotate === 90 || g.rotate === 270 ? [baseMeta.height!, baseMeta.width!] : [baseMeta.width!, baseMeta.height!];
   let designed = await applyGeometry(base, g);
+  // Added things: draw them at a resolution that stays crisp in print.
+  let k = 1;
+  if (objects.length) {
+    k = Math.min(4, Math.max(1, OVERLAY_EDGE / Math.max(designed.width, designed.height)));
+    if (k > 1) {
+      const w = Math.round(designed.width * k), h = Math.round(designed.height * k);
+      designed = { buffer: await sharp(designed.buffer).resize(w, h, { kernel: 'lanczos3' }).png().toBuffer(), width: w, height: h };
+    }
+  }
   if (g.background) {
     // a filled background: the see-through parts become that colour, at full resolution
     const filled = await sharp(designed.buffer).flatten({ background: g.background }).png({ compressionLevel: 6 }).toBuffer();
     designed = { ...designed, buffer: filled };
+  }
+  if (objects.length) {
+    const gw = GW * k, gh = GH * k;
+    const buffer = await renderStudioObjects(designed.buffer, { gw, gh, cropX: Math.round(g.crop.x * GW) * k, cropY: Math.round(g.crop.y * GH) * k }, objects);
+    designed = { ...designed, buffer };
   }
   const key = derivativeKey(assetId, 'design');
   await putObject(key, designed.buffer, 'image/png');
