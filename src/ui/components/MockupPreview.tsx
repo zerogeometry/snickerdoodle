@@ -39,6 +39,7 @@ export function MockupPreview({
   spanHalf,
   px = 96,
   lazy = false,
+  placeholder = true,
 }: {
   productKey: ProductKey;
   assetId?: string | null;
@@ -57,6 +58,8 @@ export function MockupPreview({
   px?: number;
   /** Defer composing until scrolled into view (for large grids). */
   lazy?: boolean;
+  /** false = nothing at all until the photo lands (for previews layered over one another). */
+  placeholder?: boolean;
 }) {
   // `current` = the photo on screen; it is NEVER cleared while a newer variant
   // composes (the founder's rule: stay on the previous product until the chosen
@@ -226,7 +229,7 @@ export function MockupPreview({
             }
           }}
         />
-      ) : (
+      ) : !placeholder ? null : (
         // No photo yet: a calm oat block, pulsing only while work is under way —
         // deliberately never the SVG stand-in (founder call).
         <div

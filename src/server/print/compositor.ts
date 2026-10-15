@@ -59,7 +59,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r17'; // r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r18'; // r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 

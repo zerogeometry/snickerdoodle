@@ -171,7 +171,11 @@ export function ProductGrid({
   onSub,
   onCustomize,
   onZoom,
+  insert,
 }: {
+  /** An extra tile slotted in after a product (e.g. the family set after the tees); appended
+   * at the end when that product isn't in this grid. Gets its grid index for tilt/tape. */
+  insert?: { afterKey: string; render: (index: number) => React.ReactNode };
   products: CatalogueProduct[];
   qtyOf: (p: CatalogueProduct) => number;
   upload: Upload;
@@ -187,26 +191,43 @@ export function ProductGrid({
 }) {
   return (
     <div className={gridClassName}>
-      {products.map((p, i) => (
-        // Staggered sticker-slap entrance on a WRAPPER — .pop-in's fill would otherwise pin the
-        // tile's transform and cancel its .lift hover.
-        <div key={p.key} className="pop-in" style={{ ['--i' as string]: Math.min(i, 12) }}>
-        <ProductTile
-          p={p}
-          index={i}
-          qty={qtyOf(p)}
-          upload={upload}
-          lazy={lazy}
-          enableZoom={enableZoom}
-          showStepper={showStepper}
-          customizeLabel={customizeLabel}
-          onAdd={() => onAdd(p)}
-          onSub={() => onSub(p)}
-          onCustomize={() => onCustomize(p)}
-          onZoom={onZoom ? () => onZoom(p) : undefined}
-        />
-        </div>
-      ))}
+      {(() => {
+        const at = insert ? products.findIndex((p) => p.key === insert.afterKey) : -1;
+        const slot = insert ? (at >= 0 ? at + 1 : products.length) : -1;
+        const tiles = products.map((p, i) => {
+          const gi = slot >= 0 && i >= slot ? i + 1 : i; // grid position, counting the inserted tile
+          return (
+            // Staggered sticker-slap entrance on a WRAPPER — .pop-in's fill would otherwise pin the
+            // tile's transform and cancel its .lift hover.
+            <div key={p.key} className="pop-in" style={{ ['--i' as string]: Math.min(gi, 12) }}>
+              <ProductTile
+                p={p}
+                index={gi}
+                qty={qtyOf(p)}
+                upload={upload}
+                lazy={lazy}
+                enableZoom={enableZoom}
+                showStepper={showStepper}
+                customizeLabel={customizeLabel}
+                onAdd={() => onAdd(p)}
+                onSub={() => onSub(p)}
+                onCustomize={() => onCustomize(p)}
+                onZoom={onZoom ? () => onZoom(p) : undefined}
+              />
+            </div>
+          );
+        });
+        if (insert && slot >= 0) {
+          tiles.splice(
+            slot,
+            0,
+            <div key="__insert" className="pop-in" style={{ ['--i' as string]: Math.min(slot, 12) }}>
+              {insert.render(slot)}
+            </div>,
+          );
+        }
+        return tiles;
+      })()}
     </div>
   );
 }

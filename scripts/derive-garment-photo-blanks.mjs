@@ -69,7 +69,7 @@ async function measure(file, dominant, others) {
  * Derive the white blank: dominant channel as luminance (+lift), crop to garment
  * + margin, and report the chest-region fractions of the CROPPED canvas.
  */
-async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTopFrac, colours = [] }) {
+async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTopFrac, colours = [], transparent = false }) {
   const m = await measure(file, dominant, others);
   const bw = m.bbox.x1 - m.bbox.x0;
   const bh = m.bbox.y1 - m.bbox.y0;
@@ -86,33 +86,47 @@ async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTop
   const b = 246 - a * m.median;
   // (no tint: sharp's fixed pipeline order lets tint() re-normalise away the linear
   // lift — and a neutral white garment is what we want anyway)
-  const grey = await sharp(path.join(SRC, file)).extractChannel(dominant).linear(a, b).toBuffer();
-  const white = await sharp(grey).png().toBuffer();
-  await sharp(white).extract({ left, top, width, height }).png().toFile(path.join(OUT, out));
+  // Soft garment mask from the coloured source (dominant channel clearly above the others).
+  const { data, info } = await sharp(path.join(SRC, file)).raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: C } = info;
+  const mask = Buffer.alloc(W * H);
+  for (let k = 0; k < W * H; k++) {
+    const i = k * C;
+    const d = data[i + dominant];
+    const gap = Math.min(...others.map((o) => d - data[i + o]));
+    mask[k] = Math.max(0, Math.min(255, Math.round(((gap - 10) / 30) * 255)));
+  }
+  const blurred = await sharp(mask, { raw: { width: W, height: H, channels: 1 } }).blur(0.8).raw().toBuffer({ resolveWithObject: true });
+  const mc = blurred.info.channels; // sharp may hand back more than one channel — read the first
+  const softMask = (k) => blurred.data[k * mc];
+
+  const grey = await sharp(path.join(SRC, file)).extractChannel(dominant).linear(a, b).raw().toBuffer({ resolveWithObject: true });
+  if (transparent) {
+    // SEE-THROUGH around the garment, so mockups can overlap (the family set picture)
+    const gc = grey.info.channels;
+    const rgba = Buffer.alloc(W * H * 4);
+    for (let k = 0; k < W * H; k++) {
+      const v = grey.data[k * gc];
+      rgba[k * 4] = rgba[k * 4 + 1] = rgba[k * 4 + 2] = v;
+      rgba[k * 4 + 3] = softMask(k);
+    }
+    await sharp(rgba, { raw: { width: W, height: H, channels: 4 } }).extract({ left, top, width, height }).png().toFile(path.join(OUT, out));
+  } else {
+    await sharp(grey.data, { raw: { width: W, height: H, channels: grey.info.channels } }).extract({ left, top, width, height }).png().toFile(path.join(OUT, out));
+  }
 
   // Coloured versions: garment mask from the coloured source (soft-edged), fold shading as a
   // multiplier around the chest median (contrast softened), the target colour times that —
   // with a little lift toward white on highlights so dark fabric still reads its folds.
   if (colours.length) {
-    const { data, info } = await sharp(path.join(SRC, file)).raw().toBuffer({ resolveWithObject: true });
-    const { width: W, height: H, channels: C } = info;
-    const mask = Buffer.alloc(W * H);
-    for (let k = 0; k < W * H; k++) {
-      const i = k * C;
-      const d = data[i + dominant];
-      const gap = Math.min(...others.map((o) => d - data[i + o]));
-      mask[k] = Math.max(0, Math.min(255, Math.round(((gap - 10) / 30) * 255)));
-    }
-    const blurred = await sharp(mask, { raw: { width: W, height: H, channels: 1 } }).blur(0.8).raw().toBuffer({ resolveWithObject: true });
-    const mc = blurred.info.channels; // sharp may hand back more than one channel — read the first
-    const softMask = (k) => blurred.data[k * mc];
     let seed = 12345;
     const rand = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
     for (const c of colours) {
       if (c.name === 'white') continue;
       const T = [1, 3, 5].map((o) => parseInt(c.hex.slice(o, o + 2), 16));
       const heather = c.name.includes('heather');
-      const outBuf = Buffer.alloc(W * H * 3);
+      const ch3 = transparent ? 4 : 3;
+      const outBuf = Buffer.alloc(W * H * ch3);
       for (let k = 0; k < W * H; k++) {
         const i = k * C;
         const sh = 1 + ((data[i + dominant] / m.median) - 1) * 0.85;
@@ -122,11 +136,12 @@ async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTop
         for (let ch = 0; ch < 3; ch++) {
           let v = T[ch] * Math.min(1, s1) + (255 - T[ch]) * Math.max(0, s1 - 1) * 0.5 + fleck;
           v = Math.max(0, Math.min(255, v));
-          outBuf[k * 3 + ch] = Math.round(v * a + 255 * (1 - a));
+          outBuf[k * ch3 + ch] = transparent ? Math.round(v) : Math.round(v * a + 255 * (1 - a));
         }
+        if (transparent) outBuf[k * ch3 + 3] = Math.round(a * 255);
       }
       const slug = c.name.replace(/\s+/g, '-');
-      await sharp(outBuf, { raw: { width: W, height: H, channels: 3 } })
+      await sharp(outBuf, { raw: { width: W, height: H, channels: ch3 } })
         .extract({ left, top, width, height })
         .png()
         .toFile(path.join(OUT, out.replace('.png', `-${slug}.png`)));
@@ -158,6 +173,7 @@ await derive({
   dominant: 2, others: [0],
   printWmm: 260, torsoMm: 330, panelTopFrac: 0.24,
   colours: [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS.filter((a) => !KIDS_TEE_COLOURS.some((k) => k.name === a.name))],
+  transparent: true,
 });
 // Baby bodysuit — LAT 4411 red flat packshot; NB torso ≈190mm carries the 180mm print
 // capped at 80% (pending Rabbit Skins chart / Prodigi support confirmation).

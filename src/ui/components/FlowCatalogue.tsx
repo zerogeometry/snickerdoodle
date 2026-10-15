@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronRight, IconGift, IconShirt, IconSparkles } from '@tabler/icons-react';
+import { IconChevronRight, IconGift, IconSparkles } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -14,6 +14,7 @@ import { ProductGrid } from '@/ui/components/ProductGrid';
 import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
+import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
@@ -227,23 +228,6 @@ export function FlowCatalogue({
               </Button>
             ) : null}
           </div>
-          {/* The hero set: one drawing, the whole family matching. Opens the set builder. */}
-          {familySetAvailable ? (
-            <button
-              type="button"
-              onClick={() => { if (guardUpload()) setFamilyOpen(true); }}
-              className="press mb-3 flex w-full items-center gap-3 rounded-[18px] border-2 border-cocoa bg-honey-band p-3.5 text-left shadow-[0_3px_0_var(--color-cocoa)] active:shadow-none"
-            >
-              <span className="wiggle flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-honey">
-                <Icon icon={IconShirt} size={20} className="text-cocoa" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-display text-base text-cocoa">dress the whole family</span>
-                <span className="block text-[12px] text-ink-soft">matching organic tees, one colour for everyone — 3+ pieces saves 5%</span>
-              </span>
-              <Icon icon={IconChevronRight} size={18} className="shrink-0 text-cocoa" />
-            </button>
-          ) : null}
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
           <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (
@@ -255,7 +239,20 @@ export function FlowCatalogue({
             {popular.length > 0 ? (
               <>
                 {picks.length > 0 ? <SectionLabel className="mt-5">most popular</SectionLabel> : null}
-                <ProductGrid products={popular} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
+                <ProductGrid
+                  products={popular}
+                  gridClassName={gridClassName}
+                  onZoom={setZoom}
+                  insert={
+                    familySetAvailable
+                      ? {
+                          afterKey: popular.some((p) => p.key === 'adultTee') ? 'adultTee' : 'kidsTee',
+                          render: (i) => <FamilySetTile products={products} upload={upload} index={i} label={gridProps.customizeLabel} onOpen={() => { if (guardUpload()) setFamilyOpen(true); }} />,
+                        }
+                      : undefined
+                  }
+                  {...gridProps}
+                />
               </>
             ) : picks.length === 0 ? (
               // success-but-empty: never a bare heading over a void
