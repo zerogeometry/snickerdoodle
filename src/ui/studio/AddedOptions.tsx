@@ -1,14 +1,14 @@
 'use client';
 
 import { IconCopy, IconLock, IconPencil, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
 import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { Icon } from '@/ui/primitives/Icon';
-import { Toggle } from '@/ui/primitives/Toggle';
 import { ColourPicker } from './ColourPicker';
 import { drawStroke, drawTextured } from './objects-canvas';
+import { Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from './panel';
 import type { ToolId } from './tools';
 
 export interface PenStyle {
@@ -33,8 +33,6 @@ export interface ShapeStyle {
   texture: TextureKind;
 }
 
-const hint = (t: string) => <p className="text-xs text-ink-soft">{t}</p>;
-const label = (t: string) => <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">{t}</p>;
 
 /** Options for the "adding things" tools: draw, add text, shapes, layers. */
 export function AddedOptions(p: {
@@ -61,157 +59,180 @@ export function AddedOptions(p: {
 
   if (tool === 'draw') {
     return (
-      <div className="flex flex-col gap-2.5">
-        {hint('draw with a finger, mouse or stylus.')}
-        <ColourPicker value={p.pen.colour} onChange={(colour) => p.setPen({ ...p.pen, colour })} label="pen colour" />
-        <TextureChips value={p.pen.texture} colour={p.pen.colour} onChange={(texture) => p.setPen({ ...p.pen, texture })} />
-        <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-          thickness
-          <input type="range" min={2} max={60} value={Math.round(p.pen.width * 1000)} onChange={(e) => p.setPen({ ...p.pen, width: Number(e.target.value) / 1000 })} className="flex-1 accent-[var(--color-cta)]" aria-label="line thickness" />
-        </label>
-        <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-          smoothing
-          <input type="range" min={0} max={100} value={Math.round(p.pen.smooth * 100)} onChange={(e) => p.setPen({ ...p.pen, smooth: Number(e.target.value) / 100 })} className="flex-1 accent-[var(--color-cta)]" aria-label="smooth out wobbles" />
-        </label>
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper-2 px-3 py-2">
-          <span className="text-xs text-cocoa">
-            <b>stylus only</b>
-            <span className="block text-[11px] text-ink-soft">fingers move the picture; only the pen draws</span>
-          </span>
-          <Toggle on={p.pen.stylusOnly} onChange={(stylusOnly) => p.setPen({ ...p.pen, stylusOnly })} label="stylus only" />
-        </div>
-      </div>
+      <Stack>
+        <Section label="colour">
+          <ColourPicker value={p.pen.colour} onChange={(colour) => p.setPen({ ...p.pen, colour })} label="pen colour" />
+        </Section>
+        <Section label="line">
+          <SliderRow label="thickness" min={2} max={60} value={Math.round(p.pen.width * 1000)} onChange={(v) => p.setPen({ ...p.pen, width: v / 1000 })} ariaLabel="line thickness" display={<SizeDot px={p.pen.width * 600} colour={p.pen.colour} />} />
+          <SliderRow label="smoothing" min={0} max={100} value={Math.round(p.pen.smooth * 100)} onChange={(v) => p.setPen({ ...p.pen, smooth: v / 100 })} ariaLabel="smooth out wobbles" display={p.pen.smooth < 0.2 ? 'off' : p.pen.smooth > 0.7 ? 'lots' : 'some'} />
+        </Section>
+        <TextureSection value={p.pen.texture} colour={p.pen.colour} onChange={(texture) => p.setPen({ ...p.pen, texture })} />
+        <Section>
+          <ToggleRow title="stylus only" note="fingers move the picture; only the pen draws" on={p.pen.stylusOnly} onChange={(stylusOnly) => p.setPen({ ...p.pen, stylusOnly })} />
+        </Section>
+      </Stack>
     );
   }
 
   const actions = (
-    <div className="flex flex-wrap gap-1.5">
+    <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="this layer">
       <ActionButton icon={IconCopy} label="duplicate" onClick={p.onDuplicate} />
-      <ActionButton icon={IconStackPop} label="bring forward" onClick={p.onForward} />
-      <ActionButton icon={IconStackPush} label="send back" onClick={p.onBack} />
+      <ActionButton icon={IconStackPop} label="forward" onClick={p.onForward} />
+      <ActionButton icon={IconStackPush} label="back" onClick={p.onBack} />
       <ActionButton icon={IconTrash} label="delete" onClick={p.onDelete} danger />
     </div>
   );
 
-  // the editor for whatever's selected
+  // the editor for whatever's selected: its actions first, then its look
   const editor = (o: StudioObject) => {
     if (o.type === 'text') {
       return (
-        <div className="flex flex-col gap-2.5">
-          <TextEditor key={o.id} value={o.text} onChange={(text) => p.onUpdate({ text }, true)} />
-          {label('font')}
-          <FontChips value={o.font} onChange={(font) => p.onUpdate({ font })} />
-          <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-            size
-            <input type="range" min={2} max={40} value={Math.round(o.size * 100)} onChange={(e) => p.onUpdate({ size: Number(e.target.value) / 100 }, true)} className="flex-1 accent-[var(--color-cta)]" aria-label="text size" />
-          </label>
-          {label('colour')}
-          <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="text colour" />
-          <TextureChips value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
-          {actions}
-        </div>
+        <Stack>
+          <Section>{actions}</Section>
+          <Section label="your words">
+            <TextEditor key={o.id} value={o.text} onChange={(text) => p.onUpdate({ text }, true)} />
+          </Section>
+          <Section label="font">
+            <FontChips value={o.font} onChange={(font) => p.onUpdate({ font })} />
+            <SliderRow label="size" min={2} max={40} value={Math.round(o.size * 100)} onChange={(v) => p.onUpdate({ size: v / 100 }, true)} ariaLabel="text size" display={<span style={{ fontFamily: cardFontCss(o.font), fontSize: Math.max(11, Math.min(24, o.size * 110)) }}>Aa</span>} />
+          </Section>
+          <Section label="colour">
+            <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="text colour" />
+          </Section>
+          <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+        </Stack>
       );
     }
     if (o.type === 'shape') {
       return (
-        <div className="flex flex-col gap-2.5">
-          <ShapeStyleControls
-            style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }}
-            onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)}
-          />
-          {actions}
-        </div>
+        <Stack>
+          <Section>{actions}</Section>
+          <ShapeStyleControls style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }} onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)} />
+        </Stack>
       );
     }
     return (
-      <div className="flex flex-col gap-2.5">
-        {label('line colour')}
-        <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="line colour" />
-        <TextureChips value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
-        <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-          thickness
-          <input type="range" min={2} max={60} value={Math.round(o.width * 1000)} onChange={(e) => p.onUpdate({ width: Number(e.target.value) / 1000 } as Partial<StudioObject>, true)} className="flex-1 accent-[var(--color-cta)]" aria-label="line thickness" />
-        </label>
-        {actions}
-      </div>
+      <Stack>
+        <Section>{actions}</Section>
+        <Section label="colour">
+          <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="line colour" />
+        </Section>
+        <Section label="line">
+          <SliderRow label="thickness" min={2} max={60} value={Math.round(o.width * 1000)} onChange={(v) => p.onUpdate({ width: v / 1000 } as Partial<StudioObject>, true)} ariaLabel="line thickness" display={<SizeDot px={o.width * 600} colour={o.colour} />} />
+        </Section>
+        <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+      </Stack>
     );
   };
 
   if (tool === 'select') {
     return (
-      <div className="flex flex-col gap-3">
-        <LayersList objects={p.objects} selectedId={selected?.id ?? null} baseLabel={p.baseLabel} onSelect={p.onSelect} />
+      <Stack>
+        <Section label="layers · top first">
+          <LayersList objects={p.objects} selectedId={selected?.id ?? null} baseLabel={p.baseLabel} onSelect={p.onSelect} />
+          {!selected ? <p className="text-xs text-ink-soft">{p.objects.length ? 'tap a layer — here or on the picture — to move it, size it or change it.' : 'nothing added yet — try add text, draw or shapes.'}</p> : null}
+        </Section>
         {selected ? (
-          <div className="flex flex-col gap-2.5 border-t-2 border-dashed border-cocoa/15 pt-3">
-            {label(`editing · ${layerName(selected)}`)}
+          <Section
+            label={`editing · ${layerName(selected)}`}
+            aside={
+              <button type="button" onClick={() => p.onSelect(null)} className="min-h-8 px-1 text-[11px] font-bold text-cinnamon">
+                done
+              </button>
+            }
+          >
             {editor(selected)}
-          </div>
-        ) : (
-          hint(p.objects.length ? 'tap a layer — here or on the picture — to move it, size it or change it.' : 'nothing added yet — try draw, add text or shapes.')
-        )}
-      </div>
+          </Section>
+        ) : null}
+      </Stack>
     );
   }
 
   if (tool === 'shapes') {
     if (selected?.type === 'shape') return editor(selected);
     return (
-      <div className="flex flex-col gap-2.5">
-        {hint('tap a shape to add it.')}
-        <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="shapes">
-          {SHAPE_KINDS.map((k) => (
-            <button key={k} type="button" aria-label={`add a ${k}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
-              <svg viewBox="-12 -12 124 124" className="h-9 w-9" aria-hidden>
-                <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
-              </svg>
-            </button>
-          ))}
-        </div>
+      <Stack>
+        <Section label="add a shape">
+          <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="shapes">
+            {SHAPE_KINDS.map((k) => (
+              <button key={k} type="button" aria-label={`add a ${k}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
+                <svg viewBox="-12 -12 124 124" className="h-9 w-9" aria-hidden>
+                  <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        </Section>
         <ShapeStyleControls style={p.shapeStyle} onChange={(patch) => p.setShapeStyle({ ...p.shapeStyle, ...patch })} />
-      </div>
+      </Stack>
     );
   }
 
   // add text
   if (selected?.type === 'text') return editor(selected);
   return (
-    <div className="flex flex-col gap-2.5">
-      {hint('tap the picture where you’d like your words — or tap words you’ve added to change them.')}
-      {label('font')}
-      <FontChips value={p.textStyle.font} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
-      {label('colour')}
-      <ColourPicker value={p.textStyle.colour} onChange={(colour) => p.setTextStyle({ ...p.textStyle, colour })} label="text colour" />
-      <TextureChips value={p.textStyle.texture} colour={p.textStyle.colour} onChange={(texture) => p.setTextStyle({ ...p.textStyle, texture })} />
-    </div>
+    <Stack>
+      <Section label="font">
+        <FontChips value={p.textStyle.font} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
+      </Section>
+      <Section label="colour">
+        <ColourPicker value={p.textStyle.colour} onChange={(colour) => p.setTextStyle({ ...p.textStyle, colour })} label="text colour" />
+      </Section>
+      <TextureSection value={p.textStyle.texture} colour={p.textStyle.colour} onChange={(texture) => p.setTextStyle({ ...p.textStyle, texture })} />
+    </Stack>
   );
 }
 
-/** Fill, outline (colour + thickness) and texture — for new shapes and the selected one. */
+/**
+ * Fill and outline share ONE palette — a switch picks which one it paints — so a shape's options
+ * stay short; outline thickness (0 = none) and texture follow.
+ */
 function ShapeStyleControls({ style, onChange }: { style: ShapeStyle; onChange: (patch: Partial<ShapeStyle>, group?: boolean) => void }) {
+  const [part, setPart] = useState<'fill' | 'outline'>('fill');
+  const dot = (c: string, ring = false) => (
+    <span aria-hidden className={`inline-block h-3.5 w-3.5 rounded-full ${ring ? 'border-[3px]' : 'border border-cocoa/30'}`} style={ring ? { borderColor: c, background: '#fffbf2' } : { background: c, boxShadow: '0 0 0 1.5px #fffbf2' }} />
+  );
   return (
     <>
-      {label('fill')}
-      <ColourPicker value={style.fill} onChange={(fill) => onChange({ fill }, true)} label="fill colour" />
-      {label('outline')}
-      <ColourPicker value={style.stroke} onChange={(stroke) => onChange({ stroke, strokeWidth: style.strokeWidth || 0.05 }, true)} label="outline colour" />
-      <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-        thickness
-        <input
-          type="range"
+      <Section label="colour">
+        <Segmented
+          label="which colour"
+          value={part}
+          onChange={setPart}
+          options={[
+            { value: 'fill', label: <>{dot(style.fill)} fill</> },
+            { value: 'outline', label: <>{dot(style.strokeWidth > 0 ? style.stroke : '#d9c7a9', true)} outline</> },
+          ]}
+        />
+        {part === 'fill' ? (
+          <ColourPicker value={style.fill} onChange={(fill) => onChange({ fill }, true)} label="fill colour" />
+        ) : (
+          <ColourPicker value={style.strokeWidth > 0 ? style.stroke : null} onChange={(stroke) => onChange({ stroke, strokeWidth: style.strokeWidth || 0.05 }, true)} label="outline colour" />
+        )}
+      </Section>
+      <Section label="outline">
+        <SliderRow
+          label="thickness"
           min={0}
           max={Math.round(MAX_SHAPE_STROKE * 100)}
           value={Math.round(style.strokeWidth * 100)}
-          onChange={(e) => onChange({ strokeWidth: Number(e.target.value) / 100 }, true)}
-          className="flex-1 accent-[var(--color-cta)]"
-          aria-label="outline thickness"
-          aria-valuetext={style.strokeWidth === 0 ? 'no outline' : `${Math.round(style.strokeWidth * 100)}`}
+          onChange={(v) => onChange({ strokeWidth: v / 100 }, true)}
+          ariaLabel="outline thickness"
+          valueText={style.strokeWidth === 0 ? 'no outline' : String(Math.round(style.strokeWidth * 100))}
+          display={style.strokeWidth === 0 ? 'none' : <SizeDot px={style.strokeWidth * 120} colour={style.stroke} />}
         />
-        <span className="w-12 text-right text-[11px] font-normal text-ink-soft">{style.strokeWidth === 0 ? 'none' : ''}</span>
-      </label>
-      <TextureChips value={style.texture} colour={style.fill} onChange={(texture) => onChange({ texture })} />
+      </Section>
+      <TextureSection value={style.texture} colour={style.fill} onChange={(texture) => onChange({ texture })} />
     </>
   );
 }
+
+const TextureSection = (p: { value: TextureKind; colour: string; onChange: (t: TextureKind) => void }) => (
+  <Section label="texture">
+    <TextureChips {...p} />
+  </Section>
+);
 
 export const layerName = (o: StudioObject) =>
   o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? o.shape : 'pen line';
@@ -221,8 +242,7 @@ function LayersList({ objects, selectedId, baseLabel, onSelect }: { objects: Stu
   const rows = [...objects].reverse();
   return (
     <div>
-      {label('layers · top first')}
-      <ul className="mt-1.5 flex max-h-56 flex-col gap-1 overflow-y-auto" aria-label="layers">
+      <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto" aria-label="layers">
         {rows.map((o) => {
           const on = o.id === selectedId;
           return (
@@ -264,8 +284,7 @@ function LayersList({ objects, selectedId, baseLabel, onSelect }: { objects: Stu
 function TextureChips({ value, colour, onChange }: { value: TextureKind; colour: string; onChange: (t: TextureKind) => void }) {
   return (
     <div>
-      {label('texture')}
-      <div className="mt-1.5 grid grid-cols-4 gap-1.5" role="group" aria-label="texture">
+      <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="texture">
         {TEXTURES.map((t) => (
           <button
             key={t.kind}
@@ -334,7 +353,7 @@ function TextEditor({ value, onChange }: { value: string; onChange: (v: string) 
   }, []);
   return (
     <label className="block">
-      <span className="mb-1 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">your words</span>
+      <span className="sr-only">your words</span>
       <textarea
         ref={ref}
         value={value}
@@ -352,9 +371,9 @@ function ActionButton({ icon, label: text, onClick, danger }: { icon: typeof Ico
     <button
       type="button"
       onClick={onClick}
-      className={`press flex min-h-11 items-center gap-1.5 rounded-pill border-2 px-3 text-xs font-extrabold ${danger ? 'border-berry bg-paper text-cinnamon' : 'border-cocoa/25 bg-paper text-cocoa hover:border-cocoa'}`}
+      className={`press flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[12px] border-2 px-1 text-[11px] font-extrabold ${danger ? 'border-berry bg-paper text-cinnamon' : 'border-cocoa/20 bg-paper text-cocoa hover:border-cocoa'}`}
     >
-      <Icon icon={icon} size={15} /> {text}
+      <Icon icon={icon} size={16} /> {text}
     </button>
   );
 }

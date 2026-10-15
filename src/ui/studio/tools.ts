@@ -19,10 +19,23 @@ import {
 
 export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
+export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
+/** Toolbar groups, in order of how often parents reach for them. */
+export const TOOL_GROUPS: { id: ToolGroup; label: string }[] = [
+  { id: 'cut', label: 'cut out' },
+  { id: 'add', label: 'add' },
+  { id: 'frame', label: 'frame' },
+  { id: 'colour', label: 'colour' },
+  { id: 'check', label: 'check' },
+];
+
 export interface ToolDef {
   id: ToolId;
+  group: ToolGroup;
   label: string;
   icon: TablerIcon;
+  /** The panel header's one line: what to do with this tool. */
+  hint: string;
   /** What the (i) explains — one or two warm, plain sentences. */
   info: string;
   /** Keyboard shortcut (desktop), shown in the expanded toolbar. */
@@ -31,10 +44,16 @@ export interface ToolDef {
   kind: 'mode' | 'action' | 'hold';
 }
 
-/** The Studio's image tools (Phase 1), in toolbar order. */
+/**
+ * The Studio's tools, in toolbar order — grouped, and ordered by how likely a parent is to want
+ * each edit: lift the drawing off the paper (and tidy it), add a name or a doodle, frame it, then
+ * colour; checking and starting again last.
+ */
 export const TOOLS: ToolDef[] = [
   {
     id: 'removeBg',
+    group: 'cut',
+    hint: 'lifts the drawing off the paper, so it sits on any colour.',
     label: 'remove background',
     icon: IconBackground,
     kind: 'mode',
@@ -42,15 +61,9 @@ export const TOOLS: ToolDef[] = [
     info: 'Lifts the drawing off the paper so it can go on any colour — paper inside shapes and shadows too. On a painted background, use remove colour instead.',
   },
   {
-    id: 'removeColour',
-    label: 'remove colour',
-    icon: IconColorPicker,
-    kind: 'mode',
-    key: 'C',
-    info: 'Tap a colour to make it see-through, everywhere it appears. Switch on “only the patch I tap” to remove just the patch you touch — handy when the same colour is in the drawing too.',
-  },
-  {
     id: 'erase',
+    group: 'cut',
+    hint: 'brush over anything you don’t want.',
     label: 'eraser',
     icon: IconEraser,
     kind: 'mode',
@@ -59,6 +72,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'restore',
+    group: 'cut',
+    hint: 'brush back anything removed — exactly as it was.',
     label: 'bring back',
     icon: IconBrush,
     kind: 'mode',
@@ -66,31 +81,19 @@ export const TOOLS: ToolDef[] = [
     info: 'Brush back anything removed by mistake. It comes back exactly as it was in the original.',
   },
   {
-    id: 'seeOn',
-    label: 'see it on',
-    icon: IconPalette,
+    id: 'removeColour',
+    group: 'cut',
+    hint: 'tap a colour to make it see-through.',
+    label: 'remove colour',
+    icon: IconColorPicker,
     kind: 'mode',
-    key: 'S',
-    info: 'Preview your cut-out on the colours it might be printed on — a white mug, a navy tee, kraft paper. Available once something is see-through.',
-  },
-  {
-    id: 'background',
-    label: 'background',
-    icon: IconBucketDroplet,
-    kind: 'mode',
-    key: 'K',
-    info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
-  },
-  {
-    id: 'draw',
-    label: 'draw',
-    icon: IconPencil,
-    kind: 'mode',
-    key: 'P',
-    info: 'Draw on top with a finger, mouse or stylus — pressing harder with a stylus makes a thicker line. Turn on “stylus only” so a resting hand doesn’t leave marks.',
+    key: 'C',
+    info: 'Tap a colour to make it see-through, everywhere it appears. Switch on “only the patch I tap” to remove just the patch you touch — handy when the same colour is in the drawing too.',
   },
   {
     id: 'text',
+    group: 'add',
+    hint: 'tap the picture where you’d like words — or tap words to change them.',
     label: 'add text',
     icon: IconTypography,
     kind: 'mode',
@@ -98,7 +101,19 @@ export const TOOLS: ToolDef[] = [
     info: 'Tap where you’d like words — a name, a date, a little message — then type. Pick a font, size and colour.',
   },
   {
+    id: 'draw',
+    group: 'add',
+    hint: 'draw with a finger, mouse or stylus.',
+    label: 'draw',
+    icon: IconPencil,
+    kind: 'mode',
+    key: 'P',
+    info: 'Draw on top with a finger, mouse or stylus — pressing harder with a stylus makes a thicker line. Turn on “stylus only” so a resting hand doesn’t leave marks.',
+  },
+  {
     id: 'shapes',
+    group: 'add',
+    hint: 'tap a shape to add it — then drag it into place.',
     label: 'shapes',
     icon: IconShape,
     kind: 'mode',
@@ -107,6 +122,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'select',
+    group: 'add',
+    hint: 'everything you’ve added, top first — tap one to change it.',
     label: 'layers',
     icon: IconStack2,
     kind: 'mode',
@@ -114,7 +131,19 @@ export const TOOLS: ToolDef[] = [
     info: 'Everything you add is its own layer. Tap one — on the picture or in the list — to move it, resize it from the corner, turn it with the top handle, change it, bring it forward or send it back, or delete it.',
   },
   {
+    id: 'crop',
+    group: 'frame',
+    hint: 'drag the corners, or drag the box to move it.',
+    label: 'crop',
+    icon: IconCrop,
+    kind: 'mode',
+    key: 'X',
+    info: 'Trim to just the part you want: drag the corners or the whole box. Great for getting the drawing big on a tee.',
+  },
+  {
     id: 'rotate',
+    group: 'frame',
+    hint: 'a quarter turn clockwise.',
     label: 'rotate',
     icon: IconRotateClockwise,
     kind: 'action',
@@ -123,6 +152,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'flip',
+    group: 'frame',
+    hint: 'mirror it.',
     label: 'flip',
     icon: IconFlipVertical,
     kind: 'mode',
@@ -130,15 +161,29 @@ export const TOOLS: ToolDef[] = [
     info: 'Mirror it — left to right, or top to bottom.',
   },
   {
-    id: 'crop',
-    label: 'crop',
-    icon: IconCrop,
+    id: 'background',
+    group: 'colour',
+    hint: 'fill the see-through parts with a colour.',
+    label: 'background',
+    icon: IconBucketDroplet,
     kind: 'mode',
-    key: 'X',
-    info: 'Trim to just the part you want: drag the corners or the whole box. Great for getting the drawing big on a tee.',
+    key: 'K',
+    info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
+  },
+  {
+    id: 'seeOn',
+    group: 'colour',
+    hint: 'preview it on the colours it might be printed on.',
+    label: 'see it on',
+    icon: IconPalette,
+    kind: 'mode',
+    key: 'S',
+    info: 'Preview your cut-out on the colours it might be printed on — a white mug, a navy tee, kraft paper. Available once something is see-through.',
   },
   {
     id: 'compare',
+    group: 'check',
+    hint: 'press and hold to see your original.',
     label: 'compare',
     icon: IconEye,
     kind: 'hold',
@@ -147,6 +192,8 @@ export const TOOLS: ToolDef[] = [
   },
   {
     id: 'startAgain',
+    group: 'check',
+    hint: 'clear every edit.',
     label: 'start again',
     icon: IconRestore,
     kind: 'action',

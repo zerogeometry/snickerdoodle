@@ -33,7 +33,7 @@ const isLight = (hex: string) => {
 export function ColourPicker({ value, onChange, label = 'colour' }: { value: string | null; onChange: (hex: string) => void; label?: string }) {
   const custom = value && !STANDARD_COLOURS.some((c) => c.hex === value.toLowerCase()) ? value : null;
   return (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label={label}>
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] justify-items-center gap-1.5" role="group" aria-label={label}>
       {STANDARD_COLOURS.map((c) => {
         const on = value?.toLowerCase() === c.hex;
         return (

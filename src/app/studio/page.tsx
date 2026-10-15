@@ -6,6 +6,7 @@ import {
   IconArrowLeft,
   IconArrowsHorizontal,
   IconArrowsVertical,
+  IconBackground,
   IconCheck,
   IconCircleCheck,
   IconMinus,
@@ -16,10 +17,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
-import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { Toggle } from '@/ui/primitives/Toggle';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -29,7 +28,8 @@ import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/
 import { boxOf, drawObject, drawStroke, drawTextured, hits, moveObject, scaleObject, type Frame } from '@/ui/studio/objects-canvas';
 import { CARD_FONTS } from '@/lib/card-fonts';
 import { flipObjects, rotateObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
-import type { ToolId } from '@/ui/studio/tools';
+import { toolById, type ToolId } from '@/ui/studio/tools';
+import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import {
   IDENTITY,
   buildWork,
@@ -816,7 +816,7 @@ export default function StudioPage() {
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
-  const options = tool && ADDING.includes(tool) ? (
+  const toolOptions = tool && ADDING.includes(tool) ? (
     <AddedOptions
       tool={tool}
       pen={pen}
@@ -862,6 +862,7 @@ export default function StudioPage() {
         setGeo((g) => ({ ...g, crop: { x: 0, y: 0, w: 1, h: 1 } }));
       }}
       onDoneCrop={() => setTool(null)}
+      onTool={onTool}
       background={geo.background}
       setBackground={(bg) => {
         // dragging the device colour picker fires continuously — one undo step per burst
@@ -871,6 +872,17 @@ export default function StudioPage() {
       }}
     />
   );
+  // every tool's panel: what it's for in a line, then its options (actions show nothing extra)
+  const def = tool ? toolById(tool) : null;
+  const options =
+    def && def.kind === 'mode' ? (
+      <div className="flex flex-col gap-4">
+        <PanelHeader tool={def} hint={def.hint} />
+        {toolOptions}
+      </div>
+    ) : (
+      <StartHere scratch={scratch} onTool={onTool} />
+    );
 
   return (
     <div className="fixed inset-0 flex flex-col bg-oat">
@@ -950,7 +962,7 @@ export default function StudioPage() {
 
         {/* options: a strip above the toolbar on phones, a side panel on bigger screens */}
         <div className="order-first max-h-[38vh] overflow-y-auto overscroll-contain border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{options}</div>
-        <aside className="hidden w-72 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-4 md:block">{options}</aside>
+        <aside aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{options}</aside>
       </div>
 
       {/* leaving with unsaved changes */}
@@ -1005,130 +1017,173 @@ function ToolOptions(p: {
   onDoneCrop: () => void;
   background: string | null;
   setBackground: (bg: string | null) => void;
+  onTool: (id: ToolId) => void;
 }) {
-  const hint = (t: string) => <p className="text-xs text-ink-soft">{t}</p>;
+  const jump = (id: ToolId, label: string) => (
+    <Button variant="secondary" size="sm" className="flex-1" onClick={() => p.onTool(id)}>
+      <Icon icon={toolById(id).icon} size={15} /> {label}
+    </Button>
+  );
   switch (p.tool) {
     case 'removeBg':
       return (
-        <div className="flex flex-col gap-2.5">
-          {p.hadCutout ? (
-            <p className="flex items-center gap-1.5 text-[13px] font-bold text-green-save">
-              <Icon icon={IconCircleCheck} size={16} /> background removed
-            </p>
-          ) : (
-            <Button variant="design" size="md" onClick={p.onRemoveBg} disabled={p.busy}>
-              remove background
-            </Button>
-          )}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper-2 px-3 py-2">
-            <span className="text-xs text-cocoa">
-              <b>keep the white inside shapes</b>
-              <span className="block text-[11px] text-ink-soft">for the whites of eyes, a snowman, a cloud</span>
-            </span>
-            <Toggle on={p.keepWhite} onChange={p.onKeepWhite} label="keep the white inside shapes" />
-          </div>
-          {hint('tidy any bits with the eraser or bring back.')}
-        </div>
+        <Stack>
+          <Section>
+            {p.hadCutout ? (
+              <p className="flex min-h-11 items-center gap-1.5 rounded-xl bg-leaf-pale px-3 text-[13px] font-bold text-green-save">
+                <Icon icon={IconCircleCheck} size={16} /> background removed
+              </p>
+            ) : (
+              <Button variant="design" size="md" className="w-full" onClick={p.onRemoveBg} disabled={p.busy}>
+                <Icon icon={IconBackground} size={16} /> remove background
+              </Button>
+            )}
+            <ToggleRow title="keep the white inside shapes" note="for the whites of eyes, a snowman, a cloud" on={p.keepWhite} onChange={p.onKeepWhite} />
+          </Section>
+          <Section label="tidy up">
+            <div className="flex gap-2">
+              {jump('erase', 'eraser')}
+              {jump('restore', 'bring back')}
+            </div>
+          </Section>
+        </Stack>
       );
     case 'removeColour':
       return (
-        <div className="flex flex-col gap-2.5">
-          {hint('tap the colour you’d like gone.')}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-paper-2 px-3 py-2">
-            <span className="text-xs text-cocoa">
-              <b>only the patch I tap</b>
-              <span className="block text-[11px] text-ink-soft">
-                {p.everywhere ? 'off: removes that colour everywhere it appears' : 'on: removes just the patch you touch — it stops at outlines'}
-              </span>
-            </span>
-            <Toggle on={!p.everywhere} onChange={(on) => p.setEverywhere(!on)} label="only the patch I tap" />
-          </div>
-          <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-            how fussy
-            <input type="range" min={8} max={60} value={p.fussy} onChange={(e) => p.setFussy(Number(e.target.value))} className="flex-1 accent-[var(--color-cta)]" aria-label="how close a colour has to be to go" />
-          </label>
-          {hint('low = only that exact colour · high = similar shades too')}
-        </div>
+        <Stack>
+          <Section label="where">
+            <Segmented
+              label="where to remove the colour"
+              value={p.everywhere ? 'all' : 'patch'}
+              onChange={(v) => p.setEverywhere(v === 'all')}
+              options={[
+                { value: 'all', label: 'everywhere' },
+                { value: 'patch', label: 'just that patch' },
+              ]}
+            />
+            <p className="text-[11px] leading-snug text-ink-soft">
+              {p.everywhere ? 'that colour goes wherever it appears in the picture.' : 'only the patch you tap goes — it stops at outlines. handy when the same colour is in the drawing too.'}
+            </p>
+          </Section>
+          <Section label="how fussy">
+            <SliderRow label="match" min={8} max={60} value={p.fussy} onChange={p.setFussy} ariaLabel="how close a colour has to be to go" display={p.fussy < 20 ? 'exact' : p.fussy > 42 ? 'loose' : 'close'} />
+            <p className="text-[11px] text-ink-soft">exact = only that colour · loose = similar shades too</p>
+          </Section>
+        </Stack>
       );
     case 'erase':
     case 'restore':
       return (
-        <div className="flex flex-col gap-2.5">
-          {hint(p.tool === 'erase' ? 'brush over anything you don’t want.' : 'brush over anything you want back — exactly as it was.')}
-          <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-            brush size
-            <input type="range" min={6} max={140} value={p.brush} onChange={(e) => p.setBrush(Number(e.target.value))} className="flex-1 accent-[var(--color-cta)]" aria-label="brush size" />
-            <span aria-hidden className="inline-block rounded-full border-2 border-cocoa bg-paper-2" style={{ width: Math.min(40, Math.max(8, p.brush / 3)), height: Math.min(40, Math.max(8, p.brush / 3)) }} />
-          </label>
-          {hint('two fingers to zoom in for the fiddly bits.')}
-        </div>
+        <Stack>
+          <Section label="brush">
+            <SliderRow label="size" min={6} max={140} value={p.brush} onChange={p.setBrush} ariaLabel="brush size" display={<SizeDot px={p.brush / 4} />} />
+            <p className="text-[11px] text-ink-soft">pinch or scroll to zoom in for the fiddly bits.</p>
+          </Section>
+          <Section label="switch to">{p.tool === 'erase' ? <div className="flex">{jump('restore', 'bring back')}</div> : <div className="flex">{jump('erase', 'eraser')}</div>}</Section>
+        </Stack>
       );
     case 'seeOn':
       return (
-        <div className="flex flex-col gap-2.5">
-          {hint('how it’ll look on…')}
-          <div className="flex flex-wrap gap-2" role="group" aria-label="preview on a colour">
-            {BACKDROPS.map((b) => (
-              <button
-                key={b.value}
-                type="button"
-                aria-label={b.name}
-                aria-pressed={p.backdrop === b.value}
-                onClick={() => p.setBackdrop(b.value)}
-                className={`h-11 w-11 rounded-full border-2 ${p.backdrop === b.value ? 'border-cocoa ring-2 ring-honey' : 'border-cocoa/30'}`}
-                style={b.value === 'checker' ? { background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 12px 12px' } : { background: b.value }}
-              />
-            ))}
-          </div>
-        </div>
+        <Stack>
+          <Section label="preview on">
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(44px,1fr))] justify-items-center gap-1.5" role="group" aria-label="preview on a colour">
+              {BACKDROPS.map((b) => (
+                <button
+                  key={b.value}
+                  type="button"
+                  aria-label={b.name}
+                  aria-pressed={p.backdrop === b.value}
+                  onClick={() => p.setBackdrop(b.value)}
+                  className={`h-11 w-11 rounded-full border-2 ${p.backdrop === b.value ? 'border-cocoa ring-2 ring-honey' : 'border-cocoa/30'}`}
+                  style={b.value === 'checker' ? { background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 12px 12px' } : { background: b.value }}
+                />
+              ))}
+            </div>
+            <p className="text-[11px] text-ink-soft">just a preview — it doesn’t change your design.</p>
+          </Section>
+        </Stack>
       );
     case 'background':
       return (
-        <div className="flex flex-col gap-2.5">
-          {hint('fill the see-through parts with a colour.')}
-          <button
-            type="button"
-            aria-pressed={!p.background}
-            onClick={() => p.setBackground(null)}
-            className={`flex min-h-11 items-center gap-2 rounded-xl border-2 px-3 text-xs font-extrabold ${!p.background ? 'border-cocoa bg-cocoa text-paper' : 'border-cocoa/25 bg-paper text-cocoa'}`}
-          >
-            <span aria-hidden className="h-6 w-6 rounded-full border border-cocoa/30" style={{ background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 8px 8px' }} />
-            <span className="flex flex-col items-start text-left leading-tight">
-              see-through
-              <span className="text-[11px] font-normal opacity-80">white on cards &amp; prints</span>
-            </span>
-          </button>
-          <ColourPicker value={p.background} onChange={(hex) => p.setBackground(hex)} label="background colour" />
-        </div>
+        <Stack>
+          <Section label="background">
+            <button
+              type="button"
+              aria-pressed={!p.background}
+              onClick={() => p.setBackground(null)}
+              className={`flex min-h-11 items-center gap-2 rounded-xl border-2 px-3 text-xs font-extrabold ${!p.background ? 'border-cocoa bg-cocoa text-paper' : 'border-cocoa/25 bg-paper text-cocoa'}`}
+            >
+              <span aria-hidden className="h-6 w-6 rounded-full border border-cocoa/30" style={{ background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 8px 8px' }} />
+              <span className="flex flex-col items-start text-left leading-tight">
+                see-through
+                <span className="text-[11px] font-normal opacity-80">white on cards &amp; prints</span>
+              </span>
+            </button>
+          </Section>
+          <Section label="or fill with">
+            <ColourPicker value={p.background} onChange={(hex) => p.setBackground(hex)} label="background colour" />
+          </Section>
+        </Stack>
       );
     case 'flip':
       return (
-        <div className="flex flex-wrap gap-2">
-          <Chip onClick={() => p.onFlip('h')}>
-            <Icon icon={IconArrowsHorizontal} size={15} /> left ↔ right
-          </Chip>
-          <Chip onClick={() => p.onFlip('v')}>
-            <Icon icon={IconArrowsVertical} size={15} /> top ↕ bottom
-          </Chip>
-        </div>
+        <Stack>
+          <Section label="mirror">
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" size="sm" onClick={() => p.onFlip('h')}>
+                <Icon icon={IconArrowsHorizontal} size={15} /> sideways
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => p.onFlip('v')}>
+                <Icon icon={IconArrowsVertical} size={15} /> upside down
+              </Button>
+            </div>
+          </Section>
+        </Stack>
       );
     case 'crop':
       return (
-        <div className="flex flex-col gap-2.5">
-          {hint('drag the corners, or drag the box to move it.')}
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={p.onResetCrop}>
-              reset
-            </Button>
-            <Button size="sm" onClick={p.onDoneCrop}>
-              done cropping
-            </Button>
-          </div>
-        </div>
+        <Stack>
+          <Section>
+            <div className="grid grid-cols-2 gap-2">
+              <Button variant="secondary" size="sm" onClick={p.onResetCrop}>
+                reset
+              </Button>
+              <Button size="sm" onClick={p.onDoneCrop}>
+                done cropping
+              </Button>
+            </div>
+          </Section>
+        </Stack>
       );
     default:
-      return hint('pick a tool to start — tap the arrow to see what each one does.');
+      return null;
   }
+}
+
+/** No tool picked: the likeliest first steps, one tap away. */
+function StartHere({ scratch, onTool }: { scratch: boolean; onTool: (id: ToolId) => void }) {
+  const picks: ToolId[] = scratch ? ['draw', 'text', 'shapes', 'background'] : ['removeBg', 'text', 'crop', 'draw'];
+  return (
+    <Stack>
+      <header>
+        <h2 className="font-display text-[17px] leading-tight text-cocoa">{scratch ? 'a blank canvas' : 'where to start'}</h2>
+        <p className="mt-0.5 text-xs text-ink-soft">pick a tool — or tap the toolbar’s arrow to see what each one does.</p>
+      </header>
+      <Section label="most loved">
+        <div className="grid grid-cols-2 gap-2">
+          {picks.map((id) => {
+            const t = toolById(id);
+            return (
+              <button key={id} type="button" onClick={() => onTool(id)} className="press flex min-h-[72px] flex-col items-start justify-between gap-1 rounded-[14px] border-2 border-cocoa/20 bg-paper p-2.5 text-left hover:border-cocoa">
+                <Icon icon={t.icon} size={20} className="text-cocoa" />
+                <span className="text-xs font-extrabold text-cocoa">{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+    </Stack>
+  );
 }
 
 export const dynamic = 'force-dynamic';

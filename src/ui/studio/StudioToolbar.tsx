@@ -1,9 +1,9 @@
 'use client';
 
 import { IconChevronDown, IconChevronUp, IconInfoCircle, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconX } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
-import { TOOLS, type ToolDef, type ToolId } from './tools';
+import { TOOL_GROUPS, TOOLS, type ToolDef, type ToolId } from './tools';
 
 const EXPANDED_KEY = 'snickerdoodle.studio.toolbar-expanded';
 
@@ -30,6 +30,8 @@ export function StudioToolbar({
   hidden?: ToolId[];
 }) {
   const tools = TOOLS.filter((t) => !hidden.includes(t.id));
+  const groups = TOOL_GROUPS.map((g) => ({ ...g, tools: tools.filter((t) => t.group === g.id) })).filter((g) => g.tools.length);
+  const groupHeading = (label: string) => <span className="block px-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-ink-faint">{label}</span>;
   const [expanded, setExpanded] = useState(false); // desktop rail (remembered)
   const [sheet, setSheet] = useState(false); // phone: the labelled sheet over the canvas
   const [info, setInfo] = useState<ToolDef | null>(null);
@@ -125,25 +127,37 @@ export function StudioToolbar({
                 </button>
               </div>
               {infoCard}
-              <ul className="grid grid-cols-1 gap-1.5 overflow-x-hidden pb-3">
-                {tools.map((t) => (
-                  <li key={t.id} className="flex items-center gap-1">
-                    <span className="flex min-w-0 flex-1" onClickCapture={() => t.kind !== 'hold' && setTimeout(() => setSheet(false), 0)}>
-                      {button(t, true)}
-                    </span>
-                    {infoButton(t)}
-                  </li>
+              <div className="flex flex-col gap-2 overflow-x-hidden pb-3">
+                {groups.map((g) => (
+                  <div key={g.id}>
+                    {groupHeading(g.label)}
+                    <ul className="mt-1 grid grid-cols-1 gap-1.5">
+                      {g.tools.map((t) => (
+                        <li key={t.id} className="flex items-center gap-1">
+                          <span className="flex min-w-0 flex-1" onClickCapture={() => t.kind !== 'hold' && setTimeout(() => setSheet(false), 0)}>
+                            {button(t, true)}
+                          </span>
+                          {infoButton(t)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 ))}
-              </ul>
+              </div>
             </div>
           </>
         ) : null}
         <div className="pb-safe flex items-center gap-1.5 border-t-2 border-cocoa/10 bg-paper px-2 pt-2">
           <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-2" role="toolbar" aria-label="studio tools">
-            {tools.map((t) => (
-              <span key={t.id} className="contents">
-                {button(t, false)}
-              </span>
+            {groups.map((g, gi) => (
+              <Fragment key={g.id}>
+                {gi ? <span aria-hidden className="my-1.5 w-0.5 shrink-0 self-stretch rounded-full bg-cocoa/15" /> : null}
+                {g.tools.map((t) => (
+                  <span key={t.id} className="contents">
+                    {button(t, false)}
+                  </span>
+                ))}
+              </Fragment>
             ))}
           </div>
           <button type="button" onClick={() => setSheet(true)} aria-label="show tool names" className="mb-2 flex h-12 w-11 shrink-0 items-center justify-center rounded-[14px] text-ink-soft">
@@ -166,25 +180,30 @@ export function StudioToolbar({
           <Icon icon={expanded ? IconLayoutSidebarLeftCollapse : IconLayoutSidebarLeftExpand} size={18} />
           {expanded ? 'icons only' : null}
         </button>
-        {tools.map((t) =>
-          expanded ? (
-            <div key={t.id} className="flex items-center gap-1">
-              {button(t, true)}
-              {infoButton(t)}
-            </div>
-          ) : (
-            <div
-              key={t.id}
-              className="flex justify-center"
-              onMouseEnter={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
-              onMouseLeave={() => setTip(null)}
-              onFocus={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
-              onBlur={() => setTip(null)}
-            >
-              {button(t, false)}
-            </div>
-          ),
-        )}
+        {groups.map((g, gi) => (
+          <Fragment key={g.id}>
+            {expanded ? groupHeading(g.label) : gi ? <span aria-hidden className="mx-auto my-1 h-0.5 w-8 shrink-0 rounded-full bg-cocoa/15" /> : null}
+            {g.tools.map((t) =>
+              expanded ? (
+                <div key={t.id} className="flex items-center gap-1">
+                  {button(t, true)}
+                  {infoButton(t)}
+                </div>
+              ) : (
+                <div
+                  key={t.id}
+                  className="flex justify-center"
+                  onMouseEnter={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
+                  onMouseLeave={() => setTip(null)}
+                  onFocus={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
+                  onBlur={() => setTip(null)}
+                >
+                  {button(t, false)}
+                </div>
+              ),
+            )}
+          </Fragment>
+        ))}
         {expanded && info ? <div className="mt-2">{infoCard}</div> : null}
       </nav>
       {tip && !expanded ? (
