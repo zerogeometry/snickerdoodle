@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronRight, IconGift, IconSparkles } from '@tabler/icons-react';
+import { IconChevronRight, IconGift, IconHeartPlus, IconSparkles } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -17,6 +17,7 @@ import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
+import { keepUploadAction } from '@/app/actions/keep';
 import { defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -68,6 +69,10 @@ export function FlowCatalogue({
   const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
   const [fullOpen, setFullOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
+  // "+ keepsake": keep THIS drawing in the family's keepsake box (signed-in; no second upload)
+  const [keeping, setKeeping] = useState(false);
+  const [keptId, setKeptId] = useState<string | null>(null);
+  const kept = !!upload?.assetId && keptId === upload.assetId;
   // A single in-flight ingest, shared across clicks — so a slow first ingest can't
   // deadlock the catalogue (the previous global "busy" flag froze every button).
   const ingestRef = useRef<Promise<string | null> | null>(null);
@@ -107,6 +112,26 @@ export function FlowCatalogue({
       ingestRef.current = null;
     }
   }, [upload, setAssetId]);
+
+  const keepDrawing = async () => {
+    if (!guardUpload() || keeping) return;
+    setKeeping(true);
+    try {
+      const id = await ensureAsset();
+      if (!id) return;
+      const res = await keepUploadAction(id);
+      if (res.needsAuth) {
+        // same as "+ keepsake" on a product page: keeping needs an account (the parent controls it)
+        toast('a quick sign-up keeps your keepsakes safe');
+        router.push(`/login?next=${encodeURIComponent('/start-creating')}`);
+        return;
+      }
+      if (res.ok) setKeptId(id);
+      toast(res.ok ? 'kept in your keepsake box ♥' : 'couldn’t keep that one — try again');
+    } finally {
+      setKeeping(false);
+    }
+  };
 
   const guardUpload = (): boolean => {
     if (!upload) {
@@ -295,13 +320,18 @@ export function FlowCatalogue({
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
-          <Button variant="secondary" size="lg" className="sm:flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
+          {upload ? (
+            <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>
+              <Icon icon={IconHeartPlus} size={16} /> {kept ? 'kept ♥' : keeping ? 'keeping…' : '+ keepsake'}
+            </Button>
+          ) : null}
+          <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
             create another
           </Button>
-          <Button variant="secondary" size="lg" className="sm:flex-1" onClick={() => setWhoMode('share')} disabled={items.length === 0}>
+          <Button variant="design" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => setWhoMode('share')} disabled={items.length === 0}>
             <Icon icon={IconGift} size={15} /> share a wish
           </Button>
-          <Button size="lg" className="sm:flex-1" onClick={() => setWhoMode('checkout')} disabled={items.length === 0}>
+          <Button size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => setWhoMode('checkout')} disabled={items.length === 0}>
             checkout now <Icon icon={IconSparkles} size={15} />
           </Button>
         </div>

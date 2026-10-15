@@ -6,7 +6,7 @@ import postgres from 'postgres';
 import * as schema from '@/db/schema';
 import { assets, children } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
-import { keepAndFileCreations } from '@/server/keepsakes';
+import { keepAndFileCreations, keepUpload } from '@/server/keepsakes';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -103,5 +103,30 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
     expect(nm!.familyId).toBeNull(); // never adopted
     expect(nm!.keptInHome).toBe(false);
     expect(nm!.ephemeralClaimId).toBe(notMine.claimId);
+  });
+
+  describe('"+ keepsake" on the range — keep the drawing already uploaded', () => {
+    it('a guest draft with its claim is adopted and kept, off the retention clock', async () => {
+      const a = await draft();
+      expect(await keepUpload(db, sam(), [a.claimId], a.assetId)).toBe(true);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect([row!.familyId, row!.controllerAccountId, row!.keptInHome, row!.purgeAfter]).toEqual([ids.hartleyId, ids.samId, true, null]);
+    });
+
+    it('their own not-yet-kept upload (filed for an order) is simply marked kept', async () => {
+      const a = await draft();
+      await keepAndFileCreations(db, sam(), [a.claimId], [a.assetId], null, { keep: false });
+      expect(await keepUpload(db, sam(), [], a.assetId)).toBe(true);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect([row!.keptInHome, row!.purgeAfter]).toEqual([true, null]);
+    });
+
+    it('without the claim, someone else’s draft can’t be kept — and stays on the clock', async () => {
+      const a = await draft();
+      expect(await keepUpload(db, sam(), [], a.assetId)).toBe(false);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect([row!.familyId, row!.keptInHome]).toEqual([null, false]);
+      expect(row!.purgeAfter).not.toBeNull();
+    });
   });
 });

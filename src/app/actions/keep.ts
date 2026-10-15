@@ -7,7 +7,8 @@ import { getDb } from '@/db/client';
 import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { ensureHomeFamily } from '@/server/onboarding';
-import { getCurrentAccount } from '@/server/session';
+import { keepUpload } from '@/server/keepsakes';
+import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { VisibilityTier } from '@/domain/types';
 
 /**
@@ -37,6 +38,20 @@ export async function keepCreation(formData: FormData): Promise<{ ok: boolean; n
 
   revalidatePath('/home');
   return { ok: true, assetId };
+}
+
+/**
+ * "+ keepsake" on the range: keep the drawing that's ALREADY uploaded (no second upload) in the
+ * family's keepsake box — a guest's draft is adopted (their upload claim proves it's theirs), and
+ * either way it's kept, FAMILY by default, off the retention clock. Signed-in only.
+ */
+export async function keepUploadAction(assetId: string): Promise<{ ok: boolean; needsAuth?: boolean }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, needsAuth: true };
+  if (typeof assetId !== 'string' || !assetId) return { ok: false };
+  if (!(await keepUpload(getDb(), account, await getUploadClaims(), assetId))) return { ok: false };
+  revalidatePath('/home');
+  return { ok: true };
 }
 
 /** Change a keepsake's visibility (controller-only; re-checked server-side). */

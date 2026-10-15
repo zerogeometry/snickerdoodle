@@ -51,3 +51,18 @@ export async function keepAndFileCreations(
   }
   return { familyId, childId: child?.id ?? null };
 }
+
+/**
+ * "+ keepsake" on the range: keep ONE already-uploaded drawing in the caller's keepsake box — a
+ * guest draft is adopted via its claim; one they uploaded signed-in is simply marked kept. Either
+ * way it's kept, off the retention clock. Returns false when it isn't theirs to keep.
+ */
+export async function keepUpload(db: DbHandle, account: { id: string; name: string | null }, uploadClaims: string[], assetId: string): Promise<boolean> {
+  await keepAndFileCreations(db, account, uploadClaims, [assetId]);
+  const [row] = await db
+    .update(assets)
+    .set({ keptInHome: true, purgeAfter: null })
+    .where(and(eq(assets.id, assetId), eq(assets.controllerAccountId, account.id)))
+    .returning({ id: assets.id });
+  return !!row;
+}
