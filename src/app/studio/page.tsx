@@ -26,7 +26,7 @@ import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStat
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
-import { boxOf, drawObject, drawStroke, hits, moveObject, scaleObject, type Frame } from '@/ui/studio/objects-canvas';
+import { boxOf, drawObject, drawStroke, drawTextured, hits, moveObject, scaleObject, type Frame } from '@/ui/studio/objects-canvas';
 import { CARD_FONTS } from '@/lib/card-fonts';
 import { flipObjects, rotateObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import type { ToolId } from '@/ui/studio/tools';
@@ -64,8 +64,15 @@ interface Snapshot {
   alpha: Uint8ClampedArray;
   geo: Geometry;
   objects: StudioObject[];
+  /** "background removed" travels with history, so undoing it lets you remove it again. */
+  cut: boolean;
+  keepWhite: boolean;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
+/** Tools where tapping something you've added picks it up to move / change. */
+const EDITING: ToolId[] = ['text', 'shapes', 'select'];
+/** The image tools — nothing to do on a blank canvas. */
+const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
 
 /**
@@ -112,12 +119,13 @@ export default function StudioPage() {
   // ── added things (phase 2) ──
   const [objects, setObjects] = useState<StudioObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false });
-  const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118' });
-  const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', outline: true });
+  const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false, texture: 'crayon' });
+  const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118', texture: 'smooth' });
+  const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', stroke: '#2b2118', strokeWidth: 0.05, texture: 'smooth' });
   const liveStroke = useRef<number[] | null>(null);
   const lastEditPush = useRef(0);
   const selected = objects.find((o) => o.id === selectedId) ?? null;
+  const scratch = !!upload?.scratch;
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -154,6 +162,8 @@ export default function StudioPage() {
         const st = await studioStateAction({ assetId: id });
         if (st.ok) {
           g = st.geometry;
+          // a fresh blank canvas starts on white paper (switch to see-through in background)
+          if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
           if (st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
@@ -272,21 +282,16 @@ export default function StudioPage() {
     ctx.drawImage(pic, 0, 0);
     ctx.restore();
 
-    // added things — in geometry px (no G matrix), clipped to the picture
+    // added things — in geometry px (no G matrix), clipped to the picture, each with its texture
     if (!comparing) {
       const f: Frame = { gw, gh };
-      ctx.save();
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ctx.transform(V.a, V.b, V.c, V.d, V.e, V.f);
-      ctx.beginPath();
-      ctx.rect(content.x, content.y, content.w, content.h);
-      ctx.clip();
-      for (const o of objects) drawObject(ctx, o, f);
-      if (liveStroke.current) drawStroke(ctx, { colour: pen.colour, width: pen.width, points: liveStroke.current }, f);
-      ctx.restore();
+      const M = new DOMMatrix([dpr, 0, 0, dpr, 0, 0]).multiply(V);
+      for (const o of objects) drawTextured(ctx, { texture: o.texture, draw: (c) => drawObject(c, o, f) }, f, M, content);
+      const live = liveStroke.current;
+      if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content);
 
       // selection: dashed box, corner resize handle, top turn handle (screen space)
-      const sel = tool === 'select' || tool === 'text' ? objects.find((o) => o.id === selectedId) : null;
+      const sel = tool && EDITING.includes(tool) ? objects.find((o) => o.id === selectedId) : null;
       if (sel) {
         const b = boxOf(sel, f);
         const a = (b.rotation * Math.PI) / 180;
@@ -343,7 +348,7 @@ export default function StudioPage() {
   }, [tick, stageSize, view, geo, shownGeo, backdrop, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen]);
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -355,6 +360,8 @@ export default function StudioPage() {
     workRef.current!.alpha.set(s.alpha);
     setGeo(s.geo);
     setObjects(s.objects);
+    setHadCutout(s.cut);
+    setKeepWhite(s.keepWhite);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -430,7 +437,7 @@ export default function StudioPage() {
       setTick((t) => t + 1);
       return;
     }
-    if (tool === 'select' || tool === 'text') {
+    if (tool && EDITING.includes(tool)) {
       const f = frame();
       const [gx, gy] = toGeoSpace(sx, sy);
       const sel = objects.find((o) => o.id === selectedId);
@@ -455,7 +462,7 @@ export default function StudioPage() {
         }
       }
       const slop = 10 / viewMatrix(geo).a;
-      const hit = [...objects].reverse().find((o) => (tool === 'text' ? o.type === 'text' : true) && hits(o, f, gx, gy, slop));
+      const hit = [...objects].reverse().find((o) => (tool === 'text' ? o.type === 'text' : tool === 'shapes' ? o.type === 'shape' : true) && hits(o, f, gx, gy, slop));
       if (hit) {
         setSelectedId(hit.id);
         pushUndo();
@@ -465,12 +472,13 @@ export default function StudioPage() {
       if (tool === 'text') {
         // a new text box where they tapped
         pushUndo();
-        const o: StudioObject = { id: newId(), type: 'text', text: 'your words', font: textStyle.font, colour: textStyle.colour, size: 0.12, x: gx / f.gw, y: gy / f.gh, rotation: 0 };
+        const o: StudioObject = { id: newId(), type: 'text', text: 'your words', font: textStyle.font, colour: textStyle.colour, size: 0.12, x: gx / f.gw, y: gy / f.gh, rotation: 0, texture: textStyle.texture };
         setObjects((os) => [...os, o]);
         setSelectedId(o.id);
         return;
       }
       setSelectedId(null);
+      if (tool === 'select') return;
     }
     if (tool === 'removeColour') {
       const [ix, iy] = toImage(sx, sy);
@@ -604,7 +612,7 @@ export default function StudioPage() {
     if (gesture.current?.kind === 'stroke' && liveStroke.current) {
       const points = liveStroke.current;
       liveStroke.current = null;
-      setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points }]);
+      setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points, texture: pen.texture }]);
     }
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 0) gesture.current = null;
@@ -662,7 +670,8 @@ export default function StudioPage() {
       setObjects((os) => rotateObjects(os));
       return;
     }
-    if (!ADDING.includes(id)) setSelectedId(null);
+    // keep the selection only where it can still be edited
+    if (selected && !(id === 'select' || (id === 'text' && selected.type === 'text') || (id === 'shapes' && selected.type === 'shape'))) setSelectedId(null);
     if (id === 'startAgain') return setConfirmStart(true);
     setTool((t) => (t === id ? null : id));
     if (id === 'removeBg' && !hadCutout && !busy) void runRemoveBg(keepWhite);
@@ -672,7 +681,7 @@ export default function StudioPage() {
     if (!workRef.current || !sourceAlpha.current) return;
     pushUndo();
     workRef.current.alpha.set(sourceAlpha.current);
-    setGeo(IDENTITY);
+    setGeo(scratch ? { ...IDENTITY, background: '#ffffff' } : IDENTITY);
     setObjects([]);
     setSelectedId(null);
     setHadCutout(false);
@@ -742,7 +751,7 @@ export default function StudioPage() {
     // in the middle of what's on screen
     const [cxG, cyG] = toGeoSpace(stageSize.w / 2, stageSize.h / 2);
     const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
-    const o: StudioObject = { id: newId(), type: 'shape', shape, fill: shapeStyle.fill, outline: shapeStyle.outline, x: cxG / gw, y: cyG / gh, w: 0.25, h: 0.25, rotation: 0 };
+    const o: StudioObject = { id: newId(), type: 'shape', shape, fill: shapeStyle.fill, stroke: shapeStyle.stroke, strokeWidth: shapeStyle.strokeWidth, texture: shapeStyle.texture, x: cxG / gw, y: cyG / gh, w: 0.25, h: 0.25, rotation: 0 };
     setObjects((os) => [...os, o]);
     setSelectedId(o.id);
     setTool('select');
@@ -772,9 +781,9 @@ export default function StudioPage() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
-      if (id) onTool(id);
+      if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
       if (e.key === '-') zoomBy(1 / 1.2);
       if (e.key === '0') fit();
@@ -816,7 +825,10 @@ export default function StudioPage() {
       setTextStyle={setTextStyle}
       shapeStyle={shapeStyle}
       setShapeStyle={setShapeStyle}
-      selected={tool === 'text' && selected?.type !== 'text' ? null : selected}
+      objects={objects}
+      selected={selected}
+      baseLabel={scratch ? 'your canvas' : 'your drawing'}
+      onSelect={(id) => setSelectedId(id)}
       onUpdate={updateSelected}
       onAddShape={addShape}
       onDelete={deleteSelected}
@@ -891,6 +903,7 @@ export default function StudioPage() {
           disabled={disabled}
           onTool={onTool}
           onHold={(id, down) => id === 'compare' && setComparing(down)}
+          hidden={scratch ? IMAGE_ONLY : []}
         />
 
         {/* stage */}
@@ -936,7 +949,7 @@ export default function StudioPage() {
         </div>
 
         {/* options: a strip above the toolbar on phones, a side panel on bigger screens */}
-        <div className="order-first border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{options}</div>
+        <div className="order-first max-h-[38vh] overflow-y-auto overscroll-contain border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{options}</div>
         <aside className="hidden w-72 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-4 md:block">{options}</aside>
       </div>
 
@@ -955,10 +968,10 @@ export default function StudioPage() {
         </div>
       </Modal>
 
-      <Modal open={confirmStart} onClose={() => setConfirmStart(false)} title="start again?" subtitle="clears every edit — your original upload is never changed">
+      <Modal open={confirmStart} onClose={() => setConfirmStart(false)} title="start again?" subtitle={scratch ? 'clears everything on the canvas' : 'clears every edit — your original upload is never changed'}>
         <div className="flex flex-col gap-2">
           <Button size="lg" className="w-full" onClick={startAgain}>
-            yes, back to the original
+            {scratch ? 'yes, a clean canvas' : 'yes, back to the original'}
           </Button>
           <Button variant="ghost" size="md" className="w-full" onClick={() => setConfirmStart(false)}>
             keep my edits
@@ -1119,4 +1132,3 @@ function ToolOptions(p: {
 }
 
 export const dynamic = 'force-dynamic';
-void geometryIsIdentity;

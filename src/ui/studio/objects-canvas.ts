@@ -1,5 +1,6 @@
 import { cardFontCss } from '@/lib/card-fonts';
 import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 
 /**
  * Drawing + measuring the Studio's added things on the browser canvas, in GEOMETRY-SPACE PIXELS
@@ -80,10 +81,10 @@ export function drawObject(ctx: CanvasRenderingContext2D, o: StudioObject, f: Fr
     ctx.scale(w / 100, h / 100);
     ctx.fillStyle = o.fill;
     ctx.fill(shapePath(o.shape), 'evenodd');
-    if (o.outline) {
-      ctx.lineWidth = 5;
+    if (o.strokeWidth > 0) {
+      ctx.lineWidth = o.strokeWidth * 100; // box units, like the server's SVG
       ctx.lineJoin = 'round';
-      ctx.strokeStyle = '#2b2118';
+      ctx.strokeStyle = o.stroke;
       ctx.stroke(shapePath(o.shape));
     }
   } else {
@@ -100,6 +101,7 @@ export function drawObject(ctx: CanvasRenderingContext2D, o: StudioObject, f: Fr
 
 /** A pressure-varying pen line (round-capped segments) — same width rule as the server. */
 export function drawStroke(ctx: CanvasRenderingContext2D, o: Pick<StrokeObject, 'colour' | 'width' | 'points'>, f: Frame): void {
+  if (!o.points.length) return;
   const base = Math.max(1, o.width * S(f));
   const p = o.points;
   ctx.save();
@@ -146,4 +148,77 @@ export function scaleObject(o: StudioObject, f: Frame, k: number): StudioObject 
     p[i + 1] = (b.cy + (p[i + 1]! * f.gh - b.cy) * k) / f.gh;
   }
   return { ...o, points: p, width: Math.min(0.3, Math.max(0.001, o.width * k)) };
+}
+
+// ── textures (crayon / chalk / paint) — the same tiles the print render uses ──
+
+const tileCanvases = new Map<string, HTMLCanvasElement>();
+function tileCanvas(kind: Exclude<TextureKind, 'smooth'>, part: 'mask' | 'dark' | 'light'): HTMLCanvasElement {
+  const key = `${kind}.${part}`;
+  let c = tileCanvases.get(key);
+  if (!c) {
+    const t = textureTiles(kind);
+    c = document.createElement('canvas');
+    c.width = c.height = t.size;
+    c.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(t[part]), t.size, t.size), 0, 0);
+    tileCanvases.set(key, c);
+  }
+  return c;
+}
+
+let scratch: HTMLCanvasElement | null = null;
+
+/**
+ * Draw one object WITH its texture onto `ctx`. `M` maps geometry px → device px (the canvas's
+ * own transform); `clip` is the picture's visible area in geometry px. Textured objects are drawn
+ * on a scratch layer, cut by the grain mask, shaded, then laid on — like the server does.
+ */
+export function drawTextured(
+  ctx: CanvasRenderingContext2D,
+  o: Pick<StudioObject, 'texture'> & ({ draw: (c: CanvasRenderingContext2D) => void }),
+  f: Frame,
+  M: DOMMatrix,
+  clip: { x: number; y: number; w: number; h: number },
+): void {
+  const apply = (c: CanvasRenderingContext2D) => {
+    c.setTransform(M);
+    c.beginPath();
+    c.rect(clip.x, clip.y, clip.w, clip.h);
+    c.clip();
+    o.draw(c);
+  };
+  if (o.texture === 'smooth') {
+    ctx.save();
+    apply(ctx);
+    ctx.restore();
+    return;
+  }
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  scratch ??= document.createElement('canvas');
+  if (scratch.width !== W || scratch.height !== H) {
+    scratch.width = W;
+    scratch.height = H;
+  }
+  const s = scratch.getContext('2d')!;
+  s.save();
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.clearRect(0, 0, W, H);
+  apply(s);
+  const T = TEXTURE_TILE_FRAC * S(f);
+  const grain = (part: 'mask' | 'dark' | 'light', op: GlobalCompositeOperation) => {
+    const tile = tileCanvas(o.texture as Exclude<TextureKind, 'smooth'>, part);
+    const p = s.createPattern(tile, 'repeat')!;
+    p.setTransform(new DOMMatrix().scale(T / tile.width));
+    s.globalCompositeOperation = op;
+    s.fillStyle = p;
+    s.fillRect(clip.x, clip.y, clip.w, clip.h);
+  };
+  grain('mask', 'destination-in');
+  grain('dark', 'source-atop');
+  grain('light', 'source-atop');
+  s.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(scratch, 0, 0);
+  ctx.restore();
 }

@@ -1,4 +1,5 @@
 import { CARD_FONTS, type CardFontToken } from '@/lib/card-fonts';
+import { cleanTexture, type TextureKind } from '@/lib/textures';
 
 /**
  * The Studio's added things — text, shapes and pen strokes — as VECTOR objects in the recipe.
@@ -24,20 +25,23 @@ export interface TextObject {
   y: number;
   /** Degrees, clockwise. */
   rotation: number;
+  texture: TextureKind;
 }
 export interface ShapeObject {
   id: string;
   type: 'shape';
   shape: ShapeKind;
   fill: string;
-  /** A dark outline around the shape (sticker style). */
-  outline: boolean;
+  /** Outline colour, and its thickness as a fraction of the shape's shorter side (0 = none). */
+  stroke: string;
+  strokeWidth: number;
   x: number;
   y: number;
   /** Width / height as fractions of S. */
   w: number;
   h: number;
   rotation: number;
+  texture: TextureKind;
 }
 export interface StrokeObject {
   id: string;
@@ -47,6 +51,7 @@ export interface StrokeObject {
   width: number;
   /** Flat [u, v, pressure, u, v, pressure, …] — pressure 0–1 (0.5 when not a stylus). */
   points: number[];
+  texture: TextureKind;
 }
 export type StudioObject = TextObject | ShapeObject | StrokeObject;
 
@@ -68,6 +73,7 @@ export const TEXT_LINE_HEIGHT = 1.2;
 export const MAX_OBJECTS = 120;
 export const MAX_TEXT_LENGTH = 200;
 export const MAX_STROKE_POINTS = 4000;
+export const MAX_SHAPE_STROKE = 0.2;
 const MAX_TOTAL_POINTS = 40000;
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -90,18 +96,23 @@ export function cleanObjects(raw: unknown): StudioObject[] {
       const text = String(r.text ?? '').replace(/\r/g, '').slice(0, MAX_TEXT_LENGTH);
       if (!text.trim()) continue;
       const font = CARD_FONTS.find((f) => f.token === r.font)?.token ?? 'caveat';
-      out.push({ id: id(r.id), type: 'text', text, font, colour: colour(r.colour), size: num(r.size, 0.01, 1, 0.08), x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), rotation: num(r.rotation, -360, 360, 0) });
+      out.push({ id: id(r.id), type: 'text', text, font, colour: colour(r.colour), size: num(r.size, 0.01, 1, 0.08), x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture) });
     } else if (r.type === 'shape') {
       const shape = SHAPE_KINDS.includes(r.shape as ShapeKind) ? (r.shape as ShapeKind) : null;
       if (!shape) continue;
-      out.push({ id: id(r.id), type: 'shape', shape, fill: colour(r.fill, '#f6c445'), outline: r.outline === true, x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, 2, 0.2), h: num(r.h, 0.01, 2, 0.2), rotation: num(r.rotation, -360, 360, 0) });
+      // saved before outlines had a colour + thickness: `outline: true` was a 5% dark line
+      const legacy = r.strokeWidth === undefined ? (r.outline === true ? 0.05 : 0) : 0;
+      out.push({
+        id: id(r.id), type: 'shape', shape, fill: colour(r.fill, '#f6c445'), stroke: colour(r.stroke), strokeWidth: num(r.strokeWidth, 0, MAX_SHAPE_STROKE, legacy),
+        x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, 2, 0.2), h: num(r.h, 0.01, 2, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture),
+      });
     } else if (r.type === 'stroke') {
       if (!Array.isArray(r.points)) continue;
       const pts = (r.points as unknown[]).slice(0, MAX_STROKE_POINTS * 3).map((n, i) => (i % 3 === 2 ? num(n, 0, 1, 0.5) : num(n, -0.5, 1.5, 0)));
       const n = Math.floor(pts.length / 3) * 3;
       if (n < 3 || points + n / 3 > MAX_TOTAL_POINTS) continue;
       points += n / 3;
-      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n) });
+      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n), texture: cleanTexture(r.texture) });
     }
   }
   return out;

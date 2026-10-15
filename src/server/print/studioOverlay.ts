@@ -2,7 +2,8 @@ import { createElement as el } from 'react';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import sharp, { type OverlayOptions } from 'sharp';
-import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type StudioObject } from '@/lib/studio-objects';
+import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StudioObject } from '@/lib/studio-objects';
+import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { loadCardFontWoff } from './cardFonts';
 
 /**
@@ -21,6 +22,8 @@ export async function renderStudioObjects(
   const W = meta.width!, H = meta.height!;
   const S = Math.min(frame.gw, frame.gh);
   const toPx = (u: number, v: number): [number, number] => [u * frame.gw - frame.cropX, v * frame.gh - frame.cropY];
+  // texture grain is anchored to the picture's origin (geometry 0,0), so it matches the preview
+  const grain = (png: Buffer, left: number, top: number, kind: TextureKind) => applyTexture(png, left + frame.cropX, top + frame.cropY, kind, TEXTURE_TILE_FRAC * S);
 
   const layers: OverlayOptions[] = [];
   for (const o of objects) {
@@ -31,17 +34,17 @@ export async function renderStudioObjects(
       [cx, cy] = toPx(o.x, o.y);
       if (o.rotation) png = await rotate(png, o.rotation);
     } else if (o.type === 'shape') {
-      png = await renderShape(o.shape, o.fill, o.outline, Math.max(2, o.w * S), Math.max(2, o.h * S));
+      png = await renderShape(o, Math.max(2, o.w * S), Math.max(2, o.h * S));
       [cx, cy] = toPx(o.x, o.y);
       if (o.rotation) png = await rotate(png, o.rotation);
     } else {
       const r = await renderStroke(o, S, toPx);
-      if (r) layers.push(...(await clipAsync(r.png, r.left, r.top, r.w, r.h, W, H)));
+      if (r) layers.push(...(await clipAsync(await grain(r.png, r.left, r.top, o.texture), r.left, r.top, r.w, r.h, W, H)));
       continue;
     }
     const m = await sharp(png).metadata();
     const left = Math.round(cx - m.width! / 2), top = Math.round(cy - m.height! / 2);
-    layers.push(...(await clipAsync(png, left, top, m.width!, m.height!, W, H)));
+    layers.push(...(await clipAsync(await grain(png, left, top, o.texture), left, top, m.width!, m.height!, W, H)));
   }
   return sharp(design).ensureAlpha().composite(layers).png({ compressionLevel: 6 }).toBuffer();
 }
@@ -76,13 +79,59 @@ async function renderText(text: string, font: Parameters<typeof loadCardFontWoff
   return sharp(png).trim({ threshold: 1 }).png().toBuffer().catch(() => png);
 }
 
-async function renderShape(shape: keyof typeof SHAPE_PATHS, fill: string, outline: boolean, w: number, h: number): Promise<Buffer> {
-  const pad = outline ? Math.max(2, Math.min(w, h) * 0.04) : 0;
+/** A shape on its 100-box, stretched to w×h; the outline is centred on the edge (as in the browser). */
+async function renderShape(o: ShapeObject, w: number, h: number): Promise<Buffer> {
+  const sw = o.strokeWidth * 100; // in box units — a fraction of the shape's size
+  const pad = sw > 0 ? (o.strokeWidth * Math.min(w, h)) / 2 + 2 : 0;
   const W = Math.ceil(w + pad * 2), H = Math.ceil(h + pad * 2);
-  const sw = outline ? (Math.min(w, h) * 0.05 * 100) / Math.min(w, h) : 0; // ~5% of the shape, in box units
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${-pad * (100 / w)} ${-pad * (100 / h)} ${100 + (2 * pad * 100) / w} ${100 + (2 * pad * 100) / h}" preserveAspectRatio="none">
-    <path d="${SHAPE_PATHS[shape]}" fill="${fill}" fill-rule="evenodd" ${outline ? `stroke="#2b2118" stroke-width="${sw}" stroke-linejoin="round"` : ''}/></svg>`;
+    <path d="${SHAPE_PATHS[o.shape]}" fill="${o.fill}" fill-rule="evenodd" ${sw > 0 ? `stroke="${o.stroke}" stroke-width="${sw}" stroke-linejoin="round"` : ''}/></svg>`;
   return Buffer.from(new Resvg(svg).render().asPng());
+}
+
+const tilePng = new Map<string, Promise<Buffer>>();
+/** One texture tile (mask / dark / light) as a PNG at `px` pixels square. */
+function tileAt(kind: Exclude<TextureKind, 'smooth'>, part: 'mask' | 'dark' | 'light', px: number): Promise<Buffer> {
+  const key = `${kind}.${part}.${px}`;
+  let p = tilePng.get(key);
+  if (!p) {
+    const t = textureTiles(kind);
+    p = sharp(Buffer.from(t[part].buffer, t[part].byteOffset, t[part].byteLength), { raw: { width: t.size, height: t.size, channels: 4 } })
+      .resize(px, px, { kernel: 'cubic' })
+      .png()
+      .toBuffer();
+    tilePng.set(key, p);
+    if (tilePng.size > 48) tilePng.delete(tilePng.keys().next().value!);
+  }
+  return p;
+}
+
+/**
+ * Give a layer its texture: keep only the colour the mask lets through, then lay the dark and
+ * light grain on the colour that's left. (gx, gy) = where the layer's top-left sits in the
+ * picture, so the grain lines up with the browser's (anchored at the picture's corner).
+ */
+export async function applyTexture(png: Buffer, gx: number, gy: number, kind: TextureKind, tileSize: number): Promise<Buffer> {
+  if (kind === 'smooth') return png;
+  const T = Math.max(8, Math.round(tileSize));
+  const m = await sharp(png).metadata();
+  const w = m.width!, h = m.height!;
+  const ox = ((Math.round(gx) % T) + T) % T, oy = ((Math.round(gy) % T) + T) % T;
+  const tiled = async (part: 'mask' | 'dark' | 'light') =>
+    sharp({ create: { width: w + T, height: h + T, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: await tileAt(kind, part, T), tile: true, left: 0, top: 0 }])
+      .png()
+      .toBuffer()
+      .then((b) => sharp(b).extract({ left: ox, top: oy, width: w, height: h }).png().toBuffer());
+  const [mask, dark, light] = await Promise.all([tiled('mask'), tiled('dark'), tiled('light')]);
+  const masked = await sharp(png).ensureAlpha().composite([{ input: mask, blend: 'dest-in' }]).png().toBuffer();
+  return sharp(masked)
+    .composite([
+      { input: dark, blend: 'atop' },
+      { input: light, blend: 'atop' },
+    ])
+    .png()
+    .toBuffer();
 }
 
 /** A pressure-varying pen line, as round-capped segments (clipped to the design by the caller). */

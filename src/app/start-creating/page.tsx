@@ -19,6 +19,7 @@ import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
 import { detectAspect, detectOpaqueBg, normalizeUpload, useUpload } from '@/lib/store';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import type { CatalogueProduct } from '@/server/catalogue';
+import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 
 export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
@@ -140,6 +141,7 @@ export default function StartCreatingPage() {
             <Button variant="secondary" size="lg" className="w-full md:w-auto" onClick={() => setCameraOpen(true)}>
               <Icon icon={IconCamera} size={18} /> use camera
             </Button>
+            <DesignFromScratch variant="ghost" size="md" className="w-full md:w-auto" label="or design from scratch" />
           </div>
           <div className="pop-in mt-7 max-w-sm rounded-[18px] border-2 border-cocoa/15 bg-paper p-3.5 text-left text-xs leading-relaxed text-ink-soft" style={{ ['--i' as string]: 3 }}>
             <p className="flex items-start gap-1.5 font-bold text-cocoa">

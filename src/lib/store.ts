@@ -26,7 +26,9 @@ export const gbp = formatPence;
 // `aspect` = the drawing's width/height (detected client-side after upload) — lets the catalogue
 // tiles auto-orient (a wide drawing → a landscape frame/jigsaw thumbnail) BEFORE the shopper opens
 // the customize page, mirroring the customize-page auto-orient. Absent until measured.
-export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string } } | null;
+// `scratch` = a blank canvas made for "design from scratch" (no drawing to edit — the Studio hides
+// its image tools, and the range shows the design rather than the empty canvas).
+export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string }; scratch?: boolean } | null;
 export const useUpload = create<{
   upload: Upload;
   setUpload: (u: Upload) => void;

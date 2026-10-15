@@ -18,6 +18,7 @@ export function StudioToolbar({
   disabled,
   onTool,
   onHold,
+  hidden = [],
 }: {
   active: ToolId | null;
   /** Tools that can't be used right now (e.g. "see it on" before anything is see-through). */
@@ -25,7 +26,10 @@ export function StudioToolbar({
   onTool: (id: ToolId) => void;
   /** Press-and-hold tools (compare). */
   onHold: (id: ToolId, down: boolean) => void;
+  /** Tools that don't apply here at all (the image tools on a blank canvas). */
+  hidden?: ToolId[];
 }) {
+  const tools = TOOLS.filter((t) => !hidden.includes(t.id));
   const [expanded, setExpanded] = useState(false); // desktop rail (remembered)
   const [sheet, setSheet] = useState(false); // phone: the labelled sheet over the canvas
   const [info, setInfo] = useState<ToolDef | null>(null);
@@ -122,7 +126,7 @@ export function StudioToolbar({
               </div>
               {infoCard}
               <ul className="grid grid-cols-1 gap-1.5 overflow-x-hidden pb-3">
-                {TOOLS.map((t) => (
+                {tools.map((t) => (
                   <li key={t.id} className="flex items-center gap-1">
                     <span className="flex min-w-0 flex-1" onClickCapture={() => t.kind !== 'hold' && setTimeout(() => setSheet(false), 0)}>
                       {button(t, true)}
@@ -136,7 +140,7 @@ export function StudioToolbar({
         ) : null}
         <div className="pb-safe flex items-center gap-1.5 border-t-2 border-cocoa/10 bg-paper px-2 pt-2">
           <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-2" role="toolbar" aria-label="studio tools">
-            {TOOLS.map((t) => (
+            {tools.map((t) => (
               <span key={t.id} className="contents">
                 {button(t, false)}
               </span>
@@ -162,7 +166,7 @@ export function StudioToolbar({
           <Icon icon={expanded ? IconLayoutSidebarLeftCollapse : IconLayoutSidebarLeftExpand} size={18} />
           {expanded ? 'icons only' : null}
         </button>
-        {TOOLS.map((t) =>
+        {tools.map((t) =>
           expanded ? (
             <div key={t.id} className="flex items-center gap-1">
               {button(t, true)}

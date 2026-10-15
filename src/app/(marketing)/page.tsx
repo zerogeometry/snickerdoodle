@@ -11,6 +11,7 @@ import { ExampleWall } from '@/ui/components/ExampleWall';
 import { RangeHero } from '@/ui/components/RangeHero';
 import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
+import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 
 /** The range strip: real keepsakes, one per product we sell (founder-made examples). */
 const RANGE = [
@@ -75,10 +76,11 @@ export default function LandingPage() {
               mugs, cushions, jigsaws, blankets and cards.
             </p>
             <div className="hidden md:block">
-              <div className="pop-in mt-9" style={{ ['--i' as string]: 3 }}>
+              <div className="pop-in mt-9 flex flex-wrap items-center gap-3" style={{ ['--i' as string]: 3 }}>
                 <Button href="/start-creating" size="lg" attention>
                   start creating
                 </Button>
+                <DesignFromScratch />
               </div>
               <TrustLine className="mt-6">everything you make is yours</TrustLine>
             </div>
@@ -178,7 +180,8 @@ export default function LandingPage() {
         <Button href="/start-creating" size="lg" className="w-full" attention>
           start creating
         </Button>
-        <div className="mt-2 flex justify-center">
+        <DesignFromScratch variant="ghost" size="sm" className="mt-1 w-full" label="or design from scratch" />
+        <div className="mt-1 flex justify-center">
           <TrustLine>everything you make is yours</TrustLine>
         </div>
       </div>
