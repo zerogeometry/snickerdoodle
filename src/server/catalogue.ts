@@ -4,6 +4,7 @@ import { printTemplates, productVariantProviders, productVariants, products } fr
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
 import type { DbHandle } from './db';
+import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
 import { ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES } from '@/lib/garments';
 
 export { mmToPx };
@@ -324,13 +325,9 @@ const DEFS: Record<string, ProductDef> = {
   },
 };
 
-// Curated "Most Popular" front-of-shop order (by product key). Anything NOT listed
-// lives only in the Full Catalogue — so the founder's incoming big list defaults to
-// full-catalogue-only until promoted here. Founder-curated for now; ready to be
-// driven by real order counts later. Order in this array = the popular rank.
-const POPULAR_ORDER = ['framedPrint', 'storybook', 'cushion', 'mug', 'jigsaw', 'kidsTee', 'adultTee', 'blanket', 'babyBodysuit', 'card'];
+// Front-of-shop order: the EXPECTED popularity to begin with, then actual sales (popularity.ts).
 function popularRankOf(key: string): number | null {
-  const i = POPULAR_ORDER.indexOf(key);
+  const i = EXPECTED_POPULARITY.indexOf(key);
   return i === -1 ? null : i + 1;
 }
 
@@ -541,6 +538,9 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     .update(productVariants)
     .set({ active: false })
     .where(inArray(productVariants.productId, db.select({ id: products.id }).from(products).where(notInArray(products.key, keys))));
+
+  // the expected order is only the starting point — recent sales re-rank it straight away
+  await recomputePopularity(db);
 
   return { products: keys.length, variants: variantCount };
 }

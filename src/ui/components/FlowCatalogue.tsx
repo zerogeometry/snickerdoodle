@@ -217,17 +217,9 @@ export function FlowCatalogue({
         // or jump as creations are added — only the content inside each scrolls.
         <div className="grid gap-4 md:h-[calc(100dvh-23rem)] md:max-h-[34rem] md:grid-cols-[1fr_8rem] md:items-stretch">
           <div className="flex min-h-0 min-w-0 flex-col">
-          {/* Header — the section title and the Full Catalogue button on one aligned row.
-              When the shopper has picks from the full catalogue the title steps aside to
-              "your range" and the two sections are labelled inside the scroll instead. */}
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h2 className="font-display text-xl text-cocoa">{picks.length > 0 ? 'your range' : popular.length === 1 && picks.length === 0 ? 'your keepsake' : 'most popular'}</h2>
-            {hasMoreThanShown ? (
-              <Button variant="secondary" onClick={() => setFullOpen(true)} className="shrink-0">
-                full catalogue <Icon icon={IconChevronRight} size={15} />
-              </Button>
-            ) : null}
-          </div>
+          {/* No visible header: the catalogue starts level with the basket. The heading stays for
+              screen readers; "full catalogue" sits at the foot of the list. */}
+          <h2 className="sr-only">{picks.length > 0 ? 'your range' : 'the range'}</h2>
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
           <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (
@@ -238,7 +230,7 @@ export function FlowCatalogue({
             ) : null}
             {popular.length > 0 ? (
               <>
-                {picks.length > 0 ? <SectionLabel className="mt-5">most popular</SectionLabel> : null}
+                {picks.length > 0 ? <SectionLabel className="mt-5">more ideas</SectionLabel> : null}
                 <ProductGrid
                   products={popular}
                   gridClassName={gridClassName}
@@ -246,7 +238,8 @@ export function FlowCatalogue({
                   insert={
                     familySetAvailable
                       ? {
-                          afterKey: popular.some((p) => p.key === 'adultTee') ? 'adultTee' : 'kidsTee',
+                          // the set sits next to whichever tee parents reach for first
+                          afterKey: popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee',
                           render: (i) => <FamilySetTile products={products} upload={upload} index={i} label={gridProps.customizeLabel} onOpen={() => { if (guardUpload()) setFamilyOpen(true); }} />,
                         }
                       : undefined
@@ -263,6 +256,11 @@ export function FlowCatalogue({
                   <>the range is being lovingly prepared — back very soon.</>
                 )}
               </div>
+            ) : null}
+            {hasMoreThanShown ? (
+              <Button variant="secondary" onClick={() => setFullOpen(true)} className="mt-6 w-full">
+                see the full catalogue <Icon icon={IconChevronRight} size={15} />
+              </Button>
             ) : null}
           </div>
           </div>
