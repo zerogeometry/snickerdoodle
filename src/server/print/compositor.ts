@@ -233,7 +233,9 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 
   // 4. Deterministic, VERSIONED cache key. templateVersion + size + the SOURCE OBJECT id
   //    are all load-bearing: the source id keeps the ORIGINAL and a bg-removed cutout
-  //    (both DERIVATIVE/ORIGINAL under the SAME asset) from colliding on one key.
+  //    (both DERIVATIVE/ORIGINAL under the SAME asset) from colliding on one key, and the source's
+  //    content hash makes a REPLACED cutout (touch-up, re-run removal) recompose instead of
+  //    serving the old picture.
   const t = clampTransform(input.transform);
   const size: MockupSize = input.size ?? 'thumb';
   const viewTag = input.view && input.view !== 'primary' && input.view !== 'board' ? `-${input.view}` : '';
@@ -245,7 +247,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // view carries its span in the box); ignored elsewhere so it never forks other products' keys.
   const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
   const spanTag = spanHalf ? `-span${spanHalf}` : '';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}-${srcObj.id}-${transformHash(t)}`);
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));

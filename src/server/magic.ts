@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import { and, eq, gte } from 'drizzle-orm';
+import sharp from 'sharp';
 import { mlOperations, storageObjects } from '@/db/schema';
 import { runImageOp } from '@/ml/client';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
@@ -36,7 +38,12 @@ export interface MagicResult {
  * cutout as a DERIVATIVE, and records the op against the budget. The original is
  * never touched.
  */
-export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<MagicResult> {
+export async function removeBackgroundForAsset(
+  db: DbHandle,
+  viewer: ViewerContext,
+  assetId: string,
+  opts: { keepEnclosedPaper?: boolean } = {},
+): Promise<MagicResult> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate (member OR upload-claim holder)
   await assertMlBudget(db, viewer.accountId, assetId);
 
@@ -47,7 +54,7 @@ export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerConte
   if (!orig) throw new Error('no original to edit');
 
   const srcBuf = await getObjectBytes(orig.key);
-  const res = await runImageOp({ kind: 'BG_REMOVE' }, srcBuf); // self-hosted; one image; PNG, no EXIF
+  const res = await runImageOp({ kind: 'BG_REMOVE', keepEnclosedPaper: opts.keepEnclosedPaper }, srcBuf); // self-hosted; one image; PNG, no EXIF
 
   // HONESTY GATE: if the edit didn't meaningfully change anything (no clean background
   // found) or would erase essentially the whole image (border == subject), fail here —
@@ -56,23 +63,99 @@ export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerConte
   // (a fine-line drawing on a large sheet can be ~99% paper — only "nothing left" is a failure)
   if (removed < 0.02 || removed > 0.999) throw new Error('no-clean-background');
 
-  const key = derivativeKey(assetId, 'cutout');
-  await putObject(key, res.buffer, res.contentType);
-  const { bucket } = getS3();
-
-  const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
-  let objectId: string;
-  if (existing) {
-    await db.update(storageObjects).set({ byteSize: res.byteSize, sha256: res.sha256 }).where(eq(storageObjects.id, existing.id));
-    objectId = existing.id;
-  } else {
-    const [row] = await db
-      .insert(storageObjects)
-      .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: res.contentType, byteSize: res.byteSize, sha256: res.sha256, exifStripped: true, writeOnce: false })
-      .returning();
-    objectId = row!.id;
-  }
-
+  const { objectId, key } = await storeCutout(db, assetId, res.buffer, res.sha256);
   await db.insert(mlOperations).values({ accountId: viewer.accountId, op: 'BG_REMOVE', assetId });
   return { objectId, key };
+}
+
+/** Store (or overwrite) an asset's CUTOUT derivative and return its storage object. */
+async function storeCutout(db: DbHandle, assetId: string, buffer: Buffer, sha256: string): Promise<{ objectId: string; key: string }> {
+  const key = derivativeKey(assetId, 'cutout');
+  await putObject(key, buffer, 'image/png');
+  const { bucket } = getS3();
+  const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+  if (existing) {
+    await db.update(storageObjects).set({ byteSize: buffer.byteLength, sha256 }).where(eq(storageObjects.id, existing.id));
+    return { objectId: existing.id, key };
+  }
+  const [row] = await db
+    .insert(storageObjects)
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: buffer.byteLength, sha256, exifStripped: true, writeOnce: false })
+    .returning();
+  return { objectId: row!.id, key };
+}
+
+/** Longest side of the editing copy the touch-up tool works on (and of the masks it sends back). */
+export const TOUCHUP_EDGE = 1600;
+
+async function originalBytes(db: DbHandle, assetId: string): Promise<Buffer> {
+  const [orig] = await db
+    .select()
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!orig) throw new Error('no original to edit');
+  return getObjectBytes(orig.key);
+}
+
+async function cutoutBytes(db: DbHandle, assetId: string): Promise<Buffer | null> {
+  const key = derivativeKey(assetId, 'cutout');
+  const [row] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+  return row ? getObjectBytes(key) : null;
+}
+
+/**
+ * The touch-up tool's starting point: the current cutout's transparency as a greyscale PNG at the
+ * editing size (white = kept). Null when there's no cutout yet (the tool starts fully kept).
+ */
+export async function cutoutAlphaForAsset(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<Buffer | null> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const cut = await cutoutBytes(db, assetId);
+  if (!cut) return null;
+  return sharp(cut)
+    .ensureAlpha()
+    .extractChannel(3)
+    .resize(TOUCHUP_EDGE, TOUCHUP_EDGE, { fit: 'inside', withoutEnlargement: true })
+    .png()
+    .toBuffer();
+}
+
+/**
+ * Save the parent's touch-up: a greyscale MASK (white = keep, black = gone, greys = soft) at the
+ * editing size. It's scaled to the original and becomes the cutout's transparency; colour comes
+ * from the auto cutout where it kept ink (its un-mixed colours) and from the original elsewhere
+ * (so "restore" brings back exactly what was there). The original is never touched.
+ */
+export async function applyCutoutMask(db: DbHandle, viewer: ViewerContext, assetId: string, maskPng: Buffer): Promise<MagicResult> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const orig = sharp(await originalBytes(db, assetId)).rotate();
+  const { data: rgb, info } = await orig.clone().removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height;
+
+  const mm = await sharp(maskPng).metadata();
+  if (!mm.width || !mm.height || Math.max(mm.width, mm.height) > TOUCHUP_EDGE * 1.05) throw new Error('bad-mask');
+  if (Math.abs(mm.width / mm.height - W / H) > 0.02 * (W / H)) throw new Error('bad-mask');
+  const alpha = await sharp(maskPng).removeAlpha().greyscale().resize(W, H, { fit: 'fill', kernel: 'cubic' }).raw().toBuffer();
+
+  const cut = await cutoutBytes(db, assetId);
+  const cutRaw = cut ? await sharp(cut).ensureAlpha().resize(W, H, { fit: 'fill' }).raw().toBuffer() : null;
+
+  const out = Buffer.alloc(W * H * 4);
+  for (let k = 0; k < W * H; k++) {
+    const i = k * 3, o = k * 4;
+    let r = rgb[i]!, g = rgb[i + 1]!, b = rgb[i + 2]!;
+    if (cutRaw) {
+      const ca = cutRaw[o + 3]! / 255;
+      if (ca > 0) {
+        r = Math.round(r * (1 - ca) + cutRaw[o]! * ca);
+        g = Math.round(g * (1 - ca) + cutRaw[o + 1]! * ca);
+        b = Math.round(b * (1 - ca) + cutRaw[o + 2]! * ca);
+      }
+    }
+    out[o] = r;
+    out[o + 1] = g;
+    out[o + 2] = b;
+    out[o + 3] = alpha[k]!;
+  }
+  const png = await sharp(out, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
+  return storeCutout(db, assetId, png, createHash('sha256').update(png).digest('hex'));
 }

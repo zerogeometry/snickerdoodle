@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
-import { liftInk } from './inkLift';
+import { liftInk, type InkLiftDiagnosis } from './inkLift';
 
 /**
  * Self-hosted, in-region image ops — the "magic edits" (CLAUDE.md: SELF-HOST
@@ -46,17 +46,22 @@ export interface CutoutResult {
  * Truly complex backgrounds (busy photos, patterned surfaces) remain the neural-cutout worker's job
  * — this returns a small removedFraction there, reported honestly.
  */
-export async function removeBackground(input: Buffer): Promise<CutoutResult> {
+export async function removeBackground(input: Buffer, opts: { keepEnclosedPaper?: boolean } = {}): Promise<CutoutResult> {
   // FIRST CHOICE — ink lift (src/ml/inkLift.ts): models the paper and lifts the ink off it, so
   // paper enclosed by the drawing goes too, pencil keeps soft edges, shadows don't survive and
   // pale crayon stays solid. It declines (null) when there's no paper to model — then the older
   // border flood below gets its chance (e.g. a dark card), and failing that we fail honestly.
-  const lifted = await liftInk(input, { edge: 'soft' }).catch(() => null);
+  const diag: InkLiftDiagnosis = {};
+  const lifted = await liftInk(input, { edge: 'soft', keepEnclosedPaper: opts.keepEnclosedPaper }, diag).catch(() => null);
   // A line drawing on a big sheet is legitimately ~99% paper — the test is "some ink survives".
   if (lifted && lifted.removedFraction >= 0.02 && lifted.removedFraction <= 0.999) {
     return { buffer: lifted.buffer, removedFraction: lifted.removedFraction };
   }
-  return floodRemoveBackground(input);
+  // The old border flood is only safe on DARK paper (chalk / light paint on black card). On a
+  // painted or busy background it silently ate content (a blue figure on a blue sky) while
+  // claiming success — so there we change nothing and let the parent decide in the touch-up.
+  if (diag.declined === 'dark-paper') return floodRemoveBackground(input);
+  return { buffer: await sharp(input).ensureAlpha().png().toBuffer(), removedFraction: 0 };
 }
 
 /** The original border-connected flood — now the fallback when ink lift finds no paper. */
@@ -183,7 +188,7 @@ export async function upscale(input: Buffer, targetWidth: number, targetHeight: 
   return sharp(input).resize(targetWidth, targetHeight, { kernel: 'lanczos3', fit: 'fill' }).png().toBuffer();
 }
 
-export type ImageOp = { kind: 'BG_REMOVE' } | { kind: 'UPSCALE'; width: number; height: number };
+export type ImageOp = { kind: 'BG_REMOVE'; keepEnclosedPaper?: boolean } | { kind: 'UPSCALE'; width: number; height: number };
 
 export interface ImageOpResult {
   buffer: Buffer;
@@ -200,7 +205,7 @@ export interface ImageOpResult {
  */
 export async function runImageOp(op: ImageOp, input: Buffer): Promise<ImageOpResult> {
   if (op.kind === 'BG_REMOVE') {
-    const cut = await removeBackground(input);
+    const cut = await removeBackground(input, { keepEnclosedPaper: op.keepEnclosedPaper === true });
     return {
       buffer: cut.buffer,
       contentType: 'image/png',

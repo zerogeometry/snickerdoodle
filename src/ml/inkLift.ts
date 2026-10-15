@@ -60,7 +60,13 @@ function chroma(r: number, g: number, b: number): { cr: number; cg: number; l: n
   return { cr: r / s, cg: g / s, l: s / 3 };
 }
 
-export async function liftInk(input: Buffer, opts: InkLiftOptions = {}): Promise<InkLiftResult | null> {
+/** Why liftInk declined (null): DARK paper (light-on-dark art — a plain colour flood is safe there)
+ * or NO paper at all (painted / busy background — a judgement for the parent, never automatic). */
+export interface InkLiftDiagnosis {
+  declined?: 'dark-paper' | 'no-paper';
+}
+
+export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftDiagnosis = {}): Promise<InkLiftResult | null> {
   const edge = opts.edge ?? 'soft';
   const src = sharp(input, { limitInputPixels: MAX_PIXELS }).rotate();
   const meta = await src.metadata();
@@ -95,7 +101,10 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}): Promise
     buckets.set(key, e);
   }
   const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
-  if (!top) return null;
+  if (!top) {
+    diag.declined = 'no-paper';
+    return null;
+  }
   const pcr = top.cr / top.n;
   const pcg = top.cg / top.n;
   const pl = top.l / top.n;
@@ -106,8 +115,14 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}): Promise
     const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
     if (Math.hypot(c.cr - pcr, c.cg - pcg) < 0.03 && c.l > pl * 0.45) fam++;
   }
-  if (fam / ring.length < 0.4) return null;
-  if (pl < 60) return null; // a dark "paper" (black card) — colour-to-alpha against dark needs light ink; not this path
+  if (fam / ring.length < 0.4) {
+    diag.declined = 'no-paper';
+    return null;
+  }
+  if (pl < 60) {
+    diag.declined = 'dark-paper'; // black card — colour-to-alpha against dark needs light ink; not this path
+    return null;
+  }
 
   // Every paper-like pixel in the image (same chromaticity family, plausibly lit).
   const isPaper = (i: number) => {
@@ -144,7 +159,10 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}): Promise
     }
   }
   const known = field.filter(Boolean).length;
-  if (known < Math.max(4, GW * GH * 0.15)) return null;
+  if (known < Math.max(4, GW * GH * 0.15)) {
+    diag.declined = 'no-paper';
+    return null;
+  }
   // Diffuse into empty cells (inside large painted areas) from known neighbours.
   for (let pass = 0; pass < GW + GH && field.some((f) => f === null); pass++) {
     const next = field.slice();

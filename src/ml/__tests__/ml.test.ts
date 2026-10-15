@@ -93,10 +93,11 @@ describe('self-hosted image ops (the magic edits)', () => {
   });
 
   it('reports a tiny removedFraction when there is no clean background (honesty signal)', async () => {
-    // A full-bleed solid: the border IS the subject → the flood would erase everything.
+    // A full-bleed solid: the border IS the subject. Whatever happens, it must land OUTSIDE the
+    // band the caller treats as success (0.02–0.999), so the UI never claims a fake removal.
     const solid = await sharp({ create: { width: 100, height: 100, channels: 3, background: { r: 204, g: 34, b: 34 } } }).png().toBuffer();
     const res = await removeBackground(solid);
-    expect(res.removedFraction).toBeGreaterThan(0.95); // caller's honesty gate rejects this
+    expect(res.removedFraction < 0.02 || res.removedFraction > 0.999).toBe(true);
   });
 
   it('a magic edit strips ALL metadata — no EXIF/GPS survives', async () => {
@@ -119,5 +120,38 @@ describe('self-hosted image ops (the magic edits)', () => {
     expect(r.byteSize).toBeGreaterThan(0);
     expect(r.removedFraction).toBeGreaterThan(0.5); // the white ground was removed
     expect((await sharp(r.buffer).metadata()).channels).toBe(4); // RGBA cutout
+  });
+
+  it('never floods a PAINTED background (a blue figure on a brushy blue sky survives untouched)', async () => {
+    // Brushy, uneven paint (coloured noise over blue) — not a flat sheet of coloured paper.
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240">
+      <defs><filter id="paint"><feTurbulence type="fractalNoise" baseFrequency="0.035" numOctaves="3" seed="7"/>
+        <feColorMatrix type="matrix" values="1.4 0 0 0 -0.2  0 1.4 0 0 -0.2  0 0 1.4 0 -0.2  0 0 0 0 0.85"/></filter></defs>
+      <rect width="300" height="240" fill="#2aa7d8"/><rect width="300" height="240" filter="url(#paint)"/>
+      <circle cx="80" cy="80" r="30" fill="#f6c445"/><rect x="180" y="60" width="40" height="120" fill="#1f5fbf"/></svg>`;
+    const painting = await sharp(Buffer.from(svg)).jpeg().toBuffer();
+    const res = await removeBackground(painting);
+    expect(res.removedFraction).toBe(0); // nothing removed automatically — the touch-up decides
+    const px = await pixels(res.buffer);
+    expect(px(200, 120).a).toBe(255); // the blue figure is intact
+  });
+
+  it('a flat COLOURED sheet (sugar paper) is treated as paper — a darker figure on it stays solid', async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240"><rect width="300" height="240" fill="#2aa7d8"/>
+      <rect x="180" y="60" width="40" height="120" fill="#1f3f8f"/></svg>`;
+    const res = await removeBackground(await sharp(Buffer.from(svg)).jpeg().toBuffer());
+    const px = await pixels(res.buffer);
+    expect(px(10, 10).a).toBe(0); // the paper
+    expect(px(200, 120).a).toBe(255); // the figure
+  });
+
+  it('still floods DARK card (chalk on black) — the case the flood is safe for', async () => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="240"><rect width="300" height="240" fill="#151515"/>
+      <circle cx="150" cy="120" r="60" fill="none" stroke="#f4f4f0" stroke-width="10"/></svg>`;
+    const res = await removeBackground(await sharp(Buffer.from(svg)).png().toBuffer());
+    expect(res.removedFraction).toBeGreaterThan(0.02);
+    const px = await pixels(res.buffer);
+    expect(px(5, 5).a).toBe(0);
+    expect(px(210, 120).a).toBe(255); // the chalk ring
   });
 });

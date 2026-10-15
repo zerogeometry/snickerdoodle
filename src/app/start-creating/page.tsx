@@ -11,6 +11,7 @@ import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
+import { CutoutTouchUp } from '@/ui/components/CutoutTouchUp';
 import { ImageStudio } from '@/ui/components/ImageStudio';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
@@ -33,6 +34,8 @@ export default function StartCreatingPage() {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [removingBg, setRemovingBg] = useState(false);
+  // The touch-up tool: opened to refine a cutout, or straight away when there's no plain paper.
+  const [touchUp, setTouchUp] = useState<{ assetId: string; intro?: string } | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [studioOpen, setStudioOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
@@ -122,12 +125,16 @@ export default function StartCreatingPage() {
     try {
       const assetId = await ensureAsset();
       if (!assetId) return;
+      // Already cut out → refine it by hand.
+      if (upload?.cutout) return setTouchUp({ assetId });
       const res = await removeBackgroundAction({ assetId });
       if (res.ok) {
         setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
         toast('background removed ✨');
       } else if (res.reason === 'budget') toast('that’s all your magic edits for now');
-      else if (res.reason === 'nochange') toast('we couldn’t find a clean background to remove on this one');
+      // No plain paper to lift the art off (e.g. a painted background) — that's the parent's call:
+      // open the touch-up so they can tap the colour they'd like gone.
+      else if (res.reason === 'nochange') setTouchUp({ assetId, intro: 'no plain paper on this one — tap the colour you’d like gone' });
       else toast('couldn’t do that — try again');
     } finally {
       setRemovingBg(false);
@@ -145,6 +152,17 @@ export default function StartCreatingPage() {
         onCapture={(dataUrl, name) => applyUpload(dataUrl, name)}
         onUploadInstead={() => fileRef.current?.click()}
       />
+      {upload ? (
+        <CutoutTouchUp
+          open={!!touchUp}
+          onClose={() => setTouchUp(null)}
+          assetId={touchUp?.assetId ?? null}
+          imageDataUrl={upload.dataUrl}
+          hasCutout={!!upload.cutout}
+          intro={touchUp?.intro}
+          onSaved={(c) => setCutout(c)}
+        />
+      ) : null}
       <ImageStudio
         open={studioOpen}
         image={upload?.dataUrl ?? null}
@@ -249,7 +267,7 @@ export default function StartCreatingPage() {
                   attention={!removingBg && !upload.cutout && upload.opaqueBg === true}
                 >
                   <Icon icon={upload.cutout ? IconCircleCheck : IconSparkles} size={16} />
-                  {removingBg ? 'removing…' : upload.cutout ? 'background removed' : 'remove background'}
+                  {removingBg ? 'removing…' : upload.cutout ? 'background removed · touch up' : 'remove background'}
                 </Button>
                 <Button variant="design" size="lg" className="w-full" onClick={() => setStudioOpen(true)}>
                   <Icon icon={IconPencil} size={16} /> edit in studio
