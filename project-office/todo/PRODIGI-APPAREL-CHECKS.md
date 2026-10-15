@@ -42,5 +42,18 @@
 - [ ] Kids tee 3–4y + 12–14y and adult S + XL, in white and one dark colour, printed with a
       calibration design (ruler, fine lines, soft edges, colour patches, a cut-out). Measure the print
       size + position, compare colour to the preview, update the numbers above.
-- [ ] A 1024px drawing on the 28×40″ framed print — the most-stretched case the new sharpness rule
+- [ ] A 1024px drawing on the 24×32″ framed print — the most-stretched case the new sharpness rule
       allows (`minimumDpi`). If it's too soft, raise `ACUITY_K` in `geometry.ts`.
+
+## Shipping & where things are made (re-quoted 2026-10-15)
+
+- [ ] **Keep an eye on "Standard = tracked".** Every shop product quotes a tracked Standard service
+      today (jigsaws moved from Express to Standard: Evri Standard 48). Prodigi picks the carrier —
+      ask them to confirm Standard stays tracked for these SKUs. Cards are untracked (95p post).
+- [ ] **28×40″ frame (withdrawn):** it's made at Prodigi's NL lab. Before it returns: is it
+      delivered duty/VAT-paid to GB (no charge on the doorstep), and how long does it take?
+- [ ] **Cards are made on Guernsey (lab uk7)** — not the UK, but UK-adequate. Note it in the DPIA.
+- [ ] **Baby bodysuit (hidden):** Standard is untracked Royal Mail First Class from lab uk2; tracked
+      means Express (£10.75) on a £9 item. Ask for a bodysuit made at the tee lab (uk9) — ideally a
+      Stanley/Stella organic one — so it ships tracked with the tees. Also confirm which print area
+      the 18–24 months size gets (two labs list 180×180mm and 127×170mm).

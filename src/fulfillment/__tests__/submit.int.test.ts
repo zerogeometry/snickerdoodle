@@ -24,9 +24,9 @@ const src = (w: number, h: number) => sharp({ create: { width: w, height: h, cha
 
 // The shipping-method rule is pure — test it without a DB.
 describe('resolveShippingMethod', () => {
-  it('Express when any line is a jigsaw (its Express cost is baked into the price)', () => {
-    expect(resolveShippingMethod(['kidsTee', 'jigsaw-110pieces'])).toBe('Express');
-    expect(resolveShippingMethod(['jigsaw'])).toBe('Express');
+  it('jigsaws go Standard too — tracked (Evri Standard 48) since 2026-10', () => {
+    expect(resolveShippingMethod(['kidsTee', 'jigsaw-110pieces'])).toBe('Standard');
+    expect(resolveShippingMethod(['jigsaw'])).toBe('Standard');
   });
   it('Standard otherwise (garments, prints, the family set)', () => {
     expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee', 'babyBodysuit'])).toBe('Standard');

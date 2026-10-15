@@ -75,10 +75,15 @@ export function assertProdigiConfigConsistent(env: GateEnv): void {
   }
 }
 
-/** Express when any line needs it (the jigsaw's Express cost is baked into its price);
- * Standard otherwise — tracked for garments/prints, founder-accepted for the bodysuit. */
-export function resolveShippingMethod(productKeys: string[]): 'Standard' | 'Express' {
-  return productKeys.some((k) => k === 'jigsaw' || k.startsWith('jigsaw-')) ? 'Express' : 'Standard';
+/**
+ * Standard for everything. It's TRACKED for every product in the shop (re-quoted 2026-10-15:
+ * Royal Mail Tracked 48, FedEx Tracked & Signed, Evri, DPD) — bar the greetings card, which is
+ * untracked post. Jigsaws used to go Express because their Standard service was untracked; it's
+ * now Evri Standard 48, tracked (founder: Standard is fine so long as it's tracked). Kept as a
+ * function so a product that needs Express can opt back in.
+ */
+export function resolveShippingMethod(_productKeys: string[]): 'Standard' | 'Express' {
+  return 'Standard';
 }
 
 /** Is this frozen line spec fulfilled by Prodigi? (Legacy specs lack `provider`; for

@@ -63,7 +63,8 @@ const FRAME_SIZES = [
   { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 7000 },
   { size: '18×24″', sku: 'GLOBAL-CFP-18X24', wMm: 457, hMm: 610, dpi: 150, pricePence: 9000 },
   { size: '24×32″', sku: 'GLOBAL-CFP-24X32', wMm: 610, hMm: 813, dpi: 150, pricePence: 10500 },
-  { size: '28×40″', sku: 'GLOBAL-CFP-28X40', wMm: 711, hMm: 1016, dpi: 150, pricePence: 13000 },
+  // 28×40″ (GLOBAL-CFP-28X40) withdrawn 2026-10-15: made at Prodigi's NL lab, not GB — the one
+  // non-UK item, pricier to post; customs/VAT + delivery time to confirm before it returns.
 ] as const;
 function frameVariants(): VariantDef[] {
   // Orientation is OURS, not Prodigi's: their frame print files are fixed-portrait
