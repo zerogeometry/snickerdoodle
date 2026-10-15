@@ -244,7 +244,8 @@ export function printReadiness(origW: number, origH: number, g: Geometry): { lab
   const short = Math.min(gw * g.crop.w, gh * g.crop.h);
   const px = (mm: number) => (mm / 25.4) * 150;
   for (const [name, L, S] of [['A2', 594, 420], ['A3', 420, 297], ['A4', 297, 210], ['A5', 210, 148]] as const) {
-    if (long >= px(L) && short >= px(S)) return { label: `print-ready up to ${name}`, good: true };
+    if (long >= px(L) && short >= px(S)) return { label: `crisp up to ${name}`, good: true };
   }
-  return { label: 'best for small prints', good: false };
+  // still prints big — just softer up close (the product page says so, size by size)
+  return { label: 'crisp on smaller things', good: false };
 }

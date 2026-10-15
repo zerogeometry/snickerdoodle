@@ -240,13 +240,13 @@ export function Positioner({
   const dpiFix = useMemo<{ scale: number; kind: 'ok' | 'enhance' } | null>(() => {
     if (!assess || assess.decision === 'OK') return null;
     // dpi ∝ 1/scale, so the largest zoom that reaches a dpi d is zoom·(effective/d).
-    // Prefer full print-ready; from BLOCK, falling back to the enhanceable tier
-    // (required/2 → classical resample) still un-blocks the order honestly. The
+    // Prefer full print-ready; from BLOCK, falling back to the least this product needs
+    // where it's seen (minimumDpi) still un-blocks the order honestly. The
     // 0.995 nudges the landing safely inside the boundary against px rounding.
     const floor = lockToCover ? scaleFloor : Math.max(fitScale / 2, MIN_SCALE);
     const scaleFor = (d: number) => zoomValue * (assess.effectiveDpi / d) * 0.995;
     const ok = scaleFor(assess.requiredDpi);
-    const enhance = scaleFor(assess.requiredDpi / 2);
+    const enhance = scaleFor(assess.minimumDpi);
     const pick =
       ok >= floor
         ? { scale: ok, kind: 'ok' as const }
@@ -925,7 +925,9 @@ export function Positioner({
                 {assess.decision === 'OK'
                   ? `print-ready · ${t.requiredDpi} dpi`
                   : assess.decision === 'UPSCALE'
-                    ? `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
+                    ? assess.softUpClose
+                      ? 'lovely from a step back, a little soft up close'
+                      : `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
                     : dpiFix !== null
                       ? 'image quality too low at this size'
                       : 'too small to print well here — try a smaller product'}

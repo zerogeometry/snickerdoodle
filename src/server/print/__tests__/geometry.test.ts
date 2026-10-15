@@ -7,6 +7,8 @@ import {
   containScale,
   MAX_ZOOM,
   MIN_SCALE,
+  MIN_FLOOR_DPI,
+  minimumDpi,
   type TemplateGeom,
   type Transform,
 } from '@/server/print/geometry';
@@ -152,5 +154,45 @@ describe('assessResolution — the DPI gate', () => {
     const zoomed = assessResolution(t, { width: 3000, height: 3000 }, T({ scale: 4 }));
     expect(ok.decision).toBe('OK');
     expect(zoomed.effectiveDpi).toBeLessThan(ok.effectiveDpi);
+  });
+});
+
+describe('minimumDpi — how much detail a print needs depends on how far away it’s seen', () => {
+  const rect = (wIn: number, hIn: number, dpi: number): TemplateGeom => ({ printWidthPx: Math.round(wIn * dpi), printHeightPx: Math.round(hIn * dpi), bleedMm: 0, requiredDpi: dpi });
+  const mug = rect(8.2, 3.9, 300);
+  const card = rect(5, 7, 300);
+  const frame11x14 = rect(11, 14, 300);
+  const frame28x40 = rect(28, 40, 150);
+  const bigBlanket = rect(60, 80, 150);
+
+  it('hand-held things keep the old floor (4× enlargement at most)', () => {
+    expect(minimumDpi(mug)).toBe(75);
+    expect(minimumDpi(card)).toBe(75);
+  });
+
+  it('wall art and blankets, seen from further away, need less — never below the floor', () => {
+    expect(minimumDpi(frame11x14)).toBeLessThan(75);
+    expect(minimumDpi(frame11x14)).toBeGreaterThan(50);
+    expect(minimumDpi(frame28x40)).toBeLessThan(minimumDpi(frame11x14));
+    expect(minimumDpi(bigBlanket)).toBe(MIN_FLOOR_DPI);
+  });
+
+  it('is never stricter than the old flat rule (required ÷ 4)', () => {
+    for (const t of [mug, card, frame11x14, frame28x40, bigBlanket, rect(4, 4, 150), rect(12, 12, 150)]) {
+      expect(minimumDpi(t)).toBeLessThanOrEqual(t.requiredDpi / 4);
+    }
+  });
+
+  it('between 2× and the floor it prints, flagged soft up close; below the floor it’s blocked', () => {
+    // 11×14 at 300dpi from a 1024px-wide drawing: ~73dpi — soft up close, but it prints
+    const soft = assessResolution(frame11x14, { width: 1024, height: 1303 }, T({ scale: 1 }));
+    expect(soft.decision).toBe('UPSCALE');
+    expect(soft.softUpClose).toBe(true);
+    // a proper photo of the drawing: sharp at this size
+    const crisp = assessResolution(frame11x14, { width: 3300, height: 4200 }, T({ scale: 1 }));
+    expect(crisp.softUpClose).toBe(false);
+    // a thumbnail on a big frame: blocked, however far away
+    const tiny = assessResolution(frame28x40, { width: 400, height: 571 }, T({ scale: 1 }));
+    expect(tiny.decision).toBe('BLOCK');
   });
 });

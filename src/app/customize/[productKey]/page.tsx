@@ -319,19 +319,21 @@ export default function CustomizePage() {
     v?.printGeom && srcSize ? assessResolution(v.printGeom, srcSize, clampTransform(placement)) : null;
   const quality = assessFor(variant);
   const blocked = quality?.decision === 'BLOCK';
-  // One-tap fix: the LARGEST size (same colour + orientation) that still prints well.
-  const fitSize = blocked
-    ? [...product.sizes].reverse().find((sz) => {
-        const v = product.variants.find(
-          (x) =>
-            x.attributes.size === sz &&
-            (product.colours.length === 0 || x.attributes.colour === colour) &&
-            (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
-        );
-        const a = assessFor(v);
-        return a !== null && a.decision !== 'BLOCK';
-      }) ?? null
-    : null;
+  // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test.
+  const largestSize = (ok: (a: ResolutionAssessment) => boolean) =>
+    [...product.sizes].reverse().find((sz) => {
+      const v = product.variants.find(
+        (x) =>
+          x.attributes.size === sz &&
+          (product.colours.length === 0 || x.attributes.colour === colour) &&
+          (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
+      );
+      const a = assessFor(v);
+      return a !== null && ok(a);
+    }) ?? null;
+  // blocked → the biggest that prints at all; soft up close → the biggest that's sharp too
+  const fitSize = blocked ? largestSize((a) => a.decision !== 'BLOCK') : null;
+  const sharpSize = quality?.softUpClose && !blocked ? largestSize((a) => !a.softUpClose) : null;
 
   const editPlacement = () => {
     if (!activeAssetId) {
@@ -958,14 +960,31 @@ export default function CustomizePage() {
                 )}
               </div>
             ) : (
-              <p role="status" className="mt-5 flex items-center gap-1.5 text-[13px] font-semibold text-green-save">
-                <Icon icon={IconCircleCheck} size={16} />
-                {quality.decision === 'OK'
-                  ? 'print-ready at this size'
-                  : quality.tier === 0
-                    ? 'print-ready — we’ll gently sharpen it up for print'
-                    : 'it’ll print, a touch softer at this size — a bigger photo (or a smaller size) is crisper'}
-              </p>
+              <div role="status" className="mt-5 text-[13px]">
+                <p className="flex items-center gap-1.5 font-semibold text-green-save">
+                  <Icon icon={IconCircleCheck} size={16} />
+                  {quality.decision === 'OK'
+                    ? 'print-ready at this size'
+                    : !quality.softUpClose
+                      ? 'print-ready — we’ll gently sharpen it up for print'
+                      : 'it’ll print — lovely from a step back, a little soft up close'}
+                </p>
+                {quality.softUpClose ? (
+                  <p className="mt-1 pl-[22px] text-xs text-ink-soft">
+                    {sharpSize && sharpSize !== size ? (
+                      <>
+                        crisp right up close at{' '}
+                        <button type="button" onClick={() => setSize(sharpSize)} className="font-bold text-cinnamon underline-offset-2 hover:underline">
+                          {sharpSize}
+                        </button>{' '}
+                        — or use the original photo, not one sent by message.
+                      </>
+                    ) : (
+                      'for crisp up close, use the original photo — not one sent by message.'
+                    )}
+                  </p>
+                ) : null}
+              </div>
             )
           ) : null}
 

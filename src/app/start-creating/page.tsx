@@ -143,7 +143,11 @@ export default function StartCreatingPage() {
             </Button>
             <DesignFromScratch variant="ghost" size="md" className="w-full md:w-auto" label="or design from scratch" />
           </div>
-          <div className="pop-in mt-7 max-w-sm rounded-[18px] border-2 border-cocoa/15 bg-paper p-3.5 text-left text-xs leading-relaxed text-ink-soft" style={{ ['--i' as string]: 3 }}>
+          <p className="pop-in mt-6 max-w-sm text-xs leading-relaxed text-ink-soft" style={{ ['--i' as string]: 3 }}>
+            <b className="text-cocoa">tip:</b> snap it in daylight, filling the frame — and pick the original photo, not one sent
+            by message (those get shrunk, and big prints love detail).
+          </p>
+          <div className="pop-in mt-4 max-w-sm rounded-[18px] border-2 border-cocoa/15 bg-paper p-3.5 text-left text-xs leading-relaxed text-ink-soft" style={{ ['--i' as string]: 3 }}>
             <p className="flex items-start gap-1.5 font-bold text-cocoa">
               <Icon icon={IconLock} size={14} className="mt-px shrink-0 text-green-save" />
               By uploading, you confirm it&apos;s your little one&apos;s own artwork that you&apos;re free to use.

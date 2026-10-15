@@ -34,8 +34,24 @@ export const MAX_ZOOM = 4;
 /** Sanity floor for an explicit numeric scale (a zoom-out below contain is legitimate —
  * a small motif with margins — but never microscopic). The UI offers contain/2 at most. */
 export const MIN_SCALE = 0.1;
-export const MAX_UPSCALE = 4; // beyond this we can't reach print quality → BLOCK
+export const MAX_UPSCALE = 4; // the most a HAND-HELD print (mug, card, small jigsaw) may be enlarged
 const TIER0_MAX = 2; // classical resample handles up to 2×; above that needs ML (tier 1)
+
+/**
+ * The least real detail (dots per inch FROM THE SOURCE) a print can have and still look good
+ * where it's seen. Detail you can resolve falls with viewing distance (~1 arc-minute: ppi ≈
+ * 3438 / inches away); children's art is flat colour and soft edges, so it needs far less than a
+ * photo — K = 1050 matches the 75dpi floor we already trusted for hand-held things. Distance ≈
+ * the print's diagonal (nobody reads a 28×40″ frame from 30cm), never under 14″ (arm's length).
+ * Never stricter than the old flat 4× rule, and never below 24dpi however big the print.
+ */
+export const MIN_FLOOR_DPI = 24;
+const ACUITY_K = 1050;
+export function minimumDpi(t: TemplateGeom): number {
+  const wIn = t.printWidthPx / t.requiredDpi, hIn = t.printHeightPx / t.requiredDpi;
+  const viewIn = Math.max(14, Math.hypot(wIn, hIn));
+  return Math.min(t.requiredDpi / MAX_UPSCALE, Math.max(MIN_FLOOR_DPI, Math.round(ACUITY_K / viewIn)));
+}
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
@@ -143,6 +159,10 @@ export interface ResolutionAssessment {
   effectiveDpi: number;
   requiredDpi: number;
   upscaleFactor: number;
+  /** The least the print can have where it's seen (minimumDpi) — below this it's BLOCKED. */
+  minimumDpi: number;
+  /** Fine where it's seen, but softer if you look closely (more than 2× enlarged). */
+  softUpClose: boolean;
 }
 
 /**
@@ -150,8 +170,8 @@ export interface ResolutionAssessment {
  * does the print get, and can we reach the product's requirement?
  *  - source big enough              → OK (no upscale)
  *  - within 2×                      → UPSCALE tier 0 (classical resample)
- *  - within 4×                      → UPSCALE tier 1 (CPU ML super-resolution, P2)
- *  - more than 4× short             → BLOCK (can't fake print quality)
+ *  - more, but ≥ minimumDpi         → UPSCALE tier 1, softUpClose (looks right where it's seen)
+ *  - below minimumDpi               → BLOCK (can't fake print quality)
  */
 export function assessResolution(
   t: TemplateGeom,
@@ -164,9 +184,10 @@ export function assessResolution(
   const effectiveDpi = Math.round((t.requiredDpi * sw) / rect.width);
   const requiredDpi = t.requiredDpi;
 
-  if (effectiveDpi >= requiredDpi) return { decision: 'OK', tier: 0, effectiveDpi, requiredDpi, upscaleFactor: 1 };
+  const floor = minimumDpi(t);
+  if (effectiveDpi >= requiredDpi) return { decision: 'OK', tier: 0, effectiveDpi, requiredDpi, upscaleFactor: 1, minimumDpi: floor, softUpClose: false };
   const upscaleFactor = requiredDpi / effectiveDpi;
-  if (upscaleFactor <= TIER0_MAX) return { decision: 'UPSCALE', tier: 0, effectiveDpi, requiredDpi, upscaleFactor };
-  if (upscaleFactor <= MAX_UPSCALE) return { decision: 'UPSCALE', tier: 1, effectiveDpi, requiredDpi, upscaleFactor };
-  return { decision: 'BLOCK', tier: -1, effectiveDpi, requiredDpi, upscaleFactor };
+  if (upscaleFactor <= TIER0_MAX) return { decision: 'UPSCALE', tier: 0, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: false };
+  if (effectiveDpi >= floor) return { decision: 'UPSCALE', tier: 1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
+  return { decision: 'BLOCK', tier: -1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
 }
