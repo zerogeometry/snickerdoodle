@@ -44,7 +44,7 @@ describe('self-hosted image ops (the magic edits)', () => {
     expect(res.removedFraction).toBeGreaterThan(0.5);
   });
 
-  it('keeps background-coloured areas ENCLOSED by the subject (only border-connected goes)', async () => {
+  it('clears paper ENCLOSED by the subject too (it would print as a white blob on a coloured tee)', async () => {
     const hole = await sharp({ create: { width: 20, height: 20, channels: 3, background: { r: 255, g: 255, b: 255 } } }).png().toBuffer();
     const frame = await sharp({ create: { width: 60, height: 60, channels: 3, background: { r: 204, g: 34, b: 34 } } })
       .composite([{ input: hole, left: 20, top: 20 }])
@@ -57,7 +57,8 @@ describe('self-hosted image ops (the magic edits)', () => {
     const res = await removeBackground(img);
     const px = await pixels(res.buffer);
     expect(px(2, 2).a).toBe(0); // outer white removed
-    expect(px(50, 50).a).toBe(255); // the white HOLE inside the red frame survives
+    expect(px(50, 50).a).toBe(0); // the paper inside the red frame goes too (ink lift — no flood)
+    expect(px(25, 25).a).toBe(255); // the frame itself stays
   });
 
   it('KEEPS a subject that runs to the paper edge (never treats an edge-touching drawing as background)', async () => {

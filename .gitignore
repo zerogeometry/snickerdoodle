@@ -22,3 +22,7 @@ vitest.config.ts.timestamp-*.mjs
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# local test photos for the cutout sheet — real children's art never goes in git
+test-art/
+cutout-sheet.png

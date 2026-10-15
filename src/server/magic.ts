@@ -53,7 +53,8 @@ export async function removeBackgroundForAsset(db: DbHandle, viewer: ViewerConte
   // found) or would erase essentially the whole image (border == subject), fail here —
   // BEFORE storing a "cutout" or spending budget — so the UI never claims a fake success.
   const removed = res.removedFraction ?? 0;
-  if (removed < 0.02 || removed > 0.95) throw new Error('no-clean-background');
+  // (a fine-line drawing on a large sheet can be ~99% paper — only "nothing left" is a failure)
+  if (removed < 0.02 || removed > 0.999) throw new Error('no-clean-background');
 
   const key = derivativeKey(assetId, 'cutout');
   await putObject(key, res.buffer, res.contentType);

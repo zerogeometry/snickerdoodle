@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
+import { liftInk } from './inkLift';
 
 /**
  * Self-hosted, in-region image ops — the "magic edits" (CLAUDE.md: SELF-HOST
@@ -46,6 +47,20 @@ export interface CutoutResult {
  * — this returns a small removedFraction there, reported honestly.
  */
 export async function removeBackground(input: Buffer): Promise<CutoutResult> {
+  // FIRST CHOICE — ink lift (src/ml/inkLift.ts): models the paper and lifts the ink off it, so
+  // paper enclosed by the drawing goes too, pencil keeps soft edges, shadows don't survive and
+  // pale crayon stays solid. It declines (null) when there's no paper to model — then the older
+  // border flood below gets its chance (e.g. a dark card), and failing that we fail honestly.
+  const lifted = await liftInk(input, { edge: 'soft' }).catch(() => null);
+  // A line drawing on a big sheet is legitimately ~99% paper — the test is "some ink survives".
+  if (lifted && lifted.removedFraction >= 0.02 && lifted.removedFraction <= 0.999) {
+    return { buffer: lifted.buffer, removedFraction: lifted.removedFraction };
+  }
+  return floodRemoveBackground(input);
+}
+
+/** The original border-connected flood — now the fallback when ink lift finds no paper. */
+export async function floodRemoveBackground(input: Buffer): Promise<CutoutResult> {
   const base = sharp(input).ensureAlpha();
   const meta = await base.metadata();
   const fullW = meta.width ?? 0;
