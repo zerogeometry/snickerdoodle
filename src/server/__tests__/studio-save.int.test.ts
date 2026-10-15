@@ -12,6 +12,7 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { IDENTITY_GEOMETRY, saveStudio, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
 import { derivativeKey, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
+import type { ModerationProviders } from '@/server/moderation';
 
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
@@ -99,8 +100,8 @@ describe.skipIf(!DB || !S3)('studio save — non-destructive design', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
     const objects = [
-      { id: 's', type: 'shape', shape: 'square', fill: '#d7352c', outline: false, x: 0.75, y: 0.5, w: 0.3, h: 0.3, rotation: 0 },
-      { id: 't', type: 'text', text: 'Mia', font: 'baloo', colour: '#2b2118', size: 0.2, x: 0.5, y: 0.2, rotation: 0 },
+      { id: 's', type: 'shape', shape: 'square', fill: '#d7352c', stroke: '#2b2118', strokeWidth: 0, texture: 'smooth', x: 0.75, y: 0.5, w: 0.3, h: 0.3, rotation: 0 },
+      { id: 't', type: 'text', text: 'Mia', font: 'baloo', colour: '#2b2118', size: 0.2, x: 0.5, y: 0.2, rotation: 0, texture: 'crayon' },
     ];
     const res = await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects });
     expect(res.sourceObjectId).not.toBeNull();
@@ -122,5 +123,77 @@ describe.skipIf(!DB || !S3)('studio save — non-destructive design', () => {
     await expect(saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects })).rejects.toBeInstanceOf(StudioTextError);
     const derivs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, a.assetId));
     expect(derivs.map((d) => d.objectClass)).toEqual(['ORIGINAL']);
+  });
+
+  describe('anything drawn or added is screened before it can be printed', () => {
+    const pen = [{ id: 'p', type: 'stroke', colour: '#111111', width: 0.03, points: [0.2, 0.5, 0.5, 0.8, 0.5, 0.5], texture: 'smooth' }];
+    const providers = (o: { flag?: boolean; words?: string[] | 'fail' }): ModerationProviders & { seen: number } => {
+      const p = {
+        seen: 0,
+        hash: { isKnownIllegal: async () => false },
+        classifier: {
+          classify: async () => {
+            p.seen++;
+            return { flagged: !!o.flag, labels: o.flag ? ['Illustrated Explicit Nudity'] : [] };
+          },
+        },
+        textReader: {
+          read: async () => {
+            if (o.words === 'fail') throw new Error('ocr down');
+            return o.words ?? [];
+          },
+        },
+      };
+      return p;
+    };
+    const status = async (id: string) => (await db.select({ s: assets.moderationStatus, d: assets.moderationDetail }).from(assets).where(eq(assets.id, id)))[0]!;
+
+    it('a flagged drawing holds the keepsake back for review (never deleted); removing it clears it again', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+      expect((await status(a.assetId)).s).toBe('CLEAR');
+
+      const flagging = providers({ flag: true });
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: pen }, { moderation: flagging });
+      expect(flagging.seen).toBe(1);
+      const held = await status(a.assetId);
+      expect(held.s).toBe('FLAGGED');
+      expect(held.d).toMatchObject({ original: { status: 'CLEAR' }, design: { status: 'FLAGGED', labels: ['Illustrated Explicit Nudity'] } });
+      expect(await getObjectBytes(derivativeKey(a.assetId, 'design'))).toBeTruthy(); // preserved for review, not binned
+
+      // the parent removes what they drew → just the (clean) upload again
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: [] }, { moderation: providers({}) });
+      expect((await status(a.assetId)).s).toBe('CLEAR');
+    });
+
+    it('words drawn by hand get the same abuse screen as typed words; an unreadable design goes to review', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: pen }, { moderation: providers({ words: ['SHIT'] }) });
+      expect((await status(a.assetId)).s).toBe('FLAGGED');
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: pen }, { moderation: providers({ words: ['MUM', 'I', 'LOVE', 'YOU'] }) });
+      expect((await status(a.assetId)).s).toBe('CLEAR');
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: pen }, { moderation: providers({ words: 'fail' }) });
+      expect((await status(a.assetId)).s).toBe('FLAGGED');
+    });
+
+    it('a clean design can never clear a flagged upload', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+      await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { labels: ['x'], original: { status: 'FLAGGED', labels: ['x'] } } }).where(eq(assets.id, a.assetId));
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: pen }, { moderation: providers({}) });
+      expect((await status(a.assetId)).s).toBe('FLAGGED');
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, objects: [] }, { moderation: providers({}) });
+      expect((await status(a.assetId)).s).toBe('FLAGGED');
+    });
+
+    it('rotating or cropping alone adds nothing new, so it isn’t re-screened', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+      const p = providers({ flag: true });
+      await saveStudio(db, sam, a.assetId, { mask: null, geometry: { ...IDENTITY_GEOMETRY, rotate: 90 } }, { moderation: p });
+      expect(p.seen).toBe(0);
+      expect((await status(a.assetId)).s).toBe('CLEAR');
+    });
   });
 });

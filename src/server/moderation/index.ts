@@ -3,6 +3,7 @@ import { assets, auditRecords } from '@/db/schema';
 import type { DbHandle } from '../db';
 import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
+import { containsAbusiveText } from '../textSafety';
 
 const sha256Hex = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -65,7 +66,7 @@ export async function moderateAndRecord(
 
   await db
     .update(assets)
-    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels } })
+    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels, original: { status, labels } } })
     .where(eq(assets.id, input.assetId));
   if (status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -80,5 +81,71 @@ export async function moderateAndRecord(
   return { status, labels };
 }
 
+// ── Studio designs ───────────────────────────────────────────────────────────
+// A design can carry things the upload never had: pen lines, shapes, words. Anything drawn or
+// added in the Studio is screened like an upload BEFORE it can reach a print order — the same
+// classifier (it reads illustrations, not just photos), plus OCR so hand-drawn words get the
+// same abuse screen as typed ones. Same D8 rules: it FLAGS for review, never auto-rejects.
+// The asset's status is the WORSE of the upload's verdict and the design's, so a clean design
+// can never clear a flagged upload (and a flagged design holds a clean upload back).
+
+const RANK: Record<ModerationState | 'PENDING', number> = { CLEAR: 0, PENDING: 1, FLAGGED: 2, BLOCKED: 3 };
+type Stored = { status: ModerationState | 'PENDING'; labels: string[] };
+const worse = (a: Stored, b: Stored): Stored => (RANK[b.status] > RANK[a.status] ? b : a);
+
+async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {
+  const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
+  const d = (row?.detail ?? {}) as { labels?: string[]; original?: Stored; design?: Stored };
+  // assets screened before designs were tracked: the stored status IS the upload's
+  return d.original ?? { status: row?.status ?? 'PENDING', labels: d.labels ?? [] };
+}
+
+/** Screen a Studio design (anything drawn / added) and fold its verdict into the asset's. */
+export async function moderateDesignAndRecord(
+  db: DbHandle,
+  input: { assetId: string; familyId: string | null; buffer: Buffer; now?: Date },
+  providers?: ModerationProviders,
+  env: Record<string, string | undefined> = process.env,
+): Promise<ModerationVerdict> {
+  let design: Stored;
+  if (!providers && env.NODE_ENV === 'production' && !isModerationConfigured(env)) {
+    design = { status: 'FLAGGED', labels: ['screening-not-configured'] };
+  } else {
+    const p = providers ?? defaultProviders(env);
+    const [c, words] = await Promise.all([p.classifier.classify(input.buffer), p.textReader ? p.textReader.read(input.buffer).catch(() => null) : Promise.resolve([])]);
+    const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
+    // a reader that FAILED is not a clean read — route to review rather than wave it through
+    if (words === null) labels.push('text-unreadable');
+    else if (words.length && containsAbusiveText(words.join(' '))) labels.push('drawn-words');
+    design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
+  }
+  const original = await originalVerdict(db, input.assetId);
+  const combined = worse(original, design);
+  await db
+    .update(assets)
+    .set({ moderationStatus: combined.status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels: [...new Set([...original.labels, ...design.labels])], original, design } })
+    .where(eq(assets.id, input.assetId));
+  if (design.status !== 'CLEAR') {
+    await db.insert(auditRecords).values({
+      familyId: input.familyId,
+      actorType: 'SYSTEM',
+      event: 'CONTENT_FLAGGED',
+      targetType: 'asset',
+      targetId: input.assetId,
+      metadata: { labels: design.labels, source: 'studio-design' },
+    });
+  }
+  return { status: design.status === 'PENDING' ? 'FLAGGED' : design.status, labels: design.labels };
+}
+
+/** The design was dropped (back to the plain upload, or nothing added): only the upload's verdict counts. */
+export async function clearDesignModeration(db: DbHandle, assetId: string): Promise<void> {
+  const [row] = await db.select({ detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
+  const d = (row?.detail ?? {}) as { design?: Stored };
+  if (!d.design) return;
+  const original = await originalVerdict(db, assetId);
+  await db.update(assets).set({ moderationStatus: original.status, moderationDetail: { labels: original.labels, original } }).where(eq(assets.id, assetId));
+}
+
 export { defaultProviders, isModerationConfigured } from './providers';
-export type { ModerationProviders, HashMatchProvider, ClassifierProvider } from './providers';
+export type { ModerationProviders, HashMatchProvider, ClassifierProvider, TextReaderProvider } from './providers';

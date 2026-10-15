@@ -21,9 +21,19 @@ export interface ClassifierProvider {
   classify(buffer: Buffer): Promise<{ flagged: boolean; labels: string[] }>;
 }
 
+/**
+ * Reads words written IN an image (OCR — AWS Rekognition DetectText, eu-west-2, when real), so
+ * words drawn by hand in the Studio get the same abuse screen as typed words.
+ */
+export interface TextReaderProvider {
+  read(buffer: Buffer): Promise<string[]>;
+}
+
 export interface ModerationProviders {
   hash: HashMatchProvider;
   classifier: ClassifierProvider;
+  /** Optional until the real providers land; designs fall back to the classifier alone. */
+  textReader?: TextReaderProvider;
 }
 
 // ── STUB (dev only — NOT FOR PRODUCTION) ─────────────────────────────────────
@@ -38,6 +48,12 @@ const stubClassifier: ClassifierProvider = {
   },
 };
 
+const stubTextReader: TextReaderProvider = {
+  async read() {
+    return []; // no OCR wired yet
+  },
+};
+
 /**
  * Resolve the configured providers. Real providers slot in here (read creds from
  * the secret store) once LG6 is closed; until then, the stub.
@@ -49,7 +65,7 @@ export function defaultProviders(env: Record<string, string | undefined> = proce
     // Never let "real" quietly mean the pass-everything stub.
     throw new Error('MODERATION_PROVIDER=real but the real providers are not wired yet (LG6)');
   }
-  return { hash: stubHash, classifier: stubClassifier };
+  return { hash: stubHash, classifier: stubClassifier, textReader: stubTextReader };
 }
 
 /** Go-live guard: true only when the REAL providers are configured. */

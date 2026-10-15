@@ -10,6 +10,7 @@ import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
 import { containsAbusiveText } from './textSafety';
+import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from './moderation';
 
 /** Small designs are scaled up to this longest edge before added things are drawn, so text and
  * pen lines are crisp on big prints (the print path would upscale the picture anyway). */
@@ -111,8 +112,9 @@ export async function saveStudio(
   viewer: ViewerContext,
   assetId: string,
   input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
+  deps: { moderation?: ModerationProviders } = {},
 ): Promise<StudioSaveResult> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
@@ -126,10 +128,13 @@ export async function saveStudio(
 
   if (!cut && isIdentity(g) && objects.length === 0) {
     await dropDerivative(db, assetId, 'design'); // back to the plain original — no stale design left behind
+    await clearDesignModeration(db, assetId);
     const meta = await sharp(source).rotate().metadata();
     return { sourceObjectId: null, objectKey: null, aspect: (meta.width ?? 1) / (meta.height ?? 1) };
   }
   if (cut && isIdentity(g) && objects.length === 0) {
+    await dropDerivative(db, assetId, 'design'); // the cutout IS the design now
+    await clearDesignModeration(db, assetId);
     const key = derivativeKey(assetId, 'cutout');
     const [o] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
     const meta = await sharp(cut).metadata();
@@ -174,6 +179,10 @@ export async function saveStudio(
       .returning();
     objectId = row!.id;
   }
+  // Anything drawn or added is new content: screen it before it can reach a print order.
+  // (Rotate / crop / background / removals only ever show less of the screened upload.)
+  if (objects.length) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
+  else await clearDesignModeration(db, assetId);
   return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height };
 }
 
