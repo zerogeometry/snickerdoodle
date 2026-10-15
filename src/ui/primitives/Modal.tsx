@@ -2,6 +2,7 @@
 
 import { IconX } from '@tabler/icons-react';
 import { useEffect, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icon';
 
 const FOCUSABLE =
@@ -9,7 +10,7 @@ const FOCUSABLE =
 
 /** Accessible modal dialog — dimmed backdrop, Escape/backdrop to close, scrollable
  * body, and a focus TRAP that returns focus to the trigger on close (NN7). */
-const SIZE = { sm: 'max-w-[440px]', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const;
+const SIZE = { sm: 'max-w-[440px]', md: 'md:max-w-[min(680px,88vw)]', lg: 'max-w-3xl', xl: 'max-w-5xl' } as const;
 
 export function Modal({
   open,
@@ -83,9 +84,12 @@ export function Modal({
 
   if (!open) return null;
 
-  return (
+  // Rendered at the top of the page (a portal), never inside the component that opened it: an
+  // animated ancestor (pop-in, lift…) would otherwise trap this position:fixed layer in ITS box —
+  // a half-page backdrop with the rest of the page drawn over it. Above the cookie banner too.
+  return createPortal(
     // Phones: an app-style bottom sheet that rises from the thumb zone. md+: a centred card.
-    <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-4">
+    <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-4">
       <div className="absolute inset-0 bg-cocoa/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
       <div
         ref={dialogRef}
@@ -116,6 +120,7 @@ export function Modal({
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">{children}</div>
         {footer ? <div className="pb-safe border-t border-line px-5 pt-3 md:pb-5">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

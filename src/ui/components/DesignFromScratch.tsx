@@ -46,25 +46,29 @@ export function DesignFromScratch({ className = '', variant = 'secondary', size 
       <Button variant={variant} size={size} className={className} onClick={() => setOpen(true)}>
         <Icon icon={IconBrush} size={18} /> {label}
       </Button>
-      <Modal open={open} onClose={() => setOpen(false)} title="design from scratch" subtitle="a blank canvas — draw, add words and shapes, then make it into anything">
-        <div className="grid grid-cols-3 gap-2.5" role="group" aria-label="canvas shape">
+      <Modal open={open} onClose={() => setOpen(false)} size="md" title="design from scratch" subtitle="a blank canvas — draw, add words and shapes, then make it into anything">
+        <div className="grid grid-cols-3 gap-2.5 py-1 md:gap-4" role="group" aria-label="canvas shape">
           {CANVASES.map((c, i) => (
             <button
               key={c.id}
               type="button"
               onClick={() => start(c)}
-              className="press pop-in flex flex-col items-center gap-2 rounded-[16px] border-2 border-cocoa/20 bg-paper px-2 pb-3 pt-4 text-center hover:border-cocoa"
+              className="press pop-in flex flex-col items-center gap-2 rounded-[18px] border-2 border-cocoa/20 bg-paper px-2 pb-3 pt-4 text-center hover:border-cocoa md:gap-3 md:pb-5 md:pt-7"
               style={{ ['--i' as string]: i }}
             >
-              <span className="flex h-16 items-center justify-center" aria-hidden>
-                <span className="block rounded-[6px] border-2 border-cocoa bg-white shadow-[0_3px_0_var(--color-cocoa)]" style={{ width: (c.w / Math.max(c.w, c.h)) * 56, height: (c.h / Math.max(c.w, c.h)) * 56 }} />
+              {/* the canvas outline scales with the card: 56px on a phone, up to ~104px on a big screen */}
+              <span className="flex h-16 w-full items-center justify-center md:h-[clamp(5rem,9vw,7rem)]" aria-hidden>
+                <span
+                  className="block rounded-[6px] border-2 border-cocoa bg-white shadow-[0_3px_0_var(--color-cocoa)]"
+                  style={{ height: `${(c.h / Math.max(c.w, c.h)) * 92}%`, aspectRatio: `${c.w} / ${c.h}` }}
+                />
               </span>
-              <span className="text-sm font-extrabold text-cocoa">{c.label}</span>
-              <span className="text-[11px] leading-tight text-ink-soft">{c.note}</span>
+              <span className="text-sm font-extrabold text-cocoa md:text-base">{c.label}</span>
+              <span className="text-[11px] leading-tight text-ink-soft md:text-xs">{c.note}</span>
             </button>
           ))}
         </div>
-        <p className="mt-4 text-[11px] leading-relaxed text-ink-soft">
+        <p className="mt-4 pb-2 text-[11px] leading-relaxed text-ink-soft md:text-xs">
           You can change the background colour, or make it see-through, in the studio. By starting you accept our{' '}
           <Link href="/trust/terms" className="font-bold text-cinnamon">terms</Link> &amp;{' '}
           <Link href="/trust/privacy" className="font-bold text-cinnamon">privacy notice</Link>.
