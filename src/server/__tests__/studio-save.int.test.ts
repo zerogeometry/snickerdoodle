@@ -77,4 +77,21 @@ describe.skipIf(!DB || !S3)('studio save — non-destructive design', () => {
     await expect(saveStudio(db, blake, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY })).rejects.toBeInstanceOf(AuthzError);
     await expect(studioStateForAsset(db, blake, a.assetId)).rejects.toBeInstanceOf(AuthzError);
   });
+
+  it('a filled background turns the see-through parts that colour, at full resolution', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const mask = await sharp({ create: { width: 200, height: 100, channels: 3, background: { r: 0, g: 0, b: 0 } } })
+      .composite([{ input: { create: { width: 40, height: 40, channels: 3, background: { r: 255, g: 255, b: 255 } } }, left: 20, top: 30 }])
+      .png()
+      .toBuffer();
+    const res = await saveStudio(db, sam, a.assetId, { mask, geometry: { ...IDENTITY_GEOMETRY, background: '#2f5da8' } });
+    expect(res.sourceObjectId).not.toBeNull();
+    const { data, info } = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => [...data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4)];
+    expect(at(150, 50)).toEqual([47, 93, 168, 255]); // was see-through → now the chosen blue
+    expect(at(40, 50)[3]).toBe(255);
+    const st = await studioStateForAsset(db, sam, a.assetId);
+    expect(st.geometry.background).toBe('#2f5da8');
+  });
 });

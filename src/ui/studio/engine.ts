@@ -21,8 +21,10 @@ export interface Geometry {
   flipH: boolean;
   flipV: boolean;
   crop: Crop;
+  /** Fill for the see-through parts (#rrggbb), or null = leave see-through. */
+  background: string | null;
 }
-export const IDENTITY: Geometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 } };
+export const IDENTITY: Geometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null };
 
 export interface Work {
   w: number;
@@ -220,7 +222,7 @@ export function rotateGeometry(g: Geometry): Geometry {
   // a clockwise quarter turn of the rotated+flipped picture
   const crop = { x: 1 - c.y - c.h, y: c.x, w: c.h, h: c.w };
   // rotating after a flip ≡ flipping the other axis after rotating
-  return { rotate: (((g.rotate + 90) % 360) as Rotation), flipH: g.flipV, flipV: g.flipH, crop };
+  return { rotate: (((g.rotate + 90) % 360) as Rotation), flipH: g.flipV, flipV: g.flipH, crop, background: g.background };
 }
 export function flipGeometry(g: Geometry, axis: 'h' | 'v'): Geometry {
   const c = g.crop;
@@ -230,6 +232,7 @@ export function flipGeometry(g: Geometry, axis: 'h' | 'v'): Geometry {
 }
 
 export const geometryIsIdentity = (g: Geometry) =>
+  !g.background &&
   g.rotate === 0 && !g.flipH && !g.flipV && g.crop.x <= 0.0005 && g.crop.y <= 0.0005 && g.crop.w >= 0.9995 && g.crop.h >= 0.9995;
 
 // ── Print readiness ───────────────────────────────────────────────────────────

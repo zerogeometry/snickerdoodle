@@ -29,6 +29,12 @@ export function StudioToolbar({
   const [expanded, setExpanded] = useState(false); // desktop rail (remembered)
   const [sheet, setSheet] = useState(false); // phone: the labelled sheet over the canvas
   const [info, setInfo] = useState<ToolDef | null>(null);
+  // Desktop, collapsed rail: hovering (or focusing) an icon shows its name beside it.
+  const [tip, setTip] = useState<{ tool: ToolDef; x: number; y: number } | null>(null);
+  const showTip = (t: ToolDef, el: HTMLElement) => {
+    const r = el.getBoundingClientRect();
+    setTip({ tool: t, x: r.right + 10, y: r.top + r.height / 2 });
+  };
   useEffect(() => {
     try {
       setExpanded(localStorage.getItem(EXPANDED_KEY) === '1');
@@ -68,7 +74,6 @@ export function StudioToolbar({
         aria-label={withLabel ? undefined : t.label}
         aria-pressed={t.kind === 'mode' ? isActive : undefined}
         aria-disabled={off ? true : undefined}
-        title={off ?? undefined}
         {...handlers}
         className={`press flex min-h-11 items-center gap-2.5 rounded-[14px] border-2 font-extrabold transition-colors ${
           withLabel ? 'min-w-0 flex-1 px-3 text-left text-[13px]' : 'h-12 w-12 shrink-0 justify-center'
@@ -164,13 +169,31 @@ export function StudioToolbar({
               {infoButton(t)}
             </div>
           ) : (
-            <div key={t.id} className="flex justify-center">
+            <div
+              key={t.id}
+              className="flex justify-center"
+              onMouseEnter={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
+              onMouseLeave={() => setTip(null)}
+              onFocus={(e) => showTip(t, e.currentTarget.firstElementChild as HTMLElement)}
+              onBlur={() => setTip(null)}
+            >
               {button(t, false)}
             </div>
           ),
         )}
         {expanded && info ? <div className="mt-2">{infoCard}</div> : null}
       </nav>
+      {tip && !expanded ? (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-50 hidden -translate-y-1/2 items-center gap-2 whitespace-nowrap rounded-[12px] border-2 border-cocoa bg-cocoa px-3 py-1.5 text-[13px] font-extrabold text-paper shadow-[0_3px_0_var(--color-honey)] md:flex"
+          style={{ left: tip.x, top: tip.y }}
+        >
+          {tip.tool.label}
+          {tip.tool.key ? <kbd className="rounded border border-paper/40 px-1 text-[10px] font-bold text-paper/80">{tip.tool.key}</kbd> : null}
+          {disabled[tip.tool.id] ? <span className="text-[11px] font-bold text-paper/70">· {disabled[tip.tool.id]}</span> : null}
+        </div>
+      ) : null}
     </>
   );
 }

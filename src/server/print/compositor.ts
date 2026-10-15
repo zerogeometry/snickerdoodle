@@ -58,7 +58,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r15'; // r15: mug 'centre' view (design middle head-on) alongside front/back
+const RENDER_REV = 'r16'; // r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -608,7 +608,10 @@ async function renderPerspective(args: {
   const iw = Math.max(1, Math.min(layer.width - ix, cw - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
   const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
-  const spread = await sharp({ create: { width: cw, height: dh, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+  // The printed surface is PAPER: anything see-through in the design (a transparent PNG, a
+  // removed background) prints as the white of the stock — so lay the design on white here too,
+  // or the preview shows a ghost card with the art floating over the envelope.
+  const spread = await sharp({ create: { width: cw, height: dh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } })
     .composite([{ input: part, left: ox, top: oy }])
     .png()
     .toBuffer();

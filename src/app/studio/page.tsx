@@ -24,6 +24,7 @@ import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
+import { ColourPicker } from '@/ui/studio/ColourPicker';
 import type { ToolId } from '@/ui/studio/tools';
 import {
   IDENTITY,
@@ -100,6 +101,7 @@ export default function StudioPage() {
   const [leaving, setLeaving] = useState(false);
   const [confirmStart, setConfirmStart] = useState(false);
   const [, setHistoryTick] = useState(0);
+  const lastBgPush = useRef(0);
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -227,7 +229,10 @@ export default function StudioPage() {
     ctx.beginPath();
     ctx.rect(content.x, content.y, content.w, content.h);
     ctx.clip();
-    if (backdrop === 'checker' || !(transparent || comparing)) {
+    if (g.background && !comparing) {
+      ctx.fillStyle = g.background;
+      ctx.fillRect(content.x, content.y, content.w, content.h);
+    } else if (backdrop === 'checker' || !(transparent || comparing)) {
       const tile = 12 / V.a;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(content.x, content.y, content.w, content.h);
@@ -549,7 +554,7 @@ export default function StudioPage() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', s: 'seeOn', k: 'background', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
       if (id) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -579,7 +584,9 @@ export default function StudioPage() {
   }
 
   const disabled: Partial<Record<ToolId, string>> = {};
-  if (!transparent) disabled.seeOn = 'remove the background first';
+  if (geo.background) disabled.seeOn = 'the background is filled in';
+  else if (!transparent) disabled.seeOn = 'remove the background first';
+  if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
   const options = (
@@ -607,6 +614,13 @@ export default function StudioPage() {
         setGeo((g) => ({ ...g, crop: { x: 0, y: 0, w: 1, h: 1 } }));
       }}
       onDoneCrop={() => setTool(null)}
+      background={geo.background}
+      setBackground={(bg) => {
+        // dragging the device colour picker fires continuously — one undo step per burst
+        if (Date.now() - lastBgPush.current > 600) pushUndo();
+        lastBgPush.current = Date.now();
+        setGeo((g) => ({ ...g, background: bg }));
+      }}
     />
   );
 
@@ -740,6 +754,8 @@ function ToolOptions(p: {
   onFlip: (axis: 'h' | 'v') => void;
   onResetCrop: () => void;
   onDoneCrop: () => void;
+  background: string | null;
+  setBackground: (bg: string | null) => void;
 }) {
   const hint = (t: string) => <p className="text-xs text-ink-soft">{t}</p>;
   switch (p.tool) {
@@ -815,6 +831,25 @@ function ToolOptions(p: {
               />
             ))}
           </div>
+        </div>
+      );
+    case 'background':
+      return (
+        <div className="flex flex-col gap-2.5">
+          {hint('fill the see-through parts with a colour.')}
+          <button
+            type="button"
+            aria-pressed={!p.background}
+            onClick={() => p.setBackground(null)}
+            className={`flex min-h-11 items-center gap-2 rounded-xl border-2 px-3 text-xs font-extrabold ${!p.background ? 'border-cocoa bg-cocoa text-paper' : 'border-cocoa/25 bg-paper text-cocoa'}`}
+          >
+            <span aria-hidden className="h-6 w-6 rounded-full border border-cocoa/30" style={{ background: 'repeating-conic-gradient(#ece4d6 0 25%, #fff 0 50%) 50% / 8px 8px' }} />
+            <span className="flex flex-col items-start text-left leading-tight">
+              see-through
+              <span className="text-[11px] font-normal opacity-80">white on cards &amp; prints</span>
+            </span>
+          </button>
+          <ColourPicker value={p.background} onChange={(hex) => p.setBackground(hex)} label="background colour" />
         </div>
       );
     case 'flip':

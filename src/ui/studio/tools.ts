@@ -9,10 +9,11 @@ import {
   IconRestore,
   IconRotateClockwise,
   IconBrush,
+  IconBucketDroplet,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'seeOn' | 'background' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export interface ToolDef {
   id: ToolId;
@@ -67,6 +68,14 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'S',
     info: 'Preview your cut-out on the colours it might be printed on — a white mug, a navy tee, kraft paper. Available once something is see-through.',
+  },
+  {
+    id: 'background',
+    label: 'background',
+    icon: IconBucketDroplet,
+    kind: 'mode',
+    key: 'K',
+    info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
   },
   {
     id: 'rotate',

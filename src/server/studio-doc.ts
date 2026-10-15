@@ -19,9 +19,11 @@ export interface StudioGeometry {
   flipH: boolean;
   flipV: boolean;
   crop: { x: number; y: number; w: number; h: number };
+  /** Fill for the see-through parts (#rrggbb), or null = leave see-through. */
+  background: string | null;
 }
 
-export const IDENTITY_GEOMETRY: StudioGeometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 } };
+export const IDENTITY_GEOMETRY: StudioGeometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null };
 
 /** Validate + clamp a client-sent geometry (never trust the client). */
 export function cleanGeometry(raw: unknown): StudioGeometry {
@@ -35,10 +37,12 @@ export function cleanGeometry(raw: unknown): StudioGeometry {
   const h = Math.min(1 - y, Math.max(0.02, num(c.h, 1)));
   x = Math.min(x, 1 - w);
   y = Math.min(y, 1 - h);
-  return { rotate, flipH: g.flipH === true, flipV: g.flipV === true, crop: { x, y, w, h } };
+  const background = typeof g.background === 'string' && /^#[0-9a-f]{6}$/i.test(g.background) ? g.background.toLowerCase() : null;
+  return { rotate, flipH: g.flipH === true, flipV: g.flipV === true, crop: { x, y, w, h }, background };
 }
 
 export const isIdentity = (g: StudioGeometry) =>
+  !g.background &&
   g.rotate === 0 && !g.flipH && !g.flipV && g.crop.x <= 0.0005 && g.crop.y <= 0.0005 && g.crop.w >= 0.9995 && g.crop.h >= 0.9995;
 
 /** Apply the recipe's geometry to an image (any size) — the server half of the shared contract. */
@@ -120,7 +124,12 @@ export async function saveStudio(
   }
 
   const base = cut ?? (await sharp(source).rotate().png().toBuffer()); // originals: honour orientation first
-  const designed = await applyGeometry(base, g);
+  let designed = await applyGeometry(base, g);
+  if (g.background) {
+    // a filled background: the see-through parts become that colour, at full resolution
+    const filled = await sharp(designed.buffer).flatten({ background: g.background }).png({ compressionLevel: 6 }).toBuffer();
+    designed = { ...designed, buffer: filled };
+  }
   const key = derivativeKey(assetId, 'design');
   await putObject(key, designed.buffer, 'image/png');
   const sha256 = createHash('sha256').update(designed.buffer).digest('hex');
