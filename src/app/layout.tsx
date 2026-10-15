@@ -22,7 +22,7 @@ export const metadata: Metadata = {
     "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
-  icons: { icon: '/brand/snickerdoodle-badge.png', apple: '/brand/snickerdoodle-badge.png' },
+  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32' }, { url: '/brand/favicon-192.png', sizes: '192x192' }], apple: '/brand/favicon-180.png' },
 };
 
 export const viewport: Viewport = {

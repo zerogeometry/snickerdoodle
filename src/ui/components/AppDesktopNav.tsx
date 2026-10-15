@@ -7,6 +7,7 @@ import { APP_NAV } from './appTabs';
 import { basketCount, useBasket } from '@/lib/store';
 import { useEffect, useState } from 'react';
 import { myAvatarAction } from '@/app/actions/session';
+import { Logo } from './Logo';
 
 /** The account sticker — your own profile picture once you've added one, else the person icon. */
 function AccountSticker() {
@@ -31,10 +32,6 @@ function AccountSticker() {
   );
 }
 
-/** The founder's badge logo (small sizes only until a hi-res original exists). */
-function Badge({ size }: { size: number }) {
-  return <img src="/brand/snickerdoodle-badge.png" alt="" width={size} height={size} className="rounded-full" />;
-}
 
 function BasketLink({ count, size }: { count: number; size: number }) {
   return (
@@ -64,8 +61,7 @@ export function AppDesktopNav({ active }: { active: string }) {
     <>
       <header className="pt-safe kraft sticky top-0 z-30 flex items-center justify-between px-4 py-2 md:hidden">
         <Link href="/home" aria-label="snickerdoodle home" className="flex items-center gap-2">
-          <Badge size={36} />
-          <span className="font-display text-lg text-cocoa">snickerdoodle</span>
+          <Logo height={38} />
         </Link>
         <div className="flex items-center gap-2">
           <BasketLink count={count} size={20} />
@@ -74,9 +70,8 @@ export function AppDesktopNav({ active }: { active: string }) {
       </header>
 
       <header className="hidden items-center justify-between border-b-2 border-cocoa/10 px-6 py-3 md:flex">
-        <Link href="/home" className="flex items-center gap-2.5">
-          <Badge size={40} />
-          <span className="font-display text-xl text-cocoa shadow-[inset_0_-7px_0_var(--color-honey)]">snickerdoodle</span>
+        <Link href="/home" aria-label="snickerdoodle home" className="flex items-center gap-2.5">
+          <Logo height={44} />
         </Link>
         <nav className="flex items-center gap-1.5 text-sm">
           {APP_NAV.map((n) =>

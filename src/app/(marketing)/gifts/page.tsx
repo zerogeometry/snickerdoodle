@@ -70,7 +70,7 @@ export default function GiftsPage() {
           <h2 id="gift-examples" className="text-center font-display text-3xl text-cocoa md:text-4xl">
             Little drawings, <span className="text-cinnamon">made real</span>
           </h2>
-          <ExampleWall limit={8} className="mt-8" />
+          <ExampleWall limit={12} className="mt-8" />
         </section>
 
         <p className="mx-auto mt-12 flex max-w-md items-center justify-center gap-2 text-center text-xs font-semibold text-green-save">

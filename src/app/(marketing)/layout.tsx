@@ -4,6 +4,7 @@ import { Button } from '@/ui/primitives/Button';
 import { MarketingMobileMenu } from '@/ui/components/MarketingMobileMenu';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { getCurrentAccount } from '@/server/session';
+import { Logo } from '@/ui/components/Logo';
 
 /** Marketing surface: nav + footer, goal is "start creating". A signed-in parent also gets a way
  * back to their keepsakes + account (never a dead-end "log in"). */
@@ -14,8 +15,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
       <header className="pt-safe relative z-10">
         <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <Link href="/" className="flex items-center gap-2.5" aria-label="snickerdoodle home">
-            <img src="/brand/snickerdoodle-badge.png" alt="" width={44} height={44} className="rounded-full" />
-            <span className="font-display text-2xl text-cocoa shadow-[inset_0_-8px_0_var(--color-honey)] md:text-3xl">snickerdoodle</span>
+            <Logo height={46} className="md:!h-[56px]" />
           </Link>
           <div className="hidden items-center gap-7 text-sm text-ink-soft md:flex">
             <Link href="/how-it-works" className="hover:text-cinnamon">

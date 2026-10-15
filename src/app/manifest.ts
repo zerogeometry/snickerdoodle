@@ -2,8 +2,8 @@ import type { MetadataRoute } from 'next';
 
 /**
  * Installable-app manifest (PWA): opens full-screen like a native app, kraft-coloured chrome.
- * Icons: the founder's badge — only a 141px source exists today; a ≥1024px original is needed
- * for crisp 192/512 install icons (flagged).
+ * Icons: the founder's smiley-face favicon — only a 100px source exists today; a ≥1024px original
+ * is needed for crisp 192/512 install icons (flagged).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
@@ -16,6 +16,6 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: 'portrait',
     background_color: '#EBDDC6',
     theme_color: '#EBDDC6',
-    icons: [{ src: '/brand/snickerdoodle-badge.png', sizes: '141x141', type: 'image/png', purpose: 'any' }],
+    icons: [{ src: '/brand/favicon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }],
   };
 }

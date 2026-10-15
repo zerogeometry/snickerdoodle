@@ -2,6 +2,7 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '../primitives/Icon';
+import { Logo } from './Logo';
 
 /**
  * The compact, sticky app header for the create/buy flow screens (start creating, the range,
@@ -39,8 +40,7 @@ export function FlowHeader({
             </Link>
           ) : null}
           <Link href="/" aria-label="snickerdoodle home" className="flex min-h-11 min-w-0 items-center gap-2">
-            <img src="/brand/snickerdoodle-badge.png" alt="" width={34} height={34} className="shrink-0 rounded-full" />
-            <span className="truncate font-display text-lg text-cocoa md:text-xl">snickerdoodle</span>
+            <Logo height={36} />
           </Link>
           {tag ? (
             <span className="sticker shrink-0 rotate-[-4deg] rounded-pill bg-honey px-2 py-0.5 text-[11px] font-extrabold lowercase text-cocoa">
