@@ -184,6 +184,7 @@ export function MockupPreview({
         if (isLatest() && !currentRef.current) setResting(true);
       });
     return () => ctrl.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tfKey is `transform` by value (a fresh object each render would refetch forever)
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, spanHalf, attempt]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
@@ -209,7 +210,6 @@ export function MockupPreview({
     // parent (customize page) it falls back to content height and max-h-full is inert.
     <div ref={containerRef} className="flex h-full w-full items-center justify-center">
       {current ? (
-        // eslint-disable-next-line @next/next/no-img-element
         <img
           src={current}
           alt={`your drawing on a ${productKey}`}

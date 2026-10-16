@@ -30,6 +30,10 @@ services:
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
+      # Throwaway LOCAL encryption key (MinIO's built-in KMS) so the production rule
+      # "originals are always KMS-encrypted" runs for real locally — e2e sets
+      # S3_KMS_KEY_ALIAS(_ORIGINALS)=snickerdoodle-local. Never used anywhere deployed.
+      MINIO_KMS_SECRET_KEY: snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
       - '9000:9000' # S3 API

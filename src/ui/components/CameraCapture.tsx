@@ -122,7 +122,6 @@ export function CameraCapture({
                 <p>{error}</p>
               </div>
             ) : shot ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={shot} alt="Captured photo" className="h-full w-full object-cover" />
             ) : (
               <video ref={videoRef} playsInline muted className="h-full w-full object-cover" />

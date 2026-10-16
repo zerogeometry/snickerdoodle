@@ -24,7 +24,7 @@ import {
   type Rotation,
   type Transform,
 } from '@/server/print/geometry';
-import type { StudioData, StudioVariant } from '@/server/studio';
+import type { StudioData } from '@/server/studio';
 
 /** The editor canvas is deliberately MUCH larger than the customize-page preview
  * (founder call 2026-07-07: "I can barely see the guides"). MAX caps it so the controls
@@ -38,19 +38,36 @@ const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
 const DOUBLE_TAP_MS = 300;
 const HISTORY_COALESCE_MS = 800; // slider drags / key bursts collapse into one undo entry
 
-export function Positioner({
-  data,
-  draft = false,
-  returnTo,
-  focusVariantId,
-}: {
+interface PositionerProps {
   data: StudioData;
   draft?: boolean;
   returnTo?: string;
   /** Arrived from Customize for ONE specific product+variant: scope the editor to it —
    * this session edits THAT creation's placement, not the whole catalogue. */
   focusVariantId?: string;
-}) {
+}
+
+/** Nothing to place yet → a friendly nudge; otherwise the editor (whose hooks always run in order). */
+export function Positioner(props: PositionerProps) {
+  const { data, draft = false, returnTo } = props;
+  if (!data.keepsakes[0] || !data.variants[0]) {
+    return (
+      <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
+        <div className="pop-in mx-auto max-w-md rounded-[22px] border-2 border-dashed border-cocoa/25 bg-paper p-8 text-center text-sm text-ink-soft">
+          Keep a drawing in your keepsake home first — then you can place it on a product here.
+          <div className="mt-4">
+            <Button href="/start-creating" size="md">
+              start creating
+            </Button>
+          </div>
+        </div>
+      </Shell>
+    );
+  }
+  return <PositionerEditor {...props} />;
+}
+
+function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: PositionerProps) {
   const focused = Boolean(focusVariantId && data.variants.some((v) => v.id === focusVariantId));
   // The editor is ALWAYS scoped to one creation (founder call 2026-07-07 — no catalogue
   // in here). When focused, data.variants is the creation's orientation pair (server-
@@ -179,23 +196,9 @@ export function Positioner({
     setHistVer((v) => v + 1);
   };
 
-  const keepsake = data.keepsakes[assetIdx];
-  const variant = variants.find((v) => v.id === variantId) ?? variants[0];
-
-  if (!keepsake || !variant) {
-    return (
-      <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
-        <div className="pop-in mx-auto max-w-md rounded-[22px] border-2 border-dashed border-cocoa/25 bg-paper p-8 text-center text-sm text-ink-soft">
-          Keep a drawing in your keepsake home first — then you can place it on a product here.
-          <div className="mt-4">
-            <Button href="/start-creating" size="md">
-              start creating
-            </Button>
-          </div>
-        </div>
-      </Shell>
-    );
-  }
+  // both exist: the outer Positioner only renders the editor when there's something to place
+  const keepsake = data.keepsakes[assetIdx] ?? data.keepsakes[0]!;
+  const variant = variants.find((v) => v.id === variantId) ?? variants[0]!;
 
   const t = variant.template;
   const isJigsaw = variant.productKey === 'jigsaw';
@@ -416,7 +419,7 @@ export function Positioner({
     const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * previewW;
     const qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
     return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx };
-  }, [ctx, t]);
+  }, [ctx, t, previewW]);
 
   const bdImgStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (!bd || !natural) return undefined;
@@ -762,6 +765,7 @@ export function Positioner({
     return () => el.removeEventListener('wheel', onWheel);
     // zoomBy closes over fitScale/scaleFloor/lockToCover; re-bind when they change so the floor
     // is current, and when viewMode flips (the canvas element itself swaps).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- zoomBy is re-made every render; the deps above are what it reads
   }, [fitScale, scaleFloor, lockToCover, viewMode]);
 
   const canvasInteractionProps = {
@@ -851,11 +855,9 @@ export function Positioner({
               className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: bd.pvH }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={ctx.blankUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
               <div className="absolute inset-0" style={maskStyle}>
                 <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={setImgEl}
                     src={cutout?.url ?? keepsake.imageUrl}
@@ -869,7 +871,6 @@ export function Positioner({
               {/* "On the board" = as a puzzle: the die-cut piece lines over the placed art,
                   on the print-area quad. Under the guide + handles so they stay grabbable. */}
               {ctx.overlayUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={ctx.overlayUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh, maxWidth: 'none', maxHeight: 'none' }} />
               ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
@@ -888,7 +889,6 @@ export function Positioner({
               className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: previewH }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 ref={setImgEl}
                 src={cutout?.url ?? keepsake.imageUrl}
@@ -987,7 +987,6 @@ export function Positioner({
                     aria-label={`keepsake ${i + 1}`}
                     className={`press h-12 w-12 overflow-hidden rounded-[12px] border-2 ${i === assetIdx ? 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]' : 'border-cocoa/15'}`}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={k.imageUrl} alt="" className="h-full w-full object-cover" />
                   </button>
                 ))}
@@ -1122,7 +1121,6 @@ export function Positioner({
           {result && result.ok ? (
             <div className="pop-in polaroid tape mt-6" style={{ ['--tilt' as string]: '-1deg' }}>
               <p className="mb-2 text-[11px] font-bold text-green-save">your print file — exactly what gets made</p>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={result.url} alt="rendered print file" className="w-full border border-line" />
               <p className="mt-2 text-[11px] text-ink-soft">
                 {result.widthPx}×{result.heightPx}px · {result.renderedDpi} dpi{result.upscaled ? ' · gently enhanced' : ''}

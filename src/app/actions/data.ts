@@ -48,7 +48,7 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
  * removable on demand. (The login record + financial order history are retained per
  * the legal-basis schedule with the child image already cascaded out of any order.)
  */
-export async function deleteAllMyKeepsakesAction(nowISO: string): Promise<{ ok: boolean; deleted: number }> {
+export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok: boolean; deleted: number }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, deleted: 0 };
 

@@ -174,7 +174,7 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - dev: (added with the Next.js app shell) · test: `npm test` (watch: `npm run test:watch`)
 - typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (added later) ·
   visual diff: `npm run test:visual` (added later) · db: `npm run db:*` (added later) ·
-  jobs: `npm run jobs` (added later) · lint: `npm run lint` (added with the app shell)
+  jobs: `npm run jobs` (added later) · lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
 
 ## STOP AND ASK
 If a task seems to require breaking ANY non-negotiable — or trusting the client for visibility/

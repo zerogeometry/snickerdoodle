@@ -137,7 +137,6 @@ export function ReviewList({ items }: { items: ClientItem[] }) {
               </p>
               <div className="mt-3 flex aspect-[4/3] max-h-80 w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-paper-2">
                 {open ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={`/api/admin/review/${it.kind}/${it.id}`} alt="the flagged picture" className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
                 ) : (
                   <p className="px-6 text-center text-xs text-ink-soft">hidden — looking is recorded in the audit log</p>

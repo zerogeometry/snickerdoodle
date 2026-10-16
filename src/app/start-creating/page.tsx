@@ -198,7 +198,6 @@ export default function StartCreatingPage() {
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={previewImg ?? ''} alt="your drawing" className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
                   </div>
                 </div>

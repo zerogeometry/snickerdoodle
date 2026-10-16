@@ -7,7 +7,7 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { clampTransform, computeLayerRect, mmToPx, type RawTransform, type Transform } from './geometry';
+import { clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 import { firmEdges } from './apparel';
 import { perspectiveWarp } from './perspective';

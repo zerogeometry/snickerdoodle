@@ -38,7 +38,6 @@ export async function recordErasure(entry: ErasureEntry, at = new Date()): Promi
       }),
     );
   } catch (e) {
-    // eslint-disable-next-line no-console
     console.error('[erasure-ledger] FAILED to record an erasure — replay after a restore would miss it', entry, e);
   }
 }

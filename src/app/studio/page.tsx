@@ -341,6 +341,7 @@ export default function StudioPage() {
         ctx.stroke();
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
   }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */

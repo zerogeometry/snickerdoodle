@@ -20,7 +20,6 @@ const retailA = (C, S) => roundUpToX9(((C + S + R.stripeFixedPence) / (1 - R.mar
 // Model B: shipping recovered at cost (no margin on it), 25% margin on the item only.
 const retailB = (C, S) => roundUpToX9((((C + R.stripeFixedPence) / (1 - R.marginRate - K)) + S / (1 - K)) * (1 + R.vatRate));
 const f = (p) => (p / 100).toFixed(2);
-const csvEsc = (v) => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
 const csv = ['Product,Variants / sizes,No. variants,Item cost (GBP),Shipping (GBP),Stripe fees (GBP),Total cost (GBP),Retail inc-VAT (GBP),Shipping profit (GBP),Item profit (GBP),Total profit (GBP),Margin (%),No-ship-margin retail (GBP),Source,US-sourced?'];
 
 // Founder-facing sheet (no profit on shipping): the product is priced for 25% margin on

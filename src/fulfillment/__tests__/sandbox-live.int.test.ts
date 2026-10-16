@@ -79,7 +79,6 @@ describe.skipIf(!DB || !S3 || !GO)('Prodigi SANDBOX live smoke — one real orde
 
     // REAL transport (no fake) — this touches api.sandbox.prodigi.com.
     const summary = await submitReadyOrders(db, { env: SANDBOX, onlyOrderIds: [o!.id] });
-    // eslint-disable-next-line no-console
     console.log('[sandbox-live] submit summary:', JSON.stringify(summary));
     expect(summary.submitted).toBe(1);
 
@@ -88,7 +87,6 @@ describe.skipIf(!DB || !S3 || !GO)('Prodigi SANDBOX live smoke — one real orde
     expect(after!.prodigiOrderId).toMatch(/^ord_/);
 
     const sync = await syncSubmittedOrders(db, { onlyOrderIds: [o!.id] });
-    // eslint-disable-next-line no-console
     console.log('[sandbox-live] sync summary:', JSON.stringify(sync));
     expect(sync.checked).toBe(1);
   });

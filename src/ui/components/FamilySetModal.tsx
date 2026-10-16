@@ -98,7 +98,6 @@ export function FamilySetModal({
   useEffect(() => {
     if (!open) return;
     setMembers(garments.filter((g) => g.product.key !== 'babyBodysuit').map((g) => memberFor(g.product)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, garments]);
 
   const rows = members.map((m) => {

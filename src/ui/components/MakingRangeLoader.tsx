@@ -49,7 +49,6 @@ export function MakingRangeLoader({ drawing, className = '' }: { drawing?: strin
         <div className="polaroid tape loader-bob relative z-10" style={{ ['--tilt' as string]: '-3deg' }}>
           <div className="flex aspect-square items-center justify-center overflow-hidden bg-paper-2">
             {drawing ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={drawing} alt="" className="max-h-full max-w-full object-contain" />
             ) : null}
           </div>

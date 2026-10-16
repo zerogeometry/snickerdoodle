@@ -218,7 +218,7 @@ export const children = pgTable('children', {
     .references(() => families.id),
   firstName: text('first_name').notNull(), // no surname collected (minimisation)
   birthday: date('birthday'),
-  avatarAssetId: uuid('avatar_asset_id').references((): any => assets.id),
+  avatarAssetId: uuid('avatar_asset_id').references((): AnyPgColumn => assets.id),
   controllerAccountId: uuid('controller_account_id')
     .notNull()
     .references(() => accounts.id),

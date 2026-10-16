@@ -26,7 +26,6 @@ export interface Mailer {
 
 const consoleMailer: Mailer = {
   async send(m) {
-    // eslint-disable-next-line no-console
     console.log(
       `\n┌─────────────────────────────────────────────────────────────\n` +
         `│ ✉️  [${m.kind}] to ${m.to} — ${m.subject}\n` +
