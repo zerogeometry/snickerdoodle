@@ -113,6 +113,9 @@ export const auditEvent = pgEnum('audit_event', [
   'KEEP_CHOICE_MADE',
   'PROFILE_UPDATED',
   'EMAIL_CHANGED',
+  'ADMIN_MFA_ENROLLED',
+  'CONTENT_REVIEW_VIEWED',
+  'CONTENT_REVIEWED',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
