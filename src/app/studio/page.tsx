@@ -7,8 +7,6 @@ import {
   IconArrowsHorizontal,
   IconArrowsVertical,
   IconBackground,
-  IconRotate,
-  IconRotateClockwise,
   IconCheck,
   IconCircleCheck,
   IconMinus,
@@ -27,7 +25,8 @@ import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStat
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
-import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
+import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
+import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS } from '@/lib/card-fonts';
 import { flipObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
@@ -354,7 +353,7 @@ export default function StudioPage() {
   const selectedBox = (f: Frame): { box: Box; turnable: boolean; obj: StudioObject | null } | null => {
     if (selectedId === DRAWING) return drawingUnlocked && tool === 'select' ? { box: drawingBox(f), turnable: true, obj: null } : null;
     const o = objects.find((x) => x.id === selectedId);
-    return o ? { box: boxOf(o, f), turnable: o.type !== 'stroke', obj: o } : null;
+    return o ? { box: boxOf(o, f), turnable: true, obj: o } : null;
   };
 
   // ── history ──
@@ -616,7 +615,7 @@ export default function StudioPage() {
       } else {
         const b = boxOf(o0, f);
         const deg = ((Math.atan2(gy - b.cy, gx - b.cx) - gst.startAngle!) * 180) / Math.PI;
-        next = o0.type === 'stroke' ? o0 : { ...o0, rotation: snapAngle(o0.rotation + deg) };
+        next = turnObject(o0, f, snapAngle((o0.rotation ?? 0) + deg));
       }
       setObjects((os) => os.map((o) => (o.id === o0.id ? next : o)));
       return;
@@ -781,6 +780,14 @@ export default function StudioPage() {
     lastEditPush.current = Date.now();
     setObjects((os) => os.map((o) => (o.id === selectedId ? ({ ...o, ...patch } as StudioObject) : o)));
   };
+  /** Turn what's selected to `deg`° from its panel (slider, exact number, quarter turns). */
+  const turnSelected = (deg: number, group = false) => {
+    const o = objects.find((x) => x.id === selectedId);
+    const work = workRef.current;
+    if (!o || !work) return;
+    const [gw, gh] = rotatedSize(work.w, work.h, geo.rotate);
+    updateSelected(turnObject(o, { gw, gh }, deg) as Partial<StudioObject>, group);
+  };
   const deleteSelected = () => {
     if (!selectedId) return;
     pushUndo();
@@ -917,9 +924,17 @@ export default function StudioPage() {
                 pushUndo();
                 setGeo((g) => ({ ...g, place: null }));
               },
+              // its tilt AS SEEN: the design's own turn plus the drawing's
+              angle: normAngle(visualAngle(geo) + (geo.place?.angle ?? 0)),
+              onTurn: (seen, group) => {
+                if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
+                lastEditPush.current = Date.now();
+                setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), angle: normAngle(seen - visualAngle(g)) } }));
+              },
             }
       }
       onSelect={(id) => setSelectedId(id)}
+      onTurn={turnSelected}
       onUpdate={updateSelected}
       onAddShape={addShape}
       onDelete={deleteSelected}
@@ -1196,7 +1211,20 @@ function ToolOptions(p: {
         </Stack>
       );
     case 'rotate':
-      return <RotateOptions angle={p.angle} onAngle={p.onAngle} />;
+      return (
+        <Stack>
+          <AngleControl
+            angle={p.angle}
+            onAngle={p.onAngle}
+            what="the design"
+            hint={
+              <>
+                or drag on the picture to turn it — it clicks gently into place at every 45°. <span className="hidden md:inline">[ and ] nudge by 1° (with shift, 0.1°).</span>
+              </>
+            }
+          />
+        </Stack>
+      );
     case 'flip':
       return (
         <Stack>
@@ -1230,82 +1258,6 @@ function ToolOptions(p: {
     default:
       return null;
   }
-}
-
-/** Turn the whole design to any angle: a slider that clicks gently into place at every 45°, an
- * exact number (to 0.1°), quarter turns, and straight. Dragging on the picture turns it too. */
-function RotateOptions({ angle, onAngle }: { angle: number; onAngle: (visual: number, group?: boolean) => void }) {
-  const fmt = (a: number) => (Math.round(a * 10) / 10).toString();
-  const [text, setText] = useState(fmt(angle));
-  useEffect(() => setText(fmt(angle)), [angle]);
-  const commit = () => {
-    const v = Number(text);
-    if (Number.isFinite(v)) onAngle(normAngle(v)); // typed = exactly that, no snap
-    else setText(fmt(angle));
-  };
-  return (
-    <Stack>
-      <Section label="angle" aside={<span className="font-display text-2xl leading-none text-cocoa">{fmt(angle)}°</span>}>
-        <input
-          type="range"
-          min={0}
-          max={360}
-          step={0.1}
-          value={angle}
-          onChange={(e) => onAngle(snapAngle(Number(e.target.value)), true)}
-          className="h-11 w-full accent-[var(--color-cta)]"
-          aria-label="turn the design"
-          aria-valuetext={`${fmt(angle)} degrees`}
-          list="studio-angle-snaps"
-        />
-        <datalist id="studio-angle-snaps">
-          {[0, 45, 90, 135, 180, 225, 270, 315, 360].map((v) => (
-            <option key={v} value={v} />
-          ))}
-        </datalist>
-        <div aria-hidden className="-mt-1 flex justify-between px-0.5 text-[10px] font-bold text-ink-faint">
-          <span>0°</span>
-          <span>90°</span>
-          <span>180°</span>
-          <span>270°</span>
-          <span>360°</span>
-        </div>
-        <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
-          exact
-          <input
-            type="number"
-            inputMode="decimal"
-            min={0}
-            max={360}
-            step={0.1}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => e.key === 'Enter' && commit()}
-            className="min-h-11 w-24 rounded-lg border border-line bg-paper px-3 text-[15px] text-cocoa"
-            aria-label="exact angle in degrees"
-          />
-          <span className="font-normal text-ink-soft">degrees</span>
-        </label>
-      </Section>
-      <Section label="quick turns">
-        <div className="grid grid-cols-3 gap-2">
-          <Button variant="secondary" size="sm" onClick={() => onAngle(angle - 90)} aria-label="a quarter turn anticlockwise">
-            <Icon icon={IconRotate} size={15} /> 90°
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => onAngle(angle + 90)} aria-label="a quarter turn clockwise">
-            <Icon icon={IconRotateClockwise} size={15} /> 90°
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => onAngle(0)} disabled={angle === 0}>
-            straight
-          </Button>
-        </div>
-        <p className="text-[11px] leading-snug text-ink-soft">
-          or drag on the picture to turn it — it clicks gently into place at every 45°. <span className="hidden md:inline">[ and ] nudge by 1° (with shift, 0.1°).</span>
-        </p>
-      </Section>
-    </Stack>
-  );
 }
 
 /** No tool picked: the likeliest first steps, one tap away. */

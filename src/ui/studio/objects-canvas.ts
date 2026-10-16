@@ -1,6 +1,7 @@
 import { cardFontCss } from '@/lib/card-fonts';
 import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
+import { normAngle } from '@/lib/studio-geometry';
 
 /**
  * Drawing + measuring the Studio's added things on the browser canvas, in GEOMETRY-SPACE PIXELS
@@ -138,6 +139,33 @@ export function moveObject(o: StudioObject, f: Frame, dx: number, dy: number): S
     return { ...o, points: p };
   }
   return { ...o, x: o.x + dx / f.gw, y: o.y + dy / f.gh };
+}
+
+/**
+ * Turn an object to `to`° (as its dial reads). Words and shapes just take the angle; a pen line's
+ * points are turned about their average point — which doesn't move as it turns, so repeated turns
+ * never drift — and it remembers the angle for the dial and the 45° snaps.
+ */
+export function turnObject(o: StudioObject, f: Frame, to: number): StudioObject {
+  const angle = normAngle(to);
+  if (o.type !== 'stroke') return { ...o, rotation: angle };
+  const d = ((angle - (o.rotation ?? 0)) * Math.PI) / 180;
+  if (!d) return o;
+  const n = o.points.length / 3;
+  let cx = 0, cy = 0;
+  for (let i = 0; i < o.points.length; i += 3) {
+    cx += o.points[i]! * f.gw;
+    cy += o.points[i + 1]! * f.gh;
+  }
+  cx /= n;
+  cy /= n;
+  const p = o.points.slice();
+  for (let i = 0; i < p.length; i += 3) {
+    const dx = p[i]! * f.gw - cx, dy = p[i + 1]! * f.gh - cy;
+    p[i] = (cx + dx * Math.cos(d) - dy * Math.sin(d)) / f.gw;
+    p[i + 1] = (cy + dx * Math.sin(d) + dy * Math.cos(d)) / f.gh;
+  }
+  return { ...o, points: p, rotation: angle };
 }
 
 /** Scale an object about its centre by k (text → size, shape → w/h, stroke → points + width). */

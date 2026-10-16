@@ -10,6 +10,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { ColourPicker } from './ColourPicker';
 import { drawStroke, drawTextured } from './objects-canvas';
 import { Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from './panel';
+import { AngleControl } from './AngleControl';
 import type { ToolId } from './tools';
 
 export interface PenStyle {
@@ -34,6 +35,9 @@ export interface DrawingLayer {
   onToggleLock: () => void;
   onSize: (scale: number) => void;
   onReset: () => void;
+  /** Its tilt as seen, and turning it there. */
+  angle: number;
+  onTurn: (deg: number, group?: boolean) => void;
 }
 export interface ShapeStyle {
   fill: string;
@@ -60,6 +64,8 @@ export function AddedOptions(p: {
   /** The drawing layer's lock + controls (null on a blank canvas — nothing to move). */
   drawing: DrawingLayer | null;
   onSelect: (id: string | null) => void;
+  /** Turn what's selected to an exact angle (pen lines turn about their middle). */
+  onTurn: (deg: number, group?: boolean) => void;
   onUpdate: (patch: Partial<StudioObject>, group?: boolean) => void;
   onAddShape: (k: ShapeKind) => void;
   onDelete: () => void;
@@ -113,6 +119,7 @@ export function AddedOptions(p: {
             <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="text colour" />
           </Section>
           <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+          <AngleControl angle={o.rotation} onAngle={p.onTurn} what="the words" />
         </Stack>
       );
     }
@@ -121,6 +128,7 @@ export function AddedOptions(p: {
         <Stack>
           <Section>{actions}</Section>
           <ShapeStyleControls style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }} onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)} />
+          <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${o.shape}`} />
         </Stack>
       );
     }
@@ -134,6 +142,7 @@ export function AddedOptions(p: {
           <SliderRow label="thickness" min={2} max={60} value={Math.round(o.width * 1000)} onChange={(v) => p.onUpdate({ width: v / 1000 } as Partial<StudioObject>, true)} ariaLabel="line thickness" display={<SizeDot px={o.width * 600} colour={o.colour} />} />
         </Section>
         <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+        <AngleControl angle={o.rotation ?? 0} onAngle={p.onTurn} what="the pen line" />
       </Stack>
     );
   };
@@ -165,6 +174,7 @@ export function AddedOptions(p: {
               ariaLabel="drawing size"
               display={`${Math.round(d.place.scale * 100)}%`}
             />
+            <AngleControl angle={d.angle} onAngle={d.onTurn} what="your drawing" label="its angle" />
             <div className="grid grid-cols-2 gap-2">
               <ActionButton icon={IconRestore} label="put it back" onClick={d.onReset} />
               <ActionButton icon={IconLock} label="lock it" onClick={d.onToggleLock} />

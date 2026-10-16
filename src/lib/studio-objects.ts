@@ -52,6 +52,8 @@ export interface StrokeObject {
   /** Flat [u, v, pressure, u, v, pressure, …] — pressure 0–1 (0.5 when not a stylus). */
   points: number[];
   texture: TextureKind;
+  /** How far it's been turned (degrees). The points already ARE turned — this is the dial's reading. */
+  rotation?: number;
 }
 export type StudioObject = TextObject | ShapeObject | StrokeObject;
 
@@ -112,7 +114,7 @@ export function cleanObjects(raw: unknown): StudioObject[] {
       const n = Math.floor(pts.length / 3) * 3;
       if (n < 3 || points + n / 3 > MAX_TOTAL_POINTS) continue;
       points += n / 3;
-      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n), texture: cleanTexture(r.texture) });
+      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n), texture: cleanTexture(r.texture), ...(typeof r.rotation === 'number' && Number.isFinite(r.rotation) && r.rotation % 360 !== 0 ? { rotation: num(r.rotation, -360, 360, 0) } : {}) });
     }
   }
   return out;
@@ -147,7 +149,8 @@ export function flipObjects(objs: StudioObject[], axis: 'h' | 'v'): StudioObject
         if (axis === 'h') p[i] = 1 - p[i]!;
         else p[i + 1] = 1 - p[i + 1]!;
       }
-      return { ...o, points: p };
+      // the points mirror; the dial's reading mirrors with them
+      return o.rotation ? { ...o, points: p, rotation: (((-o.rotation % 360) + 360) % 360) } : { ...o, points: p };
     }
     return axis === 'h' ? { ...o, x: 1 - o.x, rotation: -o.rotation } : { ...o, y: 1 - o.y, rotation: -o.rotation };
   });

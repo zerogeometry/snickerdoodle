@@ -117,7 +117,7 @@ export function turnObjects(objs: StudioObject[], deg: number, f0: [number, numb
         p[i] = x / f1[0];
         p[i + 1] = y / f1[1];
       }
-      return { ...o, points: p, width: o.width * k };
+      return { ...o, points: p, width: o.width * k, rotation: normAngle((o.rotation ?? 0) + deg) };
     }
     const [x, y] = turnPoint(o.x * f0[0], o.y * f0[1], deg, f0, f1);
     const rotation = Math.round(normAngle(o.rotation + deg) * 10) / 10;
