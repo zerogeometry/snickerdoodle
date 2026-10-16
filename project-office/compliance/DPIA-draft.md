@@ -191,6 +191,8 @@ No processing relies on a child's consent; no information society service is off
 
 *(v0.2)* **Hosting decided (D18, 2026-10-16): all-AWS, no relaxed rules.** Vercel + Supabase was considered and **not** adopted. One AWS Lightsail server in London (app + Postgres), private S3 in `eu-west-2`, and **two customer-managed KMS keys (a separate one for originals)** — so the A-03 design stands unchanged. Single US-parented provider (AWS) for hosting, storage and moderation keeps the US-parent / remote-access assessment to one supplier. Residual: a single server has no automatic failover — an availability risk, not a confidentiality one; mitigated by encrypted backups and a tested restore (R-10).
 
+*(v0.2)* **Test site (D19, 2026-10-16):** a password-locked, non-indexed test copy on Netlify + Supabase (London) + Resend (EU) holds **test drawings only** and testers' sign-in emails; nothing is charged or printed. It is not the production system and is out of scope for live processing; if any real child's picture were ever uploaded there, treat it as an incident and erase it. Netlify and Resend are US-parented — the test copy carries no children's data by design.
+
 ---
 
 ## 6. Consultation

@@ -5,6 +5,8 @@
  *
  * Adapters:
  *  - `console` (default, dev): prints the message to the server log — no third party.
+ *  - `resend`: Resend's HTTP API (RESEND_API_KEY, MAIL_FROM). Used by the TEST SITE (founder,
+ *    2026-10-16, EU sending region); D7 still decides the launch provider + its DPA.
  *
  * In production an unconfigured provider is a hard error, never a silent drop: a parent
  * who never receives their sign-in link is a broken product, and a missing invite email
@@ -38,9 +40,27 @@ const consoleMailer: Mailer = {
   },
 };
 
+/** Resend over plain fetch (no SDK). A failed send throws — never a silent drop. */
+export function resendMailer(apiKey: string, from: string, doFetch: typeof fetch = fetch): Mailer {
+  return {
+    async send(m) {
+      const res = await doFetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from, to: [m.to], subject: m.subject, text: m.text, tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
+      });
+      if (!res.ok) throw new Error(`email not sent (${res.status}) — check the Resend key and domain`);
+    },
+  };
+}
+
 export function resolveMailer(env: Record<string, string | undefined> = process.env): Mailer {
   const provider = (env.MAIL_PROVIDER ?? '').trim() || (env.NODE_ENV === 'production' ? '' : 'console');
   if (provider === 'console') return consoleMailer;
+  if (provider === 'resend') {
+    if (!env.RESEND_API_KEY || !env.MAIL_FROM) throw new Error('MAIL_PROVIDER=resend needs RESEND_API_KEY and MAIL_FROM');
+    return resendMailer(env.RESEND_API_KEY, env.MAIL_FROM);
+  }
   throw new Error(
     provider
       ? `MAIL_PROVIDER="${provider}" has no adapter yet — add one in src/server/mail (decision D7)`

@@ -1,0 +1,22 @@
+# The TEST SITE (founder, 2026-10-16): Netlify + Supabase, password-locked, test drawings only.
+# The real home is AWS in London (decision D18). Netlify's Next.js runtime is picked up
+# automatically. Secrets (DB URL, storage keys, Resend key, Stripe TEST key, the test password)
+# live in Netlify's environment settings — never in this file.
+# Functions region: set it to London (eu-west-2) in Site configuration → Functions (paid plans).
+
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "22"
+  SITE_MODE = "test"
+  NEXT_TELEMETRY_DISABLED = "1"
+
+[functions]
+  # files the server reads from disk at runtime
+  included_files = [
+    "node_modules/@fontsource/*/files/*-latin-400-normal.woff",
+    "src/server/print/assets/**",
+    "public/examples/range/**",
+  ]

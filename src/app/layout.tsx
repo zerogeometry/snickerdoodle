@@ -15,6 +15,7 @@ import '@fontsource-variable/baloo-2';
 import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
+import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 
 export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         >
           Skip to content
         </a>
+        <TestSiteBanner />
         {children}
         <Toaster />
         <CookieBanner />

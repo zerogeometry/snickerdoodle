@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { isTestSite, testSiteProblems } from '@/lib/siteMode';
 import { getS3 } from './client';
 
 let bucketReady = false;
@@ -65,6 +66,9 @@ export function encryptionFor(
   const isOriginal = /\/original$/.test(key);
   const alias = isOriginal ? env.S3_KMS_KEY_ALIAS_ORIGINALS : env.S3_KMS_KEY_ALIAS;
   if (alias) return { ServerSideEncryption: 'aws:kms', SSEKMSKeyId: alias };
+  // TEST SITE only (src/lib/siteMode.ts): the storage provider's own at-rest encryption stands in
+  // for our KMS keys. Test drawings only; the real site still refuses (below).
+  if (isTestSite(env) && testSiteProblems(env).length === 0) return {};
   if (env.NODE_ENV === 'production') {
     throw new Error(`${isOriginal ? 'S3_KMS_KEY_ALIAS_ORIGINALS' : 'S3_KMS_KEY_ALIAS'} is required in production — refusing to store unencrypted`);
   }
