@@ -26,3 +26,6 @@ vitest.config.ts.timestamp-*.mjs
 # local test photos for the cutout sheet — real children's art never goes in git
 test-art/
 cutout-sheet.png
+
+# Netlify CLI link (site id) — local only
+.netlify/
