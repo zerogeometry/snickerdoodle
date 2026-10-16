@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { mockupViews, printTemplates, productVariants, storageObjects, templateAssets } from '@/db/schema';
+import { mockupViews, printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
@@ -28,10 +28,8 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
   let db: DbHandle;
   let ids: SeededIds;
   let variantId = '';
+  let productId = '';
   let blankAssetId = '';
-  // The REAL mockup template of the shared framedPrint variant, snapshotted so the suite
-  // restores it verbatim — otherwise a test run wipes the live catalogue's photoreal mockup.
-  let realTpl: { blankObjectId: string | null; printQuad: [number, number][] | null; maskObjectId: string | null; materialClass: 'PAPER' | 'LIGHT_FABRIC' | 'DARK_FABRIC' | 'CERAMIC' | 'GLOSS'; templateVersion: number } | undefined;
   const designAssetIds: string[] = [];
   const keys: string[] = [];
 
@@ -40,13 +38,25 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-    const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
-    variantId = v!.id;
-    // Snapshot the REAL template BEFORE we overwrite it with the test blank.
-    [realTpl] = await db
-      .select({ blankObjectId: printTemplates.blankObjectId, printQuad: printTemplates.printQuad, maskObjectId: printTemplates.maskObjectId, materialClass: printTemplates.materialClass, templateVersion: printTemplates.templateVersion })
+    // A PRIVATE, hidden test product with the framed print's real print canvas — never the shared
+    // framedPrint variant: mutating that one mid-suite raced every test (and the dev server)
+    // reading the live catalogue, e.g. the print-map registration check saw the test quad.
+    const [real] = await db
+      .select({ t: printTemplates })
       .from(printTemplates)
-      .where(eq(printTemplates.variantId, variantId));
+      .innerJoin(productVariants, eq(printTemplates.variantId, productVariants.id))
+      .where(eq(productVariants.sku, 'framedPrint'));
+    const [prod] = await db
+      .insert(products)
+      .values({ key: `zz-test-compositor-${ids.nonce}`, category: 'PRINT', label: 'test frame', active: false, visibleInShop: false })
+      .returning();
+    productId = prod!.id;
+    const [v] = await db
+      .insert(productVariants)
+      .values({ productId, sku: `zz-test-compositor-${ids.nonce}`, label: 'test frame', attributes: { size: '11×14″', colour: 'gold' }, pricePence: 100, active: false })
+      .returning();
+    variantId = v!.id;
+    const { id: _id, variantId: _v, ...tpl } = real!.t;
 
     // Brand-safe NON-child blank in template_assets + wire the variant's mockup template.
     const buf = await blankPhoto();
@@ -58,24 +68,13 @@ describe.skipIf(!DB || !S3)('mockup compositor — FLAT (integration)', () => {
       .values({ kind: 'BLANK', bucket: process.env.S3_BUCKET!, key: blankKey, contentType: 'image/png', byteSize: buf.byteLength, widthPx: 600, heightPx: 800 })
       .returning();
     blankAssetId = ta!.id;
-    await db.update(printTemplates).set({ blankObjectId: blankAssetId, printQuad: QUAD, templateVersion: 1, materialClass: 'PAPER' }).where(eq(printTemplates.variantId, variantId));
+    await db.insert(printTemplates).values({ ...tpl, variantId, blankObjectId: blankAssetId, printQuad: QUAD, templateVersion: 1, materialClass: 'PAPER', maskObjectId: null, lightingObjectId: null });
   });
 
   afterAll(async () => {
-    // RESTORE the shared variant's REAL mockup template (never null it — that wipes the
-    // live catalogue's photoreal mockup for the running dev server), then drop test assets.
-    // templateVersion is NOT restored verbatim: mockup derivatives are write-once and
-    // keyed by version, so rewinding lets a mockup cached against the TEST blank (a dev
-    // tab composing mid-suite) collide with the next real authoring bump. Restore at a
-    // version ABOVE anything this suite minted so future cache keys stay fresh.
-    if (realTpl) {
-      const [cur] = await db.select({ v: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, variantId));
-      await db
-        .update(printTemplates)
-        .set({ blankObjectId: realTpl.blankObjectId, printQuad: realTpl.printQuad, maskObjectId: realTpl.maskObjectId, materialClass: realTpl.materialClass, templateVersion: Math.max(cur?.v ?? 0, 7, realTpl.templateVersion) + 1 })
-        .where(eq(printTemplates.variantId, variantId))
-        .catch(() => {});
-    }
+    // the private test product goes, and its variant + template with it (cascade)
+    if (variantId) await db.delete(printTemplates).where(eq(printTemplates.variantId, variantId)).catch(() => {});
+    if (productId) await db.delete(products).where(eq(products.id, productId)).catch(() => {});
     if (blankAssetId) await db.delete(templateAssets).where(eq(templateAssets.id, blankAssetId)).catch(() => {});
     for (const id of designAssetIds) {
       const objs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, id));
