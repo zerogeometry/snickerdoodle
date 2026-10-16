@@ -9,6 +9,7 @@ import type { DbHandle } from './db';
 import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
+import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
 import { containsAbusiveText } from './textSafety';
 import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from './moderation';
 
@@ -18,25 +19,29 @@ const OVERLAY_EDGE = 3000;
 
 /**
  * The Studio's non-destructive recipe (Studio spec §16 "always-recoverable original"). Geometry is
- * applied in a fixed order — ROTATE (clockwise quarter-turns) → FLIP (horizontal, then vertical) →
- * CROP (a rectangle, 0–1 fractions of the rotated+flipped picture) — identically here and in the
- * browser, so what the parent sees is what prints.
+ * applied in a fixed order — ROTATE (any angle clockwise; the frame grows to fit) → FLIP
+ * (horizontal, then vertical) → PLACE (the unlocked drawing's position / size / turn in the frame)
+ * → CROP (a rectangle, 0–1 fractions of the frame) — identically here and in the browser
+ * (src/lib/studio-geometry.ts), so what the parent sees is what prints.
  */
 export interface StudioGeometry {
-  rotate: 0 | 90 | 180 | 270;
+  /** Degrees clockwise, 0 ≤ r < 360, to a tenth of a degree. */
+  rotate: number;
   flipH: boolean;
   flipV: boolean;
   crop: { x: number; y: number; w: number; h: number };
   /** Fill for the see-through parts (#rrggbb), or null = leave see-through. */
   background: string | null;
+  /** The unlocked drawing's placement in the frame; null = as rotated into it. */
+  place?: Placement | null;
 }
 
-export const IDENTITY_GEOMETRY: StudioGeometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null };
+export const IDENTITY_GEOMETRY: StudioGeometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null, place: null };
 
 /** Validate + clamp a client-sent geometry (never trust the client). */
 export function cleanGeometry(raw: unknown): StudioGeometry {
   const g = (raw ?? {}) as Partial<StudioGeometry>;
-  const rotate = ([0, 90, 180, 270] as const).includes(g.rotate as 0) ? (g.rotate as StudioGeometry['rotate']) : 0;
+  const rotate = typeof g.rotate === 'number' && Number.isFinite(g.rotate) ? normAngle(g.rotate) : 0;
   const c = g.crop ?? IDENTITY_GEOMETRY.crop;
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
   let x = Math.min(0.98, Math.max(0, num(c.x, 0)));
@@ -46,25 +51,52 @@ export function cleanGeometry(raw: unknown): StudioGeometry {
   x = Math.min(x, 1 - w);
   y = Math.min(y, 1 - h);
   const background = typeof g.background === 'string' && /^#[0-9a-f]{6}$/i.test(g.background) ? g.background.toLowerCase() : null;
-  return { rotate, flipH: g.flipH === true, flipV: g.flipV === true, crop: { x, y, w, h }, background };
+  return { rotate, flipH: g.flipH === true, flipV: g.flipV === true, crop: { x, y, w, h }, background, place: cleanPlace(g.place) };
 }
 
 export const isIdentity = (g: StudioGeometry) =>
   !g.background &&
+  placeIsIdentity(g.place) &&
   g.rotate === 0 && !g.flipH && !g.flipV && g.crop.x <= 0.0005 && g.crop.y <= 0.0005 && g.crop.w >= 0.9995 && g.crop.h >= 0.9995;
 
 /** Apply the recipe's geometry to an image (any size) — the server half of the shared contract. */
 export async function applyGeometry(input: Buffer, g: StudioGeometry): Promise<{ buffer: Buffer; width: number; height: number }> {
-  let buf = g.rotate ? await sharp(input).rotate(g.rotate).png().toBuffer() : input;
+  const src = await sharp(input).metadata();
+  const [fw, fh] = rotatedSize(src.width!, src.height!, g.rotate);
+  const W = Math.max(1, Math.round(fw)), H = Math.max(1, Math.round(fh));
+  const clear = { r: 0, g: 0, b: 0, alpha: 0 };
+  let buf = input;
+  if (g.rotate) {
+    buf = await sharp(input).ensureAlpha().rotate(g.rotate, { background: clear }).png().toBuffer();
+    // a free turn's bounding box can land a pixel off the shared maths — pin it to the frame size
+    const m = await sharp(buf).metadata();
+    if (m.width !== W || m.height !== H) buf = await sharp(buf).resize(W, H, { fit: 'fill' }).png().toBuffer();
+  }
   if (g.flipH) buf = await sharp(buf).flop().png().toBuffer();
   if (g.flipV) buf = await sharp(buf).flip().png().toBuffer();
-  const meta = await sharp(buf).metadata();
-  const W = meta.width!, H = meta.height!;
+  if (!placeIsIdentity(g.place)) buf = await placeInFrame(buf, W, H, g.place!);
   const left = Math.round(g.crop.x * W), top = Math.round(g.crop.y * H);
   const width = Math.max(1, Math.min(W - left, Math.round(g.crop.w * W)));
   const height = Math.max(1, Math.min(H - top, Math.round(g.crop.h * H)));
   const out = await sharp(buf).extract({ left, top, width, height }).png({ compressionLevel: 6 }).toBuffer();
   return { buffer: out, width, height };
+}
+
+/** The unlocked drawing, sized + turned about its centre and set at its place on a clear W×H frame. */
+async function placeInFrame(drawing: Buffer, W: number, H: number, p: Placement): Promise<Buffer> {
+  const clear = { r: 0, g: 0, b: 0, alpha: 0 };
+  const sw = Math.max(1, Math.round(W * p.scale)), sh = Math.max(1, Math.round(H * p.scale));
+  let layer = await sharp(drawing).ensureAlpha().resize(sw, sh, { fit: 'fill' }).png().toBuffer();
+  if (p.angle) layer = await sharp(layer).rotate(p.angle, { background: clear }).png().toBuffer();
+  const m = await sharp(layer).metadata();
+  const lw = m.width!, lh = m.height!;
+  const left = Math.round(p.x * W - lw / 2), top = Math.round(p.y * H - lh / 2);
+  // only the part inside the frame
+  const x0 = Math.max(0, left), y0 = Math.max(0, top), x1 = Math.min(W, left + lw), y1 = Math.min(H, top + lh);
+  const frame = sharp({ create: { width: W, height: H, channels: 4, background: clear } });
+  if (x1 <= x0 || y1 <= y0) return frame.png().toBuffer();
+  const part = await sharp(layer).extract({ left: x0 - left, top: y0 - top, width: x1 - x0, height: y1 - y0 }).png().toBuffer();
+  return frame.composite([{ input: part, left: x0, top: y0 }]).png().toBuffer();
 }
 
 async function bytesOf(db: DbHandle, assetId: string, which: 'ORIGINAL' | 'cutout'): Promise<Buffer | null> {
@@ -143,7 +175,8 @@ export async function saveStudio(
 
   const base = cut ?? (await sharp(source).rotate().png().toBuffer()); // originals: honour orientation first
   const baseMeta = await sharp(base).metadata();
-  const [GW, GH] = g.rotate === 90 || g.rotate === 270 ? [baseMeta.height!, baseMeta.width!] : [baseMeta.width!, baseMeta.height!];
+  const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
+  const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
   let designed = await applyGeometry(base, g);
   // Added things: draw them at a resolution that stays crisp in print.
   let k = 1;

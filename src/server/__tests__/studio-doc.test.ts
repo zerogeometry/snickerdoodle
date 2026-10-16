@@ -37,8 +37,9 @@ describe('studio geometry — rotate → flip → crop, identical on server and 
   });
 
   it('never trusts the client: junk is cleaned to a safe recipe', () => {
-    const g = cleanGeometry({ rotate: 45, flipH: 'yes', crop: { x: -1, y: 0.9, w: 5, h: NaN } });
+    const g = cleanGeometry({ rotate: 'sideways', flipH: 'yes', crop: { x: -1, y: 0.9, w: 5, h: NaN } });
     expect(g.rotate).toBe(0);
+    expect(cleanGeometry({ rotate: 45 }).rotate).toBe(45); // any angle is fine now (free turns)
     expect(g.flipH).toBe(false);
     expect(g.crop.x).toBe(0);
     expect(g.crop.x + g.crop.w).toBeLessThanOrEqual(1);

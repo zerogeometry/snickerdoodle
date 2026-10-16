@@ -1,10 +1,11 @@
 'use client';
 
-import { IconCopy, IconLock, IconPencil, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
+import { IconCopy, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
 import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
+import type { Placement } from '@/lib/studio-geometry';
 import { Icon } from '@/ui/primitives/Icon';
 import { ColourPicker } from './ColourPicker';
 import { drawStroke, drawTextured } from './objects-canvas';
@@ -24,6 +25,15 @@ export interface TextStyle {
   font: CardFontToken;
   colour: string;
   texture: TextureKind;
+}
+/** The drawing itself as a layer: locked by default; unlocked, it moves / sizes / turns. */
+export interface DrawingLayer {
+  unlocked: boolean;
+  selected: boolean;
+  place: Placement;
+  onToggleLock: () => void;
+  onSize: (scale: number) => void;
+  onReset: () => void;
 }
 export interface ShapeStyle {
   fill: string;
@@ -47,6 +57,8 @@ export function AddedOptions(p: {
   selected: StudioObject | null;
   /** What the base layer is called: "your drawing", or "your canvas" when designing from scratch. */
   baseLabel: string;
+  /** The drawing layer's lock + controls (null on a blank canvas — nothing to move). */
+  drawing: DrawingLayer | null;
   onSelect: (id: string | null) => void;
   onUpdate: (patch: Partial<StudioObject>, group?: boolean) => void;
   onAddShape: (k: ShapeKind) => void;
@@ -127,12 +139,38 @@ export function AddedOptions(p: {
   };
 
   if (tool === 'select') {
+    const d = p.drawing;
     return (
       <Stack>
         <Section label="layers · top first">
-          <LayersList objects={p.objects} selectedId={selected?.id ?? null} baseLabel={p.baseLabel} onSelect={p.onSelect} />
-          {!selected ? <p className="text-xs text-ink-soft">{p.objects.length ? 'tap a layer — here or on the picture — to move it, size it or change it.' : 'nothing added yet — try add text, draw or shapes.'}</p> : null}
+          <LayersList objects={p.objects} selectedId={d?.selected ? '__drawing' : selected?.id ?? null} baseLabel={p.baseLabel} drawing={d} onSelect={p.onSelect} />
+          {!selected && !d?.selected ? <p className="text-xs text-ink-soft">{p.objects.length ? 'tap a layer — here or on the picture — to move it, size it or change it.' : 'nothing added yet — try add text, draw or shapes.'}</p> : null}
         </Section>
+        {d?.selected ? (
+          <Section
+            label={`editing · ${p.baseLabel}`}
+            aside={
+              <button type="button" onClick={() => p.onSelect(null)} className="min-h-8 px-1 text-[11px] font-bold text-cinnamon">
+                done
+              </button>
+            }
+          >
+            <p className="text-xs text-ink-soft">drag it to move, the yellow corner to size, the blue dot to turn — it clicks into place at every 45°.</p>
+            <SliderRow
+              label="size"
+              min={5}
+              max={300}
+              value={Math.round(d.place.scale * 100)}
+              onChange={(v) => d.onSize(v / 100)}
+              ariaLabel="drawing size"
+              display={`${Math.round(d.place.scale * 100)}%`}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <ActionButton icon={IconRestore} label="put it back" onClick={d.onReset} />
+              <ActionButton icon={IconLock} label="lock it" onClick={d.onToggleLock} />
+            </div>
+          </Section>
+        ) : null}
         {selected ? (
           <Section
             label={`editing · ${layerName(selected)}`}
@@ -238,7 +276,19 @@ export const layerName = (o: StudioObject) =>
   o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? o.shape : 'pen line';
 
 /** Every added thing as its own layer, top first; the drawing itself is the locked bottom layer. */
-function LayersList({ objects, selectedId, baseLabel, onSelect }: { objects: StudioObject[]; selectedId: string | null; baseLabel: string; onSelect: (id: string | null) => void }) {
+function LayersList({
+  objects,
+  selectedId,
+  baseLabel,
+  drawing,
+  onSelect,
+}: {
+  objects: StudioObject[];
+  selectedId: string | null;
+  baseLabel: string;
+  drawing: DrawingLayer | null;
+  onSelect: (id: string | null) => void;
+}) {
   const rows = [...objects].reverse();
   return (
     <div>
@@ -270,11 +320,39 @@ function LayersList({ objects, selectedId, baseLabel, onSelect }: { objects: Stu
             </li>
           );
         })}
-        <li className="flex min-h-11 items-center gap-2 rounded-xl border-2 border-dashed border-cocoa/15 px-2.5 text-xs font-bold text-ink-soft">
-          <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-lg bg-paper-2">
-            <Icon icon={IconLock} size={14} />
-          </span>
-          {baseLabel}
+        <li className="flex items-center gap-1.5">
+          {drawing?.unlocked ? (
+            <button
+              type="button"
+              aria-pressed={drawing.selected}
+              onClick={() => onSelect(drawing.selected ? null : '__drawing')}
+              className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 px-2.5 text-left text-xs font-bold ${drawing.selected ? 'border-cocoa bg-honey-band text-cocoa' : 'border-cocoa/15 bg-paper text-cocoa hover:border-cocoa/50'}`}
+            >
+              <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-lg border border-cocoa/20 bg-paper-2">
+                <Icon icon={IconLockOpen} size={14} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{baseLabel}</span>
+            </button>
+          ) : (
+            <span className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 border-dashed border-cocoa/15 px-2.5 text-xs font-bold text-ink-soft">
+              <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-lg bg-paper-2">
+                <Icon icon={IconLock} size={14} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{baseLabel}</span>
+            </span>
+          )}
+          {drawing ? (
+            <button
+              type="button"
+              onClick={drawing.onToggleLock}
+              aria-pressed={drawing.unlocked}
+              aria-label={drawing.unlocked ? `lock ${baseLabel}` : `unlock ${baseLabel} to move, size or turn it`}
+              title={drawing.unlocked ? 'lock it' : 'unlock to move, size or turn it'}
+              className="press flex h-11 shrink-0 items-center gap-1 rounded-xl border-2 border-cocoa/20 bg-paper px-2.5 text-[11px] font-extrabold text-cocoa hover:border-cocoa"
+            >
+              <Icon icon={drawing.unlocked ? IconLock : IconLockOpen} size={14} /> {drawing.unlocked ? 'lock' : 'unlock'}
+            </button>
+          ) : null}
         </li>
       </ul>
     </div>

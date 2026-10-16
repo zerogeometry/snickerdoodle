@@ -9,7 +9,8 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { IDENTITY_GEOMETRY, saveStudio, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
+import { applyGeometry, cleanGeometry, IDENTITY_GEOMETRY, saveStudio, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
+import { rotatedSize } from '@/lib/studio-geometry';
 import { derivativeKey, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
 import type { ModerationProviders } from '@/server/moderation';
@@ -194,6 +195,55 @@ describe.skipIf(!DB || !S3)('studio save — non-destructive design', () => {
       await saveStudio(db, sam, a.assetId, { mask: null, geometry: { ...IDENTITY_GEOMETRY, rotate: 90 } }, { moderation: p });
       expect(p.seen).toBe(0);
       expect((await status(a.assetId)).s).toBe('CLEAR');
+    });
+  });
+
+  describe('free turns and an unlocked drawing — the print matches the shared maths', () => {
+    const alphaAt = async (buf: Buffer) => {
+      const { data, info } = await sharp(buf).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      return { w: info.width, h: info.height, a: (x: number, y: number) => data[(Math.round(y) * info.width + Math.round(x)) * 4 + 3]! };
+    };
+    const solid = () => sharp({ create: { width: 400, height: 200, channels: 4, background: { r: 30, g: 90, b: 200, alpha: 1 } } }).png().toBuffer();
+
+    it('a 30 degree turn: the frame is the turned box, corners see-through, middle solid', async () => {
+      const g = cleanGeometry({ ...IDENTITY_GEOMETRY, rotate: 30 });
+      const out = await applyGeometry(await solid(), g);
+      const [fw, fh] = rotatedSize(400, 200, 30);
+      expect([out.width, out.height]).toEqual([Math.round(fw), Math.round(fh)]);
+      const px = await alphaAt(out.buffer);
+      expect(px.a(2, 2)).toBe(0);
+      expect(px.a(out.width / 2, out.height / 2)).toBe(255);
+    });
+
+    it('an unlocked drawing at half size, moved left: the frame stays, the drawing sits where placed', async () => {
+      const g = cleanGeometry({ ...IDENTITY_GEOMETRY, place: { x: 0.3, y: 0.5, scale: 0.5, angle: 0 } });
+      const out = await applyGeometry(await solid(), g);
+      expect([out.width, out.height]).toEqual([400, 200]); // same frame
+      const px = await alphaAt(out.buffer);
+      expect(px.a(120, 100)).toBe(255); // centre of the drawing: 0.3 x 400
+      expect(px.a(10, 100)).toBe(0); // left of it (it spans 20-220)
+      expect(px.a(300, 100)).toBe(0); // right of it
+      expect(px.a(120, 20)).toBe(0); // above it (it spans 50-150)
+    });
+
+    it('cleans whatever the browser sends: any angle to 0.1 degree, junk dropped', () => {
+      expect(cleanGeometry({ rotate: 37.46 }).rotate).toBe(37.5);
+      expect(cleanGeometry({ rotate: -90 }).rotate).toBe(270);
+      expect(cleanGeometry({ rotate: 'sideways' }).rotate).toBe(0);
+      expect(cleanGeometry({ rotate: 0, place: { x: 0.5, y: 0.5, scale: 1, angle: 0 } }).place).toBeNull();
+    });
+
+    it('a turned design saves, prints the turned frame, and reopens at that angle', async () => {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+      const res = await saveStudio(db, sam, a.assetId, { mask: null, geometry: { ...IDENTITY_GEOMETRY, rotate: 12.5, place: { x: 0.45, y: 0.5, scale: 0.8, angle: 5 } } });
+      expect(res.sourceObjectId).not.toBeNull();
+      const [fw, fh] = rotatedSize(200, 100, 12.5);
+      const meta = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).metadata();
+      expect([meta.width, meta.height]).toEqual([Math.round(fw), Math.round(fh)]);
+      const st = await studioStateForAsset(db, sam, a.assetId);
+      expect(st.geometry.rotate).toBe(12.5);
+      expect(st.geometry.place).toMatchObject({ x: 0.45, scale: 0.8, angle: 5 });
     });
   });
 });

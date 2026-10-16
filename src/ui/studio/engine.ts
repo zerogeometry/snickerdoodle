@@ -1,3 +1,4 @@
+import { flipPlacement, IDENTITY_PLACE, normAngle, placeIsIdentity, rotatedSize, turnTo, type Placement } from '@/lib/studio-geometry';
 /**
  * Studio engine — the pure pixel + geometry maths behind the Studio's image tools (no React).
  *
@@ -9,7 +10,8 @@
 
 export const EDGE = 1600;
 
-export type Rotation = 0 | 90 | 180 | 270;
+/** Degrees clockwise, any angle to a tenth of a degree (0 ≤ r < 360). */
+export type Rotation = number;
 export interface Crop {
   x: number;
   y: number;
@@ -23,8 +25,10 @@ export interface Geometry {
   crop: Crop;
   /** Fill for the see-through parts (#rrggbb), or null = leave see-through. */
   background: string | null;
+  /** Where the (unlocked) drawing sits in the frame; null = exactly as rotated into it. */
+  place?: Placement | null;
 }
-export const IDENTITY: Geometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null };
+export const IDENTITY: Geometry = { rotate: 0, flipH: false, flipV: false, crop: { x: 0, y: 0, w: 1, h: 1 }, background: null, place: null };
 
 export interface Work {
   w: number;
@@ -198,50 +202,52 @@ export function dab(work: Work, x: number, y: number, size: number, mode: 'erase
 
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
-/** Size of the picture after rotation (before crop). */
-export function rotatedSize(w: number, h: number, r: Rotation): [number, number] {
-  return r === 90 || r === 270 ? [h, w] : [w, h];
-}
+export { rotatedSize };
 
 /**
- * The matrix taking editing-copy pixels into "geometry space" (rotated + flipped, uncropped) —
- * rotate clockwise about the centre, then flip — matching the server's order.
+ * The matrix taking editing-copy pixels into "geometry space" (the frame: rotated + flipped, the
+ * drawing placed, uncropped) — rotate clockwise about the centre, flip, then place — matching the
+ * server's order (src/lib/studio-geometry.ts).
  */
 export function geometryMatrix(w: number, h: number, g: Geometry): DOMMatrix {
   const [gw, gh] = rotatedSize(w, h, g.rotate);
+  const p = g.place ?? IDENTITY_PLACE;
   return new DOMMatrix()
     .translate(gw / 2, gh / 2)
+    .translate((p.x - 0.5) * gw, (p.y - 0.5) * gh)
+    .rotate(p.angle)
+    .scale(p.scale)
     .scale(g.flipH ? -1 : 1, g.flipV ? -1 : 1)
     .rotate(g.rotate)
     .translate(-w / 2, -h / 2);
 }
 
-/** Turning or flipping the picture carries the crop rectangle with it. */
-export function rotateGeometry(g: Geometry): Geometry {
-  const c = g.crop;
-  // a clockwise quarter turn of the rotated+flipped picture
-  const crop = { x: 1 - c.y - c.h, y: c.x, w: c.h, h: c.w };
-  // rotating after a flip ≡ flipping the other axis after rotating
-  return { rotate: (((g.rotate + 90) % 360) as Rotation), flipH: g.flipV, flipV: g.flipH, crop, background: g.background };
+/** Turn the whole design to `visual`° on screen (see turnTo); a quarter-turn is `visualAngle(g) + 90`. */
+export function turnGeometry(g: Geometry, visual: number, w: number, h: number) {
+  return turnTo(g, visual, w, h);
 }
 export function flipGeometry(g: Geometry, axis: 'h' | 'v'): Geometry {
   const c = g.crop;
+  const place = flipPlacement(g.place, axis);
   return axis === 'h'
-    ? { ...g, flipH: !g.flipH, crop: { ...c, x: 1 - c.x - c.w } }
-    : { ...g, flipV: !g.flipV, crop: { ...c, y: 1 - c.y - c.h } };
+    ? { ...g, flipH: !g.flipH, crop: { ...c, x: 1 - c.x - c.w }, place }
+    : { ...g, flipV: !g.flipV, crop: { ...c, y: 1 - c.y - c.h }, place };
 }
 
 export const geometryIsIdentity = (g: Geometry) =>
   !g.background &&
-  g.rotate === 0 && !g.flipH && !g.flipV && g.crop.x <= 0.0005 && g.crop.y <= 0.0005 && g.crop.w >= 0.9995 && g.crop.h >= 0.9995;
+  placeIsIdentity(g.place) &&
+  normAngle(g.rotate) === 0 && !g.flipH && !g.flipV && g.crop.x <= 0.0005 && g.crop.y <= 0.0005 && g.crop.w >= 0.9995 && g.crop.h >= 0.9995;
 
 // ── Print readiness ───────────────────────────────────────────────────────────
 
 /** The largest paper size the (cropped) picture prints well at (≥150 dpi), in plain words. */
 export function printReadiness(origW: number, origH: number, g: Geometry): { label: string; good: boolean } {
+  // the drawing's own pixels across the cropped frame (a drawing scaled up spreads them thinner)
   const [gw, gh] = rotatedSize(origW, origH, g.rotate);
-  const long = Math.max(gw * g.crop.w, gh * g.crop.h);
-  const short = Math.min(gw * g.crop.w, gh * g.crop.h);
+  const k = 1 / Math.max(0.05, g.place?.scale ?? 1);
+  const long = Math.max(gw * g.crop.w, gh * g.crop.h) * k;
+  const short = Math.min(gw * g.crop.w, gh * g.crop.h) * k;
   const px = (mm: number) => (mm / 25.4) * 150;
   for (const [name, L, S] of [['A2', 594, 420], ['A3', 420, 297], ['A4', 297, 210], ['A5', 210, 148]] as const) {
     if (long >= px(L) && short >= px(S)) return { label: `crisp up to ${name}`, good: true };

@@ -142,12 +142,12 @@ export const TOOLS: ToolDef[] = [
   {
     id: 'rotate',
     group: 'frame',
-    hint: 'a quarter turn clockwise.',
+    hint: 'turn it to any angle — it clicks into place at every 45°.',
     label: 'rotate',
     icon: IconRotateClockwise,
-    kind: 'action',
+    kind: 'mode',
     key: 'R',
-    info: 'Turn it a quarter turn clockwise. Tap again to keep turning.',
+    info: 'Turn the whole design to any angle, to a tenth of a degree — handy for straightening a wonky photo. Drag on the picture or use the slider; it clicks gently into place at every 45°. Words and shapes turn with it.',
   },
   {
     id: 'flip',

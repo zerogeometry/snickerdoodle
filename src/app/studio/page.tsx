@@ -7,6 +7,8 @@ import {
   IconArrowsHorizontal,
   IconArrowsVertical,
   IconBackground,
+  IconRotate,
+  IconRotateClockwise,
   IconCheck,
   IconCircleCheck,
   IconMinus,
@@ -25,9 +27,10 @@ import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStat
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
-import { boxOf, drawObject, drawStroke, drawTextured, hits, moveObject, scaleObject, type Frame } from '@/ui/studio/objects-canvas';
+import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { CARD_FONTS } from '@/lib/card-fonts';
-import { flipObjects, rotateObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { flipObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import {
@@ -43,7 +46,7 @@ import {
   printReadiness,
   readMask,
   removeColour,
-  rotateGeometry,
+  turnGeometry,
   rotatedSize,
   type Crop,
   type Geometry,
@@ -66,6 +69,8 @@ const EDITING: ToolId[] = ['text', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
 const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
+/** The drawing itself, as a selectable layer (once unlocked). */
+const DRAWING = '__drawing';
 
 /**
  * The Studio (Phase 1: the image tools). Full screen, app-like; the original upload is never
@@ -116,6 +121,10 @@ export default function StudioPage() {
   const liveStroke = useRef<number[] | null>(null);
   const lastEditPush = useRef(0);
   const selected = objects.find((o) => o.id === selectedId) ?? null;
+  // the drawing layer is locked until the parent unlocks it (then it moves / sizes / turns)
+  const [drawingUnlocked, setDrawingUnlocked] = useState(false);
+  // a continuous turn (slider / dial / drag) works from where it started, so it never drifts
+  const turnBase = useRef<{ geo: Geometry; objects: StudioObject[]; at: number } | null>(null);
   const scratch = !!upload?.scratch;
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -279,9 +288,9 @@ export default function StudioPage() {
       if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content);
 
       // selection: dashed box, corner resize handle, top turn handle (screen space)
-      const sel = tool && EDITING.includes(tool) ? objects.find((o) => o.id === selectedId) : null;
-      if (sel) {
-        const b = boxOf(sel, f);
+      const selB = tool && EDITING.includes(tool) ? selectedBox(f) : null;
+      if (selB) {
+        const b = selB.box;
         const a = (b.rotation * Math.PI) / 180;
         const pt = (lx: number, ly: number) => V.transformPoint(new DOMPoint(b.cx + lx * Math.cos(a) - ly * Math.sin(a), b.cy + lx * Math.sin(a) + ly * Math.cos(a)));
         const pad = 6 / V.a;
@@ -304,7 +313,7 @@ export default function StudioPage() {
           ctx.stroke();
         };
         handle(c[2]!, '#f6c445'); // resize
-        if (sel.type !== 'stroke') handle(pt(0, -b.h / 2 - pad - 28 / V.a), '#8fb5d6'); // turn
+        if (selB.turnable) handle(pt(0, -b.h / 2 - pad - 28 / V.a), '#8fb5d6'); // turn
         ctx.restore();
       }
     }
@@ -333,7 +342,20 @@ export default function StudioPage() {
         ctx.stroke();
       }
     }
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked]);
+
+  /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
+  const drawingBox = (f: Frame, g: Geometry = geo): Box => {
+    const p = g.place ?? IDENTITY_PLACE;
+    const w = workRef.current?.w ?? f.gw, h = workRef.current?.h ?? f.gh;
+    return { cx: p.x * f.gw, cy: p.y * f.gh, w: w * p.scale, h: h * p.scale, rotation: visualAngle(g) + p.angle };
+  };
+  /** What's selected, as a box with handles — an added thing, or the unlocked drawing. */
+  const selectedBox = (f: Frame): { box: Box; turnable: boolean; obj: StudioObject | null } | null => {
+    if (selectedId === DRAWING) return drawingUnlocked && tool === 'select' ? { box: drawingBox(f), turnable: true, obj: null } : null;
+    const o = objects.find((x) => x.id === selectedId);
+    return o ? { box: boxOf(o, f), turnable: o.type !== 'stroke', obj: o } : null;
+  };
 
   // ── history ──
   const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite });
@@ -372,7 +394,7 @@ export default function StudioPage() {
 
   // ── pointer handling: tools, pinch-zoom, pan ──
   const pointers = useRef(new Map<number, { x: number; y: number; type: string }>());
-  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn'; obj?: StudioObject; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
+  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn' | 'spin'; obj?: StudioObject; drawing?: boolean; place0?: Placement; spin0?: number; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
 
   const local = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -425,13 +447,24 @@ export default function StudioPage() {
       setTick((t) => t + 1);
       return;
     }
+    if (tool === 'rotate') {
+      // drag round the middle of the design to turn it (snaps gently at every 45°)
+      const f = frame();
+      const c = viewMatrix(geo).transformPoint(new DOMPoint(f.gw / 2, f.gh / 2));
+      turnBase.current = null;
+      gesture.current = { kind: 'spin', startAngle: Math.atan2(sy - c.y, sx - c.x), spin0: visualAngle(geo), m0: [c.x, c.y] };
+      return;
+    }
     if (tool && EDITING.includes(tool)) {
       const f = frame();
       const [gx, gy] = toGeoSpace(sx, sy);
-      const sel = objects.find((o) => o.id === selectedId);
-      if (sel) {
+      const selB = selectedBox(f);
+      if (selB) {
         // the handles first
-        const b = boxOf(sel, f);
+        const b = selB.box;
+        const sel = selB.obj;
+        const drawing = !sel;
+        const place0 = geo.place ?? IDENTITY_PLACE;
         const a = (b.rotation * Math.PI) / 180;
         const V = viewMatrix(geo);
         const pt = (lx: number, ly: number) => V.transformPoint(new DOMPoint(b.cx + lx * Math.cos(a) - ly * Math.sin(a), b.cy + lx * Math.sin(a) + ly * Math.cos(a)));
@@ -440,12 +473,12 @@ export default function StudioPage() {
         const tn = pt(0, -b.h / 2 - pad - 28 / V.a);
         if (Math.hypot(rz.x - sx, rz.y - sy) < 24) {
           pushUndo();
-          gesture.current = { kind: 'scale', obj: sel, startDist: Math.hypot(gx - b.cx, gy - b.cy) };
+          gesture.current = { kind: 'scale', obj: sel ?? undefined, drawing, place0, startDist: Math.hypot(gx - b.cx, gy - b.cy) };
           return;
         }
-        if (sel.type !== 'stroke' && Math.hypot(tn.x - sx, tn.y - sy) < 24) {
+        if (selB.turnable && Math.hypot(tn.x - sx, tn.y - sy) < 24) {
           pushUndo();
-          gesture.current = { kind: 'turn', obj: sel, startAngle: Math.atan2(gy - b.cy, gx - b.cx) };
+          gesture.current = { kind: 'turn', obj: sel ?? undefined, drawing, place0, startAngle: Math.atan2(gy - b.cy, gx - b.cx) };
           return;
         }
       }
@@ -455,6 +488,13 @@ export default function StudioPage() {
         setSelectedId(hit.id);
         pushUndo();
         gesture.current = { kind: 'move', obj: hit, g0: [gx, gy] };
+        return;
+      }
+      // the unlocked drawing sits underneath everything added
+      if (tool === 'select' && drawingUnlocked && !scratch && inBox(drawingBox(f), gx, gy)) {
+        setSelectedId(DRAWING);
+        pushUndo();
+        gesture.current = { kind: 'move', drawing: true, place0: geo.place ?? IDENTITY_PLACE, g0: [gx, gy] };
         return;
       }
       if (tool === 'text') {
@@ -542,6 +582,27 @@ export default function StudioPage() {
       setTick((t) => t + 1);
       return;
     }
+    if (gst.kind === 'spin') {
+      const deg = ((Math.atan2(sy - gst.m0![1], sx - gst.m0![0]) - gst.startAngle!) * 180) / Math.PI;
+      turnDesign(snapAngle(gst.spin0! + deg), true);
+      return;
+    }
+    if ((gst.kind === 'move' || gst.kind === 'scale' || gst.kind === 'turn') && gst.drawing && gst.place0) {
+      const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+      const [gx, gy] = toGeoSpace(sx, sy);
+      const p0 = gst.place0;
+      let p: Placement;
+      if (gst.kind === 'move') p = { ...p0, x: p0.x + (gx - gst.g0![0]) / gw, y: p0.y + (gy - gst.g0![1]) / gh };
+      else if (gst.kind === 'scale') p = { ...p0, scale: Math.min(8, Math.max(0.05, p0.scale * (Math.hypot(gx - p0.x * gw, gy - p0.y * gh) / Math.max(1, gst.startDist!)))) };
+      else {
+        const deg = ((Math.atan2(gy - p0.y * gh, gx - p0.x * gw) - gst.startAngle!) * 180) / Math.PI;
+        // snap the drawing's tilt AS SEEN (the design's turn + its own) at every 45°
+        const seen = snapAngle(visualAngle(geo) + p0.angle + deg);
+        p = { ...p0, angle: normAngle(seen - visualAngle(geo)) };
+      }
+      setGeo((g) => ({ ...g, place: p }));
+      return;
+    }
     if ((gst.kind === 'move' || gst.kind === 'scale' || gst.kind === 'turn') && gst.obj) {
       const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
       const f: Frame = { gw, gh };
@@ -555,7 +616,7 @@ export default function StudioPage() {
       } else {
         const b = boxOf(o0, f);
         const deg = ((Math.atan2(gy - b.cy, gx - b.cx) - gst.startAngle!) * 180) / Math.PI;
-        next = o0.type === 'stroke' ? o0 : { ...o0, rotation: Math.round((o0.rotation + deg) * 2) / 2 };
+        next = o0.type === 'stroke' ? o0 : { ...o0, rotation: snapAngle(o0.rotation + deg) };
       }
       setObjects((os) => os.map((o) => (o.id === o0.id ? next : o)));
       return;
@@ -650,13 +711,25 @@ export default function StudioPage() {
     }
   };
 
-  const onTool = (id: ToolId) => {
-    if (id === 'rotate') {
+  /**
+   * Turn the whole design to `visual`° (as seen). A continuous gesture (`group`) works from where
+   * it started — one undo step, and no drift from re-turning already-turned things.
+   */
+  const turnDesign = (visual: number, group = false) => {
+    const work = workRef.current;
+    if (!work) return;
+    const now = Date.now();
+    if (!group || !turnBase.current || now - turnBase.current.at > 900) {
       pushUndo();
-      setGeo((g) => rotateGeometry(g));
-      setObjects((os) => rotateObjects(os));
-      return;
-    }
+      turnBase.current = { geo, objects, at: now };
+    } else turnBase.current.at = now;
+    const b = turnBase.current;
+    const t = turnGeometry(b.geo, visual, work.w, work.h);
+    setGeo(t.geo);
+    setObjects(turnObjects(b.objects, t.delta, t.f0, t.f1));
+  };
+
+  const onTool = (id: ToolId) => {
     // keep the selection only where it can still be edited
     if (selected && !(id === 'select' || (id === 'text' && selected.type === 'text') || (id === 'shapes' && selected.type === 'shape'))) setSelectedId(null);
     if (id === 'startAgain') return setConfirmStart(true);
@@ -669,6 +742,7 @@ export default function StudioPage() {
     pushUndo();
     workRef.current.alpha.set(sourceAlpha.current);
     setGeo(scratch ? { ...IDENTITY, background: '#ffffff' } : IDENTITY);
+    setDrawingUnlocked(false);
     setObjects([]);
     setSelectedId(null);
     setHadCutout(false);
@@ -759,7 +833,12 @@ export default function StudioPage() {
         return redo();
       }
       if (mod) return;
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      if (tool === 'rotate' && (e.key === '[' || e.key === ']')) {
+        e.preventDefault();
+        const step = (e.shiftKey ? 0.1 : 1) * (e.key === ']' ? 1 : -1);
+        return turnDesign(visualAngle(geo) + step, true);
+      }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId && selectedId !== DRAWING) {
         e.preventDefault();
         return deleteSelected();
       }
@@ -812,6 +891,34 @@ export default function StudioPage() {
       objects={objects}
       selected={selected}
       baseLabel={scratch ? 'your canvas' : 'your drawing'}
+      drawing={
+        scratch
+          ? null
+          : {
+              unlocked: drawingUnlocked,
+              selected: selectedId === DRAWING,
+              place: geo.place ?? IDENTITY_PLACE,
+              onToggleLock: () => {
+                // unlocking picks it up, ready to move; locking puts it down
+                if (drawingUnlocked) {
+                  if (selectedId === DRAWING) setSelectedId(null);
+                  setDrawingUnlocked(false);
+                } else {
+                  setDrawingUnlocked(true);
+                  setSelectedId(DRAWING);
+                }
+              },
+              onSize: (scale) => {
+                if (Date.now() - lastEditPush.current > 800) pushUndo();
+                lastEditPush.current = Date.now();
+                setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), scale } }));
+              },
+              onReset: () => {
+                pushUndo();
+                setGeo((g) => ({ ...g, place: null }));
+              },
+            }
+      }
       onSelect={(id) => setSelectedId(id)}
       onUpdate={updateSelected}
       onAddShape={addShape}
@@ -845,6 +952,8 @@ export default function StudioPage() {
       }}
       onDoneCrop={() => setTool(null)}
       onTool={onTool}
+      angle={visualAngle(geo)}
+      onAngle={(v, group) => turnDesign(v, group)}
       background={geo.background}
       setBackground={(bg) => {
         // dragging the device colour picker fires continuously — one undo step per burst
@@ -998,6 +1107,8 @@ function ToolOptions(p: {
   background: string | null;
   setBackground: (bg: string | null) => void;
   onTool: (id: ToolId) => void;
+  angle: number;
+  onAngle: (visual: number, group?: boolean) => void;
 }) {
   const jump = (id: ToolId, label: string) => (
     <Button variant="secondary" size="sm" className="flex-1" onClick={() => p.onTool(id)}>
@@ -1084,6 +1195,8 @@ function ToolOptions(p: {
           </Section>
         </Stack>
       );
+    case 'rotate':
+      return <RotateOptions angle={p.angle} onAngle={p.onAngle} />;
     case 'flip':
       return (
         <Stack>
@@ -1117,6 +1230,82 @@ function ToolOptions(p: {
     default:
       return null;
   }
+}
+
+/** Turn the whole design to any angle: a slider that clicks gently into place at every 45°, an
+ * exact number (to 0.1°), quarter turns, and straight. Dragging on the picture turns it too. */
+function RotateOptions({ angle, onAngle }: { angle: number; onAngle: (visual: number, group?: boolean) => void }) {
+  const fmt = (a: number) => (Math.round(a * 10) / 10).toString();
+  const [text, setText] = useState(fmt(angle));
+  useEffect(() => setText(fmt(angle)), [angle]);
+  const commit = () => {
+    const v = Number(text);
+    if (Number.isFinite(v)) onAngle(normAngle(v)); // typed = exactly that, no snap
+    else setText(fmt(angle));
+  };
+  return (
+    <Stack>
+      <Section label="angle" aside={<span className="font-display text-2xl leading-none text-cocoa">{fmt(angle)}°</span>}>
+        <input
+          type="range"
+          min={0}
+          max={360}
+          step={0.1}
+          value={angle}
+          onChange={(e) => onAngle(snapAngle(Number(e.target.value)), true)}
+          className="h-11 w-full accent-[var(--color-cta)]"
+          aria-label="turn the design"
+          aria-valuetext={`${fmt(angle)} degrees`}
+          list="studio-angle-snaps"
+        />
+        <datalist id="studio-angle-snaps">
+          {[0, 45, 90, 135, 180, 225, 270, 315, 360].map((v) => (
+            <option key={v} value={v} />
+          ))}
+        </datalist>
+        <div aria-hidden className="-mt-1 flex justify-between px-0.5 text-[10px] font-bold text-ink-faint">
+          <span>0°</span>
+          <span>90°</span>
+          <span>180°</span>
+          <span>270°</span>
+          <span>360°</span>
+        </div>
+        <label className="flex items-center gap-2 text-xs font-bold text-cocoa">
+          exact
+          <input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            max={360}
+            step={0.1}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === 'Enter' && commit()}
+            className="min-h-11 w-24 rounded-lg border border-line bg-paper px-3 text-[15px] text-cocoa"
+            aria-label="exact angle in degrees"
+          />
+          <span className="font-normal text-ink-soft">degrees</span>
+        </label>
+      </Section>
+      <Section label="quick turns">
+        <div className="grid grid-cols-3 gap-2">
+          <Button variant="secondary" size="sm" onClick={() => onAngle(angle - 90)} aria-label="a quarter turn anticlockwise">
+            <Icon icon={IconRotate} size={15} /> 90°
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => onAngle(angle + 90)} aria-label="a quarter turn clockwise">
+            <Icon icon={IconRotateClockwise} size={15} /> 90°
+          </Button>
+          <Button variant="secondary" size="sm" onClick={() => onAngle(0)} disabled={angle === 0}>
+            straight
+          </Button>
+        </div>
+        <p className="text-[11px] leading-snug text-ink-soft">
+          or drag on the picture to turn it — it clicks gently into place at every 45°. <span className="hidden md:inline">[ and ] nudge by 1° (with shift, 0.1°).</span>
+        </p>
+      </Section>
+    </Stack>
+  );
 }
 
 /** No tool picked: the likeliest first steps, one tap away. */

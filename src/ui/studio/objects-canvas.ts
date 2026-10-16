@@ -62,7 +62,11 @@ export function boxOf(o: StudioObject, f: Frame): Box {
 
 /** Is the geometry-px point inside the object's (rotated) box? */
 export function hits(o: StudioObject, f: Frame, x: number, y: number, slop = 0): boolean {
-  const b = boxOf(o, f);
+  return inBox(boxOf(o, f), x, y, slop);
+}
+
+/** Is the geometry-px point inside a (rotated) box? */
+export function inBox(b: Box, x: number, y: number, slop = 0): boolean {
   const a = (-b.rotation * Math.PI) / 180;
   const dx = x - b.cx, dy = y - b.cy;
   const lx = dx * Math.cos(a) - dy * Math.sin(a), ly = dx * Math.sin(a) + dy * Math.cos(a);
