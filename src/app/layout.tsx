@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#EBDDC6',
+  themeColor: '#F8F5E9',
   // App-like on phones: draw under the notch/home indicator (safe-area padding in the shell).
   viewportFit: 'cover',
 };
