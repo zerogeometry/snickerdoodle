@@ -16,6 +16,7 @@ import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
+import { deliveryLine } from '@/lib/delivery';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
@@ -334,7 +335,7 @@ export function FlowCatalogue({
           </span>
           <div className="text-right">
             <div className="font-display text-xl text-cocoa">{gbp(subtotal)}</div>
-            <div className="text-[11px] font-semibold text-green-save">free tracked delivery</div>
+            <div className="text-[11px] font-semibold text-green-save">{deliveryLine(items.map((i) => i.product))}</div>
           </div>
         </div>
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">

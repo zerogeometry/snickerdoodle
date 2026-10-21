@@ -10,6 +10,7 @@ import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
+import { deliveryLine } from '@/lib/delivery';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
@@ -764,7 +765,7 @@ function CustomizeProduct() {
             <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">
               {gbp(variant?.pricePence ?? product.fromPence)}
             </span>
-            <span className="text-xs font-semibold text-green-save">free tracked delivery</span>
+            <span className="text-xs font-semibold text-green-save">{deliveryLine(product.key)}</span>
           </div>
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
