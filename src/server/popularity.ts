@@ -15,11 +15,16 @@ import type { DbHandle } from './db';
  * Only products listed here are "popular" (shown in the range); anything else lives in the full
  * catalogue. Hidden products may sit in the list — the shop still only shows visibleInShop ones.
  */
-export const EXPECTED_POPULARITY = ['framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit'];
+export const EXPECTED_POPULARITY = [
+  'framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
+  // the range expansion (D21) joins the same range — one collection, shown together (founder, 2026-10-21)
+  'cardPack', 'heightChart', 'socks', 'acrylicBlock', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
+];
 
 export const POPULARITY_WINDOW_DAYS = 90;
 /** How many sales the expected order is "worth" in total — real sales take over beyond this. */
-export const PRIOR_STRENGTH = 50;
+// (100 with the 21-product list: the same "a few sales nudge, many decide" as 50 was with 11.)
+export const PRIOR_STRENGTH = 100;
 
 const SOLD_STATUSES = ['PAID', 'FULFILLING', 'SHIPPED'] as const;
 

@@ -393,9 +393,9 @@ const DEFS: Record<string, ProductDef> = {
   // One basket line carries the N cards; the order splits it into card lines at an equal share of
   // the pack price (src/lib/card-packs.ts), so Prodigi gets N cards in one order. Sandbox
   // 2026-10-21: £1.10 a card + a FLAT £0.95 Guernsey Post (untracked, uk7) for 1–15 cards.
-  // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). HIDDEN for now.
+  // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). LIVE 2026-10-21.
   cardPack: {
-    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true,
+    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true, visibleInShop: true,
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same' },
     variants: [
@@ -447,19 +447,21 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
-  // ── Range expansion (D21) — all HIDDEN until samples + mockup blanks are in ──
+  // ── Range expansion (D21) — LIVE 2026-10-21 (founder): socks, height chart, acrylic block, wrapping
+// paper, tea towel, playing cards (+ card packs above). HELD until ready: the hoodies (need a hoodie
+// packshot + confirmed chest sizes) and the pet bandana (its shape is drawn from a guess) ──
   // (The women's Dazzler sweatshirt was left out — founder, 2026-10-21.)
   // Categories reuse the existing enum (a new value needs a migration): socks/hoodies/bandana → wear,
   // height chart/acrylic block → cards & prints, wrapping paper → festive, tea towel → home,
   // playing cards → gifts.
   socks: {
-    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true,
+    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
     description: "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10).",
     specs: { material: 'polyester, printed all over', size: 'one size, UK 6–10', styles: 'ankle or tube', care: 'machine wash at 30°', made: 'in the UK' },
     variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, printTo: [...s.printTo] })),
   },
   heightChart: {
-    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true,
+    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
     description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
     specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
@@ -479,19 +481,19 @@ const DEFS: Record<string, ProductDef> = {
     variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   acrylicBlock: {
-    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true,
+    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true, visibleInShop: true,
     description: 'Their drawing set behind a thick block of clear acrylic that stands on its own — a little piece of the fridge gallery for a desk or shelf.',
     specs: { material: '25mm clear acrylic, printed behind', stands: 'on its own, no frame needed', made: 'in the UK' },
     variants: ACRYLIC_BLOCKS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   wrappingPaper: {
-    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true,
+    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
     description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. Sheets or a roll.',
     specs: { material: 'FSC-certified 95gsm paper', formats: '3 sheets or a 70cm-wide roll', made: 'in the UK' },
     variants: WRAPPING_PAPER.map((w) => ({ size: w.size, pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
   },
   teaTowel: {
-    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true,
+    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,
     description: "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours.",
     specs: { material: 'cotton', care: 'machine washable', made: 'in the UK' },
     // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
@@ -504,7 +506,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: BANDANAS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   playingCards: {
-    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true,
+    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true, visibleInShop: true,
     description: 'A full 54-card deck with their drawing on the back of every card, in a white presentation box — for family card nights.',
     specs: { cards: '54, one design on every back', size: '6 × 9 cm', box: 'white presentation box', made: 'in the UK' },
     // Standard post is Royal Mail RM24 (UNTRACKED), £6.45. Budget (RM48, £3.20) would allow ~£19 —

@@ -225,9 +225,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
       : variant.productKey === 'blanket' ? 'on the blanket'
-      : variant.productKey === 'card' ? 'on the card'
+      : variant.productKey === 'card' || variant.productKey === 'playingCards' ? 'on the card'
+      : variant.productKey === 'acrylicBlock' ? 'in the block'
+      : variant.productKey === 'phoneCase' ? 'on the case'
       : isJigsaw ? 'on the board'
-      : 'in the frame';
+      : variant.productKey === 'framedPrint' ? 'in the frame'
+      : 'on the product';
   // A FRAME DEFAULTS to cover-filled (scale 1 = "1.0×", no margins), but the shopper CAN
   // zoom out to 0.5× if they want a border (founder call 2026-07-07). So its zoom floors
   // at 0.5 of cover — below the fit-centred model other products use.
@@ -977,7 +980,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             ) : isChart ? (
               <>the ruler prints just like this · your drawing goes in the <b className="text-cinnamon">outlined box</b> beside it · drag a corner to resize</>
             ) : (
-              <>the <b className="text-cinnamon">outlined box</b> is what shows in the frame · drag a corner to resize · keep faces &amp; words a little in from the edges</>
+              <>the <b className="text-cinnamon">outlined box</b> is what {variant.productKey === 'framedPrint' ? 'shows in the frame' : 'prints'} · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             )}
           </p>
 
