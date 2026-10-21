@@ -22,7 +22,8 @@ import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
-import { assessResolution, clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
+import { clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
+import { assessPrintResolution } from '@/server/print/pattern-geometry';
 
 // Tier-C 3D spin view — lazy, so three.js never loads unless someone opens it.
 // (The framed print deliberately has NO 3D/wall views — founder call 2026-07-07:
@@ -284,7 +285,7 @@ export default function CustomizePage() {
   }, [product, size, colour, orientation, grade, finish, back]);
 
   // The pixel size of the image this line will print from (the cutout if chosen) — fed to the
-  // SAME assessResolution the server's order-time gate runs, so the badge can't disagree with it.
+  // SAME assessment (assessPrintResolution) the server's order-time gate runs, so the badge can't disagree with it.
   const printSrc = upload?.cutout?.url ?? upload?.dataUrl ?? null;
   const [srcSize, setSrcSize] = useState<{ width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false); // "+ Keepsake" in flight (declared before any early return)
@@ -339,7 +340,7 @@ export default function CustomizePage() {
 
   // Print-readiness (Studio spec §15 / docs/04: never silently under-resolve).
   const assessFor = (v: (typeof product.variants)[number] | null | undefined): ResolutionAssessment | null =>
-    v?.printGeom && srcSize ? assessResolution(v.printGeom, srcSize, clampTransform(placement)) : null;
+    v?.printGeom && srcSize ? assessPrintResolution(v.printGeom, srcSize, clampTransform(placement), product.key) : null;
   const quality = assessFor(variant);
   const blocked = quality?.decision === 'BLOCK';
   // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test.

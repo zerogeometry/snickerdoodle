@@ -6,10 +6,13 @@ import { printTemplates, productVariants, products, storageObjects } from '@/db/
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
 import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
+import { isPatternProduct } from '@/lib/patterns';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { assessResolution, canvasSizePx, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { renderRepeatPattern } from './pattern';
+import { assessPrintResolution } from './pattern-geometry';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
@@ -78,6 +81,27 @@ export async function renderPrintFile(
 
   const transform = clampTransform(input.transform);
   const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
+
+  const [variantRow] = await db
+    .select({ attributes: productVariants.attributes, key: products.key })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(eq(productVariants.id, input.variantId));
+
+  // A REPEAT-PATTERN product (socks, wrapping paper, tea towel) prints the drawing tiled into a
+  // seamless repeat that fills the whole file — the 'pattern' magic edit, deterministic and in-VPC.
+  // Resolution is judged on ONE motif (that's what's printed at size), not on the whole sheet: a
+  // 5 m roll needs no bigger a photo than a pair of socks.
+  if (variantRow?.key && isPatternProduct(variantRow.key)) {
+    const canvas = canvasSizePx(geom);
+    const motifAssess = assessPrintResolution(geom, src, transform, variantRow.key);
+    if (motifAssess.decision === 'BLOCK') {
+      throw new Error(`source too low-res for this product (would need ${motifAssess.upscaleFactor.toFixed(1)}× upscale)`);
+    }
+    const { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform);
+    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+  }
+
   const assess = assessResolution(geom, src, transform);
   if (assess.decision === 'BLOCK') {
     throw new Error(`source too low-res for this product (would need ${assess.upscaleFactor.toFixed(1)}× upscale)`);
@@ -88,11 +112,6 @@ export async function renderPrintFile(
   // fixed-portrait (rotate the landscape variant); jigsaw boards are fixed-landscape (rotate
   // the portrait variant). "Preview the exact print file" shows this same rotated file —
   // exactly what the printer receives. Unknown/no orientation ⇒ never rotate.
-  const [variantRow] = await db
-    .select({ attributes: productVariants.attributes, key: products.key })
-    .from(productVariants)
-    .innerJoin(products, eq(productVariants.productId, products.id))
-    .where(eq(productVariants.id, input.variantId));
   const orientation = ((variantRow?.attributes as Record<string, string>) ?? {}).orientation;
   const nativeOri = (variantRow?.key ? PRODIGI_NATIVE_ORIENTATION[variantRow.key] : undefined) ?? 'portrait';
   const landscape = !!orientation && orientation !== nativeOri; // "landscape" = "needs the 90° rotate"

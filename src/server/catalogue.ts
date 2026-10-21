@@ -305,8 +305,9 @@ const BANDANAS = [
   { size: 'large', sku: 'PET-BANDANA-LRG', px: { w: 10158, h: 3306 }, pricePence: 1900 },
 ] as const;
 
-/** Products whose print file is a seamless REPEAT of the drawing (the 'pattern' magic edit). */
-export const PATTERN_PRODUCT_KEYS = ['socks', 'wrappingPaper', 'teaTowel'] as const;
+// Socks, wrapping paper and tea towel print a seamless REPEAT of the drawing — the 'pattern' magic
+// edit (src/lib/patterns.ts → PATTERN_PRODUCT_KEYS; pixels in src/server/print/pattern.ts).
+export { PATTERN_PRODUCT_KEYS } from '@/lib/patterns';
 
 // The founder-approved launch range (2026-07-01). Prices are our retail pence, VAT-inclusive with
 // FREE tracked delivery baked in (the shipping cost is inside the price, no separate line). Every

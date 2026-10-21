@@ -13,7 +13,6 @@ import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/ren
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { mockupContextAction, type MockupContext } from '@/app/actions/mockup';
 import {
-  assessResolution,
   canvasSizePx,
   clampTransform,
   computeLayerRect,
@@ -24,6 +23,7 @@ import {
   type Rotation,
   type Transform,
 } from '@/server/print/geometry';
+import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import type { StudioData } from '@/server/studio';
 
 /** The editor canvas is deliberately MUCH larger than the customize-page preview
@@ -231,7 +231,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
 
   const rect = natural ? computeLayerRect(t, { width: natural.w, height: natural.h }, tf) : null;
-  const assess = natural ? assessResolution(t, { width: natural.w, height: natural.h }, tf) : null;
+  const assess = natural ? assessPrintResolution(t, { width: natural.w, height: natural.h }, tf, variant.productKey) : null;
   // "Fit the whole image" scale for THIS product + rotation — the zoom slider's centre.
   const fitScale = natural ? containScale(t, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
   const zoomValue = tf.scale === 0 ? fitScale : tf.scale;

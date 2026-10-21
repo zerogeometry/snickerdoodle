@@ -6,7 +6,8 @@ import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
-import { assessResolution, clampTransform, type RawTransform } from '@/server/print/geometry';
+import { clampTransform, type RawTransform } from '@/server/print/geometry';
+import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { getObjectBytes } from '@/storage';
 import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
@@ -177,12 +178,13 @@ export async function placeOrder(
     }
     // Print-quality gate BEFORE any money moves: a placement that can't reach the
     // product's DPI even with upscaling is refused here, not discovered at render time
-    // after payment (the same assessResolution the positioner + renderer use).
+    // after payment (the same assessment the positioner + renderer use; a repeat-pattern product
+    // is judged on one motif).
     const transform = clampTransform(art.transform);
     const srcDims = await sourceDimensions(db, art.assetId, sourceObjectId);
     if (srcDims) {
       const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
-      if (assessResolution(geom, srcDims, transform).decision === 'BLOCK') {
+      if (assessPrintResolution(geom, srcDims, transform, valid[i]!.productKey).decision === 'BLOCK') {
         return { ok: false, reason: 'too-small', productKey: valid[i]!.productKey };
       }
     }
