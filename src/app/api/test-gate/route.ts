@@ -11,9 +11,9 @@ export async function POST(req: NextRequest) {
   if (!ok) {
     // a small pause makes guessing slow
     await new Promise((r) => setTimeout(r, 800));
-    return NextResponse.redirect(new URL(`/test-gate?wrong=1&next=${encodeURIComponent(next)}`, req.url), 303);
+    return seeOther(`/test-gate?wrong=1&next=${encodeURIComponent(next)}`);
   }
-  const res = NextResponse.redirect(new URL(next, req.url), 303);
+  const res = seeOther(next);
   res.cookies.set(TEST_GATE_COOKIE, await gateToken(), {
     httpOnly: true,
     secure: req.nextUrl.protocol === 'https:',
@@ -23,3 +23,11 @@ export async function POST(req: NextRequest) {
   });
   return res;
 }
+
+/** A RELATIVE redirect: the browser stays on the address it came in on. (Behind Netlify,
+ * `req.url` can carry the deploy's own host — an absolute redirect there lands on a host the
+ * lock cookie isn't set for, and the tester bounces back to the password page.) */
+function seeOther(path: string): NextResponse {
+  return new NextResponse(null, { status: 303, headers: { Location: path } });
+}
+
