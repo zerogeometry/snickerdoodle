@@ -2,12 +2,16 @@ import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { mockupViews, printTemplates, storageObjects, templateAssets } from '@/db/schema';
+import { mockupViews, printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
+import { canvasSizePx, clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
+import { isPatternProduct } from '@/lib/patterns';
+import { renderRepeatPattern } from './pattern';
+import { isHeightChart } from './height-chart-geometry';
+import { renderHeightChartFace } from './heightChart';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 import { firmEdges } from './apparel';
 import { perspectiveWarp } from './perspective';
@@ -210,6 +214,17 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   //    (mockup_views, e.g. the tin). Its brand-safe blank is NON-child. No template ⇒ fallback.
   const tpl = await loadResolvedTemplate(db, input.variantId, input.view);
   if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
+  // Products whose print file is NOT "the drawing, placed": a repeat pattern (socks, wrapping
+  // paper, tea towel) and the height chart (drawing + ruler). Their preview shows the PRINTED FACE
+  // — rendered by the same code as the print file, just smaller — so preview == print.
+  const [prod] = await db
+    .select({ key: products.key })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(eq(productVariants.id, input.variantId));
+  const face: Face | undefined = !input.fill && (!input.view || PRIMARY_VIEWS.has(input.view))
+    ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : undefined
+    : undefined;
   const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
   if (!blank) throw new NoMockupTemplateError('blank template asset missing');
   // Optional product-silhouette mask: the design is clipped to it (shaped product edges).
@@ -248,7 +263,8 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // view carries its span in the box); ignored elsewhere so it never forks other products' keys.
   const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
   const spanTag = spanHalf ? `-span${spanHalf}` : '';
-  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}` : '';
+  const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
@@ -274,6 +290,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
       mugMode: input.view === 'back' ? 'back' : input.view === 'centre' ? 'centre' : 'front',
+      face,
     }),
   );
   inFlight.set(key, p);
@@ -282,6 +299,28 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   } finally {
     inFlight.delete(key);
   }
+}
+
+type Face = 'pattern' | 'heightChart';
+/** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
+const FACE_REV = '1';
+/** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
+ * the photo's print area is never more than the ~1500 px working edge, so 2× that is plenty). */
+const FACE_MAX_EDGE = 3000;
+const FACE_MAX_PIXELS = 8_000_000;
+
+/** Render a product's printed face at preview size — the same functions renderPrintFile uses. */
+export async function renderPrintedFace(
+  srcBuf: Buffer,
+  face: Face,
+  print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number },
+  transform: Transform,
+): Promise<Buffer> {
+  const geom = { printWidthPx: print.widthPx, printHeightPx: print.heightPx, bleedMm: print.bleedMm, requiredDpi: print.requiredDpi };
+  const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
+  const scale = Math.min(1, FACE_MAX_EDGE / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
+  if (face === 'pattern') return (await renderRepeatPattern(srcBuf, canvas, print.requiredDpi, transform, '#ffffff', { scale })).png;
+  return (await renderHeightChartFace(srcBuf, geom, transform, { scale })).png;
 }
 
 /** A solid-colour design for a FILL render (e.g. the cushion's plain coloured back): cover-fit
@@ -299,7 +338,7 @@ async function renderAndPersist(
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
-    materialClass: string; mugMode?: 'front' | 'back' | 'centre';
+    materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
   },
 ): Promise<MockupResult> {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
@@ -309,13 +348,21 @@ async function renderAndPersist(
   // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
   // (the plain-white fallback blank) it falls through to FLAT.
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.maskKey;
+  // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
+  // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
+  let designBuf = args.fillHex ? await solidFill(args.fillHex) : await getObjectBytes(args.designKey);
+  let transform = args.transform;
+  if (args.face) {
+    // The PRINTED FACE (the repeat / the drawing + ruler) at preview size, from the print code. It
+    // has the print canvas's exact aspect, so a plain cover-fit lays it on the print area 1:1.
+    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform);
+    transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  }
   const common = {
     blankBuf: await getObjectBytes(args.blankKey),
-    // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
-    // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
-    designBuf: args.fillHex ? await solidFill(args.fillHex) : await getObjectBytes(args.designKey),
+    designBuf,
     quad: args.quad,
-    transform: args.transform,
+    transform,
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
     print: args.print,

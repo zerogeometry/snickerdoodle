@@ -23,7 +23,10 @@ import {
   type Rotation,
   type Transform,
 } from '@/server/print/geometry';
-import { assessPrintResolution } from '@/server/print/pattern-geometry';
+import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
+import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
+import { isPatternProduct } from '@/lib/patterns';
+import { PatternRepeat } from './PatternRepeat';
 import type { StudioData } from '@/server/studio';
 
 /** The editor canvas is deliberately MUCH larger than the customize-page preview
@@ -32,6 +35,7 @@ import type { StudioData } from '@/server/studio';
  * the ResizeObserver measures the real available space (no window read during render). */
 const MAX_PREVIEW_W = 680;
 const SSR_PREVIEW_W = 420;
+const SSR_MAX_PREVIEW_H = 640;
 const SNAP_OFFSET = 0.07; // |offset| within this of centre snaps to 0 (with a guide flash)
 const FIT_SNAP = 0.03; // scale within 3% of "fit" snaps back to the contain sentinel
 const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
@@ -103,6 +107,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // 2026-07-07), or ON the product photo. Product view only when a photo exists.
   const [viewMode, setViewMode] = useState<'flat' | 'product'>('flat');
   const imgRef = useRef<HTMLImageElement>(null);
+  const patternRef = useRef<HTMLDivElement>(null); // the drawn repeat follows live gestures too
   // Callback ref: capture natural dimensions the instant the <img> attaches IF it is
   // already loaded (a cached image fires no onLoad — that race left `natural` null, so
   // the whole editor had no placement and no resize grips). onLoad still covers the
@@ -118,7 +123,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // updates as the layout changes, and starts from an SSR-stable default (no reading
   // window during render → no hydration mismatch).
   const gridRef = useRef<HTMLDivElement>(null);
-  const [previewW, setPreviewW] = useState(SSR_PREVIEW_W);
+  const [availW, setPreviewW] = useState(SSR_PREVIEW_W);
+  // A very TALL print (the 1:6 height chart) must not make a canvas taller than the screen: the
+  // canvas takes the touch (no page scroll over it), so the shopper could never scroll past it.
+  const [maxPreviewH, setMaxPreviewH] = useState(SSR_MAX_PREVIEW_H);
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -128,6 +136,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       const desktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
       const avail = desktop ? gw - 396 : gw;
       setPreviewW(Math.max(320, Math.min(MAX_PREVIEW_W, Math.floor(avail))));
+      setMaxPreviewH(Math.max(420, Math.round(window.innerHeight * 0.72)));
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -206,6 +215,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // (misleading). Edit placement stays the flat print layout; the real front/back wrap lives on the
   // product page. So suppress the on-product toggle for the mug.
   const isMug = variant.productKey === 'mug';
+  // A REPEAT-PATTERN product (socks, wrapping paper, tea towel) and the HEIGHT CHART don't print
+  // "the drawing, placed": the flat print layout below draws exactly what prints (the repeat; the
+  // drawing beside the ruler), and — like the mug — there's no on-the-product view in here.
+  const isPattern = isPatternProduct(variant.productKey);
+  const isChart = isHeightChart(variant.productKey);
+  const noProductView = isMug || isPattern || isChart;
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
@@ -226,14 +241,27 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const scaleFloor = lockToCover ? 0.5 : MIN_SCALE;
   const canvas = canvasSizePx(t);
   const aspect = canvas.width / canvas.height;
+  const previewW = Math.min(availW, Math.max(80, Math.floor(maxPreviewH * aspect)));
   const previewH = Math.round(previewW / aspect);
   const scale = previewW / canvas.width; // canvas-px → preview-px
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
 
-  const rect = natural ? computeLayerRect(t, { width: natural.w, height: natural.h }, tf) : null;
+  // The drawing's placement area: the whole canvas, or (height chart) the art area beside the
+  // ruler band, `artX` canvas-px in from the left edge.
+  const placeT = useMemo(() => (isChart ? heightChartArtGeom(t) : t), [isChart, t]);
+  const chartLayout = useMemo(() => (isChart ? heightChartLayout(canvasSizePx(t), t.requiredDpi) : null), [isChart, t]);
+  const artX = chartLayout?.bandPx ?? 0;
+  const rulerSrc = useMemo(
+    () => (chartLayout ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(rulerBandSvg(chartLayout))}` : null),
+    // the band depends only on the canvas size + dpi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [chartLayout?.width, chartLayout?.height, chartLayout?.dpi],
+  );
+  const rect = natural ? computeLayerRect(placeT, { width: natural.w, height: natural.h }, tf) : null;
   const assess = natural ? assessPrintResolution(t, { width: natural.w, height: natural.h }, tf, variant.productKey) : null;
   // "Fit the whole image" scale for THIS product + rotation — the zoom slider's centre.
-  const fitScale = natural ? containScale(t, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
+  // (A pattern's "fit" is its default motif size — scale 0 and 1 are the same repeat.)
+  const fitScale = natural && !isPattern ? containScale(placeT, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
   const zoomValue = tf.scale === 0 ? fitScale : tf.scale;
 
   // The ACTIONABLE fix for a soft/blocked placement: effective dpi ∝ 1/scale, so the
@@ -392,7 +420,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     const imgH = (swap ? rect.width : rect.height) * scale;
     return {
       position: 'absolute',
-      left: rect.x * scale + boxW / 2,
+      left: (artX + rect.x) * scale + boxW / 2,
       top: rect.y * scale + boxH / 2,
       width: imgW,
       height: imgH,
@@ -406,7 +434,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
       objectFit: 'fill',
     };
-  }, [rect, scale, tf.rotationDeg]);
+  }, [rect, scale, tf.rotationDeg, artX]);
 
   // ── Product-backdrop geometry (preview px): the print-area quad on the blank photo, and
   // the image's placement INSIDE it via the SAME shared geometry as the print renderer and
@@ -451,7 +479,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const gestureGeom = useMemo(() => {
     if (!natural) return null;
     const src = { width: natural.w, height: natural.h };
-    if (bd) {
+    if (bd && !noProductView) {
       const geomPv = { printWidthPx: Math.max(1, Math.round(bd.qw)), printHeightPx: Math.max(1, Math.round(bd.qh)), bleedMm: t.bleedMm, requiredDpi: t.requiredDpi * bd.s };
       const geom = (probe: Transform) => {
         const r = computeLayerRect(geomPv, src, probe);
@@ -459,28 +487,39 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       };
       return { geom, pxPerSpace: 1 };
     }
+    if (isPattern) {
+      // A drag shifts the repeat: offset ±1 = a phase of ±½ cell (patternLayout), so the "slack"
+      // that maps a drag 1:1 onto the pattern is one cell.
+      const geom = (probe: Transform) => {
+        const l = patternLayout(canvasSizePx(t), t.requiredDpi, src, probe);
+        return { slackX: l.cellW, slackY: l.stripH };
+      };
+      return { geom, pxPerSpace: scale };
+    }
     const geom = (probe: Transform) => {
-      const r = computeLayerRect(t, src, probe);
+      const r = computeLayerRect(placeT, src, probe);
       return { slackX: Math.abs(r.width - r.canvasWidth), slackY: Math.abs(r.height - r.canvasHeight) };
     };
     return { geom, pxPerSpace: scale };
-  }, [bd, natural, t, scale]);
+  }, [bd, natural, t, placeT, scale, isPattern, noProductView]);
   const slackNow = gestureGeom ? gestureGeom.geom(tf) : { slackX: 0, slackY: 0 };
 
   /** Live pointer deltas → the css-var transform on the image (no re-render). */
   const applyLive = (dxPv: number, dyPv: number, k: number) => {
-    const el = imgRef.current;
-    if (!el) return;
-    el.style.setProperty('--gx', `${dxPv}px`);
-    el.style.setProperty('--gy', `${dyPv}px`);
-    el.style.setProperty('--gk', `${k}`);
+    for (const el of [imgRef.current, patternRef.current]) {
+      if (!el) continue;
+      el.style.setProperty('--gx', `${dxPv}px`);
+      el.style.setProperty('--gy', `${dyPv}px`);
+      el.style.setProperty('--gk', `${k}`);
+    }
   };
   const clearLive = () => {
-    const el = imgRef.current;
-    if (!el) return;
-    el.style.removeProperty('--gx');
-    el.style.removeProperty('--gy');
-    el.style.removeProperty('--gk');
+    for (const el of [imgRef.current, patternRef.current]) {
+      if (!el) continue;
+      el.style.removeProperty('--gx');
+      el.style.removeProperty('--gy');
+      el.style.removeProperty('--gk');
+    }
   };
 
   /** Current gesture deltas in preview px (+ pinch factor) from live pointers. */
@@ -829,7 +868,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
         {/* Canvas — the image ON the product (photo backdrop) when a template exists;
             the flat print canvas otherwise (or on request). Same shared geometry either way. */}
         <div>
-          {!isMug && bd && ctx && ctx.ok ? (
+          {!noProductView && bd && ctx && ctx.ok ? (
             <div className="mb-2 flex gap-1.5" role="group" aria-label="preview view">
               <button
                 type="button"
@@ -849,10 +888,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               </button>
             </div>
           ) : null}
-          {!isMug && bd && ctx && ctx.ok && viewMode === 'product' ? (
+          {!noProductView && bd && ctx && ctx.ok && viewMode === 'product' ? (
             <div
               {...canvasInteractionProps}
-              className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
+              className={`relative mx-auto overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: bd.pvH }}
             >
               <img src={ctx.blankUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
@@ -886,7 +925,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           ) : (
             <div
               {...canvasInteractionProps}
-              className={`relative overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
+              className={`relative mx-auto overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: previewH }}
             >
               <img
@@ -894,18 +933,52 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                 src={cutout?.url ?? keepsake.imageUrl}
                 alt="your keepsake"
                 draggable={false}
-                style={imgStyle}
+                // a repeat draws its own motifs below; this one stays as the measuring/gesture anchor
+                style={isPattern ? { ...imgStyle, opacity: 0 } : imgStyle}
                 onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
               />
+              {isPattern && natural ? (
+                <PatternRepeat
+                  ref={patternRef}
+                  image={imgRef.current}
+                  natural={natural}
+                  canvas={canvas}
+                  dpi={t.requiredDpi}
+                  transform={tf}
+                  width={previewW}
+                  height={previewH}
+                />
+              ) : null}
+              {/* the height chart's ruler prints exactly like this, down the left edge */}
+              {rulerSrc && chartLayout ? (
+                <img
+                  src={rulerSrc}
+                  alt=""
+                  aria-hidden
+                  draggable={false}
+                  className="pointer-events-none absolute left-0 top-0"
+                  style={{ width: chartLayout.bandPx * scale, height: previewH, maxWidth: 'none', maxHeight: 'none' }}
+                />
+              ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
-              {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 left-1/2 w-px bg-cinnamon/80" /> : null}
+              {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 w-px bg-cinnamon/80" style={{ left: (artX + canvasSizePx(placeT).width / 2) * scale }} /> : null}
               {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
-              {/* the ONE guide + resize grips (what prints / shows in the frame) */}
-              {renderSelection({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale })}
+              {/* the ONE guide + resize grips (what prints / shows in the frame — beside the ruler on a height chart) */}
+              {renderSelection(
+                isChart
+                  ? { left: artX * scale, top: 0, w: previewW - artX * scale, h: previewH }
+                  : { left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale },
+              )}
             </div>
           )}
           <p className="mt-2 text-center text-[11px] text-ink-faint">
-            the <b className="text-cinnamon">outlined box</b> is what shows in the frame · drag a corner to resize · keep faces &amp; words a little in from the edges
+            {isPattern ? (
+              <>this is the pattern that prints · drag to shift it · drag a corner to make the drawings bigger or smaller</>
+            ) : isChart ? (
+              <>the ruler prints just like this · your drawing goes in the <b className="text-cinnamon">outlined box</b> beside it · drag a corner to resize</>
+            ) : (
+              <>the <b className="text-cinnamon">outlined box</b> is what shows in the frame · drag a corner to resize · keep faces &amp; words a little in from the edges</>
+            )}
           </p>
 
           {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX

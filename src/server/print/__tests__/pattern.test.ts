@@ -4,7 +4,8 @@ import sharp from 'sharp';
 import { assessResolution, clampTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { isPatternProduct } from '@/lib/patterns';
-import { patternLayout, PATTERN_MOTIF_MM, renderRepeatPattern } from '@/server/print/pattern';
+import { patternLayout, PATTERN_MOTIF_MM, renderRepeatPattern, scalePatternLayout } from '@/server/print/pattern';
+import { patternMotifCentres } from '@/server/print/pattern-geometry';
 
 const T = clampTransform({ scale: 0 });
 
@@ -133,5 +134,49 @@ describe('the print-quality gate for a repeat — judged on ONE motif, not the w
   it('pattern products are recognised by product key AND variant sku — and nothing else', () => {
     for (const k of ['socks', 'socks-tube', 'wrappingPaper', 'wrappingPaper-5mroll', 'teaTowel']) expect(isPatternProduct(k), k).toBe(true);
     for (const k of ['sock', 'framedPrint', 'kidsTee', 'teaTowels', '', null, undefined]) expect(isPatternProduct(k), String(k)).toBe(false);
+  });
+});
+
+describe('the preview repeat == the print repeat (B2)', () => {
+  it('scaling keeps the columns, rows and seam (cells still exactly fill the width)', () => {
+    const canvas = { width: 4133, height: 29527 };
+    const l = patternLayout(canvas, 150, { width: 1200, height: 1600 }, T);
+    for (const s of [0.5, 0.25, 0.1, 0.037]) {
+      const p = scalePatternLayout(l, canvas, s);
+      expect([p.layout.cols, p.layout.rows]).toEqual([l.cols, l.rows]);
+      expect(p.layout.cols * p.layout.cellW).toBeCloseTo(p.canvas.width, 6);
+      expect(p.layout.motifW / p.layout.motifH).toBeCloseTo(l.motifW / l.motifH, 1);
+    }
+  });
+
+  it('patternMotifCentres lands on the motifs the print file actually draws', async () => {
+    const canvas = { width: 1416, height: 1180 };
+    for (const tf of [T, clampTransform({ scale: 0, offsetX: 0.6, offsetY: -0.4 }), clampTransform({ scale: 1.4, rotationDeg: 90 })]) {
+      const src = await drawing();
+      const { png, layout } = await renderRepeatPattern(src, canvas, 50, tf); // 720×600 mm → many motifs
+      const { data, info } = await raw(png);
+      const centres = patternMotifCentres(layout, canvas).filter((c) => c.x >= 2 && c.y >= 2 && c.x < canvas.width - 2 && c.y < canvas.height - 2);
+      expect(centres.length).toBeGreaterThan(4);
+      for (const c of centres) {
+        const i = (Math.round(c.y) * info.width + Math.round(c.x)) * info.channels;
+        // the drawing's red circle sits at the motif's centre
+        expect(data[i]!, `${c.x},${c.y}`).toBeGreaterThan(150);
+        expect(data[i + 2]!, `${c.x},${c.y}`).toBeLessThan(100);
+      }
+    }
+  });
+
+  it('a scaled render is the print file, smaller (same picture, not a re-layout)', async () => {
+    const canvas = { width: 1416, height: 1180 };
+    const src = await drawing();
+    const full = await renderRepeatPattern(src, canvas, 300, T);
+    const small = await renderRepeatPattern(src, canvas, 300, T, '#ffffff', { scale: 0.25 });
+    expect([small.width, small.height]).toEqual([354, 295]);
+    expect(small.layout.cols).toBe(full.layout.cols);
+    const a = await sharp(full.png).resize(354, 295, { fit: 'fill' }).removeAlpha().raw().toBuffer();
+    const b = await sharp(small.png).removeAlpha().raw().toBuffer();
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) diff += Math.abs(a[i]! - b[i]!);
+    expect(diff / a.length).toBeLessThan(12); // mean per-channel difference: edge resampling only
   });
 });
