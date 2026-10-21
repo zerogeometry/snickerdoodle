@@ -44,11 +44,37 @@ export const ADULT_TEE_COLOURS: GarmentColour[] = [
 /** A family set is ONE colour for everyone — so only the colours every garment comes in. */
 export const FAMILY_SET_COLOURS = KIDS_TEE_COLOURS.filter((c) => ADULT_TEE_COLOURS.some((a) => a.name === c.name)).map((c) => c.name);
 
+// ── Hoodies (range expansion, 2026-10-21) — Stanley/Stella organic, Prodigi lab uk9 ──
+// Every colour + size below sandbox-quoted to GB from uk9 (Royal Mail Tracked 48). The Drummer's
+// OTHER colours (anthracite, khaki, red, royal blue …) quote from Poland (pl1, £25.12 + £7.20) —
+// left out on purpose: UK-made only.
+/** Kids: Mini Cruiser 2.0 (STSK180, Prodigi HOOD-SS-STSK911). Front 3070×3070px — same as the kids tee. */
+export const KIDS_HOODIE_COLOURS: GarmentColour[] = [
+  { name: 'heather grey', attr: 'heather grey', hex: '#a9aaad' },
+  { name: 'french navy', attr: 'french navy', hex: '#232c46' },
+  { name: 'black', attr: 'black', hex: '#232325' },
+  { name: 'cotton pink', attr: 'cotton pink', hex: '#f2c5cd' },
+  { name: 'burgundy', attr: 'burgundy', hex: '#6e2232' },
+];
+export const KIDS_HOODIE_SIZES = ['3-4 years', '5-6 years', '7-8 years', '9-11 years', '12-14 years'];
+/** Adult: Drummer 2.0 (STSU168, Prodigi HOOD-SS-STSU812), 85% organic cotton. These colours also list
+ * a Polish route (front 3307×4606px), but a GB order quotes from uk9, whose front is 3070×3070px. */
+export const ADULT_HOODIE_COLOURS: GarmentColour[] = [
+  { name: 'white', attr: 'white', hex: '#ffffff' },
+  { name: 'heather grey', attr: 'heather grey', hex: '#a9aaad' },
+  { name: 'dark heather grey', attr: 'dark heather grey', hex: '#5d5e62' },
+  { name: 'french navy', attr: 'french navy', hex: '#232c46' },
+  { name: 'black', attr: 'black', hex: '#232325' },
+  { name: 'burgundy', attr: 'burgundy', hex: '#6e2232' },
+];
+export const ADULT_HOODIE_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
+export const HOODIE_PRINT_MM = { w: 260, h: 260 } as const; // kids AND adult (GB route), 3070×3070px
+
 /** The garment products (printed direct-to-garment). */
-export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit'] as const;
+export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie'] as const;
 export const isGarmentKey = (key: string | null | undefined): boolean => !!key && (GARMENT_PRODUCT_KEYS as readonly string[]).includes(key);
 
-const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS];
+const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS];
 export const garmentHex = (name: string): string | null => ALL.find((c) => c.name === name)?.hex ?? null;
 
 /**

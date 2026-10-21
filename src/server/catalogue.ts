@@ -5,7 +5,10 @@ import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
-import { ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES } from '@/lib/garments';
+import {
+  ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, HOODIE_PRINT_MM, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
+  KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES, type GarmentColour,
+} from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 
 export { mmToPx };
@@ -234,6 +237,77 @@ function phoneCaseVariants(): VariantDef[] {
   );
 }
 
+// ── Range expansion (founder, 2026-10-21 — D21; project-office/briefs/PRODUCT-RANGE-expansion.md §0) ──
+// All Prodigi, all made in the UK; every SKU, attribute, lab and cost sandbox-quoted to GB on
+// 2026-10-21. Seeded HIDDEN until samples + mockup blanks are in. Prices are whole pounds, free
+// delivery baked in, ~15% net after ALL costs (card fee, 3% reprints, 5% codes, £0.55 running).
+// Non-garment print files are Prodigi's EXACT printAreaSizes (`px`, bleed 0 — Prodigi's file
+// already carries its own bleed), at the dpi Prodigi specifies them, so nothing rounds from mm.
+function exactPx(px: { w: number; h: number }, dpi: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
+  return { wMm: Math.round((px.w / dpi) * 25.4), hMm: Math.round((px.h / dpi) * 25.4), dpi, px, bleedMm: 0 };
+}
+
+// Hoodies: like the tees, size + colour are Prodigi attributes of ONE SKU, the print is
+// the front, and the file renders at 150dpi (Prodigi scales it onto the platen, as for the tees).
+function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColour[]; printMm: { w: number; h: number }; pricePence: number; defaultSize?: string; attrSize?: (s: string) => string }): VariantDef[] {
+  return o.sizes.flatMap((size) =>
+    o.colours.map((c, ci) => ({
+      size, colour: c.name, pricePence: o.pricePence, wMm: o.printMm.w, hMm: o.printMm.h, dpi: 150, bleedMm: 0,
+      prodigiSku: o.sku, prodigiAttrs: { size: o.attrSize ? o.attrSize(size) : size, color: c.attr }, printTo: ['front'],
+      ...(o.defaultSize === size && ci === 0 ? { default: true } : {}),
+    })),
+  );
+}
+
+// Socks: one size (UK 6–10), sublimated all over — sold as a REPEAT PATTERN of the drawing (Prodigi
+// can't guarantee placement on a sock). Ankle prints to 'front', tube to 'default'. uk9, Tracked 48.
+const SOCKS = [
+  { size: 'ankle', sku: 'GLOBAL-ANKLE-SOCKS', px: { w: 3543, h: 3543 }, printTo: ['front'] },
+  { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 6141, h: 5433 }, printTo: ['default'] },
+] as const;
+
+// Wall height chart: canvas on wooden poster hangers (hanger colour = Prodigi `color`). Made at
+// gb3, Evri Next Day (tracked). Prodigi prints NO ruler — the cm + ft/in markings must be drawn
+// INTO the print file (to-do before this goes on show: the ruler render + a scale-accuracy test).
+const HEIGHT_CHARTS = [
+  { size: '20 × 120 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X48', px: { w: 1200, h: 7200 }, pricePence: 3100 },
+  { size: '30 × 120 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X48', px: { w: 1800, h: 7200 }, pricePence: 3400 },
+  { size: '20 × 150 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X60', px: { w: 1200, h: 9000 }, pricePence: 3400 },
+  { size: '30 × 150 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X60', px: { w: 1800, h: 9000 }, pricePence: 3600 },
+] as const;
+const HANGER_COLOURS = ['natural', 'black', 'white'];
+
+// Acrylic desk block: a 25mm acrylic prism with the drawing printed full-bleed behind it. gb3, Evri
+// Next Day. (A see-through-background "-TRANS" twin exists at the same price — it needs a
+// transparent print file, so it waits for a render path that keeps the alpha.)
+const ACRYLIC_BLOCKS = [
+  { size: '4 × 6″', sku: 'GLOBAL-MOU-PRISM-4X6', px: { w: 1227, h: 1818 }, pricePence: 2700 },
+  { size: '5 × 7″', sku: 'GLOBAL-MOU-PRISM-5X7', px: { w: 1512, h: 2112 }, pricePence: 2900 },
+  { size: '6 × 8″', sku: 'GLOBAL-MOU-PRISM-6X8', px: { w: 1818, h: 2409 }, pricePence: 3600 },
+  { size: '8 × 8″', sku: 'GLOBAL-MOU-PRISM-8X8', px: { w: 2409, h: 2409 }, pricePence: 4100 },
+] as const;
+
+// Wrapping paper: FSC 95gsm, a REPEAT PATTERN of the drawing. gb2. NB Standard is Royal Mail RM24
+// — UNTRACKED (sandbox 2026-10-21); tracked (Express, RM Tracked 24) is +£1.05. Founder to decide.
+const WRAPPING_PAPER = [
+  { size: '3 sheets · 50 × 70 cm', sku: 'WRAP-3-50X70', px: { w: 2952, h: 4133 }, pricePence: 2000 },
+  { size: '2 m roll', sku: 'WRAP-ROL-70X200', px: { w: 4133, h: 11811 }, pricePence: 2300 },
+  { size: '3 sheets · 75 × 90 cm', sku: 'WRAP-3-75X90', px: { w: 4429, h: 5314 }, pricePence: 2800 },
+  { size: '3 m roll', sku: 'WRAP-ROL-70X300', px: { w: 4133, h: 17716 }, pricePence: 2800 },
+  { size: '5 m roll', sku: 'WRAP-ROL-70X500', px: { w: 4133, h: 29527 }, pricePence: 3800 },
+] as const;
+
+// Pet bandana: polyester, sublimated. uk9, Tracked 48. Each SKU also lists a non-GB route with a
+// smaller print area; the GB route's size is the one here.
+const BANDANAS = [
+  { size: 'small', sku: 'PET-BANDANA-SML', px: { w: 7500, h: 2244 }, pricePence: 1800 },
+  { size: 'medium', sku: 'PET-BANDANA-MED', px: { w: 9447, h: 2952 }, pricePence: 1800 },
+  { size: 'large', sku: 'PET-BANDANA-LRG', px: { w: 10158, h: 3306 }, pricePence: 1900 },
+] as const;
+
+/** Products whose print file is a seamless REPEAT of the drawing (the 'pattern' magic edit). */
+export const PATTERN_PRODUCT_KEYS = ['socks', 'wrappingPaper', 'teaTowel'] as const;
+
 // The founder-approved launch range (2026-07-01). Prices are our retail pence, VAT-inclusive with
 // FREE tracked delivery baked in (the shipping cost is inside the price, no separate line). Every
 // SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
@@ -356,6 +430,70 @@ const DEFS: Record<string, ProductDef> = {
     description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
+  },
+  // ── Range expansion (D21) — all HIDDEN until samples + mockup blanks are in ──
+  // (The women's Dazzler sweatshirt was left out — founder, 2026-10-21.)
+  // Categories reuse the existing enum (a new value needs a migration): socks/hoodies/bandana → wear,
+  // height chart/acrylic block → cards & prints, wrapping paper → festive, tea towel → home,
+  // playing cards → gifts.
+  socks: {
+    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true,
+    description: "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10).",
+    specs: { material: 'polyester, printed all over', size: 'one size, UK 6–10', styles: 'ankle or tube', care: 'machine wash at 30°', made: 'in the UK' },
+    variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, printTo: [...s.printTo] })),
+  },
+  heightChart: {
+    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true,
+    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. They're only little once.",
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', made: 'in the UK' },
+    variants: HEIGHT_CHARTS.flatMap((h) =>
+      HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
+    ),
+  },
+  kidsHoodie: {
+    category: 'APPAREL', label: 'kids hoodie', blurb: 'their masterpiece, snuggled up', print: true,
+    description: 'A cosy organic-cotton hoodie with their own drawing on the front — the winter sibling of the kids tee.',
+    specs: { material: '100% organic cotton', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
+    variants: garmentVariants({ sku: 'HOOD-SS-STSK911', sizes: KIDS_HOODIE_SIZES, colours: KIDS_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4300 }),
+  },
+  adultHoodie: {
+    category: 'APPAREL', label: 'adult hoodie', blurb: 'matching hoodies for the whole fan club', print: true,
+    description: "A soft unisex hoodie with your little one's artwork on the front — for the grown-ups who'd wear their masterpiece every day.",
+    specs: { material: '85% organic cotton, 15% recycled polyester', fit: 'unisex, XS–3XL', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
+    variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
+  },
+  acrylicBlock: {
+    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true,
+    description: 'Their drawing set behind a thick block of clear acrylic that stands on its own — a little piece of the fridge gallery for a desk or shelf.',
+    specs: { material: '25mm clear acrylic, printed behind', stands: 'on its own, no frame needed', made: 'in the UK' },
+    variants: ACRYLIC_BLOCKS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
+  },
+  wrappingPaper: {
+    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true,
+    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. Sheets or a roll.',
+    specs: { material: 'FSC-certified 95gsm paper', formats: '3 sheets or a 70cm-wide roll', made: 'in the UK' },
+    variants: WRAPPING_PAPER.map((w) => ({ size: w.size, pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
+  },
+  teaTowel: {
+    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true,
+    description: "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours.",
+    specs: { material: 'cotton', care: 'machine washable', made: 'in the UK' },
+    // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
+    variants: [{ size: 'one size', pricePence: 2700, ...exactPx({ w: 5492, h: 8208 }, 300), prodigiSku: 'H-TEATOWEL-SUB' }],
+  },
+  petBandana: {
+    category: 'APPAREL', label: 'pet bandana', blurb: 'the dog, wearing their drawing of the dog', print: true,
+    description: "A soft bandana for the family dog (or a very patient cat) with their artwork on it — pets are family too.",
+    specs: { material: 'polyester', sizes: 'small, medium or large', made: 'in the UK' },
+    variants: BANDANAS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
+  },
+  playingCards: {
+    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true,
+    description: 'A full 54-card deck with their drawing on the back of every card, in a white presentation box — for family card nights.',
+    specs: { cards: '54, one design on every back', size: '6 × 9 cm', box: 'white presentation box', made: 'in the UK' },
+    // Standard post is Royal Mail RM24 (UNTRACKED), £6.45. Budget (RM48, £3.20) would allow ~£19 —
+    // a per-product shipping rule the founder hasn't asked for, so this is priced on Standard.
+    variants: [{ size: '54 cards', pricePence: 2400, ...exactPx({ w: 820, h: 1122 }, 300), prodigiSku: 'PLAY-CARD' }],
   },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false, paused: true,

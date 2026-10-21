@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOGUE } from '@/pricing';
-import { definedPriceList } from '../catalogue';
+import { definedPriceList, PATTERN_PRODUCT_KEYS } from '../catalogue';
 
 // The founder-agreed shop prices (2026-10-21: "adjust all prices to the nearest £0.50", plus the
 // heart cushion +£2, 30-piece jigsaw +£1 and greetings card +50p). Server-authoritative: this is
@@ -54,5 +54,84 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
       expect(def, key).toBeDefined();
       expect(entry.pricePence, key).toBe(def!.pricePence);
     }
+  });
+});
+
+// The range expansion (D21, 2026-10-21): every SKU, attribute, lab and print size checked against
+// the Prodigi SANDBOX (GET /products + POST /quotes to GB) the same day.
+describe('range expansion — new products', () => {
+  const NEW = ['socks', 'heightChart', 'kidsHoodie', 'adultHoodie', 'acrylicBlock', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'];
+  const rows = (k: string) => list.filter((r) => r.productKey === k);
+  const bySize = (k: string) => Object.fromEntries(rows(k).map((r) => [r.sku, r]));
+
+  it('every new product is defined, and seeded HIDDEN (not on show until samples + mockups)', () => {
+    for (const k of NEW) {
+      expect(rows(k).length, k).toBeGreaterThan(0);
+      expect(rows(k).every((r) => !r.visibleInShop && !r.paused), k).toBe(true);
+    }
+  });
+
+  it('the women’s sweatshirt is left out (founder, 2026-10-21)', () => {
+    expect(list.some((r) => r.prodigiSku === 'SWEAT-SS-STSW125')).toBe(false);
+  });
+
+  it('the agreed prices (whole pounds, free delivery baked in)', () => {
+    expect(prices('socks')).toEqual([2000]);
+    expect(prices('kidsHoodie')).toEqual([4300]);
+    expect(prices('adultHoodie')).toEqual([4200]);
+    expect(prices('teaTowel')).toEqual([2700]);
+    expect(prices('playingCards')).toEqual([2400]);
+    const skuPrice = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.pricePence]));
+    expect(skuPrice('heightChart')).toEqual({
+      'POSTER-HANGER-20-CAN-ROL-SC-8X48': 3100, 'POSTER-HANGER-30-CAN-ROL-SC-12X48': 3400,
+      'POSTER-HANGER-20-CAN-ROL-SC-8X60': 3400, 'POSTER-HANGER-30-CAN-ROL-SC-12X60': 3600,
+    });
+    expect(skuPrice('acrylicBlock')).toEqual({ 'GLOBAL-MOU-PRISM-4X6': 2700, 'GLOBAL-MOU-PRISM-5X7': 2900, 'GLOBAL-MOU-PRISM-6X8': 3600, 'GLOBAL-MOU-PRISM-8X8': 4100 });
+    expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-3-50X70': 2000, 'WRAP-3-75X90': 2800, 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800 });
+    expect(skuPrice('petBandana')).toEqual({ 'PET-BANDANA-SML': 1800, 'PET-BANDANA-MED': 1800, 'PET-BANDANA-LRG': 1900 });
+  });
+
+  it('print files are Prodigi’s EXACT printAreaSizes (sandbox, GB route)', () => {
+    const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
+    expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '6141x5433' });
+    expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
+    expect(px('acrylicBlock')).toMatchObject({ 'GLOBAL-MOU-PRISM-4X6': '1227x1818', 'GLOBAL-MOU-PRISM-5X7': '1512x2112', 'GLOBAL-MOU-PRISM-8X8': '2409x2409' });
+    expect(px('wrappingPaper')).toMatchObject({ 'WRAP-3-50X70': '2952x4133', 'WRAP-3-75X90': '4429x5314', 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X500': '4133x29527' });
+    expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '5492x8208' });
+    expect(px('petBandana')).toEqual({ 'PET-BANDANA-SML': '7500x2244', 'PET-BANDANA-MED': '9447x2952', 'PET-BANDANA-LRG': '10158x3306' });
+    expect(px('playingCards')).toEqual({ 'PLAY-CARD': '820x1122' });
+  });
+
+  it('only UK-made tea towels — never the US-made cotton/poly twill SKUs', () => {
+    expect(rows('teaTowel').map((r) => r.prodigiSku)).toEqual(['H-TEATOWEL-SUB']);
+    expect(list.some((r) => /^H-TEATOWEL-(COTTON|POLY)/.test(r.prodigiSku ?? ''))).toBe(false);
+  });
+
+  it('the adult hoodie comes only in the colours made in the UK (uk9) — Poland-made colours are out', () => {
+    const colours = new Set(rows('adultHoodie').map((r) => r.prodigiAttrs?.color));
+    expect([...colours].sort()).toEqual(['black', 'burgundy', 'dark heather grey', 'french navy', 'heather grey', 'white']);
+    for (const pl of ['khaki', 'anthracite', 'red', 'royal blue', 'bottle green', 'bright orange']) expect(colours.has(pl)).toBe(false);
+    expect(new Set(rows('adultHoodie').map((r) => r.prodigiAttrs?.size))).toEqual(new Set(['xs', 's', 'm', 'l', 'xl', '2xl', '3xl']));
+    expect(bySize('adultHoodie').adultHoodie!.prodigiAttrs).toEqual({ size: 'm', color: 'white' }); // the default
+  });
+
+  it('the kids hoodie: 5 sizes × 5 colours on ONE SKU, with Prodigi’s exact attribute values', () => {
+    expect(rows('kidsHoodie')).toHaveLength(25);
+    expect(new Set(rows('kidsHoodie').map((r) => r.prodigiSku))).toEqual(new Set(['HOOD-SS-STSK911']));
+    expect(new Set(rows('kidsHoodie').map((r) => r.prodigiAttrs?.color))).toEqual(new Set(['black', 'burgundy', 'cotton pink', 'french navy', 'heather grey']));
+  });
+
+  it('height-chart hanger colour is sent to Prodigi as its `color` attribute', () => {
+    expect(new Set(rows('heightChart').map((r) => r.prodigiAttrs?.color))).toEqual(new Set(['natural', 'black', 'white']));
+    expect(rows('heightChart')).toHaveLength(12);
+  });
+
+  it('socks, wrapping paper and tea towel are the repeat-pattern products', () => {
+    expect([...PATTERN_PRODUCT_KEYS].sort()).toEqual(['socks', 'teaTowel', 'wrappingPaper']);
+  });
+
+  it('every variant sku in the whole catalogue is unique (the seed refuses duplicates)', () => {
+    const skus = list.map((r) => r.sku);
+    expect(skus.length).toBe(new Set(skus).size);
   });
 });

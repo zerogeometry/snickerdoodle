@@ -56,6 +56,16 @@ export const CATALOGUE = {
   bauble: { pricePence: 2100, label: 'ceramic bauble' },
   sack: { pricePence: 3500, label: 'christmas sack' },
   phoneCase: { pricePence: 2499, label: 'phone case' }, // the default: snap (tough £29.99 — DB per variant)
+  // Range expansion (D21, 2026-10-21) — seeded hidden until samples + mockups are in.
+  socks: { pricePence: 2000, label: 'socks' },
+  heightChart: { pricePence: 3100, label: 'height chart' },
+  kidsHoodie: { pricePence: 4300, label: 'kids hoodie' },
+  adultHoodie: { pricePence: 4200, label: 'adult hoodie' },
+  acrylicBlock: { pricePence: 2700, label: 'acrylic block' },
+  wrappingPaper: { pricePence: 2000, label: 'wrapping paper' },
+  teaTowel: { pricePence: 2700, label: 'tea towel' },
+  petBandana: { pricePence: 1800, label: 'pet bandana' },
+  playingCards: { pricePence: 2400, label: 'playing cards' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 
