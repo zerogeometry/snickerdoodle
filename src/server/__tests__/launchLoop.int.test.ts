@@ -366,10 +366,15 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   it('the owner adds a child (first name + birthday); a surname is refused, a non-owner is refused', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     expect(await addChild(db, sam, { familyId: ids.hartleyId, firstName: 'Ada Lovelace' })).toEqual({ ok: false, reason: 'surname' });
-    const ok = await addChild(db, sam, { familyId: ids.hartleyId, firstName: 'Ada', birthday: '2021-11-02' });
+    // Ada's birthday is ~half a year away, ALWAYS outside the 10–21-day reminder window: a fixed
+    // date (it was 2 Nov) became a time bomb every late October — her reminder used Sam's weekly
+    // cap and starved the reminder tests below.
+    const far = new Date(Date.now() + 180 * 86_400_000);
+    const adaBday = `2021-${String(far.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(far.getUTCDate(), 28)).padStart(2, '0')}`;
+    const ok = await addChild(db, sam, { familyId: ids.hartleyId, firstName: 'Ada', birthday: adaBday });
     expect(ok.ok).toBe(true);
     const [row] = await db.select().from(children).where(and(eq(children.familyId, ids.hartleyId), eq(children.firstName, 'Ada')));
-    expect(String(row!.birthday).slice(0, 10)).toBe('2021-11-02');
+    expect(String(row!.birthday).slice(0, 10)).toBe(adaBday);
 
     const rosie = await resolveViewerContext(db, ids.rosieId, ids.hartleyId);
     expect(await addChild(db, rosie, { familyId: ids.hartleyId, firstName: 'Bea' })).toEqual({ ok: false, reason: 'not-owner' });
