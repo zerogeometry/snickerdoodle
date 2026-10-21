@@ -5,14 +5,19 @@
 > to `.prodigi-assets/DISCOUNT-HEADROOM.md`.
 
 ## What each shop product keeps per sale (contribution)
+> **Prices updated 2026-10-21** (whole-pound / £0.50 shop: card £5.50, heart cushion £22, 30-piece
+> jigsaw £26, tees £25/£27/£32). The Keeps/Margin columns are the 2026-10-12 run and are now a little
+> conservative for those three rows — re-run the script to refresh. All-in profit per product (incl.
+> reprints, codes, running costs) is in [PRODUCT-RANGE-expansion.md](PRODUCT-RANGE-expansion.md) §0.
+
 | Product | Price | Keeps | Margin | Break-even % off | Max % keeping 10% | After £5 off | After £10 off |
 |---|--:|--:|--:|--:|--:|--:|--:|
-| greetings card | £5 | £1.94 | 47% | 47% | 37% | −£2.15 | −£6.24 |
+| greetings card | £5.50 | £1.94 | 47% | 47% | 37% | −£2.15 | −£6.24 |
 | mug | £18 | £5.23 | 35% | 35% | 25% | £1.14 | −£2.95 |
-| cushion (small heart/round) | £20 | £2.87 | 17% | 17% | 7% | −£1.23 | −£5.32 |
+| cushion (heart) | £22 | £2.87 | 17% | 17% | 7% | −£1.23 | −£5.32 |
 | cushion 12″ / 18″ round | £30 | £7–8 | 28–32% | 28–32% | 18–22% | ~£3–4 | ~−£1 |
 | cushion 22″ / double-sided | £35–45 | £7–10 | 22–35% | | 11–25% | £3–6 | −£1 to £2 |
-| jigsaw 30 / 110 / 252 | £25–35 | £3.51–8.69 | 17–30% | | 6–20% | −£0.58 to £4.60 | negative to £0.51 |
+| jigsaw 30 / 110 / 252 | £26–35 | £3.51–8.69 | 17–30% | | 6–20% | −£0.58 to £4.60 | negative to £0.51 |
 | framed print 11×14 → 28×40 | £65–130 | £15–19 | 16–30% | | 6–19% | £11–15 | £7–10.50 |
 | fleece blanket M / L | £60 / £75 | £12.60 / £17.88 | 25–29% | | 15–18% | £8.51 / £13.78 | £4.42 / £9.69 |
 

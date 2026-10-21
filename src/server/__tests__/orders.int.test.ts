@@ -52,7 +52,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [
         { productKey: 'mug', qty: 2 }, // 3600
-        { productKey: 'card', qty: 1 }, // 500
+        { productKey: 'card', qty: 1 }, // 550
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
       account: null,
@@ -61,7 +61,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4100); // catalogue (2×1800 + 500), not the client
+    expect(order!.subtotalPence).toBe(4150); // catalogue (2×1800 + 550), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });
@@ -69,9 +69,9 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('a family set (3+ garments) earns the 5% set saving — persisted, with the sold spec frozen on each line', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'kidsTee', qty: 1 }, // 2495
-        { productKey: 'adultTee', qty: 1 }, // 3195
-        { productKey: 'babyBodysuit', qty: 1 }, // 2195
+        { productKey: 'kidsTee', qty: 1 }, // 2500
+        { productKey: 'adultTee', qty: 1 }, // 3200
+        { productKey: 'babyBodysuit', qty: 1 }, // 2200
       ],
       account: null,
       joinProvenance: null,
@@ -79,10 +79,10 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(7885);
-    expect(order!.familySetSavingPence).toBe(394); // Math.round(5% of 7885)
+    expect(order!.subtotalPence).toBe(7900);
+    expect(order!.familySetSavingPence).toBe(395); // 5% of 7900
     expect(order!.joinSavingPence).toBe(0); // guest — the two savings are independent
-    expect(order!.totalPence).toBe(7885 - 394 + 0); // free delivery
+    expect(order!.totalPence).toBe(7900 - 395 + 0); // free delivery
 
     // WHAT WAS SOLD is frozen on the line — a later re-seed (price change, supplier
     // SKU swap, default move) can never change the meaning of this paid order.
@@ -120,14 +120,14 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     };
 
     const res = await placeOrder(db, {
-      items: [{ productKey: 'storybook', qty: 1 }], // 2595
+      items: [{ productKey: 'storybook', qty: 1 }], // 2600
       account: { id: ids.rosieId },
       joinProvenance: provenance,
     });
     await track(res);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.joinSavingPence).toBe(130); // Math.round(5% of 2595) = 130
-    expect(order!.totalPence).toBe(2595 - 130 + 0); // free delivery
+    expect(order!.joinSavingPence).toBe(130); // 5% of 2600 = 130
+    expect(order!.totalPence).toBe(2600 - 130 + 0); // free delivery
 
     // consumed: the membership now records when the saving was spent
     const [m] = await db.select().from(memberships).where(eq(memberships.id, row!.m.id));
@@ -165,7 +165,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const sessionId = `cs_ship_${ids.nonce}`;
     const [order] = await db
       .insert(orders)
-      .values({ ref: `SNK-ship-${ids.nonce}`, status: 'PENDING', subtotalPence: 2495, deliveryPence: 0, totalPence: 2495, stripeSessionId: sessionId })
+      .values({ ref: `SNK-ship-${ids.nonce}`, status: 'PENDING', subtotalPence: 2500, deliveryPence: 0, totalPence: 2500, stripeSessionId: sessionId })
       .returning();
     orderIds.push(order!.id);
 

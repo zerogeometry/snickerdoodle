@@ -31,11 +31,11 @@ test('family set: build a set → 3 pieces earns the saving → basket → serve
   await expect(page.getByText(/kids tee/).first()).toBeVisible();
   await expect(page.getByText(/adult tee/).first()).toBeVisible();
 
-  // the server re-prices: subtotal 2 × £24.95 + £31.95 = £81.85, and the set saving is applied
+  // the server re-prices: subtotal 2 × £25 + £32 = £82, and the set saving is applied
   const summary = page.locator('dl').first();
   const rowValue = (label: string) => summary.locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
-  await expect(rowValue('Subtotal')).toHaveText('£81.85');
-  await expect(rowValue('Family set saving (5%)')).toHaveText(/£4\.09/); // 5% of £81.85
+  await expect(rowValue('Subtotal')).toHaveText('£82');
+  await expect(rowValue('Family set saving (5%)')).toHaveText(/£4\.10/); // 5% of £82
   const total = (await rowValue('Total').innerText()).replace(/[£,]/g, '');
-  expect(Number(total)).toBeCloseTo(81.85 * 0.95, 1);
+  expect(Number(total)).toBeCloseTo(82 * 0.95, 1);
 });

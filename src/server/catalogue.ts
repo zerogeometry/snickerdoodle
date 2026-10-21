@@ -100,7 +100,7 @@ function frameVariants(): VariantDef[] {
 // Landscape leads (the native board) and is the default. NO colour — Prodigi fulfils one board
 // per size (there's no colour SKU), so faking a colour choice would misrepresent the product.
 const JIGSAW_SIZES = [
-  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2500 },
+  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2600 },
   { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', wMm: 250, hMm: 200, dpi: 300, pricePence: 3000 },
   { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', wMm: 375, hMm: 285, dpi: 300, pricePence: 3500 },
 ] as const;
@@ -150,7 +150,7 @@ function mugVariants(): VariantDef[] {
 function kidsTeeVariants(): VariantDef[] {
   return KIDS_TEE_SIZES.flatMap((size) =>
     KIDS_TEE_COLOURS.map((c) => ({
-      size, colour: c.name, pricePence: c.name === 'white' ? 2495 : 2695, wMm: KIDS_TEE_PRINT_MM.w, hMm: KIDS_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
+      size, colour: c.name, pricePence: c.name === 'white' ? 2500 : 2700, wMm: KIDS_TEE_PRINT_MM.w, hMm: KIDS_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
       prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr }, printTo: ['front'],
     })),
   );
@@ -165,7 +165,7 @@ function kidsTeeVariants(): VariantDef[] {
 function adultTeeVariants(): VariantDef[] {
   return ADULT_TEE_SIZES.flatMap((s) =>
     ADULT_TEE_COLOURS.map((c) => ({
-      size: s, colour: c.name, pricePence: 3195, wMm: ADULT_TEE_PRINT_MM.w, hMm: ADULT_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
+      size: s, colour: c.name, pricePence: 3200, wMm: ADULT_TEE_PRINT_MM.w, hMm: ADULT_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
       prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: c.attr }, printTo: ['front'],
       ...(s === 'M' && c.name === 'white' ? { default: true } : {}), // sizes display XS→2XL; M is the sane default
     })),
@@ -185,7 +185,7 @@ function adultTeeVariants(): VariantDef[] {
 // the founder's support email for confirmation.
 function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
-    size, colour: 'white', pricePence: 2195,
+    size, colour: 'white', pricePence: 2200,
     wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150, bleedMm: 0,
     prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' }, printTo: ['front'],
   }));
@@ -256,7 +256,7 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
       // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
-      { size: 'heart', pricePence: 2000, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      { size: 'heart', pricePence: 2200, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
       { size: '18″ round', pricePence: 3000, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
       // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
       // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]
@@ -273,8 +273,8 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
     specs: { material: 'hardcover, gloss', pages: '24 pages' },
     variants: [
-      { size: 'A5', pricePence: 2595, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
-      { size: 'A4', pricePence: 2895, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
+      { size: 'A5', pricePence: 2600, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
+      { size: 'A4', pricePence: 2900, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
     ],
   },
   kidsTee: {
@@ -310,7 +310,7 @@ const DEFS: Record<string, ProductDef> = {
     description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message' },
     variants: [
-      { size: '7×5″', pricePence: 500, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: '7×5″', pricePence: 550, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   calendar: {
@@ -318,8 +318,8 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month.',
     specs: { material: 'silk 300gsm', format: 'landscape wall calendar' },
     variants: [
-      { size: 'A5', pricePence: 1895, wMm: 210, hMm: 148, dpi: 300, prodigiSku: 'CALENDAR-A5-L-UNDATED' },
-      { size: 'A4', pricePence: 2095, wMm: 297, hMm: 210, dpi: 300, prodigiSku: 'CALENDAR-A4-L-UNDATED' },
+      { size: 'A5', pricePence: 1900, wMm: 210, hMm: 148, dpi: 300, prodigiSku: 'CALENDAR-A5-L-UNDATED' },
+      { size: 'A4', pricePence: 2100, wMm: 297, hMm: 210, dpi: 300, prodigiSku: 'CALENDAR-A4-L-UNDATED' },
     ],
   },
   adultTee: {
@@ -333,8 +333,8 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A wipe-clean apron with their artwork on it — for baking days, painting days, and every happy mess.',
     specs: { material: 'poly-cotton', ties: 'black' },
     variants: [
-      { size: 'child', pricePence: 2495, wMm: 220, hMm: 280, dpi: 150, prodigiSku: 'H-APR-CA-BTIE' },
-      { size: 'adult', pricePence: 2895, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
+      { size: 'child', pricePence: 2500, wMm: 220, hMm: 280, dpi: 150, prodigiSku: 'H-APR-CA-BTIE' },
+      { size: 'adult', pricePence: 2900, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
     ],
   },
   bauble: {
@@ -342,14 +342,14 @@ const DEFS: Record<string, ProductDef> = {
     description: "A ceramic bauble carrying their drawing — the ornament you'll unwrap and smile at every Christmas.",
     specs: { material: 'ceramic', size: '3″' },
     // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
-    variants: [{ size: '3″', pricePence: 2095, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+    variants: [{ size: '3″', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
   },
   sack: {
     category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true,
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
     // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
-    variants: [{ size: 'one size', pricePence: 3495, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
+    variants: [{ size: 'one size', pricePence: 3500, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
   phoneCase: {
     category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
@@ -376,6 +376,23 @@ function slug(s: string | undefined): string | null {
   if (!s) return null;
   // '+' must survive ("Galaxy S23+" ≠ "Galaxy S23") — stripping it made two phones share a sku
   return s.toLowerCase().replace(/\+/g, 'plus').replace(/[^a-z0-9]+/g, '');
+}
+
+/**
+ * The seeded price list straight from the DEFS (no DB): every variant's sku, retail pence, Prodigi
+ * SKU and whether its product is on show. Pure — what the seed WILL write, so the agreed prices and
+ * the static fallback can be unit-tested without a database.
+ */
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
+  return Object.entries(DEFS).flatMap(([productKey, def]) => {
+    const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
+    return def.variants.map((v, i) => ({
+      productKey, sku: variantSku(productKey, v, i === defaultIndex), isDefault: i === defaultIndex,
+      pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null,
+      visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
+      px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
+    }));
+  });
 }
 
 /** Stable sku for a variant: the default keeps the legacy product key (back-compat). */
