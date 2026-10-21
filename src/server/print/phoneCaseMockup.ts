@@ -1,6 +1,7 @@
 import 'server-only';
 import sharp from 'sharp';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
+import { maskPng, type TracedCase } from './phoneCaseTemplate';
 
 /**
  * A DRAWN phone-case mockup (no photography yet): the case back at the exact proportions of
@@ -50,11 +51,14 @@ const W = 1000;
 const H = 1250;
 const OAT = '#FBF5E9';
 
-/** Draws the mockup for one phone × grade × finish. Throws for a phone we don't know. */
-export async function drawPhoneCase(modelName: string, grade: CaseGrade, finish: CaseFinish): Promise<DrawnCase> {
+/** Draws the mockup for one phone × grade × finish. Throws for a phone we don't know. With
+ * Prodigi's traced template for that phone ({@link traceCaseTemplate}) the case shape and camera
+ * holes are EXACT; without one, a drawn case with the camera per family. */
+export async function drawPhoneCase(modelName: string, grade: CaseGrade, finish: CaseFinish, traced?: TracedCase): Promise<DrawnCase> {
   const model = PHONE_MODELS.find((m) => m.name === modelName);
   const px = model?.[grade];
   if (!model || !px) throw new Error(`no ${grade} case for ${modelName}`);
+  if (traced) return fromTemplate(traced, grade, finish);
 
   // the case body at the print file's exact aspect, centred, ~88% of the height
   const ch = Math.round(H * 0.88);
@@ -123,3 +127,79 @@ export async function drawPhoneCase(modelName: string, grade: CaseGrade, finish:
   ]);
   return { blank, mask, overlay, quad, W, H };
 }
+
+// ── from Prodigi's traced template: exact shape + holes ───────────────────────────────────
+
+/** A W×H single-channel canvas with `mask` (aw×ah) placed at (ax, ay), smoothly resized. */
+async function placeMask(mask: Uint8Array, mw: number, mh: number, aw: number, ah: number, ax: number, ay: number, blur = 0): Promise<Uint8Array> {
+  let img = sharp(await maskPng(mask, mw, mh)).resize(aw, ah, { fit: 'fill' }).extend({ left: ax, top: ay, right: W - aw - ax, bottom: H - ah - ay, background: '#000' });
+  if (blur > 0) img = sharp(await img.png().toBuffer()).blur(blur);
+  const { data } = await img.extractChannel(0).raw().toBuffer({ resolveWithObject: true });
+  return new Uint8Array(data);
+}
+
+async function fromTemplate(t: TracedCase, grade: CaseGrade, finish: CaseFinish): Promise<DrawnCase> {
+  // the whole print artboard (bleed included) at its exact aspect, centred, ~94% of the height
+  const ah = Math.round(H * 0.94);
+  const aw = Math.round((ah * t.W) / t.H);
+  const ax = Math.round((W - aw) / 2);
+  const ay = Math.round((H - ah) / 2);
+  const quad: [number, number][] = [[ax / W, ay / H], [(ax + aw) / W, ay / H], [(ax + aw) / W, (ay + ah) / H], [ax / W, (ay + ah) / H]];
+
+  const caseAll = new Uint8Array(t.W * t.H); // the case body, holes included (for the shadow + rim)
+  for (let i = 0; i < caseAll.length; i++) caseAll[i] = t.face[i] || t.holes[i] ? 1 : 0;
+  const [face, body, holes, bodySoft, shadow] = await Promise.all([
+    placeMask(t.face, t.W, t.H, aw, ah, ax, ay),
+    placeMask(caseAll, t.W, t.H, aw, ah, ax, ay),
+    placeMask(t.holes, t.W, t.H, aw, ah, ax, ay),
+    placeMask(caseAll, t.W, t.H, aw, ah, ax, ay, grade === 'tough' ? 3.5 : 1.4),
+    placeMask(caseAll, t.W, t.H, aw, ah, Math.min(ax + 6, W - aw), Math.min(ay + 16, H - ah), 14),
+  ]);
+
+  const n = W * H;
+  const blankRaw = Buffer.alloc(n * 3);
+  const overlayRaw = Buffer.alloc(n * 4);
+  const oat = [0xfb, 0xf5, 0xe9];
+  const cocoa = [0x2b, 0x21, 0x18];
+  for (let i = 0; i < n; i++) {
+    const x = i % W;
+    const y = (i / W) | 0;
+    // blank: oat page → soft shadow → the white case body
+    const sh = (shadow[i]! / 255) * 0.22;
+    const b = body[i]! / 255;
+    for (let c = 0; c < 3; c++) {
+      const under = oat[c]! * (1 - sh) + cocoa[c]! * sh;
+      blankRaw[i * 3 + c] = Math.round(under * (1 - b) + 255 * b);
+    }
+    // overlay: the camera holes show the phone through them; the case edge; the gloss sheen
+    let r = 0, g = 0, bl = 0, a = 0;
+    const hole = holes[i]! / 255;
+    if (hole > 0) {
+      r = 0x22; g = 0x1d; bl = 0x18; a = hole;
+    }
+    const soft = bodySoft[i]! / 255;
+    const edge = Math.min(1, 4 * soft * (1 - soft)) * (body[i]! > 0 || soft > 0.02 ? 1 : 0);
+    const edgeA = grade === 'tough' ? edge * 0.85 : edge * 0.25;
+    if (edgeA > a) {
+      r = grade === 'tough' ? 0x1d : 0x2b; g = grade === 'tough' ? 0x1a : 0x21; bl = grade === 'tough' ? 0x17 : 0x18; a = edgeA;
+    }
+    if (finish === 'gloss' && face[i]! > 0 && a === 0) {
+      const t01 = (x - ax) / aw + (y - ay) / ah; // 0 top-left → 2 bottom-right
+      const sheen = t01 < 0.7 ? 0.3 * (1 - t01 / 0.7) : 0;
+      if (sheen > 0) {
+        r = 255; g = 255; bl = 255; a = sheen * (face[i]! / 255);
+      }
+    }
+    overlayRaw[i * 4] = r;
+    overlayRaw[i * 4 + 1] = g;
+    overlayRaw[i * 4 + 2] = bl;
+    overlayRaw[i * 4 + 3] = Math.round(a * 255);
+  }
+  const [blank, mask, overlay] = await Promise.all([
+    sharp(blankRaw, { raw: { width: W, height: H, channels: 3 } }).png().toBuffer(),
+    sharp(Buffer.from(face), { raw: { width: W, height: H, channels: 1 } }).png().toBuffer(),
+    sharp(overlayRaw, { raw: { width: W, height: H, channels: 4 } }).png().toBuffer(),
+  ]);
+  return { blank, mask, overlay, quad, W, H };
+}
+

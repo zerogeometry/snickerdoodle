@@ -99,3 +99,15 @@ would have been the problem — another reason to skip it.)
 6. Tests: server pricing, SKU per model/style resolves server-side (never trust the client's
    model), print file at the API's exact pixel size, shipping rule; e2e: pick a phone → basket.
 7. Order one sample of each style (Stage 5) before it goes on show (`visibleInShop`, D11).
+
+## 9. Update 2026-10-21 — built, and the camera holes are exact
+
+Built (D20). Prodigi's free per-model print templates (71 PNGs, 5.5 MB) were downloaded with
+the founder's OK into `.prodigi-assets/templates/phone-cases/` (git-ignored, with a
+`manifest.json`). The preview job traces each one — white = the case back you see, enclosed
+grey = a camera/flash cut-out, outer grey = the bleed that wraps the sides — so 142 of the 152
+previews show the REAL case shape, side-button bumps and camera holes. The iPhone 13 snap
+templates are Photoshop files we can't read, so those 8 borrow the same phone's tough template;
+the Galaxy S24 FE has no template and keeps the drawn camera (2). The preview job must run on a
+machine that has the templates (like every other blank).
+

@@ -7,7 +7,29 @@ import { printTemplates, products, productVariants } from '@/db/schema';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { setMockupTemplate, setMockupView } from '@/server/print/templates';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
-import type { CaseFinish, CaseGrade } from '@/lib/phone-cases';
+import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
+import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
+
+// Prodigi's free per-model phone-case print templates (downloaded 2026-10-21, founder OK'd),
+// listed in manifest.json as { model: { snap?: file, tough?: file } }. Traced once per model ×
+// grade at the print file's exact pixels; a grade without its own template borrows the other
+// grade's (same phone, same camera — e.g. the iPhone 13 snap templates are PSDs we can't read);
+// a phone with neither keeps the drawn mockup.
+const CASE_TEMPLATES = path.join(process.cwd(), '.prodigi-assets', 'templates', 'phone-cases');
+const caseTraces = new Map<string, TracedCase | null>();
+async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: TracedCase | null; source: string }> {
+  const key = `${model}|${grade}`;
+  const manifestPath = path.join(CASE_TEMPLATES, 'manifest.json');
+  if (!existsSync(manifestPath)) return { traced: null, source: 'drawn (no templates on this machine)' };
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, Partial<Record<CaseGrade, string>>>;
+  const file = manifest[model]?.[grade] ?? manifest[model]?.[grade === 'snap' ? 'tough' : 'snap'];
+  if (!file) return { traced: null, source: 'drawn (no template)' };
+  if (!caseTraces.has(key)) {
+    const px = PHONE_MODELS.find((m) => m.name === model)?.[grade];
+    caseTraces.set(key, px ? await traceCaseTemplate(readFileSync(path.join(CASE_TEMPLATES, file)), px.w, px.h) : null);
+  }
+  return { traced: caseTraces.get(key) ?? null, source: manifest[model]?.[grade] ? 'prodigi template' : 'prodigi template (other grade)' };
+}
 import { ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, isDarkGarment, KIDS_TEE_CHEST_MM, KIDS_TEE_PRINT_MM, teePrintRegion } from '@/lib/garments';
 
 /**
@@ -902,10 +924,11 @@ export async function POST(req: Request): Promise<Response> {
     // is the whole case back at the print file's exact aspect, so registration drift is 0.
     if (r.key === 'phoneCase') {
       const a = (r.attrs as Record<string, string>) ?? {};
-      const d = await drawPhoneCase(a.size!, a.grade as CaseGrade, a.finish as CaseFinish);
+      const { traced, source } = await caseTrace(a.size!, a.grade as CaseGrade);
+      const d = await drawPhoneCase(a.size!, a.grade as CaseGrade, a.finish as CaseFinish, traced ?? undefined);
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: a.finish === 'gloss' ? 'GLOSS' : 'PAPER', mask: d.mask, overlay: d.overlay });
       authored++;
-      registration.push({ sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'drawn-phone-case', quadAspect: null, printAspect: Math.round((r.printWmm / r.printHmm) * 1000) / 1000, driftPct: 0 });
+      registration.push({ sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `phone-case: ${source}`, quadAspect: null, printAspect: Math.round((r.printWmm / r.printHmm) * 1000) / 1000, driftPct: 0 });
       continue;
     }
     const p = plan(r.key, (r.attrs as Record<string, string>) ?? {});
