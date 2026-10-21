@@ -4,6 +4,7 @@
  * The pixels are drawn by src/server/print/pattern.ts.
  */
 import { isPatternProduct } from '@/lib/patterns';
+import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
 import { assessResolution, canvasSizePx, mmToPx, type ResolutionAssessment, type TemplateGeom, type Transform } from './geometry';
 
 /** The motif's default printed size, and how much of its cell it fills (the rest is breathing room). */
@@ -56,11 +57,13 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
 }
 
 /**
- * The DPI gate, pattern-aware. For a repeat-pattern product what's printed at size is ONE motif,
+ * The DPI gate, pattern- and height-chart-aware. For a repeat-pattern product what's printed at size is ONE motif,
  * so resolution is judged on the motif — a 5 m roll needs no bigger a photo than a pair of socks.
  * Every other product: the ordinary whole-canvas assessResolution.
  */
 export function assessPrintResolution(t: TemplateGeom, src: { width: number; height: number }, transform: Transform, productKey?: string | null): ResolutionAssessment {
+  // A height chart prints the drawing in the ART AREA beside its ruler — judged on that area.
+  if (isHeightChart(productKey)) return assessResolution(heightChartArtGeom(t), src, transform);
   if (!isPatternProduct(productKey)) return assessResolution(t, src, transform);
   const layout = patternLayout(canvasSizePx(t), t.requiredDpi, src, transform);
   return assessResolution(

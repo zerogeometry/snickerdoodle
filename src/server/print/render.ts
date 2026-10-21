@@ -13,6 +13,8 @@ import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, canvasSizePx, clampTransform, computeLayerRect, type RawTransform } from './geometry';
 import { renderRepeatPattern } from './pattern';
+import { renderHeightChartFace } from './heightChart';
+import { isHeightChart } from './height-chart-geometry';
 import { assessPrintResolution } from './pattern-geometry';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
@@ -101,6 +103,18 @@ export async function renderPrintFile(
     }
     const { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform);
     return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+  }
+
+  // A HEIGHT CHART prints the drawing beside a cm + ft/in ruler drawn INTO the file at true scale
+  // (Prodigi prints no markings). Placement and resolution are judged on the art area beside the
+  // ruler — the same answer the positioner, the mockup and the order gate use.
+  if (variantRow?.key && isHeightChart(variantRow.key)) {
+    const chartAssess = assessPrintResolution(geom, src, transform, variantRow.key);
+    if (chartAssess.decision === 'BLOCK') {
+      throw new Error(`source too low-res for this product (would need ${chartAssess.upscaleFactor.toFixed(1)}× upscale)`);
+    }
+    const face = await renderHeightChartFace(srcBuf, geom, transform);
+    return persistPrintFile(db, input.assetId, input.variantId, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height);
   }
 
   const assess = assessResolution(geom, src, transform);
