@@ -20,6 +20,7 @@ import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
 import { defaultPlacementFor, defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { isCardPackKey } from '@/lib/card-packs';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 function variantSub(v: CatalogueVariant): string | undefined {
@@ -173,6 +174,11 @@ export function FlowCatalogue({
     // A phone case is only right for ONE phone — never quick-add a default model the parent didn't
     // pick; take them to the phone picker instead (a line already in the basket still steps up).
     if (p.key === 'phoneCase' && !useBasket.getState().items.some((i) => i.id === defId)) {
+      void customize(p);
+      return;
+    }
+    // A card pack needs its N drawings chosen — "+" opens the pack builder, never a blank pack.
+    if (isCardPackKey(p.key)) {
       void customize(p);
       return;
     }

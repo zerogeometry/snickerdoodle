@@ -18,6 +18,8 @@ import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHIO
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
 import { CASE_GRADE_BLURB, caseDefaultTransform, gradesFor } from '@/lib/phone-cases';
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
+import { CardPackBuilder } from '@/ui/components/CardPackBuilder';
+import { isCardPackKey } from '@/lib/card-packs';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -42,12 +44,18 @@ function webglOk(): boolean {
   }
 }
 
+/** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
+export default function CustomizePage() {
+  const params = useParams<{ productKey: string }>();
+  return isCardPackKey(params.productKey) ? <CardPackBuilder /> : <CustomizeProduct />;
+}
+
 /**
  * Customize a product: size + colour + placement only. Image-level edits (remove
  * background, the studio) live on the catalogue page and apply to every product —
  * here we just place the (already-edited) image on this product.
  */
-export default function CustomizePage() {
+function CustomizeProduct() {
   const router = useRouter();
   const params = useParams<{ productKey: string }>();
   const productKey = params.productKey;

@@ -26,9 +26,10 @@ export async function quietCookies(page: Page) {
   });
 }
 
-/** Upload through the real "upload a drawing" control and wait for the personalised range. */
-export async function uploadAndOpenRange(page: Page, art?: Buffer) {
-  await page.goto('/start-creating');
+/** Upload through the real "upload a drawing" control and wait for the personalised range.
+ * `path` lets a test open the range with a query (e.g. the dev curation view, ?all=1). */
+export async function uploadAndOpenRange(page: Page, art?: Buffer, path = '/start-creating') {
+  await page.goto(path);
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
     page.getByRole('button', { name: /upload a drawing/i }).click(),

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
+import { isCardPackKey } from '@/lib/card-packs';
 
 /**
  * Lightweight client-side stores so the docs/03 flows are walkable end-to-end
@@ -191,7 +192,17 @@ export type BasketItem = {
   /** GREETINGS-CARD outside image span (card only): 'front' = the drawing on the front panel only
    * (default); 'full' = it spans the whole outside across the fold. */
   cardImageSpan?: 'full' | 'front';
+  /** A CARD PACK line only: its N cards (which drawing + placement each), in pack order. The line
+   * is always qty 1 — the server prices it as ONE pack and checks the exact card count. */
+  cards?: PackCardLine[];
+  /** DISPLAY ONLY (pack lines): the single-card variant the pack's fronts preview on, so the basket
+   * can show the real first card. Never sent to the server. */
+  previewVariantId?: string;
 };
+/** One card of a pack in the basket: which drawing, how it sits on the front (+ an optional cutout). */
+export type PackCardLine = { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
+/** Is this basket line a card pack? (Its quantity is fixed at 1.) */
+export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.product);
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
@@ -212,12 +223,17 @@ export const useBasket = create<BasketState>()(
       add: (item) =>
         set((s) => {
           const existing = s.items.find((x) => x.id === item.id);
+          // A card pack is always ONE pack: re-adding the same line replaces it, never makes it 2.
+          if (existing && isPackLine(item)) return { items: s.items.map((x) => (x.id === item.id ? { ...item, qty: 1 } : x)) };
           if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
           return { items: [...s.items, { ...item, qty: 1 }] };
         }),
       setQty: (id, qty) =>
         set((s) => ({
-          items: qty <= 0 ? s.items.filter((x) => x.id !== id) : s.items.map((x) => (x.id === id ? { ...x, qty } : x)),
+          items:
+            qty <= 0
+              ? s.items.filter((x) => x.id !== id)
+              : s.items.map((x) => (x.id === id ? { ...x, qty: isPackLine(x) ? 1 : qty } : x)), // a pack stays at 1
         })),
       update: (id, patch, newId) =>
         set((s) => {
@@ -248,6 +264,19 @@ export const useBasket = create<BasketState>()(
 );
 export const basketCount = (items: BasketItem[]) => items.reduce((n, i) => n + i.qty, 0);
 export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n + i.pricePence * i.qty, 0);
+
+/**
+ * The basket as the order action receives it: product keys (the variant sku when chosen) + qty, and
+ * WHICH drawings — never a price. A personalised line folds its per-print details (cushion back,
+ * card inside message, span) into `artwork`; a card PACK sends qty 1 + its `cards` instead.
+ */
+export function orderItemsFor(items: BasketItem[]) {
+  return items.map((i) => {
+    const productKey = i.sku ?? i.product;
+    if (isPackLine(i)) return { productKey, qty: 1, cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
+    return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
+  });
+}
 
 // ── studio placements (Save & Return carries a placement back to Customize) ──
 // Keyed by `${assetId}-${productKey}`.
