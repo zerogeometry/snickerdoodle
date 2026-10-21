@@ -1,12 +1,13 @@
 'use client';
 
-import { IconInfoCircle, IconMinus, IconPlus } from '@tabler/icons-react';
+import { IconInfoCircle, IconMinus, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
+import { CardPackThumb } from './CardPackThumb';
 import { MockupPreview } from './MockupPreview';
 import { ProductArt, type ProductKey } from './ProductArt';
-import { gbp, useBasket, type BasketItem } from '@/lib/store';
+import { gbp, isPackLine, useBasket, type BasketItem } from '@/lib/store';
 
 /**
  * The slim vertical basket down the right of the Start-Creating catalogue — a clear
@@ -18,19 +19,24 @@ import { gbp, useBasket, type BasketItem } from '@/lib/store';
  */
 function BasketRow({ item, index }: { item: BasketItem; index: number }) {
   const setQty = useBasket((s) => s.setQty);
+  const remove = useBasket((s) => s.remove);
   const router = useRouter();
+  // A card pack is always ONE pack (qty fixed): it shows its card count + a remove, not − / +.
+  const pack = isPackLine(item);
   const [infoOpen, setInfoOpen] = useState(false);
   // A personalised line renders its ACTUAL creation; an add-on with no artwork falls
   // back to the stylised motif.
   const personalised = Boolean(item.artwork && item.variantId);
-  const label = item.sub ? `${item.name}, ${item.sub}` : item.name;
+  const label = pack ? `${item.name} · ${item.cards?.length ?? 0} cards` : item.sub ? `${item.name}, ${item.sub}` : item.name;
   // Editing re-opens Customize for THIS line (carries its variant + placement) and swaps
   // the CTA to "update basket".
   const edit = () => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`);
   return (
     <li className="pop-in rounded-[14px] border-2 border-cocoa/20 bg-paper p-1.5" style={{ ['--i' as string]: Math.min(index, 6) }}>
       <div className="relative aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
-        {personalised ? (
+        {pack ? (
+          <CardPackThumb item={item} px={150} />
+        ) : personalised ? (
           <MockupPreview
             productKey={item.product}
             assetId={item.artwork!.assetId}
@@ -69,28 +75,42 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
           {item.sub ? <span className="text-[10px] leading-tight text-paper">{item.sub}</span> : null}
         </div>
       </div>
-      {/* −qty+ and price beneath, spanning the thumbnail width. − at 1 removes the line.
-          The buttons fill the row height (44px) and split its width, so the tap targets
-          stay ≥44px tall even though the basket column is deliberately slim. */}
-      <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
-        <button
-          type="button"
-          aria-label={`one fewer ${item.name}`}
-          onClick={() => setQty(item.id, item.qty - 1)}
-          className="press flex h-11 flex-1 items-center justify-center rounded-l-full text-cocoa"
-        >
-          <Icon icon={IconMinus} size={14} />
-        </button>
-        <span className="flex min-w-6 items-center justify-center text-xs font-bold text-cocoa">{item.qty}</span>
-        <button
-          type="button"
-          aria-label={`one more ${item.name}`}
-          onClick={() => setQty(item.id, item.qty + 1)}
-          className="press flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
-        >
-          <Icon icon={IconPlus} size={14} />
-        </button>
-      </div>
+      {pack ? (
+        <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
+          <span className="flex flex-1 items-center justify-center text-[11px] font-bold text-cocoa">{item.cards?.length ?? 0} cards</span>
+          <button
+            type="button"
+            aria-label={`remove ${label}`}
+            onClick={() => remove(item.id)}
+            className="press flex h-11 w-11 items-center justify-center rounded-r-full text-ink-soft hover:text-cinnamon"
+          >
+            <Icon icon={IconTrash} size={14} />
+          </button>
+        </div>
+      ) : (
+        // −qty+ beneath, spanning the thumbnail width. − at 1 removes the line. The buttons fill
+        // the row height (44px) and split its width, so the tap targets stay ≥44px tall even
+        // though the basket column is deliberately slim.
+        <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
+          <button
+            type="button"
+            aria-label={`one fewer ${item.name}`}
+            onClick={() => setQty(item.id, item.qty - 1)}
+            className="press flex h-11 flex-1 items-center justify-center rounded-l-full text-cocoa"
+          >
+            <Icon icon={IconMinus} size={14} />
+          </button>
+          <span className="flex min-w-6 items-center justify-center text-xs font-bold text-cocoa">{item.qty}</span>
+          <button
+            type="button"
+            aria-label={`one more ${item.name}`}
+            onClick={() => setQty(item.id, item.qty + 1)}
+            className="press flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
+          >
+            <Icon icon={IconPlus} size={14} />
+          </button>
+        </div>
+      )}
       <div className="mt-1 text-center text-xs font-extrabold text-cocoa">{gbp(item.pricePence * item.qty)}</div>
     </li>
   );

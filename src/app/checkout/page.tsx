@@ -9,7 +9,8 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
-import { basketSubtotal, DELIVERY_PENCE, gbp, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { CardPackThumb } from '@/ui/components/CardPackThumb';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -36,7 +37,7 @@ export default function CheckoutPage() {
   const empty = items.length === 0;
   // A personalised line (a drawing on a product) needs the controlling parent — so
   // checkout asks a guest to sign up; pure add-ons can still guest-checkout.
-  const hasPersonalised = items.some((i) => i.artwork);
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length);
 
   // The child this is for, named in "Who's this for?" before checkout.
   useEffect(() => {
@@ -129,6 +130,9 @@ export default function CheckoutPage() {
   const promoSavingPence = quote?.promoSavingPence ?? 0;
   const creditPence = quote?.creditPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
+  // Each line's price from the SERVER quote (its lines align 1:1 with the basket when every line is
+  // sellable); the client figure only fills in until the quote lands.
+  const linePence = (i: number) => (quote && quote.lines.length === items.length ? quote.lines[i]!.linePence : items[i]!.pricePence * items[i]!.qty);
 
   // Place a REAL order: the server re-prices and persists it. With Stripe
   // configured we redirect to Checkout; in local dev it's marked paid and we go
@@ -148,7 +152,8 @@ export default function CheckoutPage() {
       const res = await placeOrderAction({
         // Fold the per-print details (cushion back, card inside message) into the artwork payload
         // — the server freezes + screens them and the fulfilment renderer reads them. Harmless elsewhere.
-        items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) })),
+        // A card pack sends qty 1 + its cards instead (orderItemsFor).
+        items: orderItemsFor(items),
         gift,
         subject: liveSubject ?? undefined,
         promoCode,
@@ -300,12 +305,14 @@ export default function CheckoutPage() {
                 </p>
               ) : null}
               <div className="mt-3 space-y-2.5">
-                {items.map((item) => (
+                {items.map((item, idx) => (
                   <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line bg-paper p-3">
                     <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-oat">
                       {/* The ACTUAL creation — this drawing, on this variant, at its saved
                           placement — so checkout shows every unique instance exactly as it prints. */}
-                      {item.artwork && item.variantId ? (
+                      {isPackLine(item) ? (
+                        <CardPackThumb item={item} px={56} />
+                      ) : item.artwork && item.variantId ? (
                         <MockupPreview
                           productKey={item.product}
                           assetId={item.artwork.assetId}
@@ -324,6 +331,14 @@ export default function CheckoutPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
                       {item.sub ? <div className="text-[11px] text-ink-faint">{item.sub}</div> : null}
+                      {isPackLine(item) ? (
+                        // A card pack is always one pack — no quantity; its cards are edited in the builder.
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <button type="button" onClick={() => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`)} className="relative rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:border-honey">
+                            edit cards
+                          </button>
+                        </div>
+                      ) : (
                       <div className="mt-1.5 flex items-center gap-2">
                         <div className="flex items-center rounded-full border border-line bg-white">
                           <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-ink-soft">
@@ -338,9 +353,10 @@ export default function CheckoutPage() {
                           customize
                         </button>
                       </div>
+                      )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(item.pricePence * item.qty)}</div>
+                      <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(linePence(idx))}</div>
                       <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-ink-faint hover:text-berry">remove</button>
                     </div>
                   </div>

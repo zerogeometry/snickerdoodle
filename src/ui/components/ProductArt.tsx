@@ -8,6 +8,7 @@ import type { ReactNode } from 'react';
  */
 export type ProductKey =
   | 'card'
+  | 'cardPack'
   | 'framedPrint'
   | 'mug'
   | 'kidsTee'
@@ -41,6 +42,15 @@ const ART: Record<ProductKey, ReactNode> = {
       <rect x="30" y="16" width="40" height="64" rx="2" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" />
       <line x1="50" y1="16" x2="50" y2="80" stroke="var(--color-tomato)" strokeWidth="2" />
       <House transform="translate(52,38) scale(0.5)" />
+    </>
+  ),
+  // a little fanned stack of cards
+  cardPack: (
+    <>
+      <rect x="18" y="20" width="36" height="56" rx="2" transform="rotate(-10 36 48)" fill="var(--color-paper)" stroke="var(--color-sky)" strokeWidth="3" />
+      <rect x="42" y="20" width="36" height="56" rx="2" transform="rotate(10 60 48)" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="3" />
+      <rect x="30" y="18" width="36" height="58" rx="2" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" />
+      <House transform="translate(36,36) scale(0.62)" />
     </>
   ),
   framedPrint: (
