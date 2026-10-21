@@ -49,30 +49,48 @@ full suite with the dev DB 761 passed ×2, lint ignores `.claude/**`, pushed, te
   run the full suite 3–5× against the dev DB, commit. Retire the stale worktree.
 - A3. Re-seed the dev DB; full suite + lint + typecheck green; push.
 
-**B. Make the new range presentable ✦**
-- B1. Shop art + mockups: a fallback `ProductArt` motif per new key (+ cardPack), Prodigi template
-  blanks → `seed-mockups` cases (cardPack reuses card). Founder: confirm Prodigi's photo licence.
-- B2. Pattern preview: positioner + mockup compositor draw the repeat for pattern products.
-- B3. Height-chart ruler + scale test (proposed session already waiting).
-- B4. Hoodie photo blanks + chest sizes (`derive-garment-photo-blanks.mjs`).
+**B. Make the new range presentable — ✅ DONE 21 Oct night** (branch `claude/brave-bohr-dv13jo`, PR into `build/phase-0-trust-spine`)
+- ✅ B1. Shop art: a `ProductArt` motif per new key + a plain-sheet fallback for any unknown key. Mockups: card packs
+  reuse the card's; socks / height chart / acrylic / wrap / bandana / playing cards get a DRAWN mockup (print area at the
+  print file's exact aspect, drift 0); the tea towel uses Prodigi's blank if staged (else drawn). **Founder: confirm
+  Prodigi's photo licence** (downloads library = for integrators; product-page photos = one-line check in the support thread).
+- ✅ B2. Pattern preview: the positioner draws the repeat (drag = shift, resize = motif size); the compositor lays the
+  printed face (same code as the print file) on the product, so customize previews show it. Height chart: its ruler too.
+- ✅ B3. Height-chart ruler: cm (1/5/10) + ft/in (1/6/12) drawn into the print file at true scale, the drawing beside it;
+  every tick within ±1 px for all four sizes. **Founder: where the scale starts** (`HEIGHT_CHART_FLOOR_CM`, default 30 cm).
+- ✅ B4. Hoodie photo blanks: `derive-garment-photo-blanks.mjs` derives them from a staged `*hoodie*` packshot (per
+  colour) + chest tables (approximate — confirm with Prodigi). Until a packshot is staged, hoodies keep the plain tile.
+- ➕ Copy fix: cards, card packs, wrapping paper and playing cards say "free delivery", not "free tracked delivery".
 
-**C. Fix the deploy pipeline (small, one session)**
-- C1. `deploy.ps1`: exclude `.claude/worktrees`, tolerate stderr, fail on `$LASTEXITCODE`.
-- C2. `scripts/test-site/seed.ps1`: run `seedCatalogue` (and mockups) locally against
-  `.env.test-site` (`NODE_OPTIONS=--conditions=react-server`, tsx). Optionally batch the upserts.
+**C. Fix the deploy pipeline — ✅ DONE 21 Oct night**
+- ✅ C1. `deploy.ps1`: excludes `.claude/worktrees`, judges native tools by `$LASTEXITCODE` (no more dying on npm
+  warnings), prints the live URL.
+- ✅ C2. `scripts/test-site/seed.ps1` (+ `seed.ts`): catalogue then mockups, locally, against `.env.test-site`; refuses
+  unless `SITE_MODE=test`; never prints a setting. `seedCatalogue` batched (~1,800 → ~180 queries — the Netlify 504).
 
-**D. Go live on the test site (last)**
-- D1. Decide what shows: per product, flip `visibleInShop` once its art/preview is right — or add a
-  test-site-only "preview" visibility so hidden lines show on the password-locked site only.
-- D2. Deploy (fixed script) → seed catalogue + mockups → run `e2e/storefront-smoke` + the card-pack
-  e2e against the test site → click through: card pack, socks pattern, gift link (create, open as
-  guest, revoke).
+**D. Go live on the test site (last)** — D1 PREPARED, not flipped
+- D1. **Proposal (awaiting the founder's yes):** a test-site-only "preview" visibility.
+  - A per-product `previewOnTestSite: true` in the catalogue DEFS (code, no migration). `loadCatalogue` shows a product
+    when `visibleInShop` — OR when `previewOnTestSite` AND `isTestSite()` (SITE_MODE=test, decided server-side; the real
+    shop can never show it). Those tiles carry a small "preview" sticker so nobody mistakes them for live lines.
+  - The card-pack builder asks for the catalogue the same way, so it works on the test site too (today it needs the dev
+    curation view, which a production build refuses).
+  - Tests: hidden ⇒ absent on the real shop; preview ⇒ present only with SITE_MODE=test; a forged client flag does nothing.
+  - **Recommended to preview first:** card pack, socks, wrapping paper, tea towel, acrylic block, playing cards, height
+    chart (after the floor-height answer). **Hold:** hoodies (need a hoodie packshot staged + chest sizes confirmed) and
+    the pet bandana (its drawn shape is a guess until Prodigi's template is traced).
+- D2. On the founder's computer (see the PR's "run locally"): integration tests → `deploy.ps1` → `seed.ps1` →
+  `e2e/storefront-smoke` + card-pack e2e against the test site → click through card pack, socks pattern, gift link
+  (create, open as guest, revoke).
 
-## Founder decisions needed
-- Card-pack builder: layout/copy, auto-fill fronts (no per-card repositioning in v1), guests can
-  start a pack, "not quite ready to print" wording.
-- Which new products show on the test site first (D1), and whether "show hidden on test site only" is OK.
-- Wrapping paper + playing cards ship **untracked** (tracked +£1.05 for wrap; Budget would let cards be £19).
-- Height chart: where the scale starts above the floor.
-- Gift-link default expiry (30 days today).
-- Prodigi: are envelopes included with cards? does LIVE keep the flat £0.95 for 10+ cards?
+## Founder decisions needed (recommended default in **bold**)
+- Show which products on the test site, and is a "preview on the test site only" switch OK? → **yes; the seven above**.
+- Height chart: where the scale starts → **30 cm above the floor** (clears skirting; a 120 cm chart reads ~32–150 cm).
+- Gift-link default expiry (30 days today) → **14 days**; the parent can always make a fresh link.
+- Untracked post for wrapping paper + playing cards → **accept it** (the copy now says "free delivery" for them).
+- Card-pack builder layout/copy (a14a5f1) → **keep as built**: fronts auto-fill (no per-card repositioning in v1),
+  guests can start a pack, "not quite ready to print" wording.
+- Prodigi photo licence → **ask in the open support thread** (one line).
+
+- Still open with Prodigi: are envelopes included with cards? does LIVE keep the flat £0.95 for 10+ cards? Are jigsaw
+  and baby bodysuit standard post tracked now (PRICING.md, July, said untracked; the jigsaw page says tracked)?
