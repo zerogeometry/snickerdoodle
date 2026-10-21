@@ -132,7 +132,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
       expect(r!.providerSku).toBe(prodigiCaseSku(m, g, f as 'gloss' | 'matte'));
       expect([r!.wPx, r!.hPx]).toEqual([m[g]!.w, m[g]!.h]); // Prodigi's own printAreaSizes, not rounded from mm
       expect(r!.bleed).toBe(0); // the file IS the wrap
-      expect(r!.price).toBe(g === 'snap' ? 2499 : 2999);
+      expect(r!.price).toBe(g === 'snap' ? 2500 : 3000);
     }
     // tough-only phones never offer snap
     expect(rows.some((x) => { const a = x.attrs as Record<string, string>; return a.size === 'Pixel 9' && a.grade === 'snap'; })).toBe(false);

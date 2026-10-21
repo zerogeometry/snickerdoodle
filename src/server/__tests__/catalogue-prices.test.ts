@@ -14,11 +14,8 @@ const price = (sku: string) => {
 const prices = (productKey: string) => [...new Set(list.filter((r) => r.productKey === productKey).map((r) => r.pricePence))].sort((a, b) => a - b);
 
 describe('shop prices — on the nearest £0.50, never .95/.99', () => {
-  // Phone cases are owned by src/lib/phone-cases.ts (CASE_PRICE_PENCE) and move to £25/£30 separately.
-  const PENDING = new Set(['phoneCase']);
-
   it('every variant price is a multiple of 50p', () => {
-    const off = list.filter((r) => !PENDING.has(r.productKey) && r.pricePence % 50 !== 0).map((r) => `${r.sku}=${r.pricePence}`);
+    const off = list.filter((r) => r.pricePence % 50 !== 0).map((r) => `${r.sku}=${r.pricePence}`);
     expect(off).toEqual([]);
   });
 
@@ -46,6 +43,7 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
     expect(prices('apron')).toEqual([2500, 2900]);
     expect(prices('bauble')).toEqual([2100]);
     expect(prices('sack')).toEqual([3500]);
+    expect(prices('phoneCase')).toEqual([2500, 3000]); // snap / tough
   });
 
   it('the static fallback CATALOGUE matches each product’s seeded DEFAULT variant', () => {

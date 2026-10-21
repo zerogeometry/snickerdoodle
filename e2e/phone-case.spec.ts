@@ -28,7 +28,7 @@ test('phone case: type to find the phone → tough + matte → basket → server
   await page.getByRole('button', { name: /^tough/ }).click();
   await page.getByRole('button', { name: 'matte', exact: true }).click();
   const add = page.getByRole('button', { name: /add to basket/ });
-  await expect(add).toContainText('£29.99');
+  await expect(add).toContainText('£30');
 
   // a tough-only phone offers tough alone
   await box.fill('pixel 9 pro');
@@ -48,6 +48,6 @@ test('phone case: type to find the phone → tough + matte → basket → server
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
   await expect(page.getByText(/phone case/).first()).toBeVisible();
   const summary = page.locator('dl').first();
-  await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText('£29.99');
+  await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText('£30');
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);
 });

@@ -55,7 +55,7 @@ export const CATALOGUE = {
   apron: { pricePence: 2500, label: 'apron' },
   bauble: { pricePence: 2100, label: 'ceramic bauble' },
   sack: { pricePence: 3500, label: 'christmas sack' },
-  phoneCase: { pricePence: 2499, label: 'phone case' }, // the default: snap (tough £29.99 — DB per variant)
+  phoneCase: { pricePence: 2500, label: 'phone case' }, // the default: snap (tough £30 — DB per variant)
   // Range expansion (D21, 2026-10-21) — seeded hidden until samples + mockups are in.
   socks: { pricePence: 2000, label: 'socks' },
   heightChart: { pricePence: 3100, label: 'height chart' },

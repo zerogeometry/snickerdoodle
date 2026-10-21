@@ -67,8 +67,8 @@ export const PHONE_MODELS: PhoneModel[] = [
 
 export const CASE_GRADES: CaseGrade[] = ['snap', 'tough'];
 export const CASE_FINISHES: CaseFinish[] = ['gloss', 'matte'];
-/** Our retail, VAT-inclusive, free TRACKED delivery baked in (founder, 2026-10-21). */
-export const CASE_PRICE_PENCE: Record<CaseGrade, number> = { snap: 2499, tough: 2999 };
+/** Our retail, VAT-inclusive, free TRACKED delivery baked in (founder, 2026-10-21; whole pounds — D21). */
+export const CASE_PRICE_PENCE: Record<CaseGrade, number> = { snap: 2500, tough: 3000 };
 export const CASE_GRADE_BLURB: Record<CaseGrade, string> = {
   snap: 'slim and light',
   tough: 'extra padding for the drops',

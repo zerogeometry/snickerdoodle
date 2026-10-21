@@ -54,7 +54,7 @@ describe('phone case SKUs and grades', () => {
   });
   it('every model has at least one grade, and prices are the founder’s', () => {
     for (const m of PHONE_MODELS) expect(m.snap || m.tough, m.name).toBeTruthy();
-    expect(CASE_PRICE_PENCE).toEqual({ snap: 2499, tough: 2999 });
+    expect(CASE_PRICE_PENCE).toEqual({ snap: 2500, tough: 3000 });
   });
 });
 
