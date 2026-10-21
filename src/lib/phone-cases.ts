@@ -13,54 +13,56 @@ export interface PhoneModel {
   brand: 'Apple' | 'Samsung' | 'Google';
   /** Prodigi's model code inside the SKU, e.g. IP16 → GLOBAL-TECH-IP16-CS-G */
   code: string;
-  snap: { w: number; h: number } | null;
-  tough: { w: number; h: number } | null;
+  /** Print file px, and how far down the case the camera cut-out reaches (fraction of the height,
+   * measured from Prodigi's per-model template) — the default placement keeps the drawing below it. */
+  snap: { w: number; h: number; cam: number } | null;
+  tough: { w: number; h: number; cam: number } | null;
 }
 
 /** Oldest → newest within each brand (the picker shows newest first). */
 export const PHONE_MODELS: PhoneModel[] = [
-  { name: 'iPhone 13', brand: 'Apple', code: 'IP13', snap: { w: 1204, h: 2019 }, tough: { w: 1238, h: 2042 } },
-  { name: 'iPhone 13 mini', brand: 'Apple', code: 'IP13MN', snap: { w: 1097, h: 1830 }, tough: { w: 1122, h: 1830 } },
-  { name: 'iPhone 13 Pro', brand: 'Apple', code: 'IP13P', snap: { w: 1204, h: 2019 }, tough: { w: 1238, h: 2042 } },
-  { name: 'iPhone 13 Pro Max', brand: 'Apple', code: 'IP13PM', snap: { w: 1286, h: 2185 }, tough: { w: 1322, h: 2219 } },
-  { name: 'iPhone 14', brand: 'Apple', code: 'IP14', snap: { w: 1200, h: 2040 }, tough: { w: 1260, h: 2100 } },
-  { name: 'iPhone 14 Plus', brand: 'Apple', code: 'IP14PL', snap: { w: 1320, h: 2190 }, tough: { w: 1350, h: 2250 } },
-  { name: 'iPhone 14 Pro', brand: 'Apple', code: 'IP14PR', snap: { w: 1200, h: 2040 }, tough: { w: 1260, h: 2100 } },
-  { name: 'iPhone 14 Pro Max', brand: 'Apple', code: 'IP14PM', snap: { w: 1320, h: 2190 }, tough: { w: 1350, h: 2250 } },
-  { name: 'iPhone 15', brand: 'Apple', code: 'IP15', snap: { w: 1200, h: 2040 }, tough: { w: 1260, h: 2100 } },
-  { name: 'iPhone 15 Plus', brand: 'Apple', code: 'IP15PL', snap: { w: 1320, h: 2190 }, tough: { w: 1350, h: 2250 } },
-  { name: 'iPhone 15 Pro', brand: 'Apple', code: 'IP15PR', snap: { w: 1200, h: 2040 }, tough: { w: 1260, h: 2100 } },
-  { name: 'iPhone 15 Pro Max', brand: 'Apple', code: 'IP15PM', snap: { w: 1320, h: 2190 }, tough: { w: 1350, h: 2250 } },
-  { name: 'iPhone 16', brand: 'Apple', code: 'IP16', snap: { w: 1209, h: 2049 }, tough: { w: 1245, h: 2085 } },
-  { name: 'iPhone 16 Plus', brand: 'Apple', code: 'IP16PL', snap: { w: 1311, h: 2196 }, tough: { w: 1359, h: 2244 } },
-  { name: 'iPhone 16 Pro', brand: 'Apple', code: 'IP16PR', snap: { w: 1209, h: 2049 }, tough: { w: 1245, h: 2085 } },
-  { name: 'iPhone 16 Pro Max', brand: 'Apple', code: 'IP16PM', snap: { w: 1311, h: 2196 }, tough: { w: 1359, h: 2244 } },
-  { name: 'iPhone 16e', brand: 'Apple', code: 'IP16E', snap: null, tough: { w: 1254, h: 2069 } },
-  { name: 'iPhone 17', brand: 'Apple', code: 'IP17', snap: { w: 1233, h: 2094 }, tough: { w: 1266, h: 2121 } },
-  { name: 'iPhone 17 Air', brand: 'Apple', code: 'IP17A', snap: { w: 1272, h: 2172 }, tough: { w: 1305, h: 2196 } },
-  { name: 'iPhone 17 Pro', brand: 'Apple', code: 'IP17PR', snap: { w: 1233, h: 2091 }, tough: { w: 1266, h: 2115 } },
-  { name: 'iPhone 17 Pro Max', brand: 'Apple', code: 'IP17PM', snap: { w: 1305, h: 2250 }, tough: { w: 1338, h: 2274 } },
-  { name: 'iPhone 18 Pro', brand: 'Apple', code: 'IP18PR', snap: { w: 1233, h: 2092 }, tough: { w: 1266, h: 2115 } },
-  { name: 'iPhone 18 Pro Max', brand: 'Apple', code: 'IP18PM', snap: { w: 1305, h: 2251 }, tough: { w: 1338, h: 2274 } },
-  { name: 'Galaxy S23', brand: 'Samsung', code: 'SGS23', snap: { w: 1200, h: 2040 }, tough: { w: 1260, h: 2070 } },
-  { name: 'Galaxy S23+', brand: 'Samsung', code: 'SGS23P', snap: { w: 1290, h: 2190 }, tough: { w: 1350, h: 2220 } },
-  { name: 'Galaxy S23 Ultra', brand: 'Samsung', code: 'SGS23U', snap: { w: 1320, h: 2280 }, tough: { w: 1380, h: 2310 } },
-  { name: 'Galaxy S23 FE', brand: 'Samsung', code: 'SGS23FE', snap: null, tough: { w: 1356, h: 2244 } },
-  { name: 'Galaxy S24', brand: 'Samsung', code: 'SGS24', snap: { w: 1224, h: 2073 }, tough: { w: 1251, h: 2097 } },
-  { name: 'Galaxy S24+', brand: 'Samsung', code: 'SGS24P', snap: { w: 1281, h: 2202 }, tough: { w: 1314, h: 2229 } },
-  { name: 'Galaxy S24 Ultra', brand: 'Samsung', code: 'SGS24U', snap: { w: 1323, h: 2268 }, tough: { w: 1362, h: 2295 } },
-  { name: 'Galaxy S24 FE', brand: 'Samsung', code: 'SGS24FE', snap: null, tough: { w: 1320, h: 2250 } },
-  { name: 'Galaxy S25', brand: 'Samsung', code: 'SGS25', snap: { w: 1224, h: 2073 }, tough: { w: 1251, h: 2097 } },
-  { name: 'Galaxy S25+', brand: 'Samsung', code: 'SGS25P', snap: { w: 1281, h: 2202 }, tough: { w: 1314, h: 2229 } },
-  { name: 'Galaxy S25 Ultra', brand: 'Samsung', code: 'SGS25U', snap: { w: 1323, h: 2244 }, tough: { w: 1359, h: 2244 } },
-  { name: 'Galaxy S26', brand: 'Samsung', code: 'SGS26', snap: { w: 1243, h: 2103 }, tough: { w: 1269, h: 2121 } },
-  { name: 'Galaxy S26+', brand: 'Samsung', code: 'SGS26P', snap: { w: 1290, h: 2208 }, tough: { w: 1316, h: 2226 } },
-  { name: 'Galaxy S26 Ultra', brand: 'Samsung', code: 'SGS26U', snap: { w: 1318, h: 2262 }, tough: { w: 1344, h: 2285 } },
-  { name: 'Pixel 8', brand: 'Google', code: 'GP8', snap: null, tough: { w: 1230, h: 2130 } },
-  { name: 'Pixel 8 Pro', brand: 'Google', code: 'GP8P', snap: null, tough: { w: 1320, h: 2250 } },
-  { name: 'Pixel 9', brand: 'Google', code: 'GP9', snap: null, tough: { w: 1329, h: 2124 } },
-  { name: 'Pixel 9 Pro', brand: 'Google', code: 'GP9P', snap: null, tough: { w: 1329, h: 2124 } },
-  { name: 'Pixel 9 Pro XL', brand: 'Google', code: 'GP9PXL', snap: null, tough: { w: 1359, h: 2244 } },
+  { name: 'iPhone 13', brand: 'Apple', code: 'IP13', snap: { w: 1204, h: 2019, cam: 0.29 }, tough: { w: 1238, h: 2042, cam: 0.29 } },
+  { name: 'iPhone 13 mini', brand: 'Apple', code: 'IP13MN', snap: { w: 1097, h: 1830, cam: 0.3 }, tough: { w: 1122, h: 1830, cam: 0.3 } },
+  { name: 'iPhone 13 Pro', brand: 'Apple', code: 'IP13P', snap: { w: 1204, h: 2019, cam: 0.34 }, tough: { w: 1238, h: 2042, cam: 0.34 } },
+  { name: 'iPhone 13 Pro Max', brand: 'Apple', code: 'IP13PM', snap: { w: 1286, h: 2185, cam: 0.31 }, tough: { w: 1322, h: 2219, cam: 0.31 } },
+  { name: 'iPhone 14', brand: 'Apple', code: 'IP14', snap: { w: 1200, h: 2040, cam: 0.28 }, tough: { w: 1260, h: 2100, cam: 0.3 } },
+  { name: 'iPhone 14 Plus', brand: 'Apple', code: 'IP14PL', snap: { w: 1320, h: 2190, cam: 0.26 }, tough: { w: 1350, h: 2250, cam: 0.28 } },
+  { name: 'iPhone 14 Pro', brand: 'Apple', code: 'IP14PR', snap: { w: 1200, h: 2040, cam: 0.33 }, tough: { w: 1260, h: 2100, cam: 0.35 } },
+  { name: 'iPhone 14 Pro Max', brand: 'Apple', code: 'IP14PM', snap: { w: 1320, h: 2190, cam: 0.31 }, tough: { w: 1350, h: 2250, cam: 0.33 } },
+  { name: 'iPhone 15', brand: 'Apple', code: 'IP15', snap: { w: 1200, h: 2040, cam: 0.28 }, tough: { w: 1260, h: 2100, cam: 0.3 } },
+  { name: 'iPhone 15 Plus', brand: 'Apple', code: 'IP15PL', snap: { w: 1320, h: 2190, cam: 0.26 }, tough: { w: 1350, h: 2250, cam: 0.28 } },
+  { name: 'iPhone 15 Pro', brand: 'Apple', code: 'IP15PR', snap: { w: 1200, h: 2040, cam: 0.34 }, tough: { w: 1260, h: 2100, cam: 0.35 } },
+  { name: 'iPhone 15 Pro Max', brand: 'Apple', code: 'IP15PM', snap: { w: 1320, h: 2190, cam: 0.31 }, tough: { w: 1350, h: 2250, cam: 0.33 } },
+  { name: 'iPhone 16', brand: 'Apple', code: 'IP16', snap: { w: 1209, h: 2049, cam: 0.32 }, tough: { w: 1245, h: 2085, cam: 0.34 } },
+  { name: 'iPhone 16 Plus', brand: 'Apple', code: 'IP16PL', snap: { w: 1311, h: 2196, cam: 0.3 }, tough: { w: 1359, h: 2244, cam: 0.31 } },
+  { name: 'iPhone 16 Pro', brand: 'Apple', code: 'IP16PR', snap: { w: 1209, h: 2049, cam: 0.32 }, tough: { w: 1245, h: 2085, cam: 0.34 } },
+  { name: 'iPhone 16 Pro Max', brand: 'Apple', code: 'IP16PM', snap: { w: 1311, h: 2196, cam: 0.3 }, tough: { w: 1359, h: 2244, cam: 0.32 } },
+  { name: 'iPhone 16e', brand: 'Apple', code: 'IP16E', snap: null, tough: { w: 1254, h: 2069, cam: 0.23 } },
+  { name: 'iPhone 17', brand: 'Apple', code: 'IP17', snap: { w: 1233, h: 2094, cam: 0.31 }, tough: { w: 1266, h: 2121, cam: 0.34 } },
+  { name: 'iPhone 17 Air', brand: 'Apple', code: 'IP17A', snap: { w: 1272, h: 2172, cam: 0.23 }, tough: { w: 1305, h: 2196, cam: 0.25 } },
+  { name: 'iPhone 17 Pro', brand: 'Apple', code: 'IP17PR', snap: { w: 1233, h: 2091, cam: 0.32 }, tough: { w: 1266, h: 2115, cam: 0.34 } },
+  { name: 'iPhone 17 Pro Max', brand: 'Apple', code: 'IP17PM', snap: { w: 1305, h: 2250, cam: 0.3 }, tough: { w: 1338, h: 2274, cam: 0.32 } },
+  { name: 'iPhone 18 Pro', brand: 'Apple', code: 'IP18PR', snap: { w: 1233, h: 2092, cam: 0.32 }, tough: { w: 1266, h: 2115, cam: 0.34 } },
+  { name: 'iPhone 18 Pro Max', brand: 'Apple', code: 'IP18PM', snap: { w: 1305, h: 2251, cam: 0.3 }, tough: { w: 1338, h: 2274, cam: 0.32 } },
+  { name: 'Galaxy S23', brand: 'Samsung', code: 'SGS23', snap: { w: 1200, h: 2040, cam: 0.39 }, tough: { w: 1260, h: 2070, cam: 0.4 } },
+  { name: 'Galaxy S23+', brand: 'Samsung', code: 'SGS23P', snap: { w: 1290, h: 2190, cam: 0.37 }, tough: { w: 1350, h: 2220, cam: 0.38 } },
+  { name: 'Galaxy S23 Ultra', brand: 'Samsung', code: 'SGS23U', snap: { w: 1320, h: 2280, cam: 0.38 }, tough: { w: 1380, h: 2310, cam: 0.4 } },
+  { name: 'Galaxy S23 FE', brand: 'Samsung', code: 'SGS23FE', snap: null, tough: { w: 1356, h: 2244, cam: 0.38 } },
+  { name: 'Galaxy S24', brand: 'Samsung', code: 'SGS24', snap: { w: 1224, h: 2073, cam: 0.39 }, tough: { w: 1251, h: 2097, cam: 0.4 } },
+  { name: 'Galaxy S24+', brand: 'Samsung', code: 'SGS24P', snap: { w: 1281, h: 2202, cam: 0.38 }, tough: { w: 1314, h: 2229, cam: 0.39 } },
+  { name: 'Galaxy S24 Ultra', brand: 'Samsung', code: 'SGS24U', snap: { w: 1323, h: 2268, cam: 0.39 }, tough: { w: 1362, h: 2295, cam: 0.41 } },
+  { name: 'Galaxy S24 FE', brand: 'Samsung', code: 'SGS24FE', snap: null, tough: { w: 1320, h: 2250, cam: 0.4 } },
+  { name: 'Galaxy S25', brand: 'Samsung', code: 'SGS25', snap: { w: 1224, h: 2073, cam: 0.39 }, tough: { w: 1251, h: 2097, cam: 0.4 } },
+  { name: 'Galaxy S25+', brand: 'Samsung', code: 'SGS25P', snap: { w: 1281, h: 2202, cam: 0.38 }, tough: { w: 1314, h: 2229, cam: 0.39 } },
+  { name: 'Galaxy S25 Ultra', brand: 'Samsung', code: 'SGS25U', snap: { w: 1323, h: 2244, cam: 0.39 }, tough: { w: 1359, h: 2244, cam: 0.41 } },
+  { name: 'Galaxy S26', brand: 'Samsung', code: 'SGS26', snap: { w: 1243, h: 2103, cam: 0.39 }, tough: { w: 1269, h: 2121, cam: 0.41 } },
+  { name: 'Galaxy S26+', brand: 'Samsung', code: 'SGS26P', snap: { w: 1290, h: 2208, cam: 0.37 }, tough: { w: 1316, h: 2226, cam: 0.39 } },
+  { name: 'Galaxy S26 Ultra', brand: 'Samsung', code: 'SGS26U', snap: { w: 1318, h: 2262, cam: 0.4 }, tough: { w: 1344, h: 2285, cam: 0.41 } },
+  { name: 'Pixel 8', brand: 'Google', code: 'GP8', snap: null, tough: { w: 1230, h: 2130, cam: 0.27 } },
+  { name: 'Pixel 8 Pro', brand: 'Google', code: 'GP8P', snap: null, tough: { w: 1320, h: 2250, cam: 0.28 } },
+  { name: 'Pixel 9', brand: 'Google', code: 'GP9', snap: null, tough: { w: 1329, h: 2124, cam: 0.28 } },
+  { name: 'Pixel 9 Pro', brand: 'Google', code: 'GP9P', snap: null, tough: { w: 1329, h: 2124, cam: 0.28 } },
+  { name: 'Pixel 9 Pro XL', brand: 'Google', code: 'GP9PXL', snap: null, tough: { w: 1359, h: 2244, cam: 0.27 } },
 ];
 
 export const CASE_GRADES: CaseGrade[] = ['snap', 'tough'];
@@ -129,4 +131,36 @@ export function searchPhones(query: string, limit = 8): PhoneModel[] {
   });
   scored.sort((a, b) => b.gen - a.gen || a.extra - b.extra || a.age - b.age);
   return scored.slice(0, limit).map((s) => s.m);
+}
+
+// ── default placement: clear of the camera ───────────────────────────────────────────────
+
+/**
+ * Where a drawing goes on a phone case by default: the WHOLE drawing, as big as it fits in the
+ * clear area BELOW the camera cut-out (a small gap under it, the safe margin at the sides and the
+ * bottom) — so a face never lands in a camera hole. Same Transform model as every product (a
+ * cover-relative scale + a pan within the slack; the case print file has no trim), so the preview,
+ * the print file and the print-quality check all agree. null when we can't place it (unknown
+ * phone/grade, no image size yet) — the caller keeps the usual "fit the whole drawing".
+ */
+export function caseDefaultTransform(
+  modelName: string | null | undefined,
+  grade: string | null | undefined,
+  src: { width: number; height: number } | null | undefined,
+): { scale: number; offsetX: number; offsetY: number; rotationDeg: 0 } | null {
+  const px = PHONE_MODELS.find((m) => m.name === modelName)?.[grade as CaseGrade];
+  if (!px || !src || !(src.width > 0) || !(src.height > 0)) return null;
+  const CW = px.w;
+  const CH = px.h;
+  const top = (px.cam + 0.03) * CH;
+  const bottom = 0.95 * CH;
+  const left = 0.07 * CW;
+  const right = 0.93 * CW;
+  const fit = Math.min((right - left) / src.width, (bottom - top) / src.height); // px per source px
+  const cover = Math.max(CW / src.width, CH / src.height);
+  const drawH = src.height * fit;
+  const slackY = Math.abs(drawH - CH);
+  const offsetY = slackY > 0 ? Math.max(-1, Math.min(1, ((top + bottom) / 2 - CH / 2) * 2 / slackY)) : 0;
+  const r4 = (v: number) => Math.round(v * 10000) / 10000;
+  return { scale: r4(fit / cover), offsetX: 0, offsetY: r4(offsetY), rotationDeg: 0 };
 }

@@ -1,4 +1,5 @@
 import type { BasketItem } from '@/lib/store';
+import { caseDefaultTransform } from '@/lib/phone-cases';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
@@ -30,6 +31,23 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
 const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'mug']);
 export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+}
+
+/**
+ * The default placement for a product AS SHOWN — like {@link defaultTransformFor}, but a phone case
+ * starts with the whole drawing clear of that phone's camera (needs the drawing's aspect, w/h).
+ * The range tile and its enlarge view use this so they match the customize page.
+ */
+export function defaultPlacementFor(
+  productKey: string,
+  variantAttrs: Record<string, string> | undefined,
+  aspect: number | undefined | null,
+): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
+  if (productKey === 'phoneCase' && aspect && aspect > 0) {
+    const t = caseDefaultTransform(variantAttrs?.size, variantAttrs?.grade, { width: Math.round(aspect * 1000), height: 1000 });
+    if (t) return t;
+  }
+  return defaultTransformFor(productKey);
 }
 
 /**

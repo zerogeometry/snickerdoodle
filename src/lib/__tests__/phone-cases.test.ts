@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { CASE_PRICE_PENCE, PHONE_MODELS, gradesFor, prodigiCaseSku, searchPhones } from '@/lib/phone-cases';
+import { CASE_PRICE_PENCE, PHONE_MODELS, caseDefaultTransform, gradesFor, prodigiCaseSku, searchPhones } from '@/lib/phone-cases';
+import { clampTransform, computeLayerRect } from '@/server/print/geometry';
 
 const names = (q: string) => searchPhones(q).map((m) => m.name);
 const top = (q: string) => names(q)[0];
@@ -54,5 +55,33 @@ describe('phone case SKUs and grades', () => {
   it('every model has at least one grade, and prices are the founder’s', () => {
     for (const m of PHONE_MODELS) expect(m.snap || m.tough, m.name).toBeTruthy();
     expect(CASE_PRICE_PENCE).toEqual({ snap: 2499, tough: 2999 });
+  });
+});
+
+describe('default placement keeps the drawing clear of the camera', () => {
+  const geom = (name: string, grade: 'snap' | 'tough') => {
+    const px = PHONE_MODELS.find((m) => m.name === name)![grade]!;
+    return { printWidthPx: px.w, printHeightPx: px.h, bleedMm: 0, requiredDpi: 300, cam: px.cam };
+  };
+  for (const [name, grade, src] of [
+    ['iPhone 16', 'snap', { width: 2000, height: 1500 }], // a wide drawing
+    ['Galaxy S25 Ultra', 'tough', { width: 1500, height: 2100 }], // a tall one (A4-ish)
+    ['Pixel 9', 'tough', { width: 1800, height: 1800 }], // square
+  ] as const) {
+    it(`${name} ${grade}: the whole ${src.width}×${src.height} drawing sits below the camera, inside the safe edges`, () => {
+      const t = caseDefaultTransform(name, grade, src)!;
+      const g = geom(name, grade);
+      const r = computeLayerRect(g, src, clampTransform(t)); // the SAME geometry the print file uses
+      expect(r.y).toBeGreaterThanOrEqual(Math.floor(g.cam * g.printHeightPx)); // below the camera
+      expect(r.y + r.height).toBeLessThanOrEqual(Math.ceil(0.96 * g.printHeightPx)); // above the bottom edge
+      expect(r.x).toBeGreaterThanOrEqual(Math.floor(0.06 * g.printWidthPx));
+      expect(r.x + r.width).toBeLessThanOrEqual(Math.ceil(0.94 * g.printWidthPx));
+      expect(r.width / r.height).toBeCloseTo(src.width / src.height, 1); // the whole drawing, not a crop
+    });
+  }
+  it('no placement without a known phone or an image size', () => {
+    expect(caseDefaultTransform('Nokia', 'snap', { width: 10, height: 10 })).toBeNull();
+    expect(caseDefaultTransform('Pixel 9', 'snap', { width: 10, height: 10 })).toBeNull(); // tough-only
+    expect(caseDefaultTransform('iPhone 16', 'snap', null)).toBeNull();
   });
 });

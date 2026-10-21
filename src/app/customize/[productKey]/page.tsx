@@ -16,7 +16,7 @@ import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
-import { CASE_GRADE_BLURB, gradesFor } from '@/lib/phone-cases';
+import { CASE_GRADE_BLURB, caseDefaultTransform, gradesFor } from '@/lib/phone-cases';
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { saveDesignAction } from '@/app/actions/designs';
@@ -331,7 +331,11 @@ export default function CustomizePage() {
   // placed under an earlier drawing edits the right image); otherwise the current upload.
   const activeAssetId = edit?.assetId ?? upload?.assetId ?? null;
   const activeSource = edit?.sourceObjectId ?? upload?.cutout?.sourceObjectId;
-  const placement = (activeAssetId && placements[`${activeAssetId}-${product.key}`]) || defaultTransformFor(product.key);
+  const savedPlacement = activeAssetId ? placements[`${activeAssetId}-${product.key}`] : undefined;
+  // a phone case starts with the whole drawing clear of THIS phone's camera; everything else
+  // keeps its product default. A placement the parent set themselves always wins.
+  const placement =
+    savedPlacement || (product.key === 'phoneCase' ? caseDefaultTransform(size, grade, srcSize) : null) || defaultTransformFor(product.key);
 
   // Print-readiness (Studio spec §15 / docs/04: never silently under-resolve).
   const assessFor = (v: (typeof product.variants)[number] | null | undefined): ResolutionAssessment | null =>
@@ -367,6 +371,8 @@ export default function CustomizePage() {
     // Keep ?edit through the round-trip so "save & return" lands back in edit mode, and mark
     // it resume=1 so we DON'T re-seed over the placement the positioner just saved.
     const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`;
+    // the editor opens where the preview shows it (a phone case's camera-clear default included)
+    if (activeAssetId && !savedPlacement) usePlacements.getState().setPlacement(`${activeAssetId}-${product.key}`, placement);
     router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}&return=${encodeURIComponent(ret)}`);
   };
 

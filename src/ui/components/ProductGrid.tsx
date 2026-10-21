@@ -5,7 +5,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
 import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
-import { MUG_SWATCH, defaultTransformFor, resolveDisplayVariant } from '@/lib/catalogue-view';
+import { MUG_SWATCH, defaultPlacementFor, resolveDisplayVariant } from '@/lib/catalogue-view';
 import { garmentHex, isGarmentKey } from '@/lib/garments';
 import type { CatalogueProduct } from '@/server/catalogue';
 
@@ -61,12 +61,12 @@ export function ProductTile({
   // Placement (zoom/position) is carried in usePlacements, keyed by (asset, product) to
   // match what add-to-basket stores; the chosen size/colour/orientation in useSelection.
   const savedTf = usePlacements((s) => (upload?.assetId ? s.placements[`${upload.assetId}-${p.key}`] : undefined));
-  const tf = savedTf ?? defaultTransformFor(p.key);
   const sel = useSelection((s) => s.selections[p.key]);
   // The ONE resolver the tile, the quick-add "+", and the enlarge modal all share (catalogue-view),
   // so the tile can never show a landscape frame while "+" quietly adds the portrait default:
   // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
   const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: sel });
+  const tf = savedTf ?? defaultPlacementFor(p.key, shownVariant.attributes, upload?.aspect);
   return (
     // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
     // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape

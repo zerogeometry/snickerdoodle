@@ -77,6 +77,18 @@ export async function traceCaseTemplate(png: Buffer, W: number, H: number): Prom
       }
     }
     if (comp.length < minHole) continue;
+    // a real cut-out is roughly round/oblong and solid — not a thin sliver of bleed trapped beside
+    // a side-button notch (those run down the case edge and must not read as a camera)
+    let cx0 = W, cx1 = 0, cy0 = H, cy1 = 0;
+    for (const j of comp) {
+      const x = j % W, y = (j / W) | 0;
+      if (x < cx0) cx0 = x;
+      if (x > cx1) cx1 = x;
+      if (y < cy0) cy0 = y;
+      if (y > cy1) cy1 = y;
+    }
+    const bw = cx1 - cx0 + 1, bh = cy1 - cy0 + 1;
+    if (bw < W * 0.04 || bh < W * 0.04 || comp.length < bw * bh * 0.3) continue;
     holeCount++;
     for (const j of comp) raw[j] = 1;
   }
