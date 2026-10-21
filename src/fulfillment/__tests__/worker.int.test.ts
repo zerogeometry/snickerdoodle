@@ -75,10 +75,15 @@ describe.skipIf(!DB || !S3)('fulfilment worker — claim → render → gate (in
     return a!;
   }
 
+  // Suites share one DB: every tick is scoped to OUR order. A broad tick claims every
+  // PAID order's PENDING artwork in the DB — e.g. the launch loop's fresh gift order,
+  // whose artwork it asserts is still PENDING — so it made other suites flaky.
+  const tick = (orderId: string) => processFulfilment(db, { env: SANDBOX, onlyOrderIds: [orderId] });
+
   it('renders a non-child drawing in-VPC and clears the gate → READY (idempotent re-run)', async () => {
     const orderId = await paidOrder('DRAWING');
-    const summary = await processFulfilment(db, { env: SANDBOX });
-    expect(summary.ready).toBeGreaterThanOrEqual(1);
+    const summary = await tick(orderId);
+    expect(summary.ready).toBe(1);
 
     const a = await artworkOf(orderId);
     expect(a.status).toBe('READY');
@@ -86,15 +91,15 @@ describe.skipIf(!DB || !S3)('fulfilment worker — claim → render → gate (in
     expect(a.renderedDpi).toBe(300);
 
     // A second tick must NOT re-claim a READY item (the claim only takes PENDING).
-    const again = await processFulfilment(db, { env: SANDBOX });
+    const again = await tick(orderId);
     expect(again.items.some((i) => i.artworkId === a.id)).toBe(false);
     expect((await artworkOf(orderId)).status).toBe('READY');
   });
 
   it('renders a child image but the GATE refuses egress (sandbox) → BLOCKED_GATE', async () => {
     const orderId = await paidOrder('PHOTO'); // a PHOTO is treated as a child image (conservative)
-    const summary = await processFulfilment(db, { env: SANDBOX });
-    expect(summary.blocked).toBeGreaterThanOrEqual(1);
+    const summary = await tick(orderId);
+    expect(summary.blocked).toBe(1);
 
     const a = await artworkOf(orderId);
     expect(a.status).toBe('BLOCKED_GATE');
@@ -106,7 +111,7 @@ describe.skipIf(!DB || !S3)('fulfilment worker — claim → render → gate (in
     await db.update(orders).set({ status: 'PENDING' }).where(eq(orders.id, orderId)); // unpay it
     const before = await artworkOf(orderId);
 
-    const summary = await processFulfilment(db, { env: SANDBOX });
+    const summary = await tick(orderId); // in scope, but unpaid → still not claimed
     expect(summary.items.some((i) => i.artworkId === before.id)).toBe(false);
     expect((await artworkOf(orderId)).status).toBe('PENDING'); // untouched
   });

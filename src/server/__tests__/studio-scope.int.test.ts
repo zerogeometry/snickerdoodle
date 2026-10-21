@@ -39,7 +39,7 @@ describe.skipIf(!URL)('studio editor scope — the focused variant wins (integra
     const [landscape] = await db
       .select()
       .from(productVariants)
-      .where(and(eq(productVariants.productId, frame!.id), eq(productVariants.isDefault, false)))
+      .where(and(eq(productVariants.productId, frame!.id), eq(productVariants.isDefault, false), eq(productVariants.active, true))) // ACTIVE: a retired size (28×40) is not a creation Customize can send
       .then((rows) => rows.filter((v) => (v.attributes as Record<string, string> | null)?.orientation === 'landscape'));
     expect(landscape, 'a landscape frame variant is seeded').toBeTruthy();
     const la = landscape!.attributes as Record<string, string>;

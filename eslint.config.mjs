@@ -25,6 +25,7 @@ const config = [
       'sample-art/**',
       'scripts/sample-art/**',
       'next-env.d.ts',
+      '.claude/**', // other sessions' worktrees (and their build output) live here
     ],
   },
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
