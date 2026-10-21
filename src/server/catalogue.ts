@@ -267,8 +267,8 @@ const SOCKS = [
 ] as const;
 
 // Wall height chart: canvas on wooden poster hangers (hanger colour = Prodigi `color`). Made at
-// gb3, Evri Next Day (tracked). Prodigi prints NO ruler — the cm + ft/in markings must be drawn
-// INTO the print file (to-do before this goes on show: the ruler render + a scale-accuracy test).
+// gb3, Evri Next Day (tracked). Prodigi prints NO ruler — the cm + ft/in markings are drawn INTO
+// the print file at true scale (src/server/print/height-chart-geometry.ts, scale-tested ±1 px).
 const HEIGHT_CHARTS = [
   { size: '20 × 120 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X48', px: { w: 1200, h: 7200 }, pricePence: 3100 },
   { size: '30 × 120 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X48', px: { w: 1800, h: 7200 }, pricePence: 3400 },
@@ -460,8 +460,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   heightChart: {
     category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true,
-    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. They're only little once.",
-    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', made: 'in the UK' },
+    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
       HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
     ),

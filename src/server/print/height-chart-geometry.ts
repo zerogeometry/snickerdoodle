@@ -19,10 +19,12 @@ import { mmToPx, type TemplateGeom } from './geometry';
 export const HEIGHT_CHART_KEY = 'heightChart';
 export const isHeightChart = (key: string | null | undefined): boolean => !!key && (key === HEIGHT_CHART_KEY || key.startsWith(`${HEIGHT_CHART_KEY}-`));
 
-/** Where the chart's BOTTOM EDGE hangs above the floor, in cm — the scale starts here.
- * FOUNDER DECISION PENDING (recommended 30 cm: clears a skirting board, and a 120 cm chart then
- * reads ~32–150 cm — about a 1-year-old to a 12-year-old; a 150 cm chart reads ~32–180 cm). */
-export const HEIGHT_CHART_FLOOR_CM = 30;
+/** Where the chart's BOTTOM EDGE hangs above the floor, in cm — the scale starts here (founder,
+ * 2026-10-21: follow the market). UK canvas charts of this size read ~50–150 cm (Not On The High
+ * Street bestsellers: 40–160, 50–150, 60–160), hung well clear of the skirting. At 40 cm our 120 cm
+ * charts read 50–150 cm (newborn to ~12) and the 150 cm charts 50–190 cm (the whole family). The
+ * product description tells parents where to hang it. */
+export const HEIGHT_CHART_FLOOR_CM = 40;
 /** The ruler band's width — wide enough that the cm and the ft labels sit in separate columns. */
 export const RULER_BAND_MM = 64;
 /** The wooden poster hangers clamp the top and bottom edges: no tick or label inside this. */

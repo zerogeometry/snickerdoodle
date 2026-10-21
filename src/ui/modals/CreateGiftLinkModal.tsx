@@ -271,6 +271,8 @@ export function CreateGiftLinkModal({
           </label>
 
           <p className="mb-2 mt-4 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">or share the link yourself</p>
+          {/* just-in-time: who can see it, and for how long — shown right where the link is shared */}
+          <p className="mb-2 text-[12px] text-ink-soft">anyone you send it to can see these drawings for 14 days — you can switch it off sooner from your keepsake home.</p>
           <div className="flex items-center gap-2 rounded-lg border border-line bg-paper-2 px-3 py-2.5">
             <Icon icon={IconLink} size={15} className="shrink-0 text-ink-faint" />
             <span className="flex-1 truncate text-xs text-ink-soft">{fullUrl.replace(/^https?:\/\//, '')}</span>

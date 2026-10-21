@@ -16,7 +16,9 @@ import { placeOrder, type PlaceOrderResult } from './orders';
 import type { RawTransform } from './print/geometry';
 import { appUrl, sendMail } from './mail';
 
-const GIFT_LINK_TTL_DAYS = 30;
+/** How long a gift link works (founder, 2026-10-21: 14 days, down from 30 — a forwarded bearer link
+ * shows a child's drawing for less time; Children's Code). A parent can always share a fresh one. */
+export const GIFT_LINK_TTL_DAYS = 14;
 const DEFAULT_GIFT_PRODUCT = 'framedPrint';
 /** Products a keepsake can be shared as on a gift link: printable, on show in the shop, and
  * needing no extra buyer input (a card needs its inside message, a card pack its N drawings, so
