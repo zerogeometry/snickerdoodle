@@ -1,5 +1,5 @@
 import 'server-only';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
@@ -30,7 +30,11 @@ async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: Tra
   }
   return { traced: caseTraces.get(key) ?? null, source: manifest[model]?.[grade] ? 'prodigi template' : 'prodigi template (other grade)' };
 }
-import { ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, isDarkGarment, KIDS_TEE_CHEST_MM, KIDS_TEE_PRINT_MM, teePrintRegion } from '@/lib/garments';
+import {
+  ADULT_HOODIE_CHEST_MM, ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, garmentPrintRegion, HOODIE_PRINT_MM, isDarkGarment, KIDS_HOODIE_CHEST_MM, KIDS_TEE_CHEST_MM,
+  KIDS_TEE_PRINT_MM, teePrintRegion, type GarmentPhoto,
+} from '@/lib/garments';
+import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawnMockups';
 
 /**
  * Mockup template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -81,7 +85,27 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
+  | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
 );
+
+/** The first image in a staged blank folder whose name matches — Prodigi's zips are named
+ * loosely ("prodigi-tea-towel-blank-asset/…"), so find it rather than hard-code a filename. */
+function findBlank(dirPattern: RegExp): string | null {
+  if (!existsSync(ROOT)) return null;
+  for (const dir of readdirSync(ROOT, { withFileTypes: true })) {
+    if (!dir.isDirectory() || !dirPattern.test(dir.name)) continue;
+    const img = readdirSync(path.join(ROOT, dir.name)).filter((f) => /\.(png|jpe?g|webp)$/i.test(f)).sort()[0];
+    if (img) return `${dir.name}/${img}`;
+  }
+  return null;
+}
+
+/** Hoodie photo blanks, derived by scripts/derive-garment-photo-blanks.mjs from a staged hoodie
+ * packshot; the script writes the measured photo geometry beside them (hoodie-photo.json). */
+function hoodiePhoto(): GarmentPhoto | null {
+  const f = path.join(ROOT, 'derived', 'hoodie-photo.json');
+  return existsSync(f) ? (JSON.parse(readFileSync(f, 'utf8')) as GarmentPhoto) : null;
+}
 
 // Founder-authored LAYER drops (background / product / shadow on one canvas, the frame's
 // aperture cut transparent in product.png) — preferred over the flat Prodigi blank when
@@ -223,7 +247,9 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'prodigi-calendar-blank-assets/Blank Calendars/calendar blank.png', material: 'PAPER', register: 'face-cover', mask: false, rotate: 90 };
     case 'storybook': // derived from Prodigi's hardcover photo-book back shot (thumbnails in-painted, portrait crop)
       return { file: 'derived/storybook-blank.jpg', material: 'PAPER', register: 'face-cover', mask: false };
-    case 'card': {
+    case 'card':
+    case 'cardPack': {
+      // (a card PACK is the same 7×5 card — it reuses the card's mockup)
       // Preferred: the founder's "Single Card View" (card-on-envelope) as the catalogue thumbnail.
       const dir = layeredCardSingleDir();
       if (dir) return { material: 'PAPER', register: 'layered-card-single', dir };
@@ -268,7 +294,30 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
       // Flat-blank fallback (the plain white Prodigi blank) if the layers aren't present.
       return { file: 'prodigi-11oz-mug-blank-asset/Prodigi 11oz Mug blank.png', material: 'CERAMIC', register: 'band', mask: false, region: { x0: 0.11, y0: 0.25, x1: 0.57, y1: 0.75 } };
     }
+    // ── Range expansion (D21) ──
+    // Hoodies: the real hoodie packshot in the variant's colour (derived like the tees), the print
+    // at its TRUE size for that size's chest. Not staged ⇒ skipped (the shop keeps the plain tile).
+    case 'kidsHoodie':
+    case 'adultHoodie': {
+      const photo = hoodiePhoto();
+      if (!photo) return null;
+      const kids = key === 'kidsHoodie';
+      const chest = (kids ? KIDS_HOODIE_CHEST_MM : ADULT_HOODIE_CHEST_MM)[size] ?? (kids ? 340 : 570);
+      const file = !colour || colour === 'white' ? 'derived/hoodie-photo.png' : `derived/hoodie-photo-${colour.replace(/\s+/g, '-')}.png`;
+      return {
+        file, material: isDarkGarment(colour) ? 'DARK_FABRIC' : 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas',
+        region: garmentPrintRegion(photo, HOODIE_PRINT_MM, chest),
+      };
+    }
+    // Tea towel: Prodigi's flat blank when staged (print-accurate, face-cover), else drawn.
+    case 'teaTowel': {
+      const file = findBlank(/tea.?towel/i);
+      return file ? { file, material: 'LIGHT_FABRIC', register: 'face-cover', mask: true } : { material: 'LIGHT_FABRIC', register: 'drawn', key: 'teaTowel' };
+    }
     default:
+      // socks, height chart, acrylic block, wrapping paper, bandana, playing cards: no Prodigi blank
+      // photo — a DRAWN mockup with the print area at the print file's exact aspect.
+      if (isDrawnProduct(key)) return { material: 'PAPER', register: 'drawn', key };
       return null; // giftWrap (no print) → keep SVG
   }
 }
@@ -914,6 +963,7 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     .select({
       id: productVariants.id, sku: productVariants.sku, attrs: productVariants.attributes, key: products.key,
       printWmm: printTemplates.printWidthMm, printHmm: printTemplates.printHeightMm,
+      printWpx: printTemplates.printWidthPx, printHpx: printTemplates.printHeightPx,
     })
     .from(productVariants)
     .innerJoin(products, eq(productVariants.productId, products.id))
@@ -943,6 +993,20 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     const p = plan(r.key, (r.attrs as Record<string, string>) ?? {});
     if (!p) { skipped.push(r.key); continue; }
     const printAspectEarly = r.printWmm / r.printHmm;
+
+    if (p.register === 'drawn') {
+      const d = drawProductMockup(p.key, (r.attrs as Record<string, string>) ?? {}, { w: r.printWpx, h: r.printHpx });
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: d.material, mask: d.mask, overlay: d.overlay });
+      authored++;
+      const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
+      const pa = r.printWpx / r.printHpx;
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'drawn',
+        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(pa * 1000) / 1000,
+        driftPct: Math.round(Math.abs(qa / pa - 1) * 1000) / 10,
+      });
+      continue;
+    }
 
     if (p.register === 'layered-frame') {
       const d = await layeredFrame(p.dir, p.orientation);

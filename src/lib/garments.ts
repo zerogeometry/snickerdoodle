@@ -69,6 +69,12 @@ export const ADULT_HOODIE_COLOURS: GarmentColour[] = [
 ];
 export const ADULT_HOODIE_SIZES = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'];
 export const HOODIE_PRINT_MM = { w: 260, h: 260 } as const; // kids AND adult (GB route), 3070×3070px
+/** Hoodie flat chest widths (½ chest, mm) for the size-true preview, like the tees'. APPROXIMATE —
+ * Stanley/Stella's published charts run a little roomier than the tees (Mini Cruiser 2.0 / Drummer
+ * 2.0); confirm against Prodigi's size guide (to-do: PRODIGI-APPAREL-CHECKS.md). Every size is
+ * listed so no size falls back to a guess. */
+export const KIDS_HOODIE_CHEST_MM: Record<string, number> = { '3-4 years': 340, '5-6 years': 370, '7-8 years': 400, '9-11 years': 430, '12-14 years': 460 };
+export const ADULT_HOODIE_CHEST_MM: Record<string, number> = { XS: 510, S: 540, M: 570, L: 600, XL: 630, '2XL': 660, '3XL': 690 };
 
 /** The garment products (printed direct-to-garment). */
 export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie'] as const;
@@ -102,6 +108,15 @@ export const ADULT_TEE_SIZES = Object.keys(ADULT_TEE_CHEST_MM);
 export const KIDS_TEE_PRINT_MM = { w: 260, h: 260 } as const;
 export const ADULT_TEE_PRINT_MM = { w: 396, h: 498 } as const;
 
+/** A flat garment photo's measured geometry (scripts/derive-garment-photo-blanks.mjs): the torso's
+ * width and centre as fractions of the photo width, the top of the print panel as a fraction of its
+ * height, and the photo's own aspect (w/h). */
+export interface GarmentPhoto {
+  torsoFrac: number;
+  centreX: number;
+  panelTop: number;
+  aspect: number;
+}
 /**
  * Where the print sits on the flat tee photo (derived/tee-photo*.png), in photo fractions, for a
  * given size: the print at its TRUE physical ratio to that size's chest. Constants are measured
@@ -109,9 +124,14 @@ export const ADULT_TEE_PRINT_MM = { w: 396, h: 498 } as const;
  * print panel a little below the collar — the drop below the collar is to be confirmed with
  * Prodigi; to-do: PRODIGI-APPAREL-CHECKS.md).
  */
-export const TEE_PHOTO = { torsoFrac: 0.4684, centreX: 0.4985, panelTop: 0.272, aspect: 1.0157 } as const;
+export const TEE_PHOTO: GarmentPhoto = { torsoFrac: 0.4684, centreX: 0.4985, panelTop: 0.272, aspect: 1.0157 };
+/** Where a print of `printMm` sits on a flat garment photo for a chest of `chestMm` — at its TRUE
+ * physical ratio to that size's chest (photo fractions). */
+export function garmentPrintRegion(photo: GarmentPhoto, printMm: { w: number; h: number }, chestMm: number): { x0: number; y0: number; x1: number; y1: number } {
+  const w = (photo.torsoFrac * printMm.w) / chestMm;
+  const h = w * (printMm.h / printMm.w) * photo.aspect;
+  return { x0: photo.centreX - w / 2, y0: photo.panelTop, x1: photo.centreX + w / 2, y1: photo.panelTop + h };
+}
 export function teePrintRegion(printMm: { w: number; h: number }, chestMm: number): { x0: number; y0: number; x1: number; y1: number } {
-  const w = (TEE_PHOTO.torsoFrac * printMm.w) / chestMm;
-  const h = w * (printMm.h / printMm.w) * TEE_PHOTO.aspect;
-  return { x0: TEE_PHOTO.centreX - w / 2, y0: TEE_PHOTO.panelTop, x1: TEE_PHOTO.centreX + w / 2, y1: TEE_PHOTO.panelTop + h };
+  return garmentPrintRegion(TEE_PHOTO, printMm, chestMm);
 }
