@@ -15,7 +15,7 @@ import type { DbHandle } from './db';
  * Only products listed here are "popular" (shown in the range); anything else lives in the full
  * catalogue. Hidden products may sit in the list — the shop still only shows visibleInShop ones.
  */
-export const EXPECTED_POPULARITY = ['framedPrint', 'mug', 'kidsTee', 'card', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit'];
+export const EXPECTED_POPULARITY = ['framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit'];
 
 export const POPULARITY_WINDOW_DAYS = 90;
 /** How many sales the expected order is "worth" in total — real sales take over beyond this. */

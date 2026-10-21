@@ -22,6 +22,7 @@ export type ProductKey =
   | 'sack'
   | 'storybook'
   | 'jigsaw'
+  | 'phoneCase'
   | 'giftWrap';
 
 function House({ transform }: { transform: string }) {
@@ -99,6 +100,13 @@ const ART: Record<ProductKey, ReactNode> = {
       <rect x="18" y="18" width="60" height="60" rx="3" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" />
       <path d="M48 18 v10 M18 48 h10 M68 48 h-10 M48 78 v-10" stroke="var(--color-line)" strokeWidth="2" />
       <House transform="translate(30,32) scale(0.86)" />
+    </>
+  ),
+  phoneCase: (
+    <>
+      <rect x="29" y="8" width="38" height="80" rx="9" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" />
+      <rect x="35" y="14" width="13" height="15" rx="4" fill="none" stroke="var(--color-cocoa)" strokeWidth="2" />
+      <House transform="translate(33,44) scale(0.85)" />
     </>
   ),
   adultTee: (

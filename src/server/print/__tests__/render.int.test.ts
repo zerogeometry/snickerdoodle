@@ -258,6 +258,21 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     expect(l.heightPx).toBe(p.heightPx);
   });
 
+  it('a PHONE CASE renders at Prodigi’s exact print-file pixels for that phone + grade (no trim, no rounding)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [v] = await db
+      .select({ id: productVariants.id })
+      .from(productVariants)
+      .where(eq(productVariants.sku, 'phoneCase-galaxys24ultra-tough-matte'));
+    const assetId = await ingest(await src(1600, 2400));
+    const res = await renderPrintFile(db, sam, { assetId, variantId: v!.id, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    keys.push(res.key);
+    expect(res).toMatchObject({ widthPx: 1362, heightPx: 2295 }); // GLOBAL-TECH-SGS24U-TCB-CS-M printAreaSizes
+    const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
+    const meta = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).metadata();
+    expect([meta.width, meta.height]).toEqual([1362, 2295]);
+  });
+
   it('a GREETINGS CARD renders the flat 4-panel spread (6236×2220), not a single face', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [card] = await db

@@ -264,7 +264,7 @@ export const usePlacements = create<{
 // (so pressing "edit placement" then "save & return" no longer resets it to the
 // default), and lets the editor's orientation toggle write back so Customize
 // reflects it on return. In-memory: a demo selection, not durable state.
-export type Selection = { size?: string; colour?: string; orientation?: string; back?: string; message?: CardMessage; cardImageSpan?: 'full' | 'front' };
+export type Selection = { size?: string; colour?: string; orientation?: string; grade?: string; finish?: string; back?: string; message?: CardMessage; cardImageSpan?: 'full' | 'front' };
 export const useSelection = create<{
   selections: Record<string, Selection>;
   setSelection: (productKey: string, patch: Selection) => void;

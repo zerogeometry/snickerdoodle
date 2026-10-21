@@ -194,7 +194,10 @@ export function FlowCatalogue({
     if (!guardUpload()) return;
     if (!upload?.assetId && !ingestRef.current) toast('getting it ready…');
     const assetId = await ensureAsset();
-    if (assetId) router.push(`/customize/${p.key}`);
+    // carry the DEV curation view (?all=1) through, so a hidden product can be tried end to end
+    // (inert in production — the server refuses includeHidden there)
+    const curating = new URLSearchParams(window.location.search).get('all') === '1';
+    if (assetId) router.push(`/customize/${p.key}${curating ? '?all=1' : ''}`);
   };
 
   const { picks, popular } = useMemo(() => splitCatalogue(products, items), [products, items]);

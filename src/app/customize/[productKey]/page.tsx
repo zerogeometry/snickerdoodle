@@ -16,6 +16,8 @@ import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
+import { CASE_GRADE_BLURB, gradesFor } from '@/lib/phone-cases';
+import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -64,6 +66,9 @@ export default function CustomizePage() {
   const [size, setSize] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
   const [orientation, setOrientation] = useState<string>('portrait');
+  // phone cases: snap | tough, gloss | matte (size = the phone model)
+  const [grade, setGrade] = useState<string | null>(null);
+  const [finish, setFinish] = useState<string | null>(null);
   const [orientationTouched, setOrientationTouched] = useState(false);
   // Ref (updates synchronously, unlike the state above) so the image-aspect auto-default
   // effect — which runs in the SAME flush as the restore effect — sees an explicit choice
@@ -137,6 +142,8 @@ export default function CustomizePage() {
       size: lv.attributes.size,
       colour: lv.attributes.colour,
       orientation: lv.attributes.orientation ?? 'portrait',
+      grade: lv.attributes.grade,
+      finish: lv.attributes.finish,
       back: line.back, // a cushion line carries its back choice
     });
     if (line.artwork?.assetId) {
@@ -153,6 +160,8 @@ export default function CustomizePage() {
     setSize(saved?.size ?? def.attributes.size ?? null);
     setColour(saved?.colour ?? def.attributes.colour ?? null);
     setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
+    setGrade(saved?.grade ?? def.attributes.grade ?? null);
+    setFinish(saved?.finish ?? def.attributes.finish ?? null);
     setBack(saved?.back ?? CUSHION_BACK_WHITE);
     setCardMessage(saved?.message ?? null);
     setCardSpan(saved?.cardImageSpan ?? 'front');
@@ -166,8 +175,15 @@ export default function CustomizePage() {
   // return) and the editor can read/reflect the chosen orientation.
   useEffect(() => {
     if (!product) return;
-    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, back, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
-  }, [product, size, colour, orientation, back, cardMessage, cardSpan]);
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, grade: grade ?? undefined, finish: finish ?? undefined, back, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
+  }, [product, size, colour, orientation, grade, finish, back, cardMessage, cardSpan]);
+
+  // Phone cases: some phones only come in one grade (Pixels are tough-only) — keep the chosen
+  // grade one Prodigi actually makes for the chosen phone.
+  const gradesForModel = useMemo(() => (product && product.grades.length > 0 ? gradesFor(size).filter((g) => product.grades.includes(g)) : []), [product, size]);
+  useEffect(() => {
+    if (gradesForModel.length > 0 && (!grade || !gradesForModel.includes(grade as never))) setGrade(gradesForModel[0]!);
+  }, [gradesForModel, grade]);
 
   // CUSHION back: only the DUAL squares offer a colour / both-sides back; heart + round show a
   // white reverse. `backFill` drives the "turn it around" preview — undefined = the image (both
@@ -260,10 +276,12 @@ export default function CustomizePage() {
           (product.sizes.length === 0 || v.attributes.size === size) &&
           (product.colours.length === 0 || v.attributes.colour === colour) &&
           (product.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === orientation) &&
+          (product.grades.length === 0 || v.attributes.grade === grade) &&
+          (product.finishes.length === 0 || v.attributes.finish === finish) &&
           (v.attributes.sides ?? undefined) === wantSides,
       ) ?? null
     );
-  }, [product, size, colour, orientation, back]);
+  }, [product, size, colour, orientation, grade, finish, back]);
 
   // The pixel size of the image this line will print from (the cutout if chosen) — fed to the
   // SAME assessResolution the server's order-time gate runs, so the badge can't disagree with it.
@@ -734,8 +752,20 @@ export default function CustomizePage() {
             <span className="text-xs font-semibold text-green-save">free tracked delivery</span>
           </div>
 
-          {/* A single-size product needs no picker — the size lives in the product details. */}
-          {product.sizes.length > 1 ? (
+          {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
+          {product.key === 'phoneCase' ? (
+            <>
+              <PhoneModelPicker value={size} onChange={setSize} />
+              {gradesForModel.length > 0 ? (
+                <Picker label="Case" options={gradesForModel} value={grade} onChange={setGrade} describe={(g) => CASE_GRADE_BLURB[g as keyof typeof CASE_GRADE_BLURB]} />
+              ) : null}
+              {gradesForModel.length === 1 && product.grades.length > 1 ? (
+                <p className="mt-1.5 text-xs text-ink-soft">this phone comes in {gradesForModel[0]} only.</p>
+              ) : null}
+              {product.finishes.length > 1 ? <Picker label="Finish" options={product.finishes} value={finish} onChange={setFinish} /> : null}
+            </>
+          ) : /* A single-size product needs no picker — the size lives in the product details. */
+          product.sizes.length > 1 ? (
             <Picker
               label="Size"
               options={product.sizes}

@@ -6,6 +6,7 @@ import { mmToPx } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
 import { ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES } from '@/lib/garments';
+import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 
 export { mmToPx };
 
@@ -33,9 +34,15 @@ type VariantDef = {
   default?: boolean; // mark the default variant when it isn't the first (e.g. size M of XS–2XL)
   /** Trim margin around the print (default 3mm). Garments have NO trim — the file IS the print area. */
   bleedMm?: number;
+  /** Phone cases: the grade (snap | tough) and the finish (gloss | matte). `size` is the phone model. */
+  grade?: string;
+  finish?: string;
+  /** Prodigi's EXACT print-file pixels, when we have them (phone cases) — the template uses these
+   * rather than rounding from mm, so the file is exactly what Prodigi asks for. */
+  px?: { w: number; h: number };
 };
 type ProductDef = {
-  category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON';
+  category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON' | 'TECH';
   label: string;
   blurb: string;
   description: string;
@@ -205,6 +212,28 @@ function blanketVariants(): VariantDef[] {
   );
 }
 
+// Phone cases (founder, 2026-10-21): every model × grade × finish Prodigi makes for it, from the
+// sandbox-validated list in src/lib/phone-cases.ts. `size` is the PHONE MODEL; the print file is
+// Prodigi's exact printAreaSizes for that SKU (~300dpi, the whole wrap — no trim, so bleed 0).
+// Made in the UK (labs uk6/uk8). The default is the newest mainstream iPhone, snap, gloss.
+const CASE_DEFAULT = { model: 'iPhone 17', grade: 'snap', finish: 'gloss' };
+function phoneCaseVariants(): VariantDef[] {
+  const newestFirst = [...PHONE_MODELS].reverse();
+  return newestFirst.flatMap((m) =>
+    CASE_GRADES.flatMap((grade) => {
+      const px = m[grade];
+      if (!px) return []; // Prodigi doesn't make this grade for this phone
+      return CASE_FINISHES.map((finish) => ({
+        size: m.name, grade, finish,
+        pricePence: CASE_PRICE_PENCE[grade],
+        wMm: Math.round((px.w / 300) * 25.4), hMm: Math.round((px.h / 300) * 25.4), dpi: 300, px, bleedMm: 0,
+        prodigiSku: prodigiCaseSku(m, grade, finish),
+        ...(m.name === CASE_DEFAULT.model && grade === CASE_DEFAULT.grade && finish === CASE_DEFAULT.finish ? { default: true } : {}),
+      }));
+    }),
+  );
+}
+
 // The founder-approved launch range (2026-07-01). Prices are our retail pence, VAT-inclusive with
 // FREE tracked delivery baked in (the shipping cost is inside the price, no separate line). Every
 // SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
@@ -322,6 +351,12 @@ const DEFS: Record<string, ProductDef> = {
     // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
     variants: [{ size: 'one size', pricePence: 3495, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
+  phoneCase: {
+    category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
+    description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
+    specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
+    variants: phoneCaseVariants(),
+  },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false, paused: true,
     description: "We'll wrap it beautifully and tuck in a handwritten-style note.",
@@ -339,7 +374,8 @@ function popularRankOf(key: string): number | null {
 /** A short, stable code for a variant's size/colour, used in its internal sku. */
 function slug(s: string | undefined): string | null {
   if (!s) return null;
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  // '+' must survive ("Galaxy S23+" ≠ "Galaxy S23") — stripping it made two phones share a sku
+  return s.toLowerCase().replace(/\+/g, 'plus').replace(/[^a-z0-9]+/g, '');
 }
 
 /** Stable sku for a variant: the default keeps the legacy product key (back-compat). */
@@ -347,7 +383,7 @@ function variantSku(productKey: string, v: VariantDef, isDefault: boolean): stri
   if (isDefault) return productKey;
   // orientation appears in the sku ONLY for landscape — portrait skus keep their
   // pre-orientation names (no churn in baskets, orders or tests).
-  return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double' : null].filter(Boolean).join('-');
+  return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double' : null, slug(v.grade), slug(v.finish)].filter(Boolean).join('-');
 }
 
 /**
@@ -402,6 +438,9 @@ export interface CatalogueProduct {
   colours: string[];
   /** Orientation axis (frames: portrait | landscape). Empty for single-orientation products. */
   orientations: string[];
+  /** Phone cases: grade (snap | tough) and finish (gloss | matte) axes. Empty elsewhere. */
+  grades: string[];
+  finishes: string[];
   variants: CatalogueVariant[];
   /** Curated front-of-shop rank (1 = first). null ⇒ Full-Catalogue-only. */
   popularRank: number | null;
@@ -432,7 +471,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
   for (const r of rows) {
     let p = byKey.get(r.key);
     if (!p) {
-      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], orientations: [], variants: [], popularRank: r.popularRank ?? null };
+      p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], orientations: [], grades: [], finishes: [], variants: [], popularRank: r.popularRank ?? null };
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
@@ -441,6 +480,8 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);
     if (attrs.orientation && !p.orientations.includes(attrs.orientation)) p.orientations.push(attrs.orientation);
+    if (attrs.grade && !p.grades.includes(attrs.grade)) p.grades.push(attrs.grade);
+    if (attrs.finish && !p.finishes.includes(attrs.finish)) p.finishes.push(attrs.finish);
   }
   return [...byKey.values()];
 }
@@ -472,6 +513,9 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
 
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     const currentSkus = def.variants.map((v, i) => variantSku(key, v, i === defaultIndex));
+    // Two variants on one sku would silently overwrite each other (the later wins) — fail loud.
+    const dupes = currentSkus.filter((k, i) => currentSkus.indexOf(k) !== i);
+    if (dupes.length) throw new Error(`[seed-catalogue] ${key}: duplicate variant skus ${[...new Set(dupes)].join(', ')}`);
 
     let vsort = 0;
     for (const v of def.variants) {
@@ -487,7 +531,9 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       if (v.colour) attributes.colour = v.colour;
       if (v.orientation) attributes.orientation = v.orientation;
       if (v.sides) attributes.sides = v.sides;
-      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null].filter(Boolean).join(' · ');
+      if (v.grade) attributes.grade = v.grade;
+      if (v.finish) attributes.finish = v.finish;
+      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
 
       const [variant] = await db
         .insert(productVariants)
@@ -499,8 +545,8 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
 
       if (def.print) {
         const dpi = v.dpi ?? 300;
-        const wPx = mmToPx(v.wMm, dpi);
-        const hPx = mmToPx(v.hMm, dpi);
+        const wPx = v.px?.w ?? mmToPx(v.wMm, dpi);
+        const hPx = v.px?.h ?? mmToPx(v.hMm, dpi);
         const tpl = {
           orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
           printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,

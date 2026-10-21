@@ -3,7 +3,8 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { printTemplates, productVariants, products } from '@/db/schema';
+import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
+import { PHONE_MODELS, prodigiCaseSku, type CaseGrade } from '@/lib/phone-cases';
 import { getCatalogue, loadCatalogue, seedCatalogue } from '@/server/catalogue';
 import { CATALOGUE, quote } from '@/pricing';
 import type { DbHandle } from '@/server/db';
@@ -69,10 +70,10 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(await db.select().from(productVariants).where(eq(productVariants.sku, 'mug'))).toHaveLength(1);
   });
 
-  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + mug + cushion + kids tee + jigsaw + blanket + card + adult tee); the curation view sees everything', async () => {
+  it('STOREFRONT curation: the shop shows only visibleInShop products (launch = framed print + mug + cushion + kids tee + jigsaw + blanket + card + adult tee + phone case); the curation view sees everything', async () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'adultTee']);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'adultTee', 'phoneCase']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -85,7 +86,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.babyBodysuit!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'adultTee']);
+    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'adultTee', 'phoneCase']);
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));
@@ -112,5 +113,28 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(priceOf('large')).toBe(7500);
     const pinkBlue = rows.filter((r) => r.active && /PINK|BLUE/i.test((r.attrs as Record<string, string>).colour ?? ''));
     expect(pinkBlue).toHaveLength(0);
+  });
+
+  it('PHONE CASES: every phone × grade × finish Prodigi makes, at its exact SKU, print size and price', async () => {
+    const rows = await db
+      .select({ sku: productVariants.sku, attrs: productVariants.attributes, price: productVariants.pricePence, wPx: printTemplates.printWidthPx, hPx: printTemplates.printHeightPx, bleed: printTemplates.bleedMm, providerSku: productVariantProviders.providerSku })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
+      .innerJoin(productVariantProviders, eq(productVariantProviders.variantId, productVariants.id))
+      .where(eq(products.key, 'phoneCase'));
+    const expected = PHONE_MODELS.flatMap((m) => (['snap', 'tough'] as CaseGrade[]).filter((g) => m[g]).flatMap((g) => ['gloss', 'matte'].map((f) => ({ m, g, f }))));
+    expect(rows).toHaveLength(expected.length); // 152 on 2026-10-21 — no two phones share a sku (S23 vs S23+)
+    expect(new Set(rows.map((r) => r.sku)).size).toBe(rows.length);
+    for (const { m, g, f } of expected) {
+      const r = rows.find((x) => { const a = x.attrs as Record<string, string>; return a.size === m.name && a.grade === g && a.finish === f; });
+      expect(r, `${m.name} ${g} ${f}`).toBeTruthy();
+      expect(r!.providerSku).toBe(prodigiCaseSku(m, g, f as 'gloss' | 'matte'));
+      expect([r!.wPx, r!.hPx]).toEqual([m[g]!.w, m[g]!.h]); // Prodigi's own printAreaSizes, not rounded from mm
+      expect(r!.bleed).toBe(0); // the file IS the wrap
+      expect(r!.price).toBe(g === 'snap' ? 2499 : 2999);
+    }
+    // tough-only phones never offer snap
+    expect(rows.some((x) => { const a = x.attrs as Record<string, string>; return a.size === 'Pixel 9' && a.grade === 'snap'; })).toBe(false);
   });
 });

@@ -519,6 +519,7 @@ export const productCategory = pgEnum('product_category', [
   'CARD',
   'FESTIVE',
   'ADDON',
+  'TECH', // phone cases (2026-10-21)
 ]);
 export const orientation = pgEnum('orientation', ['PORTRAIT', 'LANDSCAPE', 'SQUARE']);
 export const fitMode = pgEnum('fit_mode', ['CONTAIN', 'COVER']);

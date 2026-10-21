@@ -6,6 +6,8 @@ import { getDb } from '@/db/client';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { setMockupTemplate, setMockupView } from '@/server/print/templates';
+import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
+import type { CaseFinish, CaseGrade } from '@/lib/phone-cases';
 import { ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, isDarkGarment, KIDS_TEE_CHEST_MM, KIDS_TEE_PRINT_MM, teePrintRegion } from '@/lib/garments';
 
 /**
@@ -896,6 +898,16 @@ export async function POST(req: Request): Promise<Response> {
   const registration: { sku: string; print: string; mode: string; quadAspect: number | null; printAspect: number; driftPct: number | null }[] = [];
 
   for (const r of rows) {
+    // Phone cases: a DRAWN case per phone × grade × finish (no photography yet) — the print area
+    // is the whole case back at the print file's exact aspect, so registration drift is 0.
+    if (r.key === 'phoneCase') {
+      const a = (r.attrs as Record<string, string>) ?? {};
+      const d = await drawPhoneCase(a.size!, a.grade as CaseGrade, a.finish as CaseFinish);
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: a.finish === 'gloss' ? 'GLOSS' : 'PAPER', mask: d.mask, overlay: d.overlay });
+      authored++;
+      registration.push({ sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'drawn-phone-case', quadAspect: null, printAspect: Math.round((r.printWmm / r.printHmm) * 1000) / 1000, driftPct: 0 });
+      continue;
+    }
     const p = plan(r.key, (r.attrs as Record<string, string>) ?? {});
     if (!p) { skipped.push(r.key); continue; }
     const printAspectEarly = r.printWmm / r.printHmm;

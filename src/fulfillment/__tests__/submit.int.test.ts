@@ -28,6 +28,11 @@ describe('resolveShippingMethod', () => {
     expect(resolveShippingMethod(['kidsTee', 'jigsaw-110pieces'])).toBe('Standard');
     expect(resolveShippingMethod(['jigsaw'])).toBe('Standard');
   });
+  it('a phone case makes the whole order Express — the tracked service for cases', () => {
+    expect(resolveShippingMethod(['phoneCase'])).toBe('Express');
+    expect(resolveShippingMethod(['framedPrint', 'phoneCase-iphone16-tough-matte'])).toBe('Express');
+    expect(resolveShippingMethod(['phoneCaseholder'])).toBe('Standard'); // only the real key
+  });
   it('Standard otherwise (garments, prints, the family set)', () => {
     expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee', 'babyBodysuit'])).toBe('Standard');
     expect(resolveShippingMethod(['framedPrint'])).toBe('Standard');

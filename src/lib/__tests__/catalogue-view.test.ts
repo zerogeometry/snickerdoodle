@@ -9,7 +9,7 @@ const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = fa
 const product = (key: string, opts: Partial<CatalogueProduct> & { variants: CatalogueVariant[] }): CatalogueProduct => ({
   key, label: opts.label ?? key, blurb: opts.blurb ?? null, description: null, specs: {},
   category: opts.category ?? 'MUG', fromPence: 1400, sizes: opts.sizes ?? [], colours: opts.colours ?? [],
-  orientations: opts.orientations ?? [],
+  orientations: opts.orientations ?? [], grades: opts.grades ?? [], finishes: opts.finishes ?? [],
   variants: opts.variants, popularRank: opts.popularRank ?? null,
 });
 const line = (id: string, qty: number, product: string): BasketItem => ({ id, name: id, product: product as BasketItem['product'], pricePence: 1400, qty });

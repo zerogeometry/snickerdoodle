@@ -55,6 +55,7 @@ export const CATALOGUE = {
   apron: { pricePence: 2495, label: 'apron' },
   bauble: { pricePence: 2095, label: 'ceramic bauble' },
   sack: { pricePence: 3495, label: 'christmas sack' },
+  phoneCase: { pricePence: 2499, label: 'phone case' }, // the default: snap (tough £29.99 — DB per variant)
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

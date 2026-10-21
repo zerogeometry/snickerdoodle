@@ -79,11 +79,15 @@ export function assertProdigiConfigConsistent(env: GateEnv): void {
  * Standard for everything. It's TRACKED for every product in the shop (re-quoted 2026-10-15:
  * Royal Mail Tracked 48, FedEx Tracked & Signed, Evri, DPD) — bar the greetings card, which is
  * untracked post. Jigsaws used to go Express because their Standard service was untracked; it's
- * now Evri Standard 48, tracked (founder: Standard is fine so long as it's tracked). Kept as a
- * function so a product that needs Express can opt back in.
+ * now Evri Standard 48, tracked (founder: Standard is fine so long as it's tracked).
+ *
+ * PHONE CASES opt back in (founder, 2026-10-21: "definitely tracked"): their Standard service is
+ * often untracked Royal Mail 24 (lab uk8), Express is Royal Mail Tracked (lab uk6). Prodigi takes
+ * ONE method per order, so an order with a case goes Express as a whole (~£1–3 more on the
+ * other items, re-quoted 2026-10-21) — simpler and safer than splitting the order.
  */
-export function resolveShippingMethod(_productKeys: string[]): 'Standard' | 'Express' {
-  return 'Standard';
+export function resolveShippingMethod(productKeys: string[]): 'Standard' | 'Express' {
+  return productKeys.some((k) => k === 'phoneCase' || k.startsWith('phoneCase-')) ? 'Express' : 'Standard';
 }
 
 /** Is this frozen line spec fulfilled by Prodigi? (Legacy specs lack `provider`; for
