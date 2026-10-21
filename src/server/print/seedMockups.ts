@@ -1,11 +1,11 @@
+import 'server-only';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
-import { getDb } from '@/db/client';
 import { printTemplates, products, productVariants } from '@/db/schema';
-import { requireJobsSecret } from '@/server/jobs/auth';
-import { setMockupTemplate, setMockupView } from '@/server/print/templates';
+import type { DbHandle } from '@/server/db';
+import { setMockupTemplate, setMockupView } from './templates';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
@@ -33,9 +33,9 @@ async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: Tra
 import { ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, isDarkGarment, KIDS_TEE_CHEST_MM, KIDS_TEE_PRINT_MM, teePrintRegion } from '@/lib/garments';
 
 /**
- * DEV template seeder — authors FLAT photoreal mockup templates for the launch range from the
+ * Mockup template seeder — authors FLAT photoreal mockup templates for the launch range from the
  * Prodigi blank product photos staged in `.prodigi-assets/blanks/` (gitignored). Idempotent
- * (re-authoring bumps the template version). Guarded by JOBS_SECRET like the other jobs.
+ * (re-authoring bumps the template version).
  *
  * REGISTRATION MODEL (founder requirement: preview "the" image on "your" product, not "an"
  * image on "a" product). The print map on the photo is DERIVED from the same four inputs a
@@ -897,10 +897,19 @@ async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: 
   return { blank, overlay, W, H, frontBox, fullBox };
 }
 
-export async function POST(req: Request): Promise<Response> {
-  const denied = requireJobsSecret(req);
-  if (denied) return denied;
-  const db = getDb();
+export interface SeedMockupsResult {
+  authored: number;
+  authoredViews: number;
+  skippedProducts: string[];
+  registration: { sku: string; print: string; mode: string; quadAspect: number | null; printAspect: number; driftPct: number | null }[];
+}
+
+/**
+ * Author every active variant's mockup template from the staged blanks. Shared by the
+ * JOBS_SECRET-guarded /api/jobs/seed-mockups route and the local test-site seed script
+ * (scripts/test-site/seed.ts), which runs it on the founder's machine where the blanks live.
+ */
+export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
   const rows = await db
     .select({
       id: productVariants.id, sku: productVariants.sku, attrs: productVariants.attributes, key: products.key,
@@ -1028,6 +1037,9 @@ export async function POST(req: Request): Promise<Response> {
     }
 
     const filePath = path.join(ROOT, p.file);
+    // A blank that isn't staged on this machine is a SKIP, not a crash — the product keeps its
+    // plain tile and every other product still gets its mockup.
+    if (!existsSync(filePath)) { skipped.push(`${r.key} (blank not staged: ${p.file})`); continue; }
     const raw = readFileSync(filePath);
     // Rotate the blank into the print canvas's orientation where needed (cache by file+rotation).
     const cacheKey = p.rotate ? `${p.file}#r${p.rotate}` : p.file;
@@ -1148,5 +1160,5 @@ export async function POST(req: Request): Promise<Response> {
     }
   }
 
-  return Response.json({ authored, authoredViews, skippedProducts: [...new Set(skipped)], registration });
+  return { authored, authoredViews, skippedProducts: [...new Set(skipped)], registration };
 }

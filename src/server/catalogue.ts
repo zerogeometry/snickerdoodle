@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, ne, notInArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
@@ -688,15 +688,16 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     const dupes = currentSkus.filter((k, i) => currentSkus.indexOf(k) !== i);
     if (dupes.length) throw new Error(`[seed-catalogue] ${key}: duplicate variant skus ${[...new Set(dupes)].join(', ')}`);
 
-    let vsort = 0;
-    for (const v of def.variants) {
-      const isDefault = vsort === defaultIndex;
+    // BATCHED per product (a handful of round trips per product, not four per variant): the
+    // 435-variant catalogue was ~1,800 sequential queries — over Netlify's ~26 s function limit
+    // against a remote DB (the 504 on /api/jobs/seed-catalogue). Same rows, same upserts.
+    const rows = def.variants.map((v, i) => {
       // A printable product without a POD SKU would seed as MANUAL and silently never
       // fulfil — that's an authoring mistake, not a configuration.
       if (def.print && !v.prodigiSku) {
         console.warn(`[seed-catalogue] printable variant ${key}/${v.size ?? ''}/${v.colour ?? ''} has NO prodigiSku — it will be MANUAL-fulfilled`);
       }
-      const sku = variantSku(key, v, isDefault);
+      const isDefault = i === defaultIndex;
       const attributes: Record<string, string> = {};
       if (v.size) attributes.size = v.size;
       if (v.colour) attributes.colour = v.colour;
@@ -704,46 +705,75 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       if (v.sides) attributes.sides = v.sides;
       if (v.grade) attributes.grade = v.grade;
       if (v.finish) attributes.finish = v.finish;
-      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
+      const label = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
+      return { v, values: { productId: product!.id, sku: currentSkus[i]!, label, attributes, pricePence: v.pricePence, isDefault, sortOrder: i, active: true } };
+    });
+    variantCount += rows.length;
 
-      const [variant] = await db
-        .insert(productVariants)
-        .values({ productId: product!.id, sku, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true })
-        .onConflictDoUpdate({ target: productVariants.sku, set: { productId: product!.id, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true } })
-        .returning();
-      vsort++;
-      variantCount++;
+    const upserted = await db
+      .insert(productVariants)
+      .values(rows.map((r) => r.values))
+      .onConflictDoUpdate({
+        target: productVariants.sku,
+        set: {
+          productId: sql`excluded.product_id`, label: sql`excluded.label`, attributes: sql`excluded.attributes`, pricePence: sql`excluded.price_pence`,
+          isDefault: sql`excluded.is_default`, sortOrder: sql`excluded.sort_order`, active: true,
+        },
+      })
+      .returning({ id: productVariants.id, sku: productVariants.sku });
+    const idBySku = new Map(upserted.map((u) => [u.sku, u.id]));
+    const withIds = rows.map((r) => ({ ...r, id: idBySku.get(r.values.sku)! }));
 
-      if (def.print) {
+    if (def.print) {
+      const tpls = withIds.map(({ v, id }) => {
         const dpi = v.dpi ?? 300;
         const wPx = v.px?.w ?? mmToPx(v.wMm, dpi);
         const hPx = v.px?.h ?? mmToPx(v.hMm, dpi);
-        const tpl = {
+        return {
+          variantId: id,
           orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
           printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,
           aspectMilli: Math.round((v.wMm / v.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
         };
-        await db.insert(printTemplates).values({ variantId: variant!.id, ...tpl }).onConflictDoUpdate({ target: printTemplates.variantId, set: tpl });
-      }
-
-      // Exactly one provider row per variant: Prodigi when a live SKU is mapped (the
-      // order-time attributes go in providerConfig), else MANUAL. Concurrency-safe
-      // (the int suite seeds in parallel): drop any wrong-provider row (e.g. an old
-      // placeholder), then upsert the correct one.
-      const provider = v.prodigiSku ? 'PRODIGI' : 'MANUAL';
-      const providerSku = v.prodigiSku ?? sku;
-      const providerConfig = v.prodigiAttrs || v.printTo ? { ...(v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : {}), ...(v.printTo ? { printTo: v.printTo } : {}) } : null;
+      });
       await db
-        .delete(productVariantProviders)
-        .where(and(eq(productVariantProviders.variantId, variant!.id), ne(productVariantProviders.provider, provider)));
-      await db
-        .insert(productVariantProviders)
-        .values({ variantId: variant!.id, provider, providerSku, providerConfig, isDefault: true })
+        .insert(printTemplates)
+        .values(tpls)
         .onConflictDoUpdate({
-          target: [productVariantProviders.variantId, productVariantProviders.provider],
-          set: { providerSku, providerConfig, isDefault: true, active: true },
+          target: printTemplates.variantId,
+          set: {
+            orientation: sql`excluded.orientation`, printWidthMm: sql`excluded.print_width_mm`, printHeightMm: sql`excluded.print_height_mm`,
+            requiredDpi: sql`excluded.required_dpi`, printWidthPx: sql`excluded.print_width_px`, printHeightPx: sql`excluded.print_height_px`,
+            bleedMm: sql`excluded.bleed_mm`, aspectMilli: sql`excluded.aspect_milli`, minSourceWidthPx: sql`excluded.min_source_width_px`,
+            minSourceHeightPx: sql`excluded.min_source_height_px`,
+          },
         });
     }
+
+    // Exactly one provider row per variant: Prodigi when a live SKU is mapped (the
+    // order-time attributes go in providerConfig), else MANUAL. Concurrency-safe
+    // (the int suite seeds in parallel): drop any wrong-provider row (e.g. an old
+    // placeholder), then upsert the correct one.
+    const providers = withIds.map(({ v, id, values }) => ({
+      variantId: id,
+      provider: (v.prodigiSku ? 'PRODIGI' : 'MANUAL') as 'PRODIGI' | 'MANUAL',
+      providerSku: v.prodigiSku ?? values.sku,
+      providerConfig: v.prodigiAttrs || v.printTo ? { ...(v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : {}), ...(v.printTo ? { printTo: v.printTo } : {}) } : null,
+      isDefault: true,
+    }));
+    for (const provider of ['PRODIGI', 'MANUAL'] as const) {
+      const ids = providers.filter((p) => p.provider === provider).map((p) => p.variantId);
+      if (ids.length) {
+        await db.delete(productVariantProviders).where(and(inArray(productVariantProviders.variantId, ids), ne(productVariantProviders.provider, provider)));
+      }
+    }
+    await db
+      .insert(productVariantProviders)
+      .values(providers)
+      .onConflictDoUpdate({
+        target: [productVariantProviders.variantId, productVariantProviders.provider],
+        set: { providerSku: sql`excluded.provider_sku`, providerConfig: sql`excluded.provider_config`, isDefault: true, active: true },
+      });
 
     // Hide any variant of this product no longer in the DEFS (e.g. an old colour).
     await db
