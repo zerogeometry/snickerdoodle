@@ -10,8 +10,8 @@ scripts), *product expansion research* (brief + prices), *range expansion* (D21/
 | Whole-pound prices (D21) incl. phone cases £25/£30 | **Live** on the test site (deployed + re-seeded) | `build/phase-0-trust-spine` |
 | 9 new products + card packs (D21/D22) | Built, **hidden**; seeded into the test DB | same |
 | Repeat-pattern edit (socks / wrap / tea towel) | Built (print file only) | same |
-| Card-pack builder UI | Built + e2e green, **not merged** | `refs/heads/claude/stoic-bohr-a585fb` @ a14a5f1 |
-| Flaky gift-link test | Diagnosed + fixed, **uncommitted**, on a stale base | worktree `practical-agnesi-806ded` (base aadda11) |
+| Card-pack builder UI | **Merged** (5c7ff39) | `build/phase-0-trust-spine` |
+| Flaky gift-link test | **Fixed** (e5f6740) — worker ticks scoped to their own order | same |
 | Storefront e2e price expectations | Fixed today | 22a251b |
 | Test-site DB | 40/40 migrations, catalogue re-seeded 21 Oct (26 products, 435 variants) | Supabase |
 
@@ -42,7 +42,8 @@ scripts), *product expansion research* (brief + prices), *range expansion* (D21/
 9. Hoodies have no garment photos/chest tables yet (tees do); hoodies aren't in the family-set saving.
 
 ## Plan (order matters; ✦ = can run in parallel)
-**A. Land and align the code (first, ~1 h, one session)**
+**A. Land and align the code — ✅ DONE 21 Oct evening** (builder merged, gift-link + studio-scope flakes fixed,
+full suite with the dev DB 761 passed ×2, lint ignores `.claude/**`, pushed, test site redeployed)
 - A1. Merge the card-pack builder (`claude/stoic-bohr-a585fb`) into `build/phase-0-trust-spine`.
 - A2. Bring the gift-link fix onto the current branch (re-apply the `worker.int.test.ts` scoping),
   run the full suite 3–5× against the dev DB, commit. Retire the stale worktree.
