@@ -2,6 +2,7 @@ import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, i
 import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
 import { evaluatePromo, type PromoRule } from './promo';
+import { isCardPackKey } from '@/lib/card-packs';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -101,7 +102,9 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       rejectedKeys.push(r.productKey);
       continue;
     }
-    const qty = clampQty(r.qty);
+    // A card PACK line is always ONE pack — its N cards ride with it (src/lib/card-packs.ts), so a
+    // client asking for "qty 3" of a pack can't get three packs' worth of cards for one pack's price.
+    const qty = isCardPackKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
     if (qty <= 0) continue;
     const entry = catalogue[r.productKey]!;
     const unit = entry.pricePence; // SERVER price — request price (if any) ignored

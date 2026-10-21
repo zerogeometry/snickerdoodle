@@ -7,6 +7,7 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
 import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { isPatternProduct } from '@/lib/patterns';
+import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
@@ -129,14 +130,16 @@ export async function renderPrintFile(
   // face — [ outer rear (branding) | outer front (design) | inside front (note) | inside back
   // (message) ]. The message is RE-SCREENED here (never trust the stored value) so the print can't
   // carry text the screen would reject. In-VPC like every other render; the POD egress gate is the
-  // separate downstream chokepoint.
-  if (variantRow?.key === 'card') {
-    const screen = screenCardMessage(input.message as Parameters<typeof screenCardMessage>[0]);
+  // separate downstream chokepoint. A card from a PACK is the same spread, front design only and
+  // BLANK inside — whatever was stored (packs carry no printed message).
+  if (variantRow?.key === 'card' || variantRow?.key === CARD_PACK_KEY) {
+    const fromPack = variantRow.key === CARD_PACK_KEY;
+    const screen = fromPack ? { ok: true as const, value: null } : screenCardMessage(input.message as Parameters<typeof screenCardMessage>[0]);
     if (!screen.ok) throw new Error(`the card ${screen.field} can’t be printed — please reword it`);
     out = await assembleCardPrintSpread({
       design: srcBuf,
       transform,
-      span: input.cardSpan === 'full' ? 'full' : 'front',
+      span: !fromPack && input.cardSpan === 'full' ? 'full' : 'front',
       message: screen.value,
       branding: renderCardBackBadge(), // the founder's Snickerdoodle logo on the outer rear
     });

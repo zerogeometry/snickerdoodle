@@ -411,3 +411,56 @@ describe('formatPence', () => {
     expect(recipientLineLabel(line, true)).toBe('gift');
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Greetings-card MULTIPACKS — one pack line, priced by the server (never the client)
+// ─────────────────────────────────────────────────────────────────────────────
+describe('card packs — pricing', () => {
+  // The DB-shaped price list: the default variant (pack of 5) answers to the product key too.
+  const cat = {
+    card: { pricePence: 550, label: 'greetings card' },
+    cardPack: { pricePence: 1200, label: 'card pack' },
+    'cardPack-packof10': { pricePence: 2100, label: 'card pack' },
+  };
+
+  it('a pack of 5 is £12 and a pack of 10 is £21 — free delivery', () => {
+    expect(priceBasket([{ productKey: 'cardPack', qty: 1 }], { catalogue: cat }).totalPence).toBe(1200 + DELIVERY_PENCE);
+    expect(priceBasket([{ productKey: 'cardPack-packof10', qty: 1 }], { catalogue: cat }).totalPence).toBe(2100 + DELIVERY_PENCE);
+    // the static fallback agrees on the pack of 5
+    expect(priceBasket([{ productKey: 'cardPack', qty: 1 }]).totalPence).toBe(1200 + DELIVERY_PENCE);
+  });
+
+  it('a pack is cheaper than the same cards bought singly (5 × £5.50 = £27.50 vs £12)', () => {
+    const singles = priceBasket([{ productKey: 'card', qty: 5 }], { catalogue: cat }).totalPence;
+    const pack = priceBasket([{ productKey: 'cardPack', qty: 1 }], { catalogue: cat }).totalPence;
+    expect(singles).toBe(2750);
+    expect(pack).toBeLessThan(singles);
+  });
+
+  it('a pack line always prices as ONE pack, whatever qty the client sends', () => {
+    const q = priceBasket([{ productKey: 'cardPack-packof10', qty: 3 }], { catalogue: cat });
+    expect(q.lines[0]).toMatchObject({ qty: 1, unitPricePence: 2100, linePence: 2100 });
+    expect(q.totalPence).toBe(2100);
+  });
+
+  it('two packs are two lines — each its own N cards', () => {
+    const q = priceBasket([{ productKey: 'cardPack', qty: 1 }, { productKey: 'cardPack-packof10', qty: 1 }], { catalogue: cat });
+    expect(q.subtotalPence).toBe(1200 + 2100);
+  });
+
+  it('a smuggled pack price is ignored — the server price stands', () => {
+    const evil = { productKey: 'cardPack-packof10', qty: 1, pricePence: 1, unitPricePence: 1 } as unknown as RequestedLine;
+    expect(priceBasket([evil], { catalogue: cat }).totalPence).toBe(2100);
+  });
+
+  it('the 5% join saving applies ONLY with a valid server-side join context', () => {
+    const items: RequestedLine[] = [{ productKey: 'cardPack-packof10', qty: 1 }];
+    expect(quote(items, { catalogue: cat, joinProvenance: provenance() })).toMatchObject({ joinSavingApplied: true, joinSavingPence: 105, totalPence: 2100 - 105 });
+    expect(quote(items, { catalogue: cat })).toMatchObject({ joinSavingApplied: false, joinSavingPence: 0, totalPence: 2100 }); // guest
+    expect(quote(items, { catalogue: cat, joinProvenance: provenance({ invite: null, membership: null }) })).toMatchObject({ joinSavingApplied: false, totalPence: 2100 }); // forged
+  });
+
+  it('a pack is not a garment — no family-set saving', () => {
+    expect(priceBasket([{ productKey: 'cardPack', qty: 1 }, { productKey: 'cardPack', qty: 1 }, { productKey: 'cardPack', qty: 1 }], { catalogue: cat }).familySetApplied).toBe(false);
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOGUE } from '@/pricing';
 import { definedPriceList, PATTERN_PRODUCT_KEYS } from '../catalogue';
+import { packSizeOf } from '@/lib/card-packs';
 
 // The founder-agreed shop prices (2026-10-21: "adjust all prices to the nearest £0.50", plus the
 // heart cushion +£2, 30-piece jigsaw +£1 and greetings card +50p). Server-authoritative: this is
@@ -131,5 +132,29 @@ describe('range expansion — new products', () => {
   it('every variant sku in the whole catalogue is unique (the seed refuses duplicates)', () => {
     const skus = list.map((r) => r.sku);
     expect(skus.length).toBe(new Set(skus).size);
+  });
+});
+
+describe('greetings-card multipacks', () => {
+  const packs = list.filter((r) => r.productKey === 'cardPack');
+
+  it('pack of 5 £12 (the default) and pack of 10 £21 — hidden until mockups are in', () => {
+    expect(packs.map((r) => [r.sku, r.pricePence, r.isDefault])).toEqual([['cardPack', 1200, true], ['cardPack-packof10', 2100, false]]);
+    expect(packs.every((r) => !r.visibleInShop && !r.paused)).toBe(true);
+  });
+
+  it('every pack price splits evenly between its cards (the order lines must add up to the penny)', () => {
+    for (const r of packs) {
+      const n = packSizeOf(r.sku === 'cardPack' ? 'pack of 5' : 'pack of 10')!;
+      expect(r.pricePence % n, r.sku).toBe(0);
+    }
+  });
+
+  it('is the same blank-inside 7×5″ card as the single, at the same print size', () => {
+    const single = list.find((r) => r.sku === 'card')!;
+    for (const r of packs) {
+      expect(r.prodigiSku).toBe('CLASSIC-GRE-FEDR-7X5-BLA');
+      expect(r.px).toEqual(single.px);
+    }
   });
 });

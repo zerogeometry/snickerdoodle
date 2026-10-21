@@ -289,6 +289,46 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await expect(orderCard({ greeting: 'hi', message: '', signature: '', note: 'you fucking idiot', font: 'baloo' })).rejects.toThrow(/can’t be printed/);
   });
 
+  it('a CARD PACK splits into card lines: the cards say WHICH drawings, the server says the price', async () => {
+    const mk = async () =>
+      (await db
+        .insert(assets)
+        .values({ familyId: ids.hartleyId, kind: 'DRAWING', uploaderAccountId: ids.samId, controllerAccountId: ids.samId, visibility: 'FAMILY', keptInHome: true, moderationStatus: 'CLEAR' })
+        .returning())[0]!;
+    const [a, b, c] = [await mk(), await mk(), await mk()];
+    const t = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const cards = [a, a, a, a, a, b, b, b, c, c].map((x) => ({ assetId: x.id, transform: t }));
+
+    // a smuggled qty and a printed message are both ignored: one pack, blank inside
+    const res = await placeOrder(db, {
+      items: [{ productKey: 'cardPack-packof10', qty: 4, cards, artwork: { assetId: a.id, transform: t, message: { greeting: 'hi', message: 'x', signature: '', note: '', font: 'caveat' } } }],
+      account: { id: ids.samId },
+      joinProvenance: null,
+    });
+    await track(res);
+    expect(res.ok).toBe(true);
+    const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
+    expect(order!.subtotalPence).toBe(2100);
+    expect(order!.totalPence).toBe(2100);
+
+    const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
+    expect(lines.map((l) => l.qty).sort()).toEqual([2, 3, 5]);
+    expect(lines.every((l) => l.unitPricePence === 210 && l.productKey === 'cardPack-packof10')).toBe(true);
+    expect(lines.reduce((s, l) => s + l.linePence, 0)).toBe(2100); // to the penny
+    expect(lines.every((l) => l.spec?.providerSku === 'CLASSIC-GRE-FEDR-7X5-BLA')).toBe(true);
+    const arts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, lines.map((l) => l.id)));
+    expect(arts).toHaveLength(3);
+    expect(arts.every((x) => x.message === null && x.cardSpan === null)).toBe(true); // blank inside, front only
+
+    // wrong number of cards → refused before anything is written
+    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: cards.slice(0, 4) }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/needs 5 cards/);
+    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1 }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/needs 5 cards/);
+    // every card passes the SAME gates as any print — a stranger's drawing is denied
+    await expect(
+      placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: [a.id, a.id, a.id, a.id, ids.assetBloomFamily].map((assetId) => ({ assetId, transform: t })) }], account: { id: ids.samId }, joinProvenance: null }),
+    ).rejects.toThrow(AuthzError);
+  });
+
   it('marking paid is atomic + idempotent — the PAID order is the fulfilment enqueue', async () => {
     const [asset] = await db
       .insert(assets)

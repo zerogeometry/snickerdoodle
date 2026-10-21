@@ -28,7 +28,7 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
  *    zoom DOWN through contain to reveal the whole drawing's height (see Positioner `lockToCover`).
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'mug']);
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug']);
 export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 }

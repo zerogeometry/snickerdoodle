@@ -4,6 +4,7 @@ import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGr
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -47,6 +48,8 @@ export interface PlaceLine {
   productKey: string;
   qty: number;
   artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string };
+  /** A CARD PACK line only: its N cards (which drawing + placement each). Blank inside, front only. */
+  cards?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string }>;
 }
 
 export interface PlaceOrderResult {
@@ -135,16 +138,12 @@ export async function placeOrder(
 
   // Pre-validate every personalised line BEFORE writing anything (authz + a frozen
   // template snapshot + a server-clamped transform). A bad placement fails here,
-  // not half-way through inserting an order.
-  const artworkByIndex = new Map<number, {
+  // not half-way through inserting an order. Every card of a PACK passes the very same gates.
+  type PreparedArt = {
     assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; message: ScreenedCardMessage | null; cardSpan: string | null;
-  }>();
-  for (let i = 0; i < valid.length; i++) {
-    const art = valid[i]!.artwork;
-    if (!art) continue;
+  };
+  const prepareArtwork = async (art: NonNullable<PlaceLine['artwork']>, productKey: string, variantId: string, opts: { blankCard?: boolean } = {}): Promise<PreparedArt | 'too-small' | null> => {
     if (!account && !input.giftLink) throw new Error('must be signed in to order a personalised item');
-    const variantId = variantByKey.get(valid[i]!.productKey);
-    if (!variantId) continue; // not a printable product
     const [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
     if (!asset) throw new Error('keepsake not found');
     if (input.giftLink) {
@@ -166,7 +165,7 @@ export async function placeOrder(
     // An orderable keepsake is a real, adopted asset (never an ephemeral draft).
     if (!asset.controllerAccountId) throw new Error('keepsake has no controller');
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
-    if (!tpl) continue;
+    if (!tpl) return null;
     // validate the source object (a bg-removed cutout) belongs to THIS asset
     let sourceObjectId: string | null = null;
     if (art.sourceObjectId) {
@@ -184,11 +183,9 @@ export async function placeOrder(
     const srcDims = await sourceDimensions(db, art.assetId, sourceObjectId);
     if (srcDims) {
       const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
-      if (assessPrintResolution(geom, srcDims, transform, valid[i]!.productKey).decision === 'BLOCK') {
-        return { ok: false, reason: 'too-small', productKey: valid[i]!.productKey };
-      }
+      if (assessPrintResolution(geom, srcDims, transform, productKey).decision === 'BLOCK') return 'too-small';
     }
-    artworkByIndex.set(i, {
+    return {
       assetId: art.assetId,
       variantId,
       controllerAccountId: asset.controllerAccountId,
@@ -204,17 +201,67 @@ export async function placeOrder(
       },
       transform, // server-authoritative (clamped above)
       back: normalizeCushionBack(art.back), // coerced to a known token or null
-      message: (() => {
-        // Card inside message — SCREENED here (abuse) + normalised (trim/cap/font) before it can be
-        // frozen or printed. A flagged field fails the whole order with a friendly, actionable error.
-        const screen = screenCardMessage(art.message as Parameters<typeof screenCardMessage>[0]);
-        if (!screen.ok) throw new Error(`your card ${screen.field} can’t be printed — please reword it`);
-        return screen.value;
-      })(),
+      // A card in a PACK is blank inside, front only — whatever the request says.
+      message: opts.blankCard
+        ? null
+        : (() => {
+            // Card inside message — SCREENED here (abuse) + normalised (trim/cap/font) before it can be
+            // frozen or printed. A flagged field fails the whole order with a friendly, actionable error.
+            const screen = screenCardMessage(art.message as Parameters<typeof screenCardMessage>[0]);
+            if (!screen.ok) throw new Error(`your card ${screen.field} can’t be printed — please reword it`);
+            return screen.value;
+          })(),
       // Card outer span — only 'full' is meaningful; anything else (incl. non-card lines) = front default.
-      cardSpan: art.cardImageSpan === 'full' ? 'full' : null,
-    });
+      cardSpan: !opts.blankCard && art.cardImageSpan === 'full' ? 'full' : null,
+    };
+  };
+
+  const artworkByIndex = new Map<number, PreparedArt>();
+  // A card PACK line → one order line per distinct card design, at an equal share of the pack price.
+  const packByIndex = new Map<number, Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }>>();
+  for (let i = 0; i < valid.length; i++) {
+    const line = valid[i]!;
+    const variantId = variantByKey.get(line.productKey);
+    if (isCardPackKey(line.productKey)) {
+      if (input.giftLink) throw new Error('a card pack can’t be bought through a gift link');
+      const packSize = packSizeOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
+      if (!variantId || !packSize) throw new Error('unknown card pack');
+      // Pack price = the SERVER's priced line (always qty 1); the client's cards only say WHICH drawings.
+      const priced = q.lines[i]!;
+      const groups = expandCardPack(priced.linePence, packSize, line.cards ?? []);
+      const prepared: Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }> = [];
+      for (const g of groups) {
+        const art = await prepareArtwork({ assetId: g.card.assetId, transform: g.card.transform, sourceObjectId: g.card.sourceObjectId ?? undefined }, line.productKey, variantId, { blankCard: true });
+        if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
+        if (!art) throw new Error('card pack has no print template');
+        prepared.push({ art, qty: g.qty, unitPricePence: g.unitPricePence, linePence: g.linePence });
+      }
+      packByIndex.set(i, prepared);
+      continue;
+    }
+    const art = line.artwork;
+    if (!art) continue;
+    if (!variantId) continue; // not a printable product
+    const prepared = await prepareArtwork(art, line.productKey, variantId);
+    if (prepared === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
+    if (prepared) artworkByIndex.set(i, prepared);
   }
+
+  const insertArtwork = async (orderItemId: string, art: PreparedArt) => {
+    await db.insert(orderItemArtwork).values({
+      orderItemId,
+      assetId: art.assetId,
+      variantId: art.variantId,
+      controllerAccountId: art.controllerAccountId,
+      templateSnapshot: art.templateSnapshot,
+      transform: art.transform,
+      sourceObjectId: art.sourceObjectId,
+      back: art.back,
+      message: art.message, // screened card message (card only), or null
+      cardSpan: art.cardSpan, // 'full' or null (front) — card only
+      status: 'PENDING',
+    });
+  };
 
   const ref = newRef();
   const [order] = await db
@@ -243,6 +290,27 @@ export async function placeOrder(
   for (let i = 0; i < q.lines.length; i++) {
     const l = q.lines[i]!;
     const variantId = variantByKey.get(l.productKey) ?? null;
+    const pack = packByIndex.get(i);
+    if (pack) {
+      // N cards, one order line per design: fulfilment sends them as N cards in ONE Prodigi order,
+      // and the lines add up to the pack's price to the penny (expandCardPack).
+      for (const p of pack) {
+        const [pi] = await db
+          .insert(orderItems)
+          .values({
+            orderId: order!.id,
+            productKey: l.productKey,
+            variantId,
+            spec: variantId ? (specByVariantId.get(variantId) ?? null) : null,
+            qty: p.qty,
+            unitPricePence: p.unitPricePence,
+            linePence: p.linePence,
+          })
+          .returning();
+        await insertArtwork(pi!.id, p.art);
+      }
+      continue;
+    }
     const [oi] = await db
       .insert(orderItems)
       .values({
@@ -256,21 +324,7 @@ export async function placeOrder(
       })
       .returning();
     const art = artworkByIndex.get(i);
-    if (art) {
-      await db.insert(orderItemArtwork).values({
-        orderItemId: oi!.id,
-        assetId: art.assetId,
-        variantId: art.variantId,
-        controllerAccountId: art.controllerAccountId,
-        templateSnapshot: art.templateSnapshot,
-        transform: art.transform,
-        sourceObjectId: art.sourceObjectId,
-        back: art.back,
-        message: art.message, // screened card message (card only), or null
-        cardSpan: art.cardSpan, // 'full' or null (front) — card only
-        status: 'PENDING',
-      });
-    }
+    if (art) await insertArtwork(oi!.id, art);
   }
 
   if (isStripeConfigured()) {

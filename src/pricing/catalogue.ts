@@ -66,6 +66,7 @@ export const CATALOGUE = {
   teaTowel: { pricePence: 2700, label: 'tea towel' },
   petBandana: { pricePence: 1800, label: 'pet bandana' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
+  cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

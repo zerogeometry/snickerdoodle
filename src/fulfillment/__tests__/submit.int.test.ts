@@ -459,4 +459,46 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     const again = await submitReadyOrders(db, { env: SANDBOX, transport: failing, onlyOrderIds: [orderId] });
     expect(again.considered).toBe(0);
   });
+
+  it('a 10-PACK of cards becomes 10 cards in ONE Prodigi order (one item per design, copies add up)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const drawings: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const ing = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await src(1200 + i, 1700), keptInHome: true });
+      await db.update(schema.assets).set({ isBrandSafeFixture: true }).where(eq(schema.assets.id, ing.assetId));
+      keys.push(ing.key);
+      assetIds.push(ing.assetId);
+      drawings.push(ing.assetId);
+    }
+    const t = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const res = await placeOrder(db, {
+      items: [{ productKey: 'cardPack-packof10', qty: 1, cards: drawings.map((assetId) => ({ assetId, transform: t })) }],
+      account: { id: ids.samId },
+      joinProvenance: null,
+    });
+    const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+    orderIds.push(o!.id);
+
+    // render every card (10 artwork rows), then submit once
+    const t0 = Date.now();
+    for (;;) {
+      await processFulfilment(db, { env: SANDBOX, onlyOrderIds: [o!.id] });
+      const lines = await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, o!.id));
+      const arts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, lines.map((l) => l.id)));
+      if (arts.some((a) => a.status === 'RENDER_FAILED')) throw new Error('a pack card failed to render');
+      if (arts.length === 10 && arts.every((a) => a.status === 'READY')) break;
+      if (Date.now() - t0 > 60_000) throw new Error('pack cards not READY in time');
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    const transport = fakeTransport();
+    const summary = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [o!.id] });
+    expect(summary.submitted).toBe(1);
+    expect(transport.created).toHaveLength(1); // ONE Prodigi order
+    const items = transport.created[0]!.items;
+    expect(items).toHaveLength(10);
+    expect(items.every((it) => it.sku === 'CLASSIC-GRE-FEDR-7X5-BLA' && it.copies === 1)).toBe(true);
+    expect(items.reduce((n, it) => n + it.copies, 0)).toBe(10);
+    expect(transport.created[0]!.shippingMethod).toBe('Standard');
+  }, 90_000);
 });

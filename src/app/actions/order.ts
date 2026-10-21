@@ -9,6 +9,9 @@ import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 
+/** Never more cards than the biggest pack could hold, whatever the request says. */
+const MAX_PACK_CARDS = 20;
+
 /**
  * Place an order from the client's basket. The client sends product keys +
  * quantities and (for a personalised line) the keepsake + its placement; the
@@ -22,7 +25,13 @@ import type { RawTransform } from '@/server/print/geometry';
  * keepsake is real + controller-owned + grows the child's corner of the home.
  */
 export async function placeOrderAction(input: {
-  items: { productKey: string; qty: number; artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string } }[];
+  items: {
+    productKey: string;
+    qty: number;
+    artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string };
+    /** A card PACK line: its cards (which drawing + placement each). Count + price checked server-side. */
+    cards?: { assetId: string; transform: RawTransform; sourceObjectId?: string }[];
+  }[];
   gift?: boolean;
   subject?: string;
   /** What the customer typed; resolved + priced server-side. */
@@ -43,10 +52,20 @@ export async function placeOrderAction(input: {
           },
         }
       : {}),
+    // Untrusted: only WHICH drawings. Capped well above the biggest pack; placeOrder checks the exact count.
+    ...(Array.isArray(i.cards)
+      ? {
+          cards: i.cards.slice(0, MAX_PACK_CARDS).map((c) => ({
+            assetId: String(c?.assetId),
+            transform: c?.transform ?? {},
+            sourceObjectId: typeof c?.sourceObjectId === 'string' ? c.sourceObjectId : undefined,
+          })),
+        }
+      : {}),
   }));
 
   const account = await getCurrentAccount();
-  const hasPersonalised = items.some((i) => i.artwork);
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length);
   // Personalised orders require the controlling parent — a guest signs up first.
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
@@ -56,7 +75,7 @@ export async function placeOrderAction(input: {
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
-    const assetIds = items.map((i) => i.artwork?.assetId).filter((x): x is string => !!x);
+    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId)]).filter((x): x is string => !!x))];
     // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
     // keep it in their keepsake box, or have it erased as soon as the order ships.
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });

@@ -388,6 +388,21 @@ const DEFS: Record<string, ProductDef> = {
       { size: '7×5″', pricePence: 550, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
+  // Greetings-card MULTIPACKS (founder, 2026-10-21): the same 7×5″ Fedrigoni card, a different (or
+  // the same) drawing on each front, the inside BLANK to write in — no printed message on a pack.
+  // One basket line carries the N cards; the order splits it into card lines at an equal share of
+  // the pack price (src/lib/card-packs.ts), so Prodigi gets N cards in one order. Sandbox
+  // 2026-10-21: £1.10 a card + a FLAT £0.95 Guernsey Post (untracked, uk7) for 1–15 cards.
+  // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). HIDDEN for now.
+  cardPack: {
+    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true,
+    description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
+    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same' },
+    variants: [
+      { size: 'pack of 5', pricePence: 1200, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'pack of 10', pricePence: 2100, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+    ],
+  },
   calendar: {
     category: 'PRINT', label: 'calendar', blurb: 'a year of their masterpieces', print: true,
     description: 'A wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month.',
