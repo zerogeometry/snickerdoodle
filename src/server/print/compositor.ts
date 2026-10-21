@@ -96,6 +96,75 @@ export interface ComposeMockupInput {
    * then keep this half — 'front' = the right panel of [back | front]. PERSPECTIVE views only
    * (the closed-card hero); the flat outside-full view bakes the span into its box instead. */
   spanHalf?: 'front' | 'back';
+  /** Per-REQUEST memo (a batch of thumbs for one drawing shares its shrunk design). Never kept
+   * across requests: no child image lingers in the process after the request ends. */
+  memo?: ComposeMemo;
+}
+export type ComposeMemo = Map<string, Promise<Buffer>>;
+
+/** Thumbs (400px out) work at ≤ 800px — 3.5× fewer pixels than the 1500px zoom tier, no visible loss. */
+const THUMB_WORK_EDGE = 800;
+/** …and draw from a copy of the design no bigger than this (a 4500px original is ~10× the pixels). */
+const THUMB_DESIGN_EDGE = 1200;
+
+/** The design's bytes — shrunk for a thumb, memoised per request when a memo is given. */
+async function designBytes(key: string, edge: number | null, memo?: ComposeMemo): Promise<Buffer> {
+  const id = `${key}@${edge ?? 'full'}`;
+  const hit = memo?.get(id);
+  if (hit) return hit;
+  const p = (async () => {
+    const buf = await getObjectBytes(key);
+    if (!edge) return buf;
+    return sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS }).resize(edge, edge, { fit: 'inside', withoutEnlargement: true }).png({ compressionLevel: 1 }).toBuffer();
+  })();
+  memo?.set(id, p);
+  return p;
+}
+
+// ── Template layers (blank / mask / overlay): brand-safe, NON-child, and immutable per key (a
+// re-author bumps the version → a new key), so they're safe to keep in process memory. A warm
+// server then composes a thumb without touching storage for the photo at all.
+const TEMPLATE_CACHE_BYTES = 160 * 1024 * 1024;
+const templateCache = new Map<string, { buf: Promise<Buffer>; bytes: number }>();
+let templateCacheBytes = 0;
+function cacheGet(id: string, make: () => Promise<Buffer>): Promise<Buffer> {
+  const hit = templateCache.get(id);
+  if (hit) {
+    templateCache.delete(id); // LRU: re-insert as newest
+    templateCache.set(id, hit);
+    return hit.buf;
+  }
+  const entry = { buf: make(), bytes: 0 };
+  templateCache.set(id, entry);
+  entry.buf.then(
+    (b) => {
+      entry.bytes = b.byteLength;
+      templateCacheBytes += b.byteLength;
+      for (const [k, v] of templateCache) {
+        if (templateCacheBytes <= TEMPLATE_CACHE_BYTES) break;
+        if (v === entry) continue;
+        templateCache.delete(k);
+        templateCacheBytes -= v.bytes;
+      }
+    },
+    () => templateCache.delete(id), // never cache a failure
+  );
+  return entry.buf;
+}
+/** A template layer, optionally resized to exact dims (all layers of a template share a canvas). */
+function templateBytes(key: string, dims: { w: number; h: number } | null): Promise<Buffer> {
+  const full = cacheGet(key, () => getObjectBytes(key));
+  if (!dims) return full;
+  return cacheGet(`${key}@${dims.w}x${dims.h}`, async () =>
+    sharp(await full, { limitInputPixels: MAX_INPUT_PIXELS }).resize(dims.w, dims.h, { fit: 'fill' }).png({ compressionLevel: 1 }).toBuffer(),
+  );
+}
+/** The thumb working size of a template's canvas (null ⇒ already small enough). */
+async function thumbDims(blankKey: string, edge: number): Promise<{ w: number; h: number } | null> {
+  const m = await sharp(await templateBytes(blankKey, null)).metadata();
+  const W = m.width ?? 0, H = m.height ?? 0;
+  const s = Math.min(1, edge / Math.max(W, H));
+  return W && H && s < 1 ? { w: Math.max(1, Math.round(W * s)), h: Math.max(1, Math.round(H * s)) } : null;
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
@@ -285,8 +354,10 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       quad: tpl.printQuad,
       transform: t,
       spanHalf,
-      workEdge: tpl.mapResolutionPx,
+      workEdge: size === 'thumb' ? Math.min(tpl.mapResolutionPx, THUMB_WORK_EDGE) : tpl.mapResolutionPx,
       outputEdge: OUTPUT_EDGE[size],
+      thumb: size === 'thumb',
+      memo: input.memo,
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
       mugMode: input.view === 'back' ? 'back' : input.view === 'centre' ? 'centre' : 'front',
@@ -308,6 +379,8 @@ const FACE_REV = '1';
  * the photo's print area is never more than the ~1500 px working edge, so 2× that is plenty). */
 const FACE_MAX_EDGE = 3000;
 const FACE_MAX_PIXELS = 8_000_000;
+/** A thumb's face only needs to cover its ≤ 800px working photo. */
+const THUMB_FACE_EDGE = 1000;
 
 /** Render a product's printed face at preview size — the same functions renderPrintFile uses. */
 export async function renderPrintedFace(
@@ -315,10 +388,11 @@ export async function renderPrintedFace(
   face: Face,
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number },
   transform: Transform,
+  maxEdge = FACE_MAX_EDGE,
 ): Promise<Buffer> {
   const geom = { printWidthPx: print.widthPx, printHeightPx: print.heightPx, bleedMm: print.bleedMm, requiredDpi: print.requiredDpi };
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
-  const scale = Math.min(1, FACE_MAX_EDGE / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
+  const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
   if (face === 'pattern') return (await renderRepeatPattern(srcBuf, canvas, print.requiredDpi, transform, '#ffffff', { scale })).png;
   return (await renderHeightChartFace(srcBuf, geom, transform, { scale })).png;
 }
@@ -339,6 +413,7 @@ async function renderAndPersist(
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
+    thumb?: boolean; memo?: ComposeMemo;
   },
 ): Promise<MockupResult> {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
@@ -350,16 +425,21 @@ async function renderAndPersist(
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.maskKey;
   // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
   // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
-  let designBuf = args.fillHex ? await solidFill(args.fillHex) : await getObjectBytes(args.designKey);
+  // A THUMB never needs the full-size original or the full-size photo: the design is shrunk once
+  // (shared across a batch via `memo`) and every template layer comes from the in-process cache at
+  // the thumb's working size — far less to download, decode and composite (the catalogue reveal).
+  let designBuf = args.fillHex ? await solidFill(args.fillHex) : await designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo);
+  const layerDims = args.thumb ? await thumbDims(args.blankKey, args.workEdge) : null;
+  const layer = (key: string) => templateBytes(key, layerDims);
   let transform = args.transform;
   if (args.face) {
     // The PRINTED FACE (the repeat / the drawing + ruler) at preview size, from the print code. It
     // has the print canvas's exact aspect, so a plain cover-fit lays it on the print area 1:1.
-    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform);
+    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform, args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE);
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const common = {
-    blankBuf: await getObjectBytes(args.blankKey),
+    blankBuf: await layer(args.blankKey),
     designBuf,
     quad: args.quad,
     transform,
@@ -370,11 +450,11 @@ async function renderAndPersist(
   const out = perspective
     ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
     : cylinder
-      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await getObjectBytes(args.maskKey!) })
+      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await layer(args.maskKey!) })
       : await renderFlat({
           ...common,
-          maskBuf: args.maskKey ? await getObjectBytes(args.maskKey) : undefined,
-          overlayBuf: args.overlayKey ? await getObjectBytes(args.overlayKey) : undefined,
+          maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
+          overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
           materialClass: args.materialClass,
         });
 

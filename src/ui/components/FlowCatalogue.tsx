@@ -10,13 +10,14 @@ import { Modal } from '@/ui/primitives/Modal';
 import { WhoForModal } from '@/ui/modals/WhoForModal';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
-import { ProductGrid } from '@/ui/components/ProductGrid';
+import { ProductGrid, tileMockupInputs } from '@/ui/components/ProductGrid';
 import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile } from '@/ui/components/FamilySetTile';
-import { basketCount, basketSubtotal, gbp, toast, useBasket, useSelection, useUpload } from '@/lib/store';
+import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
+import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupPrefetch';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
@@ -214,6 +215,35 @@ export function FlowCatalogue({
   };
 
   const { picks, popular } = useMemo(() => splitCatalogue(products, items), [products, items]);
+
+  // ── The REVEAL: get every tile's picture as early as possible (src/lib/mockupPrefetch.ts).
+  // The range tiles, in the order they're shown (the full-catalogue modal fetches its own).
+  const rangeProducts = useMemo(() => (mode === 'sections' ? [...picks, ...popular] : products.filter((p) => p.category !== 'ADDON')), [mode, picks, popular, products]);
+  const tileInputs = useCallback(
+    (p: CatalogueProduct) => {
+      const sel = useSelection.getState().selections[p.key];
+      const saved = upload?.assetId ? usePlacements.getState().placements[`${upload.assetId}-${p.key}`] : undefined;
+      return tileMockupInputs(p, upload, sel, saved);
+    },
+    [upload],
+  );
+  // 1) instant-preview photos: they don't depend on the drawing, only on which variant each tile
+  //    shows (its orientation follows the drawing's shape) — ask as soon as that's known.
+  const aspect = upload?.aspect;
+  useEffect(() => {
+    if (!aspect) return;
+    void prefetchContexts(rangeProducts.map((p) => tileInputs(p).variantId));
+  }, [aspect, rangeProducts, tileInputs]);
+  // 2) the photoreal mockups: the whole range, the moment the drawing is ingested — tiles that
+  //    can't show an instant preview (mugs, patterns, angled views) first, then in display order.
+  const assetId = upload?.assetId;
+  const cutoutId = upload?.cutout?.sourceObjectId;
+  useEffect(() => {
+    if (!assetId) return;
+    const reqs = rangeProducts.map((p) => ({ ...tileInputs(p), assetId, size: 'thumb' as const }));
+    const noInstant = (r: (typeof reqs)[number]) => (instantContext(r.variantId) ? 1 : 0);
+    prefetchMockups([...reqs].sort((a, b) => noInstant(a) - noInstant(b)));
+  }, [assetId, cutoutId, rangeProducts, tileInputs]);
 
   // The banner promises "matching organic tees + a bodysuit" — only show it when all
   // three garments are actually purchasable (an unseeded/partial catalogue would

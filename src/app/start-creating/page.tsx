@@ -70,16 +70,23 @@ export default function StartCreatingPage() {
   useEffect(() => {
     if (!drawingKey) return;
     setRangeReady(false);
+    // Reveal as soon as the first tiles have real pixels (the instant previews count — they paint
+    // within a moment of the drawing landing), but let the loader play its little beat first so
+    // the reveal lands as a reveal, not a flicker.
+    const MIN_LOADER_MS = 1200;
+    const shownAt = Date.now();
     let painted = 0;
+    let revealTimer: ReturnType<typeof setTimeout> | undefined;
     const onReady = () => {
       painted += 1;
-      if (painted >= 2) setRangeReady(true);
+      if (painted === 2) revealTimer = setTimeout(() => setRangeReady(true), Math.max(0, MIN_LOADER_MS - (Date.now() - shownAt)));
     };
     window.addEventListener(MOCKUP_READY_EVENT, onReady);
     const safety = setTimeout(() => setRangeReady(true), 15000);
     return () => {
       window.removeEventListener(MOCKUP_READY_EVENT, onReady);
       clearTimeout(safety);
+      if (revealTimer) clearTimeout(revealTimer);
     };
   }, [drawingKey]);
 

@@ -1,6 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { cachedMockup, forgetMockup, instantContext, mockupKey, pendingMockup, rememberMockup, subscribeMockups } from '@/lib/mockupPrefetch';
+import { clampTransform } from '@/server/print/geometry';
+import { InstantMockup } from './InstantMockup';
 import type { ProductKey } from './ProductArt';
 import type { PlacementTransform } from '@/lib/store';
 
@@ -40,6 +43,7 @@ export function MockupPreview({
   px = 96,
   lazy = false,
   placeholder = true,
+  instant,
 }: {
   productKey: ProductKey;
   assetId?: string | null;
@@ -60,6 +64,9 @@ export function MockupPreview({
   lazy?: boolean;
   /** false = nothing at all until the photo lands (for previews layered over one another). */
   placeholder?: boolean;
+  /** The drawing as the BROWSER already holds it (+ its width ÷ height): while the photoreal
+   * mockup is being made, draw an instant preview from it (src/ui/components/InstantMockup.tsx). */
+  instant?: { src: string; aspect: number } | null;
 }) {
   // `current` = the photo on screen; it is NEVER cleared while a newer variant
   // composes (the founder's rule: stay on the previous product until the chosen
@@ -94,7 +101,23 @@ export function MockupPreview({
   }
   const tfKey = JSON.stringify(transform ?? null);
   // Fresh inputs get a fresh retry allowance.
-  const inputKey = `${artKey}|${variantId ?? ''}|${tfKey}|${size ?? ''}|${view ?? ''}|${fill ?? ''}|${spanHalf ?? ''}`;
+  // one key format, shared with the range prefetch (src/lib/mockupPrefetch.ts)
+  const inputKey = mockupKey({ assetId, sourceObjectId, variantId, transform, size, view, fill, spanHalf });
+  const keyRef = useRef(inputKey);
+  keyRef.current = inputKey;
+  // Re-render when the range prefetch lands something for THIS tile: its photo (prefetchTick —
+  // re-runs the compose effect, which then finds it cached) or its instant-preview context.
+  const [prefetchTick, setPrefetchTick] = useState(0);
+  const [, setContextTick] = useState(0);
+  useEffect(
+    () =>
+      subscribeMockups(() => {
+        if (currentRef.current) return;
+        if (cachedMockup(keyRef.current)) setPrefetchTick((t) => t + 1);
+        else setContextTick((t) => t + 1);
+      }),
+    [],
+  );
   const lastInputKey = useRef(inputKey);
   if (lastInputKey.current !== inputKey) {
     lastInputKey.current = inputKey;
@@ -129,14 +152,42 @@ export function MockupPreview({
   // stuck pulsing). A superseded request (newer seq) is ignored.
   const seqRef = useRef(0);
   useEffect(() => {
-    if (!visible) return;
     if (!assetId || !variantId) {
+      if (!visible) return;
       setCurrent(null);
       setResting(false); // ids still resolving — wait quietly (pulse), don't rest
       return;
     }
     const seq = ++seqRef.current;
     const isLatest = () => mountedRef.current && seq === seqRef.current;
+    const show = (url: string) => {
+      const pre = new window.Image();
+      pre.onload = () => {
+        if (isLatest()) setCurrent(url);
+      };
+      pre.onerror = () => {
+        forgetMockup(inputKey);
+        if (isLatest() && !currentRef.current) setResting(true);
+      };
+      pre.src = url;
+    };
+    // The range PREFETCH may already have this one (even for a tile not scrolled to yet) …
+    const hit = cachedMockup(inputKey);
+    if (hit) {
+      show(hit);
+      return;
+    }
+    // … or have it on the way: wait for that rather than asking twice.
+    const inflight = pendingMockup(inputKey);
+    if (inflight) {
+      void inflight.then((r) => {
+        if (!isLatest()) return;
+        if (r.ok) show(r.url);
+        else if (!r.transient) setResting(true);
+      });
+      return;
+    }
+    if (!visible) return;
     setResting(false); // a new attempt begins; `current` keeps showing meanwhile
     // The compose is a ROUTE HANDLER (not a Server Action): a plain concurrent fetch, so
     // several previews compose in PARALLEL and don't abort each other (server actions
@@ -169,14 +220,8 @@ export function MockupPreview({
           return;
         }
         // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
-        const pre = new window.Image();
-        pre.onload = () => {
-          if (isLatest()) setCurrent(r.url);
-        };
-        pre.onerror = () => {
-          if (isLatest() && !currentRef.current) setResting(true);
-        };
-        pre.src = r.url;
+        rememberMockup(inputKey, r.url);
+        show(r.url);
       })
       .catch(() => {
         // an aborted/superseded request is expected — only a genuine failure with nothing
@@ -185,7 +230,7 @@ export function MockupPreview({
       });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tfKey is `transform` by value (a fresh object each render would refetch forever)
-  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, spanHalf, attempt]);
+  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, spanHalf, attempt, prefetchTick]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
   // Independently of the dispatch above, if the preview is STUCK (visible, ids present, no
@@ -205,21 +250,38 @@ export function MockupPreview({
     return () => clearTimeout(id);
   }, [visible, assetId, variantId, current, resting, attempt]);
 
+  // The instant preview stands in until the photo lands (and stays under it while it fades in).
+  const ctx = instant && variantId && !view && !fill ? instantContext(variantId) : undefined;
+  const instantLayer = ctx ? (
+    <div className="absolute inset-0">
+      <InstantMockup
+        ctx={ctx}
+        src={instant!.src}
+        aspect={instant!.aspect}
+        transform={clampTransform((transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }) as Parameters<typeof clampTransform>[0])}
+        // the instant preview counts as "real pixels" for the create page's loader
+        onReady={() => window.dispatchEvent(new Event(MOCKUP_READY_EVENT))}
+      />
+    </div>
+  ) : null;
+
   return (
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
     // parent (customize page) it falls back to content height and max-h-full is inert.
-    <div ref={containerRef} className="flex h-full w-full items-center justify-center">
+    <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
+      {instantLayer}
       {current ? (
         <img
           src={current}
           alt={`your drawing on a ${productKey}`}
           width={px}
           height={px}
-          className="h-auto max-h-full w-full rounded-lg object-contain"
+          className={`h-auto max-h-full w-full rounded-lg object-contain ${instantLayer ? 'relative motion-safe:animate-[fade_.35s_ease-out]' : ''}`}
           // tells the create page's "making your range" loader that real pixels are on screen
           onLoad={() => window.dispatchEvent(new Event(MOCKUP_READY_EVENT))}
           onError={() => {
             // an expired signed URL: drop the dead image and recompose (fresh URL)
+            forgetMockup(inputKey);
             setCurrent(null);
             if (retriesRef.current < 2) {
               retriesRef.current += 1;
@@ -229,7 +291,7 @@ export function MockupPreview({
             }
           }}
         />
-      ) : !placeholder ? null : (
+      ) : instantLayer || !placeholder ? null : (
         // No photo yet: a calm oat block, pulsing only while work is under way —
         // deliberately never the SVG stand-in (founder call).
         <div
