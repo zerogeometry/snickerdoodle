@@ -68,29 +68,19 @@ full suite with the dev DB 761 passed ×2, lint ignores `.claude/**`, pushed, te
 - ✅ C2. `scripts/test-site/seed.ps1` (+ `seed.ts`): catalogue then mockups, locally, against `.env.test-site`; refuses
   unless `SITE_MODE=test`; never prints a setting. `seedCatalogue` batched (~1,800 → ~180 queries — the Netlify 504).
 
-**D. Go live on the test site (last)** — D1 PREPARED, not flipped
-- D1. **Proposal (awaiting the founder's yes):** a test-site-only "preview" visibility.
-  - A per-product `previewOnTestSite: true` in the catalogue DEFS (code, no migration). `loadCatalogue` shows a product
-    when `visibleInShop` — OR when `previewOnTestSite` AND `isTestSite()` (SITE_MODE=test, decided server-side; the real
-    shop can never show it). Those tiles carry a small "preview" sticker so nobody mistakes them for live lines.
-  - The card-pack builder asks for the catalogue the same way, so it works on the test site too (today it needs the dev
-    curation view, which a production build refuses).
-  - Tests: hidden ⇒ absent on the real shop; preview ⇒ present only with SITE_MODE=test; a forged client flag does nothing.
-  - **Recommended to preview first:** card pack, socks, wrapping paper, tea towel, acrylic block, playing cards, height
-    chart (after the floor-height answer). **Hold:** hoodies (need a hoodie packshot staged + chest sizes confirmed) and
-    the pet bandana (its drawn shape is a guess until Prodigi's template is traced).
+**D. Go live on the test site (last)**
+- ✅ D1. Founder (21 Oct): no switch, no hidden lines — one collection. LIVE in the range: card pack, socks, height chart,
+  acrylic block, wrapping paper, tea towel, playing cards. HELD: hoodies (need a hoodie packshot + confirmed chest sizes),
+  pet bandana (drawn shape is a guess until Prodigi's template is traced).
+- ✅ Catalogue reveal: instant in-browser previews + batched, prefetched photos (range shows in ~1.3 s locally).
+  Bigger win still available: set Netlify Functions region to London (Site configuration → Functions, paid plans).
 - D2. On the founder's computer (see the PR's "run locally"): integration tests → `deploy.ps1` → `seed.ps1` →
   `e2e/storefront-smoke` + card-pack e2e against the test site → click through card pack, socks pattern, gift link
   (create, open as guest, revoke).
 
-## Founder decisions needed (recommended default in **bold**)
-- Show which products on the test site, and is a "preview on the test site only" switch OK? → **yes; the seven above**.
-- Height chart: where the scale starts → **30 cm above the floor** (clears skirting; a 120 cm chart reads ~32–150 cm).
-- Gift-link default expiry (30 days today) → **14 days**; the parent can always make a fresh link.
-- Untracked post for wrapping paper + playing cards → **accept it** (the copy now says "free delivery" for them).
-- Card-pack builder layout/copy (a14a5f1) → **keep as built**: fronts auto-fill (no per-card repositioning in v1),
-  guests can start a pack, "not quite ready to print" wording.
-- Prodigi photo licence → **ask in the open support thread** (one line).
-
+## Founder decisions (21 Oct)
+- ✅ New range: live as one collection (above). ✅ Height chart: hang 40 cm up, reads 50–150 cm (market standard).
+- ✅ Gift links: 14 days. ✅ Untracked post for wrap + playing cards: accepted ("free delivery" copy).
+- ✅ Card-pack builder: as built. ✅ Prodigi photo licence: fine.
 - Still open with Prodigi: are envelopes included with cards? does LIVE keep the flat £0.95 for 10+ cards? Are jigsaw
   and baby bodysuit standard post tracked now (PRICING.md, July, said untracked; the jigsaw page says tracked)?
