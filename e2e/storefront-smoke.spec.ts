@@ -23,14 +23,14 @@ import sharp from 'sharp';
 
 const LIVE = [
   { key: 'framedPrint', label: 'framed print', pence: 6500 },
-  { key: 'cushion', label: 'cushion', pence: 2000 },
+  { key: 'cushion', label: 'cushion', pence: 2200 },
   { key: 'mug', label: 'mug', pence: 1800 },
-  { key: 'jigsaw', label: 'jigsaw', pence: 2500 },
+  { key: 'jigsaw', label: 'jigsaw', pence: 2600 },
   { key: 'blanket', label: 'fleece blanket', pence: 6000 },
-  { key: 'card', label: 'greetings card', pence: 500 },
+  { key: 'card', label: 'greetings card', pence: 550 },
 ] as const;
 
-const SUBTOTAL = LIVE.reduce((s, p) => s + p.pence, 0); // 19300
+const SUBTOTAL = LIVE.reduce((s, p) => s + p.pence, 0); // 19650
 
 // Mirror the app's formatPence EXACTLY: whole pounds have no decimals (£65, not £65.00).
 const gbp = (pence: number) => {
