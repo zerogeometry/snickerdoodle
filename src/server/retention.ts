@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, lte, ne, notExists, sql } from 'drizzle-or
 import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { deleteObjectConfirmed } from '@/storage';
 import { recordErasure } from './erasureLedger';
+import { forgetAssetPreviews } from './print/previewCache';
 import type { DbHandle, Tx } from './db';
 
 // An order in one of these states still needs its source art (render is pending
@@ -70,6 +71,7 @@ export async function purgeExpiredAssets(
         await deleteObjectConfirmed(obj.key); // provider, confirmed + retried
       }
       await db.delete(assets).where(eq(assets.id, asset.id)); // cascades storage_objects rows
+      forgetAssetPreviews(asset.id); // any printed face the compositor still holds in memory
       await db.insert(auditRecords).values({
         familyId: asset.familyId,
         actorType: 'SYSTEM',

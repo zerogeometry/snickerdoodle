@@ -1,5 +1,5 @@
 import './sharp-init';
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import type { Transform } from './geometry';
 import { patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
 
@@ -33,6 +33,38 @@ export async function renderRepeatPattern(
   background = '#ffffff',
   opts: { scale?: number } = {},
 ): Promise<{ png: Buffer; layout: PatternLayout; width: number; height: number }> {
+  const r = await repeatPipeline(srcBuf, canvas, dpi, transform, background, opts);
+  const png = await r.pipeline.png().withMetadata({ density: Math.round(r.dpi) }).toBuffer();
+  return { png, layout: r.layout, width: r.width, height: r.height };
+}
+
+/**
+ * The same repeat as raw pixels, for the mockup PREVIEW — it composites the face straight away,
+ * so a PNG of it would only be encoded to be decoded again. Same pixels as the PNG.
+ */
+export async function renderRepeatPatternPixels(
+  srcBuf: Buffer,
+  canvas: { width: number; height: number },
+  dpi: number,
+  transform: Transform,
+  background = '#ffffff',
+  opts: { scale?: number } = {},
+): Promise<{ data: Buffer; width: number; height: number; channels: 3 | 4 }> {
+  const r = await repeatPipeline(srcBuf, canvas, dpi, transform, background, opts);
+  const { data, info } = await r.pipeline.raw().toBuffer({ resolveWithObject: true });
+  if (info.channels !== 3 && info.channels !== 4) throw new Error(`repeat pattern: unexpected ${info.channels} channels`);
+  return { data, width: info.width, height: info.height, channels: info.channels };
+}
+
+/** Everything up to the encode. The steps hand each other raw pixels (lossless, as the PNGs were). */
+async function repeatPipeline(
+  srcBuf: Buffer,
+  canvas: { width: number; height: number },
+  dpi: number,
+  transform: Transform,
+  background: string,
+  opts: { scale?: number },
+): Promise<{ pipeline: Sharp; layout: PatternLayout; dpi: number; width: number; height: number }> {
   const meta = await sharp(srcBuf).metadata();
   if (!meta.width || !meta.height) throw new Error('unreadable source image');
   // The layout is decided at PRINT size; a preview (`scale` < 1) draws the same repeat smaller.
@@ -45,7 +77,8 @@ export async function renderRepeatPattern(
   }
   const { cols, cellW, stripH, motifW, motifH, phaseX, phaseY } = layout;
 
-  const motif = await sharp(srcBuf).rotate(transform.rotationDeg).resize(motifW, motifH, { fit: 'fill' }).ensureAlpha().png().toBuffer();
+  const motif = await sharp(srcBuf).rotate(transform.rotationDeg).resize(motifW, motifH, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
+  const motifRaw = { raw: { width: motifW, height: motifH, channels: 4 as const } };
 
   // One strip, one cell tall, with a margin so motifs that cross an edge can be drawn whole and
   // then cropped: what leaves on the right comes back on the left (and bottom → top).
@@ -59,23 +92,25 @@ export async function renderRepeatPattern(
       const left = Math.round(cx - motifW / 2) + pad;
       const top = Math.round(cy - motifH / 2) + pad;
       if (left + motifW <= 0 || top + motifH <= 0 || left >= canvas.width + 2 * pad || top >= stripH + 2 * pad) continue;
-      overlays.push({ input: motif, left, top });
+      overlays.push({ input: motif, ...motifRaw, left, top });
     }
   }
   // Every column/row index is placed at a whole multiple of the canvas width/strip height from its
   // twin, so the crop below is periodic: x and x + canvas.width carry the same pixels.
-  const wide = await sharp({ create: { width: canvas.width + 2 * pad, height: stripH + 2 * pad, channels: 4, background } })
+  const wideW = canvas.width + 2 * pad, wideH = stripH + 2 * pad;
+  const wide = await sharp({ create: { width: wideW, height: wideH, channels: 4, background } })
     .composite(overlays)
-    .png()
+    .raw()
     .toBuffer();
   // Flattened to opaque here, so the big tiled file below is plain RGB (no alpha to carry).
-  const strip = await sharp(wide).extract({ left: pad, top: pad, width: canvas.width, height: stripH }).flatten({ background }).png().toBuffer();
+  const strip = await sharp(wide, { raw: { width: wideW, height: wideH, channels: 4 } })
+    .extract({ left: pad, top: pad, width: canvas.width, height: stripH })
+    .flatten({ background })
+    .raw()
+    .toBuffer({ resolveWithObject: true });
 
-  const png = await sharp({ create: { width: canvas.width, height: canvas.height, channels: 3, background } })
-    .composite([{ input: strip, tile: true, gravity: 'northwest' }])
-    .removeAlpha()
-    .png()
-    .withMetadata({ density: Math.round(dpi) })
-    .toBuffer();
-  return { png, layout, width: canvas.width, height: canvas.height };
+  const pipeline = sharp({ create: { width: canvas.width, height: canvas.height, channels: 3, background } })
+    .composite([{ input: strip.data, raw: { width: strip.info.width, height: strip.info.height, channels: strip.info.channels }, tile: true, gravity: 'northwest' }])
+    .removeAlpha();
+  return { pipeline, layout, dpi, width: canvas.width, height: canvas.height };
 }

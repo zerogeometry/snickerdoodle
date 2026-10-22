@@ -1,6 +1,6 @@
 import './sharp-init';
 import { Resvg } from '@resvg/resvg-js';
-import sharp from 'sharp';
+import sharp, { type Sharp } from 'sharp';
 import { computeLayerRect, type TemplateGeom, type Transform } from './geometry';
 import { heightChartLayout, HEIGHT_CHART_FLOOR_CM, rulerBandSvg } from './height-chart-geometry';
 
@@ -19,6 +19,31 @@ export async function renderHeightChartFace(
   transform: Transform,
   opts: { scale?: number; floorCm?: number } = {},
 ): Promise<{ png: Buffer; width: number; height: number }> {
+  const f = await faceAssembly(srcBuf, t, transform, opts);
+  const png = await f.pipeline.png().withMetadata({ density: Math.round(f.dpi) }).toBuffer();
+  return { png, width: f.width, height: f.height };
+}
+
+/** The same face as raw pixels, for the mockup PREVIEW (it composites it straight away). */
+export async function renderHeightChartFacePixels(
+  srcBuf: Buffer,
+  t: TemplateGeom,
+  transform: Transform,
+  opts: { scale?: number; floorCm?: number } = {},
+): Promise<{ data: Buffer; width: number; height: number; channels: 3 | 4 }> {
+  const f = await faceAssembly(srcBuf, t, transform, opts);
+  const { data, info } = await f.pipeline.raw().toBuffer({ resolveWithObject: true });
+  if (info.channels !== 3 && info.channels !== 4) throw new Error(`height chart: unexpected ${info.channels} channels`);
+  return { data, width: info.width, height: info.height, channels: info.channels };
+}
+
+/** Everything up to the encode. */
+async function faceAssembly(
+  srcBuf: Buffer,
+  t: TemplateGeom,
+  transform: Transform,
+  opts: { scale?: number; floorCm?: number },
+): Promise<{ pipeline: Sharp; dpi: number; width: number; height: number }> {
   const s = opts.scale ?? 1;
   const W = Math.max(1, Math.round(t.printWidthPx * s));
   const H = Math.max(1, Math.round(t.printHeightPx * s));
@@ -43,14 +68,11 @@ export async function renderHeightChartFace(
     new Resvg(rulerBandSvg(lay, opts.floorCm ?? HEIGHT_CHART_FLOOR_CM), { fitTo: { mode: 'original' }, background: 'white' }).render().asPng(),
   );
 
-  const png = await sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
+  const pipeline = sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
     .composite([
       { input: part, left: lay.art.x + ox, top: oy },
       { input: band, left: 0, top: 0 },
     ])
-    .flatten({ background: '#ffffff' })
-    .png()
-    .withMetadata({ density: Math.round(dpi) })
-    .toBuffer();
-  return { png, width: W, height: H };
+    .flatten({ background: '#ffffff' });
+  return { pipeline, dpi, width: W, height: H };
 }

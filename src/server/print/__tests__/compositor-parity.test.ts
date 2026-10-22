@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { renderMockupLayers, renderPrintedFace, renderTemplatePreview } from '@/server/print/compositor';
+import { clearMockupCaches, renderMockupLayers, renderPrintedFace, renderTemplatePreview } from '@/server/print/compositor';
 import type { Transform } from '@/server/print/geometry';
 
 /**
@@ -117,14 +117,6 @@ const PRESETS: { name: string; render: (l: Layers) => Promise<Buffer> }[] = [
     },
   },
   {
-    // a JPEG product photo + a JPEG phone photo of a drawing (the common upload)
-    name: 'flat-jpeg-inputs-zoom',
-    render: async (l) => {
-      const [b, d] = await Promise.all([sharp(l.blank).jpeg({ quality: 90 }).toBuffer(), sharp(l.design).flatten({ background: '#ffffff' }).jpeg({ quality: 90 }).toBuffer()]);
-      return (await renderMockupLayers({ blank: b, design: d, quad: FLAT_QUAD, transform: T_MOVED, print: PRINT, materialClass: 'PAPER', ...ZOOM })).buffer;
-    },
-  },
-  {
     name: 'template-preview-pattern-skew',
     render: (l) => renderTemplatePreview({ blank: l.blank, mask: l.mask, overlay: l.overlay, quad: SKEW_QUAD, materialClass: 'LIGHT_FABRIC', design: l.design, productKey: 'socks', print: { widthPx: 2400, heightPx: 1800, bleedMm: 0, requiredDpi: 300 }, size: 'thumb', ground: 'navy' }),
   },
@@ -150,10 +142,51 @@ describe('mockup compositor — pixel parity with the known-good pipeline', () =
       expect(existsSync(file), `golden missing — UPDATE_PARITY=1 to create ${file}`).toBe(true);
       const [a, b] = await Promise.all([decode(out), decode(readFileSync(file))]);
       expect(`${a.info.width}x${a.info.height}`).toBe(`${b.info.width}x${b.info.height}`);
-      let sum = 0;
-      for (let i = 0; i < a.data.length; i++) sum += Math.abs(a.data[i]! - b.data[i]!);
+      let sum = 0, max = 0;
+      for (let i = 0; i < a.data.length; i++) {
+        const d = Math.abs(a.data[i]! - b.data[i]!);
+        sum += d;
+        if (d > max) max = d;
+      }
       const mean = sum / a.data.length;
+      if (process.env.PARITY_REPORT) console.log(`${p.name}: mean |Δ| ${mean.toFixed(4)}, max |Δ| ${max}`);
       expect(mean).toBeLessThanOrEqual(1);
     }, 30_000);
   }
+
+  // The known-good pipeline handed some steps to the next as an encoded image in the INPUT's format,
+  // so a JPEG upload was re-saved as JPEG (q80, 4:2:0) twice on its way through a zoom render. Steps
+  // now pass pixels, so a JPEG renders exactly as the same pixels given losslessly — no generation
+  // loss. (Measured against the old pipeline on this preset: mean |Δ| 0.998, max 78 — its artefacts.)
+  it('a JPEG upload loses nothing in between: same output as its pixels given as PNG', async () => {
+    const l = await getLayers();
+    const jpeg = await sharp(l.design).flatten({ background: '#ffffff' }).jpeg({ quality: 90 }).toBuffer();
+    const asPng = await sharp(jpeg).png().toBuffer();
+    const render = (design: Buffer) => renderMockupLayers({ blank: l.blank, design, quad: FLAT_QUAD, transform: T_MOVED, print: PRINT, materialClass: 'PAPER', ...ZOOM });
+    const [a, b] = await Promise.all([render(jpeg), render(asPng)]);
+    expect(a.buffer.equals(b.buffer)).toBe(true);
+  }, 30_000);
+
+  // The shop path caches each template layer decoded at its working size (and the pieces derived
+  // from it). A warm cache must draw exactly what a cold render draws — across thumb and zoom sizes.
+  it('a warm template-layer cache draws the same picture as a cold render', async () => {
+    const l = await getLayers();
+    const layerIds = { blank: 'test/blank', mask: 'test/mask', overlay: 'test/overlay' };
+    const runs = [
+      { quad: FLAT_QUAD, materialClass: 'LIGHT_FABRIC', ...ZOOM },
+      { quad: FLAT_QUAD, materialClass: 'PAPER', ...THUMB },
+      { quad: SKEW_QUAD, materialClass: 'PAPER', ...THUMB },
+      { quad: FLAT_QUAD, materialClass: 'CERAMIC', mugMode: 'back' as const, ...ZOOM },
+    ];
+    clearMockupCaches();
+    for (const r of runs) {
+      const base = { blank: l.blank, mask: l.mask, overlay: l.overlay, design: l.design, transform: T0, print: { ...PRINT, widthPx: 1500, heightPx: 1200 }, ...r };
+      const cold = await renderMockupLayers(base);
+      const first = await renderMockupLayers({ ...base, layerIds });
+      const warm = await renderMockupLayers({ ...base, layerIds });
+      expect(first.buffer.equals(cold.buffer)).toBe(true);
+      expect(warm.buffer.equals(cold.buffer)).toBe(true);
+    }
+    clearMockupCaches();
+  }, 60_000);
 });
