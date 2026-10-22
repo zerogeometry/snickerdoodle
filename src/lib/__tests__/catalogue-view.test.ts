@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BasketItem } from '@/lib/store';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
-import { defaultTransformFor, filterCatalogue, lineIdForSku, matchesQuery, orientationForAspect, productQtyInBasket, resolveDisplayVariant, sizeDimsCm, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultTransformFor, filterCatalogue, FLAT_MIN_GAP, FLAT_PRODUCT_KEYS, lineIdForSku, matchesQuery, orientationForAspect, productQtyInBasket, resolveDisplayVariant, sizeDimsCm, spaceOutFlat, splitCatalogue } from '@/lib/catalogue-view';
 
 const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = false): CatalogueVariant => ({
   id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault, printWmm: 209, printHmm: 98,
@@ -62,6 +62,43 @@ describe('splitCatalogue — Most Popular + your picks', () => {
   it('a basketed ADDON is never a pick', () => {
     const { picks } = splitCatalogue(all, [line('cat-giftWrap', 1, 'giftWrap')]);
     expect(picks).toHaveLength(0);
+  });
+});
+
+describe('spaceOutFlat — flat products never sit together (founder, 2026-10-22)', () => {
+  const keys = (list: { key: string }[]) => list.map((p) => p.key);
+  const flatGaps = (list: { key: string }[]) => {
+    const at = list.flatMap((p, i) => (FLAT_PRODUCT_KEYS.has(p.key) ? [i] : []));
+    return at.slice(1).map((i, n) => i - at[n]!);
+  };
+
+  it('the founder’s example: wrapping paper, tea towel, jigsaw, blanket in a row get spread out', () => {
+    const order = ['framedPrint', 'wrappingPaper', 'teaTowel', 'jigsaw', 'blanket', 'mug', 'kidsTee', 'socks', 'cushion', 'phoneCase', 'playingCards', 'adultTee'].map((key) => ({ key }));
+    const out = spaceOutFlat(order);
+    expect(flatGaps(out).every((g) => g >= FLAT_MIN_GAP)).toBe(true);
+    expect(new Set(keys(out))).toEqual(new Set(keys(order))); // nothing lost or duplicated
+  });
+
+  it('keeps the popularity order when nothing needs moving', () => {
+    const order = ['framedPrint', 'jigsaw', 'mug', 'kidsTee', 'blanket', 'card'].map((key) => ({ key }));
+    expect(keys(spaceOutFlat(order))).toEqual(keys(order));
+  });
+
+  it('pulls the next non-flat product forward, then lets the flat one in', () => {
+    const order = ['jigsaw', 'blanket', 'mug', 'kidsTee', 'card'].map((key) => ({ key }));
+    expect(keys(spaceOutFlat(order))).toEqual(['jigsaw', 'mug', 'kidsTee', 'blanket', 'card']);
+  });
+
+  it('never drops products: a tail of only flat ones is still shown', () => {
+    const order = ['mug', 'jigsaw', 'blanket', 'teaTowel'].map((key) => ({ key }));
+    expect(keys(spaceOutFlat(order))).toEqual(['mug', 'jigsaw', 'blanket', 'teaTowel']);
+  });
+
+  it('applies to the Most Popular grid and the full catalogue', () => {
+    const p = (key: string, rank: number) => product(key, { category: 'PRINT', popularRank: rank, variants: [variant(key, {}, true)] });
+    const all = [p('jigsaw', 1), p('blanket', 2), p('mug', 3), p('kidsTee', 4)];
+    expect(keys(splitCatalogue(all, []).popular)).toEqual(['jigsaw', 'mug', 'kidsTee', 'blanket']);
+    expect(keys(filterCatalogue(all, ''))).toEqual(['jigsaw', 'mug', 'kidsTee', 'blanket']);
   });
 });
 

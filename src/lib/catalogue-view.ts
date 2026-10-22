@@ -185,6 +185,36 @@ export function productQtyInBasket(items: BasketItem[], p: CatalogueProduct): nu
 export const isPopular = (p: CatalogueProduct): boolean => p.popularRank != null;
 
 /**
+ * Products whose photo is a flat sheet lying flat. A run of them reads as "a bunch of the same flat
+ * product" (founder, 2026-10-22), so the grids space them out.
+ */
+export const FLAT_PRODUCT_KEYS: ReadonlySet<string> = new Set(['jigsaw', 'blanket', 'wrappingPaper', 'teaTowel', 'heightChart', 'calendar']);
+/**
+ * Minimum gap (in places) between two flat products. 3 means never side by side at any width, and
+ * never one above the other on the 2-column phone grid.
+ */
+export const FLAT_MIN_GAP = 3;
+
+/**
+ * Keep the given order, but hold a flat product back until it's at least `gap` places after the
+ * previous flat one, pulling the next non-flat product forward instead. Stable otherwise. If only
+ * flat products are left, they're placed anyway rather than dropped.
+ */
+export function spaceOutFlat<T extends { key: string }>(list: readonly T[], gap: number = FLAT_MIN_GAP): T[] {
+  const pending = [...list];
+  const out: T[] = [];
+  let lastFlat = -Infinity;
+  while (pending.length) {
+    const ready = (p: T) => !FLAT_PRODUCT_KEYS.has(p.key) || out.length - lastFlat >= gap;
+    const i = Math.max(0, pending.findIndex(ready));
+    const [next] = pending.splice(i, 1);
+    if (FLAT_PRODUCT_KEYS.has(next!.key)) lastFlat = out.length;
+    out.push(next!);
+  }
+  return out;
+}
+
+/**
  * Split the catalogue for the start-creating front-of-shop: the curated Most-Popular
  * grid (sorted by rank), plus "your picks" — products the shopper added (basket qty > 0)
  * that AREN'T already in Most Popular, pinned above it on return from the Full Catalogue.
@@ -195,7 +225,7 @@ export function splitCatalogue(
   items: BasketItem[],
 ): { picks: CatalogueProduct[]; popular: CatalogueProduct[] } {
   const sellable = products.filter((p) => p.category !== 'ADDON');
-  const popular = sellable.filter(isPopular).sort((a, b) => a.popularRank! - b.popularRank!);
+  const popular = spaceOutFlat(sellable.filter(isPopular).sort((a, b) => a.popularRank! - b.popularRank!));
   const popularKeys = new Set(popular.map((p) => p.key));
   const picks = sellable.filter((p) => !popularKeys.has(p.key) && productQtyInBasket(items, p) > 0);
   return { picks, popular };
@@ -218,5 +248,5 @@ export function matchesQuery(p: CatalogueProduct, query: string): boolean {
 
 /** The full browsable catalogue (all sellable products), filtered by the search query. */
 export function filterCatalogue(products: CatalogueProduct[], query: string): CatalogueProduct[] {
-  return products.filter((p) => p.category !== 'ADDON' && matchesQuery(p, query));
+  return spaceOutFlat(products.filter((p) => p.category !== 'ADDON' && matchesQuery(p, query)));
 }
