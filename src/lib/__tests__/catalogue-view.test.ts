@@ -67,26 +67,41 @@ describe('splitCatalogue — Most Popular + your picks', () => {
 
 describe('spaceOutFlat — flat products never sit together (founder, 2026-10-22)', () => {
   const keys = (list: { key: string }[]) => list.map((p) => p.key);
+  const flatAt = (list: { key: string }[]) => list.flatMap((p, i) => (FLAT_PRODUCT_KEYS.has(p.key) ? [i] : []));
   const flatGaps = (list: { key: string }[]) => {
-    const at = list.flatMap((p, i) => (FLAT_PRODUCT_KEYS.has(p.key) ? [i] : []));
+    const at = flatAt(list);
     return at.slice(1).map((i, n) => i - at[n]!);
   };
+  // the live range in its expected-popularity order (22 Oct) — the first rule bunched the last three
+  const LIVE = ['framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards'].map((key) => ({ key }));
 
-  it('the founder’s example: wrapping paper, tea towel, jigsaw, blanket in a row get spread out', () => {
-    const order = ['framedPrint', 'wrappingPaper', 'teaTowel', 'jigsaw', 'blanket', 'mug', 'kidsTee', 'socks', 'cushion', 'phoneCase', 'playingCards', 'adultTee'].map((key) => ({ key }));
-    const out = spaceOutFlat(order);
+  it('the shop real line-up: never side by side, all the way to the end, nothing lost', () => {
+    const out = spaceOutFlat(LIVE);
     expect(flatGaps(out).every((g) => g >= FLAT_MIN_GAP)).toBe(true);
-    expect(new Set(keys(out))).toEqual(new Set(keys(order))); // nothing lost or duplicated
+    expect(new Set(keys(out))).toEqual(new Set(keys(LIVE)));
+    expect(out).toHaveLength(LIVE.length);
+  });
+
+  it('flat products are only held back, never pulled ahead of more popular ones', () => {
+    const out = spaceOutFlat(LIVE);
+    for (const k of keys(LIVE).filter((x) => FLAT_PRODUCT_KEYS.has(x))) {
+      expect(keys(out).indexOf(k), k).toBeGreaterThanOrEqual(keys(LIVE).indexOf(k));
+    }
+  });
+
+  it('prefers three apart (no stacking on a phone) when that only means holding one back', () => {
+    const order = ['framedPrint', 'jigsaw', 'mug', 'blanket', 'kidsTee', 'card', 'cushion'].map((key) => ({ key }));
+    expect(keys(spaceOutFlat(order))).toEqual(['framedPrint', 'jigsaw', 'mug', 'kidsTee', 'blanket', 'card', 'cushion']);
+  });
+
+  it('the founder example: wrapping paper, tea towel, jigsaw, blanket in a row get spread out', () => {
+    const order = ['framedPrint', 'wrappingPaper', 'teaTowel', 'jigsaw', 'blanket', 'mug', 'kidsTee', 'socks', 'cushion', 'phoneCase', 'playingCards', 'adultTee'].map((key) => ({ key }));
+    expect(flatGaps(spaceOutFlat(order)).every((g) => g >= FLAT_MIN_GAP)).toBe(true);
   });
 
   it('keeps the popularity order when nothing needs moving', () => {
     const order = ['framedPrint', 'jigsaw', 'mug', 'kidsTee', 'blanket', 'card'].map((key) => ({ key }));
     expect(keys(spaceOutFlat(order))).toEqual(keys(order));
-  });
-
-  it('pulls the next non-flat product forward, then lets the flat one in', () => {
-    const order = ['jigsaw', 'blanket', 'mug', 'kidsTee', 'card'].map((key) => ({ key }));
-    expect(keys(spaceOutFlat(order))).toEqual(['jigsaw', 'mug', 'kidsTee', 'blanket', 'card']);
   });
 
   it('never drops products: a tail of only flat ones is still shown', () => {

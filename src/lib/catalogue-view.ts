@@ -201,27 +201,50 @@ export const isPopular = (p: CatalogueProduct): boolean => p.popularRank != null
  * product" (founder, 2026-10-22), so the grids space them out.
  */
 export const FLAT_PRODUCT_KEYS: ReadonlySet<string> = new Set(['jigsaw', 'blanket', 'wrappingPaper', 'teaTowel', 'heightChart', 'calendar']);
-/**
- * Minimum gap (in places) between two flat products. 3 means never side by side at any width, and
- * never one above the other on the 2-column phone grid.
- */
-export const FLAT_MIN_GAP = 3;
+/** Never closer than this (in places): 2 = never side by side, at any width. A HARD rule. */
+export const FLAT_MIN_GAP = 2;
+/** Preferred gap: 3 also keeps them from stacking on the 2-column phone grid — where the order allows. */
+export const FLAT_PREFERRED_GAP = 3;
 
 /**
- * Keep the given order, but hold a flat product back until it's at least `gap` places after the
- * previous flat one, pulling the next non-flat product forward instead. Stable otherwise. If only
- * flat products are left, they're placed anyway rather than dropped.
+ * Keep the popularity order, but space flat products out: never side by side (a hard rule), and three
+ * places apart where that only means holding one back a little. Flat products are only ever held
+ * back, never pulled forward ahead of more popular ones; a non-flat product steps up to fill the gap.
+ * It looks ahead so it never spends the non-flat products early and bunches the last flat ones at
+ * the end. If a list simply has too many flat products, it does its best rather than drop any.
  */
-export function spaceOutFlat<T extends { key: string }>(list: readonly T[], gap: number = FLAT_MIN_GAP): T[] {
+export function spaceOutFlat<T extends { key: string }>(list: readonly T[]): T[] {
+  const isFlat = (p: T) => FLAT_PRODUCT_KEYS.has(p.key);
   const pending = [...list];
   const out: T[] = [];
   let lastFlat = -Infinity;
+  // can `f` flats still be placed >= FLAT_MIN_GAP apart with `n` others, the next place `d` after the last flat?
+  const feasible = (f: number, n: number, d: number) => f === 0 || Math.max(0, FLAT_MIN_GAP - d) + (FLAT_MIN_GAP - 1) * (f - 1) <= n;
+  const take = (i: number) => {
+    const [p] = pending.splice(i, 1);
+    if (isFlat(p!)) lastFlat = out.length;
+    out.push(p!);
+  };
   while (pending.length) {
-    const ready = (p: T) => !FLAT_PRODUCT_KEYS.has(p.key) || out.length - lastFlat >= gap;
-    const i = Math.max(0, pending.findIndex(ready));
-    const [next] = pending.splice(i, 1);
-    if (FLAT_PRODUCT_KEYS.has(next!.key)) lastFlat = out.length;
-    out.push(next!);
+    const d = out.length - lastFlat; // places since the last flat, counting this one
+    const flatsLeft = pending.filter(isFlat).length;
+    const othersLeft = pending.length - flatsLeft;
+    const firstOther = pending.findIndex((p) => !isFlat(p));
+    const head = pending[0]!;
+    if (!isFlat(head)) {
+      // a non-flat in its turn — unless the flats still to come would then run out of spacers
+      const firstFlat = pending.findIndex(isFlat);
+      // (only when bringing that flat forward actually rescues the spacing — never just to shuffle)
+      if (firstFlat >= 0 && d >= FLAT_MIN_GAP && !feasible(flatsLeft, othersLeft - 1, d + 1) && feasible(flatsLeft - 1, othersLeft, 1)) take(firstFlat);
+      else take(0);
+      continue;
+    }
+    // a flat in its turn: placed at the preferred gap; at the minimum gap only if holding it back
+    // would leave the rest unplaceable; too close -> the next non-flat steps up
+    const canHold = firstOther >= 0 && feasible(flatsLeft, othersLeft - 1, d + 1);
+    if (d >= FLAT_PREFERRED_GAP || (d >= FLAT_MIN_GAP && !canHold)) take(0);
+    else if (firstOther >= 0) take(firstOther);
+    else take(0); // only flats left: best effort
   }
   return out;
 }
