@@ -26,9 +26,25 @@ const FORMAT_TO_MIME: Record<string, string> = {
  * the EXIF orientation so the picture still looks right after the orientation tag
  * is dropped. The re-encoded bytes become the stored "original".
  */
+/** The most pixels an upload may decode to (≈ a 48MP phone photo, with room). The 25MB byte cap
+ * alone doesn't bound memory: a tiny, highly compressed file can declare 30000×30000 pixels and
+ * take gigabytes to decode (a "decompression bomb") — refused before any pixel is decoded. The
+ * browser already shrinks uploads to 4500px, so only a hand-crafted request ever meets this. */
+export const MAX_UPLOAD_PIXELS = 50_000_000;
+export class ImageTooLargeError extends Error {
+  constructor() {
+    super('image too large');
+    this.name = 'ImageTooLargeError';
+  }
+}
+
 export async function stripExif(input: Buffer): Promise<SanitisedImage> {
-  const pipeline = sharp(input, { failOn: 'none' }).rotate(); // no withMetadata() ⇒ metadata dropped
-  const meta = await sharp(input, { failOn: 'none' }).metadata();
+  // header only — no decode (sharp itself refuses headers past ~268MP; anything over OUR cap too)
+  const meta = await sharp(input, { failOn: 'none' }).metadata().catch(() => {
+    throw new ImageTooLargeError();
+  });
+  if (!meta.width || !meta.height || meta.width * meta.height > MAX_UPLOAD_PIXELS) throw new ImageTooLargeError();
+  const pipeline = sharp(input, { failOn: 'none', limitInputPixels: MAX_UPLOAD_PIXELS }).rotate(); // no withMetadata() ⇒ metadata dropped
   const format = meta.format ?? 'jpeg';
 
   const buffer = await pipeline.toBuffer();

@@ -21,10 +21,10 @@
 //
 // Run: npx tsx scripts/derive-garment-photo-blanks.mjs   (tsx: it reads the garment colours)
 
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { ADULT_TEE_COLOURS, KIDS_TEE_COLOURS } from '../src/lib/garments.ts';
+import { ADULT_HOODIE_COLOURS, ADULT_TEE_COLOURS, KIDS_HOODIE_COLOURS, KIDS_TEE_COLOURS } from '../src/lib/garments.ts';
 
 const SRC = path.join(process.cwd(), '.prodigi-assets', 'blanks', 'prodigi-garment-photos');
 const OUT = path.join(process.cwd(), '.prodigi-assets', 'blanks', 'derived');
@@ -70,6 +70,10 @@ async function measure(file, dominant, others) {
  * + margin, and report the chest-region fractions of the CROPPED canvas.
  */
 async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTopFrac, colours = [], transparent = false }) {
+  if (!existsSync(path.join(SRC, file))) {
+    console.log(`skipped ${out}: ${file} is not staged in prodigi-garment-photos/`);
+    return null;
+  }
   const m = await measure(file, dominant, others);
   const bw = m.bbox.x1 - m.bbox.x0;
   const bh = m.bbox.y1 - m.bbox.y0;
@@ -163,7 +167,25 @@ async function derive({ file, out, dominant, others, printWmm, torsoMm, panelTop
   const r4 = (n) => Math.round(n * 1000) / 1000;
   console.log(`${out}: ${width}x${height}  torso ${torsoPx}px  region { x0: ${r4(region.x0)}, y0: ${r4(region.y0)}, x1: ${r4(region.x1)}, y1: ${r4(region.y1)} }`);
   // → src/lib/garments.ts TEE_PHOTO (the size-true preview regions are computed from these)
-  console.log(`  TEE_PHOTO = { torsoFrac: ${r4(torsoPx / width)}, centreX: ${r4(torsoCx / width)}, panelTop: ${r4(panelTop / height)}, aspect: ${r4(width / height)} }`);
+  const photo = { torsoFrac: r4(torsoPx / width), centreX: r4(torsoCx / width), panelTop: r4(panelTop / height), aspect: r4(width / height) };
+  console.log(`  PHOTO = ${JSON.stringify(photo)}`);
+  return photo;
+}
+
+/** The packshot's garment colour channel: the one that stands furthest above the others in the
+ * middle of the photo (a blue hoodie → blue). */
+async function dominantChannel(file) {
+  const { data, info } = await sharp(path.join(SRC, file)).raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: C } = info;
+  const lead = [0, 0, 0];
+  for (let y = Math.round(H * 0.4); y < H * 0.6; y += 3)
+    for (let x = Math.round(W * 0.4); x < W * 0.6; x += 3) {
+      const i = (y * W + x) * C;
+      const px = [data[i], data[i + 1], data[i + 2]];
+      for (let c = 0; c < 3; c++) lead[c] += px[c] - Math.max(...px.filter((_, k) => k !== c));
+    }
+  const dominant = lead.indexOf(Math.max(...lead));
+  return { dominant, others: [0, 1, 2].filter((c) => c !== dominant) };
 }
 
 // Kids/adult tee — Mini Creator blue flat packshot; kids 3-4y torso 330mm carries the
@@ -182,3 +204,25 @@ await derive({
   dominant: 0, others: [1, 2],
   printWmm: 152, torsoMm: 190, panelTopFrac: 0.22,
 });
+
+// Hoodies (kids Mini Cruiser + adult Drummer) — ONE flat packshot, re-coloured per hoodie colour, like
+// the tees. Stage a saturated-colour hoodie flat-lay (Prodigi's product-page photo for the SKU we
+// sell) as prodigi-garment-photos/*hoodie*.(webp|png|jpg). The print panel starts a little lower than
+// a tee's (the hood) — to confirm with Prodigi. Writes derived/hoodie-photo.json, which the mockup
+// seeder reads for the size-true print region (src/server/print/seedMockups.ts).
+const hoodieFile = existsSync(SRC) ? readdirSync(SRC).filter((f) => /hoodie/i.test(f) && /\.(webp|png|jpe?g)$/i.test(f)).sort()[0] : undefined;
+if (hoodieFile) {
+  const { dominant, others } = await dominantChannel(hoodieFile);
+  const photo = await derive({
+    file: hoodieFile, out: 'hoodie-photo.png',
+    dominant, others,
+    printWmm: 260, torsoMm: 340, panelTopFrac: 0.3,
+    colours: [...KIDS_HOODIE_COLOURS, ...ADULT_HOODIE_COLOURS.filter((a) => !KIDS_HOODIE_COLOURS.some((k) => k.name === a.name))],
+    transparent: true,
+  });
+  writeFileSync(path.join(OUT, 'hoodie-photo.json'), JSON.stringify(photo, null, 2));
+  console.log('hoodie-photo.json written — the mockup seeder picks it up');
+} else {
+  console.log('no hoodie packshot staged (prodigi-garment-photos/*hoodie*) — hoodies keep the plain tile');
+}
+

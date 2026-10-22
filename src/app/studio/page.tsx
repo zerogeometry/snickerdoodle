@@ -32,6 +32,7 @@ import { flipObjects, type ShapeKind, type StudioObject } from '@/lib/studio-obj
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
+import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import {
   IDENTITY,
   buildWork,
@@ -142,7 +143,7 @@ export default function StudioPage() {
       setLocalAssetId(res.assetId);
       return res.assetId;
     }
-    toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
+    toast(res.blocked ? 'we couldn’t use that image — try another' : res.tooMany ? TOO_MANY_COPY : 'hmm, that didn’t work — try again');
     return null;
   }, [assetId, upload, setAssetId]);
 
@@ -694,7 +695,7 @@ export default function StudioPage() {
         if (res.reason === 'nochange') {
           toast('no plain paper on this one — tap the colour you’d like gone');
           setTool('removeColour');
-        } else toast(res.reason === 'budget' ? 'that’s all your magic edits for now' : 'couldn’t do that — try again');
+        } else toast(res.reason === 'budget' ? 'that’s all your magic edits for now' : res.reason === 'too-many' ? TOO_MANY_COPY : 'couldn’t do that — try again');
         return;
       }
       const m = await cutoutAlphaAction({ assetId: id });

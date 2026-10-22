@@ -29,3 +29,4 @@ cutout-sheet.png
 
 # Netlify CLI link (site id) — local only
 .netlify/
+.dev-captures/

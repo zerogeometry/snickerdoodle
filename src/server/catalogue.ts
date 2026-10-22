@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, ne, notInArray, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
 import { mmToPx } from './print/geometry';
@@ -267,8 +267,8 @@ const SOCKS = [
 ] as const;
 
 // Wall height chart: canvas on wooden poster hangers (hanger colour = Prodigi `color`). Made at
-// gb3, Evri Next Day (tracked). Prodigi prints NO ruler — the cm + ft/in markings must be drawn
-// INTO the print file (to-do before this goes on show: the ruler render + a scale-accuracy test).
+// gb3, Evri Next Day (tracked). Prodigi prints NO ruler — the cm + ft/in markings are drawn INTO
+// the print file at true scale (src/server/print/height-chart-geometry.ts, scale-tested ±1 px).
 const HEIGHT_CHARTS = [
   { size: '20 × 120 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X48', px: { w: 1200, h: 7200 }, pricePence: 3100 },
   { size: '30 × 120 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X48', px: { w: 1800, h: 7200 }, pricePence: 3400 },
@@ -393,9 +393,9 @@ const DEFS: Record<string, ProductDef> = {
   // One basket line carries the N cards; the order splits it into card lines at an equal share of
   // the pack price (src/lib/card-packs.ts), so Prodigi gets N cards in one order. Sandbox
   // 2026-10-21: £1.10 a card + a FLAT £0.95 Guernsey Post (untracked, uk7) for 1–15 cards.
-  // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). HIDDEN for now.
+  // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). LIVE 2026-10-21.
   cardPack: {
-    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true,
+    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true, visibleInShop: true,
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same' },
     variants: [
@@ -447,21 +447,23 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
-  // ── Range expansion (D21) — all HIDDEN until samples + mockup blanks are in ──
+  // ── Range expansion (D21) — LIVE 2026-10-21 (founder): socks, height chart, acrylic block, wrapping
+// paper, tea towel, playing cards (+ card packs above). HELD until ready: the hoodies (need a hoodie
+// packshot + confirmed chest sizes) and the pet bandana (its shape is drawn from a guess) ──
   // (The women's Dazzler sweatshirt was left out — founder, 2026-10-21.)
   // Categories reuse the existing enum (a new value needs a migration): socks/hoodies/bandana → wear,
   // height chart/acrylic block → cards & prints, wrapping paper → festive, tea towel → home,
   // playing cards → gifts.
   socks: {
-    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true,
+    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
     description: "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10).",
     specs: { material: 'polyester, printed all over', size: 'one size, UK 6–10', styles: 'ankle or tube', care: 'machine wash at 30°', made: 'in the UK' },
     variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, printTo: [...s.printTo] })),
   },
   heightChart: {
-    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true,
-    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. They're only little once.",
-    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', made: 'in the UK' },
+    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
+    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
       HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
     ),
@@ -479,19 +481,19 @@ const DEFS: Record<string, ProductDef> = {
     variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   acrylicBlock: {
-    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true,
+    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true, visibleInShop: true,
     description: 'Their drawing set behind a thick block of clear acrylic that stands on its own — a little piece of the fridge gallery for a desk or shelf.',
     specs: { material: '25mm clear acrylic, printed behind', stands: 'on its own, no frame needed', made: 'in the UK' },
     variants: ACRYLIC_BLOCKS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   wrappingPaper: {
-    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true,
+    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
     description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. Sheets or a roll.',
     specs: { material: 'FSC-certified 95gsm paper', formats: '3 sheets or a 70cm-wide roll', made: 'in the UK' },
     variants: WRAPPING_PAPER.map((w) => ({ size: w.size, pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
   },
   teaTowel: {
-    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true,
+    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,
     description: "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours.",
     specs: { material: 'cotton', care: 'machine washable', made: 'in the UK' },
     // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
@@ -504,7 +506,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: BANDANAS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   playingCards: {
-    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true,
+    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true, visibleInShop: true,
     description: 'A full 54-card deck with their drawing on the back of every card, in a white presentation box — for family card nights.',
     specs: { cards: '54, one design on every back', size: '6 × 9 cm', box: 'white presentation box', made: 'in the UK' },
     // Standard post is Royal Mail RM24 (UNTRACKED), £6.45. Budget (RM48, £3.20) would allow ~£19 —
@@ -688,15 +690,16 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     const dupes = currentSkus.filter((k, i) => currentSkus.indexOf(k) !== i);
     if (dupes.length) throw new Error(`[seed-catalogue] ${key}: duplicate variant skus ${[...new Set(dupes)].join(', ')}`);
 
-    let vsort = 0;
-    for (const v of def.variants) {
-      const isDefault = vsort === defaultIndex;
+    // BATCHED per product (a handful of round trips per product, not four per variant): the
+    // 435-variant catalogue was ~1,800 sequential queries — over Netlify's ~26 s function limit
+    // against a remote DB (the 504 on /api/jobs/seed-catalogue). Same rows, same upserts.
+    const rows = def.variants.map((v, i) => {
       // A printable product without a POD SKU would seed as MANUAL and silently never
       // fulfil — that's an authoring mistake, not a configuration.
       if (def.print && !v.prodigiSku) {
         console.warn(`[seed-catalogue] printable variant ${key}/${v.size ?? ''}/${v.colour ?? ''} has NO prodigiSku — it will be MANUAL-fulfilled`);
       }
-      const sku = variantSku(key, v, isDefault);
+      const isDefault = i === defaultIndex;
       const attributes: Record<string, string> = {};
       if (v.size) attributes.size = v.size;
       if (v.colour) attributes.colour = v.colour;
@@ -704,46 +707,75 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       if (v.sides) attributes.sides = v.sides;
       if (v.grade) attributes.grade = v.grade;
       if (v.finish) attributes.finish = v.finish;
-      const vlabel = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
+      const label = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
+      return { v, values: { productId: product!.id, sku: currentSkus[i]!, label, attributes, pricePence: v.pricePence, isDefault, sortOrder: i, active: true } };
+    });
+    variantCount += rows.length;
 
-      const [variant] = await db
-        .insert(productVariants)
-        .values({ productId: product!.id, sku, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true })
-        .onConflictDoUpdate({ target: productVariants.sku, set: { productId: product!.id, label: vlabel, attributes, pricePence: v.pricePence, isDefault, sortOrder: vsort, active: true } })
-        .returning();
-      vsort++;
-      variantCount++;
+    const upserted = await db
+      .insert(productVariants)
+      .values(rows.map((r) => r.values))
+      .onConflictDoUpdate({
+        target: productVariants.sku,
+        set: {
+          productId: sql`excluded.product_id`, label: sql`excluded.label`, attributes: sql`excluded.attributes`, pricePence: sql`excluded.price_pence`,
+          isDefault: sql`excluded.is_default`, sortOrder: sql`excluded.sort_order`, active: true,
+        },
+      })
+      .returning({ id: productVariants.id, sku: productVariants.sku });
+    const idBySku = new Map(upserted.map((u) => [u.sku, u.id]));
+    const withIds = rows.map((r) => ({ ...r, id: idBySku.get(r.values.sku)! }));
 
-      if (def.print) {
+    if (def.print) {
+      const tpls = withIds.map(({ v, id }) => {
         const dpi = v.dpi ?? 300;
         const wPx = v.px?.w ?? mmToPx(v.wMm, dpi);
         const hPx = v.px?.h ?? mmToPx(v.hMm, dpi);
-        const tpl = {
+        return {
+          variantId: id,
           orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
           printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,
           aspectMilli: Math.round((v.wMm / v.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
         };
-        await db.insert(printTemplates).values({ variantId: variant!.id, ...tpl }).onConflictDoUpdate({ target: printTemplates.variantId, set: tpl });
-      }
-
-      // Exactly one provider row per variant: Prodigi when a live SKU is mapped (the
-      // order-time attributes go in providerConfig), else MANUAL. Concurrency-safe
-      // (the int suite seeds in parallel): drop any wrong-provider row (e.g. an old
-      // placeholder), then upsert the correct one.
-      const provider = v.prodigiSku ? 'PRODIGI' : 'MANUAL';
-      const providerSku = v.prodigiSku ?? sku;
-      const providerConfig = v.prodigiAttrs || v.printTo ? { ...(v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : {}), ...(v.printTo ? { printTo: v.printTo } : {}) } : null;
+      });
       await db
-        .delete(productVariantProviders)
-        .where(and(eq(productVariantProviders.variantId, variant!.id), ne(productVariantProviders.provider, provider)));
-      await db
-        .insert(productVariantProviders)
-        .values({ variantId: variant!.id, provider, providerSku, providerConfig, isDefault: true })
+        .insert(printTemplates)
+        .values(tpls)
         .onConflictDoUpdate({
-          target: [productVariantProviders.variantId, productVariantProviders.provider],
-          set: { providerSku, providerConfig, isDefault: true, active: true },
+          target: printTemplates.variantId,
+          set: {
+            orientation: sql`excluded.orientation`, printWidthMm: sql`excluded.print_width_mm`, printHeightMm: sql`excluded.print_height_mm`,
+            requiredDpi: sql`excluded.required_dpi`, printWidthPx: sql`excluded.print_width_px`, printHeightPx: sql`excluded.print_height_px`,
+            bleedMm: sql`excluded.bleed_mm`, aspectMilli: sql`excluded.aspect_milli`, minSourceWidthPx: sql`excluded.min_source_width_px`,
+            minSourceHeightPx: sql`excluded.min_source_height_px`,
+          },
         });
     }
+
+    // Exactly one provider row per variant: Prodigi when a live SKU is mapped (the
+    // order-time attributes go in providerConfig), else MANUAL. Concurrency-safe
+    // (the int suite seeds in parallel): drop any wrong-provider row (e.g. an old
+    // placeholder), then upsert the correct one.
+    const providers = withIds.map(({ v, id, values }) => ({
+      variantId: id,
+      provider: (v.prodigiSku ? 'PRODIGI' : 'MANUAL') as 'PRODIGI' | 'MANUAL',
+      providerSku: v.prodigiSku ?? values.sku,
+      providerConfig: v.prodigiAttrs || v.printTo ? { ...(v.prodigiAttrs ? { prodigiAttrs: v.prodigiAttrs } : {}), ...(v.printTo ? { printTo: v.printTo } : {}) } : null,
+      isDefault: true,
+    }));
+    for (const provider of ['PRODIGI', 'MANUAL'] as const) {
+      const ids = providers.filter((p) => p.provider === provider).map((p) => p.variantId);
+      if (ids.length) {
+        await db.delete(productVariantProviders).where(and(inArray(productVariantProviders.variantId, ids), ne(productVariantProviders.provider, provider)));
+      }
+    }
+    await db
+      .insert(productVariantProviders)
+      .values(providers)
+      .onConflictDoUpdate({
+        target: [productVariantProviders.variantId, productVariantProviders.provider],
+        set: { providerSku: sql`excluded.provider_sku`, providerConfig: sql`excluded.provider_config`, isDefault: true, active: true },
+      });
 
     // Hide any variant of this product no longer in the DEFS (e.g. an old colour).
     await db

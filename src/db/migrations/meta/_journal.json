@@ -281,6 +281,13 @@
       "when": 1792587828524,
       "tag": "0039_phone_cases",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1792657553330,
+      "tag": "0040_rate_limits",
+      "breakpoints": true
     }
   ]
 }

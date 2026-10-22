@@ -63,10 +63,11 @@ describe('range expansion — new products', () => {
   const rows = (k: string) => list.filter((r) => r.productKey === k);
   const bySize = (k: string) => Object.fromEntries(rows(k).map((r) => [r.sku, r]));
 
-  it('every new product is defined, and seeded HIDDEN (not on show until samples + mockups)', () => {
+  it('every new product is defined; the ready ones are ON SHOW, the rest held back (founder, 2026-10-21)', () => {
+    const LIVE = ['socks', 'heightChart', 'acrylicBlock', 'wrappingPaper', 'teaTowel', 'playingCards'];
     for (const k of NEW) {
       expect(rows(k).length, k).toBeGreaterThan(0);
-      expect(rows(k).every((r) => !r.visibleInShop && !r.paused), k).toBe(true);
+      expect(rows(k).every((r) => r.visibleInShop === LIVE.includes(k) && !r.paused), k).toBe(true);
     }
   });
 
@@ -138,9 +139,9 @@ describe('range expansion — new products', () => {
 describe('greetings-card multipacks', () => {
   const packs = list.filter((r) => r.productKey === 'cardPack');
 
-  it('pack of 5 £12 (the default) and pack of 10 £21 — hidden until mockups are in', () => {
+  it('pack of 5 £12 (the default) and pack of 10 £21 — on show', () => {
     expect(packs.map((r) => [r.sku, r.pricePence, r.isDefault])).toEqual([['cardPack', 1200, true], ['cardPack-packof10', 2100, false]]);
-    expect(packs.every((r) => !r.visibleInShop && !r.paused)).toBe(true);
+    expect(packs.every((r) => r.visibleInShop && !r.paused)).toBe(true);
   });
 
   it('every pack price splits evenly between its cards (the order lines must add up to the penny)', () => {

@@ -24,7 +24,17 @@ export type ProductKey =
   | 'storybook'
   | 'jigsaw'
   | 'phoneCase'
-  | 'giftWrap';
+  | 'giftWrap'
+  // range expansion (D21)
+  | 'socks'
+  | 'heightChart'
+  | 'kidsHoodie'
+  | 'adultHoodie'
+  | 'acrylicBlock'
+  | 'wrappingPaper'
+  | 'teaTowel'
+  | 'petBandana'
+  | 'playingCards';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -33,6 +43,35 @@ function House({ transform }: { transform: string }) {
       <path d="M0 18 L18 4 L36 18" fill="none" stroke="var(--color-berry)" strokeWidth="3" />
       <rect x="14" y="25" width="9" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2.4" />
     </g>
+  );
+}
+
+/** A little half-drop repeat of houses (the all-over pattern products) — only the houses that fit
+ * wholly inside the box are drawn (no clip paths: ids would clash between tiles on one page). */
+function HouseRepeat({ box, step, k }: { box: { x: number; y: number; w: number; h: number }; step: number; k: number }) {
+  const out: ReactNode[] = [];
+  const hw = 36 * k, hh = 38 * k; // the house's own size
+  for (let c = 0; c * step <= box.w; c++)
+    for (let r = -1; r * step <= box.h; r++) {
+      const x = box.x + 1 + c * step;
+      const y = box.y + 1 + r * step + (c % 2 === 1 ? step / 2 : 0); // the half-drop, like the real repeat
+      if (x + hw > box.x + box.w || y < box.y || y + hh > box.y + box.h) continue;
+      out.push(<House key={`${c}-${r}`} transform={`translate(${x},${y}) scale(${k})`} />);
+    }
+  return <>{out}</>;
+}
+
+/** A hoodie silhouette (hood up behind the shoulders, kangaroo pocket). */
+function Hoodie({ stroke, wide }: { stroke: string; wide: boolean }) {
+  const d = wide
+    ? 'M12 34 L32 20 Q48 26 64 20 L84 34 L74 52 L64 46 L64 86 L32 86 L32 46 L22 52 Z'
+    : 'M16 36 L34 23 Q48 28 62 23 L80 36 L71 52 L62 47 L62 84 L34 84 L34 47 L25 52 Z';
+  return (
+    <>
+      <path d={wide ? 'M34 22 Q34 8 48 8 Q62 8 62 22' : 'M36 25 Q36 12 48 12 Q60 12 60 25'} fill="var(--color-paper)" stroke={stroke} strokeWidth="4" strokeLinejoin="round" />
+      <path d={d} fill="var(--color-paper)" stroke={stroke} strokeWidth="4" strokeLinejoin="round" />
+      <path d={wide ? 'M38 72 h20 l4 12 h-28 Z' : 'M39 70 h18 l3 11 h-24 Z'} fill="none" stroke={stroke} strokeWidth="2.4" strokeLinejoin="round" />
+    </>
   );
 }
 
@@ -185,6 +224,85 @@ const ART: Record<ProductKey, ReactNode> = {
       <House transform="translate(33,45) scale(0.72)" />
     </>
   ),
+  // a pair of socks, printed all over with the drawing on repeat
+  socks: (
+    <>
+      <path d="M18 12 h22 v40 l14 14 q6 8 -2 14 q-8 6 -16 -2 l-18 -18 Z" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" strokeLinejoin="round" />
+      <HouseRepeat box={{ x: 20, y: 14, w: 18, h: 44 }} step={9} k={0.22} />
+      <path d="M50 18 h22 v40 l12 12 q6 8 -2 14 q-8 6 -16 -2 l-16 -16 Z" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="3.5" strokeLinejoin="round" />
+      <HouseRepeat box={{ x: 52, y: 20, w: 18, h: 44 }} step={9} k={0.22} />
+    </>
+  ),
+  // a tall canvas on wooden hangers: the ruler down one edge, their drawing beside it
+  heightChart: (
+    <>
+      <rect x="32" y="10" width="32" height="76" fill="var(--color-paper)" stroke="var(--color-leaf)" strokeWidth="3" />
+      <rect x="29" y="7" width="38" height="5" rx="2" fill="var(--color-sunshine)" stroke="var(--color-cocoa)" strokeWidth="1.6" />
+      <rect x="29" y="84" width="38" height="5" rx="2" fill="var(--color-sunshine)" stroke="var(--color-cocoa)" strokeWidth="1.6" />
+      <path d="M44 7 L48 1 L52 7" fill="none" stroke="var(--color-cocoa)" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M32 18 h6 M32 24 h3 M32 30 h6 M32 36 h3 M32 42 h6 M32 48 h3 M32 54 h6 M32 60 h3 M32 66 h6 M32 72 h3 M32 78 h6" stroke="var(--color-cocoa)" strokeWidth="1.4" />
+      <House transform="translate(42,40) scale(0.52)" />
+    </>
+  ),
+  kidsHoodie: (
+    <>
+      <Hoodie stroke="var(--color-leaf)" wide={false} />
+      <House transform="translate(38,43) scale(0.56)" />
+    </>
+  ),
+  adultHoodie: (
+    <>
+      <Hoodie stroke="var(--color-cobalt)" wide />
+      <House transform="translate(37,44) scale(0.62)" />
+    </>
+  ),
+  // a thick clear block standing on its own, the drawing set behind the acrylic
+  acrylicBlock: (
+    <>
+      <path d="M26 20 L66 14 L74 20 L74 80 L34 86 L26 80 Z" fill="var(--color-sky-pale)" stroke="var(--color-sky)" strokeWidth="2.4" strokeLinejoin="round" />
+      <rect x="26" y="20" width="40" height="60" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="3" />
+      <path d="M66 20 L74 14 M66 80 L74 74" stroke="var(--color-sky)" strokeWidth="2" />
+      <path d="M30 26 L36 24" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" />
+      <House transform="translate(29,37) scale(0.95)" />
+    </>
+  ),
+  // a sheet of wrap curling off its roll, their drawing on repeat
+  wrappingPaper: (
+    <>
+      <path d="M14 30 H72 V84 H14 Z" fill="var(--color-berry-pale)" stroke="var(--color-tomato)" strokeWidth="3.5" strokeLinejoin="round" />
+      <HouseRepeat box={{ x: 17, y: 33, w: 52, h: 48 }} step={12} k={0.28} />
+      <ellipse cx="72" cy="22" rx="8" ry="12" transform="rotate(90 72 22)" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3" />
+      <path d="M14 30 Q14 10 60 10 L84 10" fill="none" stroke="var(--color-tomato)" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="84" cy="22" r="3" fill="var(--color-tomato)" />
+    </>
+  ),
+  // a tea towel hanging from its loop, printed all over
+  teaTowel: (
+    <>
+      <path d="M44 18 Q48 8 52 18" fill="none" stroke="var(--color-cocoa)" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="22" y="18" width="52" height="68" rx="2" fill="var(--color-paper)" stroke="var(--color-leaf)" strokeWidth="3.5" />
+      <HouseRepeat box={{ x: 25, y: 21, w: 46, h: 54 }} step={11} k={0.26} />
+      <path d="M22 78 H74" stroke="var(--color-leaf)" strokeWidth="2.4" />
+    </>
+  ),
+  // a triangle bandana, ties out to the sides
+  petBandana: (
+    <>
+      <path d="M8 30 Q14 26 18 32 M88 30 Q82 26 78 32" fill="none" stroke="var(--color-berry)" strokeWidth="3" strokeLinecap="round" />
+      <path d="M16 30 Q48 38 80 30 L52 82 Q48 88 44 82 Z" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="4" strokeLinejoin="round" />
+      <House transform="translate(36,40) scale(0.66)" />
+    </>
+  ),
+  // a fanned pair of playing cards, their drawing on the back
+  playingCards: (
+    <>
+      <rect x="20" y="22" width="36" height="54" rx="4" transform="rotate(-12 38 49)" fill="var(--color-paper)" stroke="var(--color-cocoa)" strokeWidth="2.6" />
+      <path d="M26 30 l3 -4 l3 4 l-3 4 Z" transform="rotate(-12 38 49)" fill="var(--color-tomato)" />
+      <rect x="40" y="18" width="36" height="54" rx="4" transform="rotate(8 58 45)" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.4" />
+      <rect x="44" y="22" width="28" height="46" rx="2" transform="rotate(8 58 45)" fill="none" stroke="var(--color-line)" strokeWidth="1.6" />
+      <House transform="translate(47,36) scale(0.62) rotate(8 18 21)" />
+    </>
+  ),
   giftWrap: (
     <>
       <rect x="22" y="40" width="52" height="40" rx="3" fill="var(--color-berry-pale)" stroke="var(--color-tomato)" strokeWidth="3.5" />
@@ -195,10 +313,25 @@ const ART: Record<ProductKey, ReactNode> = {
   ),
 };
 
-export function ProductArt({ product, size = 96 }: { product: ProductKey; size?: number }) {
+// Any product without its own motif yet (a new key, a retired one in order history): their
+// drawing on a plain sheet — never a blank tile.
+const FALLBACK: ReactNode = (
+  <>
+    <rect x="20" y="16" width="56" height="64" rx="3" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" />
+    <House transform="translate(30,33) scale(1)" />
+  </>
+);
+
+/** "framedPrint" → "framed print" (for the label). */
+const readable = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+
+/** Does this product key have its own motif? (anything else draws the plain-sheet fallback) */
+export const hasProductArt = (key: string): key is ProductKey => Object.prototype.hasOwnProperty.call(ART, key);
+
+export function ProductArt({ product, size = 96 }: { product: ProductKey | (string & {}); size?: number }) {
   return (
-    <svg viewBox="0 0 96 96" width={size} height={size} role="img" aria-label={`a drawing on a ${product}`}>
-      {ART[product]}
+    <svg viewBox="0 0 96 96" width={size} height={size} role="img" aria-label={`a drawing on a ${readable(product)}`}>
+      {hasProductArt(product) ? ART[product] : FALLBACK}
     </svg>
   );
 }

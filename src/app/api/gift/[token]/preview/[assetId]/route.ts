@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { giftLinkPreview } from '@/server/giftLinks';
+import { ipFromHeaders, LIMITS, rateLimit } from '@/server/rateLimit';
 
 /**
  * A gift-link item's preview image: small, re-encoded, gated by the link's capability (see
@@ -9,9 +10,12 @@ import { giftLinkPreview } from '@/server/giftLinks';
  */
 export const dynamic = 'force-dynamic';
 
-export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string; assetId: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ token: string; assetId: string }> }) {
   const { token, assetId } = await params;
   const headers = { 'x-robots-tag': 'noindex, nofollow', 'referrer-policy': 'no-referrer' };
+  // a public, token-gated route: limited per device so it can't be used to guess tokens or burn CPU
+  const gate = await rateLimit(getDb(), { ...LIMITS.giftPreviewPerIp, caller: ipFromHeaders(req.headers) });
+  if (!gate.ok) return new NextResponse(null, { status: 429, headers: { ...headers, 'retry-after': String(gate.retryAfterSec) } });
   let img: Buffer | null = null;
   try {
     img = await giftLinkPreview(getDb(), token, assetId);

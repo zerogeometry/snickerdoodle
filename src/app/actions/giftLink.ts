@@ -6,6 +6,7 @@ import { createGiftLink, placeGiftLinkOrder, sendGiftRequest } from '@/server/gi
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
+import { LIMITS, rateLimit } from '@/server/rateLimit';
 import type { AccessLevel, Relationship } from '@/domain/types';
 
 /** Create a real, shareable gift link from chosen keepsakes (owner-only). */
@@ -22,6 +23,7 @@ export async function createGiftLinkAction(input: {
   if (!input.assetIds?.length && !input.designIds?.length) return { ok: false };
 
   const db = getDb();
+  if (!(await rateLimit(db, { ...LIMITS.giftLinksPerAccount, caller: account.id })).ok) return { ok: false };
   const familyId = await ensureHomeFamily(db, account.id, account.name);
   const viewer = await resolveViewerContext(db, account.id, familyId);
   try {
@@ -82,6 +84,9 @@ export async function sendGiftRequestAction(input: {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
   const db = getDb();
+  // each request sends emails: limited per account (weighted by how many go out)
+  const recipients = (input.memberAccountIds?.length ?? 0) + (input.emails?.length ?? 0);
+  if (!(await rateLimit(db, { ...LIMITS.giftRequestsPerAccount, caller: account.id, cost: Math.max(1, recipients) })).ok) return { ok: false };
   const familyId = await ensureHomeFamily(db, account.id, account.name);
   const viewer = await resolveViewerContext(db, account.id, familyId);
   try {

@@ -4,23 +4,17 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
 /**
  * Greetings-card PACK (D22): choose a pack of 5, put the same favourite on every card, and the
  * basket carries ONE pack line (no quantity) at the SERVER's price — £12 for five.
- *
- * The pack is HIDDEN until it graduates (visibleInShop false), so it only appears in the dev
- * curation view (?all=1), which a production server refuses. Against a production build this
- * test skips itself; run it against a dev server to exercise it.
+ * The pack is on show (2026-10-21), in the range with everything else.
  */
 test('card pack: pack of 5 → one drawing on all five → basket → server-priced £12', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
   await quietCookies(page);
-  await uploadAndOpenRange(page, undefined, '/start-creating?all=1');
+  await uploadAndOpenRange(page);
 
-  // The pack lives in the full catalogue (no front-of-shop rank).
-  await page.getByRole('button', { name: /see the full catalogue/i }).click();
-  const catalogue = page.getByRole('dialog');
-  await catalogue.getByRole('searchbox', { name: /search the full catalogue/i }).fill('card pack');
-  const tile = catalogue.getByRole('button', { name: 'customize card pack', exact: true });
-  test.skip((await tile.count()) === 0, 'card packs are hidden — only a dev server shows them (?all=1)');
+  // The pack sits in the range with the rest of the collection.
+  const tile = page.getByRole('button', { name: 'customize card pack', exact: true });
+  await tile.scrollIntoViewIfNeeded();
   await tile.click();
 
   await expect(page).toHaveURL(/\/customize\/cardPack/);

@@ -8,7 +8,7 @@ import { assets, giftLinks } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
-import { GIFT_PREVIEW_MAX_PX, createGiftLink, getGiftLink, giftLinkPreview, giftPreviewPath, revokeGiftLink } from '@/server/giftLinks';
+import { GIFT_LINK_TTL_DAYS, GIFT_PREVIEW_MAX_PX, createGiftLink, getGiftLink, giftLinkPreview, giftPreviewPath, revokeGiftLink } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { deleteObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -47,7 +47,12 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('owner creates a link with a FROZEN snapshot; the recipient sees it active', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
+    const before = Date.now();
     const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    // a gift link works for 14 days (founder, 2026-10-21), not a month
+    const [row] = await db.select({ expiresAt: schema.giftLinks.expiresAt }).from(schema.giftLinks).where(eq(schema.giftLinks.token, token));
+    expect(GIFT_LINK_TTL_DAYS).toBe(14);
+    expect(Math.abs(row!.expiresAt.getTime() - (before + 14 * 86_400_000))).toBeLessThan(60_000);
 
     const view = await getGiftLink(db, token);
     expect(view.state).toBe('active');

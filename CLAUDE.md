@@ -54,7 +54,7 @@ child-safety are load-bearing, not features.
   language and CONFIRM; never invent a new style.
 
 ### Tokens — ONE source of truth: src/app/globals.css @theme (never raw hex in components)
-oat (kraft page) #EBDDC6 · paper #FFFBF2 · paper-2 #F6EEDF · line #D9C7A9 · cocoa (ink) #2B2118 ·
+oat (the page — light cream, 2026-10-21) #F8F5E9 · paper #FFFBF2 · paper-2 #F6EEDF · line #D9C7A9 · cocoa (ink) #2B2118 ·
 ink-soft #5A4A3A · ink-faint #6E5D4B · cta (tomato) #C8402A + cta-deep #8E2A1A, white text ·
 cinnamon (tomato for text) #A8331F · honey/sunshine #F6C445 (fills only) · honey-band #FBE9B7 ·
 cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F6E29.

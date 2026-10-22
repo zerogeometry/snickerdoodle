@@ -8,6 +8,29 @@ import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
 import { MUG_SWATCH, defaultPlacementFor, resolveDisplayVariant } from '@/lib/catalogue-view';
 import { garmentHex, isGarmentKey } from '@/lib/garments';
 import type { CatalogueProduct } from '@/server/catalogue';
+import type { MockupRequest } from '@/lib/mockupPrefetch';
+import { useLocalPreview } from '@/lib/localPreview';
+
+/**
+ * What a range TILE shows for a product — the variant, placement and view its preview composes
+ * with. ONE resolver for the tile and the range prefetch (FlowCatalogue), so a prefetched picture
+ * is always exactly the one the tile asks for.
+ */
+export function tileMockupInputs(
+  p: CatalogueProduct,
+  upload: Upload,
+  selection: { size?: string; colour?: string; orientation?: string } | undefined,
+  savedTf: MockupRequest['transform'] | undefined,
+): { variantId: string; transform: MockupRequest['transform']; view: string | undefined; sourceObjectId: string | undefined } {
+  const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection });
+  return {
+    variantId: shownVariant.id,
+    transform: savedTf ?? defaultPlacementFor(p.key, shownVariant.attributes, upload?.aspect),
+    // The mug's hero is its centred wrap (design middle, handle hidden), not the handle-right front.
+    view: p.key === 'mug' ? 'centre' : undefined,
+    sourceObjectId: upload?.cutout?.sourceObjectId,
+  };
+}
 
 const SWATCH: Record<string, string> = {
   oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
@@ -65,8 +88,10 @@ export function ProductTile({
   // The ONE resolver the tile, the quick-add "+", and the enlarge modal all share (catalogue-view),
   // so the tile can never show a landscape frame while "+" quietly adds the portrait default:
   // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
-  const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: sel });
-  const tf = savedTf ?? defaultPlacementFor(p.key, shownVariant.attributes, upload?.aspect);
+  const shown = tileMockupInputs(p, upload, sel, savedTf);
+  // the instant preview: the drawing as this browser already holds it (the cutout once made)
+  const localSrc = useLocalPreview(upload?.cutout ? null : upload?.dataUrl);
+  const instantSrc = upload?.cutout?.url ?? localSrc;
   return (
     // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
     // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape
@@ -85,14 +110,14 @@ export function ProductTile({
         <MockupPreview
           productKey={p.key as ProductKey}
           assetId={upload?.assetId}
-          variantId={shownVariant.id}
-          transform={tf}
+          variantId={shown.variantId}
+          transform={shown.transform as Parameters<typeof MockupPreview>[0]['transform']}
           size="thumb"
-          sourceObjectId={upload?.cutout?.sourceObjectId}
-          // The mug's hero is its centred wrap (design middle, handle hidden), not the handle-right front.
-          view={p.key === 'mug' ? 'centre' : undefined}
+          sourceObjectId={shown.sourceObjectId}
+          view={shown.view}
           px={128}
           lazy={lazy}
+          instant={instantSrc && upload?.aspect ? { src: instantSrc, aspect: upload.aspect } : null}
         />
         {/* Tapping the preview opens the product — the SAME action as the customize button
             below. A mouse/touch convenience only (tabIndex -1): keyboard + screen-reader users

@@ -28,9 +28,16 @@ const LIVE = [
   { key: 'jigsaw', label: 'jigsaw', pence: 2600 },
   { key: 'blanket', label: 'fleece blanket', pence: 6000 },
   { key: 'card', label: 'greetings card', pence: 550 },
+  // the range expansion, live 2026-10-21 (card packs have their own builder spec)
+  { key: 'socks', label: 'socks', pence: 2000 },
+  { key: 'heightChart', label: 'height chart', pence: 3100 },
+  { key: 'acrylicBlock', label: 'acrylic block', pence: 2700 },
+  { key: 'wrappingPaper', label: 'wrapping paper', pence: 2000 },
+  { key: 'teaTowel', label: 'tea towel', pence: 2700 },
+  { key: 'playingCards', label: 'playing cards', pence: 2400 },
 ] as const;
 
-const SUBTOTAL = LIVE.reduce((s, p) => s + p.pence, 0); // 19650
+const SUBTOTAL = LIVE.reduce((s, p) => s + p.pence, 0); // 34550
 
 // Mirror the app's formatPence EXACTLY: whole pounds have no decimals (£65, not £65.00).
 const gbp = (pence: number) => {

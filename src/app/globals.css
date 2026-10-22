@@ -12,7 +12,7 @@
  * Legacy names (oat, cocoa, cinnamon, honey…) are kept and re-pointed so nothing breaks.
  */
 @theme {
-  --color-oat: #ebddc6;
+  --color-oat: #f8f5e9; /* the page (founder, 2026-10-21: lighter, was #ebddc6) */
   --color-paper: #fffbf2;
   --color-paper-2: #f6eedf;
   --color-line: #d9c7a9;

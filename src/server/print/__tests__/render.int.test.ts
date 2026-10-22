@@ -11,6 +11,7 @@ import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { mmToPx, seedCatalogue } from '@/server/catalogue';
 import { renderPrintFile } from '@/server/print/render';
+import { heightChartLayout, yForHeightCm } from '@/server/print/height-chart-geometry';
 import { deleteObject, getObjectBytes, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -271,6 +272,24 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
     const meta = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).metadata();
     expect([meta.width, meta.height]).toEqual([1362, 2295]);
+  });
+
+  it('a HEIGHT CHART prints Prodigi’s exact canvas with the ruler drawn in, the drawing beside it', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [v] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, 'heightChart'));
+    const assetId = await ingest(await src(1600, 1200));
+    const res = await renderPrintFile(db, sam, { assetId, variantId: v!.id, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
+    keys.push(res.key);
+    expect(res).toMatchObject({ widthPx: 1200, heightPx: 7200, renderedDpi: 150 }); // POSTER-HANGER-20-CAN-ROL-SC-8X48
+    const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
+    const { data, info } = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
+    const lay = heightChartLayout({ width: 1200, height: 7200 }, 150);
+    const at = (x: number, y: number) => [...data.subarray((y * info.width + x) * info.channels, (y * info.width + x) * info.channels + 3)];
+    // the 100 cm tick is ink at the chart's edge, exactly where the scale says
+    expect(at(2, Math.round(yForHeightCm(100, lay)))[0]).toBeLessThan(128);
+    // the drawing (orange) fills the art area beside the ruler, never under it
+    expect(at(lay.bandPx + Math.round(lay.art.width / 2), 3600)).toEqual([200, 120, 60]);
+    expect(at(Math.round(lay.bandPx / 2), 3600)[0]).toBeGreaterThan(240); // the band stays white paper
   });
 
   it('a GREETINGS CARD renders the flat 4-panel spread (6236×2220), not a single face', async () => {

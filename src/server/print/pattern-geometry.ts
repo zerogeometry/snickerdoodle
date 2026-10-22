@@ -4,6 +4,7 @@
  * The pixels are drawn by src/server/print/pattern.ts.
  */
 import { isPatternProduct } from '@/lib/patterns';
+import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
 import { assessResolution, canvasSizePx, mmToPx, type ResolutionAssessment, type TemplateGeom, type Transform } from './geometry';
 
 /** The motif's default printed size, and how much of its cell it fills (the rest is breathing room). */
@@ -56,11 +57,60 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
 }
 
 /**
- * The DPI gate, pattern-aware. For a repeat-pattern product what's printed at size is ONE motif,
+ * The SAME repeat at a smaller size — for previews (the mockup compositor, the positioner). The
+ * layout is decided ONCE at print size (columns, rows, motif size), then every length is scaled,
+ * so a preview can never round to a different number of columns than the print file has.
+ */
+export function scalePatternLayout(layout: PatternLayout, canvas: { width: number; height: number }, scale: number): { canvas: { width: number; height: number }; layout: PatternLayout } {
+  const width = Math.max(1, Math.round(canvas.width * scale));
+  const height = Math.max(1, Math.round(canvas.height * scale));
+  const k = width / canvas.width; // the scale actually achieved on the width
+  return {
+    canvas: { width, height },
+    layout: {
+      cols: layout.cols,
+      rows: layout.rows,
+      cellW: width / layout.cols, // still exactly fills the (scaled) width → still seamless
+      stripH: Math.max(1, Math.round(layout.stripH * k)),
+      motifW: Math.max(1, Math.round(layout.motifW * k)),
+      motifH: Math.max(1, Math.round(layout.motifH * k)),
+      phaseX: Math.round(layout.phaseX * k),
+      phaseY: Math.round(layout.phaseY * k),
+    },
+  };
+}
+
+/**
+ * Every motif's centre (px) that lands on the canvas — the half-drop lattice: column i at
+ * (i + ½)·cellW + phaseX, row j at (j + ½)·stripH + phaseY, odd columns dropped half a strip.
+ * Exactly the pixels pattern.ts tiles (its strip repeats every stripH; its width wraps every
+ * cols·cellW), as a list a browser can draw.
+ */
+export function patternMotifCentres(layout: PatternLayout, canvas: { width: number; height: number }): { x: number; y: number }[] {
+  const { cols, cellW, stripH, motifW, motifH, phaseX, phaseY } = layout;
+  const out: { x: number; y: number }[] = [];
+  const jMax = Math.ceil(canvas.height / stripH) + 2;
+  for (let i = -2; i <= cols + 1; i++) {
+    const drop = ((i % 2) + 2) % 2 === 1 ? stripH / 2 : 0;
+    const x = (i + 0.5) * cellW + phaseX;
+    if (x + motifW / 2 <= 0 || x - motifW / 2 >= canvas.width) continue;
+    for (let j = -2; j <= jMax; j++) {
+      const y = (j + 0.5) * stripH + drop + phaseY;
+      if (y + motifH / 2 <= 0 || y - motifH / 2 >= canvas.height) continue;
+      out.push({ x, y });
+    }
+  }
+  return out;
+}
+
+/**
+ * The DPI gate, pattern- and height-chart-aware. For a repeat-pattern product what's printed at size is ONE motif,
  * so resolution is judged on the motif — a 5 m roll needs no bigger a photo than a pair of socks.
  * Every other product: the ordinary whole-canvas assessResolution.
  */
 export function assessPrintResolution(t: TemplateGeom, src: { width: number; height: number }, transform: Transform, productKey?: string | null): ResolutionAssessment {
+  // A height chart prints the drawing in the ART AREA beside its ruler — judged on that area.
+  if (isHeightChart(productKey)) return assessResolution(heightChartArtGeom(t), src, transform);
   if (!isPatternProduct(productKey)) return assessResolution(t, src, transform);
   const layout = patternLayout(canvasSizePx(t), t.requiredDpi, src, transform);
   return assessResolution(

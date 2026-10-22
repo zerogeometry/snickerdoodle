@@ -1,9 +1,9 @@
 import './sharp-init';
 import sharp from 'sharp';
 import type { Transform } from './geometry';
-import { patternLayout, type PatternLayout } from './pattern-geometry';
+import { patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
 
-export { PATTERN_FILL, PATTERN_MOTIF_MM, patternLayout, type PatternLayout } from './pattern-geometry';
+export { PATTERN_FILL, PATTERN_MOTIF_MM, patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
 
 /**
  * The "pattern" magic edit: the drawing tiled into a SEAMLESS half-drop repeat that fills a print
@@ -31,10 +31,18 @@ export async function renderRepeatPattern(
   dpi: number,
   transform: Transform,
   background = '#ffffff',
-): Promise<{ png: Buffer; layout: PatternLayout }> {
+  opts: { scale?: number } = {},
+): Promise<{ png: Buffer; layout: PatternLayout; width: number; height: number }> {
   const meta = await sharp(srcBuf).metadata();
   if (!meta.width || !meta.height) throw new Error('unreadable source image');
-  const layout = patternLayout(canvas, dpi, { width: meta.width, height: meta.height }, transform);
+  // The layout is decided at PRINT size; a preview (`scale` < 1) draws the same repeat smaller.
+  const printLayout = patternLayout(canvas, dpi, { width: meta.width, height: meta.height }, transform);
+  const scaled = opts.scale && opts.scale !== 1 ? scalePatternLayout(printLayout, canvas, opts.scale) : null;
+  const layout = scaled?.layout ?? printLayout;
+  if (scaled) {
+    dpi = (dpi * scaled.canvas.width) / canvas.width;
+    canvas = scaled.canvas;
+  }
   const { cols, cellW, stripH, motifW, motifH, phaseX, phaseY } = layout;
 
   const motif = await sharp(srcBuf).rotate(transform.rotationDeg).resize(motifW, motifH, { fit: 'fill' }).ensureAlpha().png().toBuffer();
@@ -67,7 +75,7 @@ export async function renderRepeatPattern(
     .composite([{ input: strip, tile: true, gravity: 'northwest' }])
     .removeAlpha()
     .png()
-    .withMetadata({ density: dpi })
+    .withMetadata({ density: Math.round(dpi) })
     .toBuffer();
-  return { png, layout };
+  return { png, layout, width: canvas.width, height: canvas.height };
 }
