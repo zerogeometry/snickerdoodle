@@ -352,14 +352,16 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   // ── G5: print quality is decided BEFORE money moves ───────────────────────
   it('an under-resolution placement is refused before any order row is written', async () => {
     const tiny = await keptDrawing(ids.hartleyId, ids.samId, [200, 150]);
-    const before = await db.select({ id: orders.id }).from(orders);
+    // Count Sam's orders only: other suites write orders to the shared dev DB in parallel.
+    const samsOrders = () => db.select({ id: orders.id }).from(orders).where(eq(orders.accountId, ids.samId));
+    const before = await samsOrders();
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: tiny, transform: { scale: 0 } } }],
       account: { id: ids.samId },
       joinProvenance: null,
     });
     expect(res).toMatchObject({ ok: false, reason: 'too-small', productKey: 'framedPrint' });
-    expect((await db.select({ id: orders.id }).from(orders)).length).toBe(before.length);
+    expect((await samsOrders()).length).toBe(before.length);
   });
 
   // ── G6: children are keepsake subjects — first name only ──────────────────
