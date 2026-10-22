@@ -41,6 +41,10 @@ const MAX_BATCH = 12; // = MOCKUP_BATCH_MAX on the server
 const done = new Map<string, { url: string; at: number }>();
 const failed = new Set<string>();
 const pending = new Map<string, Promise<Result>>();
+// Photos the browser has fully downloaded + decoded (ready to paint at once), and ones it couldn't
+// load — together they say when a whole range has finished (see whenMockupsSettled).
+const loaded = new Set<string>();
+const unloadable = new Set<string>();
 const contexts = new Map<string, InstantContext | null>();
 const pendingContexts = new Set<string>();
 const listeners = new Set<() => void>();
@@ -64,6 +68,7 @@ export const mockupFailed = (key: string): boolean => failed.has(key);
 /** Drop a cached URL that turned out dead (e.g. expired) — the tile recomposes. */
 export function forgetMockup(key: string): void {
   done.delete(key);
+  loaded.delete(key);
 }
 
 /**
@@ -77,12 +82,36 @@ export function forgetMockupsFor(sourceObjectId: string): void {
   for (const k of [...done.keys()]) if (k.includes(tag)) done.delete(k);
   for (const k of [...failed]) if (k.includes(tag)) failed.delete(k);
   for (const k of [...pending.keys()]) if (k.includes(tag)) pending.delete(k);
+  for (const k of [...loaded]) if (k.includes(tag)) loaded.delete(k);
+  for (const k of [...unloadable]) if (k.includes(tag)) unloadable.delete(k);
   notify();
 }
 
 /** Record a result a tile fetched itself, so others (and a re-mount) reuse it. */
 export function rememberMockup(key: string, url: string): void {
   done.set(key, { url, at: Date.now() });
+  preload(key, url); // a tile's own compose counts towards the range being ready too
+}
+
+/** Is this mockup finished — its photo ready to paint, or definitely not coming? */
+export const mockupSettled = (key: string): boolean => loaded.has(key) || failed.has(key) || unloadable.has(key);
+
+/**
+ * Call `onSettled` once every one of these mockups is finished (photo downloaded + decoded, or
+ * failed for good). The create page holds its "making your range" loader until then, so the range
+ * is revealed with every picture in place. Returns an unsubscribe.
+ */
+export function whenMockupsSettled(keys: string[], onSettled: () => void): () => void {
+  let fired = false;
+  const check = () => {
+    if (fired || !keys.every(mockupSettled)) return;
+    fired = true;
+    unsubscribe();
+    onSettled();
+  };
+  const unsubscribe = subscribeMockups(check);
+  check();
+  return unsubscribe;
 }
 
 /**
@@ -108,9 +137,11 @@ export function prefetchMockups(reqs: MockupRequest[]): void {
         pending.delete(k);
         if (res.ok) {
           done.set(k, { url: res.url, at: Date.now() });
-          preload(res.url);
+          preload(k, res.url);
         } else if (!res.needsAuth && !res.transient) {
           failed.add(k);
+        } else {
+          unloadable.add(k); // a hiccup: the tile retries itself when shown; the range doesn't wait
         }
         notify();
       });
@@ -155,8 +186,33 @@ async function runBatch(batch: MockupRequest[]): Promise<Result[]> {
   return ((await res.json()) as { results?: Result[] }).results ?? [];
 }
 
-/** Warm the browser's image cache, so a tile's swap to the photo is instant. */
-function preload(url: string) {
+/** Warm the browser's image cache, so a tile's swap to the photo is instant; note when it's ready. */
+function preload(key: string, url: string) {
+  if (typeof window === 'undefined') return;
+  loaded.delete(key);
+  unloadable.delete(key);
+  const img = new window.Image();
+  img.decoding = 'async';
+  img.onload = () => {
+    void img
+      .decode()
+      .catch(() => undefined)
+      .then(() => {
+        if (done.get(key)?.url !== url) return; // superseded by a fresher URL
+        loaded.add(key);
+        notify();
+      });
+  };
+  img.onerror = () => {
+    if (done.get(key)?.url !== url) return;
+    unloadable.add(key); // the tile re-composes itself; the range doesn't wait on it
+    notify();
+  };
+  img.src = url;
+}
+
+/** Just warm the browser's image cache (nothing waits on it). */
+function warm(url: string) {
   if (typeof window === 'undefined') return;
   const img = new window.Image();
   img.decoding = 'async';
@@ -179,7 +235,7 @@ export async function prefetchContexts(variantIds: string[]): Promise<void> {
       for (const id of chunk) {
         const ctx = body.contexts?.[id] ?? null;
         contexts.set(id, ctx);
-        if (ctx) preload(ctx.blankUrl);
+        if (ctx) warm(ctx.blankUrl);
       }
     } catch {
       // instant previews are a nicety — the photoreal mockups still come

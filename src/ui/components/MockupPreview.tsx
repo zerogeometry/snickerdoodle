@@ -286,7 +286,7 @@ export function MockupPreview({
   // The instant preview stands in until the photo lands (and stays under it while it fades in).
   const ctx = instant && variantId && !view && !fill ? instantContext(variantId) : undefined;
   const instantLayer = ctx ? (
-    <div className="absolute inset-0">
+    <div className="absolute inset-0" data-instant>
       <InstantMockup
         ctx={ctx}
         src={instant!.src}

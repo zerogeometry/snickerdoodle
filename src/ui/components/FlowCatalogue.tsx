@@ -18,7 +18,7 @@ import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
-import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupPrefetch';
+import { instantContext, mockupKey, prefetchContexts, prefetchMockups, whenMockupsSettled } from '@/lib/mockupPrefetch';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
@@ -55,6 +55,7 @@ export function FlowCatalogue({
   compact = false,
   scrollable = false,
   className,
+  onRangeReady,
 }: {
   products: CatalogueProduct[];
   mode?: 'sections' | 'flat';
@@ -62,8 +63,13 @@ export function FlowCatalogue({
   compact?: boolean; // denser grid for the narrower Start-Creating column
   scrollable?: boolean; // scroll the range inside a fixed-height container
   className?: string;
+  /** Called once every tile in the range has its photo ready to show (or definitely has none) —
+   * the create page holds its loader until then. */
+  onRangeReady?: () => void;
 }) {
   const router = useRouter();
+  const onRangeReadyRef = useRef(onRangeReady);
+  onRangeReadyRef.current = onRangeReady;
   const upload = useUpload((s) => s.upload);
   const setAssetId = useUpload((s) => s.setAssetId);
   const items = useBasket((s) => s.items);
@@ -245,6 +251,8 @@ export function FlowCatalogue({
     const reqs = rangeProducts.map((p) => ({ ...tileInputs(p), assetId, size: 'thumb' as const }));
     const noInstant = (r: (typeof reqs)[number]) => (instantContext(r.variantId) ? 1 : 0);
     prefetchMockups([...reqs].sort((a, b) => noInstant(a) - noInstant(b)));
+    // the range is ready when EVERY tile's photo is (the same keys the tiles read)
+    return whenMockupsSettled(reqs.map(mockupKey), () => onRangeReadyRef.current?.());
   }, [assetId, cutoutId, rangeProducts, tileInputs]);
 
   // The banner promises "matching organic tees + a bodysuit" — only show it when all

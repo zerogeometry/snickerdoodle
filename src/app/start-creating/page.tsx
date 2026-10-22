@@ -15,7 +15,6 @@ import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
-import { MOCKUP_READY_EVENT } from '@/ui/components/MockupPreview';
 import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { takePendingKeep } from '@/lib/pending-keep';
 import { finishPendingKeepsAction } from '@/app/actions/keep';
@@ -45,10 +44,11 @@ export default function StartCreatingPage() {
   };
   useEffect(loadCatalogue, []);
 
-  // Hold the "making your range" loader over the catalogue until the first couple of real
-  // mockups have painted (tiles compose in the background underneath), so the shopper never
-  // stares at a grid of blank tiles. A safety timeout lifts it regardless.
+  // Hold the "making your range" loader over the catalogue until EVERY tile's real photo is ready
+  // to show (tiles compose in the background underneath), so the range is revealed whole — never a
+  // grid still filling in. A generous safety timeout lifts it regardless.
   const [rangeReady, setRangeReady] = useState(false);
+  const [rangeSettled, setRangeSettled] = useState(false);
   const drawingKey = upload?.dataUrl ?? null;
   // Back from signing in after a guest's "+ keepsake": put their drawing back on screen (same
   // browser) and finish the keep (server-side — works on any device the link was opened on).
@@ -67,28 +67,25 @@ export default function StartCreatingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A new drawing: the loader comes back and waits for the new range.
+  const shownAtRef = useRef(0);
   useEffect(() => {
     if (!drawingKey) return;
     setRangeReady(false);
-    // Reveal as soon as the first tiles have real pixels (the instant previews count — they paint
-    // within a moment of the drawing landing), but let the loader play its little beat first so
-    // the reveal lands as a reveal, not a flicker.
-    const MIN_LOADER_MS = 1200;
-    const shownAt = Date.now();
-    let painted = 0;
-    let revealTimer: ReturnType<typeof setTimeout> | undefined;
-    const onReady = () => {
-      painted += 1;
-      if (painted === 2) revealTimer = setTimeout(() => setRangeReady(true), Math.max(0, MIN_LOADER_MS - (Date.now() - shownAt)));
-    };
-    window.addEventListener(MOCKUP_READY_EVENT, onReady);
-    const safety = setTimeout(() => setRangeReady(true), 15000);
-    return () => {
-      window.removeEventListener(MOCKUP_READY_EVENT, onReady);
-      clearTimeout(safety);
-      if (revealTimer) clearTimeout(revealTimer);
-    };
+    setRangeSettled(false);
+    shownAtRef.current = Date.now();
+    const safety = setTimeout(() => setRangeReady(true), 45_000); // never strand the shopper
+    return () => clearTimeout(safety);
   }, [drawingKey]);
+  // Every photo is ready: give the tiles a beat to swap them in, and let the loader play at least
+  // its little moment so the reveal lands as a reveal, not a flicker.
+  useEffect(() => {
+    if (!rangeSettled || rangeReady) return;
+    const MIN_LOADER_MS = 1200;
+    const SWAP_MS = 450; // a tile's instant preview → photo cross-fade
+    const t = setTimeout(() => setRangeReady(true), Math.max(SWAP_MS, MIN_LOADER_MS - (Date.now() - shownAtRef.current)));
+    return () => clearTimeout(t);
+  }, [rangeSettled, rangeReady]);
 
   /** Set the upload, then detect whether its background is opaque (drives the
    * "remove background" nudge — only shown when removing would actually do something). */
@@ -251,7 +248,7 @@ export default function StartCreatingPage() {
                         start) while the loader plays on top; then it fades in. */}
                     {products ? (
                       <div inert={!rangeReady} className={`transition-opacity duration-500 ${rangeReady ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
-                        <FlowCatalogue products={products} mode="sections" compact scrollable />
+                        <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setRangeSettled(true)} />
                       </div>
                     ) : (
                       <div className="h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />
