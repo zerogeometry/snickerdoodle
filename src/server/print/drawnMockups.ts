@@ -2,8 +2,9 @@ import 'server-only';
 import { Resvg } from '@resvg/resvg-js';
 
 /**
- * DRAWN product mockups for the range-expansion products Prodigi has no blank photo for (or whose
- * photo isn't staged on this machine): a calm oat page, a soft shadow, the product drawn simply —
+ * DRAWN product mockups for the range-expansion products with no photo yet (height chart, bandana),
+ * and the fallback for any whose founder-photographed layers (seedMockups → layered-flat) aren't
+ * staged on this machine: a calm oat page, a soft shadow, the product drawn simply —
  * and the PRINT AREA at the print file's exact aspect, so the compositor lays the printed face on
  * it 1:1 (preview == print, registration drift 0). Same posture as the drawn phone cases
  * (phoneCaseMockup.ts): brand-safe by construction, nothing here is a child's image. A real photo
@@ -12,7 +13,7 @@ import { Resvg } from '@resvg/resvg-js';
  * Shapes only — no text — so there are no fonts to bundle.
  */
 
-export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'acrylicBlock', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'] as const;
+export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'] as const;
 export type DrawnProductKey = (typeof DRAWN_PRODUCT_KEYS)[number];
 export const isDrawnProduct = (key: string): key is DrawnProductKey => (DRAWN_PRODUCT_KEYS as readonly string[]).includes(key);
 
@@ -118,20 +119,6 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
         overlay: png(svg(`<path d="M${r.x + 6} ${r.y - 4} L${W / 2} ${r.y - 70} L${r.x + r.w - 6} ${r.y - 4}" fill="none" stroke="${INK}" stroke-opacity="0.6" stroke-width="3"/>${bar(r.y - 12)}${bar(r.y + r.h - 10)}`)),
         quad: quadOf(r),
         material: 'PAPER',
-        W, H,
-      };
-    }
-    case 'acrylicBlock': {
-      // a thick clear block standing on its own: the print behind the front face, the acrylic's
-      // depth to the side, a soft highlight across the front
-      const r = fit(a, 600, 820, W / 2 - 20, H / 2);
-      const d = Math.round(Math.min(r.w, r.h) * 0.09);
-      const side = `M${r.x + r.w} ${r.y} L${r.x + r.w + d} ${r.y - d} V${r.y + r.h - d} L${r.x + r.w} ${r.y + r.h} Z M${r.x} ${r.y} L${r.x + d} ${r.y - d} H${r.x + r.w + d} L${r.x + r.w} ${r.y} Z`;
-      return {
-        blank: png(svg(`${SHADOW_DEFS}<rect x="${r.x + 16}" y="${r.y + 22}" width="${r.w}" height="${r.h}" fill="#000" opacity="0.2" filter="url(#s)"/><path d="${side}" fill="#DCE9F3" stroke="#8FB5D6" stroke-width="2"/><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="#fff"/>`, OAT)),
-        overlay: png(svg(`<path d="M${r.x} ${r.y + r.h * 0.35} L${r.x + r.w * 0.45} ${r.y} H${r.x + r.w * 0.62} L${r.x} ${r.y + r.h * 0.55} Z" fill="#fff" fill-opacity="0.16"/><rect x="${r.x + 1}" y="${r.y + 1}" width="${r.w - 2}" height="${r.h - 2}" fill="none" stroke="#8FB5D6" stroke-opacity="0.8" stroke-width="3"/>`)),
-        quad: quadOf(r),
-        material: 'GLOSS',
         W, H,
       };
     }

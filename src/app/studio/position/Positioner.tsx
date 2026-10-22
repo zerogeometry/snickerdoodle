@@ -227,7 +227,6 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     variant.productKey === 'cushion' ? 'on the cushion'
       : variant.productKey === 'blanket' ? 'on the blanket'
       : variant.productKey === 'card' || variant.productKey === 'playingCards' ? 'on the card'
-      : variant.productKey === 'acrylicBlock' ? 'in the block'
       : variant.productKey === 'phoneCase' ? 'on the case'
       : isJigsaw ? 'on the board'
       : variant.productKey === 'framedPrint' ? 'in the frame'

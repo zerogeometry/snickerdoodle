@@ -59,12 +59,12 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
 // The range expansion (D21, 2026-10-21): every SKU, attribute, lab and print size checked against
 // the Prodigi SANDBOX (GET /products + POST /quotes to GB) the same day.
 describe('range expansion — new products', () => {
-  const NEW = ['socks', 'heightChart', 'kidsHoodie', 'adultHoodie', 'acrylicBlock', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'];
+  const NEW = ['socks', 'heightChart', 'kidsHoodie', 'adultHoodie', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'];
   const rows = (k: string) => list.filter((r) => r.productKey === k);
   const bySize = (k: string) => Object.fromEntries(rows(k).map((r) => [r.sku, r]));
 
   it('every new product is defined; the ready ones are ON SHOW, the rest held back (founder, 2026-10-21)', () => {
-    const LIVE = ['socks', 'heightChart', 'acrylicBlock', 'wrappingPaper', 'teaTowel', 'playingCards'];
+    const LIVE = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards'];
     for (const k of NEW) {
       expect(rows(k).length, k).toBeGreaterThan(0);
       expect(rows(k).every((r) => r.visibleInShop === LIVE.includes(k) && !r.paused), k).toBe(true);
@@ -73,6 +73,11 @@ describe('range expansion — new products', () => {
 
   it('the women’s sweatshirt is left out (founder, 2026-10-21)', () => {
     expect(list.some((r) => r.prodigiSku === 'SWEAT-SS-STSW125')).toBe(false);
+  });
+
+  it('the acrylic block is gone — no honest preview of a clear block (founder, 2026-10-22)', () => {
+    expect(rows('acrylicBlock')).toHaveLength(0);
+    expect(list.some((r) => r.prodigiSku?.startsWith('GLOBAL-MOU-PRISM'))).toBe(false);
   });
 
   it('the agreed prices (whole pounds, free delivery baked in)', () => {
@@ -86,7 +91,6 @@ describe('range expansion — new products', () => {
       'POSTER-HANGER-20-CAN-ROL-SC-8X48': 3100, 'POSTER-HANGER-30-CAN-ROL-SC-12X48': 3400,
       'POSTER-HANGER-20-CAN-ROL-SC-8X60': 3400, 'POSTER-HANGER-30-CAN-ROL-SC-12X60': 3600,
     });
-    expect(skuPrice('acrylicBlock')).toEqual({ 'GLOBAL-MOU-PRISM-4X6': 2700, 'GLOBAL-MOU-PRISM-5X7': 2900, 'GLOBAL-MOU-PRISM-6X8': 3600, 'GLOBAL-MOU-PRISM-8X8': 4100 });
     expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-3-50X70': 2000, 'WRAP-3-75X90': 2800, 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800 });
     expect(skuPrice('petBandana')).toEqual({ 'PET-BANDANA-SML': 1800, 'PET-BANDANA-MED': 1800, 'PET-BANDANA-LRG': 1900 });
   });
@@ -95,7 +99,6 @@ describe('range expansion — new products', () => {
     const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
     expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '6141x5433' });
     expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
-    expect(px('acrylicBlock')).toMatchObject({ 'GLOBAL-MOU-PRISM-4X6': '1227x1818', 'GLOBAL-MOU-PRISM-5X7': '1512x2112', 'GLOBAL-MOU-PRISM-8X8': '2409x2409' });
     expect(px('wrappingPaper')).toMatchObject({ 'WRAP-3-50X70': '2952x4133', 'WRAP-3-75X90': '4429x5314', 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X500': '4133x29527' });
     expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '5492x8208' });
     expect(px('petBandana')).toEqual({ 'PET-BANDANA-SML': '7500x2244', 'PET-BANDANA-MED': '9447x2952', 'PET-BANDANA-LRG': '10158x3306' });

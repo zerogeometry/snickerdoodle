@@ -54,7 +54,7 @@ describe.skipIf(!DB || !S3)('catalogue reveal — instant contexts + batch compo
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-    variant.block = await privateCopy('acrylicBlock', 'acrylicBlock', `zz-reveal-block-${ids.nonce}`);
+    variant.bandana = await privateCopy('petBandana', 'petBandana', `zz-reveal-bandana-${ids.nonce}`);
     variant.cards = await privateCopy('playingCards', 'playingCards', `zz-reveal-cards-${ids.nonce}`);
     variant.socks = await privateCopy('socks', 'socks', `socks-zzreveal-${ids.nonce}`);
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
@@ -73,14 +73,14 @@ describe.skipIf(!DB || !S3)('catalogue reveal — instant contexts + batch compo
   });
 
   it('instant contexts: a small brand-safe photo + the print area for flat products; none where the browser can’t draw it', async () => {
-    const ctx = await instantContexts(db, [variant.block!, variant.socks!]);
+    const ctx = await instantContexts(db, [variant.bandana!, variant.socks!]);
     expect(ctx[variant.socks!]).toBeNull(); // a repeat pattern: the server's printed face only
-    const block = ctx[variant.block!]!;
-    expect(block.quad).toHaveLength(4);
-    expect(block.material).toBe('GLOSS');
-    const photo = await sharp(Buffer.from(await (await fetch(block.blankUrl)).arrayBuffer())).metadata();
+    const bandana = ctx[variant.bandana!]!;
+    expect(bandana.quad).toHaveLength(4);
+    expect(bandana.material).toBe('LIGHT_FABRIC');
+    const photo = await sharp(Buffer.from(await (await fetch(bandana.blankUrl)).arrayBuffer())).metadata();
     expect(Math.max(photo.width!, photo.height!)).toBeLessThanOrEqual(600); // the small copy, not the full photo
-    expect(block.blankW / block.blankH).toBeCloseTo(photo.width! / photo.height!, 2);
+    expect(bandana.blankW / bandana.blankH).toBeCloseTo(photo.width! / photo.height!, 2);
   });
 
   it('batch compose: one drawing download for the whole batch, each item its own photo', async () => {
@@ -88,7 +88,7 @@ describe.skipIf(!DB || !S3)('catalogue reveal — instant contexts + batch compo
     const memo: ComposeMemo = new Map();
     const tf = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
     const [a, b] = await Promise.all([
-      composeForViewer(db, sam, { assetId, variantId: variant.block, transform: tf, size: 'thumb' }, { needsAuth: false, memo }),
+      composeForViewer(db, sam, { assetId, variantId: variant.bandana, transform: tf, size: 'thumb' }, { needsAuth: false, memo }),
       composeForViewer(db, sam, { assetId, variantId: variant.cards, transform: tf, size: 'thumb' }, { needsAuth: false, memo }),
     ]);
     expect(a.ok && b.ok).toBe(true);
@@ -100,7 +100,7 @@ describe.skipIf(!DB || !S3)('catalogue reveal — instant contexts + batch compo
 
   it('batch compose never skips the gate: an outsider gets the plain fallback, not a picture', async () => {
     const blake = await resolveViewerContext(db, ids.blakeId, null);
-    const res = await composeForViewer(db, blake, { assetId, variantId: variant.block, transform: {}, size: 'thumb' }, { needsAuth: false, memo: new Map() });
+    const res = await composeForViewer(db, blake, { assetId, variantId: variant.bandana, transform: {}, size: 'thumb' }, { needsAuth: false, memo: new Map() });
     expect(res.ok).toBe(false);
   });
 });

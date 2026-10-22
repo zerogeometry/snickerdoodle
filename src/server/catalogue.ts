@@ -277,16 +277,6 @@ const HEIGHT_CHARTS = [
 ] as const;
 const HANGER_COLOURS = ['natural', 'black', 'white'];
 
-// Acrylic desk block: a 25mm acrylic prism with the drawing printed full-bleed behind it. gb3, Evri
-// Next Day. (A see-through-background "-TRANS" twin exists at the same price — it needs a
-// transparent print file, so it waits for a render path that keeps the alpha.)
-const ACRYLIC_BLOCKS = [
-  { size: '4 × 6″', sku: 'GLOBAL-MOU-PRISM-4X6', px: { w: 1227, h: 1818 }, pricePence: 2700 },
-  { size: '5 × 7″', sku: 'GLOBAL-MOU-PRISM-5X7', px: { w: 1512, h: 2112 }, pricePence: 2900 },
-  { size: '6 × 8″', sku: 'GLOBAL-MOU-PRISM-6X8', px: { w: 1818, h: 2409 }, pricePence: 3600 },
-  { size: '8 × 8″', sku: 'GLOBAL-MOU-PRISM-8X8', px: { w: 2409, h: 2409 }, pricePence: 4100 },
-] as const;
-
 // Wrapping paper: FSC 95gsm, a REPEAT PATTERN of the drawing. gb2. NB Standard is Royal Mail RM24
 // — UNTRACKED (sandbox 2026-10-21); tracked (Express, RM Tracked 24) is +£1.05. Founder to decide.
 const WRAPPING_PAPER = [
@@ -447,12 +437,12 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
-  // ── Range expansion (D21) — LIVE 2026-10-21 (founder): socks, height chart, acrylic block, wrapping
-// paper, tea towel, playing cards (+ card packs above). HELD until ready: the hoodies (need a hoodie
+  // ── Range expansion (D21) — LIVE 2026-10-21 (founder): socks, height chart, wrapping paper,
+// tea towel, playing cards (+ card packs above). HELD until ready: the hoodies (need a hoodie
 // packshot + confirmed chest sizes) and the pet bandana (its shape is drawn from a guess) ──
   // (The women's Dazzler sweatshirt was left out — founder, 2026-10-21.)
   // Categories reuse the existing enum (a new value needs a migration): socks/hoodies/bandana → wear,
-  // height chart/acrylic block → cards & prints, wrapping paper → festive, tea towel → home,
+  // height chart → cards & prints, wrapping paper → festive, tea towel → home,
   // playing cards → gifts.
   socks: {
     category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
@@ -479,12 +469,6 @@ const DEFS: Record<string, ProductDef> = {
     description: "A soft unisex hoodie with your little one's artwork on the front — for the grown-ups who'd wear their masterpiece every day.",
     specs: { material: '85% organic cotton, 15% recycled polyester', fit: 'unisex, XS–3XL', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
     variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
-  },
-  acrylicBlock: {
-    category: 'PRINT', label: 'acrylic block', blurb: 'their masterpiece, made solid', print: true, visibleInShop: true,
-    description: 'Their drawing set behind a thick block of clear acrylic that stands on its own — a little piece of the fridge gallery for a desk or shelf.',
-    specs: { material: '25mm clear acrylic, printed behind', stands: 'on its own, no frame needed', made: 'in the UK' },
-    variants: ACRYLIC_BLOCKS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   wrappingPaper: {
     category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,

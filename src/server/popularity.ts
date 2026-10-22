@@ -18,7 +18,7 @@ import type { DbHandle } from './db';
 export const EXPECTED_POPULARITY = [
   'framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
   // the range expansion (D21) joins the same range — one collection, shown together (founder, 2026-10-21)
-  'cardPack', 'heightChart', 'socks', 'acrylicBlock', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
+  'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
 ];
 
 export const POPULARITY_WINDOW_DAYS = 90;

@@ -30,7 +30,6 @@ export type ProductKey =
   | 'heightChart'
   | 'kidsHoodie'
   | 'adultHoodie'
-  | 'acrylicBlock'
   | 'wrappingPaper'
   | 'teaTowel'
   | 'petBandana'
@@ -254,16 +253,6 @@ const ART: Record<ProductKey, ReactNode> = {
     <>
       <Hoodie stroke="var(--color-cobalt)" wide />
       <House transform="translate(37,44) scale(0.62)" />
-    </>
-  ),
-  // a thick clear block standing on its own, the drawing set behind the acrylic
-  acrylicBlock: (
-    <>
-      <path d="M26 20 L66 14 L74 20 L74 80 L34 86 L26 80 Z" fill="var(--color-sky-pale)" stroke="var(--color-sky)" strokeWidth="2.4" strokeLinejoin="round" />
-      <rect x="26" y="20" width="40" height="60" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="3" />
-      <path d="M66 20 L74 14 M66 80 L74 74" stroke="var(--color-sky)" strokeWidth="2" />
-      <path d="M30 26 L36 24" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" />
-      <House transform="translate(29,37) scale(0.95)" />
     </>
   ),
   // a sheet of wrap curling off its roll, their drawing on repeat
