@@ -41,6 +41,9 @@ export interface ToolDef {
   key?: string;
   /** 'mode' = stays selected (brushes, crop…); 'action' = does its thing on tap; 'hold' = press & hold. */
   kind: 'mode' | 'action' | 'hold';
+  /** A small ✕ on the icon (founder, 22 Oct): the two "take away" tools aren't self-explanatory —
+   * remove background gets it top-left, the remove-colour pipette top-right. */
+  badge?: 'tl' | 'tr';
 }
 
 /**
@@ -55,6 +58,7 @@ export const TOOLS: ToolDef[] = [
     hint: 'lifts the drawing off the paper, so it sits on any colour.',
     label: 'remove background',
     icon: IconBackground,
+    badge: 'tl',
     kind: 'mode',
     key: 'G',
     info: 'Lifts the drawing off the paper so it can go on any colour — paper inside shapes and shadows too. On a painted background, use remove colour instead.',
@@ -85,6 +89,7 @@ export const TOOLS: ToolDef[] = [
     hint: 'tap a colour to make it see-through.',
     label: 'remove colour',
     icon: IconColorPicker,
+    badge: 'tr',
     kind: 'mode',
     key: 'C',
     info: 'Tap a colour to make it see-through, everywhere it appears. Choose “just that patch” to remove only the patch you touch — handy when the same colour is in the drawing too.',

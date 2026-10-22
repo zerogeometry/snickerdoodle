@@ -23,8 +23,10 @@ import { toast, useUpload } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
+import { StudioTray } from '@/ui/studio/Tray';
+import { ToolGlyph } from '@/ui/studio/ToolGlyph';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
-import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
+import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS } from '@/lib/card-fonts';
@@ -225,7 +227,8 @@ export default function StudioPage() {
       if (!work || !stageSize.w) return new DOMMatrix();
       const [gw, gh] = rotatedSize(work.w, work.h, g.rotate);
       const rect = cropping ? { x: 0, y: 0, w: gw, h: gh } : { x: g.crop.x * gw, y: g.crop.y * gh, w: g.crop.w * gw, h: g.crop.h * gh };
-      const pad = 24;
+      // phones: the picture fills the stage edge to edge (the controls float over it)
+      const pad = typeof window !== 'undefined' && window.innerWidth < 768 ? 6 : 24;
       const s = Math.min((stageSize.w - pad * 2) / rect.w, (stageSize.h - pad * 2) / rect.h) * view.zoom;
       return new DOMMatrix()
         .translate(stageSize.w / 2 + view.panX, stageSize.h / 2 + view.panY)
@@ -928,6 +931,55 @@ export default function StudioPage() {
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
+  const drawingLayer: DrawingLayer | null = scratch
+    ? null
+    : {
+        unlocked: drawingUnlocked,
+        selected: selectedId === DRAWING,
+        place: geo.place ?? IDENTITY_PLACE,
+        onToggleLock: () => {
+          // unlocking picks it up, ready to move; locking puts it down
+          if (drawingUnlocked) {
+            if (selectedId === DRAWING) setSelectedId(null);
+            setDrawingUnlocked(false);
+          } else {
+            setDrawingUnlocked(true);
+            setSelectedId(DRAWING);
+          }
+        },
+        onSize: (scale) => {
+          if (Date.now() - lastEditPush.current > 800) pushUndo();
+          lastEditPush.current = Date.now();
+          setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), scale } }));
+        },
+        onReset: () => {
+          pushUndo();
+          setGeo((g) => ({ ...g, place: null }));
+        },
+        // its tilt AS SEEN: the design's own turn plus the drawing's
+        angle: normAngle(visualAngle(geo) + (geo.place?.angle ?? 0)),
+        onTurn: (seen, group) => {
+          if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
+          lastEditPush.current = Date.now();
+          setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), angle: normAngle(seen - visualAngle(g)) } }));
+        },
+      };
+  const onFlip = (axis: 'h' | 'v') => {
+    pushUndo();
+    setGeo((g) => flipGeometry(g, axis));
+    setObjects((os) => flipObjects(os, axis));
+  };
+  const onResetCrop = () => {
+    pushUndo();
+    setGeo((g) => ({ ...g, crop: { x: 0, y: 0, w: 1, h: 1 } }));
+  };
+  const setBackground = (bg: string | null) => {
+    // dragging the device colour picker fires continuously — one undo step per burst
+    if (Date.now() - lastBgPush.current > 600) pushUndo();
+    lastBgPush.current = Date.now();
+    setGeo((g) => ({ ...g, background: bg }));
+  };
+
   const toolOptions = tool && ADDING.includes(tool) ? (
     <AddedOptions
       tool={tool}
@@ -940,41 +992,7 @@ export default function StudioPage() {
       objects={objects}
       selected={selected}
       baseLabel={scratch ? 'your canvas' : 'your drawing'}
-      drawing={
-        scratch
-          ? null
-          : {
-              unlocked: drawingUnlocked,
-              selected: selectedId === DRAWING,
-              place: geo.place ?? IDENTITY_PLACE,
-              onToggleLock: () => {
-                // unlocking picks it up, ready to move; locking puts it down
-                if (drawingUnlocked) {
-                  if (selectedId === DRAWING) setSelectedId(null);
-                  setDrawingUnlocked(false);
-                } else {
-                  setDrawingUnlocked(true);
-                  setSelectedId(DRAWING);
-                }
-              },
-              onSize: (scale) => {
-                if (Date.now() - lastEditPush.current > 800) pushUndo();
-                lastEditPush.current = Date.now();
-                setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), scale } }));
-              },
-              onReset: () => {
-                pushUndo();
-                setGeo((g) => ({ ...g, place: null }));
-              },
-              // its tilt AS SEEN: the design's own turn plus the drawing's
-              angle: normAngle(visualAngle(geo) + (geo.place?.angle ?? 0)),
-              onTurn: (seen, group) => {
-                if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
-                lastEditPush.current = Date.now();
-                setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), angle: normAngle(seen - visualAngle(g)) } }));
-              },
-            }
-      }
+      drawing={drawingLayer}
       onSelect={(id) => setSelectedId(id)}
       onTurn={turnSelected}
       onUpdate={updateSelected}
@@ -998,30 +1016,62 @@ export default function StudioPage() {
       setFussy={setFussy}
       brush={brush}
       setBrush={setBrush}
-      onFlip={(axis) => {
-        pushUndo();
-        setGeo((g) => flipGeometry(g, axis));
-        setObjects((os) => flipObjects(os, axis));
-      }}
-      onResetCrop={() => {
-        pushUndo();
-        setGeo((g) => ({ ...g, crop: { x: 0, y: 0, w: 1, h: 1 } }));
-      }}
+      onFlip={onFlip}
+      onResetCrop={onResetCrop}
       onDoneCrop={() => setTool(null)}
       onTool={onTool}
       angle={visualAngle(geo)}
       onAngle={(v, group) => turnDesign(v, group)}
       background={geo.background}
-      setBackground={(bg) => {
-        // dragging the device colour picker fires continuously — one undo step per burst
-        if (Date.now() - lastBgPush.current > 600) pushUndo();
-        lastBgPush.current = Date.now();
-        setGeo((g) => ({ ...g, background: bg }));
-      }}
+      setBackground={setBackground}
     />
   );
   // every tool's panel: what it's for in a line, then its options (actions show nothing extra)
   const def = tool ? toolById(tool) : null;
+  // PHONES: the same options as one slim frosted row over the picture (no pane, no "where to start")
+  const tray =
+    tool && def?.kind === 'mode'
+      ? StudioTray({
+          tool,
+          onTool,
+          busy: !!busy,
+          hadCutout,
+          keepWhite,
+          onKeepWhite: (on) => void runRemoveBg(on),
+          onRemoveBg: () => void runRemoveBg(keepWhite),
+          everywhere,
+          setEverywhere,
+          fussy,
+          setFussy,
+          brush,
+          setBrush,
+          angle: visualAngle(geo),
+          onAngle: (v, group) => turnDesign(v, group),
+          onFlip,
+          onResetCrop,
+          onDoneCrop: () => setTool(null),
+          background: geo.background,
+          setBackground,
+          pen,
+          setPen,
+          textStyle,
+          setTextStyle,
+          shapeStyle,
+          setShapeStyle,
+          objects,
+          selected,
+          baseLabel: scratch ? 'your canvas' : 'your drawing',
+          drawing: drawingLayer,
+          onSelect: (id) => setSelectedId(id),
+          onTurn: turnSelected,
+          onUpdate: updateSelected,
+          onAddShape: addShape,
+          onDelete: deleteSelected,
+          onDuplicate: duplicateSelected,
+          onForward: () => reorder(1),
+          onBack: () => reorder(-1),
+        })
+      : null;
   const options =
     def && def.kind === 'mode' ? (
       <div className="flex flex-col gap-4">
@@ -1064,6 +1114,8 @@ export default function StudioPage() {
           onTool={onTool}
           onHold={(id, down) => id === 'compare' && setComparing(down)}
           hidden={scratch ? IMAGE_ONLY : []}
+          tray={tray}
+          trayKey={tool ?? undefined}
         />
 
         {/* stage */}
@@ -1085,31 +1137,50 @@ export default function StudioPage() {
               <span className="animate-pulse">getting your drawing ready…</span>
             </div>
           )}
-          {comparing ? <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span> : null}
+          {/* PHONES: what's in use, in a quiet dark-glass line over the top of the picture (reads on any
+              drawing); with nothing picked, a nudge toward the toolbar + how print-ready it is */}
+          <div className="pointer-events-none absolute left-2.5 right-[64px] top-2.5 flex flex-col items-start gap-1.5 md:hidden" aria-live="polite">
+            {comparing ? (
+              <span className="studio-glass-ink rounded-pill px-3 py-1.5 text-[12px] font-extrabold text-paper">your original</span>
+            ) : def && def.kind === 'mode' ? (
+              <div className="studio-glass-ink flex max-w-full items-center gap-2 rounded-[16px] py-1.5 pl-2 pr-3 text-paper [--glyph-ring:var(--color-cocoa)]">
+                <ToolGlyph tool={def} size={16} />
+                <span className="min-w-0">
+                  <span className="block text-[12px] font-extrabold leading-tight">{def.label}</span>
+                  <span className="line-clamp-2 block text-[11px] leading-snug text-paper/80">{def.hint}</span>
+                </span>
+              </div>
+            ) : (
+              <>
+                <span className="studio-glass-ink rounded-pill px-3 py-1.5 text-[12px] font-bold text-paper">pick a tool below — the yellow arrow shows what each one does</span>
+                <span className={`rounded-pill px-2.5 py-1 text-[11px] font-extrabold ${readiness.good ? 'bg-leaf-pale text-green-save' : 'bg-honey-band text-cocoa'}`}>
+                  {readiness.good ? '✓ ' : ''}
+                  {readiness.label}
+                </span>
+              </>
+            )}
+          </div>
+          {comparing ? <span className="absolute left-3 top-3 hidden rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper md:inline">your original</span> : null}
           {busy ? (
-            <div role="status" className="absolute inset-x-0 top-3 mx-auto w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
+            <div role="status" className="absolute inset-x-0 top-[72px] mx-auto w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] md:top-3">
               {busy}
             </div>
           ) : null}
-          <span className={`absolute left-3 bottom-3 rounded-pill px-2.5 py-1 text-[11px] font-extrabold sm:hidden ${readiness.good ? 'bg-leaf-pale text-green-save' : 'bg-honey-band text-cocoa'}`}>
-            {readiness.label}
-          </span>
-          {/* zoom */}
-          <div className="absolute bottom-3 right-3 flex gap-1.5" role="group" aria-label="zoom">
-            <button type="button" onClick={() => zoomBy(1 / 1.25)} aria-label="zoom out" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa">
-              <Icon icon={IconMinus} size={16} />
+          {/* zoom: a slim column floating top-right over the picture */}
+          <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5" role="group" aria-label="zoom">
+            <button type="button" onClick={() => zoomBy(1.25)} aria-label="zoom in" className="studio-glass press flex h-11 w-11 items-center justify-center rounded-full text-cocoa">
+              <Icon icon={IconPlus} size={17} />
             </button>
-            <button type="button" onClick={fit} aria-label="fit to screen" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa">
-              <Icon icon={IconZoomReset} size={16} />
+            <button type="button" onClick={fit} aria-label="fit to screen" className="studio-glass press flex h-11 w-11 items-center justify-center rounded-full text-cocoa">
+              <Icon icon={IconZoomReset} size={17} />
             </button>
-            <button type="button" onClick={() => zoomBy(1.25)} aria-label="zoom in" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa">
-              <Icon icon={IconPlus} size={16} />
+            <button type="button" onClick={() => zoomBy(1 / 1.25)} aria-label="zoom out" className="studio-glass press flex h-11 w-11 items-center justify-center rounded-full text-cocoa">
+              <Icon icon={IconMinus} size={17} />
             </button>
           </div>
         </div>
 
-        {/* options: a strip above the toolbar on phones, a side panel on bigger screens */}
-        <div className="order-first max-h-[38vh] overflow-y-auto overscroll-contain border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{options}</div>
+        {/* options: the frosted row over the picture on phones (tray, above); a side panel on bigger screens */}
         <aside aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{options}</aside>
       </div>
 

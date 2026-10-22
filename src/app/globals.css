@@ -569,3 +569,35 @@ body {
   outline: none;
   box-shadow: 0 0 0 4px var(--color-honey);
 }
+
+/* Studio (phones): the frosted options row and floating controls over the picture — paper-tinted
+   glass with an ink hairline, so it reads on any drawing and still feels like the kraft app. */
+.studio-glass {
+  background: color-mix(in srgb, var(--color-paper) 72%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
+  border: 1.5px solid color-mix(in srgb, var(--color-cocoa) 16%, transparent);
+  box-shadow: 0 6px 20px rgb(43 33 24 / 0.16);
+}
+/* the dark version: the tool name over the top of the picture */
+.studio-glass-ink {
+  background: color-mix(in srgb, var(--color-cocoa) 74%, transparent);
+  -webkit-backdrop-filter: blur(12px) saturate(1.3);
+  backdrop-filter: blur(12px) saturate(1.3);
+  border: 1px solid color-mix(in srgb, var(--color-paper) 18%, transparent);
+  box-shadow: 0 4px 14px rgb(43 33 24 / 0.22);
+}
+/* the options row rises from behind the toolbar, like a camera's modes */
+@keyframes tray-up {
+  from {
+    transform: translateY(110%);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+.tray-up {
+  animation: tray-up 0.28s var(--ease-pop) both;
+}

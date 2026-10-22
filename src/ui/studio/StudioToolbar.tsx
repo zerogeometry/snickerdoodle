@@ -1,14 +1,16 @@
 'use client';
 
 import { IconChevronDown, IconChevronUp, IconInfoCircle, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconX } from '@tabler/icons-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 import { TOOL_GROUPS, TOOLS, type ToolDef, type ToolId } from './tools';
+import { ToolGlyph } from './ToolGlyph';
 
 const EXPANDED_KEY = 'snickerdoodle.studio.toolbar-expanded';
 
 /**
- * The Studio toolbar. Phone: a bottom bar of icons (thumb zone) that expands into a labelled sheet.
+ * The Studio toolbar. Phone: ONE slim bar of icons (thumb zone); the active tool's options rise from
+ * behind it as a frosted row over the picture (`tray`); the stand-out chevron opens a labelled sheet.
  * Tablet/desktop: a left rail that expands to show labels. Expanded, every tool gets an (i) that
  * explains it in a sentence (tap/click — never hover-only). The expanded/collapsed choice is
  * remembered on this device.
@@ -19,6 +21,8 @@ export function StudioToolbar({
   onTool,
   onHold,
   hidden = [],
+  tray,
+  trayKey,
 }: {
   active: ToolId | null;
   /** Tools that can't be used right now (e.g. "background" before anything is see-through). */
@@ -28,6 +32,10 @@ export function StudioToolbar({
   onHold: (id: ToolId, down: boolean) => void;
   /** Tools that don't apply here at all (the image tools on a blank canvas). */
   hidden?: ToolId[];
+  /** Phone only: the active tool's options row(s), risen over the picture from behind the bar. */
+  tray?: ReactNode;
+  /** Re-key the tray (the tool) so each one rises afresh. */
+  trayKey?: string;
 }) {
   const tools = TOOLS.filter((t) => !hidden.includes(t.id));
   const groups = TOOL_GROUPS.map((g) => ({ ...g, tools: tools.filter((t) => t.group === g.id) })).filter((g) => g.tools.length);
@@ -60,7 +68,7 @@ export function StudioToolbar({
     setInfo(null);
   };
 
-  const button = (t: ToolDef, withLabel: boolean) => {
+  const button = (t: ToolDef, withLabel: boolean, bare = false) => {
     const off = disabled[t.id];
     const isActive = active === t.id;
     const handlers =
@@ -82,16 +90,18 @@ export function StudioToolbar({
         aria-disabled={off ? true : undefined}
         {...handlers}
         className={`press flex min-h-11 items-center gap-2.5 rounded-[14px] border-2 font-extrabold transition-colors ${
-          withLabel ? 'min-w-0 flex-1 px-3 text-left text-[13px]' : 'h-12 w-12 shrink-0 justify-center'
+          withLabel ? 'min-w-0 flex-1 px-3 text-left text-[13px]' : bare ? 'h-11 w-11 shrink-0 justify-center' : 'h-12 w-12 shrink-0 justify-center'
         } ${
           off
-            ? 'cursor-not-allowed border-cocoa/10 bg-paper-2 text-ink-faint opacity-60'
+            ? 'cursor-not-allowed border-transparent bg-paper-2 text-ink-faint opacity-60'
             : isActive
-              ? 'border-cocoa bg-cocoa text-paper shadow-[0_3px_0_var(--color-honey)]'
-              : 'border-cocoa/20 bg-paper text-cocoa hover:border-cocoa'
+              ? 'border-cocoa bg-cocoa text-paper shadow-[0_3px_0_var(--color-honey)] [--glyph-ring:var(--color-cocoa)]'
+              : bare
+                ? 'border-transparent bg-transparent text-cocoa'
+                : 'border-cocoa/20 bg-paper text-cocoa hover:border-cocoa'
         }`}
       >
-        <Icon icon={t.icon} size={20} className="shrink-0" />
+        <ToolGlyph tool={t} size={20} />
         {withLabel ? <span className="flex-1">{t.label}</span> : null}
       </button>
     );
@@ -114,7 +124,8 @@ export function StudioToolbar({
   return (
     <>
       {/* ── Phone: bottom bar; the chevron slides a labelled sheet up OVER the canvas ── */}
-      <div className="md:hidden">
+      {/* its own layer (z-20): the stage comes later in the page, but the rising tray sits over it */}
+      <div className="relative z-20 md:hidden">
         {sheet ? (
           <>
             <button type="button" aria-label="close the tool list" onClick={() => { setSheet(false); setInfo(null); }} className="fixed inset-0 z-30 bg-cocoa/30" />
@@ -147,22 +158,37 @@ export function StudioToolbar({
             </div>
           </>
         ) : null}
-        <div className="pb-safe flex items-center gap-1.5 border-t-2 border-cocoa/10 bg-paper px-2 pt-2">
-          <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-2" role="toolbar" aria-label="studio tools">
-            {groups.map((g, gi) => (
-              <Fragment key={g.id}>
-                {gi ? <span aria-hidden className="my-1.5 w-0.5 shrink-0 self-stretch rounded-full bg-cocoa/15" /> : null}
-                {g.tools.map((t) => (
-                  <span key={t.id} className="contents">
-                    {button(t, false)}
-                  </span>
-                ))}
-              </Fragment>
-            ))}
+        <div className="relative">
+          {/* the active tool's options: risen from BEHIND the bar (lower layer), over the picture */}
+          {tray ? (
+            <div key={trayKey} className="tray-up absolute inset-x-0 bottom-full z-0 px-2 pb-2">
+              {tray}
+            </div>
+          ) : null}
+          <div className="pb-safe relative z-10 flex items-center gap-1 border-t-2 border-cocoa/10 bg-paper px-2 pt-1.5">
+            {/* the right edge fades: there are more tools a swipe away */}
+            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="toolbar" aria-label="studio tools">
+              {groups.map((g, gi) => (
+                <Fragment key={g.id}>
+                  {gi ? <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 rounded-full bg-cocoa/15" /> : null}
+                  {g.tools.map((t) => (
+                    <span key={t.id} className="contents">
+                      {button(t, false, true)}
+                    </span>
+                  ))}
+                </Fragment>
+              ))}
+            </div>
+            {/* the one button that isn't a tool: what they all do — stands out so it gets a look */}
+            <button
+              type="button"
+              onClick={() => setSheet(true)}
+              aria-label="show what each tool does"
+              className="press ml-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa shadow-[0_2px_0_var(--color-cocoa)]"
+            >
+              <Icon icon={IconChevronUp} size={20} stroke={2.6} />
+            </button>
           </div>
-          <button type="button" onClick={() => setSheet(true)} aria-label="show tool names" className="mb-2 flex h-12 w-11 shrink-0 items-center justify-center rounded-[14px] text-ink-soft">
-            <Icon icon={IconChevronUp} size={20} />
-          </button>
         </div>
       </div>
 
@@ -238,7 +264,7 @@ function InfoCard({ tool, onClose, disabledReason }: { tool: ToolDef; onClose: (
       className="pop-in relative mb-2 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 pr-11 text-[13px] leading-relaxed text-cocoa shadow-[0_3px_0_var(--color-cocoa)] outline-none"
     >
       <p className="mb-1 flex items-center gap-1.5 font-extrabold">
-        <Icon icon={tool.icon} size={16} /> {tool.label}
+        <ToolGlyph tool={tool} size={16} /> {tool.label}
         {tool.key ? <kbd className="ml-1 rounded border border-cocoa/30 bg-paper px-1 text-[10px] font-bold">{tool.key}</kbd> : null}
       </p>
       <p>{tool.info}</p>
