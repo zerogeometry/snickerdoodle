@@ -13,6 +13,7 @@ export async function saveDesignAction(input: {
   transform: RawTransform;
   sourceObjectId?: string;
   back?: string;
+  ground?: string;
 }): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'not-found' | 'not-savable' | 'error' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
@@ -23,6 +24,7 @@ export async function saveDesignAction(input: {
       transform: input.transform,
       sourceObjectId: typeof input.sourceObjectId === 'string' ? input.sourceObjectId : null,
       back: typeof input.back === 'string' ? input.back : null,
+      ground: typeof input.ground === 'string' ? input.ground : null, // untrusted — normalised in saveDesign
     });
     if (!res.ok) return { ok: false, reason: res.reason };
     revalidatePath('/home');

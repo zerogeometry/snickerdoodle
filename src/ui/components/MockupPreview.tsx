@@ -39,6 +39,7 @@ export function MockupPreview({
   sourceObjectId,
   view,
   fill,
+  ground,
   spanHalf,
   px = 96,
   lazy = false,
@@ -56,6 +57,8 @@ export function MockupPreview({
   view?: string | null;
   /** A solid-colour fill instead of the design (e.g. the cushion's plain coloured back), #rrggbb. */
   fill?: string | null;
+  /** A repeat-pattern product's base colour token (socks, wrap, tea towel) — the repeat sits on it. */
+  ground?: string | null;
   /** For a 'full width' closed card: which panel of the double-wide spread this view shows
    * ('front' = the right half). Only affects the perspective single-card view. */
   spanHalf?: 'front' | 'back' | null;
@@ -102,7 +105,7 @@ export function MockupPreview({
   const tfKey = JSON.stringify(transform ?? null);
   // Fresh inputs get a fresh retry allowance.
   // one key format, shared with the range prefetch (src/lib/mockupPrefetch.ts)
-  const inputKey = mockupKey({ assetId, sourceObjectId, variantId, transform, size, view, fill, spanHalf });
+  const inputKey = mockupKey({ assetId, sourceObjectId, variantId, transform, size, view, fill, spanHalf, ground });
   const keyRef = useRef(inputKey);
   keyRef.current = inputKey;
   // Re-render when the range prefetch lands something for THIS tile: its photo (prefetchTick —
@@ -207,6 +210,7 @@ export function MockupPreview({
         sourceObjectId: sourceObjectId ?? undefined,
         view: view ?? undefined,
         fill: fill ?? undefined,
+        ground: ground ?? undefined,
         spanHalf: spanHalf ?? undefined,
       }),
       signal: ctrl.signal,
@@ -230,7 +234,7 @@ export function MockupPreview({
       });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tfKey is `transform` by value (a fresh object each render would refetch forever)
-  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, spanHalf, attempt, prefetchTick]);
+  }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, ground, spanHalf, attempt, prefetchTick]);
 
   // ── Recovery: a compose fetch can be lost to a transient re-render or a flaky response.
   // Independently of the dispatch above, if the preview is STUCK (visible, ids present, no

@@ -22,6 +22,7 @@ interface ClaimedItem {
   transform: RawTransform;
   sourceObjectId: string | null;
   back: string | null; // cushion DUAL back choice (frozen at order time); null elsewhere
+  ground: string | null; // repeat-pattern base colour token (frozen at order time); null = white
   message: unknown; // greetings-card screened inside message (frozen); null = blank inside
   cardSpan: string | null; // greetings-card outer span: 'full' or null (front); card only
 }
@@ -60,6 +61,7 @@ export async function processFulfilment(
         transform: orderItemArtwork.transform,
         sourceObjectId: orderItemArtwork.sourceObjectId,
         back: orderItemArtwork.back,
+        ground: orderItemArtwork.ground,
         message: orderItemArtwork.message,
         cardSpan: orderItemArtwork.cardSpan,
       })
@@ -119,6 +121,7 @@ async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promi
       transform: item.transform,
       sourceObjectId: item.sourceObjectId ?? undefined,
       back: item.back ?? undefined,
+      ground: item.ground ?? undefined,
       message: item.message ?? undefined,
       cardSpan: item.cardSpan ?? undefined,
     });

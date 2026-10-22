@@ -101,3 +101,14 @@ full suite with the dev DB 761 passed ×2, lint ignores `.claude/**`, pushed, te
 - **To go live:** `powershell -ExecutionPolicy Bypass -File .\scripts\test-site\seed.ps1 -Only mockups` (from this
   computer — the photo sets are local) then `...\deploy.ps1`; re-seed the catalogue too (`-Only catalogue`) to
   retire the acrylic block. Still drawn: height chart, pet bandana.
+- ✅ **Pattern base colours** (founder, 22 Oct): socks, wrapping paper and tea towels offer a base colour —
+  white (default), cream, sunshine, tomato, berry, sky, leaf, grey, navy, black (`PATTERN_GROUNDS`,
+  src/lib/patterns.ts). The whole print file is filled with it and the drawing repeats on top. Chosen on the
+  customize page, frozen on the order line + saved designs (migration **0041** `ground`), server-normalised to a
+  known token, in previews / basket / positioner, and part of the basket line id (red + navy socks = two lines) and
+  of the print file's name (no overwrite). If the drawing still has its paper, a one-tap nudge lifts it off (the
+  remove-background magic edit, enclosed paper kept white) — it never runs on its own.
+- ✅ Ankle socks: the pattern runs down the socks at their angle (~24°).
+- ✅ Wrapping paper: the sheet is a window onto the paper (a 5 m roll no longer shows as a sliver).
+- **To go live:** run `db:migrate` locally (new `ground` column) before integration tests, then `seed.ps1`
+  (applies 0041 on the test site + re-seeds mockups) and `deploy.ps1`.

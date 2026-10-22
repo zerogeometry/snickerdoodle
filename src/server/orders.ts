@@ -4,6 +4,7 @@ import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGr
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { isPatternProduct, normalizePatternGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
@@ -47,7 +48,7 @@ function newRef(): string {
 export interface PlaceLine {
   productKey: string;
   qty: number;
-  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string };
+  artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; ground?: string; message?: unknown; cardImageSpan?: string };
   /** A CARD PACK line only: its N cards (which drawing + placement each). Blank inside, front only. */
   cards?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string }>;
 }
@@ -140,7 +141,7 @@ export async function placeOrder(
   // template snapshot + a server-clamped transform). A bad placement fails here,
   // not half-way through inserting an order. Every card of a PACK passes the very same gates.
   type PreparedArt = {
-    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; message: ScreenedCardMessage | null; cardSpan: string | null;
+    assetId: string; variantId: string; controllerAccountId: string; templateSnapshot: unknown; transform: RawTransform; sourceObjectId: string | null; back: string | null; ground: string | null; message: ScreenedCardMessage | null; cardSpan: string | null;
   };
   const prepareArtwork = async (art: NonNullable<PlaceLine['artwork']>, productKey: string, variantId: string, opts: { blankCard?: boolean } = {}): Promise<PreparedArt | 'too-small' | null> => {
     if (!account && !input.giftLink) throw new Error('must be signed in to order a personalised item');
@@ -201,6 +202,8 @@ export async function placeOrder(
       },
       transform, // server-authoritative (clamped above)
       back: normalizeCushionBack(art.back), // coerced to a known token or null
+      // repeat-pattern base colour: a known PATTERN_GROUNDS token on a pattern product, else null (white)
+      ground: isPatternProduct(productKey) ? normalizePatternGround(art.ground) : null,
       // A card in a PACK is blank inside, front only — whatever the request says.
       message: opts.blankCard
         ? null
@@ -257,6 +260,7 @@ export async function placeOrder(
       transform: art.transform,
       sourceObjectId: art.sourceObjectId,
       back: art.back,
+      ground: art.ground,
       message: art.message, // screened card message (card only), or null
       cardSpan: art.cardSpan, // 'full' or null (front) — card only
       status: 'PENDING',

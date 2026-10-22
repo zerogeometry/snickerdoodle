@@ -25,8 +25,10 @@ export const PatternRepeat = forwardRef<
     /** preview size in css px */
     width: number;
     height: number;
+    /** the base colour the repeat sits on (#rrggbb) — the print file's fill */
+    groundHex?: string;
   }
->(function PatternRepeat({ image, natural, canvas, dpi, transform, width, height }, ref) {
+>(function PatternRepeat({ image, natural, canvas, dpi, transform, width, height, groundHex = '#ffffff' }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -38,7 +40,7 @@ export const PatternRepeat = forwardRef<
     el.height = Math.round(height * dpr);
     const print = patternLayout(canvas, dpi, { width: natural.w, height: natural.h }, transform);
     const { canvas: small, layout } = scalePatternLayout(print, canvas, (width * dpr) / canvas.width);
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = groundHex;
     ctx.fillRect(0, 0, el.width, el.height);
     const swap = transform.rotationDeg % 180 !== 0;
     const w = swap ? layout.motifH : layout.motifW; // the motif before it's turned
@@ -50,7 +52,7 @@ export const PatternRepeat = forwardRef<
       ctx.drawImage(image, -w / 2, -h / 2, w, h);
       ctx.restore();
     }
-  }, [image, natural.w, natural.h, canvas, dpi, transform, width, height]);
+  }, [image, natural.w, natural.h, canvas, dpi, transform, width, height, groundHex]);
 
   return (
     <div

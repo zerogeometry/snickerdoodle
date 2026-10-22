@@ -28,7 +28,7 @@ export async function placeOrderAction(input: {
   items: {
     productKey: string;
     qty: number;
-    artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; message?: unknown; cardImageSpan?: string };
+    artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; ground?: string; message?: unknown; cardImageSpan?: string };
     /** A card PACK line: its cards (which drawing + placement each). Count + price checked server-side. */
     cards?: { assetId: string; transform: RawTransform; sourceObjectId?: string }[];
   }[];
@@ -47,6 +47,7 @@ export async function placeOrderAction(input: {
             transform: i.artwork.transform,
             sourceObjectId: i.artwork.sourceObjectId,
             back: typeof i.artwork.back === 'string' ? i.artwork.back : undefined,
+            ground: typeof i.artwork.ground === 'string' ? i.artwork.ground : undefined, // untrusted — normalised in placeOrder
             message: i.artwork.message, // untrusted — screened + normalised server-side in placeOrder
             cardImageSpan: typeof i.artwork.cardImageSpan === 'string' ? i.artwork.cardImageSpan : undefined,
           },

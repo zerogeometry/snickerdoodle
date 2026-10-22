@@ -37,6 +37,8 @@ export interface GiftItem {
   transform?: unknown;
   sourceObjectId?: string | null;
   back?: string | null;
+  /** Repeat-pattern base colour token the parent chose (frozen with the design). */
+  ground?: string | null;
 }
 
 export interface CreateGiftLinkInput {
@@ -121,6 +123,7 @@ export async function createGiftLink(
         transform: d.transform,
         sourceObjectId: d.sourceObjectId,
         back: d.back,
+        ground: d.ground,
       });
     }
   }
@@ -339,6 +342,7 @@ export async function placeGiftLinkOrder(
           transform: (i.transform as RawTransform | undefined) ?? { scale: 0 },
           sourceObjectId: i.sourceObjectId ?? undefined,
           back: i.back ?? undefined,
+          ground: i.ground ?? undefined,
         },
       })),
       gift: true,

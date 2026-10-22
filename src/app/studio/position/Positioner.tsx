@@ -25,7 +25,7 @@ import {
 } from '@/server/print/geometry';
 import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
-import { isPatternProduct } from '@/lib/patterns';
+import { isPatternProduct, patternGroundHex } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import type { StudioData } from '@/server/studio';
@@ -220,6 +220,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // "the drawing, placed": the flat print layout below draws exactly what prints (the repeat; the
   // drawing beside the ruler), and — like the mug — there's no on-the-product view in here.
   const isPattern = isPatternProduct(variant.productKey);
+  // the base colour chosen on the customize page — the repeat is drawn on it, like the print
+  const groundToken = useSelection((s) => s.selections[variant.productKey]?.ground);
+  const groundHex = patternGroundHex(groundToken);
   const isChart = isHeightChart(variant.productKey);
   const noProductView = isMug || isPattern || isChart;
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
@@ -349,7 +352,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     if (rendering) return;
     setRendering(true);
     try {
-      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId });
+      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId, ground: isPattern ? groundToken : undefined });
       setResult(res);
     } finally {
       setRendering(false);
@@ -952,6 +955,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   transform={tf}
                   width={previewW}
                   height={previewH}
+                  groundHex={groundHex}
                 />
               ) : null}
               {/* the height chart's ruler prints exactly like this, down the left edge */}

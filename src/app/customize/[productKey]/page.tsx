@@ -15,7 +15,10 @@ import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdForSku, sizeDimsCm } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdFor, sizeDimsCm } from '@/lib/catalogue-view';
+import { isColouredGround, isPatternProduct, PATTERN_GROUND_WHITE, PATTERN_GROUNDS } from '@/lib/patterns';
+import { removeBackgroundAction } from '@/app/actions/magic';
+import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
 import { CASE_GRADE_BLURB, caseDefaultTransform, gradesFor } from '@/lib/phone-cases';
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
@@ -97,6 +100,9 @@ function CustomizeProduct() {
   // colour token → image front + that plain back. `showBack` = the "turn it around" preview.
   const [back, setBack] = useState<string>(CUSHION_BACK_WHITE);
   const [showBack, setShowBack] = useState(false);
+  // REPEAT-PATTERN base colour (socks, wrapping paper, tea towel): the repeat sits on it. White default.
+  const [ground, setGround] = useState<string>(PATTERN_GROUND_WHITE);
+  const [lifting, setLifting] = useState(false); // the one-tap 'lift it off the paper' magic edit
   // MUG: three real-photo wrap views — the centred hero (design middle, handle hidden), the front
   // (right side of the image) and the back (left side). Centre leads.
   const [mugSide, setMugSide] = useState<'centre' | 'front' | 'back'>('centre');
@@ -155,6 +161,7 @@ function CustomizeProduct() {
       grade: lv.attributes.grade,
       finish: lv.attributes.finish,
       back: line.back, // a cushion line carries its back choice
+      ground: line.ground, // a pattern line carries its base colour
     });
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
@@ -173,6 +180,7 @@ function CustomizeProduct() {
     setGrade(saved?.grade ?? def.attributes.grade ?? null);
     setFinish(saved?.finish ?? def.attributes.finish ?? null);
     setBack(saved?.back ?? CUSHION_BACK_WHITE);
+    setGround(saved?.ground ?? PATTERN_GROUND_WHITE);
     setCardMessage(saved?.message ?? null);
     setCardSpan(saved?.cardImageSpan ?? 'front');
     if (saved?.orientation) {
@@ -185,8 +193,8 @@ function CustomizeProduct() {
   // return) and the editor can read/reflect the chosen orientation.
   useEffect(() => {
     if (!product) return;
-    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, grade: grade ?? undefined, finish: finish ?? undefined, back, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
-  }, [product, size, colour, orientation, grade, finish, back, cardMessage, cardSpan]);
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, grade: grade ?? undefined, finish: finish ?? undefined, back, ground, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
+  }, [product, size, colour, orientation, grade, finish, back, ground, cardMessage, cardSpan]);
 
   // Phone cases: some phones only come in one grade (Pixels are tough-only) — keep the chosen
   // grade one Prodigi actually makes for the chosen phone.
@@ -337,6 +345,9 @@ function CustomizeProduct() {
   }
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const isPattern = isPatternProduct(product.key);
+  const groundSwatch = PATTERN_GROUNDS.find((g) => g.token === ground) ?? PATTERN_GROUNDS[0]!;
+  const groundNoun = product.key === 'socks' ? 'sock' : product.key === 'teaTowel' ? 'towel' : 'paper';
   // The asset this screen acts on: in edit mode the basket line's own asset wins (so a line
   // placed under an earlier drawing edits the right image); otherwise the current upload.
   const activeAssetId = edit?.assetId ?? upload?.assetId ?? null;
@@ -398,6 +409,7 @@ function CustomizeProduct() {
         transform: placement,
         sourceObjectId: activeSource,
         back: supportsBack ? back : undefined,
+        ground: isPattern ? ground : undefined,
       });
       if (res.needsAuth) {
         toast('a quick sign-up keeps your keepsakes safe');
@@ -407,6 +419,32 @@ function CustomizeProduct() {
       toast(res.ok ? 'saved to your keepsakes ♥' : 'couldn’t save that one — try again');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // One tap: lift the drawing off its paper (the self-hosted remove-background magic edit) so it
+  // floats on the base colour instead of repeating as paper squares. Enclosed paper (the whites of
+  // eyes) stays white. Only ever runs when the parent taps it.
+  const liftOffPaper = async () => {
+    if (!activeAssetId || lifting) return;
+    setLifting(true);
+    try {
+      const res = await removeBackgroundAction({ assetId: activeAssetId, keepEnclosedPaper: true });
+      if (res.ok) {
+        useUpload.getState().setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
+        if (edit) setEdit({ ...edit, sourceObjectId: res.sourceObjectId });
+        toast('lifted off the paper ✨');
+      } else if (res.reason === 'budget') {
+        toast('that’s all your magic edits for now');
+      } else if (res.reason === 'too-many') {
+        toast(TOO_MANY_COPY);
+      } else if (res.reason === 'nochange') {
+        toast('we couldn’t find the paper edge on this one — try the studio');
+      } else {
+        toast('couldn’t do that — try again');
+      }
+    } finally {
+      setLifting(false);
     }
   };
 
@@ -432,7 +470,8 @@ function CustomizeProduct() {
         ? { greeting: cardMessage.greeting.trim(), message: cardMessage.message.trim(), signature: cardMessage.signature.trim(), note: (cardMessage.note ?? '').trim(), font: cardMessage.font, fontScale: cardMessage.fontScale ?? 1 }
         : undefined;
     const cardSpanLabel = product.key === 'card' && cardSpan === 'full' ? 'full-width' : null;
-    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, cardSpanLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
+    const groundLabel = isPattern && isColouredGround(ground) ? `${groundSwatch.label} ${groundNoun}` : null;
+    const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, groundLabel, cardSpanLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
     const fields = {
       name: product.label,
       product: product.key as ProductKey,
@@ -442,16 +481,17 @@ function CustomizeProduct() {
       sub,
       artwork: { assetId: activeAssetId, transform: placement, sourceObjectId: activeSource },
       back: supportsBack ? back : undefined, // cushion back choice (the DUAL squares only)
+      ground: isPattern ? ground : undefined, // repeat-pattern base colour (socks / wrap / tea towel)
       message: cardMsg, // card inside message (card only)
       cardImageSpan: product.key === 'card' ? cardSpan : undefined, // outside image span (card only)
     };
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
-      update(edit.id, fields, lineIdForSku(variant.sku));
+      update(edit.id, fields, lineIdFor(variant.sku, isPattern ? ground : null));
       toast('basket updated ✓');
     } else {
-      add({ id: lineIdForSku(variant.sku), ...fields });
+      add({ id: lineIdFor(variant.sku, isPattern ? ground : null), ...fields }); // red + navy socks = two lines
       toast('added to basket ✓');
     }
     router.push('/start-creating');
@@ -493,6 +533,7 @@ function CustomizeProduct() {
             view={activeMockupView}
             spanHalf={activeSpanHalf}
             fill={showBack ? backFill : undefined}
+            ground={isPattern ? ground : undefined}
             px={720}
           />
         </div>
@@ -545,6 +586,7 @@ function CustomizeProduct() {
                   view={activeMockupView}
                   spanHalf={activeSpanHalf}
                   fill={showBack ? backFill : undefined}
+                  ground={isPattern ? ground : undefined}
                   px={360}
                 />
                 <button
@@ -805,6 +847,37 @@ function CustomizeProduct() {
             />
           ) : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch swatchFor={product.key} /> : null}
+
+          {/* REPEAT-PATTERN base colour: the drawing repeats on top of it, edge to edge. Off its paper
+              it floats on the colour; still on its paper, a friendly one-tap nudge lifts it off. */}
+          {isPattern ? (
+            <div className="mt-5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{groundNoun} colour</p>
+              <div className="mt-2 flex flex-wrap gap-2.5" role="group" aria-label={`${groundNoun} colour`}>
+                {PATTERN_GROUNDS.map((g) => (
+                  <button
+                    key={g.token}
+                    type="button"
+                    onClick={() => setGround(g.token)}
+                    aria-pressed={ground === g.token}
+                    aria-label={`${g.label} ${groundNoun}`}
+                    title={g.label}
+                    className={`press relative h-9 w-9 rounded-full border-2 before:absolute before:-inset-[4px] before:content-[''] ${ground === g.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/30'}`}
+                    style={{ backgroundColor: g.hex }}
+                  />
+                ))}
+              </div>
+              <p className="mt-1.5 text-[11px] text-ink-faint">their drawing on repeat, on a {groundSwatch.label} {groundNoun}</p>
+              {isColouredGround(ground) && upload?.opaqueBg && !activeSource ? (
+                <div role="status" className="mt-3 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
+                  <p className="font-semibold">the paper prints too — you’d get paper squares on the {groundSwatch.label}. lift the drawing off it and it sits right on the colour.</p>
+                  <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => void liftOffPaper()} disabled={lifting}>
+                    <Icon icon={IconPencil} size={15} /> {lifting ? 'lifting it off…' : 'lift it off the paper'}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
 
           {/* CUSHION back: pick a back colour (white is the single-sided default; any other colour
               is a double-sided upgrade) or 'image both sides'. heart + round are single-sided.

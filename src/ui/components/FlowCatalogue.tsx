@@ -22,7 +22,7 @@ import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupP
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
-import { defaultPlacementFor, defaultTransformFor, groupOf, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultPlacementFor, defaultTransformFor, groupOf, isLineOfSku, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { isCardPackKey } from '@/lib/card-packs';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -169,8 +169,7 @@ export function FlowCatalogue({
     // carefully-customized line is only removed once it actually hits zero).
     if (delta < 0) {
       const current = useBasket.getState().items;
-      const ids = new Set(p.variants.map((v) => lineIdForSku(v.sku)));
-      const target = current.find((i) => i.id === defId) ?? [...current].reverse().find((i) => ids.has(i.id));
+      const target = current.find((i) => i.id === defId) ?? [...current].reverse().find((i) => p.variants.some((v) => isLineOfSku(i.id, v.sku)));
       if (target) setQty(target.id, target.qty - 1);
       return;
     }

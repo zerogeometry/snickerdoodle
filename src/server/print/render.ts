@@ -6,7 +6,7 @@ import { printTemplates, productVariants, products, storageObjects } from '@/db/
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
 import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
-import { isPatternProduct } from '@/lib/patterns';
+import { isColouredGround, isPatternProduct, normalizePatternGround, patternGroundHex } from '@/lib/patterns';
 import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
@@ -54,6 +54,9 @@ export async function renderPrintFile(
      * null/unknown) = the same image on both faces; a CUSHION_BACK_COLOURS token = image front +
      * that plain-colour back. Ignored entirely on any non-DUAL variant (the SKU is authoritative). */
     back?: string;
+    /** REPEAT-PATTERN base colour token (PATTERN_GROUNDS): the whole file is filled with it and the
+     * drawing repeats on top. Unknown / absent ⇒ white. */
+    ground?: string;
     /** GREETINGS-CARD frozen inside message (re-screened here) — the note + greeting/message/
      * signature laid into the two inside panels. null/absent ⇒ a blank (write-by-hand) inside. */
     message?: unknown;
@@ -101,8 +104,11 @@ export async function renderPrintFile(
     if (motifAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${motifAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
-    const { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform);
-    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+    const ground = normalizePatternGround(input.ground);
+    const { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, patternGroundHex(ground));
+    // the colour is part of the file's name: red + navy socks of one drawing in one order are two
+    // different files — never one overwriting the other
+    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', canvas.width, canvas.height, isColouredGround(ground) ? `-g${ground}` : '');
   }
 
   // A HEIGHT CHART prints the drawing beside a cm + ft/in ruler drawn INTO the file at true scale
@@ -238,8 +244,10 @@ async function persistPrintFile(
   upscaled: boolean,
   widthPx: number,
   heightPx: number,
+  /** distinguishes print files of one asset + variant that differ (a pattern's base colour) */
+  tag = '',
 ): Promise<RenderResult> {
-  const key = derivativeKey(assetId, `printfile-${variantId}`);
+  const key = derivativeKey(assetId, `printfile-${variantId}${tag}`);
   await putObject(key, out, 'image/png');
   const sha256 = createHash('sha256').update(out).digest('hex');
   const { bucket } = getS3();

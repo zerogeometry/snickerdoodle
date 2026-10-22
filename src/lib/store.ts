@@ -187,6 +187,9 @@ export type BasketItem = {
    * DUAL variant (a different SKU + price). Absent / heart+round = single-sided. Display, the
    * variant resolver, AND the DUAL fulfilment renderer all read this. */
   back?: string;
+  /** REPEAT-PATTERN base colour token (socks / wrapping paper / tea towel) — PATTERN_GROUNDS; the
+   * drawing repeats on top of it. Absent = white. Part of the line id (red + navy socks = two lines). */
+  ground?: string;
   /** GREETINGS-CARD inside message (card only) — absent = blank inside (write it by hand). */
   message?: CardMessage;
   /** GREETINGS-CARD outside image span (card only): 'front' = the drawing on the front panel only
@@ -274,7 +277,7 @@ export function orderItemsFor(items: BasketItem[]) {
   return items.map((i) => {
     const productKey = i.sku ?? i.product;
     if (isPackLine(i)) return { productKey, qty: 1, cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
-    return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
+    return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });
 }
 
@@ -293,7 +296,7 @@ export const usePlacements = create<{
 // (so pressing "edit placement" then "save & return" no longer resets it to the
 // default), and lets the editor's orientation toggle write back so Customize
 // reflects it on return. In-memory: a demo selection, not durable state.
-export type Selection = { size?: string; colour?: string; orientation?: string; grade?: string; finish?: string; back?: string; message?: CardMessage; cardImageSpan?: 'full' | 'front' };
+export type Selection = { size?: string; colour?: string; orientation?: string; grade?: string; finish?: string; back?: string; ground?: string; message?: CardMessage; cardImageSpan?: 'full' | 'front' };
 export const useSelection = create<{
   selections: Record<string, Selection>;
   setSelection: (productKey: string, patch: Selection) => void;

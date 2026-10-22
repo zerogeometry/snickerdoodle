@@ -24,6 +24,7 @@ export interface MockupRequestBody {
   sourceObjectId?: unknown;
   view?: unknown;
   fill?: unknown;
+  ground?: unknown;
   spanHalf?: unknown;
 }
 
@@ -52,6 +53,7 @@ export async function composeForViewer(
       sourceObjectId: typeof b.sourceObjectId === 'string' ? b.sourceObjectId : undefined,
       view: typeof b.view === 'string' ? b.view : undefined,
       fill: typeof b.fill === 'string' ? b.fill : undefined,
+      ground: typeof b.ground === 'string' ? b.ground : undefined, // normalised to a known token in composeMockup
       spanHalf: b.spanHalf === 'front' || b.spanHalf === 'back' ? b.spanHalf : undefined,
       memo: opts.memo,
     });

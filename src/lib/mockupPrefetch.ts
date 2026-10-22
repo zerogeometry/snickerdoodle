@@ -22,13 +22,15 @@ export interface MockupRequest {
   sourceObjectId?: string | null;
   view?: string | null;
   fill?: string | null;
+  /** a repeat-pattern base colour token */
+  ground?: string | null;
   spanHalf?: 'front' | 'back' | null;
 }
 type Result = { ok: true; url: string } | { ok: false; fallback: true; needsAuth?: boolean; transient?: boolean };
 
 /** The SAME key MockupPreview builds for its inputs — one place, so a prefetch always matches. */
-export function mockupKey(r: { assetId?: string | null; sourceObjectId?: string | null; variantId?: string | null; transform?: unknown; size?: string | null; view?: string | null; fill?: string | null; spanHalf?: string | null }): string {
-  return `${r.assetId ?? ''}|${r.sourceObjectId ?? ''}|${r.variantId ?? ''}|${JSON.stringify(r.transform ?? null)}|${r.size ?? ''}|${r.view ?? ''}|${r.fill ?? ''}|${r.spanHalf ?? ''}`;
+export function mockupKey(r: { assetId?: string | null; sourceObjectId?: string | null; variantId?: string | null; transform?: unknown; size?: string | null; view?: string | null; fill?: string | null; spanHalf?: string | null; ground?: string | null }): string {
+  return `${r.assetId ?? ''}|${r.sourceObjectId ?? ''}|${r.variantId ?? ''}|${JSON.stringify(r.transform ?? null)}|${r.size ?? ''}|${r.view ?? ''}|${r.fill ?? ''}|${r.spanHalf ?? ''}|${r.ground ?? ''}`;
 }
 
 const URL_REUSE_MS = 8 * 60_000;
@@ -130,6 +132,7 @@ async function runBatch(batch: MockupRequest[]): Promise<Result[]> {
         sourceObjectId: r.sourceObjectId ?? undefined,
         view: r.view ?? undefined,
         fill: r.fill ?? undefined,
+        ground: r.ground ?? undefined,
         spanHalf: r.spanHalf ?? undefined,
       })),
     }),

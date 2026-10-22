@@ -8,7 +8,7 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { canvasSizePx, clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
-import { isPatternProduct } from '@/lib/patterns';
+import { isColouredGround, isPatternProduct, normalizePatternGround, patternGroundHex } from '@/lib/patterns';
 import { renderRepeatPattern } from './pattern';
 import { isHeightChart } from './height-chart-geometry';
 import { renderHeightChartFace } from './heightChart';
@@ -96,6 +96,9 @@ export interface ComposeMockupInput {
    * then keep this half — 'front' = the right panel of [back | front]. PERSPECTIVE views only
    * (the closed-card hero); the flat outside-full view bakes the span into its box instead. */
   spanHalf?: 'front' | 'back';
+  /** A REPEAT-PATTERN product's base colour token (PATTERN_GROUNDS): the printed face is filled with
+   * it, the drawing repeating on top — exactly as the print file. Ignored on other products. */
+  ground?: string;
   /** Per-REQUEST memo (a batch of thumbs for one drawing shares its shrunk design). Never kept
    * across requests: no child image lingers in the process after the request ends. */
   memo?: ComposeMemo;
@@ -344,7 +347,10 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // view carries its span in the box); ignored elsewhere so it never forks other products' keys.
   const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
   const spanTag = spanHalf ? `-span${spanHalf}` : '';
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}` : '';
+  // a coloured base forks the pattern's key (white keeps the existing key, so nothing re-renders)
+  const ground = face === 'pattern' ? normalizePatternGround(input.ground) : null;
+  const groundTag = isColouredGround(ground) ? `-g${ground}` : '';
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}${groundTag}` : '';
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
@@ -363,6 +369,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       overlayKey: overlay?.key,
       designKey: srcObj.key,
       fillHex: fill,
+      groundHex: ground ? patternGroundHex(ground) : undefined,
       quad: tpl.printQuad,
       transform: t,
       spanHalf,
@@ -401,11 +408,13 @@ export async function renderPrintedFace(
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number },
   transform: Transform,
   maxEdge = FACE_MAX_EDGE,
+  /** A pattern's base colour (#rrggbb) — the print file's fill; white by default. */
+  groundHex = '#ffffff',
 ): Promise<Buffer> {
   const geom = { printWidthPx: print.widthPx, printHeightPx: print.heightPx, bleedMm: print.bleedMm, requiredDpi: print.requiredDpi };
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
-  if (face === 'pattern') return (await renderRepeatPattern(srcBuf, canvas, print.requiredDpi, transform, '#ffffff', { scale })).png;
+  if (face === 'pattern') return (await renderRepeatPattern(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale })).png;
   return (await renderHeightChartFace(srcBuf, geom, transform, { scale })).png;
 }
 
@@ -418,12 +427,14 @@ export async function renderTemplatePreview(args: {
   blank: Buffer; mask?: Buffer; overlay?: Buffer; quad: [number, number][]; materialClass: string;
   design: Buffer; productKey: string; print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   size?: MockupSize;
+  /** a repeat-pattern base colour token (white by default) */
+  ground?: string;
 }): Promise<Buffer> {
   const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
   let transform: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   let designBuf = args.design;
   if (face) {
-    designBuf = await renderPrintedFace(args.design, face, args.print, transform);
+    designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, patternGroundHex(args.ground));
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const meta = await sharp(args.blank).metadata();
@@ -446,7 +457,7 @@ async function solidFill(hex: string): Promise<Buffer> {
 async function renderAndPersist(
   db: DbHandle,
   args: {
-    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; quad: [number, number][];
+    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; groundHex?: string; quad: [number, number][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
@@ -472,7 +483,7 @@ async function renderAndPersist(
   if (args.face) {
     // The PRINTED FACE (the repeat / the drawing + ruler) at preview size, from the print code. It
     // has the print canvas's exact aspect, so a plain cover-fit lays it on the print area 1:1.
-    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform, args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE);
+    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform, args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE, args.groundHex);
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const common = {

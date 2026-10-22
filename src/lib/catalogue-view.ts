@@ -1,5 +1,6 @@
 import type { BasketItem } from '@/lib/store';
 import { caseDefaultTransform } from '@/lib/phone-cases';
+import { isColouredGround } from '@/lib/patterns';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
@@ -13,6 +14,17 @@ import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
  * the catalogue tile, quick-add, AND the customize page, so the id can never drift
  * between where a line is written and where it's read (the root of the qty-shows-0 bug). */
 export const lineIdForSku = (sku: string) => `cat-${sku}`;
+
+/**
+ * A basket line's id: one line per variant — and, for a repeat-pattern product, per BASE COLOUR, so
+ * red socks and navy socks are two lines rather than "2 × red". White (the default) keeps the plain
+ * variant id, so existing lines and quick-add are unchanged.
+ */
+export const lineIdFor = (sku: string, ground?: string | null) =>
+  isColouredGround(ground) ? `${lineIdForSku(sku)}~${ground}` : lineIdForSku(sku);
+
+/** Is this basket line id one of this variant's lines (any base colour)? */
+export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku) || id.startsWith(`${lineIdForSku(sku)}~`);
 
 /**
  * The DEFAULT artwork placement per product — the ONE place tiles, quick-add, the
@@ -178,8 +190,8 @@ export const productLineIds = (p: CatalogueProduct): string[] => p.variants.map(
  * id) was counted by the bag + subtotal but showed 0 on the tile.
  */
 export function productQtyInBasket(items: BasketItem[], p: CatalogueProduct): number {
-  const ids = new Set(productLineIds(p));
-  return items.reduce((n, i) => (ids.has(i.id) ? n + i.qty : n), 0);
+  // any base colour of any variant (red socks + navy socks both count on the socks tile)
+  return items.reduce((n, i) => (p.variants.some((v) => isLineOfSku(i.id, v.sku)) ? n + i.qty : n), 0);
 }
 
 export const isPopular = (p: CatalogueProduct): boolean => p.popularRank != null;

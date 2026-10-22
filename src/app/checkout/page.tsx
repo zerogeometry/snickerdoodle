@@ -319,6 +319,7 @@ export default function CheckoutPage() {
                           variantId={item.variantId}
                           transform={item.artwork.transform}
                           sourceObjectId={item.artwork.sourceObjectId}
+                          ground={item.ground}
                           size="thumb"
                           px={56}
                         />

@@ -4,6 +4,7 @@ import { assets, products, productVariants, savedDesigns, storageObjects } from 
 import { presignDownload } from '@/storage';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { isPatternProduct, normalizePatternGround } from '@/lib/patterns';
 import type { DbHandle } from './db';
 import { resolveViewerContext } from './assets';
 import { keepAndFileCreations } from './keepsakes';
@@ -18,6 +19,8 @@ export interface SaveDesignInput {
   transform: RawTransform;
   sourceObjectId?: string | null;
   back?: string | null;
+  /** Repeat-pattern base colour token — kept only on a pattern product, normalised. */
+  ground?: string | null;
 }
 
 /**
@@ -67,6 +70,7 @@ export async function saveDesign(
       transform: clampTransform(input.transform),
       sourceObjectId,
       back: normalizeCushionBack(input.back ?? undefined),
+      ground: isPatternProduct(variant.productKey) ? normalizePatternGround(input.ground) : null,
     })
     .returning({ id: savedDesigns.id });
   return { ok: true, id: row!.id };

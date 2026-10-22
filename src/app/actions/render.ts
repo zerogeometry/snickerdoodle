@@ -23,6 +23,8 @@ export async function renderPreviewAction(input: {
   variantId: string;
   transform: RawTransform;
   sourceObjectId?: string;
+  /** a repeat-pattern base colour token (untrusted — normalised in renderPrintFile) */
+  ground?: string;
 }): Promise<RenderPreviewResult> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
@@ -37,6 +39,7 @@ export async function renderPreviewAction(input: {
       variantId: input.variantId,
       transform: input.transform,
       sourceObjectId: input.sourceObjectId,
+      ground: typeof input.ground === 'string' ? input.ground : undefined,
     });
     const grant = await getStorageObjectGrant(db, res.printObjectId, viewer, 600);
     return {
