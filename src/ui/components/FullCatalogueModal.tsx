@@ -113,7 +113,7 @@ export function FullCatalogueModal({
           qtyOf={qtyOf}
           upload={upload}
           lazy
-          gridClassName="grid grid-cols-2 gap-3 pb-2 sm:grid-cols-3 md:grid-cols-4 md:gap-4"
+          gridClassName="grid grid-cols-1 gap-5 pb-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 md:gap-4"
           onAdd={onAdd}
           onSub={onSub}
           onCustomize={onCustomize}

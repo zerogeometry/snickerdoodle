@@ -153,9 +153,10 @@ export function ProductTile({
       </div>
 
       <div className="flex flex-1 flex-col gap-2 px-1 pb-0.5 pt-2.5">
-        <div className="flex items-baseline justify-between gap-1">
-          <span className="min-w-0 truncate text-sm font-extrabold text-cocoa">{p.label}</span>
-          <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-soft">from {gbp(p.fromPence)}</span>
+        {/* phones: the name and the price each get their own line; from sm, one row */}
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-1">
+          <span className="min-w-0 truncate text-base font-extrabold text-cocoa sm:text-sm">{p.label}</span>
+          <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-soft sm:text-xs">from {gbp(p.fromPence)}</span>
         </div>
         {/* Controls stack on a narrow tile (so each meets the 44px tap target without
             overflowing) and sit on one row once the TILE itself is wide enough. Uses a
@@ -173,7 +174,7 @@ export function ProductTile({
               </button>
             </div>
           ) : null}
-          <button type="button" onClick={onCustomize} className={`press inline-flex min-h-11 items-center justify-center rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
+          <button type="button" onClick={onCustomize} className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
             {customizeLabel}
           </button>
         </div>
@@ -191,7 +192,7 @@ export function ProductGrid({
   enableZoom = true,
   showStepper = true,
   customizeLabel = 'customize',
-  gridClassName = 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3 sm:grid-cols-3 md:grid-cols-4',
+  gridClassName = 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4',
   onAdd,
   onSub,
   onCustomize,
