@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { orientedCoverQuad, tiltOf } from '../seedMockups';
+import { layeredFlatPath, layeredFlatTemplate, orientedCoverQuad, plan, tiltOf } from '../seedMockups';
+import { definedPriceList } from '@/server/catalogue';
 import { isTransposed } from '../compositor';
+import { assertQuadFitsBlank } from '../templates';
 
 /** Paint a filled, rotated, ROUNDED rectangle (a card / a sock-ish capsule) into an alpha plane. */
 function paint(a: Uint8Array, W: number, H: number, cx: number, cy: number, w: number, h: number, deg: number, r: number) {
@@ -86,4 +88,36 @@ describe('isTransposed — when a print is turned 90° to fit an angled view', (
   it('leaves a print that already matches alone', () => {
     expect(isTransposed(0.731, 0.72)).toBe(false);
   });
+});
+
+describe('assertQuadFitsBlank — the seeder’s print-area check', () => {
+  it('a straight print area must sit inside the photo', () => {
+    expect(() => assertQuadFitsBlank([[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9]])).not.toThrow();
+    expect(() => assertQuadFitsBlank([[-0.05, 0.1], [0.9, 0.1], [0.9, 0.9], [-0.05, 0.9]])).toThrow(/outside the blank/);
+  });
+  it('an angled one may overhang a little (the warp only draws on the photo) — like the 24° ankle socks', () => {
+    expect(() => assertQuadFitsBlank([[-0.053, 0.277], [0.73, -0.07], [1.08, 0.72], [0.3, 1.06]])).not.toThrow();
+  });
+  it('but not far off it, and never with its centre off the photo', () => {
+    expect(() => assertQuadFitsBlank([[-0.4, 0.2], [0.6, 0.0], [0.8, 0.9], [-0.2, 1.1]])).toThrow(/outside the blank/);
+    expect(() => assertQuadFitsBlank([[0.9, 0.1], [1.2, 0.15], [1.15, 0.5], [0.85, 0.45]])).toThrow(/centre is off/);
+  });
+});
+
+// The founder-photographed sets live in .prodigi-assets (gitignored) — this runs where they're staged
+// (the computer that seeds the test site) and skips elsewhere. It walks EVERY variant through the
+// seeder's own plan + the seeder's own print-area check, so a set that can't be seeded fails here.
+const STAGED = layeredFlatPath('socks/ankle') !== null;
+describe.skipIf(!STAGED)('every founder-photographed variant can be seeded', () => {
+  const variants = definedPriceList().filter((v) => ['socks', 'teaTowel', 'wrappingPaper', 'playingCards'].includes(v.productKey));
+  for (const v of variants) {
+    it(`${v.sku}`, async () => {
+      const attrsPlan = plan(v.productKey, v.attributes); // the variant exactly as the seeder sees it
+      expect(attrsPlan?.register).toBe('layered-flat');
+      if (attrsPlan?.register !== 'layered-flat') return;
+      const t = await layeredFlatTemplate(attrsPlan.dir, v.px!.w / v.px!.h, !!attrsPlan.tilted, !!attrsPlan.window);
+      expect(t).not.toBeNull();
+      expect(() => assertQuadFitsBlank(t!.quad)).not.toThrow();
+    }, 30_000);
+  }
 });

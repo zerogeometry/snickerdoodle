@@ -523,12 +523,25 @@ function slug(s: string | undefined): string | null {
  * SKU and whether its product is on show. Pure — what the seed WILL write, so the agreed prices and
  * the static fallback can be unit-tested without a database.
  */
-export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
+/** A variant's stored attributes (size / colour / orientation / sides / grade / finish) — the ONE
+ * place they're built, for the seed and for anything that needs a variant as the DB holds it. */
+function variantAttributes(v: VariantDef): Record<string, string> {
+  const a: Record<string, string> = {};
+  if (v.size) a.size = v.size;
+  if (v.colour) a.colour = v.colour;
+  if (v.orientation) a.orientation = v.orientation;
+  if (v.sides) a.sides = v.sides;
+  if (v.grade) a.grade = v.grade;
+  if (v.finish) a.finish = v.finish;
+  return a;
+}
+
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     return def.variants.map((v, i) => ({
       productKey, sku: variantSku(productKey, v, i === defaultIndex), isDefault: i === defaultIndex,
-      pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null,
+      pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
       visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
       px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
     }));
@@ -684,13 +697,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
         console.warn(`[seed-catalogue] printable variant ${key}/${v.size ?? ''}/${v.colour ?? ''} has NO prodigiSku — it will be MANUAL-fulfilled`);
       }
       const isDefault = i === defaultIndex;
-      const attributes: Record<string, string> = {};
-      if (v.size) attributes.size = v.size;
-      if (v.colour) attributes.colour = v.colour;
-      if (v.orientation) attributes.orientation = v.orientation;
-      if (v.sides) attributes.sides = v.sides;
-      if (v.grade) attributes.grade = v.grade;
-      if (v.finish) attributes.finish = v.finish;
+      const attributes = variantAttributes(v);
       const label = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
       return { v, values: { productId: product!.id, sku: currentSkus[i]!, label, attributes, pricePence: v.pricePence, isDefault, sortOrder: i, active: true } };
     });

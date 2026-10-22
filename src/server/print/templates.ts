@@ -36,17 +36,33 @@ export interface SetMockupTemplateInput {
  * every cached mockup invalidates and re-renders against the new blank. The blank is the
  * only third-party-sourced input; the child's design never touches this path.
  */
+/**
+ * Fail LOUD at authoring, not at render. A STRAIGHT (axis-aligned) print area must sit inside the
+ * blank: the flat compositor cuts that region out of the photo, so a quad past the edge (e.g. an
+ * aspect-locked cover on a wrong-orientation photo) would throw on every request. An ANGLED one may
+ * overhang a little — the perspective warp only ever draws onto the photo's own pixels and the mask
+ * trims to the product (ankle socks laid at 24°: the turned print area reaches past the corners) —
+ * but its centre must be on the photo and no corner far off it. Exported for its unit test.
+ */
+export function assertQuadFitsBlank(quad: [number, number][]): void {
+  const [tl, tr, br, bl] = quad as [[number, number], [number, number], [number, number], [number, number]];
+  const tol = 0.004; // the compositor's own isAxisAligned tolerance
+  const straight = Math.abs(tl[0] - bl[0]) < tol && Math.abs(tr[0] - br[0]) < tol && Math.abs(tl[1] - tr[1]) < tol && Math.abs(bl[1] - br[1]) < tol;
+  const [lo, hi] = straight ? [-0.005, 1.005] : [-0.25, 1.25];
+  for (const [x, y] of quad) {
+    if (x < lo || x > hi || y < lo || y > hi) {
+      throw new Error(`printQuad extends outside the blank (got [${x.toFixed(3)}, ${y.toFixed(3)}]) — wrong photo orientation or region for this print canvas?`);
+    }
+  }
+  const cx = quad.reduce((s, p) => s + p[0], 0) / 4, cy = quad.reduce((s, p) => s + p[1], 0) / 4;
+  if (cx < 0 || cx > 1 || cy < 0 || cy > 1) throw new Error(`printQuad's centre is off the blank (${cx.toFixed(3)}, ${cy.toFixed(3)})`);
+}
+
 export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateInput): Promise<{ blankObjectId: string; templateVersion: number; key: string }> {
   if (!Array.isArray(input.printQuad) || input.printQuad.length !== 4) {
     throw new Error('printQuad must be 4 normalised [x,y] corners (TL,TR,BR,BL)');
   }
-  // Fail LOUD at authoring, not at render: a quad outside the blank (e.g. an aspect-locked
-  // cover on a wrong-orientation photo) would make the compositor throw on every request.
-  for (const [x, y] of input.printQuad) {
-    if (x < -0.005 || x > 1.005 || y < -0.005 || y > 1.005) {
-      throw new Error(`printQuad extends outside the blank (got [${x.toFixed(3)}, ${y.toFixed(3)}]) — wrong photo orientation or region for this print canvas?`);
-    }
-  }
+  assertQuadFitsBlank(input.printQuad as [number, number][]);
   const [tpl] = await db.select({ version: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
   if (!tpl) throw new Error(`no print_template for variant ${input.variantId}`);
   const templateVersion = (tpl.version ?? 1) + 1; // bump → cached mockups invalidate (version is in the key)

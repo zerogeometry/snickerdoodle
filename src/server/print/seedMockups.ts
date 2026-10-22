@@ -210,7 +210,8 @@ const FRAME: Record<string, string> = {
 };
 const JIG = 'prodigi-jigsaw-puzzle-blank-assets/Prodigi Jigsaw blanks';
 
-function plan(key: string, attrs: Record<string, string>): Plan | null {
+/** The seeder's choice of photo + registration per variant (exported for the layered-set test). */
+export function plan(key: string, attrs: Record<string, string>): Plan | null {
   const size = attrs.size ?? '';
   const colour = attrs.colour ?? '';
   switch (key) {

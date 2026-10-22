@@ -11,6 +11,7 @@ import path from 'node:path';
 import { definedPriceList } from '@/server/catalogue';
 import { renderTemplatePreview } from '@/server/print/compositor';
 import { layeredFlatPath, layeredFlatTemplate } from '@/server/print/seedMockups';
+import { assertQuadFitsBlank } from '@/server/print/templates';
 
 const args = process.argv.slice(2);
 const gi = args.indexOf('--ground');
@@ -38,6 +39,7 @@ for (const s of SETS) {
   if (!v?.px || !dir) { console.log(`${s.set}: skipped (${!dir ? 'set not staged' : 'no variant'})`); continue; }
   const t = await layeredFlatTemplate(dir, v.px.w / v.px.h, !!s.tilted, !!s.window);
   if (!t) { console.log(`${s.set}: no print area`); continue; }
+  assertQuadFitsBlank(t.quad); // the seeder's own check — a preview that couldn't be seeded fails here too
   const webp = await renderTemplatePreview({
     blank: t.blank, mask: t.mask, overlay: t.overlay, quad: t.quad, materialClass: s.material, design, productKey: s.key, ground,
     print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: 0, requiredDpi: s.dpi },
