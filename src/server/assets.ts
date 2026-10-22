@@ -14,6 +14,7 @@ import {
 import type { VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
+import { forgetAssetPreviews } from './print/previewCache';
 
 /**
  * The server-data layer for assets. EVERY read of an asset leaves this module
@@ -271,6 +272,8 @@ export async function eraseAsset(
   for (const o of objects) {
     await deleteObjectConfirmed(o.key);
   }
+  // …and anything the mockup compositor briefly holds in memory made from it (a printed face).
+  forgetAssetPreviews(row.id);
 
   // 2. append-only audit while the family link is still valid.
   await db.insert(auditRecords).values({

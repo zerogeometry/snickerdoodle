@@ -18,6 +18,11 @@ const FIRM_AT = 128;
 /** Every pixel either fully printed or fully see-through (colour untouched). */
 export async function firmEdges(png: Buffer): Promise<Buffer> {
   const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  for (let i = 3; i < data.length; i += 4) data[i] = data[i]! >= FIRM_AT ? 255 : 0;
+  firmAlpha(data);
   return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+}
+
+/** The same, IN PLACE on raw RGBA pixels (the compositor keeps its layers raw between steps). */
+export function firmAlpha(rgba: Buffer): void {
+  for (let i = 3; i < rgba.length; i += 4) rgba[i] = rgba[i]! >= FIRM_AT ? 255 : 0;
 }

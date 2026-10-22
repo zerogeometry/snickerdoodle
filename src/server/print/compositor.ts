@@ -1,7 +1,7 @@
 import './sharp-init';
 import { createHash } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import sharp from 'sharp';
+import sharp, { type OverlayOptions, type Sharp } from 'sharp';
 import { mockupViews, printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
@@ -9,13 +9,14 @@ import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { canvasSizePx, clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
 import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
-import { renderRepeatPattern } from './pattern';
+import { renderRepeatPatternPixels } from './pattern';
 import { isHeightChart } from './height-chart-geometry';
-import { renderHeightChartFace } from './heightChart';
+import { renderHeightChartFacePixels } from './heightChart';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
-import { firmEdges } from './apparel';
+import { firmAlpha } from './apparel';
 import { perspectiveWarp } from './perspective';
 import { cylinderWarp } from './cylinder';
+import { ByteLru, faceCache } from './previewCache';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -101,7 +102,8 @@ export interface ComposeMockupInput {
    * other products. */
   ground?: string;
   /** Per-REQUEST memo (a batch of thumbs for one drawing shares its shrunk design). Never kept
-   * across requests: no child image lingers in the process after the request ends. */
+   * across requests. (The one thing made from a drawing that outlives a request is the printed
+   * face — briefly, behind the authz gate, dropped on erase: see previewCache.ts.) */
   memo?: ComposeMemo;
 }
 export type ComposeMemo = Map<string, Promise<Buffer>>;
@@ -127,48 +129,117 @@ async function designBytes(key: string, edge: number | null, memo?: ComposeMemo)
 
 // ── Template layers (blank / mask / overlay): brand-safe, NON-child, and immutable per key (a
 // re-author bumps the version → a new key), so they're safe to keep in process memory. A warm
-// server then composes a thumb without touching storage for the photo at all.
-const TEMPLATE_CACHE_BYTES = 160 * 1024 * 1024;
-const templateCache = new Map<string, { buf: Promise<Buffer>; bytes: number }>();
-let templateCacheBytes = 0;
-function cacheGet(id: string, make: () => Promise<Buffer>): Promise<Buffer> {
-  const hit = templateCache.get(id);
-  if (hit) {
-    templateCache.delete(id); // LRU: re-insert as newest
-    templateCache.set(id, hit);
-    return hit.buf;
-  }
-  const entry = { buf: make(), bytes: 0 };
-  templateCache.set(id, entry);
-  entry.buf.then(
-    (b) => {
-      entry.bytes = b.byteLength;
-      templateCacheBytes += b.byteLength;
-      for (const [k, v] of templateCache) {
-        if (templateCacheBytes <= TEMPLATE_CACHE_BYTES) break;
-        if (v === entry) continue;
-        templateCache.delete(k);
-        templateCacheBytes -= v.bytes;
-      }
-    },
-    () => templateCache.delete(id), // never cache a failure
-  );
-  return entry.buf;
+// server then composes a thumb without touching storage for the photo at all — and without
+// decoding it either: each layer is also kept DECODED at the working size a render asked for (and
+// the pieces derived from it: the print-area grey maps, the silhouette clip), so a thumb, its zoom
+// and a colour flip of the same product redo none of that.
+const templateBytesCache = new ByteLru<Buffer>(160 * 1024 * 1024, (b) => b.byteLength);
+const templateRawCache = new ByteLru<Raw>(192 * 1024 * 1024, (r) => r.data.byteLength);
+function templateBytes(key: string): Promise<Buffer> {
+  return templateBytesCache.get(key, () => getObjectBytes(key));
 }
-/** A template layer, optionally resized to exact dims (all layers of a template share a canvas). */
-function templateBytes(key: string, dims: { w: number; h: number } | null): Promise<Buffer> {
-  const full = cacheGet(key, () => getObjectBytes(key));
-  if (!dims) return full;
-  return cacheGet(`${key}@${dims.w}x${dims.h}`, async () =>
-    sharp(await full, { limitInputPixels: MAX_INPUT_PIXELS }).resize(dims.w, dims.h, { fit: 'fill' }).png({ compressionLevel: 1 }).toBuffer(),
+/** A template-derived raw layer — cached under the layer's stable id when it has one (the shop's
+ * template asset key); made fresh when it hasn't (in-memory previews, tests). */
+function templateRaw(id: string | undefined, step: string, make: () => Promise<Raw>): Promise<Raw> {
+  return id ? templateRawCache.get(`${id}|${step}`, make) : make();
+}
+
+/** Empty the compositor's in-process caches (the parity test and the benchmark measure cold renders). */
+export function clearMockupCaches(): void {
+  templateBytesCache.clear();
+  templateRawCache.clear();
+  faceCache.clear();
+}
+
+// ── Raw pixels between steps. Every intermediate used to be re-encoded as PNG and decoded again by
+// the next pipeline (13 times a render) — lossless, so the pixels were identical, but it was most of
+// the render's time. Steps now hand each other the decoded pixels; only the final WebP is encoded.
+export type RawPixels = Raw;
+interface Raw {
+  data: Buffer;
+  width: number;
+  height: number;
+  channels: 1 | 2 | 3 | 4;
+}
+async function toRaw(p: Sharp): Promise<Raw> {
+  const { data, info } = await p.raw().toBuffer({ resolveWithObject: true });
+  return { data, width: info.width, height: info.height, channels: info.channels };
+}
+const rawOf = (r: Raw) => ({ raw: { width: r.width, height: r.height, channels: r.channels } });
+/** A pipeline reading raw pixels. */
+const fromRaw = (r: Raw) => sharp(r.data, { ...rawOf(r), limitInputPixels: MAX_INPUT_PIXELS });
+/** A composite input from raw pixels. */
+const overlayOf = (r: Raw, o: Omit<OverlayOptions, 'input' | 'raw'> = {}): OverlayOptions => ({ input: r.data, ...rawOf(r), ...o });
+
+/** The blank at the working size (longest edge capped at workEdge — scRGB is 32-bit float, ~4×
+ * memory, so the cap is load-bearing; the normalised quad scales with it). Its OWN pipeline: sharp
+ * honours one .resize() per pipeline, so it can't share a chain with the output resize. */
+async function workingBlankOf(blankBuf: Buffer, workEdge: number, id: string | undefined, flop = false): Promise<{ img: Raw; WW: number; WH: number }> {
+  const m = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  const bw0 = m.width ?? 0, bh0 = m.height ?? 0;
+  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
+  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
+  const WW = Math.max(1, Math.round(bw0 * scale));
+  const WH = Math.max(1, Math.round(bh0 * scale));
+  const img = await templateRaw(id, `blank@${WW}x${WH}${flop ? '-flop' : ''}`, () => {
+    const p = sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
+    return toRaw(flop ? p.flop() : p);
+  });
+  return { img, WW, WH };
+}
+
+/** The design (encoded bytes, or pixels — a printed face arrives as pixels) as a pipeline input. */
+type Design = Buffer | Raw;
+function designInput(d: Design): Sharp {
+  return Buffer.isBuffer(d) ? sharp(d, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }) : fromRaw(d);
+}
+async function designSize(d: Design): Promise<{ width: number; height: number }> {
+  if (!Buffer.isBuffer(d)) return { width: d.width, height: d.height };
+  const m = await sharp(d, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
+  return { width: m.width ?? 0, height: m.height ?? 0 };
+}
+
+/** The design rotated, scaled to the drawn rect and cut to its visible window — one pipeline. */
+function placedPart(designBuf: Design, transform: Transform, size: { width: number; height: number }, win: { left: number; top: number; width: number; height: number }): Promise<Raw> {
+  return toRaw(
+    designInput(designBuf)
+      .rotate(transform.rotationDeg)
+      .resize(size.width, size.height, { fit: 'fill' })
+      .ensureAlpha()
+      .extract(win),
   );
 }
-/** The thumb working size of a template's canvas (null ⇒ already small enough). */
-async function thumbDims(blankKey: string, edge: number): Promise<{ w: number; h: number } | null> {
-  const m = await sharp(await templateBytes(blankKey, null)).metadata();
-  const W = m.width ?? 0, H = m.height ?? 0;
-  const s = Math.min(1, edge / Math.max(W, H));
-  return W && H && s < 1 ? { w: Math.max(1, Math.round(W * s)), h: Math.max(1, Math.round(H * s)) } : null;
+
+/** The final step, unchanged: downscale to the display size (lanczos), sharpen, encode sRGB WebP. */
+async function encodeOutput(img: Raw, outputEdge: number): Promise<{ buffer: Buffer; width: number; height: number }> {
+  const out = await fromRaw(img)
+    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
+    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
+    .withMetadata({ icc: 'srgb' })
+    .webp({ quality: 82, effort: 4 })
+    .toBuffer({ resolveWithObject: true });
+  return { buffer: out.data, width: out.info.width, height: out.info.height };
+}
+
+/** Clip a layer to a silhouette window (dest-in with a black RGB + mask-alpha clip), as sharp did. */
+async function clipTo(layer: Raw, clip: Raw): Promise<Raw> {
+  return toRaw(fromRaw(layer).composite([overlayOf(clip, { blend: 'dest-in' })]));
+}
+/** The silhouette clip for a window of the mask (soft 0.6px edge so it doesn't alias). Template-only. */
+function maskClip(maskBuf: Buffer, id: string | undefined, WW: number, WH: number, win?: { x: number; y: number; w: number; h: number }): Promise<Raw> {
+  const w = win?.w ?? WW, h = win?.h ?? WH;
+  return templateRaw(id, `clip@${WW}x${WH}${win ? `:${win.x},${win.y},${w},${h}` : ''}`, async () => {
+    let p = sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
+    if (win) p = p.extract({ left: win.x, top: win.y, width: w, height: h });
+    const alpha = await toRaw(p.toColourspace('b-w').blur(0.6));
+    return toRaw(sharp({ create: { width: w, height: h, channels: 3, background: '#000' } }).joinChannel(alpha.data, rawOf(alpha)));
+  });
+}
+/** A foreground overlay at the working size. Template-only. */
+function overlayAt(overlayBuf: Buffer, id: string | undefined, WW: number, WH: number): Promise<Raw> {
+  return templateRaw(id, `overlay@${WW}x${WH}`, () =>
+    toRaw(sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).ensureAlpha()),
+  );
 }
 
 /** Thrown when a variant has no mockup template (or the source can't be used). The
@@ -369,6 +440,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       maskKey: mask?.key,
       overlayKey: overlay?.key,
       designKey: srcObj.key,
+      designTag: `${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}`,
       fillHex: fill,
       groundHex: ground ? groundHex(ground) : undefined,
       quad: tpl.printQuad,
@@ -402,7 +474,8 @@ const FACE_MAX_PIXELS = 8_000_000;
 /** A thumb's face only needs to cover its ≤ 800px working photo. */
 const THUMB_FACE_EDGE = 1000;
 
-/** Render a product's printed face at preview size — the same functions renderPrintFile uses. */
+/** Render a product's printed face at preview size — the same functions renderPrintFile uses — as
+ * pixels: the compositor lays it straight onto the photo, so it is never encoded in between. */
 export async function renderPrintedFace(
   srcBuf: Buffer,
   face: Face,
@@ -411,12 +484,12 @@ export async function renderPrintedFace(
   maxEdge = FACE_MAX_EDGE,
   /** A pattern's base colour (#rrggbb) — the print file's fill; white by default. */
   groundHex = '#ffffff',
-): Promise<Buffer> {
+): Promise<RawPixels> {
   const geom = { printWidthPx: print.widthPx, printHeightPx: print.heightPx, bleedMm: print.bleedMm, requiredDpi: print.requiredDpi };
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
-  if (face === 'pattern') return (await renderRepeatPattern(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale })).png;
-  return (await renderHeightChartFace(srcBuf, geom, transform, { scale })).png;
+  if (face === 'pattern') return renderRepeatPatternPixels(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale });
+  return renderHeightChartFacePixels(srcBuf, geom, transform, { scale });
 }
 
 /**
@@ -433,14 +506,14 @@ export async function renderTemplatePreview(args: {
 }): Promise<Buffer> {
   const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
   let transform: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
-  let designBuf = args.design;
+  let designBuf: Design = args.design;
   if (face) {
     designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, groundHex(args.ground));
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const meta = await sharp(args.blank).metadata();
   const placedGround = !face && isGroundProduct(args.productKey) && normalizeGround(args.ground) ? groundHex(args.ground) : undefined;
-  const common = { blankBuf: args.blank, designBuf, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
+  const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
   const out = !isAxisAligned(args.quad)
     ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
     : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
@@ -459,62 +532,57 @@ async function solidFill(hex: string): Promise<Buffer> {
 async function renderAndPersist(
   db: DbHandle,
   args: {
-    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string; fillHex?: string; groundHex?: string; quad: [number, number][];
+    assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string;
+    /** the source object's id + content hash — what a cached printed face was made from */
+    designTag: string;
+    fillHex?: string; groundHex?: string; quad: [number, number][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
     thumb?: boolean; memo?: ComposeMemo;
   },
 ): Promise<MockupResult> {
-  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
-  // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
-  // bbox) placement. Same secure spine either way.
-  const perspective = !isAxisAligned(args.quad);
-  // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
-  // (the plain-white fallback blank) it falls through to FLAT.
-  const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.maskKey;
   // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
   // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
   // A THUMB never needs the full-size original or the full-size photo: the design is shrunk once
-  // (shared across a batch via `memo`) and every template layer comes from the in-process cache at
-  // the thumb's working size — far less to download, decode and composite (the catalogue reveal).
-  let designBuf = args.fillHex ? await solidFill(args.fillHex) : await designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo);
-  const layerDims = args.thumb ? await thumbDims(args.blankKey, args.workEdge) : null;
-  const layer = (key: string) => templateBytes(key, layerDims);
+  // (shared across a batch via `memo`) and every template layer comes from the in-process cache,
+  // decoded at the thumb's working size — far less to download, decode and composite (the
+  // catalogue reveal).
+  const source = () => (args.fillHex ? solidFill(args.fillHex) : designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo));
+  let designBuf: Design;
   let transform = args.transform;
   if (args.face) {
     // The PRINTED FACE (the repeat / the drawing + ruler) at preview size, from the print code. It
     // has the print canvas's exact aspect, so a plain cover-fit lays it on the print area 1:1.
-    designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform, args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE, args.groundHex);
+    // Kept briefly in memory (previewCache.ts — reached only past composeMockup's authz gate, keyed
+    // by this exact source object + content hash, dropped when the asset is erased), so flipping
+    // back to a colour, a sibling size with the same print canvas, or a re-render after a template
+    // bump reuses it without fetching the drawing again.
+    const faceEdge = args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE;
+    const p = args.print;
+    const faceKey = `${args.assetId}|${args.designTag}|${args.face}${FACE_REV}|${faceEdge}|${p.widthPx}x${p.heightPx}@${p.requiredDpi}+${p.bleedMm}|${transformHash(args.transform)}|${args.groundHex ?? ''}`;
+    designBuf = await faceCache.get(faceKey, async () => renderPrintedFace(await source(), args.face!, p, args.transform, faceEdge, args.groundHex));
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  } else {
+    designBuf = await source();
   }
-  const common = {
-    blankBuf: await layer(args.blankKey),
-    designBuf,
+  const out = await renderMockupLayers({
+    blank: await templateBytes(args.blankKey),
+    mask: args.maskKey ? await templateBytes(args.maskKey) : undefined,
+    overlay: args.overlayKey ? await templateBytes(args.overlayKey) : undefined,
+    layerIds: { blank: args.blankKey, mask: args.maskKey, overlay: args.overlayKey },
+    design: designBuf,
     quad: args.quad,
     transform,
+    spanHalf: args.spanHalf,
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
     print: args.print,
+    materialClass: args.materialClass,
+    mugMode: args.mugMode,
     // a base colour under a PLACED drawing (a printed face already carries its own)
     groundHex: args.face ? undefined : args.groundHex,
-  };
-  const out = perspective
-    ? await renderPerspective({
-        ...common,
-        spanHalf: args.spanHalf,
-        maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
-        overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
-        materialClass: args.materialClass,
-      })
-    : cylinder
-      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await layer(args.maskKey!) })
-      : await renderFlat({
-          ...common,
-          maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
-          overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
-          materialClass: args.materialClass,
-        });
+  });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
   // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
@@ -530,8 +598,43 @@ async function renderAndPersist(
     .returning();
   const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, args.key)))[0]!.id;
 
-  return { mockupObjectId, key: args.key, format: 'webp', tier: perspective ? 'PERSPECTIVE' : 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
+  return { mockupObjectId, key: args.key, format: 'webp', tier: out.tier, cached: false, widthPx: out.width, heightPx: out.height };
 }
+
+/**
+ * The render itself, from layers already in memory — no storage, no database, no viewer. The ONLY
+ * caller with a child's design is renderAndPersist (after its authz gate); it is exported for the
+ * pixel-parity test, which drives every tier with synthetic, brand-safe layers.
+ */
+export async function renderMockupLayers(args: {
+  blank: Buffer; mask?: Buffer; overlay?: Buffer; design: Buffer | RawPixels; quad: [number, number][];
+  /** Stable ids of the TEMPLATE layers (their storage keys): their decoded, working-size pixels are
+   * then cached in process. Absent ⇒ nothing is cached. Never an id for the design. */
+  layerIds?: { blank?: string; mask?: string; overlay?: string };
+  transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
+  print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+  materialClass: string; mugMode?: 'front' | 'back' | 'centre';
+  /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area. Flat + perspective only. */
+  groundHex?: string;
+}): Promise<{ buffer: Buffer; width: number; height: number; tier: 'FLAT' | 'PERSPECTIVE' }> {
+  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
+  // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
+  // bbox) placement. Same secure spine either way.
+  const perspective = !isAxisAligned(args.quad);
+  // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
+  // (the plain-white fallback blank) it falls through to FLAT.
+  const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
+  const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
+  const out = perspective
+    ? await renderPerspective({ ...common, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex })
+    : cylinder
+      ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
+      : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex });
+  return { ...out, tier: perspective ? 'PERSPECTIVE' : 'FLAT' };
+}
+
+/** Template-layer ids for the in-process decoded cache (see templateRaw). */
+type LayerIds = { blank?: string; mask?: string; overlay?: string };
 
 /**
  * FLAT tier: composite the design into the (axis-aligned) print area of the blank,
@@ -545,7 +648,8 @@ async function renderFlat(args: {
   maskBuf?: Buffer;
   /** Foreground overlay composited OVER the design (full-frame, same canvas as the blank). */
   overlayBuf?: Buffer;
-  designBuf: Buffer;
+  designBuf: Design;
+  ids: LayerIds;
   quad: [number, number][];
   transform: Transform;
   workEdge: number;
@@ -557,29 +661,15 @@ async function renderFlat(args: {
   /** Drives the Tier-B fabric fx intensities (fold displacement + shading). */
   materialClass: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, designBuf, quad, transform, workEdge, outputEdge, print, materialClass, groundHex: ground } = args;
+  const { blankBuf, maskBuf, overlayBuf, designBuf, ids, quad, transform, workEdge, outputEdge, print, materialClass, groundHex: ground } = args;
 
-  // Working blank dimensions: cap the longest edge at workEdge (scRGB is 32-bit float,
-  // ~4× memory, so this cap is load-bearing). The normalised quad scales with it.
-  const blankMeta = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const bw0 = blankMeta.width ?? 0;
-  const bh0 = blankMeta.height ?? 0;
-  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
-  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
-  const WW = Math.max(1, Math.round(bw0 * scale));
-  const WH = Math.max(1, Math.round(bh0 * scale));
-
-  // Blank at working res as its OWN pipeline — sharp honours only one .resize() per
-  // pipeline, so the working-res resize must not share a chain with the output resize.
-  const workingBlank = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).toBuffer();
-
+  const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
   const rect = quadBboxPx(quad, WW, WH);
 
   // Place the design into the print area exactly as the print render places it onto the
   // bleed canvas — cover-fit + clamped transform — but with the print AREA as the canvas
   // (zero bleed), so what's previewed is the visible printed result.
-  const dMeta = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const src = { width: dMeta.width ?? 0, height: dMeta.height ?? 0 };
+  const src = await designSize(designBuf);
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
 
   // BLEED-EXACT placement: the print file cover-fits the art over the BLEED canvas (print
@@ -602,27 +692,26 @@ async function renderFlat(args: {
   // offset on a TRANSPARENT window canvas (mirroring render.ts's white canvas — here the
   // margins stay transparent so the product photo shows through, exactly like unprinted
   // surface). Handles cover (crop) and contain/zoom-out (whole image, centred) alike.
-  const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .rotate(transform.rotationDeg)
-    .resize(layer.width, layer.height, { fit: 'fill' })
-    .ensureAlpha()
-    .toBuffer();
   const ix = Math.max(0, bleed - layer.x);
   const iy = Math.max(0, bleed - layer.y);
   const ox = Math.max(0, layer.x - bleed);
   const oy = Math.max(0, layer.y - bleed);
   const iw = Math.max(1, Math.min(layer.width - ix, rect.w - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, rect.h - oy));
-  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const part = await placedPart(designBuf, transform, layer, { left: ix, top: iy, width: iw, height: ih });
   // the print area: see-through (unprinted surface), or the BASE COLOUR edge to edge
-  const windowed = await sharp({ create: { width: rect.w, height: rect.h, channels: 4, background: ground ?? { r: 0, g: 0, b: 0, alpha: 0 } } })
-    .composite([{ input: part, left: ox, top: oy }])
-    .png()
-    .toBuffer();
+  const windowed = await toRaw(
+    sharp({ create: { width: rect.w, height: rect.h, channels: 4, background: ground ?? { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
+  );
 
   const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
   // A coloured garment prints firm edges (see apparel.ts) — show exactly that.
-  let designLayer = materialClass === 'DARK_FABRIC' ? await firmEdges(windowed) : windowed;
+  let designLayer: Raw = windowed;
+  if (materialClass === 'DARK_FABRIC') {
+    const firm = Buffer.from(windowed.data);
+    firmAlpha(firm);
+    designLayer = { ...windowed, data: firm };
+  }
   if (fx.blend === 'multiply') {
     // MULTIPLY reads white as "no ink" — flatten the window over white IMMEDIATELY.
     // The composite's premultiply round-trip leaves alpha-0 margins with BLACK rgb,
@@ -630,14 +719,14 @@ async function renderFlat(args: {
     // downscaled edges) darkens the fabric as a line tracing the design's edge.
     // Opaque white margins are exact (multiply identity), and the feather is
     // unnecessary here: a bg-removal halo multiplies to invisible anyway.
-    designLayer = await sharp(windowed).flatten({ background: '#ffffff' }).png().toBuffer();
+    designLayer = await toRaw(fromRaw(windowed).flatten({ background: '#ffffff' }));
   } else {
     // Feather the alpha edge (blur the alpha channel, re-join) to remove the 1px halo a
     // background-removal can leave. Robust: if anything is off, fall back to the raw layer.
     try {
-      const rgb = await sharp(designLayer).removeAlpha().toBuffer();
-      const alpha = await sharp(designLayer).ensureAlpha().extractChannel(3).blur(0.8).toBuffer();
-      designLayer = await sharp(rgb).joinChannel(alpha).png().toBuffer();
+      const rgb = await toRaw(fromRaw(designLayer).removeAlpha());
+      const alpha = await toRaw(fromRaw(designLayer).ensureAlpha().extractChannel(3).blur(0.8));
+      designLayer = await toRaw(fromRaw(rgb).joinChannel(alpha.data, rawOf(alpha)));
     } catch {
       // keep `windowed`
     }
@@ -650,19 +739,12 @@ async function renderFlat(args: {
   // failure keeps the un-fx'd layer — a mockup must never break for realism's sake.
   if (fx.disp > 0 || fx.shade > 0) {
     try {
-      const blankGray = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS })
-        .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
-        .toColourspace('b-w')
-        .raw()
-        .toBuffer();
-      const blankGrayBlur = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS })
-        .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
-        .toColourspace('b-w')
-        .blur(Math.max(3, rect.w / 80)) // folds, not fabric grain
-        .raw()
-        .toBuffer();
-      const designRaw = await sharp(designLayer).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-      if (designRaw.info.width === rect.w && designRaw.info.height === rect.h && blankGray.length === rect.w * rect.h) {
+      const win = `${rect.x},${rect.y},${rect.w},${rect.h}`;
+      const area = () => fromRaw(workingBlank).extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h }).toColourspace('b-w');
+      const blankGray = (await templateRaw(ids.blank, `gray@${WW}x${WH}:${win}`, () => toRaw(area()))).data;
+      const blankGrayBlur = (await templateRaw(ids.blank, `grayblur@${WW}x${WH}:${win}`, () => toRaw(area().blur(Math.max(3, rect.w / 80))))).data; // folds, not fabric grain
+      const designRaw = designLayer.channels === 4 ? designLayer : await toRaw(fromRaw(designLayer).ensureAlpha());
+      if (designRaw.width === rect.w && designRaw.height === rect.h && blankGray.length === rect.w * rect.h) {
         const fxOut = applyFabricFx({
           design: designRaw.data,
           width: rect.w,
@@ -672,7 +754,7 @@ async function renderFlat(args: {
           displaceStrength: fx.disp * Math.min(10, Math.max(2, rect.w / 60)),
           shadeAmount: fx.shade,
         });
-        designLayer = await sharp(fxOut, { raw: { width: rect.w, height: rect.h, channels: 4 } }).png().toBuffer();
+        designLayer = { data: fxOut, width: rect.w, height: rect.h, channels: 4 };
       }
     } catch {
       // keep the un-fx'd designLayer
@@ -685,17 +767,7 @@ async function renderFlat(args: {
   // edge on shaped blanks (heart/round cushions, bauble, sack, apron). Unlike the feather
   // this is NOT best-effort: a template authored WITH a mask must never render unclipped.
   if (maskBuf) {
-    const maskWin = await sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-      .resize(WW, WH, { fit: 'fill' })
-      .extract({ left: rect.x, top: rect.y, width: rect.w, height: rect.h })
-      .toColourspace('b-w')
-      .blur(0.6) // soft edge so the clip doesn't alias
-      .toBuffer();
-    const clip = await sharp({ create: { width: rect.w, height: rect.h, channels: 3, background: '#000' } })
-      .joinChannel(maskWin)
-      .png()
-      .toBuffer();
-    designLayer = await sharp(designLayer).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
+    designLayer = await clipTo(designLayer, await maskClip(maskBuf, ids.mask, WW, WH, rect));
   }
 
   // MULTIPLY reads white as "no ink", so flatten the layer's alpha away over white:
@@ -704,17 +776,18 @@ async function renderFlat(args: {
   // print edge. Flattening preserves the mask semantics too (clipped area → white →
   // identity over the fabric).
   if (fx.blend === 'multiply') {
-    designLayer = await sharp(designLayer).flatten({ background: '#ffffff' }).png().toBuffer();
+    designLayer = await toRaw(fromRaw(designLayer).flatten({ background: '#ffffff' }));
   }
 
   // Composite the design over the working-res blank IN LINEAR LIGHT (own pipeline:
   // sharp applies a chained .resize() to the base BEFORE composite, which would shrink
   // it under the design — so the downscale must be a SEPARATE pipeline).
-  const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .pipelineColourspace('scrgb')
-    .composite([{ input: designLayer, left: rect.x, top: rect.y, blend: fx.blend }])
-    .toColourspace('srgb')
-    .toBuffer();
+  const composited = await toRaw(
+    fromRaw(workingBlank)
+      .pipelineColourspace('scrgb')
+      .composite([overlayOf(designLayer, { left: rect.x, top: rect.y, blend: fx.blend })])
+      .toColourspace('srgb'),
+  );
 
   // FOREGROUND overlay (piece lines etc.) OVER the design — full-frame at working res,
   // authored on the same canvas as the blank so it registers by construction; the art reads
@@ -723,26 +796,14 @@ async function renderFlat(args: {
   let flattened = composited;
   if (overlayBuf) {
     try {
-      const ov = await sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-        .resize(WW, WH, { fit: 'fill' })
-        .ensureAlpha()
-        .png()
-        .toBuffer();
-      flattened = await sharp(composited).composite([{ input: ov, left: 0, top: 0, blend: 'over' }]).toBuffer();
+      const ov = await overlayAt(overlayBuf, ids.overlay, WW, WH);
+      flattened = await toRaw(fromRaw(composited).composite([overlayOf(ov, { left: 0, top: 0, blend: 'over' })]));
     } catch {
       // keep `composited`
     }
   }
 
-  // Downscale to the display size (lanczos), sharpen after resize, encode sRGB WebP.
-  const out = await sharp(flattened, { limitInputPixels: MAX_INPUT_PIXELS })
-    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
-    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
-    .withMetadata({ icc: 'srgb' })
-    .webp({ quality: 82, effort: 4 })
-    .toBuffer({ resolveWithObject: true });
-
-  return { buffer: out.data, width: out.info.width, height: out.info.height };
+  return encodeOutput(flattened, outputEdge);
 }
 
 /**
@@ -761,7 +822,8 @@ async function renderPerspective(args: {
   overlayBuf?: Buffer;
   /** Fabric (multiply) lets the photo's own texture read through the art, as on the flat path. */
   materialClass?: string;
-  designBuf: Buffer;
+  designBuf: Design;
+  ids: LayerIds;
   quad: [number, number][];
   transform: Transform;
   spanHalf?: 'front' | 'back';
@@ -771,21 +833,14 @@ async function renderPerspective(args: {
   /** Base colour under the drawing, filling the whole print area (#rrggbb); none = white stock. */
   groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
-  const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const bw0 = bm.width ?? 0, bh0 = bm.height ?? 0;
-  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
-  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
-  const WW = Math.max(1, Math.round(bw0 * scale));
-  const WH = Math.max(1, Math.round(bh0 * scale));
-  const workingBlank = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).toBuffer();
+  const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
 
   // Prepare the design on a print-aspect canvas (dw×dh = the print area's own px) — cover-fit
   // + transformed exactly like the flat path, but with ZERO bleed (this view is never printed).
-  const dm = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const src = { width: dm.width ?? 0, height: dm.height ?? 0 };
+  const src = await designSize(designBuf);
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
   const dw = Math.max(2, print.widthPx);
   const dh = Math.max(2, print.heightPx);
@@ -794,11 +849,6 @@ async function renderPerspective(args: {
   const cw = spanHalf ? dw * 2 : dw;
   const layer = computeLayerRect({ printWidthPx: cw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
-  const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .rotate(transform.rotationDeg)
-    .resize(layer.width, layer.height, { fit: 'fill' })
-    .ensureAlpha()
-    .toBuffer();
   // Window the transformed layer onto the cw×dh canvas (handles cover-crop AND contain-centre).
   const ix = Math.max(0, -layer.x);
   const iy = Math.max(0, -layer.y);
@@ -806,72 +856,53 @@ async function renderPerspective(args: {
   const oy = Math.max(0, layer.y);
   const iw = Math.max(1, Math.min(layer.width - ix, cw - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
-  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const part = await placedPart(designBuf, transform, layer, { left: ix, top: iy, width: iw, height: ih });
   // The printed surface is PAPER: anything see-through in the design (a transparent PNG, a
   // removed background) prints as the white of the stock — so lay the design on white here too,
   // or the preview shows a ghost card with the art floating over the envelope.
-  const spread = await sharp({ create: { width: cw, height: dh, channels: 4, background: args.groundHex ?? { r: 255, g: 255, b: 255, alpha: 1 } } })
-    .composite([{ input: part, left: ox, top: oy }])
-    .png()
-    .toBuffer();
+  const spread = await toRaw(
+    sharp({ create: { width: cw, height: dh, channels: 4, background: args.groundHex ?? { r: 255, g: 255, b: 255, alpha: 1 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
+  );
   // Keep just the visible panel (front = right half) — a no-op for a normal single-panel view.
-  const designPng = spanHalf
-    ? await sharp(spread).extract({ left: spanHalf === 'front' ? dw : 0, top: 0, width: dw, height: dh }).png().toBuffer()
-    : spread;
+  const panel = spanHalf ? await toRaw(fromRaw(spread).extract({ left: spanHalf === 'front' ? dw : 0, top: 0, width: dw, height: dh })) : spread;
 
   // If the print's aspect and the quad's OWN aspect are TRANSPOSED — e.g. the tin's landscape
   // lid print (869×674) shot in a portrait orientation — rotate the design −90° so it fills the
   // quad the right way round instead of squishing across it. A no-op when the two agree.
   const transposed = isTransposed(dw / dh, quadEdgeAspect(quad));
-  const raw = await (transposed ? sharp(designPng).rotate(-90) : sharp(designPng)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const raw = transposed || panel.channels !== 4 ? await toRaw((transposed ? fromRaw(panel).rotate(-90) : fromRaw(panel)).ensureAlpha()) : panel;
 
   // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
   const quadPx = quad.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
-  const warped = perspectiveWarp({ design: raw.data, srcW: raw.info.width, srcH: raw.info.height, quad: quadPx, canvasW: WW, canvasH: WH });
-  let warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
+  let warped: Raw = { data: perspectiveWarp({ design: raw.data, srcW: raw.width, srcH: raw.height, quad: quadPx, canvasW: WW, canvasH: WH }), width: WW, height: WH, channels: 4 };
   // Clip to the silhouette — NOT best-effort, like the flat path: a template authored with a mask
   // must never render the art past the product's edge.
-  if (maskBuf) {
-    const maskFull = await sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-      .resize(WW, WH, { fit: 'fill' })
-      .toColourspace('b-w')
-      .blur(0.6) // soft edge so the clip doesn't alias
-      .toBuffer();
-    const clip = await sharp({ create: { width: WW, height: WH, channels: 3, background: '#000' } }).joinChannel(maskFull).png().toBuffer();
-    warpedPng = await sharp(warpedPng).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
-  }
+  if (maskBuf) warped = await clipTo(warped, await maskClip(maskBuf, ids.mask, WW, WH));
   const fx = MATERIAL_FX[materialClass ?? 'PAPER'] ?? MATERIAL_FX.PAPER!;
-  let composited: Buffer;
+  let composited: Raw;
   if (fx.blend === 'multiply') {
     // Fabric: flatten over white (multiply's identity — off-print stays the bare photo) and multiply
     // in linear light, so the knit / weave and folds read through the art, exactly like renderFlat.
-    const flat = await sharp(warpedPng).flatten({ background: '#ffffff' }).png().toBuffer();
-    composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-      .pipelineColourspace('scrgb')
-      .composite([{ input: flat, left: 0, top: 0, blend: 'multiply' }])
-      .toColourspace('srgb')
-      .toBuffer();
+    const flat = await toRaw(fromRaw(warped).flatten({ background: '#ffffff' }));
+    composited = await toRaw(
+      fromRaw(workingBlank)
+        .pipelineColourspace('scrgb')
+        .composite([overlayOf(flat, { left: 0, top: 0, blend: 'multiply' })])
+        .toColourspace('srgb'),
+    );
   } else {
-    composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-      .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
-      .toBuffer();
+    composited = await toRaw(fromRaw(workingBlank).composite([overlayOf(warped, { left: 0, top: 0, blend: 'over' })]));
   }
   if (overlayBuf) {
     try {
-      const ov = await sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).ensureAlpha().png().toBuffer();
-      composited = await sharp(composited).composite([{ input: ov, left: 0, top: 0, blend: 'over' }]).toBuffer();
+      const ov = await overlayAt(overlayBuf, ids.overlay, WW, WH);
+      composited = await toRaw(fromRaw(composited).composite([overlayOf(ov, { left: 0, top: 0, blend: 'over' })]));
     } catch {
       // keep `composited` — an overlay is enhancement, never a reason to fail a mockup
     }
   }
 
-  const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
-    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
-    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
-    .withMetadata({ icc: 'srgb' })
-    .webp({ quality: 82, effort: 4 })
-    .toBuffer({ resolveWithObject: true });
-  return { buffer: out.data, width: out.info.width, height: out.info.height };
+  return encodeOutput(composited, outputEdge);
 }
 
 /**
@@ -886,7 +917,8 @@ async function renderCylinder(args: {
   blankBuf: Buffer;
   /** The founder-authored PRINTMAP (alpha shape = the visible print surface on the photo). */
   printmapBuf: Buffer;
-  designBuf: Buffer;
+  designBuf: Design;
+  ids: LayerIds;
   transform: Transform;
   workEdge: number;
   outputEdge: number;
@@ -894,77 +926,59 @@ async function renderCylinder(args: {
   mode: 'front' | 'back' | 'centre';
   ellipseCx: number;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, printmapBuf, designBuf, transform, workEdge, outputEdge, print, mode, ellipseCx } = args;
+  const { blankBuf, printmapBuf, designBuf, ids, transform, workEdge, outputEdge, print, mode, ellipseCx } = args;
   const back = mode === 'back';
 
   // Working photo (cap the longest edge; the quad is normalised so it scales with it). The BACK
   // view is the same mug flopped — handle to the left — and we wrap the reverse arc onto it.
-  const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const bw0 = bm.width ?? 0, bh0 = bm.height ?? 0;
-  if (!bw0 || !bh0) throw new NoMockupTemplateError('unreadable blank template');
-  const scale = Math.min(1, workEdge / Math.max(bw0, bh0));
-  const WW = Math.max(1, Math.round(bw0 * scale));
-  const WH = Math.max(1, Math.round(bh0 * scale));
-  let workingBlankPipe = sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
-  if (back) workingBlankPipe = workingBlankPipe.flop();
-  const workingBlank = await workingBlankPipe.toBuffer();
+  const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank, back);
 
   // Prepare the design as the FULL printed wrap on a print-aspect canvas (cover-fit + transform,
   // zero bleed — this view is never printed), exactly as the print file lays the wrap out.
-  const dm = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
-  const src = { width: dm.width ?? 0, height: dm.height ?? 0 };
+  const src = await designSize(designBuf);
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
   const dw = Math.max(2, print.widthPx);
   const dh = Math.max(2, print.heightPx);
   const layer = computeLayerRect({ printWidthPx: dw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
-  const scaled = await sharp(designBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .rotate(transform.rotationDeg)
-    .resize(layer.width, layer.height, { fit: 'fill' })
-    .ensureAlpha()
-    .toBuffer();
   const ix = Math.max(0, -layer.x);
   const iy = Math.max(0, -layer.y);
   const ox = Math.max(0, layer.x);
   const oy = Math.max(0, layer.y);
   const iw = Math.max(1, Math.min(layer.width - ix, dw - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, dh - oy));
-  const part = await sharp(scaled).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  const part = await placedPart(designBuf, transform, layer, { left: ix, top: iy, width: iw, height: ih });
   // Opaque WHITE wrap canvas (not transparent): multiply reads white as "no ink", so the unprinted
   // margins are an identity op over the ceramic instead of a premultiplied-black edge line.
-  const wrap = await sharp({ create: { width: dw, height: dh, channels: 4, background: '#ffffff' } })
-    .composite([{ input: part, left: ox, top: oy }])
-    .flatten({ background: '#ffffff' })
-    .ensureAlpha()
-    .raw()
-    .toBuffer();
+  const wrap = await toRaw(
+    sharp({ create: { width: dw, height: dh, channels: 4, background: '#ffffff' } })
+      .composite([overlayOf(part, { left: ox, top: oy })])
+      .flatten({ background: '#ffffff' })
+      .ensureAlpha(),
+  );
 
   // The PRINTMAP alpha at working res (flopped for the BACK view so it still covers the face) — a
   // single channel where opaque = the visible printable surface. Its shape drives the whole wrap.
-  let pmPipe = sharp(printmapBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
-  if (back) pmPipe = pmPipe.flop();
-  const printAlpha = await pmPipe.ensureAlpha().extractChannel(3).raw().toBuffer();
+  const printAlpha = await templateRaw(ids.mask, `printmap@${WW}x${WH}${back ? '-flop' : ''}`, () => {
+    const pm = sharp(printmapBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' });
+    return toRaw((back ? pm.flop() : pm).ensureAlpha().extractChannel(3));
+  });
 
   const warped = cylinderWarp({
-    design: wrap, srcW: dw, srcH: dh, printAlpha, pmW: WW, pmH: WH,
+    design: wrap.data, srcW: dw, srcH: dh, printAlpha: printAlpha.data, pmW: WW, pmH: WH,
     // The photo + printmap are flopped for the BACK, so the ellipse centre mirrors with them.
     ellipseCx: back ? 1 - ellipseCx : ellipseCx, ellipseA: MUG_ELLIPSE_A,
     printedArcDeg: MUG_PRINTED_ARC_DEG, mode,
   });
   // Flatten the warped RGBA over white so alpha-0 (off-surface) is white → multiply identity → bare mug.
-  const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }).png().toBuffer();
+  const flat = await toRaw(sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).flatten({ background: '#ffffff' }));
 
-  const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .pipelineColourspace('scrgb')
-    .composite([{ input: warpedPng, left: 0, top: 0, blend: 'multiply' }])
-    .toColourspace('srgb')
-    .toBuffer();
+  const composited = await toRaw(
+    fromRaw(workingBlank)
+      .pipelineColourspace('scrgb')
+      .composite([overlayOf(flat, { left: 0, top: 0, blend: 'multiply' })])
+      .toColourspace('srgb'),
+  );
 
-  const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
-    .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
-    .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
-    .withMetadata({ icc: 'srgb' })
-    .webp({ quality: 82, effort: 4 })
-    .toBuffer({ resolveWithObject: true });
-  return { buffer: out.data, width: out.info.width, height: out.info.height };
+  return encodeOutput(composited, outputEdge);
 }
