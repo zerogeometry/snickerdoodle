@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { assets, auditRecords, profileImages, storageObjects } from '@/db/schema';
-import { AuthzError, canReview, type Reviewer } from '@/authz';
+import { AuthzError, canReview, hashCheckSkipped, type Reviewer, type ReviewSubject } from '@/authz';
 import { derivativeKey, getObjectBytes } from '@/storage';
 import { eraseAsset } from '../assets';
 import { eraseProfileImage } from '../profile';
@@ -21,12 +21,14 @@ export interface ReviewItem {
   /** The upload itself, or something drawn/added in the Studio. */
   source: 'upload' | 'studio design' | 'profile picture' | 'profile header' | 'family banner';
   flaggedAt: Date | null;
+  /** The known-CSAM hash check never ran on it: it can only be removed — never looked at or cleared. */
+  hashUnchecked: boolean;
 }
 
 const deny = (reason: string) => {
   throw new AuthzError({ allowed: false, reason });
 };
-const gate = (r: Reviewer, action: Parameters<typeof canReview>[1], item?: { moderationStatus: string }) => {
+const gate = (r: Reviewer, action: Parameters<typeof canReview>[1], item?: ReviewSubject) => {
   const d = canReview(r, action, item);
   if (!d.allowed) deny(d.reason);
 };
@@ -36,12 +38,12 @@ type Detail = { labels?: string[]; original?: { status: string; labels?: string[
 export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ items: ReviewItem[]; blocked: number }> {
   gate(reviewer, 'open-queue');
   const flagged = await db
-    .select({ id: assets.id, detail: assets.moderationDetail, at: assets.moderatedAt })
+    .select({ id: assets.id, detail: assets.moderationDetail, at: assets.moderatedAt, status: assets.moderationStatus })
     .from(assets)
     .where(eq(assets.moderationStatus, 'FLAGGED'))
     .orderBy(desc(assets.moderatedAt));
   const profiles = await db
-    .select({ id: profileImages.id, kind: profileImages.kind, detail: profileImages.moderationDetail, at: profileImages.moderatedAt })
+    .select({ id: profileImages.id, kind: profileImages.kind, detail: profileImages.moderationDetail, at: profileImages.moderatedAt, status: profileImages.moderationStatus })
     .from(profileImages)
     .where(eq(profileImages.moderationStatus, 'FLAGGED'));
   const blockedA = await db.select({ id: assets.id }).from(assets).where(eq(assets.moderationStatus, 'BLOCKED'));
@@ -50,7 +52,7 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
     ...flagged.map((r) => {
       const d = (r.detail ?? {}) as Detail;
       const fromDesign = d.design?.status === 'FLAGGED';
-      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at };
+      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at, hashUnchecked: hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail }) };
     }),
     ...profiles.map((r) => ({
       kind: 'profile' as const,
@@ -58,6 +60,7 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
       labels: ((r.detail ?? {}) as Detail).labels ?? [],
       source: r.kind === 'AVATAR' ? ('profile picture' as const) : r.kind === 'ACCOUNT_HEADER' ? ('profile header' as const) : ('family banner' as const),
       flaggedAt: r.at,
+      hashUnchecked: hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail }),
     })),
   ];
   items.sort((a, b) => (b.flaggedAt?.getTime() ?? 0) - (a.flaggedAt?.getTime() ?? 0));

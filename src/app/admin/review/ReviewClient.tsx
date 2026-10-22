@@ -90,6 +90,8 @@ export interface ClientItem {
   labels: string[];
   source: string;
   flaggedAt: string | null;
+  /** The safety hash check never ran: it can only be removed, never looked at or cleared. */
+  hashUnchecked: boolean;
 }
 
 /** The queue: each item hidden until the reviewer chooses to look; clear or remove. */
@@ -136,19 +138,25 @@ export function ReviewList({ items }: { items: ClientItem[] }) {
                 held back for: <b className="text-cocoa">{it.labels.length ? it.labels.join(', ') : 'unspecified'}</b>
               </p>
               <div className="mt-3 flex aspect-[4/3] max-h-80 w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-paper-2">
-                {open ? (
+                {it.hashUnchecked ? (
+                  <p className="px-6 text-center text-xs text-ink-soft">the safety hash check couldn’t run on this one, so it can’t be looked at or cleared — only removed. The family can upload it again.</p>
+                ) : open ? (
                   <img src={`/api/admin/review/${it.kind}/${it.id}`} alt="the flagged picture" className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
                 ) : (
                   <p className="px-6 text-center text-xs text-ink-soft">hidden — looking is recorded in the audit log</p>
                 )}
               </div>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setShown((s) => { const n = new Set(s); if (n.has(it.id)) n.delete(it.id); else n.add(it.id); return n; })}>
-                  <Icon icon={open ? IconEyeOff : IconEye} size={15} /> {open ? 'hide' : 'look'}
-                </Button>
-                <Button size="sm" onClick={() => void decide(it, 'clear')} disabled={busy === it.id}>
-                  <Icon icon={IconShieldCheck} size={15} /> it’s fine
-                </Button>
+                {it.hashUnchecked ? null : (
+                  <>
+                    <Button variant="secondary" size="sm" onClick={() => setShown((s) => { const n = new Set(s); if (n.has(it.id)) n.delete(it.id); else n.add(it.id); return n; })}>
+                      <Icon icon={open ? IconEyeOff : IconEye} size={15} /> {open ? 'hide' : 'look'}
+                    </Button>
+                    <Button size="sm" onClick={() => void decide(it, 'clear')} disabled={busy === it.id}>
+                      <Icon icon={IconShieldCheck} size={15} /> it’s fine
+                    </Button>
+                  </>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setConfirm(it)} disabled={busy === it.id}>
                   <Icon icon={IconTrash} size={15} /> remove
                 </Button>

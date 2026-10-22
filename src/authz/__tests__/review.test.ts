@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canReview, type Reviewer } from '@/authz';
+import { HASH_UNCHECKED_LABEL, canReview, hashCheckSkipped, type Reviewer } from '@/authz';
 import { base32Encode, openSecret, sealSecret, totpCode, verifyTotp } from '@/server/admin/totp';
 import { signStepUp, verifyStepUp } from '@/server/admin/stepUp';
 
@@ -27,6 +27,34 @@ describe('content review — who may look (launch gate: authz matrix)', () => {
 
   it('CSAM-blocked content is never viewed, cleared or removed through review — by anyone', () => {
     for (const action of ['view', 'clear', 'remove'] as const) expect(canReview(admin, action, { moderationStatus: 'BLOCKED' }).allowed).toBe(false);
+  });
+});
+
+describe('content review — a picture the hash check never saw', () => {
+  const unchecked = { moderationStatus: 'FLAGGED', moderationDetail: { labels: [HASH_UNCHECKED_LABEL], original: { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] } } };
+  const legacyShape = { moderationStatus: 'FLAGGED', moderationDetail: { labels: [HASH_UNCHECKED_LABEL] } }; // profile pictures store labels only
+
+  it('can never be VIEWED or CLEARED (could be known CSAM; clearing would skip the hash gate)', () => {
+    for (const item of [unchecked, legacyShape]) {
+      expect(canReview(admin, 'view', item).allowed).toBe(false);
+      expect(canReview(admin, 'clear', item).allowed).toBe(false);
+    }
+  });
+
+  it('can still be REMOVED by an admin with two-step login (and by nobody else)', () => {
+    expect(canReview(admin, 'remove', unchecked).allowed).toBe(true);
+    expect(canReview({ ...admin, mfaVerified: false }, 'remove', unchecked).allowed).toBe(false);
+  });
+
+  it('only the UPLOAD\'s verdict counts: a classifier flag or a design flag is reviewed as normal', () => {
+    const classifierFlag = { moderationStatus: 'FLAGGED', moderationDetail: { labels: ['Violence'], original: { status: 'FLAGGED', labels: ['Violence'] } } };
+    expect(hashCheckSkipped(classifierFlag)).toBe(false);
+    for (const action of ['view', 'clear', 'remove'] as const) expect(canReview(admin, action, classifierFlag).allowed).toBe(true);
+    const designOnly = { moderationStatus: 'FLAGGED', moderationDetail: { labels: ['drawn-words'], original: { status: 'CLEAR', labels: [] }, design: { status: 'FLAGGED', labels: ['drawn-words'] } } };
+    expect(canReview(admin, 'view', designOnly).allowed).toBe(true);
+    // an unchecked upload stays unchecked even after a design is added on top
+    const uncheckedWithDesign = { moderationStatus: 'FLAGGED', moderationDetail: { labels: [HASH_UNCHECKED_LABEL, 'drawn-words'], original: { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] }, design: { status: 'FLAGGED', labels: ['drawn-words'] } } };
+    expect(canReview(admin, 'clear', uncheckedWithDesign).allowed).toBe(false);
   });
 });
 
