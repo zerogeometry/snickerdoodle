@@ -397,6 +397,31 @@ export async function renderPrintedFace(
   return (await renderHeightChartFace(srcBuf, geom, transform, { scale })).png;
 }
 
+/**
+ * Render a mockup from template layers held in memory — no storage, no viewer, and the caller passes
+ * brand-safe TEST art only. For checking new product photo sets on this machine before they're seeded
+ * (scripts/preview-mockups.ts). Same renderers and same choice of warp as the shop.
+ */
+export async function renderTemplatePreview(args: {
+  blank: Buffer; mask?: Buffer; overlay?: Buffer; quad: [number, number][]; materialClass: string;
+  design: Buffer; productKey: string; print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+  size?: MockupSize;
+}): Promise<Buffer> {
+  const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
+  let transform: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  let designBuf = args.design;
+  if (face) {
+    designBuf = await renderPrintedFace(args.design, face, args.print, transform);
+    transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  }
+  const meta = await sharp(args.blank).metadata();
+  const common = { blankBuf: args.blank, designBuf, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print };
+  const out = !isAxisAligned(args.quad)
+    ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay })
+    : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
+  return out.buffer;
+}
+
 /** A solid-colour design for a FILL render (e.g. the cushion's plain coloured back): cover-fit
  * + multiplied over the blank, it paints the whole print area that colour. No child pixels. */
 async function solidFill(hex: string): Promise<Buffer> {
@@ -448,7 +473,12 @@ async function renderAndPersist(
     print: args.print,
   };
   const out = perspective
-    ? await renderPerspective({ ...common, spanHalf: args.spanHalf })
+    ? await renderPerspective({
+        ...common,
+        spanHalf: args.spanHalf,
+        maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
+        overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
+      })
     : cylinder
       ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await layer(args.maskKey!) })
       : await renderFlat({
@@ -693,6 +723,11 @@ async function renderFlat(args: {
  */
 async function renderPerspective(args: {
   blankBuf: Buffer;
+  /** Silhouette (white = printable, same canvas as the blank): the warped art is clipped to it —
+   * a rounded-corner card face, so the quad's sharp corners never poke past the real card. */
+  maskBuf?: Buffer;
+  /** Foreground overlay composited OVER the art (same canvas as the blank). */
+  overlayBuf?: Buffer;
   designBuf: Buffer;
   quad: [number, number][];
   transform: Transform;
@@ -701,7 +736,7 @@ async function renderPerspective(args: {
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, overlayBuf, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
   const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -758,10 +793,29 @@ async function renderPerspective(args: {
   // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
   const quadPx = quad.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
   const warped = perspectiveWarp({ design: raw.data, srcW: raw.info.width, srcH: raw.info.height, quad: quadPx, canvasW: WW, canvasH: WH });
-  const warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
-  const composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+  let warpedPng = await sharp(warped, { raw: { width: WW, height: WH, channels: 4 } }).png().toBuffer();
+  // Clip to the silhouette — NOT best-effort, like the flat path: a template authored with a mask
+  // must never render the art past the product's edge.
+  if (maskBuf) {
+    const maskFull = await sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+      .resize(WW, WH, { fit: 'fill' })
+      .toColourspace('b-w')
+      .blur(0.6) // soft edge so the clip doesn't alias
+      .toBuffer();
+    const clip = await sharp({ create: { width: WW, height: WH, channels: 3, background: '#000' } }).joinChannel(maskFull).png().toBuffer();
+    warpedPng = await sharp(warpedPng).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
+  }
+  let composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
     .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
     .toBuffer();
+  if (overlayBuf) {
+    try {
+      const ov = await sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).ensureAlpha().png().toBuffer();
+      composited = await sharp(composited).composite([{ input: ov, left: 0, top: 0, blend: 'over' }]).toBuffer();
+    } catch {
+      // keep `composited` — an overlay is enhancement, never a reason to fail a mockup
+    }
+  }
 
   const out = await sharp(composited, { limitInputPixels: MAX_INPUT_PIXELS })
     .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })

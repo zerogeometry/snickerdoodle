@@ -85,6 +85,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
 );
 
@@ -187,8 +188,18 @@ function layeredCardSingleDir(): string | null {
   return has('background.png') && has('envelope.png') && has('cardshadow.png') && has('printquad-front.png') ? dir : null;
 }
 
+// Founder-photographed products composed by scripts/compose-founder-layers.mjs (socks, tea towel,
+// wrapping paper, playing cards): background → shadow → product photo, plus printmap.png (white where
+// the print goes — the print area AND the silhouette mask) and an optional overlay.png laid over the
+// art (a sock heel, a folded corner, a paper curl).
+function layeredFlatDir(name: string): string | null {
+  const dir = path.join(LAYERED, ...name.split('/'));
+  const has = (f: string) => existsSync(path.join(dir, f));
+  return has('background.png') && has('shadow.png') && has('product.png') && has('printmap.png') ? dir : null;
+}
+
 const FRAME: Record<string, string> = {
-  gold: 'prodigi-classic-frame-blanks/Gold Classic Frame_blank.png',
+  gold:'prodigi-classic-frame-blanks/Gold Classic Frame_blank.png',
   black: 'prodigi-classic-frame-blanks/Black classic frame_blank.png',
   white: 'prodigi-classic-frame-blanks/White classic frame_blank.png',
   natural: 'prodigi-classic-frame-blanks/Natural classic frame_blank.png',
@@ -309,14 +320,32 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
         region: garmentPrintRegion(photo, HOODIE_PRINT_MM, chest),
       };
     }
-    // Tea towel: Prodigi's flat blank when staged (print-accurate, face-cover), else drawn.
+    // Founder-photographed sets (layered-flat) first; the drawn stand-in only if they aren't staged.
+    // Fabric MULTIPLIES over the photo, so the knit / cotton texture reads through the print.
+    case 'socks': {
+      const dir = layeredFlatDir(`socks/${size === 'tube' ? 'tube' : 'ankle'}`);
+      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'socks' };
+    }
     case 'teaTowel': {
+      // the photo is composed PORTRAIT (turned 90°) because the print file is portrait
+      const dir = layeredFlatDir('teaTowel');
+      if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-flat', dir };
       const file = findBlank(/tea.?towel/i);
       return file ? { file, material: 'LIGHT_FABRIC', register: 'face-cover', mask: true } : { material: 'LIGHT_FABRIC', register: 'drawn', key: 'teaTowel' };
     }
+    case 'wrappingPaper': {
+      // every size shares the one sheet: the visible paper is a window onto the sheet / roll
+      const dir = layeredFlatDir('wrappingPaper');
+      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'wrappingPaper' };
+    }
+    case 'playingCards': {
+      // the front card of a fanned hand — it leans, so its print area is a TILTED quad (perspective)
+      const dir = layeredFlatDir('playingCards');
+      return dir ? { material: 'PAPER', register: 'layered-flat', dir, tilted: true } : { material: 'PAPER', register: 'drawn', key: 'playingCards' };
+    }
     default:
-      // socks, height chart, acrylic block, wrapping paper, bandana, playing cards: no Prodigi blank
-      // photo — a DRAWN mockup with the print area at the print file's exact aspect.
+      // height chart, bandana: no photo yet — a DRAWN mockup with the print area at the print
+      // file's exact aspect.
       if (isDrawnProduct(key)) return { material: 'PAPER', register: 'drawn', key };
       return null; // giftWrap (no print) → keep SVG
   }
@@ -643,6 +672,118 @@ async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'
   }
   layeredBlanketCache.set(key, out);
   return out;
+}
+
+/**
+ * Founder-photographed product (layered-flat) → a (blank, mask, overlay, window) bundle. The blank is
+ * background → shadow → the PHOTO (not a flat white face): fabric multiplies over it, so the photo's
+ * own knit / cotton texture and folds read through the art. printmap.png is the registration
+ * authority — its opaque region is the print area AND the silhouette mask; overlay.png (if present)
+ * rides on top of the art. Same canvas rules as the cushion/blanket.
+ */
+const layeredFlatCache = new Map<string, { blank: Buffer; mask: Buffer; overlay?: Buffer; printmap: Buffer; window: Box; W: number; H: number }>();
+async function layeredFlat(dir: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; printmap: Buffer; window: Box; W: number; H: number }> {
+  const hasOverlay = existsSync(path.join(dir, 'overlay.png'));
+  const files = ['background.png', 'shadow.png', 'product.png', 'printmap.png', ...(hasOverlay ? ['overlay.png'] : [])];
+  const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const hit = layeredFlatCache.get(key);
+  if (hit) return hit;
+
+  const printmap = readFileSync(path.join(dir, 'printmap.png'));
+  const { data, info } = await sharp(printmap).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: W, height: H, channels: c } = info;
+  const maskRaw = Buffer.alloc(W * H);
+  let mx0 = W, my0 = H, mx1 = -1, my1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (data[(y * W + x) * c + 3]! >= 128) {
+        maskRaw[y * W + x] = 255;
+        if (x < mx0) mx0 = x;
+        if (x > mx1) mx1 = x;
+        if (y < my0) my0 = y;
+        if (y > my1) my1 = y;
+      }
+    }
+  if (mx1 < 0) throw new Error(`layered ${dir}: printmap.png has no opaque print region`);
+  const mask = await sharp(maskRaw, { raw: { width: W, height: H, channels: 1 } }).png().toBuffer();
+
+  for (const f of ['shadow.png', 'product.png', ...(hasOverlay ? ['overlay.png'] : [])]) {
+    const m = await sharp(readFileSync(path.join(dir, f))).metadata();
+    if (m.width !== W || m.height !== H) throw new Error(`layered ${dir}: ${f} is ${m.width}x${m.height} but printmap.png is ${W}x${H} — re-run scripts/compose-founder-layers.mjs`);
+  }
+  const backdrop = await sharp(readFileSync(path.join(dir, 'background.png'))).flatten({ background: '#ffffff' }).resize(W, H, { fit: 'cover' }).toBuffer();
+  const blank = await sharp(backdrop)
+    .composite([
+      { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
+      { input: readFileSync(path.join(dir, 'product.png')), left: 0, top: 0 },
+    ])
+    .png()
+    .toBuffer();
+  const overlay = hasOverlay ? await sharp(readFileSync(path.join(dir, 'overlay.png'))).ensureAlpha().png().toBuffer() : undefined;
+
+  const out = { blank, mask, overlay, printmap, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+  layeredFlatCache.set(key, out);
+  return out;
+}
+
+/**
+ * A layered-flat set as a ready mockup template: blank, mask, overlay and the print quad — the
+ * window aspect-locked (cover) to the print file, or, for a tilted face, its true corners passed
+ * verbatim (the compositor picks the perspective warp for a skewed quad and clips to the mask).
+ * Shared by the seeder and scripts/preview-mockups.ts, so a local preview IS what gets seeded.
+ */
+export async function layeredFlatTemplate(
+  dir: string,
+  printAspect: number,
+  tilted: boolean,
+): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; W: number; H: number } | null> {
+  const d = await layeredFlat(dir);
+  if (tilted) {
+    const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const corners = minAreaRectCorners(a, d.W, d.H);
+    return corners ? { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: corners, W: d.W, H: d.H } : null;
+  }
+  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), W: d.W, H: d.H };
+}
+
+/** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
+export function layeredFlatPath(name: string): string | null {
+  return layeredFlatDir(name);
+}
+
+/**
+ * The four corners (TL,TR,BR,BL, normalised) of the SMALLEST rectangle around a tilted shape in an
+ * image's alpha — for a rounded-corner card these are the card's true (sharp) corners, so the art
+ * reaches the straight edges and the mask trims it to the rounded ones. (The diagonal-extreme
+ * detector in detectQuadCorners lands ON the corner arcs instead, leaving a white rim.) Searches
+ * tilts within ±45°; exported for its unit test.
+ */
+export function minAreaRectCorners(alpha: Uint8Array | Buffer, W: number, H: number, step = 2): [number, number][] | null {
+  const pts: [number, number][] = [];
+  for (let y = 0; y < H; y += step)
+    for (let x = 0; x < W; x += step) if (alpha[y * W + x]! >= 128) pts.push([x + 0.5, y + 0.5]);
+  if (pts.length < 3) return null;
+  let best: { area: number; t: number; u0: number; u1: number; v0: number; v1: number } | null = null;
+  for (let deg = -45; deg <= 45; deg += 0.25) {
+    const t = (deg * Math.PI) / 180, cs = Math.cos(t), sn = Math.sin(t);
+    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+    for (const [x, y] of pts) {
+      const u = x * cs + y * sn, v = -x * sn + y * cs;
+      if (u < u0) u0 = u;
+      if (u > u1) u1 = u;
+      if (v < v0) v0 = v;
+      if (v > v1) v1 = v;
+    }
+    const area = (u1 - u0) * (v1 - v0);
+    if (!best || area < best.area) best = { area, t, u0, u1, v0, v1 };
+  }
+  const { t, u0, u1, v0, v1 } = best!;
+  const pad = step / 2; // sampled on a grid — give back half a cell
+  const cs = Math.cos(t), sn = Math.sin(t);
+  const back = (u: number, v: number): [number, number] => [(u * cs - v * sn) / W, (u * sn + v * cs) / H];
+  // In the rotated frame u runs along the card's width and v down its height (|tilt| ≤ 45°), so
+  // these four come out as TL, TR, BR, BL in image space too.
+  return [back(u0 - pad, v0 - pad), back(u1 + pad, v0 - pad), back(u1 + pad, v1 + pad), back(u0 - pad, v1 + pad)];
 }
 
 const layeredMugCache = new Map<string, { blank: Buffer; mask: Buffer; quad: Quad; W: number; H: number }>();
@@ -1082,6 +1223,21 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
       registration.push({
         sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
         quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
+      });
+      continue;
+    }
+
+    if (p.register === 'layered-flat') {
+      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted);
+      if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
+      const quad = d.quad;
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
+      authored++;
+      const qa = p.tilted ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.tilted ? 'layered-flat (tilted)' : 'layered-flat',
+        quadAspect: qa == null ? null : Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+        driftPct: qa == null ? null : Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
       });
       continue;
     }

@@ -84,3 +84,20 @@ full suite with the dev DB 761 passed ×2, lint ignores `.claude/**`, pushed, te
 - ✅ Card-pack builder: as built. ✅ Prodigi photo licence: fine.
 - Still open with Prodigi: are envelopes included with cards? does LIVE keep the flat £0.95 for 10+ cards? Are jigsaw
   and baby bodysuit standard post tracked now (PRICING.md, July, said untracked; the jigsaw page says tracked)?
+
+## Founder decisions + changes (22 Oct)
+- ✅ **Real product photos** for socks (ankle + tube), tea towel, wrapping paper and playing cards, from the
+  founder's cut-outs: `scripts/compose-founder-layers.mjs` composes them (cream backdrop, soft shadow, ~80% fill,
+  the heel / folded corner / paper curl laid OVER the print) into `.prodigi-assets/blanks/layered/` (gitignored,
+  raw cut-outs in `blanks/founder-raw/`). The seeder prefers these over the drawn stand-ins (`layered-flat`).
+  Socks + tea towel multiply the art over the photo, so the knit / cotton texture shows through. The tea towel is
+  turned portrait (its print file is portrait). The leaning playing card warps onto its true corners and clips to
+  its rounded corners (the perspective path now honours mask + overlay — the greetings card benefits too).
+  Check locally before seeding: `npx tsx --conditions=react-server scripts/preview-mockups.ts <test-drawing.png>`.
+- ✅ **Acrylic block removed** (no honest preview of a clear block). Re-seeding retires it.
+- ✅ **Flat products never sit together** in the grids (`spaceOutFlat`, src/lib/catalogue-view.ts): jigsaw, blanket,
+  wrapping paper, tea towel, height chart, calendar are held ≥3 places apart — never side by side, never stacked on
+  the 2-column phone grid. The popularity order is otherwise kept.
+- **To go live:** `powershell -ExecutionPolicy Bypass -File .\scripts\test-site\seed.ps1 -Only mockups` (from this
+  computer — the photo sets are local) then `...\deploy.ps1`; re-seed the catalogue too (`-Only catalogue`) to
+  retire the acrylic block. Still drawn: height chart, pet bandana.
