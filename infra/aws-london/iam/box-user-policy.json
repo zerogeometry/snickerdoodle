@@ -1,0 +1,62 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadTheAppSettings",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParametersByPath", "ssm:GetParameters", "ssm:GetParameter"],
+      "Resource": ["arn:aws:ssm:eu-west-2:ACCOUNT_ID:parameter/snickerdoodle/prod", "arn:aws:ssm:eu-west-2:ACCOUNT_ID:parameter/snickerdoodle/prod/*"]
+    },
+    {
+      "Sid": "DecryptSecureStringsViaSsm",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": { "StringEquals": { "kms:ViaService": "ssm.eu-west-2.amazonaws.com" } }
+    },
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": "ecr:GetAuthorizationToken",
+      "Resource": "*"
+    },
+    {
+      "Sid": "PullTheAppImage",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:BatchCheckLayerAvailability"],
+      "Resource": "arn:aws:ecr:eu-west-2:ACCOUNT_ID:repository/snickerdoodle"
+    },
+    {
+      "Sid": "WriteAndReadDbBackupsButNeverDelete",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::BACKUP_BUCKET/db/*"
+    },
+    {
+      "Sid": "ListDbBackups",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::BACKUP_BUCKET",
+      "Condition": { "StringLike": { "s3:prefix": ["db/*", "db/"] } }
+    },
+    {
+      "Sid": "EncryptDbBackupsWithTheGeneralKey",
+      "Effect": "Allow",
+      "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
+      "Resource": "GENERAL_KEY_ARN",
+      "Condition": { "StringEquals": { "kms:ViaService": "s3.eu-west-2.amazonaws.com" } }
+    },
+    {
+      "Sid": "AlertEmails",
+      "Effect": "Allow",
+      "Action": "sns:Publish",
+      "Resource": "arn:aws:sns:eu-west-2:ACCOUNT_ID:snickerdoodle-alerts"
+    },
+    {
+      "Sid": "ShipLogsToCloudWatchOptional",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"],
+      "Resource": ["arn:aws:logs:eu-west-2:ACCOUNT_ID:log-group:/snickerdoodle/prod", "arn:aws:logs:eu-west-2:ACCOUNT_ID:log-group:/snickerdoodle/prod:*"]
+    }
+  ]
+}

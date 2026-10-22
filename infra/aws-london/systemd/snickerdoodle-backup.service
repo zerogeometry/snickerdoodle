@@ -1,0 +1,11 @@
+# Nightly database dump to S3 (bin/backup-db.sh). Started by snickerdoodle-backup.timer.
+[Unit]
+Description=Snickerdoodle nightly database backup
+Requires=docker.service
+After=docker.service snickerdoodle.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/snickerdoodle/kit/bin/backup-db.sh
+Nice=10
+IOSchedulingClass=idle

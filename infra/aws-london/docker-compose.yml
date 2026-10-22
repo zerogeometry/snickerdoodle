@@ -1,0 +1,136 @@
+# Snickerdoodle on ONE AWS Lightsail box in London (decision D18). Runbook:
+# project-office/ops/AWS-LONDON-RUNBOOK.md.
+#
+# Don't run this file by hand with plain `docker compose`: bin/deploy.sh, bin/rollback.sh and the
+# systemd unit run it through bin/lib.sh, which passes the two settings files it needs:
+#   /etc/snickerdoodle/box.env       — this box's non-secret settings (domain, image repo, …)
+#   /opt/snickerdoodle/state/release.env — which image is live (written by deploy/rollback)
+# and the secrets arrive from SSM Parameter Store via bin/fetch-env.sh into /run (memory only):
+#   /run/snickerdoodle/app.env       — every app setting (env_file below)
+#   /run/snickerdoodle/jobs_secret   — the jobs secret alone, for the scheduler
+#   /run/snickerdoodle/db_password   — only with the on-box database (COMPOSE_PROFILES=local-db)
+#
+# Nothing a customer sends is written to this box's disk: the app's filesystem is read-only and its
+# only scratch space is in memory (tmpfs). Children's pictures live in the private S3 bucket.
+
+name: snickerdoodle
+
+services:
+  # ── the shop ───────────────────────────────────────────────────────────────────────────────────
+  app:
+    image: ${APP_IMAGE:?APP_IMAGE is set by bin/deploy.sh}
+    restart: unless-stopped
+    init: true
+    env_file:
+      # raw: values are taken literally (a secret may contain $ or quotes)
+      - path: /run/snickerdoodle/app.env
+        format: raw
+    environment:
+      # leave headroom under the container limit for sharp/libvips, which work outside the JS heap
+      NODE_OPTIONS: --max-old-space-size=${APP_NODE_HEAP_MB:-2560}
+    # Loopback only: Caddy reaches the app over the compose network; this port exists so the
+    # smoke test and the restore script can talk to the app ON the box. Never open it publicly.
+    ports:
+      - '127.0.0.1:3000:3000'
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m,mode=1777
+      - /app/.next/cache:size=256m,uid=1000,gid=1000,mode=0700
+    volumes:
+      # the Prodigi product blanks the mockup seeder reads (copied once from the founder's
+      # computer — runbook §4.4). Brand-safe product photos, no customer data. Empty is fine.
+      - /opt/snickerdoodle/prodigi-assets:/app/.prodigi-assets:ro
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    mem_limit: ${APP_MEM_LIMIT:-5g}
+    cpus: ${APP_CPUS:-3.5}
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false # only with the on-box database
+    stop_grace_period: 20s
+
+  # ── HTTPS in front: automatic certificates (Let's Encrypt), HTTP→HTTPS, compression ───────────
+  caddy:
+    image: ${CADDY_IMAGE:-caddy:2.10-alpine}
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      - '443:443/udp' # HTTP/3
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?set SITE_DOMAIN in /etc/snickerdoodle/box.env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in /etc/snickerdoodle/box.env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data # certificates (no customer data)
+      - caddy-config:/config
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - app
+
+  # ── the scheduled jobs: calls the app's own /api/jobs/* routes on their cadence ───────────────
+  # (scheduler/crontab). Over the private compose network, never through the public internet;
+  # Caddy refuses /api/jobs/* from outside altogether.
+  scheduler:
+    image: ${SCHEDULER_IMAGE:-alpine:3.22}
+    restart: unless-stopped
+    command: ['crond', '-f', '-l', '8', '-c', '/etc/crontabs']
+    environment:
+      APP_INTERNAL_URL: http://app:3000
+    volumes:
+      - ./scheduler/crontab:/etc/crontabs/root:ro
+      - ./scheduler/run-job.sh:/usr/local/bin/run-job:ro
+    secrets:
+      - jobs_secret
+    read_only: true
+    tmpfs:
+      - /tmp:size=8m
+      - /var/spool/cron:size=1m
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      - app
+
+  # ── OPTIONAL: Postgres on the box (COMPOSE_PROFILES=local-db). The runbook recommends the
+  # Lightsail managed database instead — see §2 for the trade-off. ──────────────────────────────
+  db:
+    profiles: [local-db]
+    image: ${POSTGRES_IMAGE:-postgres:16-bookworm}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: snickerdoodle
+      POSTGRES_DB: snickerdoodle
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    secrets:
+      - db_password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # not published on the host at all — only the app (and the backup script) reach it
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U snickerdoodle -d snickerdoodle']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    shm_size: 256m
+    mem_limit: ${DB_MEM_LIMIT:-1500m}
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 60s
+
+secrets:
+  jobs_secret:
+    file: /run/snickerdoodle/jobs_secret
+  db_password:
+    file: /run/snickerdoodle/db_password
+
+volumes:
+  caddy-data:
+  caddy-config:
+  pgdata:
+
+networks:
+  default:
+    name: snickerdoodle
