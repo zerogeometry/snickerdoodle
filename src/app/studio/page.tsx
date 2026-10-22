@@ -752,10 +752,10 @@ export default function StudioPage() {
     fit();
   };
 
-  const save = async (then: () => void) => {
+  const save = async (then: (saved: boolean) => void) => {
     const work = workRef.current;
-    if (!work) return then();
-    if (!dirty) return then();
+    if (!work) return then(false);
+    if (!dirty) return then(false);
     const id = await ensureAsset();
     if (!id) return;
     setBusy('saving…');
@@ -770,7 +770,7 @@ export default function StudioPage() {
       setAspect(res.aspect);
       setDirty(false);
       toast('saved ✨');
-      then();
+      then(true);
     } finally {
       setBusy(null);
     }
@@ -778,11 +778,14 @@ export default function StudioPage() {
   // Leaving on purpose (done / save / leave without saving). While the back-gesture guard below
   // holds an extra history entry, REPLACE it — so a later "back" from the range lands on the studio
   // once, not twice.
-  const backToRange = () => {
+  // `saved`: a design was just saved — the range opens at "your masterpiece, made real" on a
+  // phone (with its loader right there) rather than back at the top.
+  const backToRange = (saved = false) => {
+    const to = saved ? '/start-creating?edited=1' : '/start-creating';
     if (guardRef.current) {
       guardRef.current = false;
-      router.replace('/start-creating');
-    } else router.push('/start-creating');
+      router.replace(to);
+    } else router.push(to);
   };
 
   // ── added-thing actions ──
@@ -1049,7 +1052,7 @@ export default function StudioPage() {
         <button type="button" onClick={redo} disabled={!redoStack.current.length} aria-label="redo" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa disabled:opacity-40">
           <Icon icon={IconArrowForwardUp} size={18} />
         </button>
-        <Button size="md" onClick={() => void save(backToRange)} disabled={!!busy}>
+        <Button size="md" onClick={() => void save((saved) => backToRange(saved))} disabled={!!busy}>
           <Icon icon={IconCheck} size={16} /> done
         </Button>
       </header>
@@ -1113,10 +1116,10 @@ export default function StudioPage() {
       {/* leaving with unsaved changes */}
       <Modal open={leaving} onClose={() => setLeaving(false)} title="save your changes?" subtitle="you’ve edited this drawing">
         <div className="flex flex-col gap-2">
-          <Button size="lg" className="w-full" onClick={() => void save(backToRange)}>
+          <Button size="lg" className="w-full" onClick={() => void save((saved) => backToRange(saved))}>
             save &amp; go back
           </Button>
-          <Button variant="secondary" size="lg" className="w-full" onClick={backToRange}>
+          <Button variant="secondary" size="lg" className="w-full" onClick={() => backToRange()}>
             leave without saving
           </Button>
           <Button variant="ghost" size="md" className="w-full" onClick={() => setLeaving(false)}>

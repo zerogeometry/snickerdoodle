@@ -13,6 +13,12 @@ async function openStudio(page: Page) {
   await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /edit in studio/i }).first().click();
   await expect(page).toHaveURL(/\/studio$/);
+  // the picture is drawn (a tap before then is ignored)
+  await page.waitForFunction(() => {
+    const c = document.querySelector('canvas');
+    return !!c && c.width > 0 && c.height > 0;
+  });
+  await page.waitForTimeout(500);
 }
 
 test('back gesture with unsaved edits asks, and saving keeps the removed background', async ({ page }) => {
@@ -31,6 +37,12 @@ test('back gesture with unsaved edits asks, and saving keeps the removed backgro
   // and back from the range lands on the studio once — not a stale duplicate
   await page.goBack();
   await expect(page).toHaveURL(/\/studio$/);
+  // the picture is drawn (a tap before then is ignored)
+  await page.waitForFunction(() => {
+    const c = document.querySelector('canvas');
+    return !!c && c.width > 0 && c.height > 0;
+  });
+  await page.waitForTimeout(500);
 });
 
 test('back gesture with no edits just goes back', async ({ page }) => {

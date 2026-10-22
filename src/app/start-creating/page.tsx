@@ -67,6 +67,44 @@ export default function StartCreatingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Back from saving in the studio, on a PHONE: open at "your masterpiece, made real" — the loader
+  // right there, the range arriving under it — instead of at the top (the drawing + its buttons stay
+  // just above). Desktop shows both side by side already, so it stays put. Re-run once the drawing
+  // above has loaded (its height moves the heading), then hand the scroll back to the shopper.
+  const rangeRef = useRef<HTMLDivElement>(null);
+  const toRangePending = useRef(false);
+  const toRange = () => {
+    if (!toRangePending.current || !rangeRef.current) return;
+    rangeRef.current.scrollIntoView({ block: 'start', behavior: 'auto' });
+  };
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('edited') !== '1') return;
+    router.replace('/start-creating', { scroll: false }); // a refresh shouldn't jump again
+    if (!window.matchMedia('(max-width: 47.99rem)').matches) return;
+    toRangePending.current = true;
+    requestAnimationFrame(toRange);
+    // Keep the heading in place while the page above it settles (the drawing loading, the buttons)
+    // — until the shopper scrolls themselves, or after a moment.
+    const grid = rangeRef.current?.parentElement;
+    const ro = typeof ResizeObserver !== 'undefined' && grid ? new ResizeObserver(() => toRange()) : null;
+    if (ro && grid) for (const el of grid.children) ro.observe(el);
+    const stop = () => {
+      toRangePending.current = false;
+      ro?.disconnect();
+    };
+    const t = setTimeout(stop, 4000);
+    window.addEventListener('touchstart', stop, { once: true, passive: true });
+    window.addEventListener('wheel', stop, { once: true, passive: true });
+    return () => {
+      clearTimeout(t);
+      ro?.disconnect();
+      window.removeEventListener('touchstart', stop);
+      window.removeEventListener('wheel', stop);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // A new drawing: the loader comes back and waits for the new range.
   const shownAtRef = useRef(0);
   useEffect(() => {
@@ -202,7 +240,7 @@ export default function StartCreatingPage() {
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
-                    <img src={previewImg ?? ''} alt="your drawing" className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
+                    <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
                   </div>
                 </div>
               </div>
@@ -231,7 +269,7 @@ export default function StartCreatingPage() {
             </div>
 
             {/* Right: the personalised range — title fixed, range scrolls in its container */}
-            <div className="md:col-span-3">
+            <div ref={rangeRef} className="scroll-mt-[calc(env(safe-area-inset-top)+4.75rem)] md:col-span-3">
               <h1 className="font-display text-[28px] leading-tight md:text-4xl">Your masterpiece, made real.</h1>
               <div className="mt-4">
                 {loadError ? (
