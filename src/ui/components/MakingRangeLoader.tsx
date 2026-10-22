@@ -34,7 +34,9 @@ const ORBIT = [
 
 export function MakingRangeLoader({ drawing, className = '' }: { drawing?: string | null; className?: string }) {
   return (
-    <div role="status" className={`flex flex-col items-center justify-center px-4 py-10 text-center ${className}`}>
+    // Phones: it sits right under "your masterpiece, made real" (the hidden range beneath is tall, so
+    // centring would push it far down the page). Wider screens: centred in the range's box.
+    <div role="status" className={`flex flex-col items-center justify-start px-4 pb-10 pt-7 text-center md:justify-center md:py-10 ${className}`}>
       <div className="relative mx-auto mt-10 w-[44%] max-w-[170px]">
         {ORBIT.map((o, i) => (
           <span

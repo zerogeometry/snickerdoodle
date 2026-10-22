@@ -535,6 +535,9 @@ function CustomizeProduct() {
         : mockupView === 'tin'
           ? 'tin'
           : undefined;
+  // The base colour as a preview shows it: every view of the printed product — except the jigsaw's
+  // keepsake tin, a display of the lid that never takes the colour.
+  const groundFor = (view?: string | null) => (isGround && view !== 'tin' ? ground : undefined);
   const activeSpanHalf: 'front' | undefined =
     product.key === 'card' && cardView !== 'outside' && cardSpan === 'full' ? 'front' : undefined;
 
@@ -553,7 +556,7 @@ function CustomizeProduct() {
             view={activeMockupView}
             spanHalf={activeSpanHalf}
             fill={showBack ? backFill : undefined}
-            ground={isGround ? ground : undefined}
+            ground={groundFor(activeMockupView)}
             px={720}
             loader
           />
@@ -607,7 +610,7 @@ function CustomizeProduct() {
                   view={activeMockupView}
                   spanHalf={activeSpanHalf}
                   fill={showBack ? backFill : undefined}
-                  ground={isGround ? ground : undefined}
+                  ground={groundFor(activeMockupView)}
                   px={360}
                   loader
                 />
@@ -720,7 +723,7 @@ function CustomizeProduct() {
                     size="thumb"
                     sourceObjectId={activeSource ?? null}
                     view={v === 'tin' ? 'tin' : undefined}
-                    ground={isGround ? ground : undefined}
+                    ground={groundFor(v)}
                     px={120}
                     lazy
                   />
@@ -749,6 +752,7 @@ function CustomizeProduct() {
                     transform={placement}
                     size="thumb"
                     sourceObjectId={activeSource ?? null}
+                    ground={groundFor()}
                     px={110}
                     lazy
                   />
@@ -798,6 +802,7 @@ function CustomizeProduct() {
                           transform={placement}
                           size="thumb"
                           sourceObjectId={activeSource ?? null}
+                          ground={groundFor()}
                           px={110}
                           lazy
                         />

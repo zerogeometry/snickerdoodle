@@ -277,8 +277,8 @@ export function FlowCatalogue({
   const flatShown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
 
   const gridClassName = compact
-    ? 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3' // 2-up so tiles are wide enough to keep −/+/customize on ONE row
-    : 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3 sm:grid-cols-3 md:grid-cols-4 md:gap-x-5';
+    ? 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-2 sm:gap-x-4' // phones: one column (name, price + button each get room); 2-up from sm
+    : 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 md:gap-x-5';
   const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto px-1.5 pb-3 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem] 2xl:max-h-[46rem]' : undefined;
   // Sections (Start-Creating) uses the basket-sidebar model: the catalogue tiles just
   // "+ customize", and quantity lives in the basket — so no per-tile stepper.

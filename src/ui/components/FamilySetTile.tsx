@@ -75,13 +75,13 @@ export function FamilySetTile({
       </div>
 
       <div className="flex flex-1 flex-col gap-2 px-1 pb-0.5 pt-2.5">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-1">
-          <span className="whitespace-nowrap text-sm font-extrabold text-cocoa">family set</span>
-          <span className="shrink-0 whitespace-nowrap text-xs font-semibold text-ink-soft">from {gbp(fromPence)}</span>
+        <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-1">
+          <span className="whitespace-nowrap text-base font-extrabold text-cocoa sm:text-sm">family set</span>
+          <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-soft sm:text-xs">from {gbp(fromPence)}</span>
         </div>
         <span className="-mt-1.5 text-[11px] leading-snug text-ink-soft">matching tees, one colour · 3+ save 5%</span>
         <div className="mt-auto">
-          <button type="button" onClick={onOpen} className="press inline-flex min-h-11 w-full items-center justify-center rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none">
+          <button type="button" onClick={onOpen} className="press inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none">
             {label}
           </button>
         </div>

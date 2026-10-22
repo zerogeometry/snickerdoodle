@@ -6,7 +6,7 @@
 export function TileSkeletonGrid({
   count = 6,
   label = 'loading',
-  className = 'grid grid-cols-2 gap-x-4 gap-y-7 pt-3 sm:grid-cols-3 md:grid-cols-4',
+  className = 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4',
 }: {
   count?: number;
   label?: string;
