@@ -323,8 +323,10 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     // Founder-photographed sets (layered-flat) first; the drawn stand-in only if they aren't staged.
     // Fabric MULTIPLIES over the photo, so the knit / cotton texture reads through the print.
     case 'socks': {
-      const dir = layeredFlatDir(`socks/${size === 'tube' ? 'tube' : 'ankle'}`);
-      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'socks' };
+      // the ankle pair lies at an angle — the pattern runs down the socks, cuff to toe (founder)
+      const tube = size === 'tube';
+      const dir = layeredFlatDir(`socks/${tube ? 'tube' : 'ankle'}`);
+      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, tilted: !tube } : { material: 'PAPER', register: 'drawn', key: 'socks' };
     }
     case 'teaTowel': {
       // the photo is composed PORTRAIT (turned 90°) because the print file is portrait
@@ -728,8 +730,9 @@ async function layeredFlat(dir: string): Promise<{ blank: Buffer; mask: Buffer; 
 
 /**
  * A layered-flat set as a ready mockup template: blank, mask, overlay and the print quad — the
- * window aspect-locked (cover) to the print file, or, for a tilted face, its true corners passed
- * verbatim (the compositor picks the perspective warp for a skewed quad and clips to the mask).
+ * window aspect-locked (cover) to the print file, or, for a tilted product (a leaning card, socks
+ * laid at an angle), a print area turned to the product's own angle and aspect-locked the same way
+ * (the compositor picks the perspective warp for a skewed quad and clips to the mask).
  * Shared by the seeder and scripts/preview-mockups.ts, so a local preview IS what gets seeded.
  */
 export async function layeredFlatTemplate(
@@ -740,7 +743,7 @@ export async function layeredFlatTemplate(
   const d = await layeredFlat(dir);
   if (tilted) {
     const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
-    const corners = minAreaRectCorners(a, d.W, d.H);
+    const corners = orientedCoverQuad(a, d.W, d.H, printAspect, tiltOf(a, d.W, d.H));
     return corners ? { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: corners, W: d.W, H: d.H } : null;
   }
   return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), W: d.W, H: d.H };
@@ -752,38 +755,85 @@ export function layeredFlatPath(name: string): string | null {
 }
 
 /**
- * The four corners (TL,TR,BR,BL, normalised) of the SMALLEST rectangle around a tilted shape in an
- * image's alpha — for a rounded-corner card these are the card's true (sharp) corners, so the art
- * reaches the straight edges and the mask trims it to the rounded ones. (The diagonal-extreme
- * detector in detectQuadCorners lands ON the corner arcs instead, leaving a white rim.) Searches
- * tilts within ±45°; exported for its unit test.
+ * The tilt (degrees, clockwise) of a shape's pieces — a pair of socks laid at an angle, a leaning
+ * card — read from each piece's SIDES: its left and right edges through the middle band of its
+ * height (45–85%), clear of a cuff, heel, toe or rounded corner, each fitted to a straight line and
+ * averaged. (The outline's long axis or smallest box gets dragged round by a sock's heel; the row
+ * midpoints of a wide card cancel out.) Averaged over pieces by size; pieces under 5% of the total
+ * are ignored. Meant for upright-ish pieces (within ~±40°); 0 for an empty shape.
  */
-export function minAreaRectCorners(alpha: Uint8Array | Buffer, W: number, H: number, step = 2): [number, number][] | null {
-  const pts: [number, number][] = [];
+export function tiltOf(alpha: Uint8Array | Buffer, W: number, H: number, step = 2): number {
+  const gw = Math.ceil(W / step), gh = Math.ceil(H / step);
+  const on = (gx: number, gy: number) => alpha[Math.min(H - 1, gy * step) * W + Math.min(W - 1, gx * step)]! >= 128;
+  const seen = new Uint8Array(gw * gh);
+  const pieces: { n: number; t: number }[] = [];
+  let total = 0;
+  for (let start = 0; start < gw * gh; start++) {
+    if (seen[start] || !on(start % gw, (start / gw) | 0)) continue;
+    const rows = new Map<number, [number, number]>(); // y → [min x, max x]
+    let n = 0;
+    const stack = [start];
+    seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      const x = i % gw, y = (i / gw) | 0;
+      n++;
+      const r = rows.get(y);
+      if (r) { if (x < r[0]) r[0] = x; if (x > r[1]) r[1] = x; } else rows.set(y, [x, x]);
+      for (const j of [x > 0 ? i - 1 : -1, x < gw - 1 ? i + 1 : -1, y > 0 ? i - gw : -1, y < gh - 1 ? i + gw : -1]) {
+        if (j >= 0 && !seen[j] && on(j % gw, (j / gw) | 0)) { seen[j] = 1; stack.push(j); }
+      }
+    }
+    total += n;
+    // the middle band of the piece's height, then a least-squares line down each side: x = a + slope·y
+    const ys = [...rows.keys()];
+    const y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const band = ys.filter((y) => y >= y0 + (y1 - y0) * 0.45 && y <= y0 + (y1 - y0) * 0.85);
+    const slopeOf = (side: 0 | 1) => {
+      let k = 0, sy = 0, sx = 0, syy = 0, syx = 0;
+      for (const y of band) {
+        const x = rows.get(y)![side];
+        k++; sy += y; sx += x; syy += y * y; syx += y * x;
+      }
+      const den = k * syy - sy * sy;
+      return k < 3 || den === 0 ? null : (k * syx - sy * sx) / den; // x drift per row going down
+    };
+    const left = slopeOf(0), right = slopeOf(1);
+    if (left == null || right == null) continue;
+    pieces.push({ n, t: (-Math.atan((left + right) / 2) * 180) / Math.PI });
+  }
+  const big = pieces.filter((p) => p.n >= total * 0.05);
+  const n = big.reduce((s, p) => s + p.n, 0);
+  return n ? big.reduce((s, p) => s + p.t * p.n, 0) / n : 0;
+}
+
+/**
+ * A print area turned to `tiltDeg` around a shape: the smallest rectangle at that angle that holds
+ * every opaque pixel, then widened (never squashed) to the print file's aspect, centred — so the art
+ * is laid at its true proportions, upright along the product, and the mask trims it to the
+ * silhouette. Corners TL, TR, BR, BL, normalised. Exported for its unit test.
+ */
+export function orientedCoverQuad(alpha: Uint8Array | Buffer, W: number, H: number, printAspect: number, tiltDeg: number, step = 2): [number, number][] | null {
+  const t = (tiltDeg * Math.PI) / 180, cs = Math.cos(t), sn = Math.sin(t);
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
   for (let y = 0; y < H; y += step)
-    for (let x = 0; x < W; x += step) if (alpha[y * W + x]! >= 128) pts.push([x + 0.5, y + 0.5]);
-  if (pts.length < 3) return null;
-  let best: { area: number; t: number; u0: number; u1: number; v0: number; v1: number } | null = null;
-  for (let deg = -45; deg <= 45; deg += 0.25) {
-    const t = (deg * Math.PI) / 180, cs = Math.cos(t), sn = Math.sin(t);
-    let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
-    for (const [x, y] of pts) {
-      const u = x * cs + y * sn, v = -x * sn + y * cs;
+    for (let x = 0; x < W; x += step) {
+      if (alpha[y * W + x]! < 128) continue;
+      const px = x + 0.5, py = y + 0.5;
+      const u = px * cs + py * sn, v = -px * sn + py * cs;
       if (u < u0) u0 = u;
       if (u > u1) u1 = u;
       if (v < v0) v0 = v;
       if (v > v1) v1 = v;
     }
-    const area = (u1 - u0) * (v1 - v0);
-    if (!best || area < best.area) best = { area, t, u0, u1, v0, v1 };
-  }
-  const { t, u0, u1, v0, v1 } = best!;
+  if (u1 < u0) return null;
   const pad = step / 2; // sampled on a grid — give back half a cell
-  const cs = Math.cos(t), sn = Math.sin(t);
+  u0 -= pad; u1 += pad; v0 -= pad; v1 += pad;
+  // cover: widen the short side so w/h = the print's aspect
+  const w = u1 - u0, h = v1 - v0, cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+  const [ww, hh] = w / h < printAspect ? [h * printAspect, h] : [w, w / printAspect];
   const back = (u: number, v: number): [number, number] => [(u * cs - v * sn) / W, (u * sn + v * cs) / H];
-  // In the rotated frame u runs along the card's width and v down its height (|tilt| ≤ 45°), so
-  // these four come out as TL, TR, BR, BL in image space too.
-  return [back(u0 - pad, v0 - pad), back(u1 + pad, v0 - pad), back(u1 + pad, v1 + pad), back(u0 - pad, v1 + pad)];
+  return [back(cu - ww / 2, cv - hh / 2), back(cu + ww / 2, cv - hh / 2), back(cu + ww / 2, cv + hh / 2), back(cu - ww / 2, cv + hh / 2)];
 }
 
 const layeredMugCache = new Map<string, { blank: Buffer; mask: Buffer; quad: Quad; W: number; H: number }>();

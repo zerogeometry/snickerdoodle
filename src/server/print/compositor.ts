@@ -228,6 +228,18 @@ function quadEdgeAspect(quad: [number, number][]): number {
   return h === 0 ? 1 : w / h;
 }
 
+/**
+ * Should a print be turned 90° to fit a skewed quad? Only when the quad matches the SWAPPED print
+ * shape strictly better than the print as it is (the tin's landscape lid print shot in a portrait
+ * view). A square print onto a square-ish quad is never turned: a rounding hair either side of 1
+ * would otherwise lay a pattern on its side. Exported for its unit test.
+ */
+export function isTransposed(printAspect: number, quadAspect: number): boolean {
+  const straight = Math.abs(Math.log(printAspect) - Math.log(quadAspect));
+  const swapped = Math.abs(-Math.log(printAspect) - Math.log(quadAspect));
+  return swapped + 1e-9 < straight;
+}
+
 /** Is the quad an axis-aligned rectangle (FLAT) or a skewed/perspective quad? */
 function isAxisAligned(quad: [number, number][]): boolean {
   const [tl, tr, br, bl] = quad as [[number, number], [number, number], [number, number], [number, number]];
@@ -417,7 +429,7 @@ export async function renderTemplatePreview(args: {
   const meta = await sharp(args.blank).metadata();
   const common = { blankBuf: args.blank, designBuf, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print };
   const out = !isAxisAligned(args.quad)
-    ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay })
+    ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
     : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
   return out.buffer;
 }
@@ -478,6 +490,7 @@ async function renderAndPersist(
         spanHalf: args.spanHalf,
         maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
         overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
+        materialClass: args.materialClass,
       })
     : cylinder
       ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await layer(args.maskKey!) })
@@ -728,6 +741,8 @@ async function renderPerspective(args: {
   maskBuf?: Buffer;
   /** Foreground overlay composited OVER the art (same canvas as the blank). */
   overlayBuf?: Buffer;
+  /** Fabric (multiply) lets the photo's own texture read through the art, as on the flat path. */
+  materialClass?: string;
   designBuf: Buffer;
   quad: [number, number][];
   transform: Transform;
@@ -736,7 +751,7 @@ async function renderPerspective(args: {
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
   const bm = await sharp(blankBuf, { limitInputPixels: MAX_INPUT_PIXELS }).metadata();
@@ -787,7 +802,7 @@ async function renderPerspective(args: {
   // If the print's aspect and the quad's OWN aspect are TRANSPOSED — e.g. the tin's landscape
   // lid print (869×674) shot in a portrait orientation — rotate the design −90° so it fills the
   // quad the right way round instead of squishing across it. A no-op when the two agree.
-  const transposed = (dw / dh >= 1) !== (quadEdgeAspect(quad) >= 1);
+  const transposed = isTransposed(dw / dh, quadEdgeAspect(quad));
   const raw = await (transposed ? sharp(designPng).rotate(-90) : sharp(designPng)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
 
   // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
@@ -805,9 +820,22 @@ async function renderPerspective(args: {
     const clip = await sharp({ create: { width: WW, height: WH, channels: 3, background: '#000' } }).joinChannel(maskFull).png().toBuffer();
     warpedPng = await sharp(warpedPng).composite([{ input: clip, blend: 'dest-in' }]).png().toBuffer();
   }
-  let composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
-    .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
-    .toBuffer();
+  const fx = MATERIAL_FX[materialClass ?? 'PAPER'] ?? MATERIAL_FX.PAPER!;
+  let composited: Buffer;
+  if (fx.blend === 'multiply') {
+    // Fabric: flatten over white (multiply's identity — off-print stays the bare photo) and multiply
+    // in linear light, so the knit / weave and folds read through the art, exactly like renderFlat.
+    const flat = await sharp(warpedPng).flatten({ background: '#ffffff' }).png().toBuffer();
+    composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+      .pipelineColourspace('scrgb')
+      .composite([{ input: flat, left: 0, top: 0, blend: 'multiply' }])
+      .toColourspace('srgb')
+      .toBuffer();
+  } else {
+    composited = await sharp(workingBlank, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' })
+      .composite([{ input: warpedPng, left: 0, top: 0, blend: 'over' }])
+      .toBuffer();
+  }
   if (overlayBuf) {
     try {
       const ov = await sharp(overlayBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(WW, WH, { fit: 'fill' }).ensureAlpha().png().toBuffer();

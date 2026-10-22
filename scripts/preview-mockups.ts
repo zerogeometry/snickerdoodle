@@ -19,7 +19,7 @@ mkdirSync(outDir, { recursive: true });
 // One variant per photo set (the sets are shared across a product's sizes).
 // dpi = the variant's print dpi in src/server/catalogue.ts (it sets a pattern's motif size).
 const SETS: { key: string; set: string; sku?: string; material: string; dpi: number; tilted?: boolean }[] = [
-  { key: 'socks', set: 'socks/ankle', sku: 'GLOBAL-ANKLE-SOCKS', material: 'LIGHT_FABRIC', dpi: 300 },
+  { key: 'socks', set: 'socks/ankle', sku: 'GLOBAL-ANKLE-SOCKS', material: 'LIGHT_FABRIC', dpi: 300, tilted: true },
   { key: 'socks', set: 'socks/tube', sku: 'GLOBAL-TUBE-SOCKS', material: 'LIGHT_FABRIC', dpi: 300 },
   { key: 'teaTowel', set: 'teaTowel', material: 'LIGHT_FABRIC', dpi: 300 },
   { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-3-75X90', material: 'PAPER', dpi: 150 },
