@@ -46,3 +46,25 @@ export function getS3(): { client: S3Client; bucket: string } {
   }
   return { client: _client, bucket: cfg.bucket };
 }
+
+let _presignClient: S3Client | null = null;
+
+/**
+ * A second client used ONLY to sign browser upload URLs. The SDK's default "flexible checksums"
+ * add a checksum of an EMPTY body to a presigned PUT, which real S3 then rejects (the browser
+ * sends the real bytes). Checksums are switched to "when required" here so a signed upload URL
+ * names only what we mean it to: one key, one size, one content type, the encryption headers.
+ */
+export function getPresignS3(): { client: S3Client; bucket: string } {
+  const cfg = storageConfig();
+  if (_presignClient === null) {
+    _presignClient = new S3Client({
+      region: cfg.region,
+      endpoint: cfg.endpoint,
+      forcePathStyle: cfg.forcePathStyle,
+      credentials: { accessKeyId: cfg.accessKeyId, secretAccessKey: cfg.secretAccessKey },
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+    });
+  }
+  return { client: _presignClient, bucket: cfg.bucket };
+}

@@ -14,7 +14,9 @@ people must be told plainly what happens.
 - **Bucket versioning ON** (protects against accidental overwrite/delete for a few days).
 - **Lifecycle rules:** `infra/s3-lifecycle.json`
   - non-current versions expire after **7 days** → a deleted original is truly gone within a week;
-  - `erasure-ledger/` objects expire after **30 days** (longer than the DB backup window).
+  - `erasure-ledger/` objects expire after **30 days** (longer than the DB backup window);
+  - `quarantine/` (direct uploads not yet checked) expire after **1 day**, non-current versions too —
+    a backstop; the app deletes every version itself on finalise (ops/DIRECT-UPLOADS.md).
 - Apply (AWS): `aws s3api put-bucket-versioning --bucket <bucket> --versioning-configuration Status=Enabled`
   then `aws s3api put-bucket-lifecycle-configuration --bucket <bucket> --lifecycle-configuration file://infra/s3-lifecycle.json`.
 - Originals are encrypted with their own KMS key (`S3_KMS_KEY_ALIAS_ORIGINALS`). Crypto-shredding is

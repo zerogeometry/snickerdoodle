@@ -9,6 +9,13 @@
       "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
     },
     {
+      "ID": "unchecked-uploads-gone-within-1-day",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "quarantine/" },
+      "Expiration": { "Days": 1 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 1 }
+    },
+    {
       "ID": "erasure-ledger-30-days",
       "Status": "Enabled",
       "Filter": { "Prefix": "erasure-ledger/" },
