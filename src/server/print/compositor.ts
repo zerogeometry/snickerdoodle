@@ -8,7 +8,7 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { canvasSizePx, clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
-import { isColouredGround, isPatternProduct, normalizePatternGround, patternGroundHex } from '@/lib/patterns';
+import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
 import { renderRepeatPatternPixels } from './pattern';
 import { isHeightChart } from './height-chart-geometry';
 import { renderHeightChartFacePixels } from './heightChart';
@@ -97,8 +97,9 @@ export interface ComposeMockupInput {
    * then keep this half — 'front' = the right panel of [back | front]. PERSPECTIVE views only
    * (the closed-card hero); the flat outside-full view bakes the span into its box instead. */
   spanHalf?: 'front' | 'back';
-  /** A REPEAT-PATTERN product's base colour token (PATTERN_GROUNDS): the printed face is filled with
-   * it, the drawing repeating on top — exactly as the print file. Ignored on other products. */
+  /** An edge-to-edge product's BASE COLOUR (#rrggbb, GROUND_PRODUCT_KEYS): the printed face is
+   * filled with it, the drawing sitting (or repeating) on top — exactly as the print file. Ignored on
+   * other products. */
   ground?: string;
   /** Per-REQUEST memo (a batch of thumbs for one drawing shares its shrunk design). Never kept
    * across requests. (The one thing made from a drawing that outlives a request is the printed
@@ -418,10 +419,10 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // view carries its span in the box); ignored elsewhere so it never forks other products' keys.
   const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
   const spanTag = spanHalf ? `-span${spanHalf}` : '';
-  // a coloured base forks the pattern's key (white keeps the existing key, so nothing re-renders)
-  const ground = face === 'pattern' ? normalizePatternGround(input.ground) : null;
-  const groundTag = isColouredGround(ground) ? `-g${ground}` : '';
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}${groundTag}` : '';
+  // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
+  const ground = !fill && (face === 'pattern' || (!face && isGroundProduct(prod?.key))) ? normalizeGround(input.ground) : null;
+  const gTag = groundTag(ground);
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
@@ -441,7 +442,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       designKey: srcObj.key,
       designTag: `${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}`,
       fillHex: fill,
-      groundHex: ground ? patternGroundHex(ground) : undefined,
+      groundHex: ground ? groundHex(ground) : undefined,
       quad: tpl.printQuad,
       transform: t,
       spanHalf,
@@ -500,18 +501,19 @@ export async function renderTemplatePreview(args: {
   blank: Buffer; mask?: Buffer; overlay?: Buffer; quad: [number, number][]; materialClass: string;
   design: Buffer; productKey: string; print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   size?: MockupSize;
-  /** a repeat-pattern base colour token (white by default) */
+  /** a base colour (#rrggbb; white by default) */
   ground?: string;
 }): Promise<Buffer> {
   const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
   let transform: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   let designBuf: Design = args.design;
   if (face) {
-    designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, patternGroundHex(args.ground));
+    designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, groundHex(args.ground));
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const meta = await sharp(args.blank).metadata();
-  const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print };
+  const placedGround = !face && isGroundProduct(args.productKey) && normalizeGround(args.ground) ? groundHex(args.ground) : undefined;
+  const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
   const out = !isAxisAligned(args.quad)
     ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
     : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
@@ -578,6 +580,8 @@ async function renderAndPersist(
     print: args.print,
     materialClass: args.materialClass,
     mugMode: args.mugMode,
+    // a base colour under a PLACED drawing (a printed face already carries its own)
+    groundHex: args.face ? undefined : args.groundHex,
   });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
@@ -610,6 +614,8 @@ export async function renderMockupLayers(args: {
   transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   materialClass: string; mugMode?: 'front' | 'back' | 'centre';
+  /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area. Flat + perspective only. */
+  groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number; tier: 'FLAT' | 'PERSPECTIVE' }> {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
   // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
@@ -620,10 +626,10 @@ export async function renderMockupLayers(args: {
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
   const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
   const out = perspective
-    ? await renderPerspective({ ...common, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
+    ? await renderPerspective({ ...common, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex })
     : cylinder
       ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
-      : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
+      : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex });
   return { ...out, tier: perspective ? 'PERSPECTIVE' : 'FLAT' };
 }
 
@@ -650,10 +656,12 @@ async function renderFlat(args: {
   outputEdge: number;
   /** The variant's real print geometry, for bleed-exact windowing. */
   print: { widthPx: number; bleedMm: number; requiredDpi: number };
+  /** Base colour under the drawing, filling the whole print area (#rrggbb); none = see-through. */
+  groundHex?: string;
   /** Drives the Tier-B fabric fx intensities (fold displacement + shading). */
   materialClass: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, designBuf, ids, quad, transform, workEdge, outputEdge, print, materialClass } = args;
+  const { blankBuf, maskBuf, overlayBuf, designBuf, ids, quad, transform, workEdge, outputEdge, print, materialClass, groundHex: ground } = args;
 
   const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
   const rect = quadBboxPx(quad, WW, WH);
@@ -691,8 +699,9 @@ async function renderFlat(args: {
   const iw = Math.max(1, Math.min(layer.width - ix, rect.w - ox));
   const ih = Math.max(1, Math.min(layer.height - iy, rect.h - oy));
   const part = await placedPart(designBuf, transform, layer, { left: ix, top: iy, width: iw, height: ih });
+  // the print area: see-through (unprinted surface), or the BASE COLOUR edge to edge
   const windowed = await toRaw(
-    sharp({ create: { width: rect.w, height: rect.h, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
+    sharp({ create: { width: rect.w, height: rect.h, channels: 4, background: ground ?? { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
   );
 
   const fx = MATERIAL_FX[materialClass] ?? MATERIAL_FX.PAPER!;
@@ -821,6 +830,8 @@ async function renderPerspective(args: {
   workEdge: number;
   outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+  /** Base colour under the drawing, filling the whole print area (#rrggbb); none = white stock. */
+  groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
   const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
 
@@ -850,7 +861,7 @@ async function renderPerspective(args: {
   // removed background) prints as the white of the stock — so lay the design on white here too,
   // or the preview shows a ghost card with the art floating over the envelope.
   const spread = await toRaw(
-    sharp({ create: { width: cw, height: dh, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
+    sharp({ create: { width: cw, height: dh, channels: 4, background: args.groundHex ?? { r: 255, g: 255, b: 255, alpha: 1 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
   );
   // Keep just the visible panel (front = right half) — a no-op for a normal single-panel view.
   const panel = spanHalf ? await toRaw(fromRaw(spread).extract({ left: spanHalf === 'front' ? dw : 0, top: 0, width: dw, height: dh })) : spread;

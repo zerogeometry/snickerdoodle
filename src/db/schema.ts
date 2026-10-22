@@ -731,9 +731,10 @@ export const orderItemArtwork = pgTable(
     // that plain-colour back. Null / any non-DUAL variant = single-sided (renderer ignores it).
     // The SKU (not this) is authoritative for single-vs-double + price; this only picks the back.
     back: text('back'),
-    // REPEAT-PATTERN base colour (socks, wrapping paper, tea towel), frozen at order time: a
-    // PATTERN_GROUNDS token (src/lib/patterns.ts) the whole print file is filled with, the drawing
-    // repeating on top. Null / any other product = white. Server-normalised — never a raw hex.
+    // BASE COLOUR of an edge-to-edge product (GROUND_PRODUCT_KEYS, src/lib/patterns.ts), frozen at
+    // order time: lowercase #rrggbb the whole print file is filled with, the drawing on top (or
+    // repeating). Null / any other product = white. Server-normalised (normalizeGround); rows from
+    // before the colour wheel may hold a palette word ('navy'), still read as its colour.
     ground: text('ground'),
     // GREETINGS-CARD inside message, frozen + SCREENED at order time: {greeting,message,signature,note,font,fontScale}
     // or null (blank inside). Abuse-screened before it can be stored/printed (see screenCardMessage).
@@ -878,7 +879,7 @@ export const savedDesigns = pgTable(
     transform: jsonb('transform'),
     sourceObjectId: uuid('source_object_id'),
     back: text('back'),
-    ground: text('ground'), // repeat-pattern base colour token (see order_item_artwork.ground)
+    ground: text('ground'), // base colour #rrggbb (see order_item_artwork.ground)
     createdAt,
   },
   (t) => [index('saved_design_family_idx').on(t.familyId, t.createdAt)],

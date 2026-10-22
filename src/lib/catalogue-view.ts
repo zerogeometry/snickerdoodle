@@ -1,6 +1,6 @@
 import type { BasketItem } from '@/lib/store';
 import { caseDefaultTransform } from '@/lib/phone-cases';
-import { isColouredGround } from '@/lib/patterns';
+import { groundTag } from '@/lib/patterns';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
@@ -21,7 +21,7 @@ export const lineIdForSku = (sku: string) => `cat-${sku}`;
  * variant id, so existing lines and quick-add are unchanged.
  */
 export const lineIdFor = (sku: string, ground?: string | null) =>
-  isColouredGround(ground) ? `${lineIdForSku(sku)}~${ground}` : lineIdForSku(sku);
+  groundTag(ground) ? `${lineIdForSku(sku)}~${groundTag(ground).slice(2)}` : lineIdForSku(sku);
 
 /** Is this basket line id one of this variant's lines (any base colour)? */
 export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku) || id.startsWith(`${lineIdForSku(sku)}~`);

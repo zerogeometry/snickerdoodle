@@ -33,6 +33,7 @@ import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Pl
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
+import { forgetMockupsFor } from '@/lib/mockupPrefetch';
 import {
   IDENTITY,
   buildWork,
@@ -764,6 +765,9 @@ export default function StudioPage() {
       const see = hasTransparency(work.alpha);
       const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: !see });
       if (!res.ok) return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
+      // the design is re-saved in place (same id, new pixels): drop the old pictures of it
+      const prev = useUpload.getState().upload?.cutout?.sourceObjectId;
+      for (const id of new Set([prev, res.design?.sourceObjectId])) if (id) forgetMockupsFor(id);
       setCutout(res.design);
       setAspect(res.aspect);
       setDirty(false);

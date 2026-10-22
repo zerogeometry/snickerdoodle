@@ -545,3 +545,27 @@ body {
 .brand-scroll::-webkit-scrollbar-thumb:hover {
   background: var(--color-cta-deep);
 }
+
+/* The colour wheel's light-or-dark slider: a chunky paper knob, ink-outlined (never the browser's blue). */
+.wheel-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: var(--color-paper);
+  border: 3px solid var(--color-cocoa);
+  box-shadow: 0 2px 0 var(--color-cocoa);
+}
+.wheel-range::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 9999px;
+  background: var(--color-paper);
+  border: 3px solid var(--color-cocoa);
+  box-shadow: 0 2px 0 var(--color-cocoa);
+}
+.wheel-range:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--color-honey);
+}

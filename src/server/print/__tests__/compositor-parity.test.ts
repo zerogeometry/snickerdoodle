@@ -116,6 +116,15 @@ const PRESETS: { name: string; render: (l: Layers) => Promise<Buffer> }[] = [
       return (await renderMockupLayers({ blank: l.blank, design: face, quad: tall, transform: T1, print, materialClass: 'PAPER', ...THUMB })).buffer;
     },
   },
+  // a BASE COLOUR under a placed drawing (edge-to-edge products): opaque coloured window / spread
+  {
+    name: 'template-preview-placed-ground-flat-fabric',
+    render: (l) => renderTemplatePreview({ blank: l.blank, mask: l.mask, quad: FLAT_QUAD, materialClass: 'LIGHT_FABRIC', design: l.design, productKey: 'cushion', print: { widthPx: 1500, heightPx: 1500, bleedMm: 3, requiredDpi: 300 }, size: 'zoom', ground: '#2f5da8' }),
+  },
+  {
+    name: 'template-preview-placed-ground-skew-paper',
+    render: (l) => renderTemplatePreview({ blank: l.blank, mask: l.mask, overlay: l.overlay, quad: SKEW_QUAD, materialClass: 'PAPER', design: l.design, productKey: 'playingCards', print: { widthPx: 820, heightPx: 1122, bleedMm: 0, requiredDpi: 300 }, size: 'thumb', ground: '#e8786e' }),
+  },
   {
     name: 'template-preview-pattern-skew',
     render: (l) => renderTemplatePreview({ blank: l.blank, mask: l.mask, overlay: l.overlay, quad: SKEW_QUAD, materialClass: 'LIGHT_FABRIC', design: l.design, productKey: 'socks', print: { widthPx: 2400, heightPx: 1800, bleedMm: 0, requiredDpi: 300 }, size: 'thumb', ground: 'navy' }),

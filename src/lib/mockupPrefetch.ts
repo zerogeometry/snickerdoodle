@@ -66,6 +66,20 @@ export function forgetMockup(key: string): void {
   done.delete(key);
 }
 
+/**
+ * Forget every mockup made from this source object. The Studio re-saves a design IN PLACE (same
+ * object id, new pixels — new text, a new background), so without this the tiles would keep showing
+ * the old picture until the URLs aged out. The server's own cache key carries the content hash, so
+ * the next request composes the new design.
+ */
+export function forgetMockupsFor(sourceObjectId: string): void {
+  const tag = `|${sourceObjectId}|`;
+  for (const k of [...done.keys()]) if (k.includes(tag)) done.delete(k);
+  for (const k of [...failed]) if (k.includes(tag)) failed.delete(k);
+  for (const k of [...pending.keys()]) if (k.includes(tag)) pending.delete(k);
+  notify();
+}
+
 /** Record a result a tile fetched itself, so others (and a re-mount) reuse it. */
 export function rememberMockup(key: string, url: string): void {
   done.set(key, { url, at: Date.now() });

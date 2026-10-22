@@ -1,5 +1,6 @@
 'use client';
 
+import { tiltedRect } from '@/lib/studio-geometry';
 import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +26,7 @@ import {
 } from '@/server/print/geometry';
 import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
-import { isPatternProduct, patternGroundHex } from '@/lib/patterns';
+import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import type { StudioData } from '@/server/studio';
@@ -98,7 +99,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
-  const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(null);
+  // starts on the design the parent is placing (their Studio save / lifted cutout), not the original
+  const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(data.keepsakes[0]?.design ?? null);
   const [removing, setRemoving] = useState(false);
   // The product context: blank photo + print-area quad (+ silhouette mask) — so the image
   // is placed ON the product, not on an abstract canvas. Falls back to the flat canvas.
@@ -222,7 +224,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const isPattern = isPatternProduct(variant.productKey);
   // the base colour chosen on the customize page — the repeat is drawn on it, like the print
   const groundToken = useSelection((s) => s.selections[variant.productKey]?.ground);
-  const groundHex = patternGroundHex(groundToken);
+  const isGround = isGroundProduct(variant.productKey);
+  const groundHex = groundHexOf(isGround ? groundToken : null);
+  // a placed drawing on a base colour: the print area shows the colour edge to edge, like the print
+  const groundFill: React.CSSProperties | undefined = isGround && !isPattern && isColouredGround(groundToken) ? { background: groundHex } : undefined;
   const isChart = isHeightChart(variant.productKey);
   const noProductView = isMug || isPattern || isChart;
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
@@ -352,7 +357,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     if (rendering) return;
     setRendering(true);
     try {
-      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId, ground: isPattern ? groundToken : undefined });
+      const res = await renderPreviewAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId, ground: isGround ? groundToken : undefined });
       setResult(res);
     } finally {
       setRendering(false);
@@ -450,11 +455,21 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const bd = useMemo(() => {
     if (!ctx || !ctx.ok) return null;
     const pvH = Math.round((previewW * ctx.blankH) / ctx.blankW);
+    const tilt = tiltedRect(ctx.quad.map(([x, y]) => [x * previewW, y * pvH] as const));
+    if (tilt) {
+      // An ANGLED print area (ankle socks, playing cards): the box is the print area's own size,
+      // turned to its angle about its centre — placing here is placing on the product as it prints.
+      const { cx, cy, w, h, angle } = tilt;
+      // the straight box around it — the on-top overlay is cut to that (mockupContextAction)
+      const xs = ctx.quad.map((p) => p[0] * previewW), ys = ctx.quad.map((p) => p[1] * pvH);
+      const around = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
+      return { pvH, qx: cx - w / 2, qy: cy - h / 2, qw: w, qh: h, s: w / t.printWidthPx, angle, around };
+    }
     const qx = ctx.quad[0]![0] * previewW;
     const qy = ctx.quad[0]![1] * pvH;
     const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * previewW;
     const qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
-    return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx };
+    return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx, angle: 0, around: { x: qx, y: qy, w: qw, h: qh } };
   }, [ctx, t, previewW]);
 
   const bdImgStyle = useMemo<React.CSSProperties | undefined>(() => {
@@ -530,8 +545,16 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     }
   };
 
-  /** Current gesture deltas in preview px (+ pinch factor) from live pointers. */
+  /** Current gesture deltas in preview px (+ pinch factor) from live pointers — in the print
+   * area's own axes (an angled print area turns a screen drag into its frame). */
   const gestureDeltas = () => {
+    const d = screenDeltas();
+    const a = viewMode === 'product' && bd && !noProductView ? (bd.angle * Math.PI) / 180 : 0;
+    if (!a) return d;
+    const c = Math.cos(a), s = Math.sin(a);
+    return { dx: d.dx * c + d.dy * s, dy: -d.dx * s + d.dy * c, k: d.k };
+  };
+  const screenDeltas = () => {
     const g = gestureRef.current!;
     const pts = [...g.pointers.values()];
     if (pts.length >= 2 && g.baseDist) {
@@ -841,18 +864,22 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // The ONE guide (founder call 2026-07-07 — the old "print area" + "keep inside" pair
   // confused): a single clear rectangle = the frame opening / what prints, with corner
   // grips to drag-resize. `box` is in preview px for the current view.
-  const renderSelection = (box: { left: number; top: number; w: number; h: number }) => {
+  const renderSelection = (box: { left: number; top: number; w: number; h: number; angle?: number }) => {
+    const a = ((box.angle ?? 0) * Math.PI) / 180;
+    const cx = box.left + box.w / 2, cy = box.top + box.h / 2;
+    // a corner of the (possibly turned) box, about its centre
+    const at = (x: number, y: number) => [cx + (x - cx) * Math.cos(a) - (y - cy) * Math.sin(a), cy + (x - cx) * Math.sin(a) + (y - cy) * Math.cos(a)] as const;
     const corners = [
-      ['tl', box.left, box.top, 'nwse-resize'],
-      ['tr', box.left + box.w, box.top, 'nesw-resize'],
-      ['bl', box.left, box.top + box.h, 'nesw-resize'],
-      ['br', box.left + box.w, box.top + box.h, 'nwse-resize'],
+      ['tl', ...at(box.left, box.top), 'nwse-resize'],
+      ['tr', ...at(box.left + box.w, box.top), 'nesw-resize'],
+      ['bl', ...at(box.left, box.top + box.h), 'nesw-resize'],
+      ['br', ...at(box.left + box.w, box.top + box.h), 'nwse-resize'],
     ] as const;
     return (
       <>
         <div
           className="pointer-events-none absolute rounded-[3px] border-2 border-cinnamon/85"
-          style={{ left: box.left, top: box.top, width: box.w, height: box.h }}
+          style={{ left: box.left, top: box.top, width: box.w, height: box.h, ...(box.angle ? { transform: `rotate(${box.angle}deg)` } : {}) }}
         />
         {natural
           ? corners.map(([k, x, y, cur]) => (
@@ -869,6 +896,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       </>
     );
   };
+
+  // everything drawn ON the print area turns with an angled one (about the box's own centre)
+  const turnBox: React.CSSProperties = bd?.angle ? { transform: `rotate(${bd.angle}deg)` } : {};
 
   return (
     <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
@@ -904,7 +934,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             >
               <img src={ctx.blankUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute inset-0 h-full w-full" />
               <div className="absolute inset-0" style={maskStyle}>
-                <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh }}>
+                <div className="absolute overflow-hidden" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh, ...turnBox, ...groundFill }}>
                   <img
                     ref={setImgEl}
                     src={cutout?.url ?? keepsake.imageUrl}
@@ -918,23 +948,23 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               {/* "On the board" = as a puzzle: the die-cut piece lines over the placed art,
                   on the print-area quad. Under the guide + handles so they stay grabbable. */}
               {ctx.overlayUrl ? (
-                <img src={ctx.overlayUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute" style={{ left: bd.qx, top: bd.qy, width: bd.qw, height: bd.qh, maxWidth: 'none', maxHeight: 'none' }} />
+                <img src={ctx.overlayUrl} alt="" aria-hidden draggable={false} className="pointer-events-none absolute" style={{ left: bd.around.x, top: bd.around.y, width: bd.around.w, height: bd.around.h, maxWidth: 'none', maxHeight: 'none' }} />
               ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? (
-                <div className="pointer-events-none absolute w-px bg-cinnamon/80" style={{ left: bd.qx + bd.qw / 2, top: bd.qy, height: bd.qh }} />
+                <div className="pointer-events-none absolute w-px bg-cinnamon/80" style={{ left: bd.qx + bd.qw / 2, top: bd.qy, height: bd.qh, ...turnBox }} />
               ) : null}
               {dragging && snapAxis.y ? (
-                <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw }} />
+                <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw, ...turnBox }} />
               ) : null}
               {/* the ONE guide + resize grips (the frame opening) */}
-              {renderSelection({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh })}
+              {renderSelection({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh, angle: bd.angle })}
             </div>
           ) : (
             <div
               {...canvasInteractionProps}
               className={`relative mx-auto overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
-              style={{ width: previewW, height: previewH }}
+              style={{ width: previewW, height: previewH, ...groundFill }}
             >
               <img
                 ref={setImgEl}
@@ -1064,7 +1094,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   <button
                     key={k.id}
                     type="button"
-                    onClick={() => { setAssetIdx(i); setNatural(null); setResult(null); setCutout(null); }}
+                    onClick={() => { setAssetIdx(i); setNatural(null); setResult(null); setCutout(data.keepsakes[i]?.design ?? null); }}
                     aria-pressed={i === assetIdx}
                     aria-label={`keepsake ${i + 1}`}
                     className={`press h-12 w-12 overflow-hidden rounded-[12px] border-2 ${i === assetIdx ? 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]' : 'border-cocoa/15'}`}
@@ -1147,6 +1177,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             </button>
           </div>
 
+          {/* a design from the Studio already has its background handled there — no second remover */}
+          {keepsake.design ? null : (<>
           <p className="mt-5 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Magic</p>
           <div className="mt-2 flex items-center gap-2">
             <button
@@ -1170,6 +1202,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               </button>
             ) : null}
           </div>
+          </>)}
 
           {/* Primary action: a thumb-zone dock on phones (kraft, like the landing's), inline from md. */}
           <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-5 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
