@@ -110,6 +110,7 @@ export default function StudioPage() {
   const [view, setView] = useState({ zoom: 1, panX: 0, panY: 0 });
   const [stageSize, setStageSize] = useState({ w: 0, h: 0 });
   const [leaving, setLeaving] = useState(false);
+  const guardRef = useRef(false); // the back-gesture guard's history entry is in place
   const [confirmStart, setConfirmStart] = useState(false);
   const [, setHistoryTick] = useState(0);
   const lastBgPush = useRef(0);
@@ -774,7 +775,15 @@ export default function StudioPage() {
       setBusy(null);
     }
   };
-  const backToRange = () => router.push('/start-creating');
+  // Leaving on purpose (done / save / leave without saving). While the back-gesture guard below
+  // holds an extra history entry, REPLACE it — so a later "back" from the range lands on the studio
+  // once, not twice.
+  const backToRange = () => {
+    if (guardRef.current) {
+      guardRef.current = false;
+      router.replace('/start-creating');
+    } else router.push('/start-creating');
+  };
 
   // ── added-thing actions ──
   const updateSelected = (patch: Partial<StudioObject>, group = false) => {
@@ -827,6 +836,33 @@ export default function StudioPage() {
     setTool('select');
   };
   const onBack = () => (dirty ? setLeaving(true) : backToRange());
+
+  // The phone's BACK GESTURE (iOS swipe, Android back) with unsaved edits: ask, exactly like the
+  // "your range" button — instead of silently dropping the edits (a removed background lost on the
+  // way back to the range). Once there are edits, an extra history entry for this same page sits on
+  // top; stepping back off it lands here again, and we ask.
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  useEffect(() => {
+    if (!dirty || guardRef.current) return;
+    window.history.pushState({ ...window.history.state, sdStudioGuard: true }, '', window.location.href);
+    guardRef.current = true;
+  }, [dirty]);
+  useEffect(() => {
+    const onPop = () => {
+      if (!guardRef.current || window.history.state?.sdStudioGuard) return;
+      guardRef.current = false;
+      if (dirtyRef.current) {
+        window.history.pushState({ ...window.history.state, sdStudioGuard: true }, '', window.location.href);
+        guardRef.current = true;
+        setLeaving(true);
+      } else {
+        window.history.back(); // nothing to save: carry on back
+      }
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
 
   // ── keyboard (desktop) ──
   useEffect(() => {
