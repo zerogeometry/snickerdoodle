@@ -464,13 +464,6 @@ async function renderAndPersist(
     thumb?: boolean; memo?: ComposeMemo;
   },
 ): Promise<MockupResult> {
-  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
-  // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
-  // bbox) placement. Same secure spine either way.
-  const perspective = !isAxisAligned(args.quad);
-  // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
-  // (the plain-white fallback blank) it falls through to FLAT.
-  const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.maskKey;
   // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
   // cover-fits + multiplies over the blank so the whole face reads as that plush fabric colour.
   // A THUMB never needs the full-size original or the full-size photo: the design is shrunk once
@@ -486,31 +479,20 @@ async function renderAndPersist(
     designBuf = await renderPrintedFace(designBuf, args.face, args.print, args.transform, args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE, args.groundHex);
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
-  const common = {
-    blankBuf: await layer(args.blankKey),
-    designBuf,
+  const out = await renderMockupLayers({
+    blank: await layer(args.blankKey),
+    mask: args.maskKey ? await layer(args.maskKey) : undefined,
+    overlay: args.overlayKey ? await layer(args.overlayKey) : undefined,
+    design: designBuf,
     quad: args.quad,
     transform,
+    spanHalf: args.spanHalf,
     workEdge: args.workEdge,
     outputEdge: args.outputEdge,
     print: args.print,
-  };
-  const out = perspective
-    ? await renderPerspective({
-        ...common,
-        spanHalf: args.spanHalf,
-        maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
-        overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
-        materialClass: args.materialClass,
-      })
-    : cylinder
-      ? await renderCylinder({ blankBuf: common.blankBuf, designBuf: common.designBuf, transform: common.transform, workEdge: common.workEdge, outputEdge: common.outputEdge, print: common.print, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: await layer(args.maskKey!) })
-      : await renderFlat({
-          ...common,
-          maskBuf: args.maskKey ? await layer(args.maskKey) : undefined,
-          overlayBuf: args.overlayKey ? await layer(args.overlayKey) : undefined,
-          materialClass: args.materialClass,
-        });
+    materialClass: args.materialClass,
+    mugMode: args.mugMode,
+  });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
   // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
@@ -526,7 +508,34 @@ async function renderAndPersist(
     .returning();
   const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, args.key)))[0]!.id;
 
-  return { mockupObjectId, key: args.key, format: 'webp', tier: perspective ? 'PERSPECTIVE' : 'FLAT', cached: false, widthPx: out.width, heightPx: out.height };
+  return { mockupObjectId, key: args.key, format: 'webp', tier: out.tier, cached: false, widthPx: out.width, heightPx: out.height };
+}
+
+/**
+ * The render itself, from layers already in memory — no storage, no database, no viewer. The ONLY
+ * caller with a child's design is renderAndPersist (after its authz gate); it is exported for the
+ * pixel-parity test, which drives every tier with synthetic, brand-safe layers.
+ */
+export async function renderMockupLayers(args: {
+  blank: Buffer; mask?: Buffer; overlay?: Buffer; design: Buffer; quad: [number, number][];
+  transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
+  print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
+  materialClass: string; mugMode?: 'front' | 'back' | 'centre';
+}): Promise<{ buffer: Buffer; width: number; height: number; tier: 'FLAT' | 'PERSPECTIVE' }> {
+  // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
+  // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
+  // bbox) placement. Same secure spine either way.
+  const perspective = !isAxisAligned(args.quad);
+  // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
+  // (the plain-white fallback blank) it falls through to FLAT.
+  const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
+  const common = { blankBuf: args.blank, designBuf: args.design, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
+  const out = perspective
+    ? await renderPerspective({ ...common, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
+    : cylinder
+      ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
+      : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
+  return { ...out, tier: perspective ? 'PERSPECTIVE' : 'FLAT' };
 }
 
 /**
