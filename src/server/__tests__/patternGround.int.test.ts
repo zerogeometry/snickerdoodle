@@ -12,7 +12,7 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { placeOrder } from '@/server/orders';
 import { saveDesign } from '@/server/savedDesigns';
 import { renderPrintFile } from '@/server/print/render';
-import { patternGroundHex } from '@/lib/patterns';
+import { groundHex } from '@/lib/patterns';
 import { deleteObject, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -65,10 +65,11 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
     const tf = { scale: 0 };
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'socks', qty: 1, artwork: { assetId, transform: tf, ground: 'navy' } },
-        { productKey: 'socks-tube', qty: 1, artwork: { assetId, transform: tf, ground: 'tomato' } },
-        { productKey: 'teaTowel', qty: 1, artwork: { assetId, transform: tf, ground: '#ff00ff' } }, // not a token → white
-        { productKey: 'mug', qty: 1, artwork: { assetId, transform: tf, ground: 'navy' } }, // not a pattern product
+        { productKey: 'socks', qty: 1, artwork: { assetId, transform: tf, ground: 'navy' } }, // a pre-wheel word → its colour
+        { productKey: 'socks-tube', qty: 1, artwork: { assetId, transform: tf, ground: '#0B6623' } },
+        { productKey: 'teaTowel', qty: 1, artwork: { assetId, transform: tf, ground: 'not-a-colour' } }, // junk → white
+        { productKey: 'phoneCase', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // edge to edge: kept
+        { productKey: 'mug', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // the wrap stops at the handle: none
       ],
       account: { id: ids.samId },
       joinProvenance: null,
@@ -83,7 +84,8 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
       .innerJoin(schema.productVariants, eq(schema.productVariants.id, orderItemArtwork.variantId))
       .where(eq(orders.ref, res.ref!));
     const by = Object.fromEntries(rows.map((r) => [r.sku, r.ground]));
-    expect(by).toMatchObject({ socks: 'navy', 'socks-tube': 'tomato', teaTowel: null });
+    expect(by).toMatchObject({ socks: '#26334f', 'socks-tube': '#0b6623', teaTowel: null });
+    expect(Object.entries(by).find(([sku]) => sku.startsWith('phoneCase'))?.[1]).toBe('#c8402a');
     expect(Object.entries(by).find(([sku]) => sku.startsWith('mug'))?.[1]).toBeNull();
   });
 
@@ -96,31 +98,52 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
       const { data } = await sharp(await getObjectBytes(obj!.key)).removeAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
       return { id: r.printObjectId, rgb: `#${[...data].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}` };
     };
-    const navy = await corner('navy');
-    const tomato = await corner('tomato');
-    expect(navy.id).not.toBe(tomato.id); // two files — one never overwrites the other
-    expect(navy.rgb).toBe(patternGroundHex('navy'));
-    expect(tomato.rgb).toBe(patternGroundHex('tomato'));
+    const navy = await corner('#26334f');
+    const green = await corner('#0b6623');
+    expect(navy.id).not.toBe(green.id); // two files — one never overwrites the other
+    expect(navy.rgb.toLowerCase()).toBe(groundHex('#26334f'));
+    expect(green.rgb.toLowerCase()).toBe(groundHex('#0b6623'));
   });
 
   it('the landscape tea towel prints as Prodigi’s PORTRAIT file (turned back), on its colour', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [towel] = await db.select({ id: schema.productVariants.id }).from(schema.productVariants).where(eq(schema.productVariants.sku, 'teaTowel'));
-    const r = await renderPrintFile(db, sam, { assetId, variantId: towel!.id, transform: { scale: 0 }, ground: 'sky' });
+    const r = await renderPrintFile(db, sam, { assetId, variantId: towel!.id, transform: { scale: 0 }, ground: '#8fb5d6' });
     expect([r.widthPx, r.heightPx]).toEqual([5492, 8208]);
     const [obj] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, r.printObjectId));
     const meta = await sharp(await getObjectBytes(obj!.key)).metadata();
     expect([meta.width, meta.height]).toEqual([5492, 8208]);
   }, 120_000);
 
-  it('a saved design keeps its colour (pattern products only)', async () => {
+  it('a PLACED drawing on an edge-to-edge product prints on its colour — the whole face, its own file', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [cushion] = await db.select({ id: schema.productVariants.id, sku: schema.productVariants.sku }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(eq(schema.products.key, 'cushion'));
+    const fileOf = async (ground?: string) => {
+      const r = await renderPrintFile(db, sam, { assetId, variantId: cushion!.id, transform: { scale: 0.5 }, ground });
+      const [obj] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, r.printObjectId));
+      return { id: r.printObjectId, key: obj!.key, buf: await getObjectBytes(obj!.key) };
+    };
+    const white = await fileOf();
+    const green = await fileOf('#0b6623');
+    expect(green.id).not.toBe(white.id);
+    expect(green.key).toContain('-g0b6623');
+    const px = async (buf: Buffer, x: number, y: number) => {
+      const { data } = await sharp(buf).removeAlpha().extract({ left: x, top: y, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
+      return `#${[...data].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    };
+    // the corner (outside the half-size drawing) is the colour; on white it stays white
+    expect(await px(green.buf, 2, 2)).toBe('#0b6623');
+    expect(await px(white.buf, 2, 2)).toBe('#ffffff');
+  }, 120_000);
+
+  it('a saved design keeps its colour (edge-to-edge products only)', async () => {
     const account = { id: ids.samId, name: 'Sam' };
-    const a = await saveDesign(db, account, [], { assetId, variantSku: 'socks', transform: { scale: 0 }, ground: 'sky' });
-    const b = await saveDesign(db, account, [], { assetId, variantSku: 'mug', transform: { scale: 0 }, ground: 'sky' });
+    const a = await saveDesign(db, account, [], { assetId, variantSku: 'socks', transform: { scale: 0 }, ground: '#8FB5D6' });
+    const b = await saveDesign(db, account, [], { assetId, variantSku: 'mug', transform: { scale: 0 }, ground: '#8fb5d6' });
     expect(a.ok && b.ok).toBe(true);
     const rows = await db.select({ id: savedDesigns.id, ground: savedDesigns.ground }).from(savedDesigns).where(inArray(savedDesigns.id, [(a as { id: string }).id, (b as { id: string }).id]));
     const by = Object.fromEntries(rows.map((r) => [r.id, r.ground]));
-    expect(by[(a as { id: string }).id]).toBe('sky');
+    expect(by[(a as { id: string }).id]).toBe('#8fb5d6');
     expect(by[(b as { id: string }).id]).toBeNull();
   });
 });

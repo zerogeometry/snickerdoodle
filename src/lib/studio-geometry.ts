@@ -134,3 +134,24 @@ export function cleanPlace(raw: unknown): Placement | null {
   const p = { x: num(r.x, -1, 2, 0.5), y: num(r.y, -1, 2, 0.5), scale: num(r.scale, 0.05, 8, 1), angle: normAngle(num(r.angle, -3600, 3600, 0)) };
   return placeIsIdentity(p) ? null : p;
 }
+
+/**
+ * A print-area quad (corners tl, tr, br, bl in pixels) that is a rectangle TURNED by a visible
+ * angle — the angled ankle socks and playing cards — as its centre, own size and angle (degrees,
+ * clockwise on screen). Null for a straight rectangle (≤ 0.3°) and for a true perspective quad, which
+ * keep the plain box. Lets the placement editor turn the print area with the product, like the
+ * mockup does.
+ */
+export function tiltedRect(q: readonly (readonly [number, number])[]): { cx: number; cy: number; w: number; h: number; angle: number } | null {
+  if (q.length !== 4) return null;
+  const [p0, p1, p2, p3] = q as [readonly [number, number], readonly [number, number], readonly [number, number], readonly [number, number]];
+  const len = (a: readonly [number, number], b: readonly [number, number]) => Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const top = len(p0, p1), bottom = len(p3, p2), left = len(p0, p3), right = len(p1, p2);
+  if (!(top > 0 && left > 0)) return null;
+  const near = (a: number, b: number) => Math.abs(a - b) <= 0.02 * Math.max(a, b);
+  // a rectangle: opposite sides equal, and the diagonals equal too (no shear)
+  if (!near(top, bottom) || !near(left, right) || !near(len(p0, p2), len(p1, p3))) return null;
+  const angle = (Math.atan2(p1[1] - p0[1], p1[0] - p0[0]) * 180) / Math.PI;
+  if (Math.abs(angle) <= 0.3) return null;
+  return { cx: (p0[0] + p1[0] + p2[0] + p3[0]) / 4, cy: (p0[1] + p1[1] + p2[1] + p3[1]) / 4, w: (top + bottom) / 2, h: (left + right) / 2, angle };
+}

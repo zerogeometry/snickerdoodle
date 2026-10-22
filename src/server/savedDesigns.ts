@@ -4,7 +4,7 @@ import { assets, products, productVariants, savedDesigns, storageObjects } from 
 import { presignDownload } from '@/storage';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
-import { isPatternProduct, normalizePatternGround } from '@/lib/patterns';
+import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import type { DbHandle } from './db';
 import { resolveViewerContext } from './assets';
 import { keepAndFileCreations } from './keepsakes';
@@ -70,7 +70,7 @@ export async function saveDesign(
       transform: clampTransform(input.transform),
       sourceObjectId,
       back: normalizeCushionBack(input.back ?? undefined),
-      ground: isPatternProduct(variant.productKey) ? normalizePatternGround(input.ground) : null,
+      ground: isGroundProduct(variant.productKey) ? normalizeGround(input.ground) : null,
     })
     .returning({ id: savedDesigns.id });
   return { ok: true, id: row!.id };

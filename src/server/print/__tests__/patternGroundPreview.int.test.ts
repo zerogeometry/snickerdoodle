@@ -93,12 +93,14 @@ describe.skipIf(!DB || !S3)('pattern base colour — the preview (integration)',
     console.log(`[ground preview] white ${t1 - t0} ms, navy ${t2 - t1} ms`);
   }, 120_000);
 
-  it('a junk colour is just the white picture (same cached key)', async () => {
+  it('junk, or white off the wheel, is just the white picture (same cached key)', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const tf = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
     const a = await composeForViewer(db, sam, { assetId, variantId, transform: tf, size: 'thumb' }, { needsAuth: false });
-    const b = await composeForViewer(db, sam, { assetId, variantId, transform: tf, size: 'thumb', ground: '#ff00ff' }, { needsAuth: false });
-    expect(a.ok && b.ok).toBe(true);
-    if (a.ok && b.ok) expect(new URL(b.url).pathname).toBe(new URL(a.url).pathname);
+    for (const ground of ['not-a-colour', '#FFFFFF', '#ff00ff; x']) {
+      const b = await composeForViewer(db, sam, { assetId, variantId, transform: tf, size: 'thumb', ground }, { needsAuth: false });
+      expect(a.ok && b.ok).toBe(true);
+      if (a.ok && b.ok) expect(new URL(b.url).pathname, ground).toBe(new URL(a.url).pathname);
+    }
   }, 120_000);
 });

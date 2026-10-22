@@ -16,7 +16,8 @@ import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type Car
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdFor, sizeDimsCm } from '@/lib/catalogue-view';
-import { isColouredGround, isPatternProduct, PATTERN_GROUND_WHITE, PATTERN_GROUNDS } from '@/lib/patterns';
+import { colourName, groundHex, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
+import { ColourWheel } from '@/ui/primitives/ColourWheel';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
@@ -49,6 +50,12 @@ function webglOk(): boolean {
 }
 
 /** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
+/** What the base colour colours, in the shopper's words. */
+const GROUND_NOUN: Record<string, string> = {
+  socks: 'sock', teaTowel: 'towel', wrappingPaper: 'paper', phoneCase: 'case', cushion: 'cushion', blanket: 'blanket',
+  jigsaw: 'puzzle', framedPrint: 'print', playingCards: 'card back', petBandana: 'bandana',
+};
+
 export default function CustomizePage() {
   const params = useParams<{ productKey: string }>();
   return isCardPackKey(params.productKey) ? <CardPackBuilder /> : <CustomizeProduct />;
@@ -89,6 +96,10 @@ function CustomizeProduct() {
   const orientationLockedRef = useRef(false);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
+  // the base-colour wheel sheet, and the colour being tried in it (only USED on 'use this colour',
+  // so dragging round the wheel doesn't re-render the product on every step)
+  const [wheelOpen, setWheelOpen] = useState(false);
+  const [wheelDraft, setWheelDraft] = useState<string>(PATTERN_GROUND_WHITE);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
   // Alternate mockup VIEW (the jigsaw's companion tin): 'primary' = the product itself,
@@ -161,7 +172,7 @@ function CustomizeProduct() {
       grade: lv.attributes.grade,
       finish: lv.attributes.finish,
       back: line.back, // a cushion line carries its back choice
-      ground: line.ground, // a pattern line carries its base colour
+      ground: line.ground, // an edge-to-edge line carries its base colour
     });
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
@@ -346,12 +357,18 @@ function CustomizeProduct() {
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
   const isPattern = isPatternProduct(product.key);
-  const groundSwatch = PATTERN_GROUNDS.find((g) => g.token === ground) ?? PATTERN_GROUNDS[0]!;
-  const groundNoun = product.key === 'socks' ? 'sock' : product.key === 'teaTowel' ? 'towel' : 'paper';
+  // an EDGE-TO-EDGE product (a repeat, a phone case, a cushion…) can sit on any base colour
+  const isGround = isGroundProduct(product.key);
+  const groundNoun = GROUND_NOUN[product.key] ?? 'background';
+  const groundWord = colourName(ground);
+  const groundTitle = isPattern ? `${groundNoun} colour` : 'background colour';
   // The asset this screen acts on: in edit mode the basket line's own asset wins (so a line
   // placed under an earlier drawing edits the right image); otherwise the current upload.
   const activeAssetId = edit?.assetId ?? upload?.assetId ?? null;
-  const activeSource = edit?.sourceObjectId ?? upload?.cutout?.sourceObjectId;
+  // The design to show: the line's own, unless the Studio has since saved a newer one of the SAME
+  // drawing (the upload's) — then that's what the parent just made, so it wins.
+  const studioNewer = edit && upload?.assetId && upload.assetId === edit.assetId ? upload.cutout?.sourceObjectId : undefined;
+  const activeSource = studioNewer ?? edit?.sourceObjectId ?? upload?.cutout?.sourceObjectId;
   const savedPlacement = activeAssetId ? placements[`${activeAssetId}-${product.key}`] : undefined;
   // a phone case starts with the whole drawing clear of THIS phone's camera; everything else
   // keeps its product default. A placement the parent set themselves always wins.
@@ -394,7 +411,9 @@ function CustomizeProduct() {
     const ret = `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`;
     // the editor opens where the preview shows it (a phone case's camera-clear default included)
     if (activeAssetId && !savedPlacement) usePlacements.getState().setPlacement(`${activeAssetId}-${product.key}`, placement);
-    router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}&return=${encodeURIComponent(ret)}`);
+    // …and on the design being placed (a Studio save / lifted cutout), not the original
+    const src = activeSource ? `&source=${encodeURIComponent(activeSource)}` : '';
+    router.push(`/studio/position?draft=${activeAssetId}&variant=${variant.id}${src}&return=${encodeURIComponent(ret)}`);
   };
 
   // "+ Keepsake": save THIS design (drawing + exact variant + placement) for later — into the
@@ -409,7 +428,7 @@ function CustomizeProduct() {
         transform: placement,
         sourceObjectId: activeSource,
         back: supportsBack ? back : undefined,
-        ground: isPattern ? ground : undefined,
+        ground: isGround ? ground : undefined,
       });
       if (res.needsAuth) {
         toast('a quick sign-up keeps your keepsakes safe');
@@ -470,7 +489,7 @@ function CustomizeProduct() {
         ? { greeting: cardMessage.greeting.trim(), message: cardMessage.message.trim(), signature: cardMessage.signature.trim(), note: (cardMessage.note ?? '').trim(), font: cardMessage.font, fontScale: cardMessage.fontScale ?? 1 }
         : undefined;
     const cardSpanLabel = product.key === 'card' && cardSpan === 'full' ? 'full-width' : null;
-    const groundLabel = isPattern && isColouredGround(ground) ? `${groundSwatch.label} ${groundNoun}` : null;
+    const groundLabel = isGround && isColouredGround(ground) ? (isPattern ? `${groundWord} ${groundNoun}` : `on ${groundWord}`) : null;
     const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, groundLabel, cardSpanLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
     const fields = {
       name: product.label,
@@ -481,17 +500,17 @@ function CustomizeProduct() {
       sub,
       artwork: { assetId: activeAssetId, transform: placement, sourceObjectId: activeSource },
       back: supportsBack ? back : undefined, // cushion back choice (the DUAL squares only)
-      ground: isPattern ? ground : undefined, // repeat-pattern base colour (socks / wrap / tea towel)
+      ground: isGround ? ground : undefined, // base colour (edge-to-edge products)
       message: cardMsg, // card inside message (card only)
       cardImageSpan: product.key === 'card' ? cardSpan : undefined, // outside image span (card only)
     };
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
-      update(edit.id, fields, lineIdFor(variant.sku, isPattern ? ground : null));
+      update(edit.id, fields, lineIdFor(variant.sku, isGround ? ground : null));
       toast('basket updated ✓');
     } else {
-      add({ id: lineIdFor(variant.sku, isPattern ? ground : null), ...fields }); // red + navy socks = two lines
+      add({ id: lineIdFor(variant.sku, isGround ? ground : null), ...fields }); // red + navy socks = two lines
       toast('added to basket ✓');
     }
     router.push('/start-creating');
@@ -533,7 +552,7 @@ function CustomizeProduct() {
             view={activeMockupView}
             spanHalf={activeSpanHalf}
             fill={showBack ? backFill : undefined}
-            ground={isPattern ? ground : undefined}
+            ground={isGround ? ground : undefined}
             px={720}
           />
         </div>
@@ -586,7 +605,7 @@ function CustomizeProduct() {
                   view={activeMockupView}
                   spanHalf={activeSpanHalf}
                   fill={showBack ? backFill : undefined}
-                  ground={isPattern ? ground : undefined}
+                  ground={isGround ? ground : undefined}
                   px={360}
                 />
                 <button
@@ -698,6 +717,7 @@ function CustomizeProduct() {
                     size="thumb"
                     sourceObjectId={activeSource ?? null}
                     view={v === 'tin' ? 'tin' : undefined}
+                    ground={isGround ? ground : undefined}
                     px={120}
                     lazy
                   />
@@ -848,41 +868,60 @@ function CustomizeProduct() {
           ) : null}
           {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch swatchFor={product.key} /> : null}
 
-          {/* REPEAT-PATTERN base colour: the drawing repeats on top of it, edge to edge. Off its paper
-              it floats on the colour; still on its paper, a friendly one-tap nudge lifts it off. */}
-          {isPattern ? (
+          {/* BASE COLOUR (edge-to-edge products): any colour on a wheel, filling the whole printed face
+              under the drawing — a repeat sits on it, a placed drawing sits in it. Off its paper the
+              drawing floats on the colour; still on its paper, a friendly one-tap nudge lifts it off. */}
+          {isGround ? (
             <div className="mt-5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{groundNoun} colour</p>
-              {/* ONE line at every width: ten equal columns that always fill the row. Each button is
-                  its whole cell (44px tall, the full column wide), the swatch drawn inside it. */}
-              <div className="mt-1 grid grid-cols-10" role="group" aria-label={`${groundNoun} colour`}>
-                {PATTERN_GROUNDS.map((g) => (
-                  <button
-                    key={g.token}
-                    type="button"
-                    onClick={() => setGround(g.token)}
-                    aria-pressed={ground === g.token}
-                    aria-label={`${g.label} ${groundNoun}`}
-                    title={g.label}
-                    className="press flex h-11 min-w-0 items-center justify-center"
-                  >
-                    <span
-                      aria-hidden
-                      className={`aspect-square w-[78%] max-w-9 rounded-full border-2 ${ground === g.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/45'}`}
-                      style={{ backgroundColor: g.hex }}
-                    />
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{groundTitle}</p>
+              <div className="mt-1.5 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setWheelDraft(groundHex(ground)); setWheelOpen(true); }}
+                  aria-haspopup="dialog"
+                  aria-label={`${groundTitle}: ${groundWord} — change it`}
+                  className="press flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-pill border-2 border-cocoa bg-paper py-1 pl-1 pr-4 text-left shadow-[0_2px_0_var(--color-cocoa)]"
+                >
+                  <span aria-hidden className="h-9 w-9 shrink-0 rounded-full border-2 border-cocoa/45" style={{ background: groundHex(ground) }} />
+                  <span className="truncate text-sm font-bold text-cocoa">{groundWord}</span>
+                  <span aria-hidden className="ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-cocoa/30" style={{ background: 'radial-gradient(circle closest-side, #fff, rgb(255 255 255 / 0)), conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
+                  <span className="shrink-0 text-xs font-bold text-cinnamon">change</span>
+                </button>
+                {isColouredGround(ground) ? (
+                  <button type="button" onClick={() => setGround(PATTERN_GROUND_WHITE)} className="min-h-11 shrink-0 px-1 text-xs font-bold text-ink-soft underline underline-offset-2 hover:text-cinnamon">
+                    back to white
                   </button>
-                ))}
+                ) : null}
               </div>
-              <p className="mt-1.5 text-[11px] text-ink-faint">their drawing on repeat, on a {groundSwatch.label} {groundNoun}</p>
+              <p className="mt-1.5 text-[11px] text-ink-faint">
+                {isPattern ? <>their drawing on repeat, on a {groundWord} {groundNoun}</> : <>fills the whole {groundNoun}, edge to edge, behind their drawing</>}
+              </p>
               {isColouredGround(ground) && upload?.opaqueBg && !activeSource ? (
                 <div role="status" className="mt-3 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
-                  <p className="font-semibold">the paper prints too — you’d get paper squares on the {groundSwatch.label}. lift the drawing off it and it sits right on the colour.</p>
+                  <p className="font-semibold">
+                    {isPattern
+                      ? <>the paper prints too — you’d get paper squares on the {groundWord}. lift the drawing off it and it sits right on the colour.</>
+                      : <>the paper prints too — you’d get a white box on the {groundWord}. lift the drawing off it and it sits right on the colour.</>}
+                  </p>
                   <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => void liftOffPaper()} disabled={lifting}>
                     <Icon icon={IconPencil} size={15} /> {lifting ? 'lifting it off…' : 'lift it off the paper'}
                   </Button>
                 </div>
               ) : null}
+              <Modal
+                open={wheelOpen}
+                onClose={() => setWheelOpen(false)}
+                size="sm"
+                title={groundTitle}
+                subtitle="any colour you like"
+                footer={
+                  <Button size="lg" className="w-full" onClick={() => { setGround(wheelDraft); setWheelOpen(false); }}>
+                    use this colour
+                  </Button>
+                }
+              >
+                <ColourWheel value={wheelDraft} onChange={setWheelDraft} label={groundTitle} />
+              </Modal>
             </div>
           ) : null}
 

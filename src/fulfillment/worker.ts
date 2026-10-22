@@ -22,7 +22,7 @@ interface ClaimedItem {
   transform: RawTransform;
   sourceObjectId: string | null;
   back: string | null; // cushion DUAL back choice (frozen at order time); null elsewhere
-  ground: string | null; // repeat-pattern base colour token (frozen at order time); null = white
+  ground: string | null; // base colour #rrggbb (frozen at order time); null = white
   message: unknown; // greetings-card screened inside message (frozen); null = blank inside
   cardSpan: string | null; // greetings-card outer span: 'full' or null (front); card only
 }

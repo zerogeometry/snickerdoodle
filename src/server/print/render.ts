@@ -6,7 +6,7 @@ import { printTemplates, productVariants, products, storageObjects } from '@/db/
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
 import { DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
-import { isColouredGround, isPatternProduct, normalizePatternGround, patternGroundHex } from '@/lib/patterns';
+import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
 import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
@@ -54,8 +54,8 @@ export async function renderPrintFile(
      * null/unknown) = the same image on both faces; a CUSHION_BACK_COLOURS token = image front +
      * that plain-colour back. Ignored entirely on any non-DUAL variant (the SKU is authoritative). */
     back?: string;
-    /** REPEAT-PATTERN base colour token (PATTERN_GROUNDS): the whole file is filled with it and the
-     * drawing repeats on top. Unknown / absent ⇒ white. */
+    /** BASE COLOUR (#rrggbb) of an edge-to-edge product (GROUND_PRODUCT_KEYS): the whole file is
+     * filled with it and the drawing sits (or repeats) on top. Unknown / absent / other products ⇒ white. */
     ground?: string;
     /** GREETINGS-CARD frozen inside message (re-screened here) — the note + greeting/message/
      * signature laid into the two inside panels. null/absent ⇒ a blank (write-by-hand) inside. */
@@ -104,8 +104,8 @@ export async function renderPrintFile(
     if (motifAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${motifAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
-    const ground = normalizePatternGround(input.ground);
-    let { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, patternGroundHex(ground));
+    const ground = normalizeGround(input.ground);
+    let { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, groundHex(ground));
     // designed on a turned canvas (the landscape tea towel) → turn the file back to Prodigi's spec
     let [fileW, fileH] = [canvas.width, canvas.height];
     if (DESIGNED_TURNED.has(variantRow.key)) {
@@ -114,7 +114,7 @@ export async function renderPrintFile(
     }
     // the colour is part of the file's name: red + navy socks of one drawing in one order are two
     // different files — never one overwriting the other
-    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', fileW, fileH, isColouredGround(ground) ? `-g${ground}` : '');
+    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', fileW, fileH, groundTag(ground));
   }
 
   // A HEIGHT CHART prints the drawing beside a cm + ft/in ruler drawn INTO the file at true scale
@@ -203,9 +203,11 @@ export async function renderPrintFile(
     return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
   }
 
-  // The child's image placed on ONE opaque white face — the single-sided print file, and the
-  // FRONT (left) face of a DUAL cushion.
-  const face = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: '#ffffff' } })
+  // The child's image placed on ONE opaque face — the single-sided print file, and the FRONT (left)
+  // face of a DUAL cushion. White, or the BASE COLOUR on an edge-to-edge product (the whole face).
+  const ground = variantRow?.key && isGroundProduct(variantRow.key) ? normalizeGround(input.ground) : null;
+  const faceHex = groundHex(ground);
+  const face = await sharp({ create: { width: rect.canvasWidth, height: rect.canvasHeight, channels: 3, background: faceHex } })
     .composite([{ input: part, left: ox, top: oy }])
     .png()
     .toBuffer();
@@ -226,7 +228,7 @@ export async function renderPrintFile(
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
   } else {
-    out = await sharp(face).flatten({ background: '#ffffff' }).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+    out = await sharp(face).flatten({ background: faceHex }).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
     if (landscape) {
       out = await sharp(out).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
       outW = rect.canvasHeight;
@@ -234,7 +236,8 @@ export async function renderPrintFile(
     }
   }
 
-  return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+  // each base colour is its own file (two cushions of one drawing in two colours never collide)
+  return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH, groundTag(ground));
 }
 
 /** Write the finished print file as a deterministic write-once DERIVATIVE (idempotent re-render

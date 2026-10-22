@@ -187,8 +187,8 @@ export type BasketItem = {
    * DUAL variant (a different SKU + price). Absent / heart+round = single-sided. Display, the
    * variant resolver, AND the DUAL fulfilment renderer all read this. */
   back?: string;
-  /** REPEAT-PATTERN base colour token (socks / wrapping paper / tea towel) — PATTERN_GROUNDS; the
-   * drawing repeats on top of it. Absent = white. Part of the line id (red + navy socks = two lines). */
+  /** BASE COLOUR (#rrggbb) of an edge-to-edge product — the whole printed face, the drawing on top.
+   * Absent = white. Part of the line id (red + navy socks = two lines). The server re-checks it. */
   ground?: string;
   /** GREETINGS-CARD inside message (card only) — absent = blank inside (write it by hand). */
   message?: CardMessage;

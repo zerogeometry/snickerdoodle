@@ -4,7 +4,7 @@ import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGr
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
-import { isPatternProduct, normalizePatternGround } from '@/lib/patterns';
+import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
@@ -203,7 +203,7 @@ export async function placeOrder(
       transform, // server-authoritative (clamped above)
       back: normalizeCushionBack(art.back), // coerced to a known token or null
       // repeat-pattern base colour: a known PATTERN_GROUNDS token on a pattern product, else null (white)
-      ground: isPatternProduct(productKey) ? normalizePatternGround(art.ground) : null,
+      ground: isGroundProduct(productKey) ? normalizeGround(art.ground) : null, // edge-to-edge products only; #rrggbb or none
       // A card in a PACK is blank inside, front only — whatever the request says.
       message: opts.blankCard
         ? null

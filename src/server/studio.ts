@@ -12,10 +12,27 @@ export type { StudioTemplate, StudioVariant } from './studio-variants';
 export interface StudioKeepsake {
   id: string;
   imageUrl: string;
+  /** The design the parent is placing, when it isn't the original (a Studio save / a lifted
+   * cutout) — checked to belong to this keepsake. The editor shows and places THIS. */
+  design?: { url: string; sourceObjectId: string };
 }
 export interface StudioData {
   keepsakes: StudioKeepsake[];
   variants: StudioVariant[];
+}
+
+/**
+ * The design a parent asked to place (?source=…): only a DERIVATIVE of THIS asset (its Studio design
+ * or cutout) — never another asset's object, never a template. Anything else is ignored and the
+ * editor falls back to the original. Called only after the asset itself passed the gate.
+ */
+async function designOf(db: ReturnType<typeof getDb>, assetId: string, sourceObjectId: string | undefined): Promise<StudioKeepsake['design'] | null> {
+  if (!sourceObjectId || !/^[0-9a-f-]{36}$/i.test(sourceObjectId)) return null;
+  const [o] = await db
+    .select({ id: storageObjects.id, key: storageObjects.key })
+    .from(storageObjects)
+    .where(and(eq(storageObjects.id, sourceObjectId), eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')));
+  return o ? { url: await presignDownload(o.key, 600), sourceObjectId: o.id } : null;
 }
 
 function refOf(row: typeof assets.$inferSelect): AssetRef {
@@ -31,7 +48,7 @@ function refOf(row: typeof assets.$inferSelect): AssetRef {
 /** Everything the positioning editor needs for the signed-in account — null for a guest.
  * `focusVariantId` scopes the editor to the ONE variant Customize sent us (see
  * loadPrintableVariants). */
-export async function loadStudioData(focusVariantId?: string): Promise<StudioData | null> {
+export async function loadStudioData(focusVariantId?: string, sourceObjectId?: string): Promise<StudioData | null> {
   const account = await getCurrentAccount();
   if (!account) return null;
 
@@ -51,7 +68,8 @@ export async function loadStudioData(focusVariantId?: string): Promise<StudioDat
     if (!r.key) continue;
     if (!canViewAsset(refOf(r.asset), viewer).allowed) continue;
     if (r.asset.moderationStatus === 'BLOCKED') continue; // CSAM-blocked content is never served
-    keepsakes.push({ id: r.asset.id, imageUrl: await presignDownload(r.key, 600) });
+    const design = await designOf(db, r.asset.id, sourceObjectId);
+    keepsakes.push({ id: r.asset.id, imageUrl: await presignDownload(r.key, 600), ...(design ? { design } : {}) });
   }
 
   return { keepsakes, variants: await loadPrintableVariants(db, focusVariantId) };
@@ -64,7 +82,7 @@ export async function loadStudioData(focusVariantId?: string): Promise<StudioDat
  * accessible (no/expired claim, blocked, or gone) so the page can send them back
  * to start a new one.
  */
-export async function loadDraftStudioData(assetId: string, focusVariantId?: string): Promise<StudioData | null> {
+export async function loadDraftStudioData(assetId: string, focusVariantId?: string, sourceObjectId?: string): Promise<StudioData | null> {
   const db = getDb();
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
@@ -82,7 +100,7 @@ export async function loadDraftStudioData(assetId: string, focusVariantId?: stri
   if (!obj?.key) return null;
 
   return {
-    keepsakes: [{ id: assetId, imageUrl: await presignDownload(obj.key, 600) }],
+    keepsakes: [{ id: assetId, imageUrl: await presignDownload(obj.key, 600), ...((d) => (d ? { design: d } : {}))(await designOf(db, assetId, sourceObjectId)) }],
     variants: await loadPrintableVariants(db, focusVariantId),
   };
 }
