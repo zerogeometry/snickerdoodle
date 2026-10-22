@@ -34,6 +34,14 @@ export function originalKey(assetId: string): string {
   return `assets/${assetId}/original`;
 }
 
+/** Where a browser's DIRECT upload lands before the server has checked it (see ./quarantine). */
+export const QUARANTINE_PREFIX = 'quarantine/';
+
+/** The quarantine key for one direct upload. Never an asset key: nothing can view, render or order it. */
+export function quarantineKey(uploadId: string): string {
+  return `${QUARANTINE_PREFIX}${uploadId}`;
+}
+
 /** Key for a derived render of an asset (cutout / upscaled / printfile). */
 export function derivativeKey(assetId: string, kind: string): string {
   return `assets/${assetId}/derivatives/${kind}`;
@@ -56,14 +64,15 @@ export async function putObject(key: string, body: Buffer, contentType: string):
 /**
  * At-rest encryption for an object. ORIGINALS use their own KMS key (tightest policy,
  * independent rotation — CLAUDE.md "separate keys for originals"); everything else the general
- * key. In PRODUCTION a missing key is a hard error, never a silently unencrypted child's image.
+ * key. A QUARANTINE upload is a raw original (EXIF/GPS still in it), so it gets the originals key
+ * too. In PRODUCTION a missing key is a hard error, never a silently unencrypted child's image.
  * Local MinIO has no KMS, so dev without aliases writes plain objects.
  */
 export function encryptionFor(
   key: string,
   env: Record<string, string | undefined> = process.env,
 ): { ServerSideEncryption?: 'aws:kms'; SSEKMSKeyId?: string } {
-  const isOriginal = /\/original$/.test(key);
+  const isOriginal = /\/original$/.test(key) || key.startsWith(QUARANTINE_PREFIX);
   const alias = isOriginal ? env.S3_KMS_KEY_ALIAS_ORIGINALS : env.S3_KMS_KEY_ALIAS;
   if (alias) return { ServerSideEncryption: 'aws:kms', SSEKMSKeyId: alias };
   // TEST SITE only (src/lib/siteMode.ts): the storage provider's own at-rest encryption stands in

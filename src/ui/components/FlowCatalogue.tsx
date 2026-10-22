@@ -19,7 +19,7 @@ import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useS
 import { deliveryLine } from '@/lib/delivery';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupPrefetch';
-import { startGuestUpload } from '@/app/actions/guestUpload';
+import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
 import { defaultPlacementFor, defaultTransformFor, groupOf, isLineOfSku, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
@@ -94,10 +94,7 @@ export function FlowCatalogue({
     const run = (async (): Promise<string | null> => {
       try {
         const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-        const fd = new FormData();
-        fd.append('image', blob, upload.name || 'drawing.png');
-        fd.append('termsAccepted', 'true');
-        const res = await startGuestUpload(fd);
+        const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
         if (res.ok && res.assetId) {
           setAssetId(res.assetId);
           return res.assetId;

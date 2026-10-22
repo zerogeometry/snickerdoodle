@@ -3,6 +3,7 @@ import { requireJobsSecret } from '@/server/jobs/auth';
 import { purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention';
 import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
 import { purgeExpiredRateLimits } from '@/server/rateLimit';
+import { sweepQuarantine } from '@/server/directUpload';
 
 /**
  * Retention purge, triggered by a scheduler (cron / Vercel Cron / a scheduled
@@ -18,5 +19,6 @@ export async function POST(req: Request): Promise<Response> {
   const audit = await purgeExpiredAuditRecords(db); // the audit trail's own 6-year limit
   const pendingKeepsPurged = await purgeExpiredPendingKeeps(db); // guests' keep requests, a day on
   const rateLimitsPurged = await purgeExpiredRateLimits(db); // finished rate-limit windows, a day on
-  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, rateLimitsPurged });
+  const quarantine = await sweepQuarantine(); // direct uploads never finalised, an hour on
+  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, rateLimitsPurged, quarantineSwept: quarantine.deleted });
 }

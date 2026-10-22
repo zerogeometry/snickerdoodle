@@ -20,7 +20,7 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { toast, useUpload } from '@/lib/store';
-import { startGuestUpload } from '@/app/actions/guestUpload';
+import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
@@ -134,10 +134,7 @@ export default function StudioPage() {
     if (assetId) return assetId;
     if (!upload) return null;
     const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-    const fd = new FormData();
-    fd.append('image', blob, upload.name || 'drawing.png');
-    fd.append('termsAccepted', 'true');
-    const res = await startGuestUpload(fd);
+    const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
     if (res.ok && res.assetId) {
       setAssetId(res.assetId);
       setLocalAssetId(res.assetId);
