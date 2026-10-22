@@ -8,15 +8,24 @@ describe('security headers on every response', () => {
     const rules = (await nextConfig.headers!()) as Rule[];
     const all = rules.find((r) => r.source === '/:path*')!;
     const h = Object.fromEntries(all.headers.map((x) => [x.key.toLowerCase(), x.value]));
-    expect(h['content-security-policy']).toContain("frame-ancestors 'none'");
-    expect(h['content-security-policy']).toContain("object-src 'none'");
-    expect(h['content-security-policy']).toContain("base-uri 'self'");
+    // the page CSP is per request (nonce) — the middleware sends it; see csp.test.ts
+    expect(h['content-security-policy']).toBeUndefined();
     expect(h['x-frame-options']).toBe('DENY');
     expect(h['x-content-type-options']).toBe('nosniff');
     expect(h['referrer-policy']).toBe('strict-origin-when-cross-origin');
     expect(h['strict-transport-security']).toMatch(/max-age=\d{7,}/);
     expect(h['permissions-policy']).toContain('camera=(self)');
     expect(h['permissions-policy']).toContain('microphone=()');
+  });
+
+  it('the static files the middleware skips still get a policy that runs and frames nothing', async () => {
+    const rules = (await nextConfig.headers!()) as Rule[];
+    for (const source of ['/_next/static/:path*', '/_next/image']) {
+      const csp = rules.find((r) => r.source === source)?.headers.find((x) => x.key === 'Content-Security-Policy')?.value ?? '';
+      expect(csp, source).toContain("default-src 'none'");
+      expect(csp, source).toContain("frame-ancestors 'none'");
+      expect(csp, source).not.toMatch(/script-src/);
+    }
   });
 
   it('the private app is never indexed; the marketing home page can be', async () => {
