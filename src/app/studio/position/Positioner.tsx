@@ -27,6 +27,7 @@ import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geo
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
 import { isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
+import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import type { StudioData } from '@/server/studio';
 
 /** The editor canvas is deliberately MUCH larger than the customize-page preview
@@ -368,6 +369,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
         toast('background removed ✨');
       } else if (res.reason === 'budget') {
         toast('that’s all your magic edits for now');
+      } else if (res.reason === 'too-many') {
+        toast(TOO_MANY_COPY);
       } else if (res.reason === 'nochange') {
         toast('we couldn’t find a clean background to remove on this one');
       } else {
@@ -1204,6 +1207,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             </div>
           ) : result && !result.ok && result.blocked ? (
             <p role="alert" className="mt-3 text-center text-xs font-semibold text-cinnamon">That placement is too low-res to print — zoom out or choose a smaller product.</p>
+          ) : result && !result.ok && result.tooMany ? (
+            <p role="alert" className="mt-3 text-center text-xs font-semibold text-cinnamon">{TOO_MANY_COPY}</p>
           ) : null}
         </div>
       </div>

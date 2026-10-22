@@ -17,6 +17,7 @@ import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
+import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupPrefetch';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
@@ -101,7 +102,7 @@ export function FlowCatalogue({
           setAssetId(res.assetId);
           return res.assetId;
         }
-        toast(res.blocked ? 'we couldn’t use that image — try another' : 'hmm, that didn’t work — try again');
+        toast(res.blocked ? 'we couldn’t use that image — try another' : res.tooMany ? TOO_MANY_COPY : 'hmm, that didn’t work — try again');
         return null;
       } catch {
         // e.g. a too-large upload or a network blip — surface it, never throw silently

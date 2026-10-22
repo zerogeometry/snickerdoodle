@@ -965,3 +965,13 @@ export const pendingKeeps = pgTable('pending_keeps', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt,
 });
+
+// ── rate_limits — how many times a caller did something in the current window (src/server/rateLimit.ts).
+// One row per (bucket, caller) — the caller is an HMAC of their IP / email / account id, never the
+// raw value. Fixed windows, counted by an atomic upsert; rows a day past their window are purged by
+// the retention job. Nothing here is about a child.
+export const rateLimits = pgTable('rate_limits', {
+  key: text('key').primaryKey(), // `${bucket}:${hmac(caller)}`
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
+  count: integer('count').notNull(),
+});

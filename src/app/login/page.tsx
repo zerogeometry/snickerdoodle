@@ -34,7 +34,12 @@ export default function LoginPage() {
       // ask the server to keep the drawing for THIS email (claim-checked) — it finishes on whichever
       // device the link is opened on. Best-effort: sign-in goes ahead regardless.
       if (keepId) await rememberKeepAction(keepId, email.trim()).catch(() => null);
-      await signIn('email', { email: email.trim(), redirect: false, callbackUrl: next });
+      const res = await signIn('email', { email: email.trim(), redirect: false, callbackUrl: next });
+      // a refused send (e.g. too many links in a row) must not claim "check your email"
+      if (res?.error) {
+        setError(true);
+        return;
+      }
       setSent(true);
     } catch {
       setError(true);
@@ -96,7 +101,7 @@ export default function LoginPage() {
                   <Icon icon={IconSparkles} size={16} /> {busy ? 'sending…' : 'email me a magic link'}
                 </Button>
                 {error ? (
-                  <p role="alert" className="mt-2 text-center text-xs font-semibold text-cinnamon">Something went wrong — please try again.</p>
+                  <p role="alert" className="mt-2 text-center text-xs font-semibold text-cinnamon">we couldn’t send a link just now — give it a few minutes and try again.</p>
                 ) : null}
               </form>
               <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">

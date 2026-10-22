@@ -5,6 +5,7 @@ import { getDb } from '@/db/client';
 import { listActiveFamilies } from '@/server/onboarding';
 import { removeProfileImage, requestEmailChange, setProfileImage, updateDisplayName, type ProfileImageKind } from '@/server/profile';
 import { getCurrentAccount } from '@/server/session';
+import { LIMITS, rateLimit } from '@/server/rateLimit';
 
 const KINDS: ProfileImageKind[] = ['AVATAR', 'ACCOUNT_HEADER', 'FAMILY_BANNER'];
 
@@ -58,9 +59,10 @@ export async function updateNameAction(name: string): Promise<{ ok: boolean; nam
   return res;
 }
 
-export async function requestEmailChangeAction(email: string): Promise<{ ok: boolean; reason?: 'invalid' | 'same' | 'taken' }> {
+export async function requestEmailChangeAction(email: string): Promise<{ ok: boolean; reason?: 'invalid' | 'same' | 'taken' | 'too-many' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
+  if (!(await rateLimit(getDb(), { ...LIMITS.emailChange, caller: account.id })).ok) return { ok: false, reason: 'too-many' };
   try {
     return await requestEmailChange(getDb(), account.id, String(email ?? ''));
   } catch {

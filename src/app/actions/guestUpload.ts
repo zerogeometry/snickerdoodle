@@ -5,6 +5,7 @@ import { getDb } from '@/db/client';
 import { ingestEphemeralUpload } from '@/server/ingest';
 import { RETENTION_DAYS } from '@/server/retention';
 import { ImageTooLargeError } from '@/storage';
+import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
 import { UPLOAD_CLAIM_COOKIE, appendClaim, signClaims, verifyClaims } from '@/server/uploadClaims';
 
 /** The terms version a guest accepts at the upload moment. Bump on any change so
@@ -20,11 +21,14 @@ const TERMS_VERSION = '2026-06-26';
  */
 export async function startGuestUpload(
   formData: FormData,
-): Promise<{ ok: boolean; assetId?: string; needsTerms?: boolean; blocked?: boolean }> {
+): Promise<{ ok: boolean; assetId?: string; needsTerms?: boolean; blocked?: boolean; tooMany?: boolean }> {
   if (formData.get('termsAccepted') !== 'true') return { ok: false, needsTerms: true };
   const file = formData.get('image');
   if (!(file instanceof File) || file.size === 0) return { ok: false };
   if (file.size > 25 * 1024 * 1024) return { ok: false }; // 25MB guard
+
+  // anonymous uploads cost storage + a safety check each: limited per device (generous for families)
+  if (!(await rateLimit(getDb(), { ...LIMITS.guestUploadPerIp, caller: await clientIp() })).ok) return { ok: false, tooMany: true };
 
   const db = getDb();
   const buffer = Buffer.from(await file.arrayBuffer());

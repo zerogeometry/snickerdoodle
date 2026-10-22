@@ -5,6 +5,7 @@ import { resolveViewerContext } from '@/server/assets';
 import { createInvite } from '@/server/invites';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
+import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { appUrl, sendMail } from '@/server/mail';
 import type { AccessLevel, Relationship } from '@/domain/types';
 
@@ -21,6 +22,7 @@ export async function createInviteAction(input: {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
   if (!input.email.trim()) return { ok: false };
+  if (!(await rateLimit(getDb(), { ...LIMITS.invitesPerAccount, caller: account.id })).ok) return { ok: false };
 
   const db = getDb();
   const familyId = await ensureHomeFamily(db, account.id, account.name);

@@ -1,5 +1,5 @@
 /**
- * Seeds the TEST SITE's database from THIS computer: the catalogue (seedCatalogue), then the
+ * Seeds the TEST SITE's database from THIS computer: the migrations, the catalogue (seedCatalogue), then the
  * mockup templates (seedMockups — it needs the Prodigi blanks staged in `.prodigi-assets/`, which
  * only live here). Netlify's job endpoints time out on this much work, so it runs locally against
  * the test site's own settings in `.env.test-site`.
@@ -9,11 +9,12 @@
  *   - never prints a setting — any error text is scrubbed of every value from the file.
  *
  * Run it through the wrapper (it sets the flags this needs):
- *   & .\scripts\test-site\seed.ps1                 # catalogue, then mockups
+ *   & .\scripts\test-site\seed.ps1                 # migrations, catalogue, then mockups
+ *   & .\scripts\test-site\seed.ps1 -Only migrate
  *   & .\scripts\test-site\seed.ps1 -Only catalogue
  *   & .\scripts\test-site\seed.ps1 -Only mockups
  * or directly, from the repo root:
- *   NODE_OPTIONS=--conditions=react-server node node_modules/tsx/dist/cli.mjs scripts/test-site/seed.ts [catalogue|mockups]
+ *   NODE_OPTIONS=--conditions=react-server node node_modules/tsx/dist/cli.mjs scripts/test-site/seed.ts [migrate|catalogue|mockups]
  */
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -25,8 +26,8 @@ const ENV_FILE = path.join(root, '.env.test-site');
 
 async function main(): Promise<number> {
   const only = (process.argv[2] ?? '').toLowerCase();
-  if (only && only !== 'catalogue' && only !== 'mockups') {
-    console.error('usage: seed.ts [catalogue|mockups]   (no argument = both, catalogue first)');
+  if (only && only !== 'migrate' && only !== 'catalogue' && only !== 'mockups') {
+    console.error('usage: seed.ts [migrate|catalogue|mockups]   (no argument = all three, in that order)');
     return 2;
   }
   if (!existsSync(ENV_FILE)) {
@@ -49,14 +50,23 @@ async function main(): Promise<number> {
     // Imported only now, so nothing reads the environment before the test site's settings are in.
     const { getDb } = await import('@/db/client');
     const db = getDb();
-    if (only !== 'mockups') {
+    if (!only || only === 'migrate') {
+      // The database first: new tables the new code needs (e.g. rate_limits) must exist BEFORE it's
+      // deployed. Idempotent — already-applied migrations are skipped.
+      const t0 = Date.now();
+      console.log('updating the database (migrations)…');
+      const { migrate } = await import('drizzle-orm/postgres-js/migrator');
+      await migrate(db, { migrationsFolder: path.join(root, 'src', 'db', 'migrations') });
+      console.log(`database up to date (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
+    }
+    if (!only || only === 'catalogue') {
       const t0 = Date.now();
       console.log('seeding the catalogue…');
       const { seedCatalogue } = await import('@/server/catalogue');
       const res = await seedCatalogue(db);
       console.log(`catalogue: ${res.products} products, ${res.variants} variants (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
     }
-    if (only !== 'catalogue') {
+    if (!only || only === 'mockups') {
       const t0 = Date.now();
       console.log('authoring the mockups (this takes a few minutes)…');
       const { seedMockups } = await import('@/server/print/seedMockups');

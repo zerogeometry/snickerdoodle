@@ -4,11 +4,12 @@ import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { renderPrintFile } from '@/server/print/render';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
 import type { RawTransform } from '@/server/print/geometry';
 
 export type RenderPreviewResult =
   | { ok: true; url: string; widthPx: number; heightPx: number; renderedDpi: number; effectiveDpi: number; upscaled: boolean }
-  | { ok: false; blocked?: boolean; needsAuth?: boolean };
+  | { ok: false; blocked?: boolean; needsAuth?: boolean; tooMany?: boolean };
 
 /**
  * Render the REAL print-ready file for the current placement and hand back a
@@ -26,6 +27,8 @@ export async function renderPreviewAction(input: {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
+  // a full-size print render is the heaviest thing we do — limited per device
+  if (!(await rateLimit(db, { ...LIMITS.printPreviewPerIp, caller: await clientIp() })).ok) return { ok: false, tooMany: true };
   const viewer = await resolveAssetViewer(db, input.assetId, account?.id ?? null, claims);
 
   try {

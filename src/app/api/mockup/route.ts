@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { resolveAssetViewer } from '@/server/assets';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { ipFromHeaders, LIMITS, rateLimit } from '@/server/rateLimit';
 import { composeForViewer, requestAssetId, type MockupPreviewResult, type MockupRequestBody } from '@/server/print/mockupRequest';
 
 export type { MockupPreviewResult } from '@/server/print/mockupRequest';
@@ -33,9 +34,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<MockupPreview
   const assetId = requestAssetId(body);
   if (!assetId) return NextResponse.json({ ok: false, fallback: true }, { status: 400 });
 
+  const db = getDb();
+  // composing is CPU work: limited per device (a whole range + every colour swatch is well under it)
+  const gate = await rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers) });
+  if (!gate.ok) return NextResponse.json({ ok: false, fallback: true }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
-  const db = getDb();
   const viewer = await resolveAssetViewer(db, assetId, account?.id ?? null, claims);
   const res = await composeForViewer(db, viewer, body, { needsAuth: account === null && viewer.uploadClaim == null });
   return NextResponse.json(res, { headers: { 'cache-control': 'no-store' } });

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { resolveAssetViewer } from '@/server/assets';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { ipFromHeaders, LIMITS, rateLimit } from '@/server/rateLimit';
 import type { ViewerContext } from '@/authz';
 import { composeForViewer, MOCKUP_BATCH_MAX, requestAssetId, type MockupPreviewResult, type MockupRequestBody } from '@/server/print/mockupRequest';
 import type { ComposeMemo } from '@/server/print/compositor';
@@ -26,9 +27,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<{ results: Mo
     return NextResponse.json({ results: [] }, { status: 400 });
   }
 
+  const db = getDb();
+  // a batch counts as many previews as it asks for (the same per-device limit as the single route)
+  const gate = await rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers), cost: items.length });
+  if (!gate.ok) return NextResponse.json({ results: [] }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
-  const db = getDb();
   const viewers = new Map<string, Promise<ViewerContext>>();
   const viewerFor = (assetId: string) => {
     let v = viewers.get(assetId);

@@ -26,7 +26,7 @@ on a production build. Plus the full test suite (825 pass; the 3 known environme
 ## Open — need a decision or a bigger piece of work
 | # | Gap | Risk | Recommendation |
 |---|---|---|---|
-| A | **No rate limiting anywhere** | High | One small Postgres-backed limiter (no new service), applied to: magic-link requests (email bombing / cost), guest uploads (storage + moderation cost), the test-site password, the admin two-step code (6 digits can be ground down), complaints/invites/gift links, and the mockup/batch routes (CPU). ~1 day incl. tests; needs one migration. |
+| A | ~~No rate limiting anywhere~~ — **DONE 22 Oct** (`src/server/rateLimit.ts`, migration 0040): sign-in emails (5/h per email, 20/h per device), uploads, the test-site password (10/15 min, fails closed), the admin two-step code (5/15 min, fails closed), complaints/invites/gift links/gift requests, previews + print renders + magic edits, gift-link previews. Callers stored only as keyed hashes. | — | Run `seed.ps1` (it now applies migrations) BEFORE deploying. |
 | B | **Netlify functions run in the US** (default region) while children's pictures are composed there | High for real data; OK for test drawings | Before any real child image: set Functions region to London (Site configuration → Functions — a paid-plan setting) or move to the AWS London home (D18). Also makes the shop much faster. |
 | C | No script-level Content-Security-Policy (only framing/base/object/form rules today) | Medium | Add a nonce-based `script-src` via the middleware; needs a careful pass over the 3D/AR viewer. |
 | D | Magic sign-in links last 24 h | Low–Medium | 1 hour is the common norm; 24 h is kinder to parents. Founder call. |

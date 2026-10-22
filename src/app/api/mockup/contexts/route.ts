@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getDb } from '@/db/client';
 import { instantContexts } from '@/server/print/instantContext';
+import { ipFromHeaders, LIMITS, rateLimit } from '@/server/rateLimit';
 import type { InstantContext } from '@/lib/instantMockup';
 
 /**
@@ -19,6 +20,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<{ contexts: R
   } catch {
     return NextResponse.json({ contexts: {} }, { status: 400 });
   }
-  const contexts = await instantContexts(getDb(), ids);
+  const db = getDb();
+  const gate = await rateLimit(db, { ...LIMITS.mockupContextsPerIp, caller: ipFromHeaders(req.headers) });
+  if (!gate.ok) return NextResponse.json({ contexts: {} }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
+  const contexts = await instantContexts(db, ids);
   return NextResponse.json({ contexts }, { headers: { 'cache-control': 'no-store' } });
 }

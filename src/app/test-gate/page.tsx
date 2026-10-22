@@ -8,9 +8,9 @@ export const metadata: Metadata = { title: 'test site', robots: { index: false, 
 export const dynamic = 'force-dynamic';
 
 /** The test site's front door: one shared password. A plain form — works with no JS. */
-export default async function TestGatePage({ searchParams }: { searchParams: Promise<{ next?: string; wrong?: string }> }) {
+export default async function TestGatePage({ searchParams }: { searchParams: Promise<{ next?: string; wrong?: string; busy?: string }> }) {
   if (!isTestSite()) notFound();
-  const { next = '/', wrong } = await searchParams;
+  const { next = '/', wrong, busy } = await searchParams;
   return (
     <main id="main" className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-4 py-10">
       <div className="rounded-[22px] border-2 border-cocoa bg-paper p-6 shadow-[0_4px_0_var(--color-cocoa)]">
@@ -32,7 +32,11 @@ export default async function TestGatePage({ searchParams }: { searchParams: Pro
               className="mt-1 block min-h-12 w-full rounded-[14px] border-2 border-cocoa/25 bg-paper px-3 text-base text-cocoa focus:border-cocoa"
             />
           </label>
-          {wrong ? (
+          {busy ? (
+            <p role="alert" className="text-sm font-bold text-cinnamon">
+              that&apos;s a lot of tries — have a cuppa and try again in 15 minutes.
+            </p>
+          ) : wrong ? (
             <p role="alert" className="text-sm font-bold text-cinnamon">
               that&apos;s not it — try again?
             </p>

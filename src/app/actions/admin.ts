@@ -7,6 +7,7 @@ import { accounts, auditRecords } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { AuthzError } from '@/authz';
 import { currentReviewer } from '@/server/admin/context';
+import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { decideReview, type ReviewKind } from '@/server/admin/review';
 import { ADMIN_STEPUP_COOKIE, signStepUp, STEPUP_HOURS } from '@/server/admin/stepUp';
 import { newTotpSecret, openSecret, otpauthUri, sealSecret, verifyTotp } from '@/server/admin/totp';
@@ -33,6 +34,8 @@ export async function startMfaEnrolment(): Promise<{ ok: true; secret: string; u
 export async function confirmMfaEnrolment(code: string): Promise<{ ok: boolean }> {
   const r = await currentReviewer();
   if (!r.accountId || !r.isAdmin || r.enrolled) return { ok: false };
+  // a 6-digit code can be ground down by guessing — 5 tries per 15 minutes, and no tries if the check can't run
+  if (!(await rateLimit(getDb(), { ...LIMITS.mfaPerAccount, caller: r.accountId })).ok) return { ok: false };
   const jar = await cookies();
   const secret = openSecret(jar.get(PENDING_COOKIE)?.value);
   if (!secret || !verifyTotp(secret, code)) return { ok: false };
@@ -48,6 +51,7 @@ export async function confirmMfaEnrolment(code: string): Promise<{ ok: boolean }
 export async function verifyMfa(code: string): Promise<{ ok: boolean }> {
   const r = await currentReviewer();
   if (!r.accountId || !r.isAdmin || !r.enrolled) return { ok: false };
+  if (!(await rateLimit(getDb(), { ...LIMITS.mfaPerAccount, caller: r.accountId })).ok) return { ok: false };
   const [row] = await getDb().select({ mfa: accounts.mfaSecret }).from(accounts).where(eq(accounts.id, r.accountId));
   const secret = openSecret(row?.mfa);
   if (!secret || !verifyTotp(secret, code)) return { ok: false };

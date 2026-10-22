@@ -10,6 +10,7 @@ import { ensureHomeFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { ImageTooLargeError } from '@/storage';
+import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
 import type { VisibilityTier } from '@/domain/types';
 
 /**
@@ -17,9 +18,10 @@ import type { VisibilityTier } from '@/domain/types';
  * are EXIF-stripped and stored privately, and an asset row is created (kept,
  * FAMILY by default). Requires a session — a guest is told to log in.
  */
-export async function keepCreation(formData: FormData): Promise<{ ok: boolean; needsAuth?: boolean; assetId?: string }> {
+export async function keepCreation(formData: FormData): Promise<{ ok: boolean; needsAuth?: boolean; assetId?: string; tooMany?: boolean }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
+  if (!(await rateLimit(getDb(), { ...LIMITS.homeUploadPerAccount, caller: account.id })).ok) return { ok: false, tooMany: true };
 
   const file = formData.get('image');
   if (!(file instanceof File) || file.size === 0) return { ok: false };
@@ -58,6 +60,7 @@ export async function keepUploadAction(assetId: string): Promise<{ ok: boolean; 
 
 /** On the sign-in page: a guest's "+ keepsake" — keep it once THIS email signs in (claim-checked). */
 export async function rememberKeepAction(assetId: string, email: string): Promise<{ ok: boolean }> {
+  if (!(await rateLimit(getDb(), { ...LIMITS.rememberKeepPerIp, caller: await clientIp() })).ok) return { ok: false };
   if (typeof assetId !== 'string' || typeof email !== 'string') return { ok: false };
   return { ok: await rememberKeepForEmail(getDb(), { assetId, email, uploadClaims: await getUploadClaims() }) };
 }

@@ -1,10 +1,12 @@
-# Seeds the TEST SITE database from this computer: the catalogue, then the mockups.
+# Updates + seeds the TEST SITE database from this computer: migrations, the catalogue, then the mockups.
+# Run it BEFORE deploy.ps1 when a change adds tables (the new code expects them).
 # Uses .env.test-site (refuses unless it says SITE_MODE=test) and never prints a setting.
 # Run from anywhere in the repo:
-#   & .\scripts\test-site\seed.ps1                  # catalogue, then mockups
+#   & .\scripts\test-site\seed.ps1                  # migrations, catalogue, then mockups
+#   & .\scripts\test-site\seed.ps1 -Only migrate
 #   & .\scripts\test-site\seed.ps1 -Only catalogue
 #   & .\scripts\test-site\seed.ps1 -Only mockups
-param([ValidateSet('', 'catalogue', 'mockups')][string]$Only = '')
+param([ValidateSet('', 'migrate', 'catalogue', 'mockups')][string]$Only = '')
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $tsx = Join-Path $root 'node_modules\tsx\dist\cli.mjs'

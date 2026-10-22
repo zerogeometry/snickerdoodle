@@ -2,6 +2,8 @@ import NextAuth from 'next-auth';
 import type { EmailConfig } from 'next-auth/providers';
 import { DrizzleAccountsAdapter } from './adapter';
 import { sendMail } from '@/server/mail';
+import { getDb } from '@/db/client';
+import { clientIp, LIMITS, rateLimitAll } from '@/server/rateLimit';
 
 /**
  * Passwordless magic-link auth (Auth.js v5) over our `accounts` table.
@@ -19,6 +21,12 @@ const magicLink: EmailConfig = {
   server: undefined as unknown as EmailConfig['server'],
   options: {},
   async sendVerificationRequest({ identifier, url }) {
+    // A sign-in email per address and per device is limited (no inbox flooding, no mail bill run-up).
+    const gate = await rateLimitAll(getDb(), [
+      { ...LIMITS.magicLinkPerEmail, caller: identifier },
+      { ...LIMITS.magicLinkPerIp, caller: await clientIp() },
+    ]);
+    if (!gate.ok) throw new Error('too many sign-in links — try again shortly');
     await sendMail({
       kind: 'magic-link',
       to: identifier,
