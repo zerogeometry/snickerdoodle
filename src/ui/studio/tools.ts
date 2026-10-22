@@ -41,9 +41,9 @@ export interface ToolDef {
   key?: string;
   /** 'mode' = stays selected (brushes, crop…); 'action' = does its thing on tap; 'hold' = press & hold. */
   kind: 'mode' | 'action' | 'hold';
-  /** A small ✕ on the icon (founder, 22 Oct): the two "take away" tools aren't self-explanatory —
-   * remove background gets it top-left, the remove-colour pipette top-right. */
-  badge?: 'tl' | 'tr';
+  /** A small ✕ on the icon, top-right (founder, 22 Oct): the two "take away" tools — remove
+   * background and the remove-colour pipette — aren't self-explanatory without it. */
+  badge?: 'tr';
 }
 
 /**
@@ -58,7 +58,7 @@ export const TOOLS: ToolDef[] = [
     hint: 'lifts the drawing off the paper, so it sits on any colour.',
     label: 'remove background',
     icon: IconBackground,
-    badge: 'tl',
+    badge: 'tr',
     kind: 'mode',
     key: 'G',
     info: 'Lifts the drawing off the paper so it can go on any colour — paper inside shapes and shadows too. On a painted background, use remove colour instead.',
@@ -97,7 +97,7 @@ export const TOOLS: ToolDef[] = [
   {
     id: 'text',
     group: 'add',
-    hint: 'tap the picture where you’d like words — or tap words to change them.',
+    hint: 'tap the picture where you’d like words, then type — tap words to change them, drag to move.',
     label: 'add text',
     icon: IconTypography,
     kind: 'mode',

@@ -28,7 +28,7 @@ test('phones: the picture gets the screen; options rise as a row over it', async
   await expect(page.getByRole('heading', { name: /where to start/i })).toHaveCount(0);
   const toolbar = page.getByRole('toolbar', { name: 'studio tools' });
   const bar = (await toolbar.boundingBox())!;
-  const stage = (await page.locator('canvas').boundingBox())!;
+  const stage = (await page.locator('canvas[aria-label^="your drawing"]').boundingBox())!;
   expect(stage.height).toBeGreaterThan(844 * 0.7); // the stage runs from the header to the toolbar
   expect(stage.y + stage.height).toBeGreaterThan(bar.y - 20);
 
@@ -54,6 +54,20 @@ test('phones: the picture gets the screen; options rise as a row over it', async
   expect(r.y + r.height).toBeGreaterThan(bar.y - 30);
   // it scrolls sideways (fonts → colours → textures)
   expect(await row.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+
+  // words are typed right there in the box on the picture: tap → type → tap away
+  const box = (await page.locator('canvas[aria-label^="your drawing"]').boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.45);
+  const words = page.getByRole('textbox', { name: 'your words' });
+  await expect(words).toBeFocused();
+  await page.keyboard.type('Lily, 4'); // the placeholder was selected, so this replaces it
+  await expect(words).toHaveValue('Lily, 4');
+  const w = (await words.boundingBox())!;
+  expect(w.y).toBeGreaterThan(box.y); // on the picture, not in the toolbar
+  expect(w.y + w.height).toBeLessThan(bar.y - 60);
+  await page.mouse.click(box.x + 20, box.y + 40);
+  // finished: nothing is being typed into (the editor steps out of sight, and out of the a11y tree)
+  await expect.poll(() => page.evaluate(() => document.activeElement?.tagName)).not.toBe('TEXTAREA');
 
   // tapping the tool again puts the row away
   await toolbar.getByRole('button', { name: 'add text' }).click();

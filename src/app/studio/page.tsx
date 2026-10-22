@@ -29,8 +29,8 @@ import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
-import { CARD_FONTS } from '@/lib/card-fonts';
-import { flipObjects, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
+import { flipObjects, MAX_TEXT_LENGTH, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
@@ -125,6 +125,13 @@ export default function StudioPage() {
   const liveStroke = useRef<number[] | null>(null);
   const lastEditPush = useRef(0);
   const selected = objects.find((o) => o.id === selectedId) ?? null;
+  // typing straight INTO a text box on the picture (founder, 22 Oct): which one, and the one editor
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const editingRef = useRef<string | null>(null);
+  const inlineRef = useRef<HTMLTextAreaElement>(null);
+  /** A tap on words (or a new box) opens the editor when the finger LIFTS — unless it dragged. */
+  const pendingEdit = useRef<{ id: string; sx: number; sy: number; isNew: boolean } | null>(null);
+  const viewBeforeEdit = useRef<{ zoom: number; panX: number; panY: number } | null>(null);
   // the drawing layer is locked until the parent unlocks it (then it moves / sizes / turns)
   const [drawingUnlocked, setDrawingUnlocked] = useState(false);
   // a continuous turn (slider / dial / drag) works from where it started, so it never drifts
@@ -285,7 +292,8 @@ export default function StudioPage() {
     if (!comparing) {
       const f: Frame = { gw, gh };
       const M = new DOMMatrix([dpr, 0, 0, dpr, 0, 0]).multiply(V);
-      for (const o of objects) drawTextured(ctx, { texture: o.texture, draw: (c) => drawObject(c, o, f) }, f, M, content);
+      // (the words being typed into are shown by the editor over the picture, not twice)
+      for (const o of objects) if (o.id !== editingId) drawTextured(ctx, { texture: o.texture, draw: (c) => drawObject(c, o, f) }, f, M, content);
       const live = liveStroke.current;
       if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content);
 
@@ -345,7 +353,7 @@ export default function StudioPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, editingId]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
   const drawingBox = (f: Frame, g: Geometry = geo): Box => {
@@ -416,6 +424,8 @@ export default function StudioPage() {
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!workRef.current || busy) return;
+    // the canvas never takes focus itself: the words editor keeps it until we say otherwise
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     const [sx, sy] = local(e);
     pointers.current.set(e.pointerId, { x: sx, y: sy, type: e.pointerType });
@@ -461,6 +471,9 @@ export default function StudioPage() {
     if (tool && EDITING.includes(tool)) {
       const f = frame();
       const [gx, gy] = toGeoSpace(sx, sy);
+      // a tap off the words being typed: that's them finished (it doesn't start a new box)
+      const wasEditing = !!editingRef.current;
+      if (wasEditing) endEdit();
       const selB = selectedBox(f);
       if (selB) {
         // the handles first
@@ -491,6 +504,8 @@ export default function StudioPage() {
         setSelectedId(hit.id);
         pushUndo();
         gesture.current = { kind: 'move', obj: hit, g0: [gx, gy] };
+        // words: a TAP (no drag) opens them for typing, right there
+        if (hit.type === 'text' && !wasEditing) pendingEdit.current = { id: hit.id, sx, sy, isNew: false };
         return;
       }
       // the unlocked drawing sits underneath everything added
@@ -500,14 +515,16 @@ export default function StudioPage() {
         gesture.current = { kind: 'move', drawing: true, place0: geo.place ?? IDENTITY_PLACE, g0: [gx, gy] };
         return;
       }
-      if (tool === 'text') {
-        // a new text box where they tapped
+      if (tool === 'text' && !wasEditing) {
+        // a new text box where they tapped — ready to type into as the finger lifts
         pushUndo();
         const o: StudioObject = { id: newId(), type: 'text', text: 'your words', font: textStyle.font, colour: textStyle.colour, size: 0.12, x: gx / f.gw, y: gy / f.gh, rotation: 0, texture: textStyle.texture };
         setObjects((os) => [...os, o]);
         setSelectedId(o.id);
+        pendingEdit.current = { id: o.id, sx, sy, isNew: true };
         return;
       }
+      if (wasEditing) return;
       setSelectedId(null);
       if (tool === 'select') return;
     }
@@ -661,6 +678,12 @@ export default function StudioPage() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const pe = pendingEdit.current;
+    pendingEdit.current = null;
+    if (pe && pointers.current.size === 1) {
+      const [sx, sy] = local(e);
+      if (pe.isNew || Math.hypot(sx - pe.sx, sy - pe.sy) < 8) startEdit(pe.id, sy);
+    }
     if (gesture.current?.kind === 'stroke' && liveStroke.current) {
       const points = liveStroke.current;
       liveStroke.current = null;
@@ -685,6 +708,44 @@ export default function StudioPage() {
     const scale = viewMatrix(geo).a; // geometry-space units per image px are 1
     return brush / Math.max(0.0001, Math.abs(scale) || 1) / (work ? 1 : 1);
   };
+
+  // ── typing into words on the picture ──
+  /** Open a text box for typing, in place. Call it INSIDE the tap or click — phones only raise the
+   * keyboard for a focus that happens during one. `atY` (stage px) lets a phone lift low words up
+   * out of the keyboard's way while typing. */
+  const startEdit = (id: string, atY?: number) => {
+    inlineRef.current?.focus({ preventScroll: true });
+    editingRef.current = id;
+    setSelectedId(id);
+    setEditingId(id);
+    if (typeof window !== 'undefined' && window.innerWidth < 768 && atY !== undefined && atY > stageSize.h * 0.36) {
+      viewBeforeEdit.current = view;
+      setView((v) => ({ ...v, panY: v.panY + (stageSize.h * 0.24 - atY) }));
+    }
+  };
+  /** Done typing: an empty box goes; the view settles back if it was lifted for the keyboard. */
+  const endEdit = () => {
+    const id = editingRef.current;
+    if (!id) return;
+    editingRef.current = null;
+    setEditingId(null);
+    const o = objects.find((x) => x.id === id);
+    if (o?.type === 'text' && !o.text.trim()) {
+      setObjects((os) => os.filter((x) => x.id !== id));
+      setSelectedId(null);
+    }
+    if (document.activeElement === inlineRef.current) inlineRef.current?.blur();
+    if (viewBeforeEdit.current) {
+      setView(viewBeforeEdit.current);
+      viewBeforeEdit.current = null;
+    }
+  };
+  // a brand-new box: its placeholder is selected, so the first key replaces it
+  useEffect(() => {
+    const o = editingId ? objects.find((x) => x.id === editingId) : null;
+    if (o?.type === 'text' && o.text === 'your words') inlineRef.current?.select();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when a box opens
+  }, [editingId]);
 
   // ── tools ──
   const runRemoveBg = async (keep: boolean) => {
@@ -733,6 +794,7 @@ export default function StudioPage() {
   };
 
   const onTool = (id: ToolId) => {
+    endEdit();
     // keep the selection only where it can still be edited
     if (selected && !(id === 'select' || (id === 'text' && selected.type === 'text') || (id === 'shapes' && selected.type === 'shape'))) setSelectedId(null);
     if (id === 'startAgain') return setConfirmStart(true);
@@ -927,6 +989,30 @@ export default function StudioPage() {
     );
   }
 
+  // the words editor sits exactly on the box being typed into (stage px), or waits out of sight
+  const inlineObj = editingId ? (objects.find((o) => o.id === editingId && o.type === 'text') as TextObject | undefined) : undefined;
+  let inlineStyle: React.CSSProperties = { left: 0, top: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none' };
+  if (inlineObj && workRef.current && stageSize.w) {
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const b = boxOf(inlineObj, { gw, gh });
+    const V = viewMatrix(geo);
+    const c = V.transformPoint(new DOMPoint(b.cx, b.cy));
+    const fontPx = Math.max(4, inlineObj.size * Math.min(gw, gh)) * V.a;
+    inlineStyle = {
+      left: c.x,
+      top: c.y,
+      width: b.w * V.a + fontPx * 0.8, // room for the caret at the end of the longest line
+      height: b.h * V.a,
+      transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+      fontFamily: cardFontCss(inlineObj.font),
+      fontSize: fontPx,
+      lineHeight: TEXT_LINE_HEIGHT,
+      color: inlineObj.colour,
+      caretColor: inlineObj.colour,
+      outline: 'none', // the dashed selection box already shows it's being typed into
+    };
+  }
+
   const disabled: Partial<Record<ToolId, string>> = {};
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
@@ -1062,7 +1148,11 @@ export default function StudioPage() {
           selected,
           baseLabel: scratch ? 'your canvas' : 'your drawing',
           drawing: drawingLayer,
-          onSelect: (id) => setSelectedId(id),
+          onSelect: (id) => {
+            endEdit();
+            setSelectedId(id);
+          },
+          onEditWords: () => selected?.type === 'text' && startEdit(selected.id),
           onTurn: turnSelected,
           onUpdate: updateSelected,
           onAddShape: addShape,
@@ -1137,6 +1227,32 @@ export default function StudioPage() {
               <span className="animate-pulse">getting your drawing ready…</span>
             </div>
           )}
+          {/* the WORDS EDITOR: typing happens in the box on the picture — same font, size, colour and
+              angle as it prints (texture shows again when you're done). Always mounted while a words
+              tool is up, so a tap can focus it at once and the keyboard comes up. */}
+          {ready && tool && EDITING.includes(tool) ? (
+            <textarea
+              ref={inlineRef}
+              aria-label="your words"
+              value={inlineObj?.text ?? ''}
+              maxLength={MAX_TEXT_LENGTH}
+              wrap="off"
+              spellCheck
+              autoCapitalize="sentences"
+              tabIndex={inlineObj ? 0 : -1}
+              aria-hidden={inlineObj ? undefined : true}
+              onChange={(e) => inlineObj && updateSelected({ text: e.target.value.slice(0, MAX_TEXT_LENGTH) }, true)}
+              onBlur={() => endEdit()}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  endEdit();
+                }
+              }}
+              className="absolute z-10 m-0 resize-none overflow-hidden whitespace-pre border-0 bg-transparent p-0 text-center outline-none focus-visible:outline-none"
+              style={inlineStyle}
+            />
+          ) : null}
           {/* PHONES: what's in use, in a quiet dark-glass line over the top of the picture (reads on any
               drawing); with nothing picked, a nudge toward the toolbar + how print-ready it is */}
           <div className="pointer-events-none absolute left-2.5 right-[64px] top-2.5 flex flex-col items-start gap-1.5 md:hidden" aria-live="polite">

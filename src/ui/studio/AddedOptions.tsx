@@ -431,14 +431,6 @@ function FontChips({ value, onChange }: { value: CardFontToken; onChange: (f: Ca
 
 function TextEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    // a fresh text box: select the placeholder so typing replaces it
-    if (ref.current && value === 'your words') {
-      ref.current.focus({ preventScroll: true });
-      ref.current.select();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   return (
     <label className="block">
       <span className="sr-only">your words</span>

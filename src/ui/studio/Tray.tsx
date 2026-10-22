@@ -19,9 +19,9 @@ import {
   IconTrash,
   IconTypography,
 } from '@tabler/icons-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
-import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { Icon } from '@/ui/primitives/Icon';
@@ -206,31 +206,6 @@ function TTurn({ angle, onAngle, what }: { angle: number; onAngle: (deg: number,
   );
 }
 
-function TWords({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    // a fresh text box: select the placeholder so typing replaces it
-    if (ref.current && value === 'your words') {
-      ref.current.focus({ preventScroll: true });
-      ref.current.select();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return (
-    <label className="shrink-0">
-      <span className="sr-only">your words</span>
-      <textarea
-        ref={ref}
-        value={value}
-        maxLength={MAX_TEXT_LENGTH}
-        rows={1}
-        onChange={(e) => onChange(e.target.value)}
-        className="block h-11 w-44 resize-none rounded-[14px] border border-cocoa/20 bg-paper px-3 py-2.5 text-[15px] leading-tight text-cocoa"
-      />
-    </label>
-  );
-}
-
 // ── what each tool shows ──
 
 export interface TrayProps {
@@ -268,6 +243,8 @@ export interface TrayProps {
   baseLabel: string;
   drawing: DrawingLayer | null;
   onSelect: (id: string | null) => void;
+  /** Open the selected words for typing, in place on the picture. */
+  onEditWords: () => void;
   onTurn: (deg: number, group?: boolean) => void;
   onUpdate: (patch: Partial<StudioObject>, group?: boolean) => void;
   onAddShape: (k: ShapeKind) => void;
@@ -455,7 +432,9 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
   if (o.type === 'text') {
     return (
       <TrayRow label={`changing ${layerName(o)}`}>
-        <TWords key={o.id} value={o.text} onChange={(text) => p.onUpdate({ text }, true)} />
+        <TChip primary onClick={p.onEditWords} label="type the words — right there on the picture">
+          <Icon icon={IconPencil} size={16} /> type
+        </TChip>
         {quick}
         <TFonts value={o.font} onChange={(font) => p.onUpdate({ font })} />
         <TSep />

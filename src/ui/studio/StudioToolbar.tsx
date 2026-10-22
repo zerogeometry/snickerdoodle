@@ -261,7 +261,7 @@ function InfoCard({ tool, onClose, disabledReason }: { tool: ToolDef; onClose: (
       tabIndex={-1}
       role="dialog"
       aria-label={tool.label}
-      className="pop-in relative mb-2 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 pr-11 text-[13px] leading-relaxed text-cocoa shadow-[0_3px_0_var(--color-cocoa)] outline-none"
+      className="pop-in relative mb-2 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 pr-11 [--glyph-ring:var(--color-honey-band)] text-[13px] leading-relaxed text-cocoa shadow-[0_3px_0_var(--color-cocoa)] outline-none"
     >
       <p className="mb-1 flex items-center gap-1.5 font-extrabold">
         <ToolGlyph tool={tool} size={16} /> {tool.label}
