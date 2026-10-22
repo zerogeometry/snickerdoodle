@@ -26,6 +26,11 @@ people must be told plainly what happens.
 
 - Managed Postgres with **point-in-time recovery, retention 14 days**. No manual long-lived dumps.
 - The DB holds no image bytes — only ids, first names, birthdays, emails, orders, etc.
+- *(2026-10-22)* On the AWS London box (D18) this is either the **Lightsail managed database**
+  (point-in-time restore over **7 days**, inside the 14-day promise) **or** Postgres on the box;
+  both add a nightly KMS-encrypted dump kept **14 days**. With Postgres on the box the nightly dump
+  is the only restore point. How-to: `ops/AWS-LONDON-RUNBOOK.md` §6 (`infra/aws-london/bin/restore-db.sh`
+  does the §3 replay for you and keeps the site offline until it's clean).
 
 ## 3. After ANY database restore — replay the erasure ledger
 
