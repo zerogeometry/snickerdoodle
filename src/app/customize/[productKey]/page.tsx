@@ -853,7 +853,9 @@ function CustomizeProduct() {
           {isPattern ? (
             <div className="mt-5">
               <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{groundNoun} colour</p>
-              <div className="mt-2 flex flex-wrap gap-2.5" role="group" aria-label={`${groundNoun} colour`}>
+              {/* ONE line at every width: ten equal columns that always fill the row. Each button is
+                  its whole cell (44px tall, the full column wide), the swatch drawn inside it. */}
+              <div className="mt-1 grid grid-cols-10" role="group" aria-label={`${groundNoun} colour`}>
                 {PATTERN_GROUNDS.map((g) => (
                   <button
                     key={g.token}
@@ -862,9 +864,14 @@ function CustomizeProduct() {
                     aria-pressed={ground === g.token}
                     aria-label={`${g.label} ${groundNoun}`}
                     title={g.label}
-                    className={`press relative h-9 w-9 rounded-full border-2 before:absolute before:-inset-[4px] before:content-[''] ${ground === g.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/30'}`}
-                    style={{ backgroundColor: g.hex }}
-                  />
+                    className="press flex h-11 min-w-0 items-center justify-center"
+                  >
+                    <span
+                      aria-hidden
+                      className={`aspect-square w-[78%] max-w-9 rounded-full border-2 ${ground === g.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/45'}`}
+                      style={{ backgroundColor: g.hex }}
+                    />
+                  </button>
                 ))}
               </div>
               <p className="mt-1.5 text-[11px] text-ink-faint">their drawing on repeat, on a {groundSwatch.label} {groundNoun}</p>
