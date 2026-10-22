@@ -51,6 +51,8 @@ export interface PlaceLine {
   artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; ground?: string; message?: unknown; cardImageSpan?: string };
   /** A CARD PACK line only: its N cards (which drawing + placement each). Blank inside, front only. */
   cards?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string }>;
+  /** A CARD PACK line only: the pack's ONE base colour (untrusted; every card line gets it, normalised). */
+  ground?: string;
 }
 
 export interface PlaceOrderResult {
@@ -202,7 +204,7 @@ export async function placeOrder(
       },
       transform, // server-authoritative (clamped above)
       back: normalizeCushionBack(art.back), // coerced to a known token or null
-      // repeat-pattern base colour: a known PATTERN_GROUNDS token on a pattern product, else null (white)
+      // base colour: #rrggbb on an edge-to-edge product (incl. a card / every card of a pack), else null (white)
       ground: isGroundProduct(productKey) ? normalizeGround(art.ground) : null, // edge-to-edge products only; #rrggbb or none
       // A card in a PACK is blank inside, front only — whatever the request says.
       message: opts.blankCard
@@ -231,10 +233,11 @@ export async function placeOrder(
       if (!variantId || !packSize) throw new Error('unknown card pack');
       // Pack price = the SERVER's priced line (always qty 1); the client's cards only say WHICH drawings.
       const priced = q.lines[i]!;
-      const groups = expandCardPack(priced.linePence, packSize, line.cards ?? []);
+      // One colour per pack: every card line carries the pack's (normalised) base colour.
+      const groups = expandCardPack(priced.linePence, packSize, line.cards ?? [], line.ground);
       const prepared: Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }> = [];
       for (const g of groups) {
-        const art = await prepareArtwork({ assetId: g.card.assetId, transform: g.card.transform, sourceObjectId: g.card.sourceObjectId ?? undefined }, line.productKey, variantId, { blankCard: true });
+        const art = await prepareArtwork({ assetId: g.card.assetId, transform: g.card.transform, sourceObjectId: g.card.sourceObjectId ?? undefined, ground: g.ground ?? undefined }, line.productKey, variantId, { blankCard: true });
         if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
         if (!art) throw new Error('card pack has no print template');
         prepared.push({ art, qty: g.qty, unitPricePence: g.unitPricePence, linePence: g.linePence });

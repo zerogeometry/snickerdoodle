@@ -55,7 +55,8 @@ export async function renderPrintFile(
      * that plain-colour back. Ignored entirely on any non-DUAL variant (the SKU is authoritative). */
     back?: string;
     /** BASE COLOUR (#rrggbb) of an edge-to-edge product (GROUND_PRODUCT_KEYS): the whole file is
-     * filled with it and the drawing sits (or repeats) on top. Unknown / absent / other products ⇒ white. */
+     * filled with it and the drawing sits (or repeats) on top — on a greetings card / pack card, the
+     * outside panels the design covers (never the inside). Unknown / absent / other products ⇒ white. */
     ground?: string;
     /** GREETINGS-CARD frozen inside message (re-screened here) — the note + greeting/message/
      * signature laid into the two inside panels. null/absent ⇒ a blank (write-by-hand) inside. */
@@ -162,16 +163,20 @@ export async function renderPrintFile(
     const fromPack = variantRow.key === CARD_PACK_KEY;
     const screen = fromPack ? { ok: true as const, value: null } : screenCardMessage(input.message as Parameters<typeof screenCardMessage>[0]);
     if (!screen.ok) throw new Error(`the card ${screen.field} can’t be printed — please reword it`);
+    // the BASE COLOUR fills the outside under the design (front, + rear when full width); never the inside
+    const cardGround = normalizeGround(input.ground);
     out = await assembleCardPrintSpread({
       design: srcBuf,
       transform,
       span: !fromPack && input.cardSpan === 'full' ? 'full' : 'front',
       message: screen.value,
       branding: renderCardBackBadge(), // the founder's Snickerdoodle logo on the outer rear
+      groundHex: cardGround,
     });
     outW = CARD_SPREAD.widthPx;
     outH = CARD_SPREAD.heightPx;
-    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+    // each colour its own file: a red and a blue card of one drawing never overwrite each other
+    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH, groundTag(cardGround));
   }
 
   const rect = computeLayerRect(geom, src, transform);

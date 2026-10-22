@@ -1,9 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Request } from '@playwright/test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
- * Greetings-card PACK (D22): choose a pack of 5, put the same favourite on every card, and the
- * basket carries ONE pack line (no quantity) at the SERVER's price — £12 for five.
+ * Greetings-card PACK (D22): choose a pack of 5, put the same favourite on every card, pick ONE base
+ * colour for the pack's fronts, and the basket carries ONE pack line (no quantity) at the SERVER's
+ * price — £12 for five; the colour never changes it.
  * The pack is on show (2026-10-21), in the range with everything else.
  */
 test('card pack: pack of 5 → one drawing on all five → basket → server-priced £12', async ({ page }) => {
@@ -35,13 +36,29 @@ test('card pack: pack of 5 → one drawing on all five → basket → server-pri
   await expect(page.getByRole('button', { name: /^card \d: this drawing/ })).toHaveCount(5);
   await expect(page.getByRole('button', { name: /too small to print/ })).toHaveCount(0);
 
+  // one base colour for the whole pack — the same wheel as every other product; every front re-previews on it
+  const NAVY = '#26334f';
+  const bodies: { ground?: string }[] = [];
+  const record = (r: Request) => {
+    if (r.method() === 'POST' && r.url().endsWith('/api/mockup')) bodies.push(r.postDataJSON());
+  };
+  await page.getByRole('button', { name: 'background colour: white — change it' }).click();
+  await page.getByLabel('colour code').fill(NAVY.slice(1));
+  page.on('request', record);
+  await page.getByRole('button', { name: 'use this colour' }).click();
+  await expect(page.getByRole('button', { name: 'background colour: navy — change it' })).toBeVisible();
+  await expect(page.getByText('fills the whole card front, edge to edge, behind their drawing')).toBeVisible();
+  await expect.poll(() => bodies.filter((b) => b.ground === NAVY).length, { timeout: 30_000 }).toBeGreaterThan(0);
+  page.off('request', record);
+  for (const b of bodies) expect(b.ground).toBe(NAVY);
+
   await page.getByRole('button', { name: 'add to basket · £12' }).click();
   await expect(page).toHaveURL(/\/start-creating/);
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
   await expect(page.getByText('card pack', { exact: true })).toBeVisible();
-  await expect(page.getByText('5 cards · blank inside')).toBeVisible();
+  await expect(page.getByText('5 cards · on navy · blank inside')).toBeVisible();
   await expect(page.getByRole('button', { name: 'edit cards' })).toBeVisible();
   await expect(page.getByRole('button', { name: /^one more/ })).toHaveCount(0); // a pack has no quantity
 

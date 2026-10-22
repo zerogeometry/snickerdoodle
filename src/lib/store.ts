@@ -189,7 +189,8 @@ export type BasketItem = {
    * variant resolver, AND the DUAL fulfilment renderer all read this. */
   back?: string;
   /** BASE COLOUR (#rrggbb) of an edge-to-edge product — the whole printed face, the drawing on top.
-   * Absent = white. Part of the line id (red + navy socks = two lines). The server re-checks it. */
+   * Absent = white. Part of the line id (red + navy socks = two lines). The server re-checks it.
+   * A card PACK carries ONE for all its cards (each card's outside front). */
   ground?: string;
   /** GREETINGS-CARD inside message (card only) — absent = blank inside (write it by hand). */
   message?: CardMessage;
@@ -290,12 +291,13 @@ export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n 
 /**
  * The basket as the order action receives it: product keys (the variant sku when chosen) + qty, and
  * WHICH drawings — never a price. A personalised line folds its per-print details (cushion back,
- * card inside message, span) into `artwork`; a card PACK sends qty 1 + its `cards` instead.
+ * card inside message, span) into `artwork`; a card PACK sends qty 1 + its `cards` (+ its one base
+ * colour) instead.
  */
 export function orderItemsFor(items: BasketItem[]) {
   return items.map((i) => {
     const productKey = i.sku ?? i.product;
-    if (isPackLine(i)) return { productKey, qty: 1, cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
+    if (isPackLine(i)) return { productKey, qty: 1, ...(i.ground ? { ground: i.ground } : {}), cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
     return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { cardPackLine, newPackLineId } from '@/lib/card-pack-line';
+import { cardPackLine, newPackLineId, packLineBase, packLineId } from '@/lib/card-pack-line';
 import { orderItemsFor, useBasket, type BasketItem, type PackCardLine } from '@/lib/store';
 
 /**
@@ -84,5 +84,47 @@ describe('orderItemsFor — what the order action receives', () => {
   it('leaves an ordinary personalised line as it was (artwork + per-print details)', () => {
     const tee: BasketItem = { id: 'cat-kidsTee', name: 'kids tee', product: 'kidsTee', pricePence: 2500, qty: 2, sku: 'kidsTee-5-6', artwork: { assetId: 'x', transform: COVER } };
     expect(orderItemsFor([tee])).toEqual([{ productKey: 'kidsTee-5-6', qty: 2, artwork: { assetId: 'x', transform: COVER, back: undefined, message: undefined, cardImageSpan: undefined } }]);
+  });
+});
+
+describe('a pack’s base colour — one per pack line', () => {
+  const five = () => ['a', 'b', 'c', 'd', 'e'].map((x) => cardOf(x));
+
+  it('the colour is part of the line id and the line (normalised), and named in its sub line', () => {
+    const line = cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards: five(), ground: '#C8402A' });
+    expect(line).toMatchObject({ id: 'pack-1~c8402a', ground: '#c8402a', sub: '5 cards · on red · blank inside' });
+  });
+
+  it('junk or white means no colour: the plain id, no ground, the plain sub line', () => {
+    for (const none of [undefined, null, '', '#ffffff', 'white', '#fff', 'c8402a', '#12345g']) {
+      const line = cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards: five(), ground: none });
+      expect(line.id, String(none)).toBe('pack-1');
+      expect(line.ground).toBeUndefined();
+      expect(line.sub).toBe('5 cards · blank inside');
+    }
+  });
+
+  it('re-colouring keeps the pack’s own base id (never a different pack)', () => {
+    expect(packLineId('pack-1~c8402a', '#26334f')).toBe('pack-1~26334f');
+    expect(packLineId('pack-1~c8402a', '#ffffff')).toBe('pack-1');
+    expect(packLineBase('pack-1~c8402a')).toBe('pack-1');
+    expect(packLineBase('pack-1')).toBe('pack-1');
+  });
+
+  it('editing a pack’s colour re-keys the same line in place — still qty 1, still one line', () => {
+    useBasket.setState({ items: [{ id: 'cat-mug', name: 'mug', product: 'mug', pricePence: 1500, qty: 2 } as BasketItem] });
+    useBasket.getState().add(cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards: five(), ground: '#c8402a' }));
+    const { id, ...fields } = cardPackLine({ id: 'pack-1~c8402a', variant: FIVE, packSize: 5, cards: five() }); // back to white
+    useBasket.getState().update('pack-1~c8402a', fields, id);
+    const items = useBasket.getState().items;
+    expect(items.map((i) => i.id)).toEqual(['cat-mug', 'pack-1']);
+    expect(items[1]).toMatchObject({ qty: 1, sub: '5 cards · blank inside' });
+    expect(items[1]!.ground).toBeUndefined();
+  });
+
+  it('the order payload carries the pack’s colour once, beside its cards', () => {
+    const pack = { ...cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards: five(), ground: '#0b6623' }), qty: 1 };
+    const [sent] = orderItemsFor([pack]);
+    expect(sent).toEqual({ productKey: 'cardPack', qty: 1, ground: '#0b6623', cards: five().map((c) => ({ assetId: c.assetId, transform: COVER })) });
   });
 });

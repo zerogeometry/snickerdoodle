@@ -83,3 +83,56 @@ describe('card 4-panel print assembly', () => {
     expect(bandInk(p, CARD_PANEL_X.outerFront, CARD_PANEL_X.outerFront + PANEL_W)).toBe(0);
   });
 });
+
+describe('card print — the base colour fills the OUTSIDE, never the inside', () => {
+  const TOMATO = '#c8402a';
+  const isTomato = ([r, g, b]: number[]) => Math.abs(r! - 0xc8) < 6 && Math.abs(g! - 0x40) < 6 && Math.abs(b! - 0x2a) < 6;
+  // A see-through drawing: a green blob in the middle of a transparent sheet (a lifted-off cutout).
+  const cutout = async () =>
+    sharp({ create: { width: 1500, height: 2100, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: await sharp({ create: { width: 300, height: 300, channels: 4, background: { r: 40, g: 170, b: 80, alpha: 1 } } }).png().toBuffer(), left: 600, top: 900 }])
+      .png()
+      .toBuffer();
+  const near = (panelX: number) => panelX + 60; // well inside the panel, away from the drawing in its middle
+  const panelSamples = (panelX: number): [number, number][] => [[near(panelX), 60], [near(panelX), MIDY], [panelX + PANEL_W - 60, CARD_SPREAD.heightPx - 60]];
+
+  it('FRONT-ONLY: the front panel is the colour where the drawing is see-through, the drawing sits on it; rear + inside stay white', async () => {
+    const p = await pixels(await assembleCardPrintSpread({ design: await cutout(), transform: tf, span: 'front', message: null, groundHex: TOMATO }));
+    for (const [x, y] of panelSamples(CARD_PANEL_X.outerFront)) expect(isTomato(at(p, x, y)), `front ${x},${y}`).toBe(true);
+    expect(isGreen(at(p, centre(CARD_PANEL_X.outerFront), MIDY))).toBe(true); // the drawing, on top of the colour
+    for (const [x, y] of panelSamples(CARD_PANEL_X.outerRear)) expect(isWhite(at(p, x, y)), `rear ${x},${y}`).toBe(true);
+    for (const panel of [CARD_PANEL_X.insideFront, CARD_PANEL_X.insideBack]) {
+      for (const [x, y] of [...panelSamples(panel), [centre(panel), MIDY] as [number, number]]) expect(isWhite(at(p, x, y)), `inside ${x},${y}`).toBe(true);
+    }
+  });
+
+  it('FULL-WIDTH: the rear takes the colour too, and the back logo still sits on top of it', async () => {
+    const p = await pixels(await assembleCardPrintSpread({ design: await cutout(), transform: tf, span: 'full', message: null, branding: await magenta(), groundHex: TOMATO }));
+    // the drawing now straddles the fold, so sample the colour away from it: the outer edges + corners
+    const farFront = CARD_PANEL_X.outerFront + PANEL_W - 60;
+    for (const [x, y] of [[farFront, 60], [farFront, MIDY], [farFront, CARD_SPREAD.heightPx - 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `front ${x},${y}`).toBe(true);
+    expect(isGreen(at(p, CARD_PANEL_X.outerFront, MIDY))).toBe(true); // the drawing, across the fold
+    for (const [x, y] of [[60, 60], [60, MIDY], [centre(CARD_PANEL_X.outerRear), 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `rear ${x},${y}`).toBe(true);
+    const [r, g, b] = at(p, Math.round(PANEL_W * 0.149), Math.round(CARD_SPREAD.heightPx * 0.885));
+    expect(r > 160 && b > 130 && g < 110).toBe(true); // magenta stand-in for the logo, over the colour
+    for (const panel of [CARD_PANEL_X.insideFront, CARD_PANEL_X.insideBack]) {
+      for (const [x, y] of panelSamples(panel)) expect(isWhite(at(p, x, y)), `inside ${x},${y}`).toBe(true);
+    }
+  });
+
+  it('with a printed message, the inside stays white paper behind the words', async () => {
+    const p = await pixels(await assembleCardPrintSpread({ design: await cutout(), transform: tf, span: 'front', message: message(), groundHex: TOMATO }));
+    for (const panel of [CARD_PANEL_X.insideFront, CARD_PANEL_X.insideBack]) {
+      for (const [x, y] of panelSamples(panel)) expect(isWhite(at(p, x, y)), `inside ${x},${y}`).toBe(true);
+    }
+  });
+
+  it('no colour (null / absent) is the card exactly as before — byte for byte', async () => {
+    const design = await cutout();
+    const plain = await assembleCardPrintSpread({ design, transform: tf, span: 'front', message: null });
+    const nulled = await assembleCardPrintSpread({ design, transform: tf, span: 'front', message: null, groundHex: null });
+    expect(nulled.equals(plain)).toBe(true);
+    const p = await pixels(plain);
+    for (const [x, y] of panelSamples(CARD_PANEL_X.outerFront)) expect(isWhite(at(p, x, y))).toBe(true);
+  });
+});

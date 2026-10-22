@@ -299,9 +299,9 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const t = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
     const cards = [a, a, a, a, a, b, b, b, c, c].map((x) => ({ assetId: x.id, transform: t }));
 
-    // a smuggled qty and a printed message are both ignored: one pack, blank inside
+    // a smuggled qty and a printed message are both ignored: one pack, blank inside — in ONE colour
     const res = await placeOrder(db, {
-      items: [{ productKey: 'cardPack-packof10', qty: 4, cards, artwork: { assetId: a.id, transform: t, message: { greeting: 'hi', message: 'x', signature: '', note: '', font: 'caveat' } } }],
+      items: [{ productKey: 'cardPack-packof10', qty: 4, ground: '#C8402A', cards, artwork: { assetId: a.id, transform: t, message: { greeting: 'hi', message: 'x', signature: '', note: '', font: 'caveat' } } }],
       account: { id: ids.samId },
       joinProvenance: null,
     });
@@ -319,6 +319,18 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const arts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, lines.map((l) => l.id)));
     expect(arts).toHaveLength(3);
     expect(arts.every((x) => x.message === null && x.cardSpan === null)).toBe(true); // blank inside, front only
+    expect(arts.map((x) => x.ground)).toEqual(['#c8402a', '#c8402a', '#c8402a']); // every split card line carries the pack's colour
+
+    // junk (or white) for a colour → every card line is plain white, never the client's string
+    for (const junk of ['#c8402a; drop table', '#ffffff']) {
+      const plain = await placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, ground: junk, cards: cards.slice(0, 5) }], account: { id: ids.samId }, joinProvenance: null });
+      await track(plain);
+      const [po] = await db.select().from(orders).where(eq(orders.ref, plain.ref!));
+      const plainLines = await db.select().from(orderItems).where(eq(orderItems.orderId, po!.id));
+      const plainArts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, plainLines.map((l) => l.id)));
+      expect(plainArts.length).toBeGreaterThan(0);
+      expect(plainArts.every((x) => x.ground === null), junk).toBe(true);
+    }
 
     // wrong number of cards → refused before anything is written
     await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: cards.slice(0, 4) }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/needs 5 cards/);

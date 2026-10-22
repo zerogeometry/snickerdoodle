@@ -33,9 +33,9 @@ describe('base colours — any colour off the wheel, checked on the server', () 
   });
 
   it('only EDGE-TO-EDGE products take a base colour (the whole face must be printable)', () => {
-    for (const k of ['socks', 'socks-tube', 'wrappingPaper', 'teaTowel', 'phoneCase', 'cushion', 'cushion-heart', 'blanket', 'jigsaw', 'framedPrint', 'playingCards', 'petBandana']) expect(isGroundProduct(k), k).toBe(true);
+    for (const k of ['socks', 'socks-tube', 'wrappingPaper', 'teaTowel', 'phoneCase', 'cushion', 'cushion-heart', 'blanket', 'jigsaw', 'framedPrint', 'playingCards', 'petBandana', 'card', 'cardPack', 'cardPack-10']) expect(isGroundProduct(k), k).toBe(true);
     // the mug's wrap stops at the handle; garments print on the fabric's own colour; panels + the ruler band
-    for (const k of ['mug', 'kidsTee', 'adultTee', 'kidsHoodie', 'babyBodysuit', 'bauble', 'sack', 'apron', 'heightChart', 'card', 'cardPack', 'calendar', null, undefined, '']) expect(isGroundProduct(k), String(k)).toBe(false);
+    for (const k of ['mug', 'kidsTee', 'adultTee', 'kidsHoodie', 'babyBodysuit', 'bauble', 'sack', 'apron', 'heightChart', 'calendar', null, undefined, '']) expect(isGroundProduct(k), String(k)).toBe(false);
   });
 
   it('a picked colour gets a friendly name for the basket line', () => {

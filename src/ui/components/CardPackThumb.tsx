@@ -3,9 +3,9 @@ import { ProductArt } from './ProductArt';
 import type { BasketItem } from '@/lib/store';
 
 /**
- * A card-pack basket line's thumbnail: the REAL first card (its drawing on the 7×5 card) with a
- * little "×N" sticker for the pack size — falls back to the stacked-cards motif if the pack has no
- * preview variant. Decorative: the line's own text names it.
+ * A card-pack basket line's thumbnail: the REAL first card (its drawing on the 7×5 card, on the
+ * pack's base colour) with a little "×N" sticker for the pack size — falls back to the stacked-cards
+ * motif if the pack has no preview variant. Decorative: the line's own text names it.
  */
 export function CardPackThumb({ item, px }: { item: BasketItem; px: number }) {
   const first = item.cards?.[0];
@@ -19,6 +19,7 @@ export function CardPackThumb({ item, px }: { item: BasketItem; px: number }) {
           variantId={item.previewVariantId}
           transform={first.transform}
           sourceObjectId={first.sourceObjectId ?? null}
+          ground={item.ground ?? null}
           size="thumb"
           px={px}
         />
