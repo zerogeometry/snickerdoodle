@@ -1,5 +1,5 @@
 export { getS3, storageConfig, type StorageConfig } from './client';
-export { stripExif, hasExif, type SanitisedImage } from './exif';
+export { stripExif, hasExif, ImageTooLargeError, MAX_UPLOAD_PIXELS, type SanitisedImage } from './exif';
 export {
   ensureBucket,
   originalKey,

@@ -1,8 +1,43 @@
 import type { NextConfig } from 'next';
 
+/**
+ * Browser security headers on EVERY response (they cost nothing and close whole classes of attack):
+ *  - frame-ancestors 'none' + X-Frame-Options: nobody can frame our pages (clickjacking on the
+ *    keepsake home, checkout, gift links, admin review);
+ *  - base-uri / object-src / form-action: an injected <base>, plugin or off-site form can't hijack
+ *    a page (the test gate, sign-in and sign-out forms all post to ourselves; Stripe is a plain
+ *    navigation, not a form);
+ *  - nosniff: an uploaded file is never sniffed into something executable;
+ *  - Referrer-Policy: a gift-link / invite token in a URL never leaks to another site;
+ *  - Permissions-Policy: the camera is ours only (CameraCapture); no mic, location or payment API;
+ *  - HSTS: HTTPS only, for a year (no includeSubDomains/preload until every subdomain is HTTPS).
+ * A full script-src CSP (with per-request nonces) is the follow-up — it needs the middleware.
+ */
+const SECURITY_HEADERS = [
+  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()' },
+  { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
+];
+
+/** The private app (anything a child's drawing can appear on) is never indexed — only the
+ * marketing pages are. Belt and braces: these pages are behind sign-in or a token anyway. */
+const NOINDEX_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/customize', '/studio', '/start-creating', '/share-wish', '/admin', '/g', '/join', '/login', '/api'];
+
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  async headers() {
+    return [
+      { source: '/:path*', headers: SECURITY_HEADERS },
+      ...NOINDEX_PATHS.flatMap((p) => [
+        { source: p, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+        { source: `${p}/:path*`, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
+      ]),
+    ];
+  },
   // Allow an isolated build dir (e.g. e2e) so a production build can't clobber a
   // running `next dev`'s .next (they cannot safely share one). Defaults to .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
@@ -11,8 +46,6 @@ const nextConfig: NextConfig = {
   // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
   // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
   serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
-  // Security headers (CSP, app/gift noindex) are layered in with the trust-spine
-  // and gift-link surfaces; marketing stays indexable.
   experimental: {
     // Drawings/photos are uploaded to the ingest server action as FormData. The
     // default Server Actions body limit is 1MB — far too small for real phone

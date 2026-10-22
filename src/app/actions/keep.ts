@@ -9,6 +9,7 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { ImageTooLargeError } from '@/storage';
 import type { VisibilityTier } from '@/domain/types';
 
 /**
@@ -29,12 +30,13 @@ export async function keepCreation(formData: FormData): Promise<{ ok: boolean; n
   const viewer = await resolveViewerContext(db, account.id, familyId);
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { assetId } = await ingestOriginalAsset(db, viewer, {
-    familyId,
-    kind: 'DRAWING',
-    buffer,
-    keptInHome: true,
-  });
+  let assetId: string;
+  try {
+    ({ assetId } = await ingestOriginalAsset(db, viewer, { familyId, kind: 'DRAWING', buffer, keptInHome: true }));
+  } catch (e) {
+    if (e instanceof ImageTooLargeError) return { ok: false }; // a decompression bomb, or not an image
+    throw e;
+  }
 
   revalidatePath('/home');
   return { ok: true, assetId };

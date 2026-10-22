@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { getDb } from '@/db/client';
 import { ingestEphemeralUpload } from '@/server/ingest';
 import { RETENTION_DAYS } from '@/server/retention';
+import { ImageTooLargeError } from '@/storage';
 import { UPLOAD_CLAIM_COOKIE, appendClaim, signClaims, verifyClaims } from '@/server/uploadClaims';
 
 /** The terms version a guest accepts at the upload moment. Bump on any change so
@@ -27,11 +28,14 @@ export async function startGuestUpload(
 
   const db = getDb();
   const buffer = Buffer.from(await file.arrayBuffer());
-  const { assetId, claimId, moderationStatus } = await ingestEphemeralUpload(db, {
-    buffer,
-    kind: 'DRAWING',
-    termsVersion: TERMS_VERSION,
-  });
+  let ingested: Awaited<ReturnType<typeof ingestEphemeralUpload>>;
+  try {
+    ingested = await ingestEphemeralUpload(db, { buffer, kind: 'DRAWING', termsVersion: TERMS_VERSION });
+  } catch (e) {
+    if (e instanceof ImageTooLargeError) return { ok: false }; // a decompression bomb, or not an image
+    throw e;
+  }
+  const { assetId, claimId, moderationStatus } = ingested;
   // BLOCKED (CSAM) content is preserved server-side per the runbook but NEVER
   // surfaced — don't hand back a claim, so it can't be viewed or ordered.
   if (moderationStatus === 'BLOCKED') return { ok: false, blocked: true };

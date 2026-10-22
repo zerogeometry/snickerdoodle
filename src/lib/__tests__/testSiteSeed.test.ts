@@ -3,7 +3,7 @@ import { parseEnvFile, redactor, refusalReason } from '../../../scripts/test-sit
 
 const FILE = `# TEST SITE settings — never commit
 SITE_MODE=test
-DATABASE_URL=postgres://postgres.abc:hunter2-very-secret@aws-0-eu-west-2.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgres://postgres.abc:hunter2-very-secret@db.example.invalid:6543/postgres
 S3_ENDPOINT=https://abc.supabase.co/storage/v1/s3   # the S3 connection
 S3_BUCKET="snickerdoodle-test"
 S3_ACCESS_KEY='AKIAEXAMPLEKEY'
