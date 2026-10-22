@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { FlowHeader } from '@/ui/components/FlowHeader';
+import { designSig } from '@/lib/basket-line';
 import { gbp, toast, useBasket, usePlacements, useSelection } from '@/lib/store';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { ProductKey } from '@/ui/components/ProductArt';
@@ -401,13 +402,14 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       router.push('/login?next=/checkout');
       return;
     }
+    const artwork = { assetId: keepsake.id, transform: { ...tf }, sourceObjectId: cutout?.sourceObjectId };
     addToBasket({
-      id: `pos-${keepsake.id}-${variant.id}`,
+      id: `pos-${keepsake.id}-${variant.id}~d${designSig({ artwork })}`, // a different placement = its own line
       name: variant.label,
       product: variant.productKey as ProductKey,
       pricePence: variant.pricePence,
       variantId: variant.id,
-      artwork: { assetId: keepsake.id, transform: { ...tf }, sourceObjectId: cutout?.sourceObjectId },
+      artwork,
     });
     toast('added to basket ✓');
     router.push('/checkout');

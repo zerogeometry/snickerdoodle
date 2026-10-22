@@ -3,6 +3,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
+import { basketLineId } from '@/lib/basket-line';
 
 /**
  * Lightweight client-side stores so the docs/03 flows are walkable end-to-end
@@ -262,9 +263,27 @@ export const useBasket = create<BasketState>()(
     }),
     // Survive a reload — incl. the full reload the magic-link login triggers — so
     // the basket isn't emptied mid-flow. Per-tab (sessionStorage); only the items.
-    { name: 'sd_basket', storage: createJSONStorage(() => sessionStorage), partialize: (s) => ({ items: s.items }) },
+    {
+      name: 'sd_basket',
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (s) => ({ items: s.items }),
+      // v1: a line is per drawing too (src/lib/basket-line.ts) — re-key a basket saved before that
+      version: 1,
+      migrate: (persisted) => ({ items: rekeyLines((persisted as { items?: BasketItem[] } | null)?.items ?? []) }),
+    },
   ),
 );
+/** Re-key catalogue lines (`cat-…`) to their per-design id, folding any that turn out identical. */
+export function rekeyLines(items: BasketItem[]): BasketItem[] {
+  const out: BasketItem[] = [];
+  for (const i of items) {
+    const id = i.sku && i.id.startsWith('cat-') && !isPackLine(i) ? basketLineId(i.sku, i) : i.id;
+    const same = out.find((x) => x.id === id);
+    if (same) same.qty += i.qty;
+    else out.push({ ...i, id });
+  }
+  return out;
+}
 export const basketCount = (items: BasketItem[]) => items.reduce((n, i) => n + i.qty, 0);
 export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n + i.pricePence * i.qty, 0);
 

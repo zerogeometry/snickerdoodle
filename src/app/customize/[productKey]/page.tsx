@@ -15,7 +15,8 @@ import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, lineIdFor, sizeDimsCm } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
+import { basketLineId } from '@/lib/basket-line';
 import { colourName, groundHex, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { ColourWheel } from '@/ui/primitives/ColourWheel';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -507,10 +508,10 @@ function CustomizeProduct() {
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
-      update(edit.id, fields, lineIdFor(variant.sku, isGround ? ground : null));
+      update(edit.id, fields, basketLineId(variant.sku, fields));
       toast('basket updated ✓');
     } else {
-      add({ id: lineIdFor(variant.sku, isGround ? ground : null), ...fields }); // red + navy socks = two lines
+      add({ id: basketLineId(variant.sku, fields), ...fields }); // a different drawing / colour / back = its own line
       toast('added to basket ✓');
     }
     router.push('/start-creating');
@@ -554,6 +555,7 @@ function CustomizeProduct() {
             fill={showBack ? backFill : undefined}
             ground={isGround ? ground : undefined}
             px={720}
+            loader
           />
         </div>
       </Modal>
@@ -607,6 +609,7 @@ function CustomizeProduct() {
                   fill={showBack ? backFill : undefined}
                   ground={isGround ? ground : undefined}
                   px={360}
+                  loader
                 />
                 <button
                   type="button"

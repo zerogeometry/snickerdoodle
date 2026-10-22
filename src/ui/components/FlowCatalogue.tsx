@@ -22,7 +22,8 @@ import { instantContext, prefetchContexts, prefetchMockups } from '@/lib/mockupP
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
-import { defaultPlacementFor, defaultTransformFor, groupOf, isLineOfSku, lineIdForSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { basketLineId } from '@/lib/basket-line';
+import { defaultPlacementFor, defaultTransformFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { isCardPackKey } from '@/lib/card-packs';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -159,7 +160,10 @@ export function FlowCatalogue({
     // Add EXACTLY what the tile shows (the shared resolver): an explicit selection, else the
     // aspect-oriented variant, else the default — never a landscape tile that adds a portrait SKU.
     const def = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: useSelection.getState().selections[p.key] });
-    const defId = lineIdForSku(def.sku);
+    // the line for THIS drawing at the default placement — another drawing's line is never touched
+    const design = (assetId: string | null | undefined) =>
+      assetId ? { artwork: { assetId, transform: defaultTransformFor(p.key), sourceObjectId: upload?.cutout?.sourceObjectId } } : {};
+    let defId = basketLineId(def.sku, design(upload?.assetId));
     // Decrement is purely local — always allowed (never gated by an in-flight ingest).
     // Take one off the DEFAULT quick-add line first; otherwise the most-recently-added
     // line of this product (so the tile's product-level count steps down by one, and a
@@ -185,6 +189,7 @@ export function FlowCatalogue({
     if (!upload?.assetId && !ingestRef.current) toast('adding to your basket…'); // first add ingests — show it's working
     const assetId = await ensureAsset();
     if (!assetId) return;
+    defId = basketLineId(def.sku, design(assetId));
     // Re-read from the store — a concurrent add may have created the line meanwhile.
     const current = useBasket.getState().items.find((i) => i.id === defId);
     if (current) setQty(defId, current.qty + 1);
@@ -197,7 +202,7 @@ export function FlowCatalogue({
         variantId: def.id,
         pricePence: def.pricePence,
         sub: variantSub(def),
-        artwork: { assetId, transform: defaultTransformFor(p.key), sourceObjectId: upload?.cutout?.sourceObjectId },
+        ...design(assetId),
       });
   };
 
