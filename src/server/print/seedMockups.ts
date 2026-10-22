@@ -85,7 +85,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
-  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
 );
 
@@ -337,8 +337,10 @@ function plan(key: string, attrs: Record<string, string>): Plan | null {
     }
     case 'wrappingPaper': {
       // every size shares the one sheet: the visible paper is a window onto the sheet / roll
+      // the sheet is a WINDOW onto the paper: its full width and a section of its length (a 5 m roll
+      // is far too long and thin to aspect-lock — it would show as a sliver down the middle)
       const dir = layeredFlatDir('wrappingPaper');
-      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'wrappingPaper' };
+      return dir ? { material: 'PAPER', register: 'layered-flat', dir, window: true } : { material: 'PAPER', register: 'drawn', key: 'wrappingPaper' };
     }
     case 'playingCards': {
       // the front card of a fanned hand — it leans, so its print area is a TILTED quad (perspective)
@@ -739,8 +741,11 @@ export async function layeredFlatTemplate(
   dir: string,
   printAspect: number,
   tilted: boolean,
+  /** the print area IS the product's window (the art cover-fits into it, a section of a long print) */
+  window = false,
 ): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; W: number; H: number } | null> {
   const d = await layeredFlat(dir);
+  if (window) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.window), W: d.W, H: d.H };
   if (tilted) {
     const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
     const corners = orientedCoverQuad(a, d.W, d.H, printAspect, tiltOf(a, d.W, d.H));
@@ -1278,7 +1283,7 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     }
 
     if (p.register === 'layered-flat') {
-      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted);
+      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window);
       if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
       const quad = d.quad;
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
