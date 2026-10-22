@@ -554,6 +554,7 @@ function CustomizeProduct() {
             fill={showBack ? backFill : undefined}
             ground={isGround ? ground : undefined}
             px={720}
+            loader
           />
         </div>
       </Modal>
@@ -607,6 +608,7 @@ function CustomizeProduct() {
                   fill={showBack ? backFill : undefined}
                   ground={isGround ? ground : undefined}
                   px={360}
+                  loader
                 />
                 <button
                   type="button"

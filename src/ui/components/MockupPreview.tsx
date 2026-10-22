@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { cachedMockup, forgetMockup, instantContext, mockupKey, pendingMockup, rememberMockup, subscribeMockups } from '@/lib/mockupPrefetch';
 import { clampTransform } from '@/server/print/geometry';
 import { InstantMockup } from './InstantMockup';
+import { PreviewLoader } from './PreviewLoader';
 import type { ProductKey } from './ProductArt';
 import type { PlacementTransform } from '@/lib/store';
 
@@ -45,6 +46,7 @@ export function MockupPreview({
   lazy = false,
   placeholder = true,
   instant,
+  loader = false,
 }: {
   productKey: ProductKey;
   assetId?: string | null;
@@ -70,6 +72,9 @@ export function MockupPreview({
   /** The drawing as the BROWSER already holds it (+ its width ÷ height): while the photoreal
    * mockup is being made, draw an instant preview from it (src/ui/components/InstantMockup.tsx). */
   instant?: { src: string; aspect: number } | null;
+  /** Lay the "making it" loader over the preview while a newer photo is on its way, until it has
+   * painted (the customize page's big preview). Off for grids: a tile just holds its photo. */
+  loader?: boolean;
 }) {
   // `current` = the photo on screen; it is NEVER cleared while a newer variant
   // composes (the founder's rule: stay on the previous product until the chosen
@@ -77,6 +82,10 @@ export function MockupPreview({
   // the terminal no-photo states (no template / repeated failure): the block stops
   // pulsing so it doesn't promise work that isn't happening.
   const [current, setCurrent] = useState<string | null>(null);
+  // Which choice the on-screen photo is for, and which choice has actually PAINTED — the loader
+  // shows until the painted one is the latest choice (not merely fetched or preloaded).
+  const [currentKey, setCurrentKey] = useState<string | null>(null);
+  const [paintedKey, setPaintedKey] = useState<string | null>(null);
   const [resting, setResting] = useState(false);
   const [attempt, setAttempt] = useState(0); // bumped to re-run a failed compose
   const [visible, setVisible] = useState(!lazy);
@@ -163,14 +172,34 @@ export function MockupPreview({
     }
     const seq = ++seqRef.current;
     const isLatest = () => mountedRef.current && seq === seqRef.current;
+    setResting(false); // a new attempt begins; `current` keeps showing meanwhile
+    // A failed attempt: try again a couple of times (a re-compose also re-mints the signed URL),
+    // then rest — keeping whatever photo is already on screen, so the loader never spins forever.
+    const retryOrRest = () => {
+      if (!isLatest()) return;
+      if (retriesRef.current < 2) {
+        retriesRef.current += 1;
+        setAttempt((a) => a + 1);
+      } else {
+        setResting(true);
+      }
+    };
     const show = (url: string) => {
+      if (url === currentRef.current) {
+        // already on screen (e.g. back to an earlier choice): nothing new to paint
+        setCurrentKey(inputKey);
+        setPaintedKey(inputKey);
+        return;
+      }
       const pre = new window.Image();
       pre.onload = () => {
-        if (isLatest()) setCurrent(url);
+        if (!isLatest()) return;
+        setCurrent(url);
+        setCurrentKey(inputKey);
       };
       pre.onerror = () => {
         forgetMockup(inputKey);
-        if (isLatest() && !currentRef.current) setResting(true);
+        retryOrRest();
       };
       pre.src = url;
     };
@@ -186,12 +215,12 @@ export function MockupPreview({
       void inflight.then((r) => {
         if (!isLatest()) return;
         if (r.ok) show(r.url);
-        else if (!r.transient) setResting(true);
+        else if (r.transient) retryOrRest();
+        else setResting(true);
       });
       return;
     }
     if (!visible) return;
-    setResting(false); // a new attempt begins; `current` keeps showing meanwhile
     // The compose is a ROUTE HANDLER (not a Server Action): a plain concurrent fetch, so
     // several previews compose in PARALLEL and don't abort each other (server actions
     // serialise + cancel on re-render, which rendered thumbnails inconsistently). Dispatch
@@ -228,9 +257,9 @@ export function MockupPreview({
         show(r.url);
       })
       .catch(() => {
-        // an aborted/superseded request is expected — only a genuine failure with nothing
-        // to show settles on the plain block (the recovery effect below retries a stuck one)
-        if (isLatest() && !currentRef.current) setResting(true);
+        // an aborted/superseded request is expected (the seq-gate ignores it); a genuine
+        // failure retries, then settles (the recovery effect below also retries a stuck one)
+        retryOrRest();
       });
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tfKey is `transform` by value (a fresh object each render would refetch forever)
@@ -269,6 +298,9 @@ export function MockupPreview({
     </div>
   ) : null;
 
+  // Busy = a newer photo is on its way and hasn't painted yet (and we haven't given up on it).
+  const busy = loader && visible && !!assetId && !!variantId && !resting && paintedKey !== inputKey;
+
   return (
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
     // parent (customize page) it falls back to content height and max-h-full is inert.
@@ -282,7 +314,10 @@ export function MockupPreview({
           height={px}
           className={`h-auto max-h-full w-full rounded-lg object-contain ${instantLayer ? 'relative motion-safe:animate-[fade_.35s_ease-out]' : ''}`}
           // tells the create page's "making your range" loader that real pixels are on screen
-          onLoad={() => window.dispatchEvent(new Event(MOCKUP_READY_EVENT))}
+          onLoad={() => {
+            setPaintedKey(currentKey);
+            window.dispatchEvent(new Event(MOCKUP_READY_EVENT));
+          }}
           onError={() => {
             // an expired signed URL: drop the dead image and recompose (fresh URL)
             forgetMockup(inputKey);
@@ -304,6 +339,7 @@ export function MockupPreview({
           style={{ minHeight: Math.min(px, 220) }}
         />
       )}
+      {busy ? <PreviewLoader /> : null}
     </div>
   );
 }
