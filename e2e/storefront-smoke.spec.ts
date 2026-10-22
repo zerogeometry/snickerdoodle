@@ -31,7 +31,7 @@ const LIVE = [
   // the range expansion, live 2026-10-21 (card packs have their own builder spec)
   { key: 'socks', label: 'socks', pence: 2000 },
   { key: 'heightChart', label: 'height chart', pence: 3100 },
-  { key: 'wrappingPaper', label: 'wrapping paper', pence: 2000 },
+  { key: 'wrappingPaper', label: 'wrapping paper', pence: 2300 },
   { key: 'teaTowel', label: 'tea towel', pence: 2700 },
   { key: 'playingCards', label: 'playing cards', pence: 2400 },
 ] as const;

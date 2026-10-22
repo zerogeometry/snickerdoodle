@@ -103,6 +103,16 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
     expect(tomato.rgb).toBe(patternGroundHex('tomato'));
   });
 
+  it('the landscape tea towel prints as Prodigi’s PORTRAIT file (turned back), on its colour', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [towel] = await db.select({ id: schema.productVariants.id }).from(schema.productVariants).where(eq(schema.productVariants.sku, 'teaTowel'));
+    const r = await renderPrintFile(db, sam, { assetId, variantId: towel!.id, transform: { scale: 0 }, ground: 'sky' });
+    expect([r.widthPx, r.heightPx]).toEqual([5492, 8208]);
+    const [obj] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, r.printObjectId));
+    const meta = await sharp(await getObjectBytes(obj!.key)).metadata();
+    expect([meta.width, meta.height]).toEqual([5492, 8208]);
+  }, 120_000);
+
   it('a saved design keeps its colour (pattern products only)', async () => {
     const account = { id: ids.samId, name: 'Sam' };
     const a = await saveDesign(db, account, [], { assetId, variantSku: 'socks', transform: { scale: 0 }, ground: 'sky' });

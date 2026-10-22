@@ -27,13 +27,14 @@ const CANVAS = 2000;
 
 /**
  * fill   — the product's longest side as a share of the canvas.
- * rotate — turn the whole set first (the tea towel's print file is PORTRAIT; the photo is landscape).
+ * rotate — turn the whole set first (none need it today).
  * printmap — a separate print-area file; omitted ⇒ the product's own outline is the print area.
  */
 const SETS = [
   { out: 'socks/ankle', product: 'ankle-socks.png', overlay: 'ankle-socks-heel.png', fill: 0.8 },
   { out: 'socks/tube', product: 'tube-socks.png', fill: 0.82 },
-  { out: 'teaTowel', product: 'tea-towel.png', overlay: 'tea-towel-fold.png', rotate: 90, fill: 0.82 },
+  // LANDSCAPE, as photographed (founder) — its print is designed landscape (DESIGNED_TURNED)
+  { out: 'teaTowel', product: 'tea-towel.png', overlay: 'tea-towel-fold.png', fill: 0.82 },
   { out: 'wrappingPaper', product: 'wrapping-paper-flat.png', overlay: 'wrapping-paper-roll.png', fill: 0.82 },
   { out: 'playingCards', product: 'playing-cards-base.png', printmap: 'playing-cards-print.png', fill: 0.8 },
 ];

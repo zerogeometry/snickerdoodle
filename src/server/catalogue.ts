@@ -131,6 +131,14 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
   blanket: 'portrait', // Prodigi's fleece-blanket print file is fixed PORTRAIT (600×1000 / 1000×1500mm)
 };
 
+/**
+ * Products DESIGNED on a canvas turned 90° from Prodigi's print file, with no orientation choice:
+ * the tea towel is shown and designed LANDSCAPE (founder, 22 Oct — so it reads as a towel, not as
+ * wrapping paper), while Prodigi's file is portrait. The variant's print canvas is the landscape
+ * one; the finished file turns 90° back at render (render.ts), like a landscape frame.
+ */
+export const DESIGNED_TURNED: ReadonlySet<string> = new Set(['teaTowel']);
+
 // Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
 // its own Prodigi SKU. (15oz white dropped 2026-07-09; PLAIN white dropped 2026-07-10 — the founder
 // wanted the coloured two-tones only. Blue leads.) £18 (round, whole-pound pricing).
@@ -279,10 +287,9 @@ const HANGER_COLOURS = ['natural', 'black', 'white'];
 
 // Wrapping paper: FSC 95gsm, a REPEAT PATTERN of the drawing. gb2. NB Standard is Royal Mail RM24
 // — UNTRACKED (sandbox 2026-10-21); tracked (Express, RM Tracked 24) is +£1.05. Founder to decide.
+// ROLLS ONLY (founder, 22 Oct) — the 3-sheet packs (WRAP-3-50X70 / -75X90) are off the range.
 const WRAPPING_PAPER = [
-  { size: '3 sheets · 50 × 70 cm', sku: 'WRAP-3-50X70', px: { w: 2952, h: 4133 }, pricePence: 2000 },
   { size: '2 m roll', sku: 'WRAP-ROL-70X200', px: { w: 4133, h: 11811 }, pricePence: 2300 },
-  { size: '3 sheets · 75 × 90 cm', sku: 'WRAP-3-75X90', px: { w: 4429, h: 5314 }, pricePence: 2800 },
   { size: '3 m roll', sku: 'WRAP-ROL-70X300', px: { w: 4133, h: 17716 }, pricePence: 2800 },
   { size: '5 m roll', sku: 'WRAP-ROL-70X500', px: { w: 4133, h: 29527 }, pricePence: 3800 },
 ] as const;
@@ -472,8 +479,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   wrappingPaper: {
     category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
-    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. Sheets or a roll.',
-    specs: { material: 'FSC-certified 95gsm paper', formats: '3 sheets or a 70cm-wide roll', made: 'in the UK' },
+    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres.',
+    specs: { material: 'FSC-certified 95gsm paper', formats: 'a 70cm-wide roll — 2, 3 or 5 m', made: 'in the UK' },
     variants: WRAPPING_PAPER.map((w) => ({ size: w.size, pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
   },
   teaTowel: {
@@ -481,7 +488,8 @@ const DEFS: Record<string, ProductDef> = {
     description: "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours.",
     specs: { material: 'cotton', care: 'machine washable', made: 'in the UK' },
     // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
-    variants: [{ size: 'one size', pricePence: 2700, ...exactPx({ w: 5492, h: 8208 }, 300), prodigiSku: 'H-TEATOWEL-SUB' }],
+    // designed LANDSCAPE (DESIGNED_TURNED): Prodigi's file is 5492×8208 portrait; we design 8208×5492
+    variants: [{ size: 'one size', pricePence: 2700, ...exactPx({ w: 8208, h: 5492 }, 300), prodigiSku: 'H-TEATOWEL-SUB' }],
   },
   petBandana: {
     category: 'APPAREL', label: 'pet bandana', blurb: 'the dog, wearing their drawing of the dog', print: true,

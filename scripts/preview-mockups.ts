@@ -27,7 +27,7 @@ const SETS: { key: string; set: string; sku?: string; material: string; dpi: num
   { key: 'socks', set: 'socks/ankle', sku: 'GLOBAL-ANKLE-SOCKS', material: 'LIGHT_FABRIC', dpi: 300, tilted: true },
   { key: 'socks', set: 'socks/tube', sku: 'GLOBAL-TUBE-SOCKS', material: 'LIGHT_FABRIC', dpi: 300 },
   { key: 'teaTowel', set: 'teaTowel', material: 'LIGHT_FABRIC', dpi: 300 },
-  { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-3-75X90', material: 'PAPER', dpi: 150, window: true },
+  { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-ROL-70X300', material: 'PAPER', dpi: 150, window: true },
   { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-ROL-70X500', material: 'PAPER', dpi: 150, window: true },
   { key: 'playingCards', set: 'playingCards', material: 'PAPER', dpi: 300, tilted: true },
 ];

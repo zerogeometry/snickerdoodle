@@ -330,7 +330,7 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, tilted: !tube } : { material: 'PAPER', register: 'drawn', key: 'socks' };
     }
     case 'teaTowel': {
-      // the photo is composed PORTRAIT (turned 90°) because the print file is portrait
+      // shown LANDSCAPE as photographed; its print canvas is designed landscape (DESIGNED_TURNED)
       const dir = layeredFlatDir('teaTowel');
       if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-flat', dir };
       const file = findBlank(/tea.?towel/i);

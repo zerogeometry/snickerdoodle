@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import { printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
-import { PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
+import { DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { isColouredGround, isPatternProduct, normalizePatternGround, patternGroundHex } from '@/lib/patterns';
 import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
@@ -105,10 +105,16 @@ export async function renderPrintFile(
       throw new Error(`source too low-res for this product (would need ${motifAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
     const ground = normalizePatternGround(input.ground);
-    const { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, patternGroundHex(ground));
+    let { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, patternGroundHex(ground));
+    // designed on a turned canvas (the landscape tea towel) → turn the file back to Prodigi's spec
+    let [fileW, fileH] = [canvas.width, canvas.height];
+    if (DESIGNED_TURNED.has(variantRow.key)) {
+      png = await sharp(png).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+      [fileW, fileH] = [canvas.height, canvas.width];
+    }
     // the colour is part of the file's name: red + navy socks of one drawing in one order are two
     // different files — never one overwriting the other
-    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', canvas.width, canvas.height, isColouredGround(ground) ? `-g${ground}` : '');
+    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', fileW, fileH, isColouredGround(ground) ? `-g${ground}` : '');
   }
 
   // A HEIGHT CHART prints the drawing beside a cm + ft/in ruler drawn INTO the file at true scale

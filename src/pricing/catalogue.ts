@@ -61,7 +61,7 @@ export const CATALOGUE = {
   heightChart: { pricePence: 3100, label: 'height chart' },
   kidsHoodie: { pricePence: 4300, label: 'kids hoodie' },
   adultHoodie: { pricePence: 4200, label: 'adult hoodie' },
-  wrappingPaper: { pricePence: 2000, label: 'wrapping paper' },
+  wrappingPaper: { pricePence: 2300, label: 'wrapping paper' }, // the default: the 2 m roll (rolls only)
   teaTowel: { pricePence: 2700, label: 'tea towel' },
   petBandana: { pricePence: 1800, label: 'pet bandana' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
