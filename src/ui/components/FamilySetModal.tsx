@@ -10,7 +10,7 @@ import { Modal } from '@/ui/primitives/Modal';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { gbp, toast, useBasket, usePlacements, type Upload } from '@/lib/store';
-import { lineIdForSku } from '@/lib/catalogue-view';
+import { basketLineId } from '@/lib/basket-line';
 import { FAMILY_SET_MIN_QTY, isFamilySetKey } from '@/pricing';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { FAMILY_SET_COLOURS, garmentHex } from '@/lib/garments';
@@ -137,8 +137,9 @@ export function FamilySetModal({
       if (!assetId) return; // ensureAsset already toasted
       for (const r of rows) {
         if (!r.product || !r.variant) continue;
-        const id = lineIdForSku(r.variant.sku);
         const placement = placements[`${assetId}-${r.product.key}`] || DEFAULT_TF;
+        const artwork = { assetId, transform: placement, sourceObjectId: upload?.cutout?.sourceObjectId };
+        const id = basketLineId(r.variant.sku, { artwork }); // this drawing's line, never another's
         const existing = useBasket.getState().items.find((i) => i.id === id);
         if (existing) {
           setQty(id, existing.qty + 1);
@@ -152,7 +153,7 @@ export function FamilySetModal({
             variantId: r.variant.id,
             pricePence: r.variant.pricePence,
             sub,
-            artwork: { assetId, transform: placement, sourceObjectId: upload?.cutout?.sourceObjectId },
+            artwork,
           });
         }
       }
