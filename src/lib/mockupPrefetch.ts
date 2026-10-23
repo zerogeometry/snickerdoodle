@@ -118,6 +118,20 @@ export function whenMockupsSettled(keys: string[], onSettled: () => void): () =>
  * Ask for these mockups now, in parallel batches, in the order given (put what's on screen first).
  * Anything already done or in flight is skipped. Fire-and-forget; tiles pick results up from here.
  */
+/**
+ * How a range is revealed (founder, 23 Oct): the loader waits only for the TOP half of the tiles (as
+ * shown, top first; an odd one out goes in the top half), and the bottom half is asked for straight
+ * after, landing below the fold moments later. Within each half, tiles that can't show an instant
+ * in-browser preview go first — they're the ones that would otherwise sit blank.
+ */
+export function revealPlan<T>(inDisplayOrder: T[], hasInstant: (r: T) => boolean): { top: T[]; rest: T[]; order: T[] } {
+  const half = Math.ceil(inDisplayOrder.length / 2);
+  const top = inDisplayOrder.slice(0, half);
+  const rest = inDisplayOrder.slice(half);
+  const blankFirst = (xs: T[]) => [...xs.filter((r) => !hasInstant(r)), ...xs.filter(hasInstant)];
+  return { top, rest, order: [...blankFirst(top), ...blankFirst(rest)] };
+}
+
 export function prefetchMockups(reqs: MockupRequest[]): void {
   const todo = reqs.filter((r) => {
     const k = mockupKey(r);

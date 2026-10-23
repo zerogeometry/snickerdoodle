@@ -14,11 +14,11 @@ import { ProductGrid, tileMockupInputs } from '@/ui/components/ProductGrid';
 import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
-import { FamilySetTile } from '@/ui/components/FamilySetTile';
+import { FamilySetTile, familySetRequests } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
-import { instantContext, mockupKey, prefetchContexts, prefetchMockups, whenMockupsSettled } from '@/lib/mockupPrefetch';
+import { instantContext, mockupKey, prefetchContexts, prefetchMockups, revealPlan, whenMockupsSettled, type MockupRequest } from '@/lib/mockupPrefetch';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
@@ -248,12 +248,20 @@ export function FlowCatalogue({
   const cutoutId = upload?.cutout?.sourceObjectId;
   useEffect(() => {
     if (!assetId) return;
-    const reqs = rangeProducts.map((p) => ({ ...tileInputs(p), assetId, size: 'thumb' as const }));
-    const noInstant = (r: (typeof reqs)[number]) => (instantContext(r.variantId) ? 1 : 0);
-    prefetchMockups([...reqs].sort((a, b) => noInstant(a) - noInstant(b)));
-    // the range is ready when EVERY tile's photo is (the same keys the tiles read)
-    return whenMockupsSettled(reqs.map(mockupKey), () => onRangeReadyRef.current?.());
-  }, [assetId, cutoutId, rangeProducts, tileInputs]);
+    // the range in display order — the family set's tees in their place, right after the tee the
+    // set sits beside (so they're drawn with the rest and the tile can appear whole)
+    const familyAfter = mode === 'sections' ? popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee' : null;
+    const family = familyAfter ? familySetRequests(products, upload, usePlacements.getState().placements) : [];
+    const reqs: MockupRequest[] = rangeProducts.flatMap((p) => [
+      { ...tileInputs(p), assetId, size: 'thumb' as const },
+      ...(p.key === familyAfter ? family : []),
+    ]);
+    const { top, order } = revealPlan(reqs, (r) => !!instantContext(r.variantId));
+    prefetchMockups(order);
+    // the loader lifts when the TOP half's photos are ready (founder, 23 Oct); the rest were asked
+    // for straight after and land moments later, below the fold
+    return whenMockupsSettled(top.map(mockupKey), () => onRangeReadyRef.current?.());
+  }, [assetId, cutoutId, rangeProducts, tileInputs, mode, popular, products, upload]);
 
   // The banner promises "matching organic tees + a bodysuit" — only show it when all
   // three garments are actually purchasable (an unseeded/partial catalogue would

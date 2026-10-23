@@ -18,7 +18,7 @@ import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
 import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { takePendingKeep } from '@/lib/pending-keep';
 import { finishPendingKeepsAction } from '@/app/actions/keep';
-import { loadCatalogueAction } from '@/app/actions/catalogue';
+import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 
@@ -38,15 +38,16 @@ export default function StartCreatingPage() {
     // ?all=1 = the DEV curation view (every product, hidden included) — the server
     // action refuses includeHidden in production, so the param is inert there.
     const includeHidden = new URLSearchParams(window.location.search).get('all') === '1';
-    void loadCatalogueAction(includeHidden ? { includeHidden } : undefined)
+    void fetchCatalogue(includeHidden) // always current here; remembered for customize
       .then(setProducts)
       .catch(() => setLoadError(true));
   };
   useEffect(loadCatalogue, []);
 
-  // Hold the "making your range" loader over the catalogue until EVERY tile's real photo is ready
-  // to show (tiles compose in the background underneath), so the range is revealed whole — never a
-  // grid still filling in. A generous safety timeout lifts it regardless.
+  // Hold the "making your range" loader over the catalogue until the TOP HALF of the tiles have their
+  // real photos (founder, 23 Oct) — what's seen first is never a grid still filling in, and the
+  // bottom half lands just after (src/lib/mockupPrefetch.ts revealPlan). A generous safety timeout
+  // lifts it regardless.
   const [rangeReady, setRangeReady] = useState(false);
   const [rangeSettled, setRangeSettled] = useState(false);
   const drawingKey = upload?.dataUrl ?? null;
@@ -115,7 +116,7 @@ export default function StartCreatingPage() {
     const safety = setTimeout(() => setRangeReady(true), 45_000); // never strand the shopper
     return () => clearTimeout(safety);
   }, [drawingKey]);
-  // Every photo is ready: give the tiles a beat to swap them in, and let the loader play at least
+  // The top half's photos are ready: give the tiles a beat to swap them in, and let the loader play at least
   // its little moment so the reveal lands as a reveal, not a flicker.
   useEffect(() => {
     if (!rangeSettled || rangeReady) return;

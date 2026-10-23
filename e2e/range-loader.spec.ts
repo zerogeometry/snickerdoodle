@@ -2,15 +2,17 @@ import { test, expect } from '@playwright/test';
 import { artwork, quietCookies } from './helpers';
 
 /**
- * The "making your range" loader stays until EVERY tile's photo is ready, so the range is revealed
- * whole: at the reveal no tile on screen is still loading (pulsing block or sketch preview) and every
- * photo shown has fully loaded. The previews are slowed to behave like the deployed site.
+ * The "making your range" loader stays until the TOP HALF of the tiles have their photos (founder,
+ * 23 Oct), so what's seen first is never still loading: at the reveal no tile on the first screen is
+ * still loading (pulsing block or sketch preview) and every photo shown has fully loaded. The bottom
+ * half lands just after — walking down, every tile gets its photo within moments. The previews are
+ * slowed to behave like the deployed site.
  */
 for (const vp of [
   { w: 390, h: 844 },
   { w: 1280, h: 900 },
 ])
-  test(`the range loader stays until every tile has its photo (${vp.w}px)`, async ({
+  test(`the range loader stays until the top half has its photos, the rest follow (${vp.w}px)`, async ({
     page,
   }) => {
     test.setTimeout(180_000);
@@ -40,12 +42,10 @@ for (const vp of [
     await expect(loader).toBeVisible({ timeout: 30_000 });
     await expect(loader).toHaveCount(0, { timeout: 90_000 });
 
-    // Walk the whole range: every tile, as it comes into view, already has its photo — nothing is
-    // still loading. (Its picture was fetched before the reveal, so it paints straight from cache.)
-    let photos = 0;
-    for (let step = 0; step < 40; step++) {
-      await page.waitForTimeout(500);
-      const s = await page.evaluate(() => {
+    // The first screen at the reveal: complete. Then walk the range: every tile below gets its photo
+    // within moments (asked for straight after the top half).
+    const look = (scroll: boolean) =>
+      page.evaluate((scroll) => {
         const scroller = [
           ...document.querySelectorAll<HTMLElement>('.brand-scroll'),
         ].sort(
@@ -53,10 +53,15 @@ for (const vp of [
             b.querySelectorAll('img').length - a.querySelectorAll('img').length,
         )[0]!;
         const box = scroller.getBoundingClientRect();
+        // on screen = inside the range's box AND the window (on a phone the range doesn't scroll on
+        // its own — the page does)
+        const top = Math.max(box.top, 0);
+        const bottom = Math.min(box.bottom, window.innerHeight);
         const onScreen = (el: Element) => {
           const r = el.getBoundingClientRect();
-          return r.bottom > box.top && r.top < box.bottom && r.width > 0;
+          return r.bottom > top && r.top < bottom && r.width > 0;
         };
+        const ownScroll = scroller.scrollHeight > scroller.clientHeight + 2;
         const shown = [
           ...scroller.querySelectorAll<HTMLImageElement>(
             'img[alt^="your drawing on"]',
@@ -77,19 +82,33 @@ for (const vp of [
                 onScreen(el) &&
                 !el.parentElement?.querySelector('img[alt^="your drawing on"]'),
             ).length,
-          atEnd:
-            scroller.scrollTop + scroller.clientHeight >=
-            scroller.scrollHeight - 2,
+          atEnd: ownScroll
+            ? scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2
+            : box.bottom <= window.innerHeight + 2,
         };
-        scroller.scrollBy(0, scroller.clientHeight * 0.8);
+        if (scroll) {
+          if (ownScroll) scroller.scrollBy(0, scroller.clientHeight * 0.8);
+          else window.scrollBy(0, window.innerHeight * 0.8);
+        }
         return out;
-      });
-      expect(s.stillLoading, `a tile was still loading at step ${step}`).toBe(
-        0,
-      );
-      expect(s.unloaded).toBe(0);
+      }, scroll);
+    const first = await look(false);
+    expect(first.stillLoading, 'a tile on the first screen was still loading at the reveal').toBe(0);
+    expect(first.unloaded).toBe(0);
+    expect(first.photos.length).toBeGreaterThan(0);
+
+    let photos = 0;
+    for (let step = 0; step < 40; step++) {
+      await expect
+        .poll(async () => {
+          const s = await look(false);
+          return s.stillLoading + s.unloaded;
+        }, { message: `tiles still loading at step ${step}`, timeout: 30_000 })
+        .toBe(0);
+      const s = await look(true);
       photos += s.photos.length;
       if (s.atEnd) break;
+      await page.waitForTimeout(300);
     }
     expect(photos).toBeGreaterThan(0);
   });
