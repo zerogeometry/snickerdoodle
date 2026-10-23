@@ -178,8 +178,8 @@ describe('phone case + playing cards — portrait products that fill (founder, 2
       expect(defaultTransformFor(k, 0.7)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
     }
   });
-  it('a landscape drawing turns a quarter, then fills — anti-clockwise on a phone (held sideways in the right hand)', () => {
-    expect(defaultTransformFor('phoneCase', 1.5)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 270 });
+  it('a landscape drawing turns a quarter clockwise, then fills (founder: 90° clockwise on the phone)', () => {
+    expect(defaultTransformFor('phoneCase', 1.5)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 90 });
     expect(defaultTransformFor('playingCards', 1.5)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 90 });
   });
   it('an unknown shape is not turned', () => {

@@ -46,12 +46,10 @@ export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku)
 const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug']);
 export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
 /**
- * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate). A phone is held
- * sideways in the RIGHT hand (founder, 23 Oct): its top points left as you look at the screen — so
- * to anyone looking at the case, its top points to their right, and the drawing must turn a quarter
- * ANTI-clockwise on the print to read upright. Cards have no "right way up" in the hand: 90.
+ * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate): a quarter turn
+ * CLOCKWISE on both (founder, 23 Oct — checked on the phone held sideways in the right hand).
  */
-const LANDSCAPE_TURN: Record<string, number> = { phoneCase: 270, playingCards: 90 };
+const LANDSCAPE_TURN: Record<string, number> = { phoneCase: 90, playingCards: 90 };
 export function defaultTransformFor(productKey: string, aspect?: number | null): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
   if (PORTRAIT_FILL.has(productKey)) return { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: aspect && aspect > 1 ? LANDSCAPE_TURN[productKey] ?? 90 : 0 };
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
