@@ -279,7 +279,7 @@ export function FlowCatalogue({
   const gridClassName = compact
     ? 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-2 sm:gap-x-4' // phones: one column (name, price + button each get room); 2-up from sm
     : 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-3 sm:gap-x-4 md:grid-cols-4 md:gap-x-5';
-  const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto px-1.5 pb-3 h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem] 2xl:max-h-[46rem]' : undefined;
+  const scrollClasses = scrollable ? 'brand-scroll overflow-y-auto px-1.5 pb-3 h-[55dvh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem] 2xl:max-h-[46rem]' : undefined;
   // Sections (Start-Creating) uses the basket-sidebar model: the catalogue tiles just
   // "+ customize", and quantity lives in the basket — so no per-tile stepper.
   const gridProps = {
@@ -305,7 +305,7 @@ export function FlowCatalogue({
               screen readers; "full catalogue" sits at the foot of the list. */}
           <h2 className="sr-only">{picks.length > 0 ? 'your range' : 'the range'}</h2>
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
-          <div className="brand-scroll h-[52vh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
+          <div className="brand-scroll h-[52dvh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (
               <>
                 <SectionLabel>your picks</SectionLabel>
@@ -348,7 +348,7 @@ export function FlowCatalogue({
             ) : null}
           </div>
           </div>
-          <Basket className="h-[52vh] md:h-full" />
+          <Basket className="h-[52dvh] md:h-full" />
         </div>
       ) : (
         <>

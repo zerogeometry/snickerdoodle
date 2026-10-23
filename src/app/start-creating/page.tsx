@@ -289,7 +289,7 @@ export default function StartCreatingPage() {
                         <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setRangeSettled(true)} />
                       </div>
                     ) : (
-                      <div className="h-[55vh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />
+                      <div className="h-[55dvh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />
                     )}
                     {!rangeReady || !products ? (
                       <MakingRangeLoader drawing={previewImg} className="absolute inset-0" />

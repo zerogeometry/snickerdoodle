@@ -998,14 +998,17 @@ export default function StudioPage() {
     const V = viewMatrix(geo);
     const c = V.transformPoint(new DOMPoint(b.cx, b.cy));
     const fontPx = Math.max(4, inlineObj.size * Math.min(gw, gh)) * V.a;
+    // iPhone zooms the whole page in when a field under 16px is focused — so small words are laid
+    // out at 16px and scaled down to their real size (same look, no zoom)
+    const k = fontPx < 16 ? fontPx / 16 : 1;
     inlineStyle = {
       left: c.x,
       top: c.y,
-      width: b.w * V.a + fontPx * 0.8, // room for the caret at the end of the longest line
-      height: b.h * V.a,
-      transform: `translate(-50%, -50%) rotate(${b.rotation}deg)`,
+      width: (b.w * V.a + fontPx * 0.8) / k, // room for the caret at the end of the longest line
+      height: (b.h * V.a) / k,
+      transform: `translate(-50%, -50%) rotate(${b.rotation}deg)${k < 1 ? ` scale(${k})` : ''}`,
       fontFamily: cardFontCss(inlineObj.font),
-      fontSize: fontPx,
+      fontSize: fontPx / k,
       lineHeight: TEXT_LINE_HEIGHT,
       color: inlineObj.colour,
       caretColor: inlineObj.colour,
@@ -1176,8 +1179,9 @@ export default function StudioPage() {
     <div className="fixed inset-0 flex flex-col bg-oat">
       {/* header: always a clear way back to the range */}
       <header className="pt-safe kraft z-20 flex min-h-[60px] items-center gap-2 border-b-2 border-cocoa/10 px-3 md:px-5">
-        <button type="button" onClick={onBack} className="press flex min-h-11 items-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-3 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
-          <Icon icon={IconArrowLeft} size={17} /> your range
+        {/* narrow phones: just the arrow (the words come back from 400px) — the header never wraps */}
+        <button type="button" onClick={onBack} aria-label="back to your range" className="press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-2.5 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] min-[400px]:px-3">
+          <Icon icon={IconArrowLeft} size={17} /> <span className="hidden whitespace-nowrap min-[400px]:inline">your range</span>
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="hidden font-display text-lg text-cocoa min-[420px]:inline">studio</span>
@@ -1258,7 +1262,7 @@ export default function StudioPage() {
           <div className="pointer-events-none absolute left-2.5 right-[64px] top-2.5 flex flex-col items-start gap-1.5 md:hidden" aria-live="polite">
             {comparing ? (
               <span className="studio-glass-ink rounded-pill px-3 py-1.5 text-[12px] font-extrabold text-paper">your original</span>
-            ) : def && def.kind === 'mode' ? (
+            ) : editingId ? null /* typing: the words are lifted up here, clear of the keyboard — nothing over them */ : def && def.kind === 'mode' ? (
               <div className="studio-glass-ink flex max-w-full items-center gap-2 rounded-[16px] py-1.5 pl-2 pr-3 text-paper [--glyph-ring:var(--color-cocoa)]">
                 <ToolGlyph tool={def} size={16} />
                 <span className="min-w-0">

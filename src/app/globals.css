@@ -625,3 +625,15 @@ body {
     overflow-x: auto;
   }
 }
+
+/* iPhone: Safari ZOOMS THE WHOLE PAGE IN when a text field under 16px is focused — and doesn't zoom
+   back out, so pop-ups, the studio and menus end up too big and off screen. On touch screens every
+   text field is at least 16px (unlayered, so it outranks the size utilities). Pinch-zoom stays
+   available — we never cap the viewport's scale. */
+@media (pointer: coarse) {
+  input:not([type='range']):not([type='color']):not([type='checkbox']):not([type='radio']):not([type='file']):not([type='hidden']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}

@@ -129,7 +129,7 @@ export function StudioToolbar({
         {sheet ? (
           <>
             <button type="button" aria-label="close the tool list" onClick={() => { setSheet(false); setInfo(null); }} className="fixed inset-0 z-30 bg-cocoa/30" />
-            <div role="dialog" aria-label="tools" className="sheet-up pb-safe fixed inset-x-0 bottom-0 z-40 max-h-[78vh] overflow-y-auto rounded-t-[22px] border-t-2 border-cocoa bg-paper px-3 pt-2 shadow-[0_-6px_18px_rgb(43_33_24/0.18)]">
+            <div role="dialog" aria-label="tools" className="sheet-up pb-safe fixed inset-x-0 bottom-0 z-40 max-h-[78dvh] overflow-y-auto rounded-t-[22px] border-t-2 border-cocoa bg-paper px-3 pt-2 shadow-[0_-6px_18px_rgb(43_33_24/0.18)]">
               <div className="mx-auto mb-1 h-1.5 w-12 rounded-full bg-line" aria-hidden />
               <div className="flex items-center justify-between pb-1">
                 <span className="text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">tools</span>

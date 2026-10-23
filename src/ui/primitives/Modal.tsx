@@ -97,7 +97,7 @@ export function Modal({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className={`sheet-up relative z-10 flex ${fill ? 'h-[85vh]' : 'max-h-[92dvh] md:max-h-[90vh]'} w-full ${SIZE[size]} flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-2 border-b-0 border-cocoa bg-paper shadow-[0_-8px_30px_rgba(43,33,24,.25)] focus:outline-none md:rounded-[var(--radius-sheet)] md:border-b-2 md:shadow-[0_6px_0_var(--color-cocoa),0_20px_50px_rgba(43,33,24,.28)]`}
+        className={`sheet-up relative z-10 flex ${fill ? 'h-[85dvh]' : 'max-h-[92dvh] md:max-h-[90dvh]'} w-full ${SIZE[size]} flex-col overflow-hidden rounded-t-[var(--radius-sheet)] border-2 border-b-0 border-cocoa bg-paper shadow-[0_-8px_30px_rgba(43,33,24,.25)] focus:outline-none md:rounded-[var(--radius-sheet)] md:border-b-2 md:shadow-[0_6px_0_var(--color-cocoa),0_20px_50px_rgba(43,33,24,.28)]`}
       >
         <span aria-hidden className="mx-auto mt-2 h-1.5 w-11 rounded-full bg-line md:hidden" />
         <div className="flex items-start justify-between gap-3 px-5 pb-1 pt-3 md:pt-4">
