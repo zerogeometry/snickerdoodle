@@ -47,3 +47,24 @@ test('touch phone: text fields are 16px or more, and nothing runs off the side',
   expect(parseFloat(await words.evaluate((el) => getComputedStyle(el).fontSize))).toBeGreaterThanOrEqual(16);
   expect(await noSideways(page)).toBe(true);
 });
+
+test('narrow phone (320px — an SE, or an iPhone with Display Zoom): the basket fits', async ({ page }) => {
+  test.setTimeout(180_000);
+  await quietCookies(page);
+  await uploadAndOpenRange(page);
+  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  for (const product of ['mug', 'framed print']) {
+    await page.getByRole('button', { name: `customize ${product}`, exact: true }).click();
+    await page.getByRole('button', { name: /add to basket/ }).click();
+    await expect(page).toHaveURL(/\/start-creating/, { timeout: 30_000 });
+  }
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/checkout');
+  await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
+  expect(await noSideways(page)).toBe(true);
+  // every row's price + remove stay on screen
+  for (const remove of await page.getByRole('button', { name: 'remove' }).all()) {
+    const b = (await remove.boundingBox())!;
+    expect(b.x + b.width).toBeLessThanOrEqual(320);
+  }
+});

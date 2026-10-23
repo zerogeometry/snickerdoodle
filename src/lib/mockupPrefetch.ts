@@ -123,32 +123,49 @@ export function prefetchMockups(reqs: MockupRequest[]): void {
     const k = mockupKey(r);
     return !cachedMockup(k) && !pending.has(k) && !failed.has(k);
   });
-  const batches: MockupRequest[][] = [];
-  for (let i = 0; i < todo.length; i += BATCH_SIZE) batches.push(todo.slice(i, i + Math.min(BATCH_SIZE, MAX_BATCH)));
-
-  for (const batch of batches) {
-    let settle!: (rs: Result[]) => void;
-    const all = new Promise<Result[]>((res) => (settle = res));
-    batch.forEach((r, i) => {
-      const k = mockupKey(r);
-      const p = all.then((rs): Result => rs[i] ?? { ok: false, fallback: true, transient: true }); // network hiccup: the tile retries itself
-      pending.set(k, p);
-      void p.then((res) => {
-        pending.delete(k);
-        if (res.ok) {
-          done.set(k, { url: res.url, at: Date.now() });
-          preload(k, res.url);
-        } else if (!res.needsAuth && !res.transient) {
-          failed.add(k);
-        } else {
-          unloadable.add(k); // a hiccup: the tile retries itself when shown; the range doesn't wait
-        }
-        notify();
-      });
-    });
-    queue.push(() => runBatch(batch).then(settle, () => settle([])));
-  }
+  for (let i = 0; i < todo.length; i += BATCH_SIZE) enqueue(todo.slice(i, i + Math.min(BATCH_SIZE, MAX_BATCH)), 1);
   pump();
+}
+
+/** A photo whose request hiccuped (a slow / timed-out batch) is asked for again ON ITS OWN, after a
+ * pause, up to this many tries in all — and the range keeps its loader up meanwhile (founder, 23 Oct:
+ * "the loading animation disappears before the catalogue appears"). Only after the last try does the
+ * range stop waiting for it (the tile then retries itself when shown). */
+const MAX_ATTEMPTS = 3;
+const RETRY_PAUSE_MS = 1200;
+
+function enqueue(batch: MockupRequest[], attempt: number): void {
+  let settle!: (rs: Result[]) => void;
+  const all = new Promise<Result[]>((res) => (settle = res));
+  batch.forEach((r, i) => {
+    const k = mockupKey(r);
+    const p = all.then((rs): Result => rs[i] ?? { ok: false, fallback: true, transient: true }); // network hiccup
+    pending.set(k, p);
+    void p.then((res) => {
+      const mine = pending.get(k) === p;
+      if (res.ok) {
+        if (mine) pending.delete(k);
+        done.set(k, { url: res.url, at: Date.now() });
+        preload(k, res.url);
+      } else if (!res.needsAuth && !res.transient) {
+        if (mine) pending.delete(k);
+        failed.add(k);
+      } else if (!res.needsAuth && attempt < MAX_ATTEMPTS) {
+        // try again, alone (a lone compose finishes well inside a host's request time limit)
+        setTimeout(() => {
+          if (done.has(k) || failed.has(k)) return; // a tile got it meanwhile
+          enqueue([r], attempt + 1);
+          pump();
+        }, RETRY_PAUSE_MS * attempt);
+        return; // not settled yet — the range keeps waiting
+      } else {
+        if (mine) pending.delete(k);
+        unloadable.add(k); // out of tries: the tile retries itself when shown; the range doesn't wait
+      }
+      notify();
+    });
+  });
+  queue.push(() => runBatch(batch).then(settle, () => settle([])));
 }
 
 const queue: Array<() => Promise<void>> = [];
@@ -187,7 +204,7 @@ async function runBatch(batch: MockupRequest[]): Promise<Result[]> {
 }
 
 /** Warm the browser's image cache, so a tile's swap to the photo is instant; note when it's ready. */
-function preload(key: string, url: string) {
+function preload(key: string, url: string, attempt = 1) {
   if (typeof window === 'undefined') return;
   loaded.delete(key);
   unloadable.delete(key);
@@ -205,6 +222,8 @@ function preload(key: string, url: string) {
   };
   img.onerror = () => {
     if (done.get(key)?.url !== url) return;
+    // a dropped download: one more go before the range stops waiting on it
+    if (attempt < 2) return void setTimeout(() => done.get(key)?.url === url && preload(key, url, attempt + 1), RETRY_PAUSE_MS);
     unloadable.add(key); // the tile re-composes itself; the range doesn't wait on it
     notify();
   };

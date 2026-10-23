@@ -267,15 +267,16 @@ export default function CheckoutPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat pb-40 md:pb-0">
-      <header className="flex items-center justify-between border-b border-line px-6 py-3.5">
-        <div className="flex items-center gap-2.5">
-          <Link href="/start-creating" aria-label="Back to your range">
+      <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2 sm:px-6">
+        <div className="flex min-w-0 items-center gap-1">
+          <Link href="/start-creating" aria-label="Back to your range" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center">
             <Icon icon={IconArrowLeft} size={20} className="text-ink-soft" />
           </Link>
-          <Link href="/" className="font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
+          <Link href="/" className="truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
         </div>
-        <span className="flex items-center gap-1.5 text-xs text-ink-soft">
-          <Icon icon={IconLock} size={14} className="text-green-save" /> secure checkout
+        {/* narrow phones: just the padlock (the words from 360px), never wrapping into the logo */}
+        <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-soft" aria-label="secure checkout">
+          <Icon icon={IconLock} size={14} className="text-green-save" /> <span className="hidden min-[360px]:inline">secure checkout</span>
         </span>
       </header>
 
@@ -294,8 +295,9 @@ export default function CheckoutPage() {
           </Button>
         </main>
       ) : (
-        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
-          <div className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
+        <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
+          {/* min-w-0: a long line in one column must never stretch it past a narrow phone's edge */}
+          <div className="grid gap-6 md:grid-cols-[1.4fr_1fr] [&>*]:min-w-0">
             {/* Basket */}
             <div>
               <h1 className="font-display text-xl font-semibold text-cocoa">Your basket</h1>
@@ -331,7 +333,7 @@ export default function CheckoutPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
-                      {item.sub ? <div className="text-[11px] text-ink-faint">{item.sub}</div> : null}
+                      {item.sub ? <div className="break-words text-[11px] text-ink-faint">{item.sub}</div> : null}
                       {isPackLine(item) ? (
                         // A card pack is always one pack — no quantity; its cards are edited in the builder.
                         <div className="mt-1.5 flex items-center gap-2">
@@ -340,7 +342,8 @@ export default function CheckoutPage() {
                           </button>
                         </div>
                       ) : (
-                      <div className="mt-1.5 flex items-center gap-2">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                        {/* wraps to a second line on a narrow phone rather than pushing the price off screen */}
                         <div className="flex items-center rounded-full border border-line bg-white">
                           <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-ink-soft">
                             <Icon icon={IconMinus} size={12} />
