@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
+import { COMPANY } from '@/lib/company';
+
+const COMPANY_ADDRESS = `${COMPANY.street}, ${COMPANY.city} ${COMPANY.postcode}`;
 
 export const metadata: Metadata = {
   title: 'privacy notice',
@@ -25,8 +28,8 @@ export default function PrivacyNoticePage() {
 
         <h2>1. Who we are</h2>
         <p>
-          Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> ([company number], registered in
-          England &amp; Wales, registered office [address]). We are the &ldquo;data controller&rdquo; for the personal
+          Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> (company number {COMPANY.companyNumber}, registered in
+          England &amp; Wales, registered office {COMPANY_ADDRESS}). We are the &ldquo;data controller&rdquo; for the personal
           information described here. You can reach us at <a href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a>.
           We are registered with the Information Commissioner&apos;s Office (ICO), registration number [ICO number].
         </p>
@@ -125,7 +128,7 @@ export default function PrivacyNoticePage() {
 
         <p className="text-[13px] text-ink-faint">
           Contact: <a href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a> · Launch Mode Ltd,
-          [address] · ICO registration [number].
+          {COMPANY_ADDRESS} · ICO registration [number].
         </p>
       </Prose>
     </div>

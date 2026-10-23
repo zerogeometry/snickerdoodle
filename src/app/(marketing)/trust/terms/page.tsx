@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
+import { COMPANY } from '@/lib/company';
+
+const COMPANY_ADDRESS = `${COMPANY.street}, ${COMPANY.city} ${COMPANY.postcode}`;
 
 export const metadata: Metadata = {
   title: 'terms of service',
@@ -25,8 +28,8 @@ export default function TermsPage() {
 
         <h2>1. Who we are, and these terms</h2>
         <p>
-          Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> ([company number], registered in
-          England &amp; Wales, registered office [address]). These terms are the agreement between you and us when you
+          Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> (company number {COMPANY.companyNumber}, registered in
+          England &amp; Wales, registered office {COMPANY_ADDRESS}). These terms are the agreement between you and us when you
           use the service. By uploading a drawing or placing an order you accept them. How we handle personal
           information is set out in our <Link href="/trust/privacy">Privacy Notice</Link>.
         </p>
@@ -108,7 +111,7 @@ export default function TermsPage() {
 
         <p className="text-[13px] text-ink-faint">
           Contact: <a href="mailto:[hello@snickerdoodle.co.uk]">[hello@snickerdoodle.co.uk]</a> · Launch Mode Ltd,
-          [address].
+          {COMPANY_ADDRESS}.
         </p>
       </Prose>
     </div>
