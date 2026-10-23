@@ -4,6 +4,7 @@ import { purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention
 import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
 import { purgeExpiredRateLimits } from '@/server/rateLimit';
 import { sweepQuarantine } from '@/server/directUpload';
+import { purgeExpiredSupportRequests } from '@/server/support';
 
 /**
  * Retention purge, triggered by a scheduler (cron / Vercel Cron / a scheduled
@@ -20,5 +21,6 @@ export async function POST(req: Request): Promise<Response> {
   const pendingKeepsPurged = await purgeExpiredPendingKeeps(db); // guests' keep requests, a day on
   const rateLimitsPurged = await purgeExpiredRateLimits(db); // finished rate-limit windows, a day on
   const quarantine = await sweepQuarantine(); // direct uploads never finalised, an hour on
-  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, rateLimitsPurged, quarantineSwept: quarantine.deleted });
+  const supportPurged = await purgeExpiredSupportRequests(db); // help messages, two years on
+  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, rateLimitsPurged, quarantineSwept: quarantine.deleted, supportPurged });
 }

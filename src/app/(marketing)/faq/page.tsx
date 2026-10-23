@@ -8,6 +8,7 @@ import { FAQ, FAQ_PRODUCT_NAMES, FAQ_UPDATED, plainAnswer, type FaqItem } from '
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
+import { FaqSearch } from '@/ui/components/FaqSearch';
 import { COMPANY } from '@/lib/company';
 
 export const metadata: Metadata = {
@@ -113,6 +114,7 @@ export default async function FaqPage() {
             Snickerdoodle turns your child’s drawings and photos into personalised keepsakes and gifts — made to order in the UK,
             delivered free, and kept private in your Family Keepsake Home. Here’s everything families usually ask.
           </p>
+          <FaqSearch className="mx-auto mt-6 max-w-2xl text-left" />
           <nav aria-label="FAQ topics" className="mt-6 flex flex-wrap justify-center gap-2">
             {FAQ.map((s) => (
               <a key={s.id} href={`#${s.id}`} className="press inline-flex min-h-11 items-center rounded-pill border-2 border-cocoa/20 bg-paper px-4 text-sm font-bold text-cocoa hover:border-cocoa">
@@ -167,6 +169,13 @@ export default async function FaqPage() {
             </section>
           ))}
 
+          <div className="rounded-[20px] border-2 border-dashed border-cocoa/25 bg-paper-2 p-5 text-center">
+            <p className="font-display text-xl text-cocoa">Can’t find your answer?</p>
+            <p className="mt-1 text-[15px] text-ink-soft">
+              Send us a message on our{' '}
+              <Link href="/help#contact" className="font-bold text-cinnamon underline underline-offset-2">help page</Link> — a real person will reply.
+            </p>
+          </div>
           <p className="text-center text-[13px] text-ink-faint">
             Last checked and updated <time dateTime={FAQ_UPDATED}>{updated}</time>. Something we haven’t answered? Our{' '}
             <Link href="/trust/privacy" className="underline underline-offset-2 hover:text-cinnamon">privacy notice</Link> and{' '}

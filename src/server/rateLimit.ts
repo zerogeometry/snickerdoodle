@@ -106,6 +106,8 @@ export const LIMITS = {
   testGatePerIp: { bucket: 'test-gate:ip', limit: 10, windowSec: 900, failClosed: true },
   mfaPerAccount: { bucket: 'mfa:account', limit: 5, windowSec: 900, failClosed: true },
   complaintPerIp: { bucket: 'complaint:ip', limit: 5, windowSec: 3600 },
+  supportPerIp: { bucket: 'support:ip', limit: 6, windowSec: 3600 },
+  reportPerIp: { bucket: 'report:ip', limit: 10, windowSec: 3600 },
   invitesPerAccount: { bucket: 'invite:account', limit: 20, windowSec: 3600 },
   giftLinksPerAccount: { bucket: 'gift-link:account', limit: 30, windowSec: 3600 },
   giftRequestsPerAccount: { bucket: 'gift-request:account', limit: 20, windowSec: 3600 },

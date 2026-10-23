@@ -78,6 +78,11 @@ export const FAQ: FaqSection[] = [
         q: 'Who is Snickerdoodle for?',
         a: 'Snickerdoodle is for parents and guardians who want to keep their children’s artwork, and for the grandparents, aunts, uncles and friends who love giving it back as a present. It’s for grown-ups to use: children never have accounts, and only a parent or guardian decides who sees what.',
       },
+      {
+        id: 'contact',
+        q: 'How do I contact Snickerdoodle?',
+        a: 'The quickest way to reach Snickerdoodle is the [help page](/help): search our answers first, and if you still need us, pick a topic and send a message — a real person replies by email. For anything else, write to hello@snickerdoodle.co.uk.',
+      },
     ],
   },
   {
@@ -165,7 +170,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'delivery-cost',
         q: 'How much is delivery, and is it tracked?',
-        a: 'Delivery is free on every Snickerdoodle order to a UK address — it’s included in the price. Most products are sent tracked; greetings cards, card packs, wrapping paper and playing cards travel by standard post, which isn’t tracked.',
+        a: 'Delivery is free on every Snickerdoodle order to a UK address — it’s included in the price. Most products are sent tracked — the link is in your “on its way” email and on your orders page; greetings cards, card packs, wrapping paper and playing cards travel by standard post, which isn’t tracked.',
       },
       {
         id: 'international',
@@ -176,6 +181,11 @@ export const FAQ: FaqSection[] = [
         id: 'returns',
         q: 'Can I return a personalised item?',
         a: 'Because every Snickerdoodle piece is made especially for you, personalised items can’t be returned just for a change of mind — but your statutory rights are unaffected, so if anything arrives faulty or damaged we’ll put it right. See our [terms](/trust/terms).',
+      },
+      {
+        id: 'change-order',
+        q: 'Can I change or cancel my order?',
+        a: 'Snickerdoodle makes every order specially and it goes into production quickly, so we can’t promise a change once it’s placed — but tell us straight away through the [help page](/help), with your order reference, and we’ll do everything we can. Your order reference is on your orders page and in your order email.',
       },
       {
         id: 'payment',

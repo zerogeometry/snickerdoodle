@@ -18,6 +18,7 @@ export const PRIVATE_PATHS = ['/home', '/family', '/account', '/checkout', '/ord
 export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: 'weekly' | 'monthly' | 'yearly' }[] = [
   { path: '/', priority: 1, changeFrequency: 'weekly' },
   { path: '/faq', priority: 0.9, changeFrequency: 'monthly' },
+  { path: '/help', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/how-it-works', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/gifts', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/our-story', priority: 0.6, changeFrequency: 'yearly' },

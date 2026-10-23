@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { getDb } from '@/db/client';
 import { currentReviewer } from '@/server/admin/context';
@@ -21,7 +22,11 @@ export default async function ReviewPage() {
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader tag="admin" />
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16 pt-6 md:px-6">
-        <h1 className="font-display text-3xl text-cocoa">content review</h1>
+        <nav aria-label="admin" className="flex gap-4 text-sm font-bold">
+          <span className="text-cocoa" aria-current="page">content review</span>
+          <Link href="/admin/support" className="text-ink-soft underline underline-offset-2">support inbox</Link>
+        </nav>
+        <h1 className="mt-3 font-display text-3xl text-cocoa">content review</h1>
         <p className="mt-1 max-w-xl text-sm text-ink-soft">
           Pictures the safety checks held back. Looking at a child&apos;s picture is a privacy event: pictures stay hidden until you choose to look, and every look and decision is recorded.
         </p>

@@ -12,7 +12,9 @@
  * who never receives their sign-in link is a broken product, and a missing invite email
  * is a broken family loop.
  */
-export type MailKind = 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover' | 'email-change';
+export type MailKind =
+  | 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover' | 'email-change'
+  | 'support-ack' | 'support-request' | 'content-report' | 'order-confirmed' | 'order-shipped';
 
 export interface MailMessage {
   kind: MailKind;
@@ -20,6 +22,8 @@ export interface MailMessage {
   subject: string;
   /** Plain-text body (warm, brand voice). Links must be absolute — see appUrl(). */
   text: string;
+  /** Where a reply goes (e.g. support@ on a customer's acknowledgement; the customer on the team's copy). */
+  replyTo?: string;
 }
 
 export interface Mailer {
@@ -30,7 +34,7 @@ const consoleMailer: Mailer = {
   async send(m) {
     console.log(
       `\n┌─────────────────────────────────────────────────────────────\n` +
-        `│ ✉️  [${m.kind}] to ${m.to} — ${m.subject}\n` +
+        `│ ✉️  [${m.kind}] to ${m.to} — ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}\n` +
         m.text
           .split('\n')
           .map((l) => `│ ${l}`)
@@ -47,7 +51,7 @@ export function resendMailer(apiKey: string, from: string, doFetch: typeof fetch
       const res = await doFetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [m.to], subject: m.subject, text: m.text, tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
+        body: JSON.stringify({ from, to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}), tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
       });
       if (!res.ok) throw new Error(`email not sent (${res.status}) — check the Resend key and domain`);
     },

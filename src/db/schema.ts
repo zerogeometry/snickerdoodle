@@ -372,6 +372,32 @@ export const rightsRequests = pgTable('rights_requests', {
   createdAt,
 });
 
+// ── support_request — the help form (founder, 23 Oct): a topic, an email, a message (and an order
+// reference for order questions). Saved FIRST, so nothing is lost if an email can't go; the team is
+// told at support@ and the customer gets an acknowledgement. Personal data: purged by the retention
+// job SUPPORT_RETENTION_DAYS after it arrived (src/server/support.ts). ────────────────────────
+export const supportRequestStatus = pgEnum('support_request_status', ['OPEN', 'ANSWERED', 'CLOSED']);
+export const supportRequests = pgTable(
+  'support_requests',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ref: text('ref').notNull().unique(),
+    topic: text('topic').notNull(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    email: text('email').notNull(),
+    name: text('name'),
+    orderRef: text('order_ref'),
+    message: text('message').notNull(),
+    status: supportRequestStatus('status').notNull().default('OPEN'),
+    receivedAt: timestamp('received_at', { withTimezone: true }).defaultNow().notNull(),
+    ackSentAt: timestamp('ack_sent_at', { withTimezone: true }),
+    teamNotifiedAt: timestamp('team_notified_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('support_requests_received_idx').on(t.receivedAt), index('support_requests_email_idx').on(t.email)],
+);
+
 // ── sub_processor — accountability register (mirrors the DPA pack). ──────────
 export const subProcessors = pgTable('sub_processors', {
   id: uuid('id').defaultRandom().primaryKey(),

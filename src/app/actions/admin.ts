@@ -9,6 +9,7 @@ import { AuthzError } from '@/authz';
 import { currentReviewer } from '@/server/admin/context';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { decideReview, type ReviewKind } from '@/server/admin/review';
+import { setSupportStatus, type SupportStatus } from '@/server/admin/support';
 import { ADMIN_STEPUP_COOKIE, signStepUp, STEPUP_HOURS } from '@/server/admin/stepUp';
 import { newTotpSecret, openSecret, otpauthUri, sealSecret, verifyTotp } from '@/server/admin/totp';
 
@@ -69,5 +70,19 @@ export async function decideReviewAction(kind: ReviewKind, id: string, decision:
     throw e;
   }
   revalidatePath('/admin/review');
+  return { ok: true };
+}
+
+/** Support inbox: mark a help message answered / closed (or open again). */
+export async function setSupportStatusAction(id: string, status: SupportStatus): Promise<{ ok: boolean }> {
+  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id) || !['OPEN', 'ANSWERED', 'CLOSED'].includes(status)) return { ok: false };
+  try {
+    const ok = await setSupportStatus(getDb(), await currentReviewer(), id, status);
+    if (!ok) return { ok: false };
+  } catch (e) {
+    if (e instanceof AuthzError) return { ok: false };
+    throw e;
+  }
+  revalidatePath('/admin/support');
   return { ok: true };
 }
