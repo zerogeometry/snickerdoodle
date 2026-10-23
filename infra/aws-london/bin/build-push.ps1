@@ -30,7 +30,9 @@ try {
   $tag = "$((Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmm'))-$sha"
 
   $registry = $Repo.Split('/')[0]
-  & aws ecr get-login-password --region eu-west-2 --profile $AwsProfile | & docker login --username AWS --password-stdin $registry
+  # through cmd's pipe: Windows PowerShell 5.1 re-encodes text piped between two programs, and ECR
+  # then answers the login with "400 Bad Request"
+  & cmd /c "aws ecr get-login-password --region eu-west-2 --profile $AwsProfile | docker login --username AWS --password-stdin $registry"
   if ($LASTEXITCODE -ne 0) { throw 'could not log in to ECR - check the AWS profile' }
 
   & docker buildx build --platform linux/amd64 -f infra/aws-london/Dockerfile `
