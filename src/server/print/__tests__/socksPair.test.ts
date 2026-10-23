@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { nearestOf, renderTemplatePreview } from '../compositor';
+import { nearestOf, pieceOwners, renderTemplatePreview } from '../compositor';
 import { layeredFlatTemplate, piecesOf } from '../seedMockups';
 
 /**
@@ -131,5 +131,30 @@ describe('a pair of socks in the photo — both socks show the same print', () =
     };
     expect(await compare(true), 'one print area per sock: the socks match').toBeLessThan(25);
     expect(await compare(false), 'one area across the pair: they did not').toBeGreaterThan(60);
+  });
+});
+
+describe('each sock keeps its own mapping where the two print areas overlap (founder, 23 Oct)', () => {
+  it('a pixel on a piece belongs to that piece’s area, even when the other area’s centre is nearer', async () => {
+    // two long diagonal "socks" side by side: near the left one's lower edge, the RIGHT one's centre
+    // is nearer than the left one's — "nearest centre" alone hands that edge to the wrong sock
+    const W = 200, H = 200;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+      <polygon points="20,40 60,20 120,180 80,200" fill="#fff"/><polygon points="90,30 130,10 190,170 150,190" fill="#fff"/></svg>`;
+    const mask = await sharp({ create: { width: W, height: H, channels: 3, background: '#000' } }).composite([{ input: Buffer.from(svg) }]).png().toBuffer();
+    const centres: [number, number][] = [[70, 110], [140, 100]];
+    const owner = await pieceOwners(mask, undefined, W, H, centres);
+    // a point on the left sock's lower-right edge, nearer the right sock's centre
+    const [x, y] = [115, 172];
+    expect((x - centres[1]![0]) ** 2 + (y - centres[1]![1]) ** 2).toBeLessThan((x - centres[0]![0]) ** 2 + (y - centres[0]![1]) ** 2);
+    expect(owner[y * W + x]).toBe(0);
+    expect(owner[100 * W + 140]).toBe(1);
+    expect(owner[5 * W + 5]).toBe(-1); // off the print map
+
+    // and the merge follows it: two solid layers covering everything, red (left area) and blue (right)
+    const red = Buffer.alloc(W * H * 4), blue = Buffer.alloc(W * H * 4);
+    for (let i = 0; i < W * H; i++) { red.set([255, 0, 0, 255], i * 4); blue.set([0, 0, 255, 255], i * 4); }
+    const merged = nearestOf([red, blue], centres, W, H, owner);
+    expect(merged[(y * W + x) * 4]).toBe(255); // red: the left sock's own mapping
   });
 });

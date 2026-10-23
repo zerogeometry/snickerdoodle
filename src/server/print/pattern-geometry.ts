@@ -31,8 +31,8 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 
 /** The most of its cell a motif may fill when the spacing is tight — a gap always shows. */
 const MAX_FILL = 0.9;
-/** A narrow print's default: at least this many motifs round (see patternLayout). */
-const NARROW_MIN_COLS = 4;
+/** A narrow print's default motif, as a share of its column's width (see patternLayout). */
+const NARROW_MOTIF_OF_CELL = 0.51;
 
 /**
  * Where every motif goes. The ZOOM sets the motif's size directly (scale 0 = PATTERN_MOTIF_MM), so
@@ -51,13 +51,14 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
   const rotated = transform.rotationDeg % 180 !== 0;
   const sw = rotated ? src.height : src.width;
   const sh = rotated ? src.width : src.height;
-  // A NARROW print at its default zoom (an ankle sock, ~300 mm round: only 2 columns would fit) gets
-  // smaller motifs — at least NARROW_MIN_COLS round — and a column centred on the side you see,
-  // instead of two big motifs chopped at the sock's edges (founder, 23 Oct). Zooming still works.
+  // A NARROW print at its default zoom (an ankle sock, ~300 mm round) shows ONE column per side: two
+  // columns round, each motif about half its column wide and centred on the side you see — so each
+  // sock shows whole motifs with white either side, never slices of the next column at its edges
+  // (founder, 23 Oct: "chopped up"; four-round always left slivers). Zooming still works.
   const widthMm = (canvas.width / dpi) * 25.4;
-  const narrowDefault = transform.scale === 0 && widthMm < NARROW_MIN_COLS * (PATTERN_MOTIF_MM / PATTERN_FILL) * 0.75;
+  const narrowDefault = transform.scale === 0 && widthMm < 3 * (PATTERN_MOTIF_MM / PATTERN_FILL);
   const motifMm = narrowDefault
-    ? clamp((widthMm * PATTERN_FILL) / NARROW_MIN_COLS, MOTIF_MM_MIN, PATTERN_MOTIF_MM)
+    ? clamp((widthMm / 2) * NARROW_MOTIF_OF_CELL, MOTIF_MM_MIN, PATTERN_MOTIF_MM)
     : clamp(PATTERN_MOTIF_MM * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
   // the motif's box at this zoom: motifMm wide, as tall as the drawing's shape (capped for very
   // tall / very wide drawings, so they stay a sensible size)

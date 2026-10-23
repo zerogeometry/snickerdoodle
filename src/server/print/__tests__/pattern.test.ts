@@ -21,11 +21,12 @@ async function raw(png: Buffer) {
 
 describe('patternLayout — a narrow print (the ankle sock) at its default zoom (founder, 23 Oct)', () => {
   const src = { width: 1600, height: 1200 };
-  it('at least four motifs round, with a whole one centred on each half (not two chopped at the edges)', () => {
+  it('one whole column per side: two round, each motif about half its column, centred (never slivers of a neighbour)', () => {
     const L = patternLayout({ width: 3543, height: 3543 }, 300, src, T);
-    expect(L.cols).toBeGreaterThanOrEqual(4);
-    expect(L.cols % 2).toBe(0); // still even, so the half-drop meets itself round the sock
-    expect(L.phaseX).toBe(Math.round(L.cellW / 2)); // shifted half a column
+    expect(L.cols).toBe(2); // even, so the half-drop meets itself round the sock
+    expect(L.phaseX).toBe(Math.round(L.cellW / 2)); // shifted half a column → a motif mid-side
+    expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
+    expect(L.motifW / L.cellW).toBeLessThan(0.56); // white either side of it on the sock's face
   });
   it('wide prints (tube socks, tea towel, wrap) keep their default layout', () => {
     for (const [w, h, dpi] of [[6141, 5433, 300], [8208, 5492, 300], [4133, 11811, 150]] as const) {
@@ -40,6 +41,8 @@ describe('patternLayout — a narrow print (the ankle sock) at its default zoom 
     const big = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1 }));
     expect(big.cols).toBe(2);
     expect(big.phaseX).toBe(0);
+    const small = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 0.5 }));
+    expect(small.cols).toBeGreaterThan(2);
   });
 });
 

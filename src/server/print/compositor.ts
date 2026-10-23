@@ -64,7 +64,15 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r19'; // r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+/**
+ * PREVIEW-ONLY paper tone, by product: the photographed products beside the printed one aren't pure
+ * white, so a pure-white printed surface glares next to them (founder, 23 Oct: the custom playing
+ * card next to the photographed K/Q/J, whose white measures ~237/255). The whole printed surface is
+ * multiplied by this in the MOCKUP only — the print file is never touched.
+ */
+const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
+
+const RENDER_REV = 'r20'; // r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -457,6 +465,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       materialClass: tpl.materialClass,
       mugMode: input.view === 'back' ? 'back' : input.view === 'centre' ? 'centre' : 'front',
       face,
+      paperTone: PAPER_TONE[prod?.key ?? ''],
     }),
   );
   inFlight.set(key, p);
@@ -522,7 +531,7 @@ export async function renderTemplatePreview(args: {
   const placedGround = !face && isGroundProduct(args.productKey) && normalizeGround(args.ground) ? groundHex(args.ground) : undefined;
   const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
   const out = !isAxisAligned(args.quad) || args.extraQuads?.length
-    ? await renderPerspective({ ...common, extraQuads: args.extraQuads?.length ? args.extraQuads : undefined, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
+    ? await renderPerspective({ ...common, extraQuads: args.extraQuads?.length ? args.extraQuads : undefined, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, paperTone: PAPER_TONE[args.productKey] })
     : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
   return out.buffer;
 }
@@ -547,6 +556,8 @@ async function renderAndPersist(
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
     thumb?: boolean; memo?: ComposeMemo;
+    /** preview-only paper tone (PAPER_TONE) */
+    paperTone?: number;
   },
 ): Promise<MockupResult> {
   // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
@@ -590,6 +601,7 @@ async function renderAndPersist(
     mugMode: args.mugMode,
     // a base colour under a PLACED drawing (a printed face already carries its own)
     groundHex: args.face ? undefined : args.groundHex,
+    paperTone: args.paperTone,
   });
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
@@ -626,6 +638,8 @@ export async function renderMockupLayers(args: {
   materialClass: string; mugMode?: 'front' | 'back' | 'centre';
   /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area. Flat + perspective only. */
   groundHex?: string;
+  /** Preview-only paper tone (PAPER_TONE), multiplied over the printed surface. Perspective only. */
+  paperTone?: number;
 }): Promise<{ buffer: Buffer; width: number; height: number; tier: 'FLAT' | 'PERSPECTIVE' }> {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
   // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
@@ -639,7 +653,7 @@ export async function renderMockupLayers(args: {
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
   const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
   const out = perspective
-    ? await renderPerspective({ ...common, extraQuads: extra, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex })
+    ? await renderPerspective({ ...common, extraQuads: extra, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex, paperTone: args.paperTone })
     : cylinder
       ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
       : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex });
@@ -847,6 +861,7 @@ async function renderPerspective(args: {
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   /** Base colour under the drawing, filling the whole print area (#rrggbb); none = white stock. */
   groundHex?: string;
+  paperTone?: number;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
   const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, extraQuads, transform, spanHalf, workEdge, outputEdge, print } = args;
 
@@ -875,9 +890,14 @@ async function renderPerspective(args: {
   // The printed surface is PAPER: anything see-through in the design (a transparent PNG, a
   // removed background) prints as the white of the stock — so lay the design on white here too,
   // or the preview shows a ghost card with the art floating over the envelope.
-  const spread = await toRaw(
+  let spread = await toRaw(
     sharp({ create: { width: cw, height: dh, channels: 4, background: args.groundHex ?? { r: 255, g: 255, b: 255, alpha: 1 } } }).composite([overlayOf(part, { left: ox, top: oy })]),
   );
+  // the preview-only paper tone: the printed surface, a shade off pure white like the photo around it
+  if (args.paperTone && args.paperTone < 1) {
+    const k = args.paperTone;
+    spread = await toRaw(fromRaw(spread).linear([k, k, k, 1], [0, 0, 0, 0]));
+  }
   // Keep just the visible panel (front = right half) — a no-op for a normal single-panel view.
   const panel = spanHalf ? await toRaw(fromRaw(spread).extract({ left: spanHalf === 'front' ? dw : 0, top: 0, width: dw, height: dh })) : spread;
 
@@ -895,7 +915,10 @@ async function renderPerspective(args: {
   const warpInto = (q: [number, number][]) => perspectiveWarp({ design: raw.data, srcW: raw.width, srcH: raw.height, quad: toPx(q), canvasW: WW, canvasH: WH });
   const areas = [quad, ...(extraQuads ?? [])];
   let warped: Raw = {
-    data: areas.length === 1 ? warpInto(quad) : nearestOf(areas.map(warpInto), areas.map((q) => quadCentre(toPx(q))), WW, WH),
+    data:
+      areas.length === 1
+        ? warpInto(quad)
+        : nearestOf(areas.map(warpInto), areas.map((q) => quadCentre(toPx(q))), WW, WH, maskBuf ? await pieceOwners(maskBuf, ids.mask, WW, WH, areas.map((q) => quadCentre(toPx(q)))) : undefined),
     width: WW,
     height: WH,
     channels: 4,
@@ -931,22 +954,76 @@ async function renderPerspective(args: {
 }
 
 /** A quad's centre (the mean of its corners). */
+/**
+ * Which print area owns each pixel of the product's printable surface: the printmap's separate
+ * pieces (each sock of a pair) are found as connected shapes, and each piece goes to the area whose
+ * centre is nearest the piece's own centre. Off the printmap → -1. Without this, "nearest area
+ * centre" per pixel let a diagonal pair's areas steal each other's edges (the left sock's toe showed
+ * the right sock's mapping — founder, 23 Oct: "chopped up"). Cached per template + size.
+ */
+const ownerCache = new Map<string, Int8Array>();
+export async function pieceOwners(maskBuf: Buffer, id: string | undefined, W: number, H: number, centres: [number, number][]): Promise<Int8Array> {
+  const key = id ? `${id}|${W}x${H}|${centres.map((c) => c.map((n) => Math.round(n)).join(',')).join(';')}` : null;
+  const hit = key ? ownerCache.get(key) : undefined;
+  if (hit) return hit;
+  const { data } = await sharp(maskBuf, { limitInputPixels: MAX_INPUT_PIXELS, failOn: 'error' }).resize(W, H, { fit: 'fill' }).toColourspace('b-w').raw().toBuffer({ resolveWithObject: true });
+  const label = new Int32Array(W * H).fill(-1);
+  const pieces: { sx: number; sy: number; n: number }[] = [];
+  const stack = new Int32Array(W * H);
+  for (let p = 0; p < W * H; p++) {
+    if (label[p] !== -1 || data[p]! < 128) continue;
+    const id2 = pieces.length;
+    let top = 0, sx = 0, sy = 0, n = 0;
+    stack[top++] = p;
+    label[p] = id2;
+    while (top) {
+      const q = stack[--top]!;
+      const x = q % W, y = (q - x) / W;
+      sx += x; sy += y; n++;
+      if (x > 0 && label[q - 1] === -1 && data[q - 1]! >= 128) { label[q - 1] = id2; stack[top++] = q - 1; }
+      if (x < W - 1 && label[q + 1] === -1 && data[q + 1]! >= 128) { label[q + 1] = id2; stack[top++] = q + 1; }
+      if (y > 0 && label[q - W] === -1 && data[q - W]! >= 128) { label[q - W] = id2; stack[top++] = q - W; }
+      if (y < H - 1 && label[q + W] === -1 && data[q + W]! >= 128) { label[q + W] = id2; stack[top++] = q + W; }
+    }
+    pieces.push({ sx, sy, n });
+  }
+  const areaOf = pieces.map(({ sx, sy, n }) => {
+    const cx = sx / n, cy = sy / n;
+    let best = 0, bestD = Infinity;
+    centres.forEach(([x, y], k) => {
+      const d = (cx - x) ** 2 + (cy - y) ** 2;
+      if (d < bestD) { bestD = d; best = k; }
+    });
+    return best;
+  });
+  const owner = new Int8Array(W * H).fill(-1);
+  for (let p = 0; p < W * H; p++) if (label[p]! >= 0) owner[p] = areaOf[label[p]!]!;
+  if (key) {
+    if (ownerCache.size > 24) ownerCache.delete(ownerCache.keys().next().value!);
+    ownerCache.set(key, owner);
+  }
+  return owner;
+}
+
 function quadCentre(q: [number, number][]): [number, number] {
   return [q.reduce((n, p) => n + p[0], 0) / q.length, q.reduce((n, p) => n + p[1], 0) / q.length];
 }
 
 /**
- * Several warped layers (RGBA, W×H) → one: each pixel from the layer that covers it whose area
- * centre is nearest — so two neighbouring print areas (a pair of socks) never draw over each
- * other. Exported for its unit test.
+ * Several warped layers (RGBA, W×H) → one: each pixel from the layer of the PIECE it lies on (when
+ * `owner` says — see pieceOwners), else from the covering layer whose area centre is nearest — so
+ * two neighbouring print areas (a pair of socks) never draw over each other. Exported for its test.
  */
-export function nearestOf(layers: (Uint8Array | Buffer)[], centres: [number, number][], W: number, H: number): Buffer {
+export function nearestOf(layers: (Uint8Array | Buffer)[], centres: [number, number][], W: number, H: number, owner?: Int8Array): Buffer {
   const out = Buffer.alloc(W * H * 4);
   for (let y = 0; y < H; y++) {
     for (let x = 0; x < W; x++) {
       const i = (y * W + x) * 4;
       let best = -1, bestD = Infinity;
-      for (let k = 0; k < layers.length; k++) {
+      // a pixel ON one of the product's pieces belongs to that piece's area (the sock it's on)
+      const own = owner ? owner[y * W + x]! : -1;
+      if (own >= 0 && layers[own]![i + 3]) best = own;
+      else for (let k = 0; k < layers.length; k++) {
         if (!layers[k]![i + 3]) continue;
         const dx = x + 0.5 - centres[k]![0], dy = y + 0.5 - centres[k]![1];
         const d = dx * dx + dy * dy;
