@@ -9,7 +9,7 @@ export const COMPANY = {
   city: 'London',
   postcode: 'EC1V 2NX',
   country: 'GB',
-  email: 'hello@sidekickco.co.uk',
+  email: 'hello@snickerdoodle.co.uk',
   registeredIn: 'England & Wales',
   companyNumber: '16671398',
   vatNumber: 'GB 521180434',

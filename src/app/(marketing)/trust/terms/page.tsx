@@ -106,11 +106,11 @@ export default function TermsPage() {
         <h2>10. Law and contact</h2>
         <p>
           These terms are governed by the law of England &amp; Wales, and the courts of England &amp; Wales have
-          jurisdiction. Questions? <a href="mailto:[hello@snickerdoodle.co.uk]">[hello@snickerdoodle.co.uk]</a>.
+          jurisdiction. Questions? <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a>.
         </p>
 
         <p className="text-[13px] text-ink-faint">
-          Contact: <a href="mailto:[hello@snickerdoodle.co.uk]">[hello@snickerdoodle.co.uk]</a> · Launch Mode Ltd,
+          Contact: <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a> · Launch Mode Ltd,
           {COMPANY_ADDRESS}.
         </p>
       </Prose>

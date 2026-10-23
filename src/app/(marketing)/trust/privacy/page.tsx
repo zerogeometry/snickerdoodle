@@ -30,7 +30,7 @@ export default function PrivacyNoticePage() {
         <p>
           Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> (company number {COMPANY.companyNumber}, registered in
           England &amp; Wales, registered office {COMPANY_ADDRESS}). We are the &ldquo;data controller&rdquo; for the personal
-          information described here. You can reach us at <a href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a>.
+          information described here. You can reach us at <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a>.
           We are registered with the Information Commissioner&apos;s Office (ICO), registration number [ICO number].
         </p>
 
@@ -42,6 +42,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Your orders</strong> — what you bought, your delivery address, and a secure payment token (we never see or store your full card details).</li>
           <li><strong>Your preferences</strong> — your marketing and reminder choices.</li>
           <li><strong>Wishlists and shares</strong> — the wishlists you create and the private links you share with family.</li>
+          <li><strong>Messages you send us</strong> — what you tell us through our help page (and any order reference), plus the email address we reply to.</li>
           <li><strong>Basic technical data</strong> — device and cookie data, for security and to keep the site working.</li>
         </ul>
 
@@ -92,6 +93,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Keepsake Home items:</strong> for as long as you want them. Delete any time.</li>
           <li><strong>Profile pictures, profile headers and family banners:</strong> until you change or remove them, or close your account. Only people in your family can see them, and we strip location data from every one.</li>
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
+          <li><strong>Messages you send us through the help page:</strong> two years after we receive them, so we can look back if an order needs it — then deleted.</li>
           <li><strong>Account data:</strong> until you close your account.</li>
           <li><strong>Marketing choices:</strong> until you change them.</li>
           <li><strong>Backups:</strong> when we delete something it&apos;s gone from our live systems straight away, and from our backups within 14 days. Backups are only ever used to recover from a fault — never for anything else — and if we ever restore one, we re-apply every deletion made since.</li>
@@ -127,7 +129,7 @@ export default function PrivacyNoticePage() {
         </p>
 
         <p className="text-[13px] text-ink-faint">
-          Contact: <a href="mailto:[privacy@snickerdoodle.co.uk]">[privacy@snickerdoodle.co.uk]</a> · Launch Mode Ltd,
+          Contact: <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a> · Launch Mode Ltd,
           {COMPANY_ADDRESS} · ICO registration [number].
         </p>
       </Prose>
