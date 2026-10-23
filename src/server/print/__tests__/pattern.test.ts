@@ -19,6 +19,30 @@ async function raw(png: Buffer) {
   return sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
 }
 
+describe('patternLayout — a narrow print (the ankle sock) at its default zoom (founder, 23 Oct)', () => {
+  const src = { width: 1600, height: 1200 };
+  it('at least four motifs round, with a whole one centred on each half (not two chopped at the edges)', () => {
+    const L = patternLayout({ width: 3543, height: 3543 }, 300, src, T);
+    expect(L.cols).toBeGreaterThanOrEqual(4);
+    expect(L.cols % 2).toBe(0); // still even, so the half-drop meets itself round the sock
+    expect(L.phaseX).toBe(Math.round(L.cellW / 2)); // shifted half a column
+  });
+  it('wide prints (tube socks, tea towel, wrap) keep their default layout', () => {
+    for (const [w, h, dpi] of [[6141, 5433, 300], [8208, 5492, 300], [4133, 11811, 150]] as const) {
+      const L = patternLayout({ width: w, height: h }, dpi, src, T);
+      expect(L.phaseX).toBe(0);
+      expect(L.motifW).toBeGreaterThan(0);
+    }
+    // the tube's columns, as before: a 90 mm motif at 72% fill across 520 mm
+    expect(patternLayout({ width: 6141, height: 5433 }, 300, src, T).cols).toBe(4);
+  });
+  it('zooming on the ankle sock still works from there (an explicit zoom is the shopper’s choice)', () => {
+    const big = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1 }));
+    expect(big.cols).toBe(2);
+    expect(big.phaseX).toBe(0);
+  });
+});
+
 describe('patternLayout — the seam + scale maths', () => {
   it('every zoom out shrinks the drawing AND adds copies — on every repeat product (founder: socks only shrank)', () => {
     // the real print canvases: ankle + tube socks (300 dpi), tea towel (300 dpi), a 2 m wrap roll (150 dpi)

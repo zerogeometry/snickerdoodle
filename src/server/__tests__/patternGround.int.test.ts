@@ -96,8 +96,16 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
     const corner = async (ground: string) => {
       const r = await renderPrintFile(db, sam, { assetId, variantId: socks!.id, transform: { scale: 0 }, ground });
       const [obj] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, r.printObjectId));
-      const { data } = await sharp(await getObjectBytes(obj!.key)).removeAlpha().extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
-      return { id: r.printObjectId, rgb: `#${[...data].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}` };
+      // the base colour = the most common colour on a grid of points (the motifs cover far less of
+      // the sheet than the gaps — and a motif may wrap across any single spot, e.g. the corner)
+      const { data, info } = await sharp(await getObjectBytes(obj!.key)).removeAlpha().resize(40, 40, { kernel: 'nearest' }).raw().toBuffer({ resolveWithObject: true });
+      const counts = new Map<string, number>();
+      for (let i = 0; i < info.width * info.height; i++) {
+        const hex = `#${[data[i * 3]!, data[i * 3 + 1]!, data[i * 3 + 2]!].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+        counts.set(hex, (counts.get(hex) ?? 0) + 1);
+      }
+      const rgb = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]![0];
+      return { id: r.printObjectId, rgb };
     };
     const navy = await corner('#26334f');
     const green = await corner('#0b6623');

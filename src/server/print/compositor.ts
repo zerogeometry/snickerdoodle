@@ -64,7 +64,7 @@ const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
-const RENDER_REV = 'r18'; // r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r19'; // r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -508,9 +508,11 @@ export async function renderTemplatePreview(args: {
   size?: MockupSize;
   /** a base colour (#rrggbb; white by default) */
   ground?: string;
+  /** the placement (default: the product's default) */
+  transform?: Transform;
 }): Promise<Buffer> {
   const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
-  let transform: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+  let transform: Transform = args.transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   let designBuf: Design = args.design;
   if (face) {
     designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, groundHex(args.ground));
