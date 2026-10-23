@@ -43,7 +43,10 @@ export default async function MarketingLayout({ children }: { children: ReactNod
       <footer className="relative z-10 bg-paper-2 px-6 py-5 text-xs text-ink-soft">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <span>snickerdoodle · made with care in the UK</span>
-          <nav className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+          <nav aria-label="footer" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <Link href="/faq" className="hover:text-cinnamon">
+              FAQs
+            </Link>
             <Link href="/trust/family-promise" className="hover:text-cinnamon">
               our promise
             </Link>

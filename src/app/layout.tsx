@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { siteOrigin } from '@/lib/seo';
 import type { ReactNode } from 'react';
 import { connection } from 'next/server';
 // Self-hosted brand fonts, bundled via @fontsource (no build-time or runtime fetch
@@ -19,9 +20,12 @@ import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 
 export const metadata: Metadata = {
+  // the canonical public origin — canonical links, sitemaps and share cards resolve against it
+  metadataBase: new URL(siteOrigin()),
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
   description:
     "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+  openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website' },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
   icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32' }, { url: '/brand/favicon-192.png', sizes: '192x192' }], apple: '/brand/favicon-180.png' },
