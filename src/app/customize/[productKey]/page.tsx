@@ -26,7 +26,7 @@ import { CASE_GRADE_BLURB, caseDefaultTransform, gradesFor } from '@/lib/phone-c
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
 import { CardPackBuilder } from '@/ui/components/CardPackBuilder';
 import { isCardPackKey } from '@/lib/card-packs';
-import { loadCatalogueAction } from '@/app/actions/catalogue';
+import { cachedCatalogue, loadCatalogueCached } from '@/lib/catalogueCache';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -140,7 +140,11 @@ function CustomizeProduct() {
     // ?all=1 = the DEV curation view (customize a hidden product before it graduates);
     // the server action refuses includeHidden in production.
     const includeHidden = new URLSearchParams(window.location.search).get('all') === '1';
-    void loadCatalogueAction(includeHidden ? { includeHidden } : undefined).then(setProducts);
+    // the range page's copy of the list first, so this page opens at once (refreshed behind)
+    const copy = cachedCatalogue(includeHidden);
+    if (copy) setProducts(copy);
+    // an unchanged list keeps the same object, so nothing on the page re-initialises
+    void loadCatalogueCached(includeHidden).then((fresh) => setProducts((cur) => (cur && JSON.stringify(cur) === JSON.stringify(fresh) ? cur : fresh)));
   }, []);
 
   const product = products?.find((p) => p.key === productKey) ?? null;

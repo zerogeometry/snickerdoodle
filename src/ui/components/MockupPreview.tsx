@@ -13,6 +13,9 @@ import type { PlacementTransform } from '@/lib/store';
 /** Fired on window whenever a mockup photo has actually painted (see MakingRangeLoader). */
 export const MOCKUP_READY_EVENT = 'sd:mockup-ready';
 
+/** The key a close-up's small stand-in is shown under — painted, it lifts the loader (same picture). */
+const standInKey = (inputKey: string) => `small:${inputKey}`;
+
 type MockupPreviewResult =
   | { ok: true; url: string; tier: 'FLAT' | 'PERSPECTIVE'; widthPx?: number; heightPx?: number }
   | { ok: false; needsAuth?: boolean; fallback: true };
@@ -209,6 +212,16 @@ export function MockupPreview({
       show(hit);
       return;
     }
+    // A close-up whose small range tile is already here (the SAME picture — same drawing, product,
+    // colour, placement, view): show that at once while the sharp one is drawn, then swap (founder,
+    // 23 Oct). Only an exact match stands in, so the sharp version is never a different picture.
+    if (size === 'zoom' && !currentRef.current) {
+      const small = cachedMockup(mockupKey({ assetId, sourceObjectId, variantId, transform, size: 'thumb', view, fill, spanHalf, ground }));
+      if (small) {
+        setCurrent(small);
+        setCurrentKey(standInKey(inputKey));
+      }
+    }
     // … or have it on the way: wait for that rather than asking twice.
     const inflight = pendingMockup(inputKey);
     if (inflight) {
@@ -299,7 +312,8 @@ export function MockupPreview({
   ) : null;
 
   // Busy = a newer photo is on its way and hasn't painted yet (and we haven't given up on it).
-  const busy = loader && visible && !!assetId && !!variantId && !resting && paintedKey !== inputKey;
+  // (a painted stand-in for this exact choice counts: it's the same picture, just smaller)
+  const busy = loader && visible && !!assetId && !!variantId && !resting && paintedKey !== inputKey && paintedKey !== standInKey(inputKey);
 
   return (
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
