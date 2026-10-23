@@ -185,7 +185,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'change-order',
         q: 'Can I change or cancel my order?',
-        a: 'Snickerdoodle makes every order specially and it goes into production quickly, so we can’t promise a change once it’s placed — but tell us straight away through the [help page](/help), with your order reference, and we’ll do everything we can. Your order reference is on your orders page and in your order email.',
+        a: 'Snickerdoodle makes every order specially and it goes into production quickly, so we can’t promise a change once it’s placed — but message us as soon as you can, choosing “Change or cancel an order” on our [contact form](/help#contact) and including your order reference, and we’ll do everything we can. Your order reference is on your orders page and in your order email.',
       },
       {
         id: 'payment',

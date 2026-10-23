@@ -29,7 +29,7 @@ describe('the FAQ — written to be quoted by search + answer engines, and true'
 
   it('every link goes to a public page that exists', () => {
     const publicPaths = new Set(PUBLIC_PAGES.map((p) => p.path));
-    for (const it of items) for (const m of it.a.matchAll(/\]\((\/[^)]*)\)/g)) expect(publicPaths.has(m[1]!), `${it.id} → ${m[1]}`).toBe(true);
+    for (const it of items) for (const m of it.a.matchAll(/\]\((\/[^)]*)\)/g)) expect(publicPaths.has(m[1]!.split('#')[0]!), `${it.id} → ${m[1]}`).toBe(true);
   });
 
   it('brand rules: "AI" appears only where the privacy promise talks about training', () => {
