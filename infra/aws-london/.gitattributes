@@ -1,0 +1,4 @@
+# Everything in the kit runs on the Linux box, so it must keep Unix line endings even when checked
+# out on Windows (a CRLF bash script fails with "bad interpreter"). PowerShell stays Windows-style.
+* text=auto eol=lf
+*.ps1 text eol=crlf

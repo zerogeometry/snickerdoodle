@@ -1,0 +1,11 @@
+{
+  "CORSRules": [
+    {
+      "ID": "direct-uploads",
+      "AllowedOrigins": ["https://snickerdoodle.co.uk", "https://www.snickerdoodle.co.uk"],
+      "AllowedMethods": ["PUT"],
+      "AllowedHeaders": ["content-type", "x-amz-server-side-encryption", "x-amz-server-side-encryption-aws-kms-key-id"],
+      "MaxAgeSeconds": 3000
+    }
+  ]
+}

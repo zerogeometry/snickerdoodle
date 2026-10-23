@@ -1,0 +1,24 @@
+# The scheduled jobs, run by the `scheduler` service (busybox crond, times in UTC).
+# (Output goes to crond's own stdout, i.e. the container log.)
+# Each line calls one of the app's own /api/jobs/* routes over the private network with the jobs
+# secret (run-job). Every route is idempotent and safe to overlap, so a missed or doubled run is
+# harmless; run-job also skips a run while the previous one of the same job is still going.
+#
+# min   hour  dom mon dow  job
+# Fulfilment: render paid orders' print files, hand ready orders to Prodigi, sync tracking.
+# Every 5 minutes, so a paid order reaches the printer quickly.
+*/5     *     *   *   *    run-job fulfilment 900 > /proc/1/fd/1 2>&1
+# Retention: purge unkept uploads past their window, the audit trail's 6-year limit, guests'
+# keep requests, finished rate-limit windows, and direct uploads never finished (quarantine).
+15      3     *   *   *    run-job retention 1800 > /proc/1/fd/1 2>&1
+# Re-rank the range by popularity (product counts only, no personal data).
+45      3     *   *   *    run-job popularity 600 > /proc/1/fd/1 2>&1
+# Occasion reminders (consent + frequency caps enforced in the app). 08:05 UTC = 08:05 / 09:05 UK.
+5       8     *   *   *    run-job reminders 900 > /proc/1/fd/1 2>&1
+# Prodigi catalogue check (SKU metadata only, no image). Weekly, Monday morning.
+30      4     *   *   1    run-job prodigi-sync 900 > /proc/1/fd/1 2>&1
+#
+# NOT scheduled on purpose (run by hand — runbook):
+#   seed-catalogue    — run by bin/deploy.sh after every deploy
+#   seed-mockups      — after new Prodigi blanks are copied to the box (runbook §4.4)
+#   reapply-erasures  — only after a database restore (bin/restore-db.sh does it)

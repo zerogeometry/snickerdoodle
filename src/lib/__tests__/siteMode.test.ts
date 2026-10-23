@@ -51,8 +51,8 @@ describe('the password lock', () => {
     for (const evil of ['//evil.example', '/\\evil.example', '\\\\evil.example', 'https://evil.example/x', 'javascript:alert(1)']) expect(sameSitePath(evil, base)).toBe('/');
   });
   it('lets through only the lock itself, signed webhooks/jobs and static brand files', () => {
-    for (const p of ['/test-gate', '/api/test-gate', '/api/webhooks/stripe', '/api/jobs/retention', '/_next/static/x.js', '/brand/logo.webp']) expect(isGateExempt(p)).toBe(true);
-    for (const p of ['/', '/home', '/studio', '/g/abc', '/api/admin/review/keepsake/1', '/api/mockup/x.png', '/admin/review']) expect(isGateExempt(p)).toBe(false);
+    for (const p of ['/test-gate', '/api/test-gate', '/api/webhooks/stripe', '/api/jobs/retention', '/api/health', '/api/health/render', '/_next/static/x.js', '/brand/logo.webp']) expect(isGateExempt(p)).toBe(true);
+    for (const p of ['/', '/home', '/studio', '/g/abc', '/api/admin/review/keepsake/1', '/api/mockup/x.png', '/admin/review', '/api/healthcheck-lookalike']) expect(isGateExempt(p)).toBe(false);
   });
 });
 

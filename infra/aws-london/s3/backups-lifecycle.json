@@ -1,0 +1,18 @@
+{
+  "Rules": [
+    {
+      "ID": "db-dumps-14-days",
+      "Filter": { "Prefix": "db/" },
+      "Status": "Enabled",
+      "Expiration": { "Days": 14 },
+      "NoncurrentVersionExpiration": { "NoncurrentDays": 1 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 1 }
+    },
+    {
+      "ID": "tidy-delete-markers",
+      "Filter": {},
+      "Status": "Enabled",
+      "Expiration": { "ExpiredObjectDeleteMarker": true }
+    }
+  ]
+}

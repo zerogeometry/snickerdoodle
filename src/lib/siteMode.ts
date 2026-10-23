@@ -43,13 +43,17 @@ export const TEST_GATE_COOKIE = 'sd_test_gate';
 export const TEST_GATE_DAYS = 30;
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the
- * scheduled jobs (each carries its own signature / secret), and static assets. */
+ * scheduled jobs (each carries its own signature / secret), the health check the deploy and the
+ * uptime alarm ask (it says only "ok" + the build; its render check needs the jobs secret), and
+ * static assets. */
 export function isGateExempt(pathname: string): boolean {
   return (
     pathname === '/test-gate' ||
     pathname.startsWith('/api/test-gate') ||
     pathname.startsWith('/api/webhooks/') ||
     pathname.startsWith('/api/jobs/') ||
+    pathname === '/api/health' ||
+    pathname.startsWith('/api/health/') ||
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/brand/') ||
     pathname === '/favicon.ico' ||

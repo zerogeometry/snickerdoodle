@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PicturesBucketObjects",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:GetObjectVersion", "s3:PutObject", "s3:DeleteObject", "s3:DeleteObjectVersion"],
+      "Resource": "arn:aws:s3:::PICTURES_BUCKET/*"
+    },
+    {
+      "Sid": "PicturesBucketListing",
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket", "s3:ListBucketVersions"],
+      "Resource": "arn:aws:s3:::PICTURES_BUCKET"
+    },
+    {
+      "Sid": "UseBothPictureKeys",
+      "Effect": "Allow",
+      "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
+      "Resource": ["GENERAL_KEY_ARN", "ORIGINALS_KEY_ARN"],
+      "Condition": { "StringEquals": { "kms:ViaService": "s3.eu-west-2.amazonaws.com" } }
+    },
+    {
+      "Sid": "ContentSafetyInLondonOnly",
+      "Effect": "Allow",
+      "Action": ["rekognition:DetectModerationLabels", "rekognition:DetectText"],
+      "Resource": "*",
+      "Condition": { "StringEquals": { "aws:RequestedRegion": "eu-west-2" } }
+    }
+  ]
+}

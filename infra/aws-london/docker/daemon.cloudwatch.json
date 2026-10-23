@@ -1,0 +1,11 @@
+{
+  "log-driver": "awslogs",
+  "log-opts": {
+    "awslogs-region": "eu-west-2",
+    "awslogs-group": "/snickerdoodle/prod",
+    "tag": "{{.Name}}",
+    "mode": "non-blocking",
+    "max-buffer-size": "8m"
+  },
+  "live-restore": true
+}

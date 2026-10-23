@@ -1,0 +1,37 @@
+# Used automatically by BuildKit for `-f infra/aws-london/Dockerfile` (context = repo root).
+# Keeps secrets, local-only assets and anything rebuilt inside the image out of the build context.
+
+# secrets and local settings — never in an image
+.env
+.env.*
+!.env.example
+.netlify
+**/*.pem
+**/*.key
+
+# rebuilt inside the image
+node_modules
+**/node_modules
+.next
+.next-*
+
+# local-only assets and outputs (some may hold real photos — never shipped)
+.prodigi-assets
+test-art
+sample-art
+scripts/sample-art
+cutout-sheet.png
+reports
+research_notes
+.dev-captures
+test-results
+playwright-report
+blob-report
+coverage
+
+# not needed to build or run
+.git
+.github
+.claude
+.vscode
+*.log

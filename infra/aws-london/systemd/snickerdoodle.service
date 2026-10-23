@@ -1,0 +1,15 @@
+# Starts the shop at boot (settings from SSM → memory, then docker compose up) — bin/up.sh.
+[Unit]
+Description=Snickerdoodle (app, Caddy, scheduled jobs)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/snickerdoodle/kit/bin/up.sh
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

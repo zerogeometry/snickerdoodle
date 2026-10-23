@@ -1,0 +1,41 @@
+# Caddy in front of the app: automatic HTTPS certificates for the domain (Let's Encrypt, renewed
+# by Caddy itself), HTTP → HTTPS, www → the bare domain, compression. Settings come from
+# /etc/snickerdoodle/box.env via docker-compose.yml.
+#
+# No access log on purpose: request lines carry gift-link and invite tokens, and they'd sit on the
+# box's disk (and its snapshots). The app logs what it needs.
+{
+	email {$ACME_EMAIL}
+}
+
+www.{$SITE_DOMAIN} {
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
+
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	# Drawings and photos go straight to S3 (direct uploads); the inline fallback is capped at 20 MB
+	# by next.config.ts. Anything bigger is refused here before it reaches the app.
+	request_body {
+		max_size 25MB
+	}
+
+	# Never from outside: the scheduled jobs (the scheduler calls them on the private network),
+	# the post-deploy render check, and the dev-only routes.
+	@internal path /api/jobs/* /api/health/render /api/dev/*
+	respond @internal 404
+
+	# The app's rate limits read the client's address from these headers (src/server/rateLimit.ts
+	# ipFromHeaders), so a visitor must never be able to supply them: drop the Netlify one and set
+	# X-Real-IP to the address Caddy actually saw. (Caddy already rewrites X-Forwarded-For.)
+	request_header -X-Nf-Client-Connection-Ip
+
+	reverse_proxy app:3000 {
+		header_up X-Real-IP {remote_host}
+		# during a deploy the app restarts for a few seconds: hold requests and retry instead of
+		# showing an error page
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+}
