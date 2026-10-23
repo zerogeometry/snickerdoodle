@@ -11,6 +11,7 @@ import { getCurrentAccount } from '@/server/session';
 import { screenFromName } from '@/server/giftLinks';
 import { Icon } from '@/ui/primitives/Icon';
 import { GiftCheckout } from './GiftCheckout';
+import { ReportGiftLink } from './ReportGiftLink';
 
 // Gift links are private, unguessable and never indexed (docs/05).
 export const metadata: Metadata = {
@@ -38,7 +39,7 @@ const UNAVAILABLE: Record<string, { title: string; body: string }> = {
   'not-found': { title: "This gift link isn't valid", body: 'It may have been mistyped. Ask whoever shared it to send a fresh one.' },
   revoked: { title: 'This gift list was turned off', body: 'The family switched this link off. Ask them for a new one if you still need it.' },
   expired: { title: 'This gift list has expired', body: 'Gift links don’t last forever. Ask the family to share a fresh one.' },
-  gone: { title: 'This gift list is no longer available', body: 'One of these keepsakes was removed by the family.' },
+  gone: { title: 'This gift list is no longer available', body: 'One of these keepsakes isn’t available any more. Ask the family if you’d like a fresh link.' },
 };
 
 export default async function GiftLinkPage({ params }: { params: Promise<{ token: string }> }) {
@@ -98,8 +99,11 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
         />
       </main>
 
-      <div className="flex items-center justify-center gap-1.5 bg-paper-2 px-6 py-2.5 text-center text-[11px] text-green-save">
-        <Icon icon={IconShieldCheck} size={14} /> Secure. Your details are yours — never shared, never sold.
+      <div className="flex flex-col items-center justify-center gap-0.5 bg-paper-2 px-6 py-2 text-center">
+        <span className="flex items-center gap-1.5 text-[11px] text-green-save">
+          <Icon icon={IconShieldCheck} size={14} /> Secure. Your details are yours — never shared, never sold.
+        </span>
+        <ReportGiftLink token={token} />
       </div>
     </Shell>
   );
