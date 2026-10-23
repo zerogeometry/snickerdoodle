@@ -1,4 +1,4 @@
-import { IconArrowRight, IconBox, IconPackage, IconTruck } from '@tabler/icons-react';
+import { IconArrowRight, IconBox, IconHelpCircle, IconPackage, IconTruck } from '@tabler/icons-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getDb } from '@/db/client';
@@ -72,6 +72,30 @@ export default async function OrdersPage() {
                 <div className="flex items-center justify-between border-t-2 border-cocoa/10 px-4 py-2.5">
                   <span className="text-[13px] text-ink-soft">Total incl. delivery</span>
                   <span className="font-display text-lg text-cocoa">{formatPence(o.totalPence)}</span>
+                </div>
+                {o.status === 'SHIPPED' && (
+                  <div className="border-t-2 border-cocoa/10 px-4 py-2.5 text-[14px] text-ink-soft">
+                    {o.tracking?.url ? (
+                      <a href={o.tracking.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-cinnamon underline underline-offset-2">
+                        <Icon icon={IconTruck} size={16} /> track your parcel{o.tracking.carrier ? ` with ${o.tracking.carrier}` : ''}
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                    ) : o.tracking?.number ? (
+                      <p className="py-2">
+                        Tracking number{o.tracking.carrier ? ` (${o.tracking.carrier})` : ''}: <span className="font-bold text-cocoa">{o.tracking.number}</span>
+                      </p>
+                    ) : (
+                      <p className="py-2">Sent by standard post, so there&apos;s no tracking — it should be with you very soon.</p>
+                    )}
+                  </div>
+                )}
+                <div className="border-t-2 border-cocoa/10 px-4 py-1">
+                  <Link
+                    href={`/help?topic=${o.status === 'SHIPPED' ? 'order-problem' : o.status === 'PENDING' || o.status === 'CANCELLED' ? 'order-where' : 'order-change'}&order=${encodeURIComponent(o.ref)}#contact`}
+                    className="inline-flex min-h-11 items-center gap-1.5 text-[14px] font-bold text-cinnamon"
+                  >
+                    <Icon icon={IconHelpCircle} size={16} /> need help with this order?
+                  </Link>
                 </div>
               </div>
             ))}

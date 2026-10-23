@@ -17,6 +17,7 @@ import { resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
 import { notifyGiftListPurchase } from './giftListNotify';
 import { settlePaidOrderCredits } from './referrals';
+import { sendOrderConfirmed } from './orderEmails';
 
 /** Pixel size of the image a line will print from (the bg-removed cutout if chosen,
  * else the ORIGINAL) — read from the stored bytes' header, in-VPC. null if unreadable,
@@ -386,6 +387,8 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
   // Credit spent on this order + any referral reward — settled exactly once, after commit.
   if (flipped) {
     await settlePaidOrderCredits(db, flipped.id).catch((e) => console.error('credit settle failed', (e as Error).message));
+    // "we've got your order" — once, on the real transition; a mail failure never touches the payment
+    await sendOrderConfirmed(db, flipped.id).catch((e) => console.error('order confirmation not sent', flipped.ref, (e as Error).message));
   }
 }
 
@@ -412,6 +415,8 @@ export interface OrderSummary {
   totalPence: number;
   createdAtISO: string;
   items: { productKey: string; qty: number; linePence: number }[];
+  /** Carrier + tracking, once it has shipped (null for untracked post). */
+  tracking: { carrier?: string | null; number?: string | null; url?: string | null } | null;
 }
 
 export async function getOrdersForAccount(db: DbHandle, accountId: string): Promise<OrderSummary[]> {
@@ -425,6 +430,7 @@ export async function getOrdersForAccount(db: DbHandle, accountId: string): Prom
       totalPence: o.totalPence,
       createdAtISO: o.createdAt.toISOString(),
       items: items.map((i) => ({ productKey: i.productKey, qty: i.qty, linePence: i.linePence })),
+      tracking: o.tracking ?? null,
     });
   }
   return result;

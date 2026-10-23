@@ -7,6 +7,7 @@ import { presignProviderIngest } from '@/storage';
 import type { DbHandle, Tx } from '@/server/db';
 import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
 import { startRetentionClockForOrder } from '@/server/retention';
+import { sendOrderShipped } from '@/server/orderEmails';
 
 /**
  * POD ORDER SUBMISSION — the READY → SUBMITTED step (proposal/04 §6, the last leg of
@@ -501,14 +502,20 @@ export async function syncSubmittedOrders(
       if (stage === 'Complete') {
         const shipment = remote.shipments?.[remote.shipments.length - 1];
         const carrier = typeof shipment?.carrier === 'string' ? shipment.carrier : (shipment?.carrier?.name ?? null);
-        await db.transaction(async (tx) => {
-          await tx
+        // guarded on FULFILLING: two overlapping syncs can't both ship it (or both email)
+        const moved = await db.transaction(async (tx) => {
+          const [m] = await tx
             .update(orders)
             .set({ status: 'SHIPPED', submitError: null, tracking: { carrier, number: shipment?.tracking?.number ?? null, url: shipment?.tracking?.url ?? null } })
-            .where(eq(orders.id, row.id));
+            .where(and(eq(orders.id, row.id), eq(orders.status, 'FULFILLING')))
+            .returning({ id: orders.id });
+          if (!m) return false;
           await setArtworkStatus(tx, row.id, 'SHIPPED');
           await startRetentionClockForOrder(tx, row.id); // source upload: fulfilment + 30d unless kept
+          return true;
         });
+        // "it's on its way" (+ tracking) — once, after commit; a mail failure never undoes the sync
+        if (moved) await sendOrderShipped(db, row.id).catch((e) => console.error('shipped email not sent', row.ref, (e as Error).message));
         summary.shipped++;
         summary.orders.push({ ref: row.ref, stage });
       } else if (stage === 'Cancelled') {
