@@ -29,24 +29,38 @@ export interface PatternLayout {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
+/** The most of its cell a motif may fill when the spacing is tight — a gap always shows. */
+const MAX_FILL = 0.9;
+
 /**
- * Where every motif goes. The canvas width is an EVEN number of whole columns (so a half-drop
- * repeat meets itself exactly when a sock or a roll wraps round) and the height whole rows.
- * The transform maps onto the repeat: scale (0 = default) → motif size · offset → shifts the
- * pattern · rotation → turns each motif.
+ * Where every motif goes. The ZOOM sets the motif's size directly (scale 0 = PATTERN_MOTIF_MM), so
+ * every zoom step changes the print: smaller drawing → more of them.
+ *  - Columns: an EVEN number of whole columns across (so a half-drop repeat meets itself exactly
+ *    where a sock or a roll wraps round), as close as possible to the zoom's spacing.
+ *  - Rows: their own whole number, from the motif's own height — so even on a narrow print (an
+ *    ankle sock, where the even columns can only step 2 → 4 → 6) the count keeps rising as you
+ *    zoom out.
+ *  - The motif keeps its size unless its cell is tighter, and then it never fills more than
+ *    MAX_FILL of it.
+ * The transform maps onto the repeat: scale → motif size · offset → shifts the pattern ·
+ * rotation → turns each motif.
  */
 export function patternLayout(canvas: { width: number; height: number }, dpi: number, src: { width: number; height: number }, transform: Transform): PatternLayout {
   const rotated = transform.rotationDeg % 180 !== 0;
   const sw = rotated ? src.height : src.width;
   const sh = rotated ? src.width : src.height;
   const motifMm = clamp(PATTERN_MOTIF_MM * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
-  const targetCellW = mmToPx(motifMm, dpi) / PATTERN_FILL;
-  const cols = Math.max(2, 2 * Math.round(canvas.width / targetCellW / 2)); // EVEN → the half-drop wraps
+  // the motif's box at this zoom: motifMm wide, as tall as the drawing's shape (capped for very
+  // tall / very wide drawings, so they stay a sensible size)
+  const boxW = mmToPx(motifMm, dpi);
+  const boxH = boxW * clamp(sh / sw, 0.6, 1.6);
+  const k = Math.min(boxW / sw, boxH / sh);
+  const cols = Math.max(2, 2 * Math.round(canvas.width / (boxW / PATTERN_FILL) / 2)); // EVEN → the half-drop wraps
   const cellW = canvas.width / cols;
-  const targetCellH = cellW * clamp(sh / sw, 0.6, 1.6); // tall drawings get taller cells
-  const rows = Math.max(1, Math.round(canvas.height / targetCellH));
+  const kW = Math.min(k, (cellW * MAX_FILL) / sw); // a narrow print caps the motif to its column
+  const rows = Math.max(1, Math.round(canvas.height / ((sh * kW) / PATTERN_FILL)));
   const stripH = Math.max(1, Math.round(canvas.height / rows));
-  const fit = Math.min((cellW * PATTERN_FILL) / sw, (stripH * PATTERN_FILL) / sh);
+  const fit = Math.min(kW, (stripH * MAX_FILL) / sh);
   return {
     cols, rows, cellW, stripH,
     motifW: Math.max(1, Math.round(sw * fit)),

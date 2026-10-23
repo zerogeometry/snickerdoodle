@@ -20,6 +20,39 @@ async function raw(png: Buffer) {
 }
 
 describe('patternLayout — the seam + scale maths', () => {
+  it('every zoom out shrinks the drawing AND adds copies — on every repeat product (founder: socks only shrank)', () => {
+    // the real print canvases: ankle + tube socks (300 dpi), tea towel (300 dpi), a 2 m wrap roll (150 dpi)
+    const canvases = [
+      { w: 3543, h: 3543, dpi: 300 },
+      { w: 6141, h: 5433, dpi: 300 },
+      { w: 8208, h: 5492, dpi: 300 },
+      { w: 4133, h: 11811, dpi: 150 },
+    ];
+    for (const c of canvases) {
+      for (const src of [{ width: 1000, height: 1000 }, { width: 1200, height: 1600 }, { width: 1600, height: 1000 }]) {
+        let prev: { count: number; motif: number } | null = null;
+        for (let pct = 100; pct >= 34; pct -= 2) {
+          const l = patternLayout({ width: c.w, height: c.h }, c.dpi, src, clampTransform({ scale: pct / 100 }));
+          const now = { count: l.cols * l.rows, motif: l.motifW };
+          if (prev) {
+            expect(now.count, `${c.w}×${c.h} @${pct}%`).toBeGreaterThanOrEqual(prev.count); // never fewer
+            expect(now.motif, `${c.w}×${c.h} @${pct}%`).toBeLessThanOrEqual(prev.motif); // never bigger
+          }
+          prev = now;
+        }
+        // and it really changes: every 30% of zoom out adds copies (the old layout printed the same
+        // file from 80% to 50% on an ankle sock)
+        for (let pct = 100; pct - 30 >= 34; pct -= 10) {
+          const at = (p: number) => {
+            const l = patternLayout({ width: c.w, height: c.h }, c.dpi, src, clampTransform({ scale: p / 100 }));
+            return l.cols * l.rows;
+          };
+          expect(at(pct - 30), `${c.w}×${c.h} ${src.width}×${src.height}: ${pct}% → ${pct - 30}%`).toBeGreaterThan(at(pct));
+        }
+      }
+    }
+  });
+
   it('whole, EVEN columns that exactly fill the width (so a sock / roll wraps without a seam)', () => {
     for (const [w, h, dpi] of [[3543, 3543, 300], [6141, 5433, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
       const l = patternLayout({ width: w, height: h }, dpi, { width: 1200, height: 1600 }, T);
@@ -87,13 +120,14 @@ describe('renderRepeatPattern — the print file', () => {
   });
 
   it('actually shows the drawing many times — ink spread over the whole sheet, not one copy', async () => {
-    const { png, layout } = await renderRepeatPattern(await drawing(), { width: 1200, height: 1200 }, 150, T);
+    // a sheet about the size of an ankle sock's print (≈ 40 cm square at 150 dpi)
+    const { png, layout } = await renderRepeatPattern(await drawing(), { width: 2400, height: 2400 }, 150, T);
     expect(layout.cols * layout.rows).toBeGreaterThanOrEqual(4);
     const { data, info } = await raw(png);
     // red ink present in every quadrant
     for (const [qx, qy] of [[0, 0], [1, 0], [0, 1], [1, 1]] as const) {
       let red = 0;
-      for (let y = qy * 600; y < qy * 600 + 600; y++) for (let x = qx * 600; x < qx * 600 + 600; x++) {
+      for (let y = qy * 1200; y < qy * 1200 + 1200; y++) for (let x = qx * 1200; x < qx * 1200 + 1200; x++) {
         const i = (y * info.width + x) * 3;
         if (data[i]! > 150 && data[i + 1]! < 120) red++;
       }

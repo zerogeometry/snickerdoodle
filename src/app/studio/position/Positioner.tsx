@@ -111,7 +111,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // 2026-07-07), or ON the product photo. Product view only when a photo exists.
   const [viewMode, setViewMode] = useState<'flat' | 'product'>('flat');
   const imgRef = useRef<HTMLImageElement>(null);
-  const patternRef = useRef<HTMLDivElement>(null); // the drawn repeat follows live gestures too
+  const patternRef = useRef<HTMLDivElement>(null);
+  // a repeat RE-DRAWS at the live zoom + pan while a finger is down (zooming out adds copies as you go)
+  const patternDrawRef = useRef<((t: Transform) => void) | null>(null);
+  const patternFrameRef = useRef(0);
   // Callback ref: capture natural dimensions the instant the <img> attaches IF it is
   // already loaded (a cached image fires no onLoad — that race left `natural` null, so
   // the whole editor had no placement and no resize grips). onLoad still covers the
@@ -531,6 +534,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
 
   /** Live pointer deltas → the css-var transform on the image (no re-render). */
   const applyLive = (dxPv: number, dyPv: number, k: number) => {
+    if (isPattern && patternDrawRef.current && gestureRef.current) {
+      // redraw the repeat itself at the gesture's zoom + pan (once per frame)
+      const live = transformFromGesture(gestureRef.current.base, dxPv, dyPv, k);
+      cancelAnimationFrame(patternFrameRef.current);
+      patternFrameRef.current = requestAnimationFrame(() => patternDrawRef.current?.(live));
+      return;
+    }
     for (const el of [imgRef.current, patternRef.current]) {
       if (!el) continue;
       el.style.setProperty('--gx', `${dxPv}px`);
@@ -539,6 +549,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     }
   };
   const clearLive = () => {
+    cancelAnimationFrame(patternFrameRef.current);
     for (const el of [imgRef.current, patternRef.current]) {
       if (!el) continue;
       el.style.removeProperty('--gx');
@@ -570,6 +581,24 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     return p ? { dx: p.x - p.startX, dy: p.y - p.startY, k: 1 } : { dx: 0, dy: 0, k: 1 };
   };
 
+  /** A gesture (pan dx/dy in preview px, pinch k) applied to `base` — through the SHARED geometry,
+   * so the live redraw and the committed result are the same transform. Pans against the slack AT
+   * THE NEW SCALE (the range grows as you zoom in). */
+  const transformFromGesture = (base: Transform, dx: number, dy: number, k: number): Transform => {
+    if (!gestureGeom) return base;
+    const s0 = base.scale === 0 ? fitScale : base.scale;
+    let nextScale: number = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
+    if (!lockToCover && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
+    const { slackX, slackY } = gestureGeom.geom({ ...base, scale: nextScale });
+    const dxSpace = dx / gestureGeom.pxPerSpace;
+    const dySpace = dy / gestureGeom.pxPerSpace;
+    let offsetX = slackX > 0 ? Math.max(-1, Math.min(1, base.offsetX + (2 * dxSpace) / slackX)) : 0;
+    let offsetY = slackY > 0 ? Math.max(-1, Math.min(1, base.offsetY + (2 * dySpace) / slackY)) : 0;
+    if (Math.abs(offsetX) < SNAP_OFFSET) offsetX = 0; // snap to centre
+    if (Math.abs(offsetY) < SNAP_OFFSET) offsetY = 0;
+    return clampTransform({ ...base, scale: nextScale, offsetX, offsetY });
+  };
+
   /** Commit the live gesture through the SHARED geometry (what you see is what prints). */
   const commitGesture = () => {
     const g = gestureRef.current;
@@ -578,21 +607,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     clearLive();
     if (!g.moved && k === 1) return; // a tap, not a gesture — nothing to commit
 
-    const s0 = g.base.scale === 0 ? fitScale : g.base.scale;
-    let nextScale: number = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
-    if (!lockToCover && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
-
-    // Pan against the slack AT THE NEW SCALE (the range grows as you zoom in).
-    const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: nextScale });
-    const dxSpace = dx / gestureGeom.pxPerSpace;
-    const dySpace = dy / gestureGeom.pxPerSpace;
-    let offsetX = slackX > 0 ? Math.max(-1, Math.min(1, g.base.offsetX + (2 * dxSpace) / slackX)) : 0;
-    let offsetY = slackY > 0 ? Math.max(-1, Math.min(1, g.base.offsetY + (2 * dySpace) / slackY)) : 0;
-    if (Math.abs(offsetX) < SNAP_OFFSET) offsetX = 0; // snap to centre
-    if (Math.abs(offsetY) < SNAP_OFFSET) offsetY = 0;
-
+    // pan against the slack AT THE NEW SCALE (the range grows as you zoom in)
     setResult(null);
-    const next = clampTransform({ ...g.base, scale: nextScale, offsetX, offsetY });
+    const next = transformFromGesture(g.base, dx, dy, k);
     if (!sameTf(next, g.base)) pushHistory(g.base);
     lastPushRef.current = 0; // a gesture is its own undo entry — never coalesced away
     setTf(next);
@@ -988,6 +1005,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   width={previewW}
                   height={previewH}
                   groundHex={groundHex}
+                  drawRef={patternDrawRef}
                 />
               ) : null}
               {/* the height chart's ruler prints exactly like this, down the left edge */}
