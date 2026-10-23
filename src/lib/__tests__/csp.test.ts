@@ -134,6 +134,9 @@ describe('middleware — sends the policy and hands the nonce to Next', () => {
 
   async function run(path: string, env: Record<string, string> = {}) {
     vi.stubEnv('NODE_ENV', 'production');
+    // a clean slate: a developer's own .env (e.g. a local MinIO S3_ENDPOINT) must not leak in
+    vi.stubEnv('S3_ENDPOINT', '');
+    vi.stubEnv('S3_FORCE_PATH_STYLE', '');
     for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
     vi.resetModules();
     const { middleware } = await import('@/middleware');

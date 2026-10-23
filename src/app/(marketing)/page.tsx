@@ -7,7 +7,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import type { TablerIconComponent } from '@/ui/primitives/Icon';
 import { TrustLine } from '@/ui/primitives/TrustLine';
 import { ExampleMorph } from '@/ui/components/ExampleMorph';
-import { ExampleWall } from '@/ui/components/ExampleWall';
+import { ExampleCarousel } from '@/ui/components/ExampleCarousel';
 import { RangeHero } from '@/ui/components/RangeHero';
 import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
@@ -100,11 +100,12 @@ export default function LandingPage() {
           <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-cobalt-deep">
             One drawing, turned into everything you&apos;d want to keep or give.
           </p>
-          <ul className="mt-12 grid grid-cols-2 gap-x-5 gap-y-8 sm:grid-cols-3 md:grid-cols-5">
+          {/* phones: four, two by two (the fifth joins from md up, five across) */}
+          <ul className="mt-12 grid grid-cols-2 gap-x-5 gap-y-8 md:grid-cols-5">
             {RANGE.map((item, i) => (
               <li
                 key={item.label}
-                className="polaroid tape lift pop-in text-center"
+                className={`polaroid tape lift pop-in text-center ${i >= 4 ? 'max-md:hidden' : ''}`}
                 style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg', ['--i' as string]: i }}
               >
                 <div className="mb-2 flex aspect-square items-center justify-center bg-paper-2 p-2">
@@ -132,7 +133,7 @@ export default function LandingPage() {
           <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-ink-soft">
             A peek inside a few families&apos; keepsake boxes — every one started life on the fridge door.
           </p>
-          <ExampleWall className="mt-12" />
+          <ExampleCarousel className="mt-10" />
         </div>
       </section>
 

@@ -380,7 +380,7 @@ const DEFS: Record<string, ProductDef> = {
   card: {
     category: 'CARD', label: 'greetings card', blurb: 'a little card, a big smile', print: true, visibleInShop: true,
     description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
-    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message' },
+    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message', envelope: 'included' },
     variants: [
       { size: '7×5″', pricePence: 550, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
@@ -394,7 +394,7 @@ const DEFS: Record<string, ProductDef> = {
   cardPack: {
     category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true, visibleInShop: true,
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
-    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same' },
+    specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same', envelopes: 'one with every card' },
     variants: [
       { size: 'pack of 5', pricePence: 1200, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
       { size: 'pack of 10', pricePence: 2100, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },

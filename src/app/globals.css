@@ -601,3 +601,27 @@ body {
 .tray-up {
   animation: tray-up 0.28s var(--ease-pop) both;
 }
+
+/* The home page's keepsake carousel: each row slides one lap leftwards and loops (the track holds
+   the row twice, so -50% lands exactly on the start). Paused while hovered / focused; with reduced
+   motion it stands still and the row scrolls by hand. */
+@keyframes marquee-left {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  animation: marquee-left var(--marquee-dur, 64s) linear infinite;
+}
+.marquee-row:hover .marquee-track,
+.marquee-row:focus-within .marquee-track {
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
+  .marquee-row {
+    overflow-x: auto;
+  }
+}

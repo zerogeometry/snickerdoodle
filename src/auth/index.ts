@@ -16,7 +16,8 @@ const magicLink: EmailConfig = {
   type: 'email',
   name: 'Email',
   from: 'hello@snickerdoodle.co.uk',
-  maxAge: 24 * 60 * 60, // links valid for 24h
+  // links valid for 1 hour (founder, 23 Oct — the common norm; security review D)
+  maxAge: 60 * 60,
   // No SMTP server in dev — sendVerificationRequest fully overrides delivery.
   server: undefined as unknown as EmailConfig['server'],
   options: {},
@@ -31,7 +32,7 @@ const magicLink: EmailConfig = {
       kind: 'magic-link',
       to: identifier,
       subject: 'your one-tap link to snickerdoodle',
-      text: `Here's your one-tap link — it works once, for 24 hours:\n${url}\n\nDidn't ask for this? You can safely ignore it.`,
+      text: `Here's your one-tap link — it works once, for the next hour:\n${url}\n\nDidn't ask for this? You can safely ignore it.`,
     });
   },
 };
