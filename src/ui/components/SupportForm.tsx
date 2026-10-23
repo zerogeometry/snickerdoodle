@@ -1,8 +1,9 @@
 'use client';
 
 import { IconCircleCheck } from '@tabler/icons-react';
-import { useId, useState } from 'react';
-import { submitSupportAction } from '@/app/actions/support';
+import { useEffect, useId, useRef, useState } from 'react';
+import { humanChallengeAction, submitSupportAction } from '@/app/actions/support';
+import { solveHumanCheck, type HumanProof } from '@/lib/humanCheck';
 import { SUPPORT_TOPICS, supportTopic } from '@/lib/support';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
@@ -38,12 +39,26 @@ export function SupportForm({
   const topic = supportTopic(topicId);
   const tries = (topic?.suggest ?? []).map((id) => suggestions[id]).filter((s): s is Suggestion => !!s);
 
+  // the "are you a person?" check: solved quietly in the background once the form is showing
+  const proof = useRef<Promise<HumanProof | null> | null>(null);
+  const prove = () => (proof.current = humanChallengeAction().then((c) => solveHumanCheck(c)).catch(() => null));
+  useEffect(() => {
+    if (topic && !proof.current) prove();
+  }, [topic]);
+
   const send = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic) return setState({ status: 'error', error: 'pick a topic first' });
     if (message.trim().length < 10) return setState({ status: 'error', error: 'tell us a little more — a sentence or two helps us help you' });
     setState({ status: 'sending' });
-    const res = await submitSupportAction({ topic: topic.id, email, name, orderRef, message, website });
+    const attempt = async () => {
+      const p = await (proof.current ?? prove());
+      proof.current = null; // each solve is good for one send
+      return submitSupportAction({ topic: topic.id, email, name, orderRef, message, website, proof: p });
+    };
+    let res = await attempt();
+    if (!res.ok && res.reason === 'check') res = await attempt(); // a lapsed check is quietly re-done, once
+    if (!res.ok) prove(); // ready for another go
     if (res.ok) return setState({ status: 'sent', ref: res.ref });
     setState({
       status: 'error',
@@ -52,7 +67,9 @@ export function SupportForm({
           ? 'that’s a lot of messages in a row — give it a little while and try again'
           : res.reason === 'invalid'
             ? 'please check your email address and message'
-            : 'that didn’t send — please try again in a moment',
+            : res.reason === 'check'
+              ? 'we couldn’t confirm you’re a person — please try sending again'
+              : 'that didn’t send — please try again in a moment',
     });
   };
 

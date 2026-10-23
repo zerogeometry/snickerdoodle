@@ -17,6 +17,8 @@ import { createGiftLink, getGiftLink } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { markOrderPaid } from '@/server/orders';
 import { sendOrderShipped } from '@/server/orderEmails';
+import { checkHumanProof, createHumanChallenge } from '@/server/humanCheck';
+import { solveHumanCheck } from '@/lib/humanCheck';
 import { SUPPORT_PER_EMAIL_PER_DAY, SUPPORT_RETENTION_DAYS, purgeExpiredSupportRequests, submitSupportRequest } from '@/server/support';
 import type { DbHandle } from '@/server/db';
 
@@ -99,6 +101,13 @@ describe.skipIf(!DB)('help & support — integration', () => {
       if (!res.ok) return;
       const [row] = await db.select().from(supportRequests).where(eq(supportRequests.ref, res.ref));
       expect(row!.orderRef).toBeNull();
+    });
+
+    it('the "are you a person?" check works once — a solve can’t be replayed', async () => {
+      const proof = await solveHumanCheck(createHumanChallenge(Date.now(), 2000));
+      expect(await checkHumanProof(db, proof)).toBe(true);
+      expect(await checkHumanProof(db, proof)).toBe(false);
+      expect(await checkHumanProof(db, null)).toBe(false);
     });
 
     it('refuses an unusable message', async () => {
