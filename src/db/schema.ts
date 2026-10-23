@@ -623,6 +623,10 @@ export const printTemplates = pgTable('print_templates', {
   materialClass: materialClass('material_class').notNull().default('PAPER'),
   blankObjectId: uuid('blank_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
   printQuad: jsonb('print_quad').$type<[number, number][]>(), // 4 normalised corners TL,TR,BR,BL of the print surface on the blank
+  // MORE print surfaces on the same photo that print the SAME file — a pair of socks: one print map
+  // per sock, so the photo shows both socks printed alike. Display only (Prodigi prints from the
+  // print geometry above); null for every single-surface product.
+  extraQuads: jsonb('extra_quads').$type<[number, number][][]>(),
   maskObjectId: uuid('mask_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
   lightingObjectId: uuid('lighting_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),
   textureObjectId: uuid('texture_object_id').references(() => templateAssets.id, { onDelete: 'set null' }),

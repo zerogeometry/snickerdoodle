@@ -85,7 +85,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
-  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
 );
 
@@ -327,7 +327,9 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // the ankle pair lies at an angle — the pattern runs down the socks, cuff to toe (founder)
       const tube = size === 'tube';
       const dir = layeredFlatDir(`socks/${tube ? 'tube' : 'ankle'}`);
-      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, tilted: !tube } : { material: 'PAPER', register: 'drawn', key: 'socks' };
+      // PIECES: the pair is two of the same sock printed from the same print map, so each sock gets
+      // its own print area showing the WHOLE print file — the two socks in the photo match (founder)
+      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, tilted: !tube, pieces: true } : { material: 'PAPER', register: 'drawn', key: 'socks' };
     }
     case 'teaTowel': {
       // shown LANDSCAPE as photographed; its print canvas is designed landscape (DESIGNED_TURNED)
@@ -744,9 +746,23 @@ export async function layeredFlatTemplate(
   tilted: boolean,
   /** the print area IS the product's window (the art cover-fits into it, a section of a long print) */
   window = false,
-): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; W: number; H: number } | null> {
+  /** each separate piece of the print area (a pair of socks) shows the WHOLE print file — one
+   * print area per piece (`quad` + `extraQuads`), each at its own angle, left to right */
+  pieces = false,
+): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; extraQuads?: Quad[]; W: number; H: number } | null> {
   const d = await layeredFlat(dir);
   if (window) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.window), W: d.W, H: d.H };
+  if (pieces) {
+    const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
+    const parts = piecesOf(a, d.W, d.H);
+    if (parts.length >= 2) {
+      const quads = parts
+        .map((p) => orientedCoverQuad(p, d.W, d.H, printAspect, tilted ? tiltOf(p, d.W, d.H) : 0))
+        .filter((q): q is Quad => !!q);
+      if (quads.length >= 2) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: quads[0]!, extraQuads: quads.slice(1), W: d.W, H: d.H };
+    }
+    // one piece only: an ordinary single print area, below
+  }
   if (tilted) {
     const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
     const corners = orientedCoverQuad(a, d.W, d.H, printAspect, tiltOf(a, d.W, d.H));
@@ -758,6 +774,46 @@ export async function layeredFlatTemplate(
 /** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
 export function layeredFlatPath(name: string): string | null {
   return layeredFlatDir(name);
+}
+
+/**
+ * The separate PIECES of a print area's alpha (W×H, ≥128 = in) — a pair of socks → two. Each comes
+ * back as its own W×H alpha (255 in, 0 out), ordered left to right by its centre; specks under 5% of
+ * the total are dropped. Exported for its unit test.
+ */
+export function piecesOf(alpha: Uint8Array | Buffer, W: number, H: number): Uint8Array[] {
+  const label = new Int32Array(W * H).fill(-1);
+  const found: { px: number[]; cx: number }[] = [];
+  const stack = new Int32Array(W * H);
+  let total = 0;
+  for (let start = 0; start < W * H; start++) {
+    if (label[start] !== -1 || alpha[start]! < 128) continue;
+    const id = found.length;
+    const px: number[] = [];
+    let sx = 0, top = 0;
+    stack[top++] = start;
+    label[start] = id;
+    while (top) {
+      const i = stack[--top]!;
+      px.push(i);
+      sx += i % W;
+      const x = i % W, y = (i / W) | 0;
+      if (x > 0 && label[i - 1] === -1 && alpha[i - 1]! >= 128) { label[i - 1] = id; stack[top++] = i - 1; }
+      if (x < W - 1 && label[i + 1] === -1 && alpha[i + 1]! >= 128) { label[i + 1] = id; stack[top++] = i + 1; }
+      if (y > 0 && label[i - W] === -1 && alpha[i - W]! >= 128) { label[i - W] = id; stack[top++] = i - W; }
+      if (y < H - 1 && label[i + W] === -1 && alpha[i + W]! >= 128) { label[i + W] = id; stack[top++] = i + W; }
+    }
+    total += px.length;
+    found.push({ px, cx: sx / px.length });
+  }
+  return found
+    .filter((f) => f.px.length >= total * 0.05)
+    .sort((a, b) => a.cx - b.cx)
+    .map((f) => {
+      const m = new Uint8Array(W * H);
+      for (const i of f.px) m[i] = 255;
+      return m;
+    });
 }
 
 /**
@@ -1284,14 +1340,14 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     }
 
     if (p.register === 'layered-flat') {
-      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window);
+      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
       if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
       const quad = d.quad;
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay });
       authored++;
       const qa = p.tilted ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
       registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.tilted ? 'layered-flat (tilted)' : 'layered-flat',
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `${p.tilted ? 'layered-flat (tilted)' : 'layered-flat'}${d.extraQuads?.length ? ` · ${d.extraQuads.length + 1} print areas` : ''}`,
         quadAspect: qa == null ? null : Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
         driftPct: qa == null ? null : Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
       });

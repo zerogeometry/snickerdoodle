@@ -295,6 +295,13 @@
       "when": 1792669921157,
       "tag": "0041_pattern_ground",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1792739217147,
+      "tag": "0042_socks_print_per_sock",
+      "breakpoints": true
     }
   ]
 }

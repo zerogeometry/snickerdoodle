@@ -26,6 +26,9 @@ export interface SetMockupTemplateInput {
    * template asset. Used for authored on-top detail the art must read THROUGH — e.g. the
    * jigsaw's die-cut piece lines, so the drawing looks physically cut, not printed flat. PNG. */
   overlay?: Buffer;
+  /** MORE print areas on the same photo that show the SAME print file — a pair of socks, one per
+   * sock. Each is 4 normalised corners like printQuad. Display only; absent = one print area. */
+  extraQuads?: [number, number][][];
 }
 
 /**
@@ -44,10 +47,12 @@ export interface SetMockupTemplateInput {
  * trims to the product (ankle socks laid at 24°: the turned print area reaches past the corners) —
  * but its centre must be on the photo and no corner far off it. Exported for its unit test.
  */
-export function assertQuadFitsBlank(quad: [number, number][]): void {
+export function assertQuadFitsBlank(quad: [number, number][], opts: { warped?: boolean } = {}): void {
   const [tl, tr, br, bl] = quad as [[number, number], [number, number], [number, number], [number, number]];
   const tol = 0.004; // the compositor's own isAxisAligned tolerance
-  const straight = Math.abs(tl[0] - bl[0]) < tol && Math.abs(tr[0] - br[0]) < tol && Math.abs(tl[1] - tr[1]) < tol && Math.abs(bl[1] - br[1]) < tol;
+  // `warped`: the area is drawn by the perspective warp even when straight (several print areas —
+  // a pair of socks), which only ever paints onto the photo's own pixels, so it may overhang too
+  const straight = !opts.warped && Math.abs(tl[0] - bl[0]) < tol && Math.abs(tr[0] - br[0]) < tol && Math.abs(tl[1] - tr[1]) < tol && Math.abs(bl[1] - br[1]) < tol;
   const [lo, hi] = straight ? [-0.005, 1.005] : [-0.25, 1.25];
   for (const [x, y] of quad) {
     if (x < lo || x > hi || y < lo || y > hi) {
@@ -62,7 +67,12 @@ export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateIn
   if (!Array.isArray(input.printQuad) || input.printQuad.length !== 4) {
     throw new Error('printQuad must be 4 normalised [x,y] corners (TL,TR,BR,BL)');
   }
-  assertQuadFitsBlank(input.printQuad as [number, number][]);
+  const warped = !!input.extraQuads?.length; // several areas → always the perspective warp
+  assertQuadFitsBlank(input.printQuad as [number, number][], { warped });
+  for (const q of input.extraQuads ?? []) {
+    if (!Array.isArray(q) || q.length !== 4) throw new Error('each extra print quad must be 4 normalised [x,y] corners (TL,TR,BR,BL)');
+    assertQuadFitsBlank(q, { warped });
+  }
   const [tpl] = await db.select({ version: printTemplates.templateVersion }).from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
   if (!tpl) throw new Error(`no print_template for variant ${input.variantId}`);
   const templateVersion = (tpl.version ?? 1) + 1; // bump → cached mockups invalidate (version is in the key)
@@ -127,7 +137,8 @@ export async function setMockupTemplate(db: DbHandle, input: SetMockupTemplateIn
 
   await db
     .update(printTemplates)
-    .set({ blankObjectId: ta!.id, maskObjectId, lightingObjectId, printQuad: input.printQuad, materialClass: input.materialClass ?? 'PAPER', templateVersion })
+    // extra print areas: re-authoring without them clears any previous ones (never a stale pair)
+    .set({ blankObjectId: ta!.id, maskObjectId, lightingObjectId, printQuad: input.printQuad, extraQuads: input.extraQuads?.length ? input.extraQuads : null, materialClass: input.materialClass ?? 'PAPER', templateVersion })
     .where(eq(printTemplates.variantId, input.variantId));
 
   return { blankObjectId: ta!.id, templateVersion, key };

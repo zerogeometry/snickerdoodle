@@ -333,6 +333,8 @@ interface ResolvedTemplate {
   maskObjectId: string | null;
   overlayObjectId: string | null;
   printQuad: [number, number][];
+  /** More print areas that show the SAME print file (a pair of socks) — display only. */
+  extraQuads: [number, number][][];
   printWidthPx: number;
   printHeightPx: number;
   bleedMm: number;
@@ -349,11 +351,11 @@ async function loadResolvedTemplate(db: DbHandle, variantId: string, view: strin
     const [v] = await db.select().from(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, view)));
     if (!v?.blankObjectId || !v.printQuad) return null;
     // Display-only: no bleed (Prodigi prints from the primary geometry, never this view).
-    return { blankObjectId: v.blankObjectId, maskObjectId: v.maskObjectId, overlayObjectId: v.overlayObjectId, printQuad: v.printQuad, printWidthPx: v.printWidthPx, printHeightPx: v.printHeightPx, bleedMm: 0, requiredDpi: 300, materialClass: v.materialClass, mapResolutionPx: v.mapResolutionPx, templateVersion: v.templateVersion };
+    return { blankObjectId: v.blankObjectId, maskObjectId: v.maskObjectId, overlayObjectId: v.overlayObjectId, printQuad: v.printQuad, extraQuads: [], printWidthPx: v.printWidthPx, printHeightPx: v.printHeightPx, bleedMm: 0, requiredDpi: 300, materialClass: v.materialClass, mapResolutionPx: v.mapResolutionPx, templateVersion: v.templateVersion };
   }
   const [t] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
   if (!t?.blankObjectId || !t.printQuad) return null;
-  return { blankObjectId: t.blankObjectId, maskObjectId: t.maskObjectId, overlayObjectId: t.lightingObjectId, printQuad: t.printQuad, printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi, materialClass: t.materialClass, mapResolutionPx: t.mapResolutionPx, templateVersion: t.templateVersion };
+  return { blankObjectId: t.blankObjectId, maskObjectId: t.maskObjectId, overlayObjectId: t.lightingObjectId, printQuad: t.printQuad, extraQuads: t.extraQuads ?? [], printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi, materialClass: t.materialClass, mapResolutionPx: t.mapResolutionPx, templateVersion: t.templateVersion };
 }
 
 // Concurrent identical renders (React strictMode double-fires the preview effect; the
@@ -427,7 +429,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 
   // 5. Cache hit → no sharp work.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
-  if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: isAxisAligned(tpl.printQuad) ? 'FLAT' : 'PERSPECTIVE', cached: true };
+  if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: isAxisAligned(tpl.printQuad) && !tpl.extraQuads.length ? 'FLAT' : 'PERSPECTIVE', cached: true };
 
   // 6. In-flight dedup → render + persist once (concurrency-capped) and share the result.
   const pending = inFlight.get(key);
@@ -444,6 +446,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       fillHex: fill,
       groundHex: ground ? groundHex(ground) : undefined,
       quad: tpl.printQuad,
+      extraQuads: tpl.extraQuads,
       transform: t,
       spanHalf,
       workEdge: size === 'thumb' ? Math.min(tpl.mapResolutionPx, THUMB_WORK_EDGE) : tpl.mapResolutionPx,
@@ -499,6 +502,8 @@ export async function renderPrintedFace(
  */
 export async function renderTemplatePreview(args: {
   blank: Buffer; mask?: Buffer; overlay?: Buffer; quad: [number, number][]; materialClass: string;
+  /** more print areas showing the same print file (a pair of socks) */
+  extraQuads?: [number, number][][];
   design: Buffer; productKey: string; print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   size?: MockupSize;
   /** a base colour (#rrggbb; white by default) */
@@ -514,8 +519,8 @@ export async function renderTemplatePreview(args: {
   const meta = await sharp(args.blank).metadata();
   const placedGround = !face && isGroundProduct(args.productKey) && normalizeGround(args.ground) ? groundHex(args.ground) : undefined;
   const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
-  const out = !isAxisAligned(args.quad)
-    ? await renderPerspective({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
+  const out = !isAxisAligned(args.quad) || args.extraQuads?.length
+    ? await renderPerspective({ ...common, extraQuads: args.extraQuads?.length ? args.extraQuads : undefined, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass })
     : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
   return out.buffer;
 }
@@ -535,7 +540,7 @@ async function renderAndPersist(
     assetId: string; key: string; blankKey: string; maskKey?: string; overlayKey?: string; designKey: string;
     /** the source object's id + content hash — what a cached printed face was made from */
     designTag: string;
-    fillHex?: string; groundHex?: string; quad: [number, number][];
+    fillHex?: string; groundHex?: string; quad: [number, number][]; extraQuads?: [number, number][][];
     transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
@@ -573,6 +578,7 @@ async function renderAndPersist(
     layerIds: { blank: args.blankKey, mask: args.maskKey, overlay: args.overlayKey },
     design: designBuf,
     quad: args.quad,
+    extraQuads: args.extraQuads,
     transform,
     spanHalf: args.spanHalf,
     workEdge: args.workEdge,
@@ -608,6 +614,8 @@ async function renderAndPersist(
  */
 export async function renderMockupLayers(args: {
   blank: Buffer; mask?: Buffer; overlay?: Buffer; design: Buffer | RawPixels; quad: [number, number][];
+  /** More print areas showing the SAME print file (a pair of socks) — drawn by the perspective tier. */
+  extraQuads?: [number, number][][];
   /** Stable ids of the TEMPLATE layers (their storage keys): their decoded, working-size pixels are
    * then cached in process. Absent ⇒ nothing is cached. Never an id for the design. */
   layerIds?: { blank?: string; mask?: string; overlay?: string };
@@ -620,13 +628,16 @@ export async function renderMockupLayers(args: {
   // A skewed quad (an angled product like the tin lid) → PERSPECTIVE warp; a ceramic mug →
   // CYLINDER warp (the art curves around the real photo's face); else the FLAT (axis-aligned
   // bbox) placement. Same secure spine either way.
-  const perspective = !isAxisAligned(args.quad);
+  // Several print areas (a pair of socks) always take the perspective tier: it maps the print file
+  // into each area (a straight area is just a simple case of the warp).
+  const extra = args.extraQuads?.length ? args.extraQuads : undefined;
+  const perspective = !isAxisAligned(args.quad) || !!extra;
   // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
   // (the plain-white fallback blank) it falls through to FLAT.
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
   const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
   const out = perspective
-    ? await renderPerspective({ ...common, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex })
+    ? await renderPerspective({ ...common, extraQuads: extra, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex })
     : cylinder
       ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
       : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex });
@@ -825,6 +836,8 @@ async function renderPerspective(args: {
   designBuf: Design;
   ids: LayerIds;
   quad: [number, number][];
+  /** More print areas that show the SAME print file — a pair of socks, one print map per sock. */
+  extraQuads?: [number, number][][];
   transform: Transform;
   spanHalf?: 'front' | 'back';
   workEdge: number;
@@ -833,7 +846,7 @@ async function renderPerspective(args: {
   /** Base colour under the drawing, filling the whole print area (#rrggbb); none = white stock. */
   groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, transform, spanHalf, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, extraQuads, transform, spanHalf, workEdge, outputEdge, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
   const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
@@ -872,9 +885,19 @@ async function renderPerspective(args: {
   const transposed = isTransposed(dw / dh, quadEdgeAspect(quad));
   const raw = transposed || panel.channels !== 4 ? await toRaw((transposed ? fromRaw(panel).rotate(-90) : fromRaw(panel)).ensureAlpha()) : panel;
 
-  // Warp the design canvas onto the quad (in working-blank px), then composite over the photo.
-  const quadPx = quad.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
-  let warped: Raw = { data: perspectiveWarp({ design: raw.data, srcW: raw.width, srcH: raw.height, quad: quadPx, canvasW: WW, canvasH: WH }), width: WW, height: WH, channels: 4 };
+  // Warp the design canvas onto the quad (in working-blank px), then composite over the photo. With
+  // several print areas (a pair of socks) the SAME design goes into each — never mirrored; a
+  // printed drawing always reads the right way round — and where two areas overlap (a sock's
+  // cover-fit area reaching past its edge) each pixel belongs to the area whose centre is nearest.
+  const toPx = (q: [number, number][]) => q.map(([x, y]) => [x * WW, y * WH]) as [number, number][];
+  const warpInto = (q: [number, number][]) => perspectiveWarp({ design: raw.data, srcW: raw.width, srcH: raw.height, quad: toPx(q), canvasW: WW, canvasH: WH });
+  const areas = [quad, ...(extraQuads ?? [])];
+  let warped: Raw = {
+    data: areas.length === 1 ? warpInto(quad) : nearestOf(areas.map(warpInto), areas.map((q) => quadCentre(toPx(q))), WW, WH),
+    width: WW,
+    height: WH,
+    channels: 4,
+  };
   // Clip to the silhouette — NOT best-effort, like the flat path: a template authored with a mask
   // must never render the art past the product's edge.
   if (maskBuf) warped = await clipTo(warped, await maskClip(maskBuf, ids.mask, WW, WH));
@@ -903,6 +926,37 @@ async function renderPerspective(args: {
   }
 
   return encodeOutput(composited, outputEdge);
+}
+
+/** A quad's centre (the mean of its corners). */
+function quadCentre(q: [number, number][]): [number, number] {
+  return [q.reduce((n, p) => n + p[0], 0) / q.length, q.reduce((n, p) => n + p[1], 0) / q.length];
+}
+
+/**
+ * Several warped layers (RGBA, W×H) → one: each pixel from the layer that covers it whose area
+ * centre is nearest — so two neighbouring print areas (a pair of socks) never draw over each
+ * other. Exported for its unit test.
+ */
+export function nearestOf(layers: (Uint8Array | Buffer)[], centres: [number, number][], W: number, H: number): Buffer {
+  const out = Buffer.alloc(W * H * 4);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = (y * W + x) * 4;
+      let best = -1, bestD = Infinity;
+      for (let k = 0; k < layers.length; k++) {
+        if (!layers[k]![i + 3]) continue;
+        const dx = x + 0.5 - centres[k]![0], dy = y + 0.5 - centres[k]![1];
+        const d = dx * dx + dy * dy;
+        if (d < bestD) { bestD = d; best = k; }
+      }
+      if (best >= 0) {
+        const L = layers[best]!;
+        out[i] = L[i]!; out[i + 1] = L[i + 1]!; out[i + 2] = L[i + 2]!; out[i + 3] = L[i + 3]!;
+      }
+    }
+  }
+  return out;
 }
 
 /**

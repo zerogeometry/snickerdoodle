@@ -1,0 +1,1 @@
+ALTER TABLE "print_templates" ADD COLUMN "extra_quads" jsonb;
