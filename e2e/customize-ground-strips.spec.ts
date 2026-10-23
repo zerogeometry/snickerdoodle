@@ -3,14 +3,15 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * The base colour reaches EVERY preview of the printed product on the customize page — the big
- * preview AND the thumbnails beneath it (frame colours, cushion shapes, the jigsaw) — but never the
- * jigsaw's keepsake tin, a display of the lid that doesn't take the colour.
+ * preview AND the thumbnails beneath it (frame colours, cushion shapes, the jigsaw, the greetings
+ * card's closed + outside views) — but never the jigsaw's keepsake tin, a display of the lid that
+ * doesn't take the colour.
  * Checked on the preview requests themselves, so it holds whether or not this machine has the
  * product photos.
  */
 const NAVY = '#26334f';
 
-for (const key of ['framedPrint', 'cushion', 'jigsaw']) {
+for (const key of ['framedPrint', 'cushion', 'jigsaw', 'card']) {
   test(`${key}: every thumbnail is previewed on the chosen base colour`, async ({ page }) => {
     test.setTimeout(120_000);
     await quietCookies(page);

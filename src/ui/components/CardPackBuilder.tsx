@@ -9,6 +9,7 @@ import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
+import { BaseColourPicker } from './BaseColourPicker';
 import { MockupPreview } from './MockupPreview';
 import { TileSkeletonGrid } from './TileSkeleton';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -19,6 +20,7 @@ import { clampTransform, type ResolutionAssessment } from '@/server/print/geomet
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { CARD_PACK_KEY, packSizeOf } from '@/lib/card-packs';
 import { cardPackLine, newPackLineId } from '@/lib/card-pack-line';
+import { isColouredGround, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
 
@@ -26,6 +28,8 @@ import { gbp, toast, useBasket, useUpload, type PackCardLine, type PlacementTran
  * The greetings-card PACK builder (D22): choose a pack of 5 or 10 → put a drawing on every card
  * (from the keepsake box, or the drawing in progress; repeats welcome, "use it on all") → see the
  * fronts with a print-quality badge each → add ONE basket line carrying the cards. Blank inside.
+ * One BASE COLOUR for the whole pack (the same wheel as every other product) fills every card's
+ * front behind its drawing.
  *
  * Not in /mockups — extends the Scrapbook language (taped cards, ink chips, the kraft thumb-zone
  * dock, the bottom-sheet picker). The price shown is the catalogue's; the server re-prices the pack
@@ -62,6 +66,9 @@ export function CardPackBuilder() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [announce, setAnnounce] = useState('');
   const [dims, setDims] = useState<Record<string, { width: number; height: number } | null>>({});
+  // the pack's ONE base colour — every card's front, behind its drawing (white = none)
+  const [ground, setGround] = useState<string>(PATTERN_GROUND_WHITE);
+  const groundOrNone = isColouredGround(ground) ? ground : undefined;
 
   // ── load: the catalogue (pack + the single card it previews on) and the keepsake box ──────
   const loadCatalogue = useCallback(() => {
@@ -105,6 +112,7 @@ export function CardPackBuilder() {
     setEdit(line.id);
     if (line.variantId) setVariantId(line.variantId);
     setSlots(line.cards!.map((c) => ({ ...c })));
+    setGround(line.ground ?? PATTERN_GROUND_WHITE);
   }, [pack]);
 
   // Every drawing on offer: the one in progress first (so a guest can make a pack of a favourite
@@ -195,10 +203,11 @@ export function CardPackBuilder() {
   const complete = packSize > 0 && filled === packSize;
   const addToBasket = () => {
     if (!variant || !complete || blockedAt >= 0) return;
-    const line = cardPackLine({ id: edit ?? newPackLineId(), variant, packSize, cards: cards as PackCardLine[], previewVariantId: card?.variants[0]?.id });
+    // the colour is part of the line id (cardPackLine) — an edit that changes it re-keys the same line
+    const line = cardPackLine({ id: edit ?? newPackLineId(), variant, packSize, cards: cards as PackCardLine[], previewVariantId: card?.variants[0]?.id, ground });
     if (edit) {
       const { id, ...fields } = line;
-      update(id, fields); // same line, same place — qty stays 1
+      update(edit, fields, id); // same line, same place — qty stays 1
       toast('basket updated ✓');
     } else {
       add(line);
@@ -277,6 +286,9 @@ export function CardPackBuilder() {
             {perCard ? <p className="mt-1.5 text-xs text-ink-faint">that’s {gbp(perCard)} a card, 7×5″ on thick Fedrigoni card</p> : null}
           </div>
 
+          {/* The pack's base colour — the same picker + copy as every edge-to-edge product. */}
+          <BaseColourPicker title="background colour" noun="card front" value={ground} onChange={setGround} />
+
           <CaveatNote className="mt-4 text-xl">blank inside, for your own words ✎</CaveatNote>
 
           {/* The fronts */}
@@ -297,7 +309,7 @@ export function CardPackBuilder() {
                     <div className="polaroid tape !p-1.5" style={{ ['--tilt' as string]: i % 2 ? '1.4deg' : '-1.6deg', ['--tape' as string]: TAPES[i % TAPES.length], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}>
                       <div className="relative aspect-square w-full overflow-hidden bg-paper-2">
                         {card?.variants[0] ? (
-                          <MockupPreview productKey="card" assetId={c.assetId} variantId={card.variants[0].id} transform={c.transform} sourceObjectId={c.sourceObjectId ?? null} size="thumb" px={160} lazy />
+                          <MockupPreview productKey="card" assetId={c.assetId} variantId={card.variants[0].id} transform={c.transform} sourceObjectId={c.sourceObjectId ?? null} ground={groundOrNone} size="thumb" px={160} lazy />
                         ) : d?.imageUrl ? (
                           <img src={d.imageUrl} alt="" className="h-full w-full object-contain" />
                         ) : null}

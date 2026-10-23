@@ -12,6 +12,7 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { placeOrder } from '@/server/orders';
 import { saveDesign } from '@/server/savedDesigns';
 import { renderPrintFile } from '@/server/print/render';
+import { CARD_PANEL_X, CARD_SPREAD } from '@/server/print/cardPrint';
 import { groundHex } from '@/lib/patterns';
 import { deleteObject, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -134,6 +135,28 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
     // the corner (outside the half-size drawing) is the colour; on white it stays white
     expect(await px(green.buf, 2, 2)).toBe('#0b6623');
     expect(await px(white.buf, 2, 2)).toBe('#ffffff');
+  }, 120_000);
+
+  it('a GREETINGS CARD prints its colour on the outside front only — the inside stays white, its own file', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [card] = await db.select({ id: schema.productVariants.id }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(eq(schema.products.key, 'card'));
+    const fileOf = async (ground?: string) => {
+      const r = await renderPrintFile(db, sam, { assetId, variantId: card!.id, transform: { scale: 0 }, ground });
+      const [obj] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, r.printObjectId));
+      return { id: r.printObjectId, key: obj!.key, buf: await getObjectBytes(obj!.key) };
+    };
+    const px = async (buf: Buffer, x: number, y: number) => {
+      const { data } = await sharp(buf).removeAlpha().extract({ left: x, top: y, width: 1, height: 1 }).raw().toBuffer({ resolveWithObject: true });
+      return `#${[...data].map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+    };
+    const white = await fileOf();
+    const sky = await fileOf('#8FB5D6');
+    expect(sky.id).not.toBe(white.id); // two colours never overwrite each other's file
+    expect(sky.key).toContain('-g8fb5d6');
+    expect(await px(sky.buf, CARD_PANEL_X.outerFront + 20, 20)).toBe('#8fb5d6'); // front, where the drawing is see-through
+    expect(await px(white.buf, CARD_PANEL_X.outerFront + 20, 20)).toBe('#ffffff');
+    expect(await px(sky.buf, 20, 20)).toBe('#ffffff'); // front-only: the rear stays white
+    for (const x of [CARD_PANEL_X.insideFront + 20, CARD_PANEL_X.insideBack + 20]) expect(await px(sky.buf, x, CARD_SPREAD.heightPx - 20)).toBe('#ffffff'); // inside: white
   }, 120_000);
 
   it('a saved design keeps its colour (edge-to-edge products only)', async () => {

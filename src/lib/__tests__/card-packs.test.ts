@@ -14,7 +14,7 @@ describe('card packs — splitting a pack into order lines', () => {
 
   it('the same drawing ten times → ONE line of 10 copies (still exactly £21)', () => {
     const lines = expandCardPack(2100, 10, Array.from({ length: 10 }, () => card('same')));
-    expect(lines).toEqual([{ card: card('same'), qty: 10, unitPricePence: 210, linePence: 2100 }]);
+    expect(lines).toEqual([{ card: card('same'), qty: 10, unitPricePence: 210, linePence: 2100, ground: null }]);
   });
 
   it('a mix: 3 of one + 2 of another in a 5-pack → 2 lines (3 × £2.40, 2 × £2.40 = £12)', () => {
@@ -36,6 +36,26 @@ describe('card packs — splitting a pack into order lines', () => {
 
   it('refuses a pack price that doesn’t split evenly (a catalogue mistake, caught loudly)', () => {
     expect(() => expandCardPack(1199, 5, Array.from({ length: 5 }, () => card('a')))).toThrow(/split evenly/);
+  });
+});
+
+describe('card packs — one base colour per pack', () => {
+  it('every split card line carries the pack’s colour (normalised to lowercase #rrggbb)', () => {
+    const lines = expandCardPack(1200, 5, [card('a'), card('b'), card('a'), card('c'), card('b')], '#C8402A');
+    expect(lines).toHaveLength(3);
+    expect(lines.every((l) => l.ground === '#c8402a')).toBe(true);
+    expect(sum(lines)).toBe(1200); // the colour never changes the money
+  });
+
+  it('a pack saved before the wheel (a palette word) still prints its colour on every card', () => {
+    expect(expandCardPack(1200, 5, Array.from({ length: 5 }, () => card('a')), 'navy').map((l) => l.ground)).toEqual(['#26334f']);
+  });
+
+  it('junk, white or nothing means no colour — every card stays white', () => {
+    const five = Array.from({ length: 5 }, (_, i) => card(`a${i}`));
+    for (const none of [undefined, null, '', '#ffffff', '#FFF', 'white', 'c8402a', '#12345g', '#000000; drop', 42, { hex: '#c8402a' }]) {
+      expect(expandCardPack(1200, 5, five, none).every((l) => l.ground === null), String(none)).toBe(true);
+    }
   });
 });
 

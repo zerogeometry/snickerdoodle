@@ -31,6 +31,8 @@ export async function placeOrderAction(input: {
     artwork?: { assetId: string; transform: RawTransform; sourceObjectId?: string; back?: string; ground?: string; message?: unknown; cardImageSpan?: string };
     /** A card PACK line: its cards (which drawing + placement each). Count + price checked server-side. */
     cards?: { assetId: string; transform: RawTransform; sourceObjectId?: string }[];
+    /** A card PACK line: its one base colour (untrusted — normalised in placeOrder). */
+    ground?: string;
   }[];
   gift?: boolean;
   subject?: string;
@@ -53,9 +55,11 @@ export async function placeOrderAction(input: {
           },
         }
       : {}),
-    // Untrusted: only WHICH drawings. Capped well above the biggest pack; placeOrder checks the exact count.
+    // Untrusted: only WHICH drawings (+ the pack's colour). Capped well above the biggest pack;
+    // placeOrder checks the exact count and normalises the colour.
     ...(Array.isArray(i.cards)
       ? {
+          ...(typeof i.ground === 'string' ? { ground: i.ground } : {}),
           cards: i.cards.slice(0, MAX_PACK_CARDS).map((c) => ({
             assetId: String(c?.assetId),
             transform: c?.transform ?? {},

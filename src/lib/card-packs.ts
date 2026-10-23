@@ -9,6 +9,8 @@
  * pack still costs exactly its catalogue price. Client-safe: no I/O.
  */
 
+import { normalizeGround } from '@/lib/patterns';
+
 export const CARD_PACK_KEY = 'cardPack';
 
 /** Is this basket-line key a card pack (the product key or one of its variant skus)? */
@@ -33,6 +35,9 @@ export interface PackOrderLine<C extends PackCard = PackCard> {
   qty: number;
   unitPricePence: number;
   linePence: number;
+  /** The PACK's base colour (#rrggbb, server-normalised) — one per pack, so every card line of the
+   * pack carries the same one; null = white. */
+  ground: string | null;
 }
 
 /** Two cards are the same design when they print identically (same image, same placement). */
@@ -42,9 +47,10 @@ const designKey = (c: PackCard) =>
 /**
  * Split a pack into order lines. Throws unless there are EXACTLY `packSize` cards and the pack price
  * divides evenly between them (an authoring mistake in the catalogue, never a customer's) — so the
- * lines always add up to the pack price to the penny.
+ * lines always add up to the pack price to the penny. The pack's BASE COLOUR (untrusted — normalised
+ * here; junk / white = none) goes on EVERY line: a pack is one colour, whichever drawings it holds.
  */
-export function expandCardPack<C extends PackCard>(packPricePence: number, packSize: number, cards: C[]): PackOrderLine<C>[] {
+export function expandCardPack<C extends PackCard>(packPricePence: number, packSize: number, cards: C[], ground?: unknown): PackOrderLine<C>[] {
   if (!Number.isInteger(packSize) || packSize < 2) throw new Error('not a card pack');
   if (cards.length !== packSize) throw new Error(`a pack of ${packSize} needs ${packSize} cards (got ${cards.length})`);
   if (!Number.isInteger(packPricePence) || packPricePence % packSize !== 0) throw new Error('pack price must split evenly between its cards');
@@ -56,5 +62,6 @@ export function expandCardPack<C extends PackCard>(packPricePence: number, packS
     if (g) g.qty++;
     else groups.set(k, { card: c, qty: 1 });
   }
-  return [...groups.values()].map((g) => ({ card: g.card, qty: g.qty, unitPricePence: unit, linePence: unit * g.qty }));
+  const g0 = normalizeGround(ground);
+  return [...groups.values()].map((g) => ({ card: g.card, qty: g.qty, unitPricePence: unit, linePence: unit * g.qty, ground: g0 }));
 }

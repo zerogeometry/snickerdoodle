@@ -17,8 +17,8 @@ import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
 import { basketLineId } from '@/lib/basket-line';
-import { colourName, groundHex, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
-import { ColourWheel } from '@/ui/primitives/ColourWheel';
+import { colourName, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
+import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
@@ -50,13 +50,14 @@ function webglOk(): boolean {
   }
 }
 
-/** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
-/** What the base colour colours, in the shopper's words. */
+/** What the base colour colours, in the shopper's words. A greetings card takes it on the front
+ * (the whole outside when the drawing spans it — see groundNoun below); the inside stays white. */
 const GROUND_NOUN: Record<string, string> = {
   socks: 'sock', teaTowel: 'towel', wrappingPaper: 'paper', phoneCase: 'case', cushion: 'cushion', blanket: 'blanket',
-  jigsaw: 'puzzle', framedPrint: 'print', playingCards: 'card back', petBandana: 'bandana',
+  jigsaw: 'puzzle', framedPrint: 'print', playingCards: 'card back', petBandana: 'bandana', card: 'card front',
 };
 
+/** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
 export default function CustomizePage() {
   const params = useParams<{ productKey: string }>();
   return isCardPackKey(params.productKey) ? <CardPackBuilder /> : <CustomizeProduct />;
@@ -97,10 +98,6 @@ function CustomizeProduct() {
   const orientationLockedRef = useRef(false);
   const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
-  // the base-colour wheel sheet, and the colour being tried in it (only USED on 'use this colour',
-  // so dragging round the wheel doesn't re-render the product on every step)
-  const [wheelOpen, setWheelOpen] = useState(false);
-  const [wheelDraft, setWheelDraft] = useState<string>(PATTERN_GROUND_WHITE);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
   // Alternate mockup VIEW (the jigsaw's companion tin): 'primary' = the product itself,
@@ -360,7 +357,7 @@ function CustomizeProduct() {
   const isPattern = isPatternProduct(product.key);
   // an EDGE-TO-EDGE product (a repeat, a phone case, a cushion…) can sit on any base colour
   const isGround = isGroundProduct(product.key);
-  const groundNoun = GROUND_NOUN[product.key] ?? 'background';
+  const groundNoun = product.key === 'card' && cardSpan === 'full' ? 'outside of the card' : GROUND_NOUN[product.key] ?? 'background';
   const groundWord = colourName(ground);
   const groundTitle = isPattern ? `${groundNoun} colour` : 'background colour';
   // The asset this screen acts on: in edit mode the basket line's own asset wins (so a line
@@ -693,6 +690,7 @@ function CustomizeProduct() {
                         sourceObjectId={activeSource ?? null}
                         view={v === 'outside' ? `outside-${cardSpan}` : undefined}
                         spanHalf={v === 'single' && cardSpan === 'full' ? 'front' : undefined}
+                        ground={groundFor()}
                         px={120}
                         lazy
                       />
@@ -880,30 +878,7 @@ function CustomizeProduct() {
               under the drawing — a repeat sits on it, a placed drawing sits in it. Off its paper the
               drawing floats on the colour; still on its paper, a friendly one-tap nudge lifts it off. */}
           {isGround ? (
-            <div className="mt-5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">{groundTitle}</p>
-              <div className="mt-1.5 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => { setWheelDraft(groundHex(ground)); setWheelOpen(true); }}
-                  aria-haspopup="dialog"
-                  aria-label={`${groundTitle}: ${groundWord} — change it`}
-                  className="press flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-pill border-2 border-cocoa bg-paper py-1 pl-1 pr-4 text-left shadow-[0_2px_0_var(--color-cocoa)]"
-                >
-                  <span aria-hidden className="h-9 w-9 shrink-0 rounded-full border-2 border-cocoa/45" style={{ background: groundHex(ground) }} />
-                  <span className="truncate text-sm font-bold text-cocoa">{groundWord}</span>
-                  <span aria-hidden className="ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-cocoa/30" style={{ background: 'radial-gradient(circle closest-side, #fff, rgb(255 255 255 / 0)), conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
-                  <span className="shrink-0 text-xs font-bold text-cinnamon">change</span>
-                </button>
-                {isColouredGround(ground) ? (
-                  <button type="button" onClick={() => setGround(PATTERN_GROUND_WHITE)} className="min-h-11 shrink-0 px-1 text-xs font-bold text-ink-soft underline underline-offset-2 hover:text-cinnamon">
-                    back to white
-                  </button>
-                ) : null}
-              </div>
-              <p className="mt-1.5 text-[11px] text-ink-faint">
-                {isPattern ? <>their drawing on repeat, on a {groundWord} {groundNoun}</> : <>fills the whole {groundNoun}, edge to edge, behind their drawing</>}
-              </p>
+            <BaseColourPicker title={groundTitle} noun={groundNoun} pattern={isPattern} value={ground} onChange={setGround}>
               {isColouredGround(ground) && upload?.opaqueBg && !activeSource ? (
                 <div role="status" className="mt-3 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                   <p className="font-semibold">
@@ -916,21 +891,7 @@ function CustomizeProduct() {
                   </Button>
                 </div>
               ) : null}
-              <Modal
-                open={wheelOpen}
-                onClose={() => setWheelOpen(false)}
-                size="sm"
-                title={groundTitle}
-                subtitle="any colour you like"
-                footer={
-                  <Button size="lg" className="w-full" onClick={() => { setGround(wheelDraft); setWheelOpen(false); }}>
-                    use this colour
-                  </Button>
-                }
-              >
-                <ColourWheel value={wheelDraft} onChange={setWheelDraft} label={groundTitle} />
-              </Modal>
-            </div>
+            </BaseColourPicker>
           ) : null}
 
           {/* CUSHION back: pick a back colour (white is the single-sided default; any other colour
