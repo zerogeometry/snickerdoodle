@@ -4,6 +4,7 @@ import type { DbHandle } from '../db';
 import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
+import { HASH_UNCHECKED_LABEL } from '@/authz/review';
 
 const sha256Hex = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -13,11 +14,24 @@ export interface ModerationVerdict {
   labels: string[];
 }
 
+/** Labels for a check that couldn't give an answer — the item is held for review, never CLEARed. */
+export const CLASSIFIER_ERROR_LABEL = 'classifier-error';
+export { HASH_UNCHECKED_LABEL };
+
+/** Log that a provider failed — the error's name only: never its details, an image or a credential. */
+const providerFailed = (which: string, e: unknown) => console.warn(`[moderation] ${which} failed (${e instanceof Error ? e.name : typeof e}) — held for review`);
+
 /**
  * The automated content-safety decision (D8). The CSAM hash-check runs FIRST and
  * takes precedence: a match is BLOCKED — preserve, never view/redistribute,
  * report per the runbook. Otherwise the classifier may FLAG into the review queue
  * (it never auto-rejects a child's drawing). No match + not flagged → CLEAR.
+ *
+ * FAIL-SAFE: only a definite "no match" passes the hash gate and only a definite "not flagged"
+ * is CLEAR. A provider that throws, times out or answers in an unexpected shape holds the item
+ * for review. A hash check that couldn't run is labelled HASH_UNCHECKED_LABEL — the classifier
+ * is skipped (no point sending the picture on), and review can neither show nor clear it
+ * (src/authz/review.ts).
  */
 export async function moderateImage(
   input: {
@@ -33,12 +47,26 @@ export async function moderateImage(
   const hashInput = input.originalBuffer
     ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
     : { buffer: input.buffer, sha256: input.sha256 };
-  if (await providers.hash.isKnownIllegal(hashInput)) {
-    return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+  let known: unknown;
+  try {
+    known = await providers.hash.isKnownIllegal(hashInput);
+  } catch (e) {
+    providerFailed('hash check', e);
+    known = undefined;
   }
-  const c = await providers.classifier.classify(input.buffer);
-  if (c.flagged) return { status: 'FLAGGED', labels: c.labels };
-  return { status: 'CLEAR', labels: [] };
+  if (known === true) return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+  if (known !== false) return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
+
+  let c: { flagged?: unknown; labels?: unknown } | null;
+  try {
+    c = await providers.classifier.classify(input.buffer);
+  } catch (e) {
+    providerFailed('classifier', e);
+    return { status: 'FLAGGED', labels: [CLASSIFIER_ERROR_LABEL] };
+  }
+  if (c?.flagged === false) return { status: 'CLEAR', labels: [] };
+  const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
+  return { status: 'FLAGGED', labels: c?.flagged === true ? labels : [...labels, CLASSIFIER_ERROR_LABEL] };
 }
 
 /**
@@ -112,8 +140,13 @@ export async function moderateDesignAndRecord(
     design = { status: 'FLAGGED', labels: ['screening-not-configured'] };
   } else {
     const p = providers ?? defaultProviders(env);
-    const [c, words] = await Promise.all([p.classifier.classify(input.buffer), p.textReader ? p.textReader.read(input.buffer).catch(() => null) : Promise.resolve([])]);
+    // a classifier that FAILED is not a clean result either — held for review, never CLEAR
+    const [c, words] = await Promise.all([
+      p.classifier.classify(input.buffer).catch((e) => (providerFailed('classifier', e), null)),
+      p.textReader ? p.textReader.read(input.buffer).catch((e) => (providerFailed('text reader', e), null)) : Promise.resolve([]),
+    ]);
     const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
+    if (c === null) labels.push(CLASSIFIER_ERROR_LABEL);
     // a reader that FAILED is not a clean read — route to review rather than wave it through
     if (words === null) labels.push('text-unreadable');
     else if (words.length && containsAbusiveText(words.join(' '))) labels.push('drawn-words');

@@ -23,4 +23,4 @@ export {
 
 export { canViewProfileImage, type ProfileImageRef, type ProfileViewer } from './profileImages';
 
-export { canReview, type Reviewer, type ReviewAction } from './review';
+export { canReview, hashCheckSkipped, HASH_UNCHECKED_LABEL, type Reviewer, type ReviewAction, type ReviewSubject } from './review';

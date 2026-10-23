@@ -18,8 +18,11 @@ describe('content-safety hardening', () => {
     expect(arg.sha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('"real" can never silently mean the pass-everything stub', () => {
-    expect(() => defaultProviders({ MODERATION_PROVIDER: 'real' })).toThrow(/not wired/);
+  it('"real" can never silently mean the pass-everything stub', async () => {
+    // real mode with IWF not onboarded: the hash gate is closed, so nothing comes back CLEAR
+    const real = defaultProviders({ MODERATION_PROVIDER: 'real' });
+    await expect(real.hash.isKnownIllegal({ sha256: 'x', buffer: Buffer.from('x') })).rejects.toThrow(/not configured/);
+    expect(() => defaultProviders({ MODERATION_PROVIDER: 'reall' })).toThrow(/must be "stub" or "real"/);
   });
 
   it('production with no real screening FAILS CLOSED: held for review (never CLEAR, never rejected)', async () => {
