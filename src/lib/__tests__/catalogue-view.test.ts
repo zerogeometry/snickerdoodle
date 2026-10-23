@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BasketItem } from '@/lib/store';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
-import { defaultTransformFor, filterCatalogue, FLAT_MIN_GAP, FLAT_PRODUCT_KEYS, lineIdForSku, matchesQuery, orientationForAspect, productQtyInBasket, resolveDisplayVariant, sizeDimsCm, spaceOutFlat, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultPlacementFor, defaultTransformFor, filterCatalogue, FLAT_MIN_GAP, FLAT_PRODUCT_KEYS, lineIdForSku, matchesQuery, orientationForAspect, productQtyInBasket, resolveDisplayVariant, sizeDimsCm, spaceOutFlat, splitCatalogue } from '@/lib/catalogue-view';
 
 const variant = (sku: string, attrs: Record<string, string> = {}, isDefault = false): CatalogueVariant => ({
   id: `id-${sku}`, sku, attributes: attrs, pricePence: 1400, isDefault, printWmm: 209, printHmm: 98,
@@ -168,6 +168,30 @@ describe('defaultTransformFor — the mug fills the full wrap width by default',
   });
   it('an un-listed product still contains (scale 0 sentinel)', () => {
     expect(defaultTransformFor('storybook').scale).toBe(0);
+  });
+});
+
+describe('phone case + playing cards — portrait products that fill (founder, 23 Oct)', () => {
+  it('a square or portrait drawing fills them, unturned (cover, no stretch)', () => {
+    for (const k of ['phoneCase', 'playingCards']) {
+      expect(defaultTransformFor(k, 1)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
+      expect(defaultTransformFor(k, 0.7)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
+    }
+  });
+  it('a landscape drawing turns a quarter, then fills — anti-clockwise on a phone (held sideways in the right hand)', () => {
+    expect(defaultTransformFor('phoneCase', 1.5)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 270 });
+    expect(defaultTransformFor('playingCards', 1.5)).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 90 });
+  });
+  it('an unknown shape is not turned', () => {
+    expect(defaultTransformFor('phoneCase').rotationDeg).toBe(0);
+    expect(defaultTransformFor('phoneCase', null).rotationDeg).toBe(0);
+  });
+  it('the tile, quick-add and customize share one answer', () => {
+    expect(defaultPlacementFor('phoneCase', { size: 'iPhone 15', grade: 'tough' }, 1.6)).toEqual(defaultTransformFor('phoneCase', 1.6));
+    expect(defaultPlacementFor('playingCards', undefined, 0.8)).toEqual(defaultTransformFor('playingCards', 0.8));
+  });
+  it('other products are unchanged by a landscape drawing (frames, blankets and jigsaws turn the product instead)', () => {
+    for (const k of ['framedPrint', 'blanket', 'jigsaw', 'mug', 'cushion']) expect(defaultTransformFor(k, 1.6).rotationDeg).toBe(0);
   });
 });
 

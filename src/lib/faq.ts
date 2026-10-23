@@ -98,7 +98,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'phone-case',
         q: 'Can I put my child’s drawing on a phone case?',
-        a: 'Yes — Snickerdoodle prints your child’s drawing edge to edge on a phone case for dozens of iPhone, Samsung Galaxy and Google Pixel models. Choose a slim snap case or a tough case with a cushioned lining, in gloss or matte, and the drawing is placed clear of the camera for your exact phone.',
+        a: 'Yes — Snickerdoodle prints your child’s drawing edge to edge on a phone case for dozens of iPhone, Samsung Galaxy and Google Pixel models. Choose a slim snap case or a tough case with a cushioned lining, in gloss or matte, and the drawing fills the back of the case — a wide drawing turns to fit, reading the right way up when the phone is held sideways — and you can move or resize it before you order.',
       },
       {
         id: 'socks-wrapping-paper',

@@ -23,7 +23,7 @@ import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
 import { basketLineId } from '@/lib/basket-line';
-import { defaultPlacementFor, defaultTransformFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultPlacementFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { isCardPackKey } from '@/lib/card-packs';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -168,7 +168,7 @@ export function FlowCatalogue({
     const def = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: useSelection.getState().selections[p.key] });
     // the line for THIS drawing at the default placement — another drawing's line is never touched
     const design = (assetId: string | null | undefined) =>
-      assetId ? { artwork: { assetId, transform: defaultTransformFor(p.key), sourceObjectId: upload?.cutout?.sourceObjectId } } : {};
+      assetId ? { artwork: { assetId, transform: defaultPlacementFor(p.key, def.attributes, upload?.aspect), sourceObjectId: upload?.cutout?.sourceObjectId } } : {};
     let defId = basketLineId(def.sku, design(upload?.assetId));
     // Decrement is purely local — always allowed (never gated by an in-flight ingest).
     // Take one off the DEFAULT quick-add line first; otherwise the most-recently-added

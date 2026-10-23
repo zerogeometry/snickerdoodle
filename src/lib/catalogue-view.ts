@@ -1,5 +1,4 @@
 import type { BasketItem } from '@/lib/store';
-import { caseDefaultTransform } from '@/lib/phone-cases';
 import { groundTag } from '@/lib/patterns';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -38,28 +37,37 @@ export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku)
  *    (209×98mm ≈ 2.14:1) by default, rather than contain-letterboxing to its own height (founder
  *    2026-07-10). Unlike a frame the mug is NOT cover-locked in the editor: the shopper can still
  *    zoom DOWN through contain to reveal the whole drawing's height (see Positioner `lockToCover`).
+ *  - phoneCase + playingCards: PORTRAIT FILL (founder, 23 Oct) — treated as portrait products: a
+ *    square or portrait drawing fills them (cover, no stretch); a LANDSCAPE drawing is turned a
+ *    quarter turn first (see LANDSCAPE_TURN), then fills. Needs the drawing's aspect (w/h);
+ *    unknown → not turned.
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
 const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug']);
-export function defaultTransformFor(productKey: string): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
+export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
+/**
+ * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate). A phone is held
+ * sideways in the RIGHT hand (founder, 23 Oct): its top points left as you look at the screen — so
+ * to anyone looking at the case, its top points to their right, and the drawing must turn a quarter
+ * ANTI-clockwise on the print to read upright. Cards have no "right way up" in the hand: 90.
+ */
+const LANDSCAPE_TURN: Record<string, number> = { phoneCase: 270, playingCards: 90 };
+export function defaultTransformFor(productKey: string, aspect?: number | null): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
+  if (PORTRAIT_FILL.has(productKey)) return { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: aspect && aspect > 1 ? LANDSCAPE_TURN[productKey] ?? 90 : 0 };
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
 }
 
 /**
- * The default placement for a product AS SHOWN — like {@link defaultTransformFor}, but a phone case
- * starts with the whole drawing clear of that phone's camera (needs the drawing's aspect, w/h).
- * The range tile and its enlarge view use this so they match the customize page.
+ * The default placement for a product AS SHOWN, for this drawing's shape (w/h) — the range tile,
+ * its enlarge view, quick-add, customize and the positioner all use it, so they always agree.
+ * (`variantAttrs` is kept for callers; no product's default depends on it today.)
  */
 export function defaultPlacementFor(
   productKey: string,
-  variantAttrs: Record<string, string> | undefined,
+  _variantAttrs: Record<string, string> | undefined,
   aspect: number | undefined | null,
 ): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
-  if (productKey === 'phoneCase' && aspect && aspect > 0) {
-    const t = caseDefaultTransform(variantAttrs?.size, variantAttrs?.grade, { width: Math.round(aspect * 1000), height: 1000 });
-    if (t) return t;
-  }
-  return defaultTransformFor(productKey);
+  return defaultTransformFor(productKey, aspect);
 }
 
 /**

@@ -97,6 +97,11 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     if (saved) return saved as Transform;
     return { scale: defaultTransformFor(v0?.productKey ?? '').scale, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   });
+  const startedFromDefault = useRef(!(() => {
+    const v0 = data.variants.find((v) => v.id === ((focused ? focusVariantId : undefined) ?? data.variants[0]?.id));
+    const keepsake0 = data.keepsakes[0];
+    return v0 && keepsake0 ? usePlacements.getState().placements[`${keepsake0.id}-${v0.productKey}`] : undefined;
+  })());
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [rendering, setRendering] = useState(false);
   const [result, setResult] = useState<RenderPreviewResult | null>(null);
@@ -215,6 +220,14 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // both exist: the outer Positioner only renders the editor when there's something to place
   const keepsake = data.keepsakes[assetIdx] ?? data.keepsakes[0]!;
   const variant = variants.find((v) => v.id === variantId) ?? variants[0]!;
+  // A fresh placement (nothing saved) on a product whose default depends on the drawing's shape (a
+  // landscape drawing turns on a phone case / playing cards): once the shape is known, start there.
+  useEffect(() => {
+    if (!natural || !startedFromDefault.current) return;
+    startedFromDefault.current = false;
+    const d = defaultTransformFor(variant.productKey, natural.w / natural.h);
+    if (d.rotationDeg) setTf((cur) => ({ ...cur, scale: d.scale, rotationDeg: d.rotationDeg as Transform['rotationDeg'] }));
+  }, [natural, variant.productKey]);
 
   const t = variant.template;
   const isJigsaw = variant.productKey === 'jigsaw';

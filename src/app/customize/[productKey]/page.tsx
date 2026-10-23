@@ -22,7 +22,7 @@ import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { garmentHex, isDarkGarment, isGarmentKey } from '@/lib/garments';
-import { CASE_GRADE_BLURB, caseDefaultTransform, gradesFor } from '@/lib/phone-cases';
+import { CASE_GRADE_BLURB, gradesFor } from '@/lib/phone-cases';
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
 import { CardPackBuilder } from '@/ui/components/CardPackBuilder';
 import { isCardPackKey } from '@/lib/card-packs';
@@ -375,7 +375,7 @@ function CustomizeProduct() {
   // a phone case starts with the whole drawing clear of THIS phone's camera; everything else
   // keeps its product default. A placement the parent set themselves always wins.
   const placement =
-    savedPlacement || (product.key === 'phoneCase' ? caseDefaultTransform(size, grade, srcSize) : null) || defaultTransformFor(product.key);
+    savedPlacement || defaultTransformFor(product.key, srcSize ? srcSize.width / srcSize.height : upload?.aspect);
 
   // Print-readiness (Studio spec §15 / docs/04: never silently under-resolve).
   const assessFor = (v: (typeof product.variants)[number] | null | undefined): ResolutionAssessment | null =>
