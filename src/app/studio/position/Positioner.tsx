@@ -29,6 +29,7 @@ import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geo
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
+import { MockupPreview } from '@/ui/components/MockupPreview';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import type { StudioData } from '@/server/studio';
 
@@ -247,6 +248,18 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const groundFill: React.CSSProperties | undefined = isGround && !isPattern && isColouredGround(groundToken) ? { background: groundHex } : undefined;
   const isChart = isHeightChart(variant.productKey);
   const noProductView = isMug || isPattern || isChart;
+  // …so those show the REAL product preview instead (founder, 23 Oct: "a quality preview of the print
+  // on the product, not just as a print") — the same renderer as the customize page and the print, so
+  // a curve round a mug or a repeat round a sock is exactly what arrives. It follows your changes a
+  // beat after you stop (each one is drawn on the server), while the print layout stays live.
+  const tfKey = JSON.stringify(tf);
+  const [settledTf, setSettledTf] = useState(tf);
+  useEffect(() => {
+    if (!noProductView) return;
+    const id = setTimeout(() => setSettledTf(JSON.parse(tfKey) as Transform), 450);
+    return () => clearTimeout(id);
+  }, [tfKey, noProductView]);
+  const productNoun = isMug ? 'mug' : variant.productKey === 'socks' ? 'socks' : variant.productKey === 'teaTowel' ? 'tea towel' : variant.productKey === 'wrappingPaper' ? 'paper' : isChart ? 'chart' : 'product';
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
@@ -1053,6 +1066,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             )}
           </p>
 
+
           {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX
               offered right where the warning is, never a dead end. */}
           {assess ? (
@@ -1209,6 +1223,28 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <Icon icon={IconRotateClockwise} size={14} /> rotate ({tf.rotationDeg}°)
             </button>
           </div>
+
+          {noProductView ? (
+            <section aria-label={`on the ${productNoun}`} className="mt-5 rounded-[14px] border-2 border-cocoa/15 bg-paper p-2">
+              <p className="px-1 text-[12px] font-extrabold text-cocoa">
+                on the {productNoun} <span className="font-normal text-ink-faint">· how it will really look — updates when you stop</span>
+              </p>
+              <div className="mx-auto mt-1 aspect-square w-full max-w-[300px]">
+                <MockupPreview
+                  productKey={variant.productKey as ProductKey}
+                  assetId={keepsake.id}
+                  variantId={variant.id}
+                  transform={settledTf}
+                  size="zoom"
+                  sourceObjectId={cutout?.sourceObjectId ?? null}
+                  view={isMug ? 'centre' : undefined}
+                  ground={isGround ? (groundToken ?? null) : null}
+                  px={340}
+                  loader
+                />
+              </div>
+            </section>
+          ) : null}
 
           {/* a design from the Studio already has its background handled there — no second remover */}
           {keepsake.design ? null : (<>
