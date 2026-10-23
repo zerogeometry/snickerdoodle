@@ -8,6 +8,7 @@ import { FAQ, FAQ_PRODUCT_NAMES, FAQ_UPDATED, plainAnswer, type FaqItem } from '
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
+import { COMPANY } from '@/lib/company';
 
 export const metadata: Metadata = {
   title: 'FAQs — turning children’s drawings into keepsakes',
@@ -68,7 +69,11 @@ export default async function FaqPage() {
         '@type': 'Organization',
         '@id': `${site}/#organization`,
         name: 'Snickerdoodle',
-        legalName: 'Launch Mode Ltd',
+        legalName: COMPANY.legalName,
+        email: COMPANY.email,
+        vatID: COMPANY.vatNumber.replace(/\s+/g, ''),
+        identifier: { '@type': 'PropertyValue', propertyID: 'Companies House company number', value: COMPANY.companyNumber },
+        address: { '@type': 'PostalAddress', streetAddress: COMPANY.street, addressLocality: COMPANY.city, postalCode: COMPANY.postcode, addressCountry: COMPANY.country },
         url: site,
         logo: `${site}/brand/snickerlogo.png`,
         description: 'A UK service that turns children’s drawings and photos into personalised keepsakes and gifts, kept safe in a private Family Keepsake Home.',

@@ -5,6 +5,7 @@ import { MarketingMobileMenu } from '@/ui/components/MarketingMobileMenu';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { getCurrentAccount } from '@/server/session';
 import { Logo } from '@/ui/components/Logo';
+import { COMPANY } from '@/lib/company';
 
 /** Marketing surface: nav + footer, goal is "start creating". A signed-in parent also gets a way
  * back to their keepsakes + account (never a dead-end "log in"). */
@@ -64,6 +65,21 @@ export default async function MarketingLayout({ children }: { children: ReactNod
             start creating
           </Button>
         </div>
+        {/* who we are — the company behind the shop (the same details as the invoices + schema) */}
+        <address className="mx-auto mt-4 max-w-6xl border-t border-cocoa/10 pt-4 text-center text-[11px] not-italic leading-relaxed text-ink-faint sm:text-left">
+          <span className="block font-bold text-ink-soft">
+            {COMPANY.legalName} (t/a {COMPANY.tradingAs})
+          </span>
+          <span className="block">
+            {COMPANY.street}, {COMPANY.city} {COMPANY.postcode} ·{' '}
+            <a href={`mailto:${COMPANY.email}`} className="underline underline-offset-2 hover:text-cinnamon">
+              {COMPANY.email}
+            </a>
+          </span>
+          <span className="block">
+            Registered in {COMPANY.registeredIn} · Company No: {COMPANY.companyNumber} · VAT No: {COMPANY.vatNumber}
+          </span>
+        </address>
       </footer>
     </div>
   );

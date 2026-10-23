@@ -139,7 +139,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'remove-background',
         q: 'Can you remove the paper background from my child’s drawing?',
-        a: 'Yes — one tap in the Snickerdoodle studio lifts the drawing off its paper, so it can sit on any colour or product. It can keep the white inside shapes (the whites of eyes, a snowman, a cloud), and you can brush back anything you want to keep.',
+        a: 'Yes — one tap in the Snickerdoodle studio lifts the drawing off its paper, so it can sit on any colour or product. If you still need to fine-tune it, you can remove specific colours and use the eraser. It can keep the white inside shapes (the whites of eyes, a snowman, a cloud), and you can brush back anything you want to keep.',
       },
       {
         id: 'change-drawing',
