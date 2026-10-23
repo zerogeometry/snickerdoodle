@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, useEffect, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useRef, type MutableRefObject } from 'react';
 import type { Transform } from '@/server/print/geometry';
 import { patternLayout, patternMotifCentres, scalePatternLayout } from '@/server/print/pattern-geometry';
 
@@ -10,8 +10,9 @@ import { patternLayout, patternMotifCentres, scalePatternLayout } from '@/server
  * positions (patternMotifCentres) — so what you place here is what prints. Display only; the
  * print file is still made server-side (pattern.ts).
  *
- * The outer div is the live-gesture target: the editor sets --gx/--gy/--gk on it while a finger
- * is down, and the repeat follows; on release the committed transform re-draws it exactly.
+ * While a finger is down the editor RE-DRAWS the repeat at the gesture's zoom + pan (`drawRef`), so
+ * zooming out adds copies as you pinch — never a shrinking picture with empty edges. On release
+ * the committed transform draws it again, exactly.
  */
 export const PatternRepeat = forwardRef<
   HTMLDivElement,
@@ -27,17 +28,20 @@ export const PatternRepeat = forwardRef<
     height: number;
     /** the base colour the repeat sits on (#rrggbb) — the print file's fill */
     groundHex?: string;
+    /** Filled with a draw function the editor calls mid-gesture with the live transform. */
+    drawRef?: MutableRefObject<((t: Transform) => void) | null>;
   }
->(function PatternRepeat({ image, natural, canvas, dpi, transform, width, height, groundHex = '#ffffff' }, ref) {
+>(function PatternRepeat({ image, natural, canvas, dpi, transform, width, height, groundHex = '#ffffff', drawRef }, ref) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  useEffect(() => {
+  const draw = useCallback((transform: Transform) => {
     const el = canvasRef.current;
     const ctx = el?.getContext('2d');
     if (!el || !ctx || !image || !image.complete || !image.naturalWidth) return;
     const dpr = typeof window !== 'undefined' ? Math.min(2, window.devicePixelRatio || 1) : 1;
-    el.width = Math.round(width * dpr);
-    el.height = Math.round(height * dpr);
+    const pw = Math.round(width * dpr), ph = Math.round(height * dpr);
+    if (el.width !== pw) el.width = pw;
+    if (el.height !== ph) el.height = ph;
     const print = patternLayout(canvas, dpi, { width: natural.w, height: natural.h }, transform);
     const { canvas: small, layout } = scalePatternLayout(print, canvas, (width * dpr) / canvas.width);
     ctx.fillStyle = groundHex;
@@ -52,7 +56,18 @@ export const PatternRepeat = forwardRef<
       ctx.drawImage(image, -w / 2, -h / 2, w, h);
       ctx.restore();
     }
-  }, [image, natural.w, natural.h, canvas, dpi, transform, width, height, groundHex]);
+  }, [image, natural.w, natural.h, canvas, dpi, width, height, groundHex]);
+
+  // the committed transform (and any input change) draws it exactly
+  useEffect(() => draw(transform), [draw, transform]);
+  // the editor's live gesture draws through this
+  useEffect(() => {
+    if (!drawRef) return;
+    drawRef.current = draw;
+    return () => {
+      if (drawRef.current === draw) drawRef.current = null;
+    };
+  }, [draw, drawRef]);
 
   return (
     <div

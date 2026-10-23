@@ -466,7 +466,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 
 type Face = 'pattern' | 'heightChart';
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
-const FACE_REV = '1';
+const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
 /** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
  * the photo's print area is never more than the ~1500 px working edge, so 2× that is plenty). */
 const FACE_MAX_EDGE = 3000;
