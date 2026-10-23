@@ -66,7 +66,7 @@ export default function FamilyPromisePage() {
         <h3>Something not right? Tell us.</h3>
         <p>
           If you&apos;re ever unhappy with how we&apos;ve looked after your data, tell us at{' '}
-          <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a> — a real person will get back
+          <a href="mailto:support@snickerdoodle.co.uk">support@snickerdoodle.co.uk</a> — a real person will get back
           to you. You can always go to the regulator too, but we&apos;d love the chance to put it right first.
         </p>
 

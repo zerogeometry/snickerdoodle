@@ -31,7 +31,7 @@ export default function DataComplaintPage() {
         <ComplaintForm />
 
         <p className="mt-6 text-[13px] leading-relaxed text-ink-faint">
-          Prefer email? Reach us at <a className="text-cinnamon underline" href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a>.
+          Prefer email? Reach us at <a className="text-cinnamon underline" href="mailto:support@snickerdoodle.co.uk">support@snickerdoodle.co.uk</a>.
           You also have the right to complain to the Information Commissioner&apos;s Office at ico.org.uk — though
           we&apos;d appreciate the chance to put things right first.
         </p>
