@@ -581,6 +581,17 @@ function CustomizeProduct() {
               ))}
             </div>
           ) : null}
+          {/* Opened without a drawing (a refresh, a shared link — the drawing lives only in this tab):
+              say so, and the way back, instead of a preview that pulses forever and dead buttons. */}
+          {!activeAssetId && !upload ? (
+            <div role="status" className="mt-3 rounded-[20px] border-2 border-cocoa bg-honey-band p-5 text-center shadow-[0_3px_0_var(--color-cocoa)]">
+              <p className="font-display text-xl text-cocoa">Your drawing isn’t loaded</p>
+              <p className="mt-1 text-[14px] text-ink-soft">Pop back and choose it again — it only takes a moment. Anything already in your basket is safe.</p>
+              <Link href="/start-creating" className="press mt-4 inline-flex min-h-11 items-center justify-center rounded-pill border-2 border-cocoa bg-cta px-5 text-sm font-extrabold text-white shadow-[0_2px_0_var(--color-cocoa)]">
+                choose your drawing
+              </Link>
+            </div>
+          ) : null}
           <div className="polaroid tape relative mt-3">
             <div className="flex w-full items-center justify-center bg-paper-2 p-3">
             {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
