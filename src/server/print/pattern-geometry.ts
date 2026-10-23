@@ -33,6 +33,11 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 const MAX_FILL = 0.9;
 /** A narrow print's default motif, as a share of its column's width (see patternLayout). */
 const NARROW_MOTIF_OF_CELL = 0.51;
+/** Prints narrower than this wrap round (socks: 300 + 520 mm) and get one whole column per side;
+ * the flat sheets — tea towel (695 mm), wrapping paper (700 mm) — keep the plain repeat. */
+const NARROW_MAX_MM = 600;
+/** A narrow print this wide or more is a tube sock (520 mm): four columns round, not two. */
+const TUBE_MIN_MM = 450;
 
 /**
  * Where every motif goes. The ZOOM sets the motif's size directly (scale 0 = PATTERN_MOTIF_MM), so
@@ -51,21 +56,26 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
   const rotated = transform.rotationDeg % 180 !== 0;
   const sw = rotated ? src.height : src.width;
   const sh = rotated ? src.width : src.height;
-  // A NARROW print at its default zoom (an ankle sock, ~300 mm round) shows ONE column per side: two
+  // A NARROW print (a sock: ankle ~300 mm round, tube ~520) shows ONE column per side at its default: two
   // columns round, each motif about half its column wide and centred on the side you see — so each
   // sock shows whole motifs with white either side, never slices of the next column at its edges
-  // (founder, 23 Oct: "chopped up"; four-round always left slivers). Zooming still works.
+  // (founder, 23 Oct: "chopped up"; four-round always left slivers). That IS its 1.0× — the zoom
+  // multiplies it and the shift starts from centred — so nudging either never jumps the pattern.
   const widthMm = (canvas.width / dpi) * 25.4;
-  const narrowDefault = transform.scale === 0 && widthMm < 3 * (PATTERN_MOTIF_MM / PATTERN_FILL);
-  const motifMm = narrowDefault
-    ? clamp((widthMm / 2) * NARROW_MOTIF_OF_CELL, MOTIF_MM_MIN, PATTERN_MOTIF_MM)
-    : clamp(PATTERN_MOTIF_MM * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
+  const narrow = widthMm < NARROW_MAX_MM;
+  // one column = the side you see: half an ankle sock's print, but only about a quarter of a tube
+  // sock's (its print is far wider than the leg — measured on the photo, 23 Oct)
+  const narrowCols = widthMm > TUBE_MIN_MM ? 4 : 2;
+  const baseMm = narrow ? clamp((widthMm / narrowCols) * NARROW_MOTIF_OF_CELL, MOTIF_MM_MIN, MOTIF_MM_MAX) : PATTERN_MOTIF_MM;
+  // narrow prints space columns by the motif's share of its column, so 1.0× lands on narrowCols
+  const colFill = narrow ? NARROW_MOTIF_OF_CELL : PATTERN_FILL;
+  const motifMm = clamp(baseMm * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
   // the motif's box at this zoom: motifMm wide, as tall as the drawing's shape (capped for very
   // tall / very wide drawings, so they stay a sensible size)
   const boxW = mmToPx(motifMm, dpi);
   const boxH = boxW * clamp(sh / sw, 0.6, 1.6);
   const k = Math.min(boxW / sw, boxH / sh);
-  const cols = Math.max(2, 2 * Math.round(canvas.width / (boxW / PATTERN_FILL) / 2)); // EVEN → the half-drop wraps
+  const cols = Math.max(2, 2 * Math.round(canvas.width / (boxW / colFill) / 2)); // EVEN → the half-drop wraps
   const cellW = canvas.width / cols;
   const kW = Math.min(k, (cellW * MAX_FILL) / sw); // a narrow print caps the motif to its column
   const rows = Math.max(1, Math.round(canvas.height / ((sh * kW) / PATTERN_FILL)));
@@ -75,8 +85,8 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
     cols, rows, cellW, stripH,
     motifW: Math.max(1, Math.round(sw * fit)),
     motifH: Math.max(1, Math.round(sh * fit)),
-    // (a narrow default starts half a column across, so a whole motif sits mid-face)
-    phaseX: Math.round(((transform.offsetX + (narrowDefault ? 1 : 0)) * cellW) / 2),
+    // (a narrow print starts half a column across, so a whole motif sits mid-face)
+    phaseX: Math.round(((transform.offsetX + (narrow ? 1 : 0)) * cellW) / 2),
     phaseY: Math.round((transform.offsetY * stripH) / 2),
   };
 }

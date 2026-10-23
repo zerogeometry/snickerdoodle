@@ -28,21 +28,29 @@ describe('patternLayout — a narrow print (the ankle sock) at its default zoom 
     expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
     expect(L.motifW / L.cellW).toBeLessThan(0.56); // white either side of it on the sock's face
   });
-  it('wide prints (tube socks, tea towel, wrap) keep their default layout', () => {
-    for (const [w, h, dpi] of [[6141, 5433, 300], [8208, 5492, 300], [4133, 11811, 150]] as const) {
+  it('tube socks wrap round too: one whole column per visible side — four round (the leg shows ~a quarter of the print)', () => {
+    const L = patternLayout({ width: 6141, height: 5433 }, 300, src, T);
+    expect(L.cols).toBe(4);
+    expect(L.phaseX).toBe(Math.round(L.cellW / 2));
+    expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
+    expect(L.motifW / L.cellW).toBeLessThan(0.56);
+  });
+  it('the flat sheets (tea towel, wrapping paper) keep the plain repeat', () => {
+    for (const [w, h, dpi] of [[8208, 5492, 300], [4133, 11811, 150]] as const) {
       const L = patternLayout({ width: w, height: h }, dpi, src, T);
       expect(L.phaseX).toBe(0);
-      expect(L.motifW).toBeGreaterThan(0);
+      expect(L.cols).toBeGreaterThan(2);
     }
-    // the tube's columns, as before: a 90 mm motif at 72% fill across 520 mm
-    expect(patternLayout({ width: 6141, height: 5433 }, 300, src, T).cols).toBe(4);
   });
-  it('zooming on the ankle sock still works from there (an explicit zoom is the shopper’s choice)', () => {
-    const big = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1 }));
-    expect(big.cols).toBe(2);
-    expect(big.phaseX).toBe(0);
+  it('the default IS 1.0×: touching the zoom or the shift never jumps the pattern; zooming works from there', () => {
+    const def = patternLayout({ width: 3543, height: 3543 }, 300, src, T);
+    const one = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1 }));
+    expect(one).toEqual(def); // the editor's "1.0×" is exactly the default
+    const nudged = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1, offsetX: 0.02 }));
+    expect(Math.abs(nudged.phaseX - def.phaseX)).toBeLessThan(def.cellW * 0.02); // a nudge moves a nudge
     const small = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 0.5 }));
     expect(small.cols).toBeGreaterThan(2);
+    expect(small.motifW).toBeLessThan(def.motifW);
   });
 });
 
@@ -92,7 +100,8 @@ describe('patternLayout — the seam + scale maths', () => {
   it('the default motif prints at about PATTERN_MOTIF_MM, and zoom changes it', () => {
     const dpi = 300;
     const motifMm = (scale: number) => {
-      const l = patternLayout({ width: 6000, height: 6000 }, dpi, { width: 1000, height: 1000 }, clampTransform({ scale }));
+      // a flat sheet (tea-towel width) — narrower prints (socks) have their own default, tested above
+      const l = patternLayout({ width: 8208, height: 6000 }, dpi, { width: 1000, height: 1000 }, clampTransform({ scale }));
       return (l.motifW / dpi) * 25.4;
     };
     expect(motifMm(0)).toBeGreaterThan(PATTERN_MOTIF_MM * 0.8);

@@ -21,9 +21,17 @@ const pinch = (page: Page, phase: 'down' | 'move' | 'up', spread: number) =>
     },
     { phase, spread },
   );
-/** A screenshot of the drawn repeat: a fingerprint, and the share of it that is the drawing's ink. */
+/** A screenshot of just the drawn repeat (the selection handles on top of it hidden for the shot): a
+ * fingerprint, and the share of it that is the drawing's ink. */
 async function repeatPixels(page: Page) {
+  const overlays = (hide: boolean) =>
+    page.evaluate((hide) => {
+      const app = document.querySelector('[role="application"]')!;
+      for (const el of app.querySelectorAll<HTMLElement>(':scope > *')) if (!el.querySelector('canvas') && el.tagName !== 'CANVAS') el.style.visibility = hide ? 'hidden' : '';
+    }, hide);
+  await overlays(true);
   const png = await page.locator('[role="application"] canvas').screenshot();
+  await overlays(false);
   const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const bg = [data[0]!, data[1]!, data[2]!]; // the corner: the sock's base colour
   let ink = 0;

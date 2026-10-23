@@ -46,7 +46,9 @@ describe.skipIf(!DB)('mockup print-map registration — quad aspect == print asp
       .innerJoin(templateAssets, eq(printTemplates.blankObjectId, templateAssets.id))
       .where(eq(productVariants.active, true)); // retired variants keep stale templates; only live ones render
 
-    const flat = rows.filter((r) => r.quad && r.blankW && r.blankH && !r.sku.startsWith('mug'));
+    // (mugs wrap a cylinder; wrapping paper's photo is a WINDOW onto the long roll — every roll length
+    // shares one sheet photo, by design (seedMockups `window: true`) — so neither is aspect-locked)
+    const flat = rows.filter((r) => r.quad && r.blankW && r.blankH && !r.sku.startsWith('mug') && !r.sku.startsWith('wrappingPaper'));
     const offenders: string[] = [];
     for (const r of flat) {
       const q = r.quad as [number, number][];

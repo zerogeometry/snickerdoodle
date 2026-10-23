@@ -60,6 +60,8 @@ const MAX_INPUT_PIXELS = 50_000_000; // decompression-bomb guard on every decode
 // independent of the decode cap. Beyond this we fall back to the SVG (the source is the
 // wrong shape for a faithful mockup anyway).
 const MAX_DRAWN_PIXELS = 16_000_000;
+/** The angled-view preview canvas's longest edge (never printed — warped onto the working photo). */
+const PERSPECTIVE_CANVAS_EDGE = 3000;
 const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
@@ -72,7 +74,7 @@ const MAX_CONCURRENT = 3;
  */
 const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
 
-const RENDER_REV = 'r20'; // r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r21'; // r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type MockupSize = 'thumb' | 'zoom';
 
@@ -872,12 +874,16 @@ async function renderPerspective(args: {
   // + transformed exactly like the flat path, but with ZERO bleed (this view is never printed).
   const src = await designSize(designBuf);
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
-  const dw = Math.max(2, print.widthPx);
-  const dh = Math.max(2, print.heightPx);
+  // A preview canvas never needs print resolution — it's warped down onto a working-size photo. Cap
+  // its longest edge (same shape): a big print (a tube sock, 6141×5433) otherwise tripped the
+  // drawn-pixel guard and the product had NO preview at all (founder testing, 23 Oct).
+  const pk = Math.min(1, PERSPECTIVE_CANVAS_EDGE / Math.max(print.widthPx, print.heightPx));
+  const dw = Math.max(2, Math.round(print.widthPx * pk));
+  const dh = Math.max(2, Math.round(print.heightPx * pk));
   // 'full width' closed card: the design spans the whole outside (front+back), so cover-fit it
   // into a DOUBLE-WIDE spread and keep just this panel — 'front' = the right half of [back|front].
   const cw = spanHalf ? dw * 2 : dw;
-  const layer = computeLayerRect({ printWidthPx: cw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi }, src, transform);
+  const layer = computeLayerRect({ printWidthPx: cw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi * pk }, src, transform);
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
   // Window the transformed layer onto the cw×dh canvas (handles cover-crop AND contain-centre).
   const ix = Math.max(0, -layer.x);
