@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import type { ReactNode } from 'react';
+import { connection } from 'next/server';
 // Self-hosted brand fonts, bundled via @fontsource (no build-time or runtime fetch
 // to Google — GDPR-clean and works offline). Scrapbook direction (D12): "Bricolage
 // Grotesque Variable" (display + UI) and Gaegu (the one handwritten moment, latin only).
@@ -32,7 +33,11 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  // Render every page per request: the middleware's script nonce (src/lib/csp.ts) is new each
+  // time and Next stamps it on its scripts at render. A page prerendered at build time would
+  // carry no nonce, and the CSP would (rightly) refuse to run it.
+  await connection();
   return (
     <html lang="en">
       <body className="kraft min-h-dvh font-sans">

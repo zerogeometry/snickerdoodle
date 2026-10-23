@@ -11,16 +11,21 @@ import type { NextConfig } from 'next';
  *  - Referrer-Policy: a gift-link / invite token in a URL never leaks to another site;
  *  - Permissions-Policy: the camera is ours only (CameraCapture); no mic, location or payment API;
  *  - HSTS: HTTPS only, for a year (no includeSubDomains/preload until every subdomain is HTTPS).
- * A full script-src CSP (with per-request nonces) is the follow-up — it needs the middleware.
+ * The Content-Security-Policy itself (scripts by per-request nonce, plus the framing/base/object/
+ * form rules) is set by the middleware — src/lib/csp.ts builds it. The only responses the
+ * middleware skips are Next's hashed static files and the image optimiser; they get the strict
+ * baseline below (no HTML is ever served there, so nothing needs to run).
  */
 const SECURITY_HEADERS = [
-  { key: 'Content-Security-Policy', value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'" },
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()' },
   { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
 ];
+
+/** For the paths the middleware doesn't see (/_next/static, /_next/image): run nothing, frame nothing. */
+const STATIC_ASSET_CSP = "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 /** The private app (anything a child's drawing can appear on) is never indexed — only the
  * marketing pages are. Belt and braces: these pages are behind sign-in or a token anyway. */
@@ -32,6 +37,7 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: SECURITY_HEADERS },
+      ...['/_next/static/:path*', '/_next/image'].map((source) => ({ source, headers: [{ key: 'Content-Security-Policy', value: STATIC_ASSET_CSP }] })),
       ...NOINDEX_PATHS.flatMap((p) => [
         { source: p, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
         { source: `${p}/:path*`, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
