@@ -1,14 +1,11 @@
-import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { FlatCompat } from '@eslint/eslintrc';
+import nextCoreWebVitals from 'eslint-config-next/core-web-vitals';
+import nextTypescript from 'eslint-config-next/typescript';
 
 /**
  * The tidy-code checker: Next's recommended rules (React, hooks, accessibility basics,
  * Core Web Vitals) plus TypeScript. `npm run lint`. Kept close to the defaults on purpose —
  * typecheck + the test suites do the heavy lifting; this catches the rest.
  */
-const compat = new FlatCompat({ baseDirectory: dirname(fileURLToPath(import.meta.url)) });
-
 const config = [
   {
     ignores: [
@@ -28,7 +25,9 @@ const config = [
       '.claude/**', // other sessions' worktrees (and their build output) live here
     ],
   },
-  ...compat.extends('next/core-web-vitals', 'next/typescript'),
+  // eslint-config-next 16 ships flat config natively (no FlatCompat bridge)
+  ...nextCoreWebVitals,
+  ...nextTypescript,
   {
     rules: {
       // Off on purpose: next/image's optimiser fetches the picture server-side and keeps a cached
@@ -36,6 +35,14 @@ const config = [
       '@next/next/no-img-element': 'off',
       // `_`-prefixed names are deliberately unused (destructuring to drop a field, etc.)
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none', ignoreRestSiblings: true }],
+      // eslint-config-next 16 newly switches on eslint-plugin-react-hooks' React Compiler readiness
+      // rules. They flag ~65 existing patterns (setState in an effect, reading a ref during render,
+      // Date.now() in render…) that work today — we don't run the React Compiler. Off until a
+      // dedicated pass, rather than rewriting dozens of components inside a framework upgrade.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/immutability': 'off',
     },
   },
 ];

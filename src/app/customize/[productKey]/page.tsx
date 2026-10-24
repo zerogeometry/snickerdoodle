@@ -12,7 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { FlowHeader } from '@/ui/components/FlowHeader';
-import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, type CardMessage } from '@/lib/store';
+import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
@@ -74,6 +74,8 @@ function CustomizeProduct() {
   const productKey = params.productKey;
 
   const upload = useUpload((s) => s.upload);
+  // this tab's drawing is read just after mount (src/lib/uploadSession.ts) — don't say it's missing before then
+  const uploadReady = useUploadHydrated();
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
   const placements = usePlacements((s) => s.placements);
@@ -581,9 +583,9 @@ function CustomizeProduct() {
               ))}
             </div>
           ) : null}
-          {/* Opened without a drawing (a refresh, a shared link — the drawing lives only in this tab):
+          {/* Opened without a drawing (a shared link, a new tab, or one too big to keep for the tab):
               say so, and the way back, instead of a preview that pulses forever and dead buttons. */}
-          {!activeAssetId && !upload ? (
+          {uploadReady && !activeAssetId && !upload ? (
             <div role="status" className="mt-3 rounded-[20px] border-2 border-cocoa bg-honey-band p-5 text-center shadow-[0_3px_0_var(--color-cocoa)]">
               <p className="font-display text-xl text-cocoa">Your drawing isn’t loaded</p>
               <p className="mt-1 text-[14px] text-ink-soft">Pop back and choose it again — it only takes a moment. Anything already in your basket is safe.</p>

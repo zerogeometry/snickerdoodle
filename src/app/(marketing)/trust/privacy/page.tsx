@@ -66,19 +66,31 @@ export default function PrivacyNoticePage() {
 
         <h2>5. Artificial intelligence, in plain terms</h2>
         <p>
-          We use AI to turn drawings and photos into beautiful products. When we do, your image is used <strong>only</strong>{' '}
-          to create the design you asked for; our AI providers are <strong>contractually forbidden from keeping your
-          images or using them to train any AI model</strong>; and we don&apos;t make any decision about you by
-          automated means that has a legal or similarly significant effect.
+          <strong>Right now, we don&apos;t use generative AI at all.</strong> The little &ldquo;magic&rdquo; touches —
+          lifting the background off a drawing, tidying it up, making it big enough to print — run on our own
+          servers in London, so no outside company ever sees your image to do them.
+        </p>
+        <p>
+          If we ever add anything generative, we&apos;ll update this notice first. Any provider we used would be
+          contractually forbidden from keeping your images or using them to train any AI model, would only ever be
+          sent the one picture needed, and nothing it made would be shown or printed without our safety checks. We
+          don&apos;t make any decision about you by automated means that has a legal or similarly significant effect.
         </p>
 
         <h2>6. Who we share it with</h2>
         <p>
-          We don&apos;t sell your data. We share it only with the trusted suppliers who help us run the service — our
-          hosting, AI design, print-and-delivery, payment, and messaging providers — and only so they can do their job
-          for us, bound by a contract that limits them to our instructions. We never share your data with other
-          Snickerdoodle families.
+          We don&apos;t sell your data, and we never share it with other Snickerdoodle families. We use a small number
+          of trusted suppliers to run the service, each bound by a contract that limits them to our instructions and
+          only sees what it needs to do its job:
         </p>
+        <ul>
+          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. When we switch on automatic image safety checks, those run with Amazon in London too.</li>
+          <li><strong>Stripe</strong> — takes your payment. Your card details go straight to Stripe; we never see or store them.</li>
+          <li><strong>Prodigi</strong> — prints your order and delivers it. They get the print file for what you ordered and the delivery address.</li>
+          <li><strong>Resend</strong> (Ireland, EU) — sends the site&apos;s emails, like your sign-in links, order updates and gift requests.</li>
+          <li><strong>Google Workspace</strong> — our own mailboxes (support@ and hello@), so a message you send us, and our reply, is kept there.</li>
+        </ul>
+        <p>If we add or change a supplier, we&apos;ll update this list.</p>
 
         <h2>7. Sending data outside the UK</h2>
         <p>

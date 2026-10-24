@@ -2,6 +2,7 @@ import { IconAlertTriangle, IconLogout } from '@tabler/icons-react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { signOut } from '@/auth';
+import { SignOutForm } from '@/ui/components/SignOutForm';
 import { getDb } from '@/db/client';
 import { acceptInvite, getInviteForDisplay } from '@/server/invites';
 import { getCurrentAccount } from '@/server/session';
@@ -99,11 +100,11 @@ export default async function JoinPage({
             It was sent to <b className="text-cocoa">{invite.email}</b>, but you&apos;re signed in as{' '}
             <b className="text-cocoa">{account.email}</b>.
           </p>
-          <form action={switchAccount}>
+          <SignOutForm action={switchAccount}>
             <Button type="submit" variant="secondary" size="lg" className="mt-5 w-full">
               <Icon icon={IconLogout} size={16} /> sign in as {invite.email}
             </Button>
-          </form>
+          </SignOutForm>
         </div>
       </Shell>
     );

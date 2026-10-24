@@ -1,7 +1,7 @@
 /**
  * The Content-Security-Policy — ONE place that says what the browser may load and run.
  *
- * Built per request by the middleware with a fresh nonce: Next.js reads the nonce from the
+ * Built per request by the proxy (src/proxy.ts) with a fresh nonce: Next.js reads the nonce from the
  * request's CSP header and stamps it on every script it renders, and 'strict-dynamic' lets those
  * trusted scripts load their own chunks (the lazy three.js spin view, model-viewer). Nothing else
  * runs: no inline script without the nonce, no eval, no script from another site.
@@ -82,7 +82,7 @@ export function buildCsp({ nonce, mode, storageOrigins }: CspInput): string {
     .join('; ');
 }
 
-/** 128 random bits, base64. Web Crypto only, so it runs in the Edge middleware. */
+/** 128 random bits, base64. Web Crypto only, so it runs anywhere (the proxy, the browser, tests). */
 export function newNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   let s = '';

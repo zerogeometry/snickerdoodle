@@ -8,7 +8,7 @@ describe('security headers on every response', () => {
     const rules = (await nextConfig.headers!()) as Rule[];
     const all = rules.find((r) => r.source === '/:path*')!;
     const h = Object.fromEntries(all.headers.map((x) => [x.key.toLowerCase(), x.value]));
-    // the page CSP is per request (nonce) — the middleware sends it; see csp.test.ts
+    // the page CSP is per request (nonce) — the proxy sends it; see csp.test.ts
     expect(h['content-security-policy']).toBeUndefined();
     expect(h['x-frame-options']).toBe('DENY');
     expect(h['x-content-type-options']).toBe('nosniff');
@@ -18,7 +18,7 @@ describe('security headers on every response', () => {
     expect(h['permissions-policy']).toContain('microphone=()');
   });
 
-  it('the static files the middleware skips still get a policy that runs and frames nothing', async () => {
+  it('the static files the proxy skips still get a policy that runs and frames nothing', async () => {
     const rules = (await nextConfig.headers!()) as Rule[];
     for (const source of ['/_next/static/:path*', '/_next/image']) {
       const csp = rules.find((r) => r.source === source)?.headers.find((x) => x.key === 'Content-Security-Policy')?.value ?? '';

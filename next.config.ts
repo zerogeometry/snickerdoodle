@@ -12,8 +12,8 @@ import type { NextConfig } from 'next';
  *  - Permissions-Policy: the camera is ours only (CameraCapture); no mic, location or payment API;
  *  - HSTS: HTTPS only, for a year (no includeSubDomains/preload until every subdomain is HTTPS).
  * The Content-Security-Policy itself (scripts by per-request nonce, plus the framing/base/object/
- * form rules) is set by the middleware — src/lib/csp.ts builds it. The only responses the
- * middleware skips are Next's hashed static files and the image optimiser; they get the strict
+ * form rules) is set by the proxy (src/proxy.ts) — src/lib/csp.ts builds it. The only responses the
+ * proxy skips are Next's hashed static files and the image optimiser; they get the strict
  * baseline below (no HTML is ever served there, so nothing needs to run).
  */
 const SECURITY_HEADERS = [
@@ -24,7 +24,7 @@ const SECURITY_HEADERS = [
   { key: 'Strict-Transport-Security', value: 'max-age=31536000' },
 ];
 
-/** For the paths the middleware doesn't see (/_next/static, /_next/image): run nothing, frame nothing. */
+/** For the paths the proxy doesn't see (/_next/static, /_next/image): run nothing, frame nothing. */
 const STATIC_ASSET_CSP = "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 /** The private app (anything a child's drawing can appear on) is never indexed — only the
@@ -47,10 +47,10 @@ const nextConfig: NextConfig = {
   // Allow an isolated build dir (e.g. e2e) so a production build can't clobber a
   // running `next dev`'s .next (they cannot safely share one). Defaults to .next.
   distDir: process.env.NEXT_DIST_DIR || '.next',
-  // Native/binary server-only deps must NOT be webpack-bundled — require them at runtime.
+  // Native/binary server-only deps must NOT be bundled (Turbopack, or webpack with --webpack) — require them at runtime.
   // @resvg/resvg-js ships a platform .node binary (the card's inside-message + back-badge print
   // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
-  // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
+  // likewise. Without this, the bundler tries to parse the .node binary and the route 500s.
   serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
   experimental: {
     // Drawings/photos are uploaded to the ingest server action as FormData. The

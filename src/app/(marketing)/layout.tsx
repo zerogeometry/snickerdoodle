@@ -44,23 +44,23 @@ export default async function MarketingLayout({ children }: { children: ReactNod
       <footer className="relative z-10 bg-paper-2 px-6 py-5 text-xs text-ink-soft">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <span>snickerdoodle · made with care in the UK</span>
-          <nav aria-label="footer" className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
-            <Link href="/faq" className="hover:text-cinnamon">
+          <nav aria-label="footer" className="flex flex-wrap items-center justify-center gap-x-4">
+            <Link href="/faq" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               FAQs
             </Link>
-            <Link href="/help" className="hover:text-cinnamon">
+            <Link href="/help" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               help &amp; contact
             </Link>
-            <Link href="/trust/family-promise" className="hover:text-cinnamon">
+            <Link href="/trust/family-promise" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               our promise
             </Link>
-            <Link href="/trust/privacy" className="hover:text-cinnamon">
+            <Link href="/trust/privacy" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               privacy
             </Link>
-            <Link href="/trust/cookies" className="hover:text-cinnamon">
+            <Link href="/trust/cookies" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               cookies
             </Link>
-            <Link href="/trust/data-complaint" className="hover:text-cinnamon">
+            <Link href="/trust/data-complaint" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               data complaint
             </Link>
           </nav>

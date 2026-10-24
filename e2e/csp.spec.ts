@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
- * The script Content-Security-Policy (src/lib/csp.ts, sent by src/middleware.ts) against the
+ * The script Content-Security-Policy (src/lib/csp.ts, sent by src/proxy.ts) against the
  * PRODUCTION server: every page carries a per-request nonce policy, every script Next renders
  * carries that nonce, and the shop's real journey runs without the browser refusing anything —
  * home → start creating (upload) → studio → customize → basket → checkout.
