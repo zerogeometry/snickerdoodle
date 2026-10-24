@@ -1,14 +1,18 @@
 'use client';
 
 import { IconCircleCheck } from '@tabler/icons-react';
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { submitComplaintAction } from '@/app/actions/complaint';
+import { humanChallengeAction } from '@/app/actions/support';
+import { solveHumanCheck, type HumanProof } from '@/lib/humanCheck';
 
 /**
  * The s.164A complaint form. Posts to the rights-request intake (recorded with its due date,
  * acknowledged by email straight away); only shows "we've got it" once that has really happened.
+ * The same quiet "are you a person?" check as the help form is solved in the background while they
+ * write (no puzzle to do, nothing sent anywhere but us).
  */
 export function ComplaintForm() {
   const [name, setName] = useState('');
@@ -19,18 +23,34 @@ export function ComplaintForm() {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
+  // the "are you a person?" check: solved quietly in the background as soon as the form shows
+  const proof = useRef<Promise<HumanProof | null> | null>(null);
+  const prove = () => (proof.current = humanChallengeAction().then((c) => solveHumanCheck(c)).catch(() => null));
+  useEffect(() => {
+    if (!proof.current) prove();
+  }, []);
+
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const res = await submitComplaintAction({ name, email, message, website });
+      const attempt = async () => {
+        const p = await (proof.current ?? prove());
+        proof.current = null; // each solve is good for one send
+        return submitComplaintAction({ name, email, message, website, proof: p });
+      };
+      let res = await attempt();
+      if (!res.ok && res.reason === 'check') res = await attempt(); // a lapsed check is quietly re-done, once
+      if (!res.ok) prove(); // ready for another go
       if (res.ok) return setSent(res.ref ?? '');
       setError(
         res.reason === 'invalid'
           ? 'please add your name, a working email, and a few words about what happened'
           : res.reason === 'too-many'
             ? 'we’ve already had a few from this email today — we’re on it, and we’ll be in touch'
-            : 'that didn’t send — please try again, or email us instead',
+            : res.reason === 'check'
+              ? 'we couldn’t confirm you’re a person — please try sending again, or email us instead'
+              : 'that didn’t send — please try again, or email us instead',
       );
     });
   };
