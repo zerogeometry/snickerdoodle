@@ -4,9 +4,9 @@
 #   then on the box:      sudo bash /tmp/kit/bin/bootstrap-box.sh
 #
 # Installs Docker (from Docker's apt repo), the AWS CLI v2, jq; turns on automatic security
-# updates; puts the kit at /opt/snickerdoodle/kit; installs the systemd units (start at boot +
-# nightly DB backup); sets Docker's log rotation. It does NOT touch AWS and holds no secrets — the
-# AWS key and box.env are separate steps (runbook §4.3).
+# updates; puts the kit at /opt/snickerdoodle/kit; fetches the Amazon RDS CA bundle; installs the
+# systemd units (start at boot, nightly DB backup, hourly watchdog); sets Docker's log rotation.
+# It does NOT touch AWS and holds no secrets — the AWS key and box.env are separate steps (§4.3).
 set -euo pipefail
 [ "$(id -u)" = 0 ] || { echo "run with sudo" >&2; exit 1; }
 src="$(cd "$(dirname "$0")/.." && pwd)"
@@ -61,6 +61,15 @@ fi
 chmod 0755 /opt/snickerdoodle/kit/bin/*.sh /opt/snickerdoodle/kit/scheduler/run-job.sh
 chown -R root:root /opt/snickerdoodle/kit
 
+echo "== the database's CA bundle (so the app and pg_dump VERIFY the managed database's certificate)"
+install -d -m 0755 /opt/snickerdoodle/certs
+curl -fsSL https://truststore.pki.rds.amazonaws.com/eu-west-2/eu-west-2-bundle.pem -o /opt/snickerdoodle/certs/rds-ca.pem.new || true
+if [ -s /opt/snickerdoodle/certs/rds-ca.pem.new ] && openssl crl2pkcs7 -nocrl -certfile /opt/snickerdoodle/certs/rds-ca.pem.new | openssl pkcs7 -print_certs -noout | grep -q 'Amazon RDS eu-west-2 Root CA'; then
+  install -m 0644 /opt/snickerdoodle/certs/rds-ca.pem.new /opt/snickerdoodle/certs/rds-ca.pem
+fi
+rm -f /opt/snickerdoodle/certs/rds-ca.pem.new
+[ -s /opt/snickerdoodle/certs/rds-ca.pem ] || { echo "could not fetch the Amazon RDS CA bundle — run this again"; exit 1; }
+
 echo "== settings file"
 install -d -m 0755 /etc/snickerdoodle
 if [ ! -e /etc/snickerdoodle/box.env ]; then
@@ -68,11 +77,11 @@ if [ ! -e /etc/snickerdoodle/box.env ]; then
   echo "   → now edit /etc/snickerdoodle/box.env (runbook §4.3)"
 fi
 
-echo "== systemd: start at boot + nightly backup"
+echo "== systemd: start at boot, nightly backup, hourly watchdog"
 install -m 0644 /opt/snickerdoodle/kit/systemd/*.service /opt/snickerdoodle/kit/systemd/*.timer /etc/systemd/system/
 systemctl daemon-reload
-systemctl enable docker snickerdoodle.service snickerdoodle-backup.timer
-systemctl start snickerdoodle-backup.timer
+systemctl enable docker snickerdoodle.service snickerdoodle-backup.timer snickerdoodle-watchdog.timer
+systemctl start snickerdoodle-backup.timer snickerdoodle-watchdog.timer
 
 echo
 echo "bootstrap done. Next (runbook §4.3): the box's AWS key in /root/.aws/credentials, then box.env."

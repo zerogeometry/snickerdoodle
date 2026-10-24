@@ -1,26 +1,16 @@
 import { getDb } from '@/db/client';
 import { requireJobsSecret } from '@/server/jobs/auth';
-import { purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention';
-import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
-import { purgeExpiredRateLimits } from '@/server/rateLimit';
-import { sweepQuarantine } from '@/server/directUpload';
-import { purgeExpiredSupportRequests } from '@/server/support';
+import { runRetention } from '@/server/jobs/retentionRun';
 
 /**
- * Retention purge, triggered by a scheduler (cron / Vercel Cron / a scheduled
- * task) hitting this endpoint daily with the shared JOBS_SECRET. Keeps ops light
- * — no standing worker — while still enforcing retention in code. Swap for a
- * pg-boss worker later if a queue is preferred.
+ * Retention purge, triggered by the scheduler (hourly on the AWS box; daily is the minimum) with
+ * the shared JOBS_SECRET. No standing worker — retention is still enforced in code. Every step
+ * runs even if another fails; anything left undone answers 500 so the scheduler reports it
+ * (src/server/jobs/retentionRun.ts).
  */
 export async function POST(req: Request): Promise<Response> {
   const denied = requireJobsSecret(req);
   if (denied) return denied;
-  const db = getDb();
-  const summary = await purgeExpiredAssets(db);
-  const audit = await purgeExpiredAuditRecords(db); // the audit trail's own 6-year limit
-  const pendingKeepsPurged = await purgeExpiredPendingKeeps(db); // guests' keep requests, a day on
-  const rateLimitsPurged = await purgeExpiredRateLimits(db); // finished rate-limit windows, a day on
-  const quarantine = await sweepQuarantine(); // direct uploads never finalised, an hour on
-  const supportPurged = await purgeExpiredSupportRequests(db); // help messages, two years on
-  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, rateLimitsPurged, quarantineSwept: quarantine.deleted, supportPurged });
+  const report = await runRetention(getDb());
+  return Response.json(report, { status: report.ok ? 200 : 500 });
 }

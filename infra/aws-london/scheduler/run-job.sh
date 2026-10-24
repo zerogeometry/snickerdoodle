@@ -14,15 +14,19 @@ if [ ! -s "$secret_file" ]; then echo "[jobs] FAILED $name: no jobs secret mount
   # one at a time per job: a slow run is never stacked on by the next tick
   if ! flock -n 9; then echo "[jobs] skip $name: previous run still going"; exit 0; fi
   start=$(date +%s)
-  # the header is built from the secret file here and never echoed
-  if wget -q -O /dev/null -T "$timeout" \
+  call() { # the header is built from the secret file here and never echoed
+    wget -q -O /dev/null -T "$timeout" \
       --header "Authorization: Bearer $(cat "$secret_file")" \
-      --post-data '' "${APP_INTERNAL_URL:-http://app:3000}/api/jobs/$name" 2>/tmp/run-job-$name.err; then
+      --post-data '' "${APP_INTERNAL_URL:-http://app:3000}/api/jobs/$name" 2>/tmp/run-job-$name.err
+  }
+  # One retry, 30 s on: a tick that lands while the app restarts for a deploy would otherwise
+  # report a failure that isn't one. Every job is idempotent, so a second call is always safe.
+  if call || { sleep 30; call; }; then
     echo "[jobs] ok $name ($(( $(date +%s) - start ))s)"
   else
     code=$?
     reason=$(head -c 200 /tmp/run-job-$name.err | tr '\n' ' ')
-    echo "[jobs] FAILED $name after $(( $(date +%s) - start ))s (exit $code): $reason"
+    echo "[jobs] FAILED $name after $(( $(date +%s) - start ))s, twice (exit $code): $reason"
   fi
   rm -f /tmp/run-job-$name.err
 ) 9>/tmp/run-job-$name.lock

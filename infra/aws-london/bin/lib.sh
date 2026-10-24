@@ -67,3 +67,41 @@ wait_healthy() { # [seconds]
 
 # A setting from the app's env file, without printing it.
 app_setting() { sed -n "s/^$1=//p" "$RUN_DIR/app.env" | head -n1; }
+
+# ── containers from the app image / the Postgres image, run the same safe way everywhere ────────
+APP_UID=10001
+CERTS_DIR=/opt/snickerdoodle/certs
+
+# The database's network: the compose network for the on-box DB, else the default (managed DB).
+db_net() { if [ "${COMPOSE_PROFILES:-}" = local-db ]; then echo "--network snickerdoodle"; fi; }
+
+# Flags that give an app-image container its settings FILE (never env), the CA bundle, and the
+# same hardening as the live app.
+app_flags() {
+  printf '%s\n' --user "$APP_UID:$APP_UID" --init --read-only \
+    --tmpfs /tmp:size=512m,mode=1777 --tmpfs "/app/.next/cache:size=256m,uid=$APP_UID,gid=$APP_UID,mode=0700" \
+    --cap-drop ALL --security-opt no-new-privileges:true \
+    --mount "type=bind,src=$RUN_DIR/app.env,dst=/run/secrets/app.env,readonly" \
+    --mount "type=bind,src=$CERTS_DIR,dst=/certs,readonly" \
+    -e NODE_EXTRA_CA_CERTS=/certs/rds-ca.pem -e SNICKERDOODLE_REQUIRE_SECRETS=1 -e HOME=/tmp
+}
+
+# app_run <image> <script> — a one-off script from the app image (e.g. infra/migrate.mjs)
+app_run() {
+  local image="$1"; shift
+  local flags; mapfile -t flags < <(app_flags)
+  # shellcheck disable=SC2046
+  docker run --rm $(db_net) "${flags[@]}" "$image" node infra/start.mjs "$@"
+}
+
+# pg_run <sh command> — psql/pg_dump/pg_restore in the Postgres image, with DATABASE_URL from the
+# settings file and the CA bundle for verify-full. Extra docker flags may come first in PG_FLAGS.
+pg_run() {
+  DATABASE_URL="$(app_setting DATABASE_URL)"
+  export DATABASE_URL
+  [ -n "$DATABASE_URL" ] || die "DATABASE_URL is not set"
+  # shellcheck disable=SC2046,SC2086
+  docker run --rm -i $(db_net) ${PG_FLAGS:-} \
+    --mount "type=bind,src=$CERTS_DIR,dst=/certs,readonly" -e PGSSLROOTCERT=/certs/rds-ca.pem \
+    -e DATABASE_URL "${POSTGRES_IMAGE:-postgres:16-bookworm}" sh -c "$1"
+}

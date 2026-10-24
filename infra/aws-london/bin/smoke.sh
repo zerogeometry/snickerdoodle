@@ -28,6 +28,11 @@ fail() { printf '  FAIL  %s\n' "$(head -n1 <<<"$*")"; fails=$((fails + 1)); }
 
 echo "smoke test: $base"
 
+# Give HTTPS a moment first: right after a deploy Caddy may still be starting, and on a new box it
+# is fetching the first certificate (up to a minute). SMOKE_WAIT seconds, then judge.
+deadline=$(( $(date +%s) + ${SMOKE_WAIT:-90} ))
+until curl -fsS --max-time 5 -o /dev/null "$base/api/health" 2>/dev/null || [ "$(date +%s)" -ge "$deadline" ]; do sleep 3; done
+
 body="$(curl -fsS --max-time 15 "$base/api/health" 2>&1)" && grep -q '"ok":true' <<<"$body" \
   && pass "health: $body" || fail "health: ${body:-no answer}"
 

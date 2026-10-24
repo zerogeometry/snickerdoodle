@@ -57,15 +57,13 @@ ecr_login
 docker pull -q "$image" >/dev/null || die "could not pull $image from ECR"
 
 # The database: on this box (compose network) or the managed one (reachable from the default network).
-net=()
 if [ "${COMPOSE_PROFILES:-}" = local-db ]; then
   APP_IMAGE="$image" dc up -d --wait db
-  net=(--network snickerdoodle)
 fi
 
 # ── 3. migrations ────────────────────────────────────────────────────────────────────────────────
 log "applying database migrations"
-docker run --rm "${net[@]}" --env-file "$RUN_DIR/app.env" "$image" node infra/migrate.mjs \
+app_run "$image" infra/migrate.mjs \
   || die "migrations failed — nothing was swapped; the live site is unchanged"
 
 # ── 4. the new image, on the side ────────────────────────────────────────────────────────────────
@@ -73,17 +71,20 @@ cand=snickerdoodle-candidate
 docker rm -f "$cand" >/dev/null 2>&1 || true
 trap 'docker rm -f '"$cand"' >/dev/null 2>&1 || true' EXIT
 log "starting the new image on the side to check it"
-docker run -d --name "$cand" "${net[@]}" --init --env-file "$RUN_DIR/app.env" \
-  --read-only --tmpfs /tmp:size=512m,mode=1777 --tmpfs /app/.next/cache:size=256m,uid=1000,gid=1000,mode=0700 \
-  --cap-drop ALL --security-opt no-new-privileges:true \
+mapfile -t flags < <(app_flags)
+# shellcheck disable=SC2046
+docker run -d --name "$cand" $(db_net) "${flags[@]}" \
   -v /opt/snickerdoodle/prodigi-assets:/app/.prodigi-assets:ro \
   "$image" >/dev/null
 
-# in-container requests (the candidate publishes no port); the jobs secret stays inside it
+# in-container requests (the candidate publishes no port); the jobs secret is read from the
+# settings file inside the container and never leaves it
 in_cand() { # <method> <path> [timeout-ms] — prints the body, fails on a non-2xx
   docker exec "$cand" node -e '
     const [m, p, t] = process.argv.slice(1);
-    fetch("http://127.0.0.1:3000" + p, { method: m, headers: { authorization: "Bearer " + process.env.JOBS_SECRET }, signal: AbortSignal.timeout(Number(t)) })
+    const line = require("fs").readFileSync("/run/secrets/app.env", "utf8").split("\n").find((l) => l.startsWith("JOBS_SECRET="));
+    const secret = line ? line.slice("JOBS_SECRET=".length) : "";
+    fetch("http://127.0.0.1:3000" + p, { method: m, headers: { authorization: "Bearer " + secret }, signal: AbortSignal.timeout(Number(t)) })
       .then(async (r) => { const b = await r.text(); console.log(b.slice(0, 400)); process.exit(r.ok ? 0 : 1); })
       .catch((e) => { console.log(String(e.message)); process.exit(1); });' "$1" "$2" "${3:-10000}"
 }

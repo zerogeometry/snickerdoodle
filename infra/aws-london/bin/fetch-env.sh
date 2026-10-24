@@ -45,6 +45,22 @@ done
 for k in DEV_UPLOADS_ARE_BRAND_SAFE_FIXTURES S3_ENDPOINT S3_FORCE_PATH_STYLE NEXT_DIST_DIR; do
   has "$k" && die "$k is set in SSM — it is for local development only; delete that parameter"
 done
+# The AWS SDK obeys AWS_ENDPOINT_URL / AWS_ENDPOINT_URL_<SERVICE>: one of these could send
+# children's pictures (S3, Rekognition) somewhere other than AWS London. Never allowed.
+if grep -q '^AWS_ENDPOINT_URL' "$tmp.env"; then
+  die "an AWS_ENDPOINT_URL* setting is in SSM — it would redirect AWS calls; delete it"
+fi
+# real content-safety screening calls Rekognition with the app user's key (standard AWS chain)
+if grep -q '^MODERATION_PROVIDER=real$' "$tmp.env"; then
+  for k in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do has "$k" || missing+=("$k"); done
+  [ "${#missing[@]}" -eq 0 ] || die "MODERATION_PROVIDER=real but missing in SSM: ${missing[*]}"
+fi
+# not fatal, but worth a line: an unverified database certificate, an unpinned client-IP header
+db_url="$(sed -n 's/^DATABASE_URL=//p' "$tmp.env")"
+if [[ "$db_url" != *@db:* && "$db_url" != *sslmode=verify-full* ]]; then
+  log "warning: DATABASE_URL does not use sslmode=verify-full — the database's certificate is not checked (runbook §3.8)"
+fi
+has CLIENT_IP_HEADER || log "warning: CLIENT_IP_HEADER is not set — set it to x-real-ip (runbook §3.6)"
 if [ "${COMPOSE_PROFILES:-}" = local-db ] && ! has LOCAL_DB_PASSWORD; then
   die "COMPOSE_PROFILES=local-db but LOCAL_DB_PASSWORD is not in SSM"
 fi
@@ -53,7 +69,11 @@ grep -v '^LOCAL_DB_PASSWORD=' "$tmp.env" > "$RUN_DIR/app.env.new"
 sed -n 's/^JOBS_SECRET=//p' "$tmp.env" | tr -d '\n' > "$RUN_DIR/jobs_secret.new"
 sed -n 's/^LOCAL_DB_PASSWORD=//p' "$tmp.env" | tr -d '\n' > "$RUN_DIR/db_password.new"
 for f in app.env jobs_secret db_password; do
-  chmod 600 "$RUN_DIR/$f.new"
-  mv "$RUN_DIR/$f.new" "$RUN_DIR/$f"
+  chmod 400 "$RUN_DIR/$f.new"
+  # if Docker ever created a directory here (a mount whose file was missing), clear it
+  [ -d "$RUN_DIR/$f" ] && rm -rf "${RUN_DIR:?}/$f"
+  mv -f "$RUN_DIR/$f.new" "$RUN_DIR/$f"
 done
+# the app runs as its own user id (docker-compose.yml): only it and root can read its settings
+chown "$APP_UID:$APP_UID" "$RUN_DIR/app.env"
 log "settings loaded from SSM: $count (values not shown)"

@@ -1,0 +1,1 @@
+ALTER TABLE "order_item_artwork" ADD COLUMN "render_claimed_at" timestamp with time zone;

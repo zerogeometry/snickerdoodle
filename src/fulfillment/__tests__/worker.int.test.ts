@@ -10,7 +10,7 @@ import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { seedCatalogue } from '@/server/catalogue';
 import { placeOrder } from '@/server/orders';
-import { processFulfilment } from '@/fulfillment/worker';
+import { processFulfilment, STALE_RENDER_MINUTES } from '@/fulfillment/worker';
 import { deleteObject } from '@/storage';
 import type { GateEnv } from '@/fulfillment/gate';
 import type { DbHandle } from '@/server/db';
@@ -104,6 +104,49 @@ describe.skipIf(!DB || !S3)('fulfilment worker — claim → render → gate (in
     const a = await artworkOf(orderId);
     expect(a.status).toBe('BLOCKED_GATE');
     expect(a.printObjectId).not.toBeNull(); // rendered locally — but egress was blocked, not the render
+  });
+
+  // A restart mid-render (a deploy, an out-of-memory kill, a reboot) must never strand a paid order.
+  it('puts a line a stopped app left RENDERING back, then renders it — and says so', async () => {
+    const orderId = await paidOrder('DRAWING');
+    const a = await artworkOf(orderId);
+    const longAgo = new Date(Date.now() - (STALE_RENDER_MINUTES + 5) * 60 * 1000);
+    await db.update(orderItemArtwork).set({ status: 'RENDERING', renderClaimedAt: longAgo }).where(eq(orderItemArtwork.id, a.id));
+
+    const summary = await tick(orderId);
+    expect(summary.recovered).toBe(1);
+    expect(summary.ready).toBe(1);
+    const after = await artworkOf(orderId);
+    expect(after.status).toBe('READY');
+    expect(after.printObjectId).not.toBeNull();
+  });
+
+  it('a line claimed before the claim time existed (no timestamp) is recovered too', async () => {
+    const orderId = await paidOrder('DRAWING');
+    const a = await artworkOf(orderId);
+    await db.update(orderItemArtwork).set({ status: 'RENDERING', renderClaimedAt: null }).where(eq(orderItemArtwork.id, a.id));
+    const summary = await tick(orderId);
+    expect(summary.recovered).toBe(1);
+    expect((await artworkOf(orderId)).status).toBe('READY');
+  });
+
+  it('leaves a line another tick is rendering RIGHT NOW alone (fresh heartbeat)', async () => {
+    const orderId = await paidOrder('DRAWING');
+    const a = await artworkOf(orderId);
+    await db.update(orderItemArtwork).set({ status: 'RENDERING', renderClaimedAt: new Date() }).where(eq(orderItemArtwork.id, a.id));
+    const summary = await tick(orderId);
+    expect(summary.recovered).toBe(0);
+    expect(summary.claimed).toBe(0);
+    expect((await artworkOf(orderId)).status).toBe('RENDERING');
+  });
+
+  it('stamps the claim time when it takes a line', async () => {
+    const orderId = await paidOrder('DRAWING');
+    const before = Date.now() - 1000;
+    await tick(orderId);
+    const a = await artworkOf(orderId);
+    expect(a.renderClaimedAt).not.toBeNull();
+    expect(a.renderClaimedAt!.getTime()).toBeGreaterThanOrEqual(before);
   });
 
   it('does not claim an UNPAID order’s artwork', async () => {
