@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  // Render every page per request: the middleware's script nonce (src/lib/csp.ts) is new each
+  // Render every page per request: the proxy's script nonce (src/lib/csp.ts) is new each
   // time and Next stamps it on its scripts at render. A page prerendered at build time would
   // carry no nonce, and the CSP would (rightly) refuse to run it.
   await connection();

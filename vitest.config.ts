@@ -2,8 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
-  // Next's tsconfig keeps JSX as-is ("preserve") for its own compiler; vite 8 (oxc) must compile the
-  // .tsx a test imports itself, with React's automatic runtime.
+  // vite 8 (oxc) compiles the .tsx a test imports itself — with React's automatic runtime, said
+  // here explicitly so it never depends on what Next writes into tsconfig's "jsx".
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: ['src/**/*.test.ts'],

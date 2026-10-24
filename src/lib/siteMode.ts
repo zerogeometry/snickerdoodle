@@ -10,7 +10,7 @@
  *
  * What it can NEVER do (refused at boot — {@link testSiteProblems}): take real money (live Stripe
  * key), print for real (POD_MODE=LIVE), or open the children's-pictures-to-the-printer gate (LG3).
- * Edge-safe: no Node imports, so the middleware can use it.
+ * Edge-safe: no Node imports, so the proxy (src/proxy.ts) can use it.
  */
 type Env = Record<string, string | undefined>;
 
