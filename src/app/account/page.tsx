@@ -2,6 +2,7 @@ import { IconLock, IconLogout, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { signOut } from '@/auth';
+import { SignOutForm } from '@/ui/components/SignOutForm';
 import { getCurrentAccount } from '@/server/session';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
@@ -59,11 +60,11 @@ export default async function AccountPage() {
           </p>
         </section>
 
-        <form action={logout}>
+        <SignOutForm action={logout}>
           <Button type="submit" variant="secondary" size="lg" className="mt-5 w-full">
             <Icon icon={IconLogout} size={16} /> log out
           </Button>
-        </form>
+        </SignOutForm>
 
         <p className="mt-4 text-center text-xs text-ink-faint">
           Questions about your data?{' '}

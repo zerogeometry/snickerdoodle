@@ -18,6 +18,7 @@ import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
+import { UploadSession } from '@/ui/components/UploadSession';
 
 export const metadata: Metadata = {
   // the canonical public origin — canonical links, sitemaps and share cards resolve against it
@@ -51,6 +52,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
+        <UploadSession />
         <TestSiteBanner />
         {children}
         <Toaster />

@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { toast, useUpload } from '@/lib/store';
+import { toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
@@ -81,6 +81,14 @@ const DRAWING = '__drawing';
  * are made from. "your range" (top-left) always takes the parent back to their drawing's range.
  */
 export default function StudioPage() {
+  // Wait for this tab's drawing to be read back (a refresh) before the editor starts: it takes the
+  // stored asset id once, and must never upload the same drawing a second time.
+  const ready = useUploadHydrated();
+  if (!ready) return <main id="main" aria-busy="true" className="min-h-dvh bg-oat" />;
+  return <StudioEditor />;
+}
+
+function StudioEditor() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
   const setAssetId = useUpload((s) => s.setAssetId);
