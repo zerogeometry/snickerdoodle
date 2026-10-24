@@ -777,6 +777,10 @@ export const orderItemArtwork = pgTable(
     renderedDpi: integer('rendered_dpi'),
     upscaled: boolean('upscaled').notNull().default(false),
     status: fulfillmentState('status').notNull().default('PENDING'),
+    // When a fulfilment tick last took this line for rendering (claim + a heartbeat just before its
+    // render). A line left RENDERING well past this — the app restarted mid-render (a deploy, an
+    // out-of-memory kill, a reboot) — is put back to PENDING by the next tick (src/fulfillment/worker.ts).
+    renderClaimedAt: timestamp('render_claimed_at', { withTimezone: true }),
     renderError: text('render_error'),
     providerItemId: text('provider_item_id'),
     createdAt,

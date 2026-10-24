@@ -309,6 +309,13 @@
       "when": 1792764361719,
       "tag": "0043_support_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1792859840201,
+      "tag": "0044_artwork_render_claimed_at",
+      "breakpoints": true
     }
   ]
 }
