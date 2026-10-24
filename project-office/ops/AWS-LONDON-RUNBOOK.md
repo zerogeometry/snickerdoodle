@@ -35,8 +35,12 @@ terminal). **🖥️ = on your computer.** **📦 = on the box** (over SSH).
 - **Images:** you build on your computer (Docker Desktop, Linux build) and push to a private ECR
   repository in London; the box pulls from there. No secrets are in the image.
 - **Settings and secrets:** one place, SSM Parameter Store (`/snickerdoodle/prod/…`). The box reads
-  them into memory at boot and on every deploy. Nothing secret is in git or in a file on disk —
-  except one thing: the box's own AWS key (Lightsail can't use IAM roles), see §3.5.
+  them into memory at boot and on every deploy, and the app reads them from a memory-only file at
+  start — never as container environment, which Docker would keep on disk. Nothing secret is in
+  git or on the box's disk — except one thing: the box's own AWS key (Lightsail can't use IAM
+  roles), see §3.5.
+- **The database connection is verified**, not just encrypted: the app and the backup tools check
+  the managed database's certificate against Amazon's RDS root CAs (`sslmode=verify-full`).
 
 ## 2. Decide first
 
@@ -67,10 +71,11 @@ The kit's defaults suit that size. To start smaller (general-purpose 4 GB, say),
 Lightsail box can be resized later by snapshot → new bigger box (§9). The image is built on your
 computer, so even a small box never has to build anything.
 
-### 2.3 Logs in CloudWatch — recommendation: yes
+### 2.3 Logs in CloudWatch — optional
 
-Costs pennies (§8) and gives you email alerts when a job fails (§7). Without it, logs stay on the
-box (rotated) and you only get alerts for downtime, deploys and backups.
+Alerts don't need it: the box's hourly watchdog emails you about everything that matters (§7).
+CloudWatch Logs only adds keeping 30 days of logs off the box, searchable, for pennies (§8).
+Turn it on if you want that history; skip it otherwise.
 
 ## 3. Provision (one-off) — all 🔑
 
@@ -200,10 +205,14 @@ put  MAIL_PROVIDER resend
 put  MAIL_FROM "snickerdoodle <hello@mail.snickerdoodle.co.uk>"
 put  PRIVACY_INBOX privacy@snickerdoodle.co.uk
 put  CLIENT_IP_HEADER x-real-ip         # rate limits trust only the address Caddy saw
+put  SUPPORT_INBOX support@snickerdoodle.co.uk
 
 KEY=$(aws iam create-access-key --user-name snickerdoodle-app --output json)
 sput S3_ACCESS_KEY "$(jq -r .AccessKey.AccessKeyId <<<"$KEY")"
 sput S3_SECRET_KEY "$(jq -r .AccessKey.SecretAccessKey <<<"$KEY")"
+# the same key again under the AWS SDK's standard names — content safety (Rekognition) reads these
+sput AWS_ACCESS_KEY_ID "$(jq -r .AccessKey.AccessKeyId <<<"$KEY")"
+sput AWS_SECRET_ACCESS_KEY "$(jq -r .AccessKey.SecretAccessKey <<<"$KEY")"
 unset KEY
 
 # paste-in secrets from their dashboards (read -s = not shown as you type):
@@ -246,10 +255,12 @@ When it says *Available*, put its address into SSM without showing the password:
 ```bash
 PW=$(aws lightsail get-relational-database-master-user-password --relational-database-name snickerdoodle-db --query masterUserPassword --output text)
 EP=$(aws lightsail get-relational-database --relational-database-name snickerdoodle-db --query relationalDatabase.masterEndpoint.address --output text)
-sput DATABASE_URL "postgres://snickerdoodle:$(jq -rn --arg p "$PW" '$p|@uri')@$EP:5432/snickerdoodle?sslmode=require"
+sput DATABASE_URL "postgres://snickerdoodle:$(jq -rn --arg p "$PW" '$p|@uri')@$EP:5432/snickerdoodle?sslmode=verify-full"
 unset PW
 ```
-(Pick PostgreSQL 16 so the nightly dump tool matches; for 17, set `POSTGRES_IMAGE=postgres:17-bookworm` in box.env.)
+`verify-full` means the app refuses to talk to anything that can't prove it is that database
+(the bootstrap installs Amazon's RDS root CAs for this). Pick PostgreSQL 16 so the nightly dump tool
+matches; for 17, set `POSTGRES_IMAGE=postgres:17-bookworm` in box.env.
 
 ### 3.9 The box 🔑
 
@@ -391,7 +402,7 @@ recent deploys) · `logs.sh app` · `logs.sh jobs` (the scheduled-job results) �
 | What | How | Kept | Pictures in it? |
 |---|---|---|---|
 | Pictures (S3) | **not backed up** — S3's own durability + versioning | deleted versions gone in **7 days** | — |
-| Database — nightly dump | `backup-db.sh` 02:30 UTC → `db-backups` bucket, KMS (general key) | **14 days**, then deleted by the bucket rule | **no** — the DB holds ids, names, emails, orders; never image bytes |
+| Database — nightly dump | `backup-db.sh` 02:30 UTC → `db-backups` bucket, KMS (general key); **read back and fully restored to nowhere** before it counts, with a manifest (size + sha256) | **14 days**, then deleted by the bucket rule | **no** — the DB holds ids, names, emails, orders; never image bytes |
 | Database — managed DB | Lightsail automatic backups + point-in-time restore | **7 days** | no |
 | Box snapshots | off (managed DB) · on, 7 days (on-box DB) | 7 days | no — the box's disk never holds a picture |
 | Erasure ledger | ids only, in the pictures bucket, outside the DB | 30 days | no |
@@ -400,7 +411,9 @@ So originals are **excluded** from every backup by design — crypto-shredding i
 (BACKUPS-AND-ERASURE.md §1). Everything with personal data is gone within 14 days, as the privacy
 notice promises.
 
-The nightly dump emails you if it fails. Check it worked: `sudo /opt/snickerdoodle/kit/bin/restore-db.sh --list`.
+The nightly dump emails you if it fails its check, and the watchdog emails you if no verified
+dump has landed for 26 hours (a timer that silently stopped). See them:
+`sudo /opt/snickerdoodle/kit/bin/restore-db.sh --list` (verified dumps only).
 
 ### 6.2 Restore from a nightly dump (both database options)
 
@@ -408,11 +421,13 @@ The nightly dump emails you if it fails. Check it worked: `sudo /opt/snickerdood
 sudo /opt/snickerdoodle/kit/bin/restore-db.sh --list
 sudo /opt/snickerdoodle/kit/bin/restore-db.sh --from db/2026/10/23/snickerdoodle-20261023T023012Z.dump --yes
 ```
-It takes the site **offline** (Caddy stopped), takes a safety dump of the current database, restores,
-then **replays every erasure since the dump was taken** (`/api/jobs/reapply-erasures`). The site
-comes back online **only when nothing failed**; otherwise it stays offline and tells you the
-command to re-run (the replay is safe to repeat). Tell affected parents if recent *edits* were lost
-(BACKUPS-AND-ERASURE.md §3).
+It only restores a dump that passed its nightly check and still matches its sha256. It takes the
+site **offline** (Caddy stopped), takes a safety dump of the current database, restores in **one
+transaction** (a failure leaves the database exactly as it was), brings the schema up to the
+running release (migrations), then **replays every erasure since the dump was taken**
+(`/api/jobs/reapply-erasures`). The site comes back online **only when nothing failed**; otherwise
+it stays offline and tells you the command to re-run (the replay is safe to repeat). Tell affected
+parents if recent *edits* were lost (BACKUPS-AND-ERASURE.md §3).
 
 ### 6.3 Restore to a moment (managed database, point-in-time)
 
@@ -420,7 +435,7 @@ command to re-run (the replay is safe to repeat). Tell affected parents if recen
    specific point in time** → pick the time → name it `snickerdoodle-db-restored`. Note the time.
 2. 🔑 Put the new database's address into SSM (§3.8, with the new name).
 3. 📦 `sudo /opt/snickerdoodle/kit/bin/restore-db.sh --replay-only --since 2026-10-23T09:14:00Z --yes`
-   (the restore point, in UTC). Same offline → replay → online rule.
+   (the restore point, in UTC). Same offline → migrations → replay → online rule.
 4. 🔑 When you're happy, delete the old database.
 
 ### 6.4 Practise it
@@ -430,15 +445,26 @@ container) and run the app against it. A backup you haven't restored is a hope, 
 
 ## 7. Logs and alerts
 
-**Always on, no setup:** the box emails you (SNS) when a deploy fails, rolls back, or a backup
-fails. Logs rotate on the box (~50 MB per service). Caddy keeps **no access log** on purpose
-(request lines carry gift-link and invite tokens).
+**Always on, no setup — the box's own watchdog** (`bin/watchdog.sh`, hourly) emails you (SNS) when:
+- a service isn't running, or the app's health check fails;
+- the disk is ≥ 85 % full;
+- the last **verified** database backup is more than 26 hours old;
+- the HTTPS certificate is within 7 days of expiry (Caddy renews well before that, so renewal is failing);
+- in the last hour the app or scheduler logged one of the lines that mean a promise to families
+  may be broken: **a deletion not recorded in the erasure ledger** (a restore could bring it back —
+  fix the cause and note the ids from `logs.sh app`), **retention left undone** (an upload past its
+  deletion date), a scheduled job failed, or fulfilment stuck.
+
+Each problem is emailed once, again every 12 hours while it lasts, and "resolved" when it clears.
+Deploy failures, automatic rollbacks and failed backups email you straight away. Logs rotate on
+the box (~50 MB per service). Caddy keeps **no access log** on purpose (request lines carry
+gift-link and invite tokens).
 
 **🔑 Lightsail alarms (free):** box → *Metrics* → add alarms for **CPU > 80% for 15 min** and
-**Status check failed**; database → **CPU > 80%**, **Free storage < 2 GB**. Notifications → your
-email/phone.
+**Status check failed** (the watchdog can't email if the box itself is dead); database → **CPU >
+80%**, **Free storage < 2 GB**. Notifications → your email/phone.
 
-**🔑 Is the site up? (Route 53 health check, ~$0.50/month):**
+**🔑 Is the site up from outside? (Route 53 health check, ~$0.50/month):**
 ```bash
 aws route53 create-health-check --caller-reference sd-$(date +%s) --health-check-config \
   '{"Type":"HTTPS_STR_MATCH","FullyQualifiedDomainName":"snickerdoodle.co.uk","ResourcePath":"/api/health","SearchString":"\"ok\":true","RequestInterval":30,"FailureThreshold":3}'
@@ -447,7 +473,7 @@ then CloudWatch (region **us-east-1**, where Route 53 metrics live) → *Alarms 
 health check's `HealthCheckStatus < 1` → an SNS email topic in us-east-1. (The check only
 fetches `/api/health`, which carries no personal data.)
 
-**🔑📦 CloudWatch Logs (recommended, §2.3):**
+**🔑📦 Optional — keep 30 days of logs off the box (CloudWatch Logs, §2.3):**
 1. 🔑 `aws logs create-log-group --log-group-name /snickerdoodle/prod` and
    `aws logs put-retention-policy --log-group-name /snickerdoodle/prod --retention-in-days 30`
    (the DPIA's 30–90-day server-log intent).
@@ -455,26 +481,8 @@ fetches `/api/health`, which carries no personal data.)
    `sudo cp /opt/snickerdoodle/kit/docker/daemon.cloudwatch.json /etc/docker/daemon.json`
    `sudo systemctl daemon-reload && sudo systemctl restart docker && sudo systemctl restart snickerdoodle`
    (If containers then refuse to start with an `awslogs` error, the box key or policy is wrong —
-   copy `docker/daemon.json` back and restart to return to local logs.)
-3. 🔑 One metric + alarm per line the app/scheduler writes when something needs you:
-
-```bash
-G=/snickerdoodle/prod
-alarm() { # name, filter pattern, threshold, period-seconds
-  aws logs put-metric-filter --log-group-name $G --filter-name "$1" --filter-pattern "$2" \
-    --metric-transformations metricName="$1",metricNamespace=Snickerdoodle,metricValue=1,defaultValue=0
-  aws cloudwatch put-metric-alarm --alarm-name "snickerdoodle-$1" --namespace Snickerdoodle --metric-name "$1" \
-    --statistic Sum --period "$4" --evaluation-periods 1 --threshold "$3" --comparison-operator GreaterThanOrEqualToThreshold \
-    --treat-missing-data notBreaching --alarm-actions "$TOPIC"
-}
-alarm JobFailed          '"[jobs] FAILED"'                    1 3600
-alarm FulfilmentAttention '"[fulfilment] tick needs attention"' 1 900
-alarm ErasureLedgerFailed '"[erasure-ledger] FAILED"'          1 300
-alarm DatabaseDown       '"[health] database check failed"'   3 300
-alarm RenderCheckFailed  '"[health] render check failed"'     1 3600
-```
-`ErasureLedgerFailed` matters most: it means a deletion wasn't written to the ledger, so a
-restore could bring it back — fix the cause and note the ids from the log.
+   copy `docker/daemon.json` back and restart to return to local logs.) The watchdog keeps working
+   either way (`docker logs` still reads them).
 
 ## 8. Monthly cost (estimate — confirm in the AWS Pricing Calculator)
 
@@ -493,7 +501,7 @@ the Lightsail pricing page before you commit.
 | KMS | 2 keys; S3 Bucket Keys keep requests in the free tier | 2 |
 | ECR | ~10 images kept | ~0.5 |
 | SSM Parameter Store (Standard) | | 0 |
-| CloudWatch Logs + 5 alarms | a few GB/month | ~1–2 |
+| CloudWatch Logs (optional) | a few GB/month | ~1 |
 | Route 53 health check (+ hosted zone if DNS moves there) | | 0.5 (+0.5) |
 | SNS email | | 0 |
 | Rekognition (once live) | ~$0.001 per picture checked; 2,000 uploads | ~2 |
@@ -512,7 +520,7 @@ earns it (§9 resize).
   change. The box applies Ubuntu security updates itself (reboots at 03:40 UTC only when a kernel
   needs it; the app comes back on its own).
 - **Every 90 days:** rotate the `snickerdoodle-app` key (create new → `sput S3_ACCESS_KEY/S3_SECRET_KEY`
-  → `deploy.sh --restart` → delete the old key) and the `snickerdoodle-box` key (create new →
+  and `AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY` → `deploy.sh --restart` → delete the old key) and the `snickerdoodle-box` key (create new →
   `sudo -H aws configure --profile snickerdoodle-box` → delete the old).
 - **Quarterly:** a restore drill (§6.4); review the AWS bill against §8.
 - **Resize the box:** Lightsail snapshot → *Create new instance from snapshot* with the bigger
@@ -522,7 +530,7 @@ earns it (§9 resize).
 
 ## 10. Your steps, in order (checklist)
 
-1. ☐ Decide: managed DB or on the box (§2.1) · box size (§2.2) · CloudWatch logs (§2.3)
+1. ☐ Decide: managed DB or on the box (§2.1) · box size (§2.2) · off-box logs (§2.3, optional)
 2. ☐ 🔑 Account safety: root MFA, budget alert, **AI-services opt-out**, (§3.1)
 3. ☐ 🔑 Two KMS keys (§3.2)
 4. ☐ 🔑 Pictures bucket + CORS (§3.3) · backups bucket (§3.4)
@@ -540,7 +548,7 @@ earns it (§9 resize).
 16. ☐ 🖥️📦 Copy `.prodigi-assets`, seed mockups (§4.6)
 17. ☐ 🔑 Stripe webhook → SSM → `deploy.sh --restart` (§4.7)
 18. ☐ Smoke test from your computer (§4.8)
-19. ☐ 🔑📦 Alerts: Lightsail alarms, Route 53 health check, CloudWatch logs + alarms (§7)
+19. ☐ 🔑 Alerts: Lightsail alarms + Route 53 health check (§7; the box's watchdog is already on)
 20. ☐ 🔑 Turn on direct uploads after the CORS check (`S3_DIRECT_UPLOADS=true`, ops/DIRECT-UPLOADS.md)
 21. ☐ Day after: check the first nightly backup (`restore-db.sh --list`) and the jobs (`logs.sh jobs`)
 22. ☐ Launch day (only when the LG gates are closed): delete `SITE_MODE` + `TEST_SITE_PASSWORD`,
