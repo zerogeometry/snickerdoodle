@@ -31,8 +31,14 @@ for (const vp of [{ w: 360, h: 780 }, { w: 390, h: 844 }]) {
 test('wider screens keep the 2-up range', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
+  // measure the settled layout, not tiles mid pop-in (the animation moves them; it was flaky)
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  const xs = await page.getByRole('button', { name: '+ customize' }).evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left / 20)));
-  expect(new Set(xs).size).toBe(2);
+  const xs = await page.getByRole('button', { name: '+ customize' }).evaluateAll((els) => els.map((e) => e.getBoundingClientRect().left));
+  // columns = groups of left edges more than 60px apart (the tiles' little tilts move each edge by a
+  // few px, so rounding to a grid could split one column in two)
+  const sorted = [...xs].sort((a, b) => a - b);
+  const columns = sorted.filter((x, i) => i === 0 || x - sorted[i - 1]! > 60).length;
+  expect(columns).toBe(2);
 });
