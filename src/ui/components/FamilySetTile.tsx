@@ -120,10 +120,11 @@ export function FamilySetTile({
         ['--tape-rot' as string]: index % 2 ? '4deg' : '-3deg',
       }}
     >
-      <div role="img" aria-label="your drawing on two grown-up tees and two kids tees — a matching family set" className="relative aspect-square w-full overflow-hidden bg-paper-2">
+      <div className="relative aspect-square w-full overflow-hidden bg-paper-2">
         {/* one calm block until the whole picture is ready — never a tee at a time */}
         {!shown ? <div aria-hidden className="absolute inset-0 bg-line motion-safe:animate-pulse" /> : null}
-        <div ref={layerRef} aria-hidden className={`absolute inset-0 transition-opacity duration-300 ${shown ? 'opacity-100' : 'opacity-0'}`}>
+        {/* the picture is the image (the tap-anywhere button below sits beside it, not inside it) */}
+        <div ref={layerRef} role="img" aria-label="your drawing on two grown-up tees and two kids tees — a matching family set" className={`absolute inset-0 transition-opacity duration-300 ${shown ? 'opacity-100' : 'opacity-0'}`}>
         {/* grown-ups at the back… */}
         {tee(adult, adultV.id, 'left-[-4%] top-[0%] w-[64%]', { transform: 'rotate(-6deg)', zIndex: 1 })}
         {tee(adult, adultV.id, 'right-[-4%] top-[0%] w-[64%]', { transform: 'rotate(6deg)', zIndex: 0 })}

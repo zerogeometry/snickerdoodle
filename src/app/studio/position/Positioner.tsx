@@ -1003,7 +1003,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const turnBox: React.CSSProperties = bd?.angle ? { transform: `rotate(${bd.angle}deg)` } : {};
 
   return (
-    <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')}>
+    <Shell back={returnTo ?? (draft ? '/start-creating' : '/home')} title={`edit placement — ${variant.label}`}>
       <div ref={gridRef} className="grid gap-6 md:grid-cols-[auto_1fr]">
         {/* Canvas — the image ON the product (photo backdrop) when a template exists;
             the flat print canvas otherwise (or on request). Same shared geometry either way. */}
@@ -1446,12 +1446,14 @@ const OPT_SM = "press relative inline-flex min-h-9 items-center rounded-pill bor
 const OPT_ON = 'border-cocoa bg-cocoa text-paper shadow-[0_2px_0_var(--color-cocoa)]';
 const OPT_OFF = 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa';
 
-function Shell({ children, back = '/home' }: { children: React.ReactNode; back?: string }) {
+function Shell({ children, back = '/home', title = 'edit placement' }: { children: React.ReactNode; back?: string; title?: string }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: back, label: 'Back' }} tag="studio" />
       {/* pb-32 on phones clears the fixed thumb-zone action dock. */}
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 pb-32 pt-6 md:px-6 md:pb-8">
+        {/* the page's heading, for screen readers (the layout itself is the visual title) */}
+        <h1 className="sr-only">{title}</h1>
         {children}
       </main>
     </div>

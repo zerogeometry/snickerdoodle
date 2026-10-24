@@ -443,7 +443,7 @@ export default function CheckoutPage() {
 
       {/* Mobile pinned total + checkout */}
       {!empty ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-oat px-4 pb-5 pt-3 md:hidden">
+        <section aria-label="your total" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-oat px-4 pb-5 pt-3 md:hidden">
           <div className="mb-2 flex items-end justify-between">
             <span className="text-[13px] text-ink-soft">
               Total <span className="text-[11px] text-ink-faint">incl. delivery</span>
@@ -462,7 +462,7 @@ export default function CheckoutPage() {
               </>
             )}
           </p>
-        </div>
+        </section>
       ) : null}
     </div>
   );

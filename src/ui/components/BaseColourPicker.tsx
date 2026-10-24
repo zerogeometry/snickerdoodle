@@ -46,13 +46,19 @@ export function BaseColourPicker({
           type="button"
           onClick={() => { setDraft(groundHex(value)); setOpen(true); }}
           aria-haspopup="dialog"
-          aria-label={`${title}: ${word} — change it`}
           className="press flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-pill border-2 border-cocoa bg-paper py-1 pl-1 pr-4 text-left shadow-[0_2px_0_var(--color-cocoa)]"
         >
           <span aria-hidden className="h-9 w-9 shrink-0 rounded-full border-2 border-cocoa/45" style={{ background: groundHex(value) }} />
-          <span className="truncate text-sm font-bold text-cocoa">{word}</span>
+          {/* named by what it shows (+ what it's for, for a screen reader): "sock colour: white — change it" */}
+          <span className="truncate text-sm font-bold text-cocoa">
+            <span className="sr-only">{title}: </span>
+            {word}
+            <span className="sr-only"> —</span>
+          </span>
           <span aria-hidden className="ml-auto h-6 w-6 shrink-0 rounded-full border-2 border-cocoa/30" style={{ background: 'radial-gradient(circle closest-side, #fff, rgb(255 255 255 / 0)), conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
-          <span className="shrink-0 text-xs font-bold text-cinnamon">change</span>
+          <span className="shrink-0 text-xs font-bold text-cinnamon">
+            change<span className="sr-only"> it</span>
+          </span>
         </button>
         {isColouredGround(value) ? (
           <button type="button" onClick={() => onChange(PATTERN_GROUND_WHITE)} className="min-h-11 shrink-0 px-1 text-xs font-bold text-ink-soft underline underline-offset-2 hover:text-cinnamon">
