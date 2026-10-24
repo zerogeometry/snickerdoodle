@@ -29,6 +29,7 @@ import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geo
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
+import { isZoomWheel, wheelZoomFactor } from './wheelZoom';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import type { StudioData } from '@/server/studio';
@@ -876,15 +877,17 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     onPointerCancel: onHandlePointerUp,
   };
 
-  /** Wheel = zoom (desktop). Non-passive via a ref effect so preventDefault stops the
-   * page scrolling under the cursor. */
+  /** Ctrl/⌘ + wheel = zoom (desktop); a trackpad pinch arrives as ctrl + wheel too. A PLAIN wheel
+   * is left alone so the page scrolls past the print layout — a laptop shopper is never trapped on
+   * it. Non-passive via a ref effect so preventDefault can stop the browser's own page zoom. */
   const canvasElRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = canvasElRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
+      if (!isZoomWheel(e)) return;
       e.preventDefault();
-      zoomBy(e.deltaY < 0 ? 1.06 : 1 / 1.06);
+      zoomBy(wheelZoomFactor(e.deltaY));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -903,7 +906,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     tabIndex: 0,
     role: 'application',
     'aria-label':
-      'drawing position. drag to move, drag a corner or scroll or pinch or press plus and minus to resize, double-tap to reset, R to rotate, arrow keys to nudge, F to reset.',
+      'drawing position. drag to move, drag a corner, pinch, ctrl or command plus scroll, or press plus and minus to resize, double-tap to reset, R to rotate, arrow keys to nudge, F to reset.',
   } as const;
   const canvasInteractionClass = `touch-none select-none outline-none focus-visible:ring-2 focus-visible:ring-cinnamon focus-visible:ring-offset-2 ${dragging ? 'cursor-grabbing' : 'cursor-grab'}`;
   const maskStyle: React.CSSProperties | undefined = ctx && ctx.ok && ctx.maskUrl
@@ -1233,7 +1236,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               </button>
             </div>
           </div>
-          <p className="mt-1 text-[11px] text-ink-faint">drag the drawing to move it · drag a corner (or scroll / pinch) to resize · double-tap to reset</p>
+          <p className="mt-1 text-[11px] text-ink-faint">drag the drawing to move it · drag a corner (or pinch, or ctrl/⌘ + scroll) to resize · double-tap to reset</p>
           <div className="mt-1 space-y-0.5">
             <ZoomSlider
               fit={fitScale}

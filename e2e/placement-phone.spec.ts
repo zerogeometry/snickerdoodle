@@ -5,7 +5,8 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
  * Edit placement on a phone (founder, 24 Oct): nothing spills sideways, every control is a ≥44px
  * target, "save & return" stays in the thumb zone, and the live product preview is on screen near
  * the print layout — beside a tall narrow one (height chart, wrapping paper), just under a wide one —
- * not buried below every control.
+ * not buried below every control. And on a laptop a plain mouse wheel scrolls the page past the print
+ * layout; only ctrl/⌘ + wheel (or a trackpad pinch) zooms.
  */
 /** The drawing is stored (it has an asset id) once the range has finished making. */
 const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
@@ -55,4 +56,33 @@ test.describe('on a phone', () => {
       await page.goBack();
     }
   });
+});
+
+test('laptop: a plain wheel scrolls past the print layout; ctrl + wheel zooms', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width: 1280, height: 640 });
+  await quietCookies(page);
+  await uploadAndOpenRange(page);
+  await rangeReady(page);
+  await openPlacement(page, 'mug');
+  await expect(page.getByText('drag a corner (or pinch, or ctrl/⌘ + scroll) to resize')).toBeVisible();
+  const zoom = page.getByRole('slider', { name: 'Zoom', exact: true });
+  const canvas = (await page.locator('[role="application"]').boundingBox())!;
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const z0 = await zoom.inputValue();
+
+  await page.mouse.move(canvas.x + canvas.width / 2, canvas.y + canvas.height / 2);
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0); // the page moved
+  expect(await zoom.inputValue()).toBe(z0); // the drawing didn't
+
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const c = (await page.locator('[role="application"]').boundingBox())!;
+  await page.mouse.move(c.x + c.width / 2, c.y + c.height / 2);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await page.mouse.wheel(0, -100);
+  await page.keyboard.up('Control');
+  await expect.poll(async () => Number(await zoom.inputValue())).toBeGreaterThan(Number(z0)); // zoomed in
+  expect(await page.evaluate(() => window.scrollY)).toBe(0); // and the page stayed put
 });
