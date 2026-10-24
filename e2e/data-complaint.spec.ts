@@ -15,12 +15,13 @@ test('data complaint: write → send → acknowledged with a reference (the pers
   await page.goto('/trust/data-complaint');
   await expect(page.getByRole('heading', { level: 1, name: 'Make a data-protection complaint' })).toBeVisible();
   await page.getByLabel('Your name').fill('Alex Parent');
-  await page.getByLabel('Your email').fill('e2e-complaint@example.test');
+  const email = `e2e-complaint-${Date.now().toString(36)}@example.test`; // 3 a day per email — fresh each run
+  await page.getByLabel('Your email').fill(email);
   await page.getByLabel(/What.s your complaint about/).fill('You kept my drawing longer than you said you would.');
   await page.getByRole('button', { name: 'send complaint' }).click();
   const done = page.getByRole('status').filter({ hasText: /we.ve got it/ });
   await expect(done).toBeVisible({ timeout: 30_000 });
-  await expect(done).toContainText('e2e-complaint@example.test');
+  await expect(done).toContainText(email);
   expect(refusals).toEqual([]);
 });
 
