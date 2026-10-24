@@ -140,6 +140,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // A very TALL print (the 1:6 height chart) must not make a canvas taller than the screen: the
   // canvas takes the touch (no page scroll over it), so the shopper could never scroll past it.
   const [maxPreviewH, setMaxPreviewH] = useState(SSR_MAX_PREVIEW_H);
+  // md+ = the controls column sits beside the canvas. SSR (and the first paint) assumes a phone.
+  const [wide, setWide] = useState(false);
   useEffect(() => {
     const el = gridRef.current;
     if (!el) return;
@@ -148,7 +150,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       // On desktop the controls column sits beside the canvas; reserve room for it.
       const desktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
       const avail = desktop ? gw - 396 : gw;
-      setPreviewW(Math.max(320, Math.min(MAX_PREVIEW_W, Math.floor(avail))));
+      // never wider than the room there is (a 320px phone has less than the 320px floor)
+      setPreviewW(Math.min(Math.floor(gw), Math.max(320, Math.min(MAX_PREVIEW_W, Math.floor(avail)))));
+      setWide(desktop);
       setMaxPreviewH(Math.max(420, Math.round(window.innerHeight * 0.72)));
     };
     measure();
@@ -284,6 +288,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const aspect = canvas.width / canvas.height;
   const previewW = Math.min(availW, Math.max(80, Math.floor(maxPreviewH * aspect)));
   const previewH = Math.round(previewW / aspect);
+  // Where the live product preview sits (founder, 24 Oct: "visible near the controls on a phone, not
+  // buried"): on desktop in the controls column; on a phone BESIDE a tall, narrow print layout (height
+  // chart, wrapping paper) when there's room, else as a compact card right under it — never below
+  // every control.
+  const besideRoom = availW - previewW - 12;
+  const livePlace: 'desktop' | 'beside' | 'below' | null = !noProductView ? null : wide ? 'desktop' : besideRoom >= 120 ? 'beside' : 'below';
   const scale = previewW / canvas.width; // canvas-px → preview-px
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
 
@@ -942,6 +952,50 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     );
   };
 
+  /** The real product, drawn by the same renderer as the customize page and the print. */
+  const livePreviewImage = (px: number) => (
+    <MockupPreview
+      productKey={variant.productKey as ProductKey}
+      assetId={keepsake.id}
+      variantId={variant.id}
+      transform={settledTf}
+      size="zoom"
+      sourceObjectId={cutout?.sourceObjectId ?? null}
+      view={isMug ? 'centre' : undefined}
+      ground={isGround ? (groundToken ?? null) : null}
+      px={px}
+      loader
+    />
+  );
+  // the phone layouts' preview box, px (the placeholder's height follows it, so nothing spills out)
+  const besideW = Math.min(200, besideRoom);
+  const belowBox = Math.min(180, Math.floor((availW - 24) * 0.44));
+  const renderLivePreview = (place: 'desktop' | 'beside' | 'below') =>
+    place === 'desktop' ? (
+      <section aria-label={`on the ${productNoun}`} className="mt-5 rounded-[14px] border-2 border-cocoa/15 bg-paper p-2">
+        <p className="px-1 text-[12px] font-extrabold text-cocoa">
+          on the {productNoun} <span className="font-normal text-ink-faint">· how it will really look — updates when you stop</span>
+        </p>
+        <div className="mx-auto mt-1 aspect-square w-full max-w-[300px]">{livePreviewImage(340)}</div>
+      </section>
+    ) : place === 'beside' ? (
+      <section aria-label={`on the ${productNoun}`} className="shrink-0 rounded-[14px] border-2 border-cocoa/15 bg-paper p-1.5" style={{ width: besideW }}>
+        <p className="px-0.5 text-[12px] font-extrabold text-cocoa">on the {productNoun}</p>
+        <div className="relative mt-1 aspect-square w-full overflow-hidden rounded-lg">{livePreviewImage(besideW - 16)}</div>
+        <p className="mt-1 px-0.5 text-[11px] leading-snug text-ink-faint">how it will really look — updates when you stop</p>
+      </section>
+    ) : (
+      <section aria-label={`on the ${productNoun}`} className="mt-3 flex items-center gap-3 rounded-[14px] border-2 border-cocoa/15 bg-paper p-2">
+        <div className="relative shrink-0 overflow-hidden rounded-lg" style={{ width: belowBox, height: belowBox }}>
+          {livePreviewImage(belowBox)}
+        </div>
+        <p className="min-w-0 text-[12px] font-extrabold text-cocoa">
+          on the {productNoun}
+          <span className="mt-0.5 block font-normal leading-snug text-ink-faint">how it will really look — updates when you stop</span>
+        </p>
+      </section>
+    );
+
   // everything drawn ON the print area turns with an angled one (about the box's own centre)
   const turnBox: React.CSSProperties = bd?.angle ? { transform: `rotate(${bd.angle}deg)` } : {};
 
@@ -971,6 +1025,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               </button>
             </div>
           ) : null}
+          <div className={livePlace === 'beside' ? 'flex items-start justify-center gap-3' : undefined}>
           {!noProductView && bd && ctx && ctx.ok && viewMode === 'product' ? (
             <div
               {...canvasInteractionProps}
@@ -1008,7 +1063,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           ) : (
             <div
               {...canvasInteractionProps}
-              className={`relative mx-auto overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
+              className={`relative ${livePlace === 'beside' ? 'shrink-0' : 'mx-auto'} overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
               style={{ width: previewW, height: previewH, ...groundFill }}
             >
               <img
@@ -1056,6 +1111,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               )}
             </div>
           )}
+          {livePlace === 'beside' ? renderLivePreview('beside') : null}
+          </div>
           <p className="mt-2 text-center text-[11px] text-ink-faint">
             {isPattern ? (
               <>this is the pattern that prints · drag to shift it · drag a corner to make the drawings bigger or smaller</>
@@ -1065,7 +1122,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <>the <b className="text-cinnamon">outlined box</b> is what {variant.productKey === 'framedPrint' ? 'shows in the frame' : 'prints'} · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             )}
           </p>
-
+          {livePlace === 'below' ? renderLivePreview('below') : null}
 
           {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX
               offered right where the warning is, never a dead end. */}
@@ -1177,7 +1234,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             </div>
           </div>
           <p className="mt-1 text-[11px] text-ink-faint">drag the drawing to move it · drag a corner (or scroll / pinch) to resize · double-tap to reset</p>
-          <div className="mt-2 space-y-3">
+          <div className="mt-1 space-y-0.5">
             <ZoomSlider
               fit={fitScale}
               value={zoomValue}
@@ -1218,33 +1275,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             <button
               type="button"
               onClick={setRot}
-              className="press inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-cocoa/25 bg-paper px-3.5 text-xs font-bold text-cocoa hover:border-cocoa"
+              className="press mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-cocoa/25 bg-paper px-3.5 text-xs font-bold text-cocoa hover:border-cocoa"
             >
               <Icon icon={IconRotateClockwise} size={14} /> rotate ({tf.rotationDeg}°)
             </button>
           </div>
 
-          {noProductView ? (
-            <section aria-label={`on the ${productNoun}`} className="mt-5 rounded-[14px] border-2 border-cocoa/15 bg-paper p-2">
-              <p className="px-1 text-[12px] font-extrabold text-cocoa">
-                on the {productNoun} <span className="font-normal text-ink-faint">· how it will really look — updates when you stop</span>
-              </p>
-              <div className="mx-auto mt-1 aspect-square w-full max-w-[300px]">
-                <MockupPreview
-                  productKey={variant.productKey as ProductKey}
-                  assetId={keepsake.id}
-                  variantId={variant.id}
-                  transform={settledTf}
-                  size="zoom"
-                  sourceObjectId={cutout?.sourceObjectId ?? null}
-                  view={isMug ? 'centre' : undefined}
-                  ground={isGround ? (groundToken ?? null) : null}
-                  px={340}
-                  loader
-                />
-              </div>
-            </section>
-          ) : null}
+          {livePlace === 'desktop' ? renderLivePreview('desktop') : null}
 
           {/* a design from the Studio already has its background handled there — no second remover */}
           {keepsake.design ? null : (<>
@@ -1350,7 +1387,8 @@ function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; valu
         value={clamp01(toT(value))}
         aria-label="Zoom"
         onChange={(e) => onChange(fromT(Number(e.target.value)))}
-        className="h-1.5 flex-1 accent-cinnamon"
+        // 44px tall to touch (the native track stays thin, centred) — CLAUDE.md tap targets
+        className="h-11 min-w-0 flex-1 cursor-pointer accent-cinnamon disabled:cursor-default"
       />
       <span className="w-8 shrink-0 text-right text-[11px] text-ink-faint">{`${shown.toFixed(1)}×`}</span>
     </label>
@@ -1391,7 +1429,8 @@ function Slider({
         aria-label={disabled && disabledHint ? `${label} — ${disabledHint}` : label}
         disabled={disabled}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 flex-1 accent-cinnamon"
+        // 44px tall to touch (the native track stays thin, centred) — CLAUDE.md tap targets
+        className="h-11 min-w-0 flex-1 cursor-pointer accent-cinnamon disabled:cursor-default"
       />
       <span className="w-8 shrink-0 text-right text-[11px] text-ink-faint">{format(value)}</span>
     </label>
