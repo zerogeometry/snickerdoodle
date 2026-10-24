@@ -23,15 +23,20 @@ problems=()
 
 problem() { problems+=("$1"); } # "<id>|<message>"
 
-# ── services and health ─────────────────────────────────────────────────────────────────────────
+# ── services and health — skipped while a deploy, rollback or restore is running (they stop and
+# start services on purpose; they email about their own failures) ────────────────────────────────
+busy=0
+flock -n "$STATE_DIR/.deploy.lock" true || busy=1
 services=(app caddy scheduler)
 [ "${COMPOSE_PROFILES:-}" = local-db ] && services+=(db)
 running="$(dc ps --status running --format '{{.Service}}' 2>/dev/null || true)"
-for s in "${services[@]}"; do
-  grep -qx "$s" <<<"$running" || problem "down-$s|the $s service is not running"
-done
-curl -fsS --max-time 10 http://127.0.0.1:3000/api/health 2>/dev/null | grep -q '"ok":true' \
-  || problem "health|the app's health check is failing (app down or database unreachable)"
+if [ "$busy" = 0 ]; then
+  for s in "${services[@]}"; do
+    grep -qx "$s" <<<"$running" || problem "down-$s|the $s service is not running"
+  done
+  curl -fsS --max-time 10 http://127.0.0.1:3000/api/health 2>/dev/null | grep -q '"ok":true' \
+    || problem "health|the app's health check is failing (app down or database unreachable)"
+fi
 
 # ── disk ────────────────────────────────────────────────────────────────────────────────────────
 used="$(df --output=pcent / | tail -1 | tr -dc '0-9')"
@@ -84,6 +89,7 @@ done
 for stamp in "$ALERT_DIR"/*; do
   [ -e "$stamp" ] || continue
   id="$(basename "$stamp")"
+  if [ "$busy" = 1 ] && [[ "$id" == down-* || "$id" == health ]]; then continue; fi # not checked this run
   if [ -z "${seen[$id]:-}" ]; then
     send+=("resolved: $id")
     rm -f "$stamp"
