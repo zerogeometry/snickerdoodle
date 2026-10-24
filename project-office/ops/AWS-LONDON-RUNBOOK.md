@@ -199,6 +199,7 @@ put  PRODIGI_BASE_URL https://api.sandbox.prodigi.com/v4.0
 put  MAIL_PROVIDER resend
 put  MAIL_FROM "snickerdoodle <hello@mail.snickerdoodle.co.uk>"
 put  PRIVACY_INBOX privacy@snickerdoodle.co.uk
+put  CLIENT_IP_HEADER x-real-ip         # rate limits trust only the address Caddy saw
 
 KEY=$(aws iam create-access-key --user-name snickerdoodle-app --output json)
 sput S3_ACCESS_KEY "$(jq -r .AccessKey.AccessKeyId <<<"$KEY")"

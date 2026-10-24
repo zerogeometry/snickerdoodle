@@ -68,10 +68,18 @@ export async function rateLimitAll(db: DbHandle, limits: Limit[]): Promise<Limit
 }
 
 /**
- * The caller's IP, from the platform's own header first (Netlify sets x-nf-client-connection-ip;
- * a visitor can't forge it), else the usual proxy headers. 'unknown' when there's none (local dev).
+ * The caller's IP. A host can name the ONE header its proxy sets and a visitor can't forge, with
+ * CLIENT_IP_HEADER (the AWS box: `x-real-ip`, which Caddy overwrites on every request) — then
+ * nothing else is read, so a visitor-supplied header can never pick their rate-limit bucket.
+ * Unset (Netlify, local dev): the platform's own header first (Netlify sets
+ * x-nf-client-connection-ip), else the usual proxy headers. 'unknown' when there's none.
  */
-export function ipFromHeaders(h: Pick<Headers, 'get'>): string {
+export function ipFromHeaders(h: Pick<Headers, 'get'>, env: Record<string, string | undefined> = process.env): string {
+  const pinned = (env.CLIENT_IP_HEADER ?? '').trim().toLowerCase();
+  if (pinned) {
+    const v = h.get(pinned);
+    return v ? v.split(',')[0]!.trim() || 'unknown' : 'unknown';
+  }
   const nf = h.get('x-nf-client-connection-ip');
   if (nf) return nf.trim();
   const real = h.get('x-real-ip');
