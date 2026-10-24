@@ -6,7 +6,7 @@
 #   /etc/snickerdoodle/box.env       — this box's non-secret settings (domain, image repo, …)
 #   /opt/snickerdoodle/state/release.env — which image is live (written by deploy/rollback)
 # and the secrets arrive from SSM Parameter Store via bin/fetch-env.sh into /run (memory only):
-#   /run/snickerdoodle/app.env       — every app setting (env_file below)
+#   /run/snickerdoodle/app.env       — every app setting (a read-only file the app loads at start)
 #   /run/snickerdoodle/jobs_secret   — the jobs secret alone, for the scheduler
 #   /run/snickerdoodle/db_password   — only with the on-box database (COMPOSE_PROFILES=local-db)
 #
@@ -21,13 +21,15 @@ services:
     image: ${APP_IMAGE:?APP_IMAGE is set by bin/deploy.sh}
     restart: unless-stopped
     init: true
-    env_file:
-      # raw: values are taken literally (a secret may contain $ or quotes)
-      - path: /run/snickerdoodle/app.env
-        format: raw
+    # Its own user id (no account on the box), so only root and the app can read its settings file.
+    user: '10001:10001'
     environment:
       # leave headroom under the container limit for sharp/libvips, which work outside the JS heap
       NODE_OPTIONS: --max-old-space-size=${APP_NODE_HEAP_MB:-2560}
+      # the Lightsail/RDS root CAs, so the database's certificate is VERIFIED (sslmode=verify-full)
+      NODE_EXTRA_CA_CERTS: /certs/rds-ca.pem
+      SNICKERDOODLE_REQUIRE_SECRETS: '1'
+      HOME: /tmp
     # Loopback only: Caddy reaches the app over the compose network; this port exists so the
     # smoke test and the restore script can talk to the app ON the box. Never open it publicly.
     ports:
@@ -35,10 +37,24 @@ services:
     read_only: true
     tmpfs:
       - /tmp:size=512m,mode=1777
-      - /app/.next/cache:size=256m,uid=1000,gid=1000,mode=0700
+      - /app/.next/cache:size=256m,uid=10001,gid=10001,mode=0700
     volumes:
+      # The settings (from SSM, in memory): a FILE the app reads at start (infra/start.mjs) —
+      # never container environment, which Docker would keep in its config on disk.
+      - type: bind
+        source: /run/snickerdoodle/app.env
+        target: /run/secrets/app.env
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /opt/snickerdoodle/certs
+        target: /certs
+        read_only: true
+        bind:
+          create_host_path: false
       # the Prodigi product blanks the mockup seeder reads (copied once from the founder's
-      # computer — runbook §4.4). Brand-safe product photos, no customer data. Empty is fine.
+      # computer — runbook §4.6). Brand-safe product photos, no customer data. Empty is fine.
       - /opt/snickerdoodle/prodigi-assets:/app/.prodigi-assets:ro
     security_opt:
       - no-new-privileges:true

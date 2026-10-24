@@ -1,0 +1,9 @@
+# The box watching itself (bin/watchdog.sh). Started hourly by snickerdoodle-watchdog.timer.
+[Unit]
+Description=Snickerdoodle hourly watchdog
+After=docker.service snickerdoodle.service
+
+[Service]
+Type=oneshot
+ExecStart=/opt/snickerdoodle/kit/bin/watchdog.sh
+Nice=10

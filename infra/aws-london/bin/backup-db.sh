@@ -9,9 +9,12 @@
 #   emails and orders, so it is encrypted with the general KMS key and kept 14 days only (the
 #   backups bucket's lifecycle rule, infra/aws-london/s3/backups-lifecycle.json) — the privacy
 #   notice promise: "gone from backups within 14 days".
-# - The object records `taken-at` (when the dump started). After a restore, every erasure since
-#   that moment is replayed (bin/restore-db.sh does it).
-# - The box user may write backups but not delete them, so a compromised box can't wipe them.
+# - A dump only COUNTS once it has been read back from S3 and restored in full to nowhere
+#   (pg_restore to /dev/null — a cut-short or corrupt dump fails that), and its manifest
+#   (<key>.manifest.json: size, sha256, taken-at) is written. restore-db.sh only offers dumps with a
+#   manifest and checks the sha256 before restoring. The box user can't delete objects, so a dump
+#   that failed its check simply sits there unlisted until the 14-day rule removes it.
+# - `taken-at` is when the dump started. After a restore, every erasure since then is replayed.
 source "$(dirname "$0")/lib.sh"
 need_root
 load_box_env
@@ -19,27 +22,32 @@ load_box_env
 : "${BACKUP_KMS_KEY:?BACKUP_KMS_KEY missing in $BOX_ENV}"
 [ -r "$RUN_DIR/app.env" ] || "$KIT_DIR/bin/fetch-env.sh"
 
-DATABASE_URL="$(app_setting DATABASE_URL)"
-export DATABASE_URL
-[ -n "$DATABASE_URL" ] || die "backup: DATABASE_URL is not set"
-
 taken_at="$(date -u +%FT%TZ)"
 key="db/$(date -u +%Y/%m/%d)/snickerdoodle-$(date -u +%Y%m%dT%H%M%SZ).dump"
-net=()
-[ "${COMPOSE_PROFILES:-}" = local-db ] && net=(--network snickerdoodle)
+sse=(--sse aws:kms --sse-kms-key-id "$BACKUP_KMS_KEY")
 
 log "backup: dumping the database → s3://$BACKUP_BUCKET/$key"
-# pg_dump runs in the Postgres image (its version must be ≥ the server's); the URL goes in by
-# environment, never on a command line. Custom format = compressed + selective restore.
-if ! docker run --rm -i "${net[@]}" -e DATABASE_URL "${POSTGRES_IMAGE:-postgres:16-bookworm}" \
-      sh -c 'exec pg_dump --format=custom --compress=6 --no-owner --no-privileges "$DATABASE_URL"' \
-    | aws s3 cp - "s3://$BACKUP_BUCKET/$key" \
-        --sse aws:kms --sse-kms-key-id "$BACKUP_KMS_KEY" \
-        --metadata "taken-at=$taken_at" --only-show-errors; then
+# custom format = compressed + selective restore. pg_dump's version must be ≥ the server's.
+if ! pg_run 'exec pg_dump --format=custom --compress=6 --no-owner --no-privileges "$DATABASE_URL"' \
+    | aws s3 cp - "s3://$BACKUP_BUCKET/$key" "${sse[@]}" --metadata "taken-at=$taken_at" --only-show-errors; then
   die "backup FAILED: the database dump did not reach S3 (key $key)"
 fi
 
-size="$(aws s3api head-object --bucket "$BACKUP_BUCKET" --key "$key" --query ContentLength --output text 2>/dev/null || echo 0)"
-[ "${size:-0}" -gt 1024 ] || die "backup FAILED: the dump in S3 is empty or missing ($key, $size bytes)"
-printf '%s %s %s\n' "$taken_at" "$key" "$size" >> "$STATE_DIR/backups.log"
-log "backup: ok ($size bytes, taken at $taken_at)"
+# Read it back (into memory — /run is tmpfs) and prove it restores in full.
+work="$(mktemp -d "$RUN_DIR/.backup.XXXXXX")"
+trap 'rm -rf "$work"' EXIT
+aws s3 cp "s3://$BACKUP_BUCKET/$key" "$work/dump" --only-show-errors || die "backup FAILED: can't read $key back"
+bytes="$(stat -c %s "$work/dump")"
+sha="$(sha256sum "$work/dump" | cut -d' ' -f1)"
+[ "$bytes" -gt 1024 ] || die "backup FAILED: $key is only $bytes bytes"
+PG_FLAGS="--mount type=bind,src=$work,dst=/work,readonly" \
+  pg_run 'pg_restore --list /work/dump >/dev/null && pg_restore -f /dev/null /work/dump' \
+  || die "backup FAILED: $key does not restore cleanly (cut short or corrupt) — it will not be offered for restore"
+
+jq -n --arg key "$key" --arg sha "$sha" --arg at "$taken_at" --arg checked "$(date -u +%FT%TZ)" --argjson bytes "$bytes" \
+  '{key: $key, bytes: $bytes, sha256: $sha, takenAt: $at, verifiedAt: $checked}' \
+  | aws s3 cp - "s3://$BACKUP_BUCKET/$key.manifest.json" "${sse[@]}" --content-type application/json --only-show-errors \
+  || die "backup FAILED: could not write the manifest for $key"
+
+printf '%s %s %s %s\n' "$taken_at" "$key" "$bytes" "$sha" >> "$STATE_DIR/backups.log"
+log "backup: ok and verified ($bytes bytes, taken at $taken_at)"

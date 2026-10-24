@@ -1,0 +1,10 @@
+# Every hour, a few minutes past (after the :15 retention run has finished).
+[Unit]
+Description=Hourly Snickerdoodle watchdog
+
+[Timer]
+OnCalendar=*-*-* *:40:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
