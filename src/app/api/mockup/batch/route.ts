@@ -29,10 +29,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<{ results: Mo
 
   const db = getDb();
   // a batch counts as many previews as it asks for (the same per-device limit as the single route)
-  const gate = await rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers), cost: items.length });
+  // independent lookups, side by side (each is a round trip); nothing is composed until the gate passes
+  const [gate, account, claims] = await Promise.all([
+    rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers), cost: items.length }),
+    getCurrentAccount(),
+    getUploadClaims(),
+  ]);
   if (!gate.ok) return NextResponse.json({ results: [] }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
-  const account = await getCurrentAccount();
-  const claims = await getUploadClaims();
   const viewers = new Map<string, Promise<ViewerContext>>();
   const viewerFor = (assetId: string) => {
     let v = viewers.get(assetId);

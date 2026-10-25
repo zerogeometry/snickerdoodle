@@ -36,10 +36,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<MockupPreview
 
   const db = getDb();
   // composing is CPU work: limited per device (a whole range + every colour swatch is well under it)
-  const gate = await rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers) });
+  const [gate, account, claims] = await Promise.all([
+    rateLimit(db, { ...LIMITS.mockupsPerIp, caller: ipFromHeaders(req.headers) }),
+    getCurrentAccount(),
+    getUploadClaims(),
+  ]);
   if (!gate.ok) return NextResponse.json({ ok: false, fallback: true }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
-  const account = await getCurrentAccount();
-  const claims = await getUploadClaims();
   const viewer = await resolveAssetViewer(db, assetId, account?.id ?? null, claims);
   const res = await composeForViewer(db, viewer, body, { needsAuth: account === null && viewer.uploadClaim == null });
   return NextResponse.json(res, { headers: { 'cache-control': 'no-store' } });
