@@ -14,7 +14,15 @@ export function ExampleCarousel({ items = EXAMPLES, rows = 3, className = '' }: 
   return (
     <div className={`flex flex-col gap-4 ${className}`} role="region" aria-label="keepsakes made from children’s drawings">
       {lines.map((line, r) => (
-        <div key={r} className="marquee-row -mx-2 overflow-hidden px-2 py-4 [container-type:inline-size] [mask-image:linear-gradient(to_right,transparent,#000_4%,#000_96%,transparent)]">
+        // focusable: with reduced motion a row scrolls sideways (arrow keys work once it has focus);
+        // otherwise focusing it pauses the slide — either way a keyboard user is in control
+        <div
+          key={r}
+          tabIndex={0}
+          role="group"
+          aria-label={`keepsakes, row ${r + 1} of ${lines.length}`}
+          className="marquee-row -mx-2 overflow-hidden rounded-[14px] px-2 py-4 [container-type:inline-size] [mask-image:linear-gradient(to_right,transparent,#000_4%,#000_96%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cinnamon"
+        >
           <ul className="marquee-track flex w-max" style={{ ['--marquee-dur' as string]: `${64 + r * 10}s`, animationDelay: `${-r * 11}s` }}>
             {[...line, ...line].map((e, i) => {
               const copy = i >= line.length; // the second lap: there for the loop, not read twice
