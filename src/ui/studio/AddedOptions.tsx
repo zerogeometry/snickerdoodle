@@ -1,10 +1,10 @@
 'use client';
 
-import { IconCopy, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
+import { IconArrowsHorizontal, IconCopy, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
-import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
-import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
-import { FESTIVE_SHAPES } from '@/lib/studio-festive';
+import { cardFontCss, pickerFonts, type CardFontToken } from '@/lib/card-fonts';
+import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_STICKER_SIZE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import type { Placement } from '@/lib/studio-geometry';
 import { Icon } from '@/ui/primitives/Icon';
@@ -40,8 +40,6 @@ export interface DrawingLayer {
   angle: number;
   onTurn: (deg: number, group?: boolean) => void;
 }
-/** Which shapes the picker shows: the everyday set, or (in the Christmas season) the festive stickers. */
-export type ShapeSet = 'plain' | 'festive';
 export interface ShapeStyle {
   fill: string;
   stroke: string;
@@ -60,10 +58,8 @@ export function AddedOptions(p: {
   setTextStyle: (s: TextStyle) => void;
   shapeStyle: ShapeStyle;
   setShapeStyle: (s: ShapeStyle) => void;
-  /** Christmas season: the shape picker offers the festive stickers too. */
+  /** Christmas season: the font picker offers the festive greeting fonts too. */
   festive: boolean;
-  shapeSet: ShapeSet;
-  setShapeSet: (s: ShapeSet) => void;
   objects: StudioObject[];
   selected: StudioObject | null;
   /** What the base layer is called: "your drawing", or "your canvas" when designing from scratch. */
@@ -119,7 +115,7 @@ export function AddedOptions(p: {
             <TextEditor key={o.id} value={o.text} onChange={(text) => p.onUpdate({ text }, true)} />
           </Section>
           <Section label="font">
-            <FontChips value={o.font} onChange={(font) => p.onUpdate({ font })} />
+            <FontChips value={o.font} festive={p.festive} onChange={(font) => p.onUpdate({ font })} />
             <SliderRow label="size" min={2} max={40} value={Math.round(o.size * 100)} onChange={(v) => p.onUpdate({ size: v / 100 }, true)} ariaLabel="text size" display={<span style={{ fontFamily: cardFontCss(o.font), fontSize: Math.max(11, Math.min(24, o.size * 110)) }}>Aa</span>} />
           </Section>
           <Section label="colour">
@@ -136,6 +132,19 @@ export function AddedOptions(p: {
           <Section>{actions}</Section>
           <ShapeStyleControls style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }} onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)} />
           <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${SHAPE_LABELS[o.shape]}`} />
+        </Stack>
+      );
+    }
+    if (o.type === 'sticker') {
+      const name = stickerLabel(o.sticker);
+      return (
+        <Stack>
+          <Section>{actions}</Section>
+          <Section label="size">
+            <SliderRow label="size" min={5} max={Math.round(MAX_STICKER_SIZE * 100)} value={Math.round(o.size * 100)} onChange={(v) => p.onUpdate({ size: v / 100 } as Partial<StudioObject>, true)} ariaLabel={`${name} size`} display={`${Math.round(o.size * 100)}%`} />
+            <ActionButton icon={IconArrowsHorizontal} label="flip it" onClick={() => p.onUpdate({ flip: !o.flip } as Partial<StudioObject>)} />
+          </Section>
+          <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${name}`} />
         </Stack>
       );
     }
@@ -208,20 +217,9 @@ export function AddedOptions(p: {
     if (selected?.type === 'shape') return editor(selected);
     return (
       <Stack>
-        <Section label={p.festive && p.shapeSet === 'festive' ? 'add a festive sticker' : 'add a shape'}>
-          {p.festive ? (
-            <Segmented
-              label="which shapes"
-              value={p.shapeSet}
-              onChange={p.setShapeSet}
-              options={[
-                { value: 'plain', label: 'shapes' },
-                { value: 'festive', label: 'festive' },
-              ]}
-            />
-          ) : null}
+        <Section label="add a shape">
           <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="shapes">
-            {(p.festive && p.shapeSet === 'festive' ? FESTIVE_SHAPES : PLAIN_SHAPES).map((k) => (
+            {PLAIN_SHAPES.map((k) => (
               <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
                 <svg viewBox="-12 -12 124 124" className="h-9 w-9" aria-hidden>
                   <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
@@ -240,7 +238,7 @@ export function AddedOptions(p: {
   return (
     <Stack>
       <Section label="font">
-        <FontChips value={p.textStyle.font} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
+        <FontChips value={p.textStyle.font} festive={p.festive} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
       </Section>
       <Section label="colour">
         <ColourPicker value={p.textStyle.colour} onChange={(colour) => p.setTextStyle({ ...p.textStyle, colour })} label="text colour" />
@@ -301,7 +299,7 @@ const TextureSection = (p: { value: TextureKind; colour: string; onChange: (t: T
 );
 
 export const layerName = (o: StudioObject) =>
-  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? SHAPE_LABELS[o.shape] : 'pen line';
+  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? SHAPE_LABELS[o.shape] : o.type === 'sticker' ? `${stickerLabel(o.sticker)} sticker` : 'pen line';
 
 /** Every added thing as its own layer, top first; the drawing itself is the locked bottom layer. */
 function LayersList({
@@ -332,7 +330,9 @@ function LayersList({
                 className={`flex min-h-11 w-full items-center gap-2 rounded-xl border-2 px-2.5 text-left text-xs font-bold ${on ? 'border-cocoa bg-honey-band text-cocoa' : 'border-cocoa/15 bg-paper text-cocoa hover:border-cocoa/50'}`}
               >
                 <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cocoa/20 bg-paper-2">
-                  {o.type === 'shape' ? (
+                  {o.type === 'sticker' ? (
+                    <img src={stickerDataUrl(o.sticker)} alt="" className="h-6 w-6" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
+                  ) : o.type === 'shape' ? (
                     <svg viewBox="-10 -10 120 120" className="h-5 w-5">
                       <path d={SHAPE_PATHS[o.shape]} fill={o.fill} fillRule="evenodd" stroke={o.strokeWidth > 0 ? o.stroke : 'none'} strokeWidth={Math.max(4, o.strokeWidth * 100)} />
                     </svg>
@@ -343,7 +343,7 @@ function LayersList({
                   )}
                 </span>
                 <span className="min-w-0 flex-1 truncate">{layerName(o)}</span>
-                {o.texture !== 'smooth' ? <span className="shrink-0 text-[11px] font-normal text-ink-faint">{o.texture}</span> : null}
+                {o.type !== 'sticker' && o.texture !== 'smooth' ? <span className="shrink-0 text-[11px] font-normal text-ink-faint">{o.texture}</span> : null}
               </button>
             </li>
           );
@@ -428,10 +428,10 @@ function TextureSwatch({ kind, colour }: { kind: TextureKind; colour: string }) 
   return <canvas ref={ref} aria-hidden style={{ width: 56, height: 18 }} />;
 }
 
-function FontChips({ value, onChange }: { value: CardFontToken; onChange: (f: CardFontToken) => void }) {
+function FontChips({ value, festive, onChange }: { value: CardFontToken; festive: boolean; onChange: (f: CardFontToken) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5" role="group" aria-label="font">
-      {CARD_FONTS.map((f) => (
+      {pickerFonts(festive).map((f) => (
         <button
           key={f.token}
           type="button"

@@ -2,7 +2,8 @@ import { createElement as el } from 'react';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import sharp, { type OverlayOptions } from 'sharp';
-import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StudioObject } from '@/lib/studio-objects';
+import { SHAPE_PATHS, TEXT_LINE_HEIGHT, textureOf, type ShapeObject, type StickerObject, type StudioObject } from '@/lib/studio-objects';
+import { stickerSvg } from '@/lib/stickers';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { loadCardFontWoff } from './cardFonts';
 
@@ -37,6 +38,10 @@ export async function renderStudioObjects(
       png = await renderShape(o, Math.max(2, o.w * S), Math.max(2, o.h * S));
       [cx, cy] = toPx(o.x, o.y);
       if (o.rotation) png = await rotate(png, o.rotation);
+    } else if (o.type === 'sticker') {
+      png = await renderSticker(o, Math.max(2, o.size * S));
+      [cx, cy] = toPx(o.x, o.y);
+      if (o.rotation) png = await rotate(png, o.rotation);
     } else {
       const r = await renderStroke(o, S, toPx);
       if (r) layers.push(...(await clipAsync(await grain(r.png, r.left, r.top, o.texture), r.left, r.top, r.w, r.h, W, H)));
@@ -44,7 +49,7 @@ export async function renderStudioObjects(
     }
     const m = await sharp(png).metadata();
     const left = Math.round(cx - m.width! / 2), top = Math.round(cy - m.height! / 2);
-    layers.push(...(await clipAsync(await grain(png, left, top, o.texture), left, top, m.width!, m.height!, W, H)));
+    layers.push(...(await clipAsync(await grain(png, left, top, textureOf(o)), left, top, m.width!, m.height!, W, H)));
   }
   return sharp(design).ensureAlpha().composite(layers).png({ compressionLevel: 6 }).toBuffer();
 }
@@ -87,6 +92,15 @@ async function renderShape(o: ShapeObject, w: number, h: number): Promise<Buffer
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="${-pad * (100 / w)} ${-pad * (100 / h)} ${100 + (2 * pad * 100) / w} ${100 + (2 * pad * 100) / h}" preserveAspectRatio="none">
     <path d="${SHAPE_PATHS[o.shape]}" fill="${o.fill}" fill-rule="evenodd" ${sw > 0 ? `stroke="${o.stroke}" stroke-width="${sw}" stroke-linejoin="round"` : ''}/></svg>`;
   return Buffer.from(new Resvg(svg).render().asPng());
+}
+
+/**
+ * A sticker: its manifest SVG (never anything from the client) rasterised at the final pixel size,
+ * mirrored if flipped — then turned by the caller, like the browser (turn · mirror · draw).
+ */
+export async function renderSticker(o: Pick<StickerObject, 'sticker' | 'flip'>, px: number): Promise<Buffer> {
+  const png = Buffer.from(new Resvg(stickerSvg(o.sticker), { fitTo: { mode: 'width', value: Math.round(px) } }).render().asPng());
+  return o.flip ? sharp(png).flop().png().toBuffer() : png;
 }
 
 const tilePng = new Map<string, Promise<Buffer>>();

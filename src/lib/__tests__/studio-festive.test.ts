@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FESTIVE_PRESETS, FESTIVE_SHAPES, festiveObjects, presetIsOn, presetOf, toggleFestive, type DesignArea } from '@/lib/studio-festive';
+import { FESTIVE_PRESETS, festiveObjects, presetIsOn, presetOf, toggleFestive, type DesignArea } from '@/lib/studio-festive';
 import { cleanObjects, MAX_OBJECTS, PLAIN_SHAPES, SHAPE_KINDS, SHAPE_LABELS, SHAPE_PATHS, type StudioObject } from '@/lib/studio-objects';
 
 /** A strict reader for the 100-box paths: absolute commands only, the right number of numbers each, closed subpaths. */
@@ -36,26 +36,18 @@ const area: DesignArea = { gw: 1200, gh: 1600, crop: { x: 0, y: 0, w: 1, h: 1 } 
 let n = 0;
 const seqId = () => `t${++n}`;
 
-describe('festive stickers: shape paths', () => {
-  it('every festive shape (and the tape + frame) is a well-formed, closed path inside the 100-box', () => {
-    for (const k of [...FESTIVE_SHAPES, 'tape', 'frame'] as const) {
+describe('festive touches: shape paths', () => {
+  it('the snowflake, tape and frame are well-formed, closed paths inside the 100-box', () => {
+    for (const k of ['snowflake', 'tape', 'frame'] as const) {
       const { subpaths, closed } = parsePath(SHAPE_PATHS[k]);
       expect(subpaths, k).toBeGreaterThan(0);
       expect(closed, `${k} subpaths are all closed`).toBe(true);
     }
   });
 
-  it('the festive set is all real shapes, with names a parent can read; the everyday picker is unchanged', () => {
-    for (const k of FESTIVE_SHAPES) expect(SHAPE_KINDS).toContain(k);
-    expect(FESTIVE_SHAPES[0]).toBe('gingerbread'); // the mascot leads
+  it('they arrive with the festive touches only; the shape picker is unchanged; every shape has a readable name', () => {
     expect(PLAIN_SHAPES).toEqual(['heart', 'star', 'circle', 'square', 'triangle', 'cloud', 'flower', 'sun']);
     for (const k of SHAPE_KINDS) expect(SHAPE_LABELS[k]).toMatch(/^[a-z ]+$/);
-    expect(SHAPE_LABELS.gingerbread).toBe('gingerbread man');
-  });
-
-  it('a saved festive sticker survives the server’s cleaning (it is just a shape)', () => {
-    const raw = { id: 'abc', type: 'shape', shape: 'gingerbread', fill: '#c8402a', stroke: '#2b2118', strokeWidth: 0.05, texture: 'crayon', x: 0.4, y: 0.6, w: 0.2, h: 0.2, rotation: 12 };
-    expect(cleanObjects([raw])).toEqual([raw]);
   });
 });
 

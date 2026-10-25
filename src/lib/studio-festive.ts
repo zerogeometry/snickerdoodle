@@ -1,7 +1,7 @@
 import { MAX_OBJECTS, type ShapeKind, type ShapeObject, type StudioObject } from '@/lib/studio-objects';
 
 /**
- * "Festive touches" (Christmas 2026, mockups/christmas screen 3): one-tap presets that add a few
+ * "Festive touches" (the Studio's christmas drawer, mockups/christmas screen 3): one-tap presets that add a few
  * ORDINARY shape objects — tape, a frame, snowflakes — so they undo, move, recolour and print like
  * anything else added in the Studio. Nothing here touches the drawing itself, and nothing new
  * reaches the print path except shapes. Deterministic and in-house: no third party sees anything.
@@ -9,9 +9,6 @@ import { MAX_OBJECTS, type ShapeKind, type ShapeObject, type StudioObject } from
 
 export type FestivePreset = 'hollyTape' | 'goldFrame' | 'snowfall';
 export const FESTIVE_PRESETS: FestivePreset[] = ['hollyTape', 'goldFrame', 'snowfall'];
-
-/** The festive stickers, in the shape picker's festive set (gingerbread first: the mascot). */
-export const FESTIVE_SHAPES: ShapeKind[] = ['gingerbread', 'christmasTree', 'snowflake', 'holly', 'bauble', 'present', 'candyCane', 'star'];
 
 /** Brand colours as recipe data (globals.css tokens: cta, paper, honey, sky; the frame's edge is the mockup's honey-deep). */
 export const FESTIVE_COLOURS = { holly: '#c8402a', gold: '#f6c445', goldEdge: '#c99a1e', snow: '#ffffff', sky: '#8fb5d6' } as const;

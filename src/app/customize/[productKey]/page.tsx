@@ -13,7 +13,8 @@ import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
-import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
+import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
+import { isChristmasSeason } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
 import { basketLineId } from '@/lib/basket-line';
@@ -1029,7 +1030,8 @@ function CustomizeProduct() {
                     <div>
                       <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Font</p>
                       <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {CARD_FONTS.map((f) => (
+                        {/* the Christmas greeting fonts join in season */}
+                        {pickerFonts(isChristmasSeason(new Date())).map((f) => (
                           <button
                             key={f.token}
                             type="button"

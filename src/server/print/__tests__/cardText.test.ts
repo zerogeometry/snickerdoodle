@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import sharp from 'sharp';
 import { renderCardInsidePanels } from '@/server/print/cardText';
 import type { ScreenedCardMessage } from '@/server/textSafety';
+import { CARD_FONTS } from '@/lib/card-fonts';
 
 // Small panels for speed; 5:7 like a real card panel.
 const GEOM = { panelWidthPx: 600, panelHeightPx: 840 };
@@ -44,9 +45,9 @@ describe('card inside-panel print renderer (satori + resvg)', () => {
 
   it('the chosen FONT actually changes the print — NO silent fallback (the sharp/Pango trap)', async () => {
     const counts = await Promise.all(
-      (['caveat', 'patrick', 'gochi', 'shadows', 'baloo'] as const).map(async (font) => ink((await renderCardInsidePanels(msg({ font }), GEOM)).right)),
+      CARD_FONTS.map(async ({ token: font }) => ink((await renderCardInsidePanels(msg({ font }), GEOM)).right)),
     );
-    expect(new Set(counts).size).toBe(5); // all five faces render distinctly
+    expect(new Set(counts).size).toBe(CARD_FONTS.length); // every face (Christmas ones too) renders distinctly
   });
 
   it('the S/M/L size control scales the print too (bigger fontScale ⇒ more ink)', async () => {

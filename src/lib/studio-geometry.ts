@@ -121,7 +121,7 @@ export function turnObjects(objs: StudioObject[], deg: number, f0: [number, numb
     }
     const [x, y] = turnPoint(o.x * f0[0], o.y * f0[1], deg, f0, f1);
     const rotation = Math.round(normAngle(o.rotation + deg) * 10) / 10;
-    if (o.type === 'text') return { ...o, x: x / f1[0], y: y / f1[1], rotation, size: o.size * k };
+    if (o.type === 'text' || o.type === 'sticker') return { ...o, x: x / f1[0], y: y / f1[1], rotation, size: o.size * k };
     return { ...o, x: x / f1[0], y: y / f1[1], rotation, w: o.w * k, h: o.h * k };
   });
 }

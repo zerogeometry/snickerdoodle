@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { Resvg } from '@resvg/resvg-js';
 import { festiveObjects } from '@/lib/studio-festive';
-import { SHAPE_PATHS, type ShapeObject } from '@/lib/studio-objects';
+import { cleanObjects, SHAPE_PATHS, type ShapeObject, type StickerObject } from '@/lib/studio-objects';
+import { stickerSvg, type StickerId } from '@/lib/stickers';
 import { renderStudioObjects } from '@/server/print/studioOverlay';
 import { boxOf } from '@/ui/studio/objects-canvas';
 
@@ -67,29 +68,67 @@ const iou = (a: Uint8Array, b: Uint8Array) => {
   return both / either;
 };
 
-const sticker = (shape: ShapeObject['shape'], rotation = 0, extra: Partial<ShapeObject> = {}): ShapeObject => ({
-  id: 's', type: 'shape', shape, fill: '#c8402a', stroke: '#2b2118', strokeWidth: 0, texture: 'smooth', x: 0.45, y: 0.55, w: 0.5, h: 0.5, rotation, ...extra,
+const shape = (kind: ShapeObject['shape'], rotation = 0): ShapeObject => ({
+  id: 's', type: 'shape', shape: kind, fill: '#c8402a', stroke: '#2b2118', strokeWidth: 0, texture: 'smooth', x: 0.45, y: 0.55, w: 0.5, h: 0.5, rotation,
 });
 
-describe('festive stickers print exactly where the preview drew them', () => {
-  for (const [shape, rotation] of [['gingerbread', 0], ['christmasTree', 0], ['snowflake', 30], ['candyCane', 336], ['present', 0], ['holly', 0], ['bauble', 0]] as const) {
-    it(`${shape}${rotation ? ` turned ${rotation}°` : ''}: server render == browser geometry`, async () => {
-      const o = sticker(shape, rotation);
-      const [server, browser] = await Promise.all([renderStudioObjects(await white(), frame, [o]).then(inked), inked(browserDrawing(o))]);
-      const ink = browser.reduce((a, v) => a + v, 0);
-      expect(ink).toBeGreaterThan(2000); // a real sticker, not a speck
+/**
+ * The BROWSER's drawing of a sticker, as objects-canvas drawObject does it — translate to the
+ * centre, turn, mirror if flipped, then the sticker's own SVG drawn into its square box.
+ */
+function browserSticker(o: StickerObject): Buffer {
+  const b = boxOf(o, { gw: W, gh: H });
+  const art = stickerSvg(o.sticker).replace(/^<svg[^>]*>/, `<svg x="${-b.w / 2}" y="${-b.w / 2}" width="${b.w}" height="${b.w}" viewBox="0 0 200 200">`);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#ffffff"/>
+    <g transform="translate(${b.cx} ${b.cy}) rotate(${b.rotation}) scale(${o.flip ? -1 : 1} 1)">${art}</g></svg>`;
+  return Buffer.from(new Resvg(svg).render().asPng());
+}
+
+/** Share of pixels whose colour differs visibly (any channel by more than 48). */
+async function colourDiff(a: Buffer, b: Buffer): Promise<number> {
+  const [x, y] = await Promise.all([a, b].map((p) => sharp(p).flatten({ background: '#ffffff' }).removeAlpha().raw().toBuffer()));
+  let n = 0;
+  for (let i = 0; i < x!.length; i += 3) if (Math.max(Math.abs(x![i]! - y![i]!), Math.abs(x![i + 1]! - y![i + 1]!), Math.abs(x![i + 2]! - y![i + 2]!)) > 48) n++;
+  return n / (x!.length / 3);
+}
+
+const sticker = (id: StickerId, rotation = 0, flip = false): StickerObject => ({ id: 'k', type: 'sticker', sticker: id, x: 0.45, y: 0.55, size: 0.6, rotation, flip });
+
+describe('Christmas stickers print exactly where (and how) the preview drew them', () => {
+  for (const [id, rotation, flip] of [['reindeer', 0, false], ['gingerbread', 0, true], ['santa', 0, false], ['tinsel', 0, false], ['penguin', 30, false], ['candyCane', 336, true]] as const) {
+    it(`${id}${rotation ? ` turned ${rotation}°` : ''}${flip ? ', flipped' : ''}: server render == browser drawing`, async () => {
+      const o = sticker(id, rotation, flip);
+      const serverPng = await renderStudioObjects(await white(), frame, [o]);
+      const browserPng = browserSticker(o);
+      const [server, browser] = await Promise.all([inked(serverPng), inked(browserPng)]);
+      expect(browser.reduce((a, v) => a + v, 0)).toBeGreaterThan(5000); // real art, not a speck
       expect(near(server, browser)).toBeGreaterThan(0.99);
-      if (!rotation) expect(iou(server, browser)).toBeGreaterThan(0.97); // unturned: the same pixels
+      if (!rotation) {
+        expect(iou(server, browser)).toBeGreaterThan(0.95); // unturned: the same pixels…
+        expect(await colourDiff(serverPng, browserPng)).toBeLessThan(0.01); // …in the same colours
+      }
     });
   }
 
-  it('the details are cut out (evenodd): the gingerbread man’s eye shows the drawing underneath', async () => {
-    // left eye at (44, 18) on the 100-box; the box is 200px square centred on (270, 220)
-    const out = await inked(await renderStudioObjects(await white(), frame, [sticker('gingerbread')]));
-    const box = { x: 270 - 100, y: 220 - 100 };
-    expect(out[Math.round(box.y + 18 * 2) * W + Math.round(box.x + 44 * 2)]).toBe(0); // the eye: no ink
-    expect(out[Math.round(box.y + 50 * 2) * W + Math.round(box.x + 30 * 2)]).toBe(1); // the tummy: ink
+  it('a flipped sticker really is mirrored (not just the same art)', async () => {
+    const [plain, flipped] = await Promise.all([renderStudioObjects(await white(), frame, [sticker('reindeer')]), renderStudioObjects(await white(), frame, [sticker('reindeer', 0, true)])]);
+    expect(await colourDiff(plain, flipped)).toBeGreaterThan(0.01);
   });
+
+  it('an unknown sticker never reaches the print: the server cleans it out first', () => {
+    expect(cleanObjects([{ ...sticker('reindeer'), sticker: 'not-ours' }])).toEqual([]);
+  });
+});
+
+describe('festive touches print like the preview', () => {
+  for (const [kind, rotation] of [['snowflake', 0], ['snowflake', 30], ['tape', 336], ['frame', 0]] as const) {
+    it(`${kind}${rotation ? ` turned ${rotation}°` : ''}: server render == browser geometry`, async () => {
+      const o = shape(kind, rotation);
+      const [server, browser] = await Promise.all([renderStudioObjects(await white(), frame, [o]).then(inked), inked(browserDrawing(o))]);
+      expect(browser.reduce((a, v) => a + v, 0)).toBeGreaterThan(1000);
+      expect(near(server, browser)).toBeGreaterThan(0.99);
+    });
+  }
 
   it('a whole festive touch (gold frame + holly tape + snowfall) prints like the preview, and leaves the middle alone', async () => {
     const area = { gw: W, gh: H, crop: { x: 0, y: 0, w: 1, h: 1 } };
