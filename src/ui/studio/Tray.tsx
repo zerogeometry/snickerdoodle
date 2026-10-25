@@ -21,11 +21,12 @@ import {
 } from '@tabler/icons-react';
 import { useState, type ReactNode } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
-import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { FESTIVE_SHAPES } from '@/lib/studio-festive';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { Icon } from '@/ui/primitives/Icon';
-import { layerName, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from './AddedOptions';
+import { layerName, type DrawingLayer, type PenStyle, type ShapeSet, type ShapeStyle, type TextStyle } from './AddedOptions';
 import { STANDARD_COLOURS } from './ColourPicker';
 import { ToolGlyph } from './ToolGlyph';
 import { toolById, type ToolId } from './tools';
@@ -238,6 +239,10 @@ export interface TrayProps {
   setTextStyle: (s: TextStyle) => void;
   shapeStyle: ShapeStyle;
   setShapeStyle: (s: ShapeStyle) => void;
+  /** Christmas season: the shape picker offers the festive stickers too. */
+  festive: boolean;
+  shapeSet: ShapeSet;
+  setShapeSet: (s: ShapeSet) => void;
   objects: StudioObject[];
   selected: StudioObject | null;
   baseLabel: string;
@@ -388,8 +393,19 @@ export function StudioTray(p: TrayProps): ReactNode {
       if (p.selected?.type === 'shape') return <ItemEditor {...p} o={p.selected} />;
       return row(
         <>
-          {SHAPE_KINDS.map((k) => (
-            <button key={k} type="button" aria-label={`add a ${k}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
+          {p.festive ? (
+            <>
+              <TChip on={p.shapeSet === 'plain'} onClick={() => p.setShapeSet('plain')}>
+                shapes
+              </TChip>
+              <TChip on={p.shapeSet === 'festive'} onClick={() => p.setShapeSet('festive')}>
+                festive
+              </TChip>
+              <TSep />
+            </>
+          ) : null}
+          {(p.festive && p.shapeSet === 'festive' ? FESTIVE_SHAPES : PLAIN_SHAPES).map((k) => (
+            <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
               <svg viewBox="-12 -12 124 124" className="h-7 w-7" aria-hidden>
                 <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
               </svg>
@@ -453,7 +469,7 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
   }
   if (o.type === 'shape') {
     return (
-      <TrayRow label={`changing the ${o.shape}`}>
+      <TrayRow label={`changing the ${SHAPE_LABELS[o.shape]}`}>
         {quick}
         <TChip on={part === 'fill'} onClick={() => setPart('fill')}>
           fill
@@ -480,7 +496,7 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
         <TSep />
         <TTextures value={o.texture} onChange={(texture) => p.onUpdate({ texture })} />
         <TSep />
-        <TTurn angle={o.rotation} onAngle={p.onTurn} what={`the ${o.shape}`} />
+        <TTurn angle={o.rotation} onAngle={p.onTurn} what={`the ${SHAPE_LABELS[o.shape]}`} />
         {actions}
       </TrayRow>
     );

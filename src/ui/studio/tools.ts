@@ -12,11 +12,12 @@ import {
   IconPencil,
   IconStack2,
   IconShape,
+  IconSnowflake,
   IconTypography,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'draw' | 'text' | 'shapes' | 'festive' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -123,6 +124,17 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'H',
     info: 'Add a heart, star, sun, cloud and more. Then drag to move it and use the corner to resize.',
+  },
+  {
+    // Christmas season only (src/lib/season.ts) — hidden the rest of the year
+    id: 'festive',
+    group: 'add',
+    hint: 'one tap for holly tape, a gold frame or snow — tap again to take it off.',
+    label: 'festive touches',
+    icon: IconSnowflake,
+    kind: 'mode',
+    key: 'J',
+    info: 'Christmas in one tap: holly tape on the corners, a gold frame, a flurry of snow, and festive stickers. Each is its own layer — move it, change it or take it off. Your drawing underneath is never changed.',
   },
   {
     id: 'select',

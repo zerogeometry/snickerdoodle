@@ -26,7 +26,10 @@ import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { StudioTray } from '@/ui/studio/Tray';
 import { ToolGlyph } from '@/ui/studio/ToolGlyph';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
-import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
+import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeSet, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
+import { FestiveTouches } from '@/ui/studio/FestiveTouches';
+import { isChristmasSeason } from '@/lib/season';
+import { toggleFestive, type FestivePreset } from '@/lib/studio-festive';
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
@@ -130,6 +133,9 @@ function StudioEditor() {
   const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false, texture: 'crayon' });
   const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118', texture: 'smooth' });
   const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', stroke: '#2b2118', strokeWidth: 0.05, texture: 'smooth' });
+  // Christmas (1 Nov–6 Jan, UK): the festive touches + stickers. `?festive` previews them in development.
+  const [festive] = useState(() => isChristmasSeason(new Date()) || (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('festive')));
+  const [shapeSet, setShapeSet] = useState<ShapeSet>('plain');
   const liveStroke = useRef<number[] | null>(null);
   const lastEditPush = useRef(0);
   const selected = objects.find((o) => o.id === selectedId) ?? null;
@@ -911,6 +917,20 @@ function StudioEditor() {
     setSelectedId(o.id);
     setTool('select');
   };
+  /** A festive touch: on in one tap (over what's on show, after crop), off with another — one undo step either way. */
+  const onFestive = (preset: FestivePreset) => {
+    if (!workRef.current) return;
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const next = toggleFestive(objects, preset, { gw, gh, crop: geo.crop }, newId);
+    if (!next) return toast('there’s no room for more — take something off first');
+    pushUndo();
+    setObjects(next);
+    if (selectedId && !next.some((o) => o.id === selectedId)) setSelectedId(null);
+  };
+  const onFestiveStickers = () => {
+    setShapeSet('festive');
+    onTool('shapes');
+  };
   const onBack = () => (dirty ? setLeaving(true) : backToRange());
 
   // The phone's BACK GESTURE (iOS swipe, Android back) with unsaved edits: ask, exactly like the
@@ -968,7 +988,7 @@ function StudioEditor() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'festive' as const } : {}) };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1077,7 +1097,9 @@ function StudioEditor() {
     setGeo((g) => ({ ...g, background: bg }));
   };
 
-  const toolOptions = tool && ADDING.includes(tool) ? (
+  const toolOptions = tool === 'festive' ? (
+    <FestiveTouches objects={objects} onToggle={onFestive} onStickers={onFestiveStickers} onDone={() => setTool(null)} />
+  ) : tool && ADDING.includes(tool) ? (
     <AddedOptions
       tool={tool}
       pen={pen}
@@ -1086,6 +1108,9 @@ function StudioEditor() {
       setTextStyle={setTextStyle}
       shapeStyle={shapeStyle}
       setShapeStyle={setShapeStyle}
+      festive={festive}
+      shapeSet={shapeSet}
+      setShapeSet={setShapeSet}
       objects={objects}
       selected={selected}
       baseLabel={scratch ? 'your canvas' : 'your drawing'}
@@ -1127,7 +1152,9 @@ function StudioEditor() {
   const def = tool ? toolById(tool) : null;
   // PHONES: the same options as one slim frosted row over the picture (no pane, no "where to start")
   const tray =
-    tool && def?.kind === 'mode'
+    tool === 'festive' ? (
+      <FestiveTouches sheet objects={objects} onToggle={onFestive} onStickers={onFestiveStickers} onDone={() => setTool(null)} />
+    ) : tool && def?.kind === 'mode'
       ? StudioTray({
           tool,
           onTool,
@@ -1155,6 +1182,9 @@ function StudioEditor() {
           setTextStyle,
           shapeStyle,
           setShapeStyle,
+          festive,
+          shapeSet,
+          setShapeSet,
           objects,
           selected,
           baseLabel: scratch ? 'your canvas' : 'your drawing',
@@ -1215,7 +1245,7 @@ function StudioEditor() {
           disabled={disabled}
           onTool={onTool}
           onHold={(id, down) => id === 'compare' && setComparing(down)}
-          hidden={scratch ? IMAGE_ONLY : []}
+          hidden={[...(scratch ? IMAGE_ONLY : []), ...(festive ? [] : ['festive' as const])]}
           tray={tray}
           trayKey={tool ?? undefined}
         />

@@ -1,5 +1,5 @@
 import { cardFontCss } from '@/lib/card-fonts';
-import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { MAX_SHAPE_SIZE, SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { normAngle } from '@/lib/studio-geometry';
 
@@ -172,7 +172,7 @@ export function turnObject(o: StudioObject, f: Frame, to: number): StudioObject 
 export function scaleObject(o: StudioObject, f: Frame, k: number): StudioObject {
   k = Math.max(0.05, Math.min(20, k));
   if (o.type === 'text') return { ...o, size: Math.min(1, Math.max(0.01, o.size * k)) };
-  if (o.type === 'shape') return { ...o, w: Math.min(2, Math.max(0.01, o.w * k)), h: Math.min(2, Math.max(0.01, o.h * k)) };
+  if (o.type === 'shape') return { ...o, w: Math.min(MAX_SHAPE_SIZE, Math.max(0.01, o.w * k)), h: Math.min(MAX_SHAPE_SIZE, Math.max(0.01, o.h * k)) };
   const b = strokeBounds(o, f);
   const p = o.points.slice();
   for (let i = 0; i < p.length; i += 3) {

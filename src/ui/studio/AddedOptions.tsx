@@ -3,7 +3,8 @@
 import { IconCopy, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
-import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { FESTIVE_SHAPES } from '@/lib/studio-festive';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import type { Placement } from '@/lib/studio-geometry';
 import { Icon } from '@/ui/primitives/Icon';
@@ -39,6 +40,8 @@ export interface DrawingLayer {
   angle: number;
   onTurn: (deg: number, group?: boolean) => void;
 }
+/** Which shapes the picker shows: the everyday set, or (in the Christmas season) the festive stickers. */
+export type ShapeSet = 'plain' | 'festive';
 export interface ShapeStyle {
   fill: string;
   stroke: string;
@@ -57,6 +60,10 @@ export function AddedOptions(p: {
   setTextStyle: (s: TextStyle) => void;
   shapeStyle: ShapeStyle;
   setShapeStyle: (s: ShapeStyle) => void;
+  /** Christmas season: the shape picker offers the festive stickers too. */
+  festive: boolean;
+  shapeSet: ShapeSet;
+  setShapeSet: (s: ShapeSet) => void;
   objects: StudioObject[];
   selected: StudioObject | null;
   /** What the base layer is called: "your drawing", or "your canvas" when designing from scratch. */
@@ -128,7 +135,7 @@ export function AddedOptions(p: {
         <Stack>
           <Section>{actions}</Section>
           <ShapeStyleControls style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }} onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)} />
-          <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${o.shape}`} />
+          <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${SHAPE_LABELS[o.shape]}`} />
         </Stack>
       );
     }
@@ -201,10 +208,21 @@ export function AddedOptions(p: {
     if (selected?.type === 'shape') return editor(selected);
     return (
       <Stack>
-        <Section label="add a shape">
+        <Section label={p.festive && p.shapeSet === 'festive' ? 'add a festive sticker' : 'add a shape'}>
+          {p.festive ? (
+            <Segmented
+              label="which shapes"
+              value={p.shapeSet}
+              onChange={p.setShapeSet}
+              options={[
+                { value: 'plain', label: 'shapes' },
+                { value: 'festive', label: 'festive' },
+              ]}
+            />
+          ) : null}
           <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="shapes">
-            {SHAPE_KINDS.map((k) => (
-              <button key={k} type="button" aria-label={`add a ${k}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
+            {(p.festive && p.shapeSet === 'festive' ? FESTIVE_SHAPES : PLAIN_SHAPES).map((k) => (
+              <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
                 <svg viewBox="-12 -12 124 124" className="h-9 w-9" aria-hidden>
                   <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
                 </svg>
@@ -283,7 +301,7 @@ const TextureSection = (p: { value: TextureKind; colour: string; onChange: (t: T
 );
 
 export const layerName = (o: StudioObject) =>
-  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? o.shape : 'pen line';
+  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? SHAPE_LABELS[o.shape] : 'pen line';
 
 /** Every added thing as its own layer, top first; the drawing itself is the locked bottom layer. */
 function LayersList({
