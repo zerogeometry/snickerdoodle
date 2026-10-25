@@ -70,7 +70,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/src ./src
-COPY --from=build /app/infra/aws-london/bin/migrate.mjs ./infra/migrate.mjs
+COPY --from=build /app/infra/aws-london/bin/migrate.mjs /app/infra/aws-london/bin/start.mjs ./infra/
 
 # Non-root. The app's files belong to root, so the app user can read but never change them, and
 # compose also mounts the whole filesystem read-only;
@@ -83,4 +83,6 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=40s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # PID 1 is Docker's own init (compose: init: true), so signals reach node and `docker stop` is clean.
-CMD ["node", "node_modules/next/dist/bin/next", "start"]
+# infra/start.mjs loads the settings from the mounted secrets file (never from container env,
+# which Docker keeps on disk), then runs `next start`.
+CMD ["node", "infra/start.mjs"]

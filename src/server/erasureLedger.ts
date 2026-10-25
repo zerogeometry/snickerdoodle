@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { and, eq, like, not } from 'drizzle-orm';
 import { accounts, assets, children, memberships, profileImages } from '@/db/schema';
-import { ensureBucket, getObjectBytes, getS3 } from '@/storage';
+import { encryptionFor, ensureBucket, getObjectBytes, getS3 } from '@/storage';
 import type { DbHandle } from './db';
 
 /**
@@ -14,7 +14,11 @@ import type { DbHandle } from './db';
  * Stored as one small object per event under `erasure-ledger/<ISO time>-<uuid>.json` (keys sort
  * by time). A bucket lifecycle rule expires the prefix after 30 days — longer than the backup
  * window, so nothing is ever needed after that (see project-office/ops/BACKUPS-AND-ERASURE.md).
- * Writing is best-effort: the erasure itself has already happened; a failed write is logged loudly.
+ * Writing is best-effort: the erasure itself has already happened. A write is tried a few times
+ * (S3 hiccups are the realistic failure), then a failure is logged loudly — the
+ * "[erasure-ledger] FAILED" line the box's log alarm watches (ops/AWS-LONDON-RUNBOOK.md §7).
+ * Each entry is KMS-encrypted with the general key like every other object we store, so a bucket
+ * that refuses unencrypted writes can never quietly drop it.
  */
 export type ErasureEntry =
   | { kind: 'asset'; id: string }
@@ -25,21 +29,31 @@ export type ErasureEntry =
 
 export const LEDGER_PREFIX = 'erasure-ledger/';
 
-export async function recordErasure(entry: ErasureEntry, at = new Date()): Promise<void> {
-  try {
-    const { client, bucket } = getS3();
-    await ensureBucket();
-    await client.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: `${LEDGER_PREFIX}${at.toISOString()}-${randomUUID()}.json`,
-        Body: JSON.stringify({ ...entry, at: at.toISOString() }),
-        ContentType: 'application/json',
-      }),
-    );
-  } catch (e) {
-    console.error('[erasure-ledger] FAILED to record an erasure — replay after a restore would miss it', entry, e);
+const WRITE_ATTEMPTS = 3;
+
+export async function recordErasure(entry: ErasureEntry, at = new Date(), retryDelayMs = 250): Promise<void> {
+  const key = `${LEDGER_PREFIX}${at.toISOString()}-${randomUUID()}.json`;
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= WRITE_ATTEMPTS; attempt++) {
+    try {
+      const { client, bucket } = getS3();
+      await ensureBucket();
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: JSON.stringify({ ...entry, at: at.toISOString() }),
+          ContentType: 'application/json',
+          ...encryptionFor(key),
+        }),
+      );
+      return;
+    } catch (e) {
+      lastError = e;
+      if (attempt < WRITE_ATTEMPTS) await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
+    }
   }
+  console.error('[erasure-ledger] FAILED to record an erasure — replay after a restore would miss it', entry, lastError);
 }
 
 export async function listErasuresSince(since: Date): Promise<(ErasureEntry & { at: string })[]> {

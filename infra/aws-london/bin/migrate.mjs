@@ -26,7 +26,9 @@ try {
   await migrate(drizzle(client), { migrationsFolder: path.join(process.cwd(), 'src', 'db', 'migrations') });
   console.log(`[migrate] database up to date (${((Date.now() - t0) / 1000).toFixed(1)} s)`);
 } catch (e) {
-  console.error(`[migrate] FAILED: ${scrub(e?.message ?? e)}`);
+  // drizzle wraps the driver's error: show the underlying reason too (e.g. a TLS certificate refusal)
+  const why = [e?.message, e?.cause?.message, e?.cause?.code].filter(Boolean).join(' — because: ');
+  console.error(`[migrate] FAILED: ${scrub(why || e)}`);
   process.exitCode = 1;
 } finally {
   await client.end({ timeout: 5 });

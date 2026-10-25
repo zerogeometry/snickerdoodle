@@ -26,9 +26,10 @@ www.{$SITE_DOMAIN} {
 	@internal path /api/jobs/* /api/health/render /api/dev/*
 	respond @internal 404
 
-	# The app's rate limits read the client's address from these headers (src/server/rateLimit.ts
-	# ipFromHeaders), so a visitor must never be able to supply them: drop the Netlify one and set
-	# X-Real-IP to the address Caddy actually saw. (Caddy already rewrites X-Forwarded-For.)
+	# The app's rate limits read the client's address from a header (src/server/rateLimit.ts
+	# ipFromHeaders). With CLIENT_IP_HEADER=x-real-ip in SSM the app reads ONLY X-Real-IP, which is
+	# set here to the address Caddy actually saw. Belt and braces: the Netlify header a visitor
+	# could send is dropped too. (Caddy already rewrites X-Forwarded-For.)
 	request_header -X-Nf-Client-Connection-Ip
 
 	reverse_proxy app:3000 {

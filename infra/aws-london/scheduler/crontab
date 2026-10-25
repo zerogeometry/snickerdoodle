@@ -9,8 +9,9 @@
 # Every 5 minutes, so a paid order reaches the printer quickly.
 */5     *     *   *   *    run-job fulfilment 900 > /proc/1/fd/1 2>&1
 # Retention: purge unkept uploads past their window, the audit trail's 6-year limit, guests'
-# keep requests, finished rate-limit windows, and direct uploads never finished (quarantine).
-15      3     *   *   *    run-job retention 1800 > /proc/1/fd/1 2>&1
+# keep requests, finished rate-limit windows, direct uploads never finished (quarantine), old
+# help messages. HOURLY: a backlog drains the same day and a raw upload is gone within ~2 hours.
+15      *     *   *   *    run-job retention 1800 > /proc/1/fd/1 2>&1
 # Re-rank the range by popularity (product counts only, no personal data).
 45      3     *   *   *    run-job popularity 600 > /proc/1/fd/1 2>&1
 # Occasion reminders (consent + frequency caps enforced in the app). 08:05 UTC = 08:05 / 09:05 UK.

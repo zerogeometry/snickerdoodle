@@ -12,6 +12,7 @@ export {
   presignProviderIngest,
   deleteObject,
   deleteObjectConfirmed,
+  encryptionFor,
 } from './objects';
 export {
   MAX_UPLOAD_BYTES,

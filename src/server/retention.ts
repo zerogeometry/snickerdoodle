@@ -83,8 +83,9 @@ export async function purgeExpiredAssets(
       await recordErasure({ kind: 'asset', id: asset.id });
       purged++;
       purgedAssetIds.push(asset.id);
-    } catch {
-      failed++; // leave it for the next run rather than half-deleting
+    } catch (e) {
+      failed++; // leave it for the next run rather than half-deleting — but say which, and why
+      console.error('[retention] could not purge asset', asset.id, (e as Error)?.message ?? String(e));
     }
   }
 

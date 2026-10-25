@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { assets, orderItemArtwork, orderItems, orders } from '@/db/schema';
 import { renderPrintFile } from '@/server/print/render';
 import { resolveViewerContext } from '@/server/assets';
@@ -7,6 +7,7 @@ import type { DbHandle } from '@/server/db';
 import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
 
 export interface FulfilmentSummary {
+  recovered: number; // lines found stuck RENDERING (a restart mid-render) and put back to PENDING
   claimed: number;
   ready: number; // rendered + gate-cleared → READY
   blocked: number; // → BLOCKED_GATE
@@ -41,12 +42,37 @@ interface ClaimedItem {
  * No image leaves the VPC here — rendering is local, and the GATE guards egress. POD
  * submission (READY → SUBMITTED) lives in ./submit.ts behind the same gate.
  */
+/** A line RENDERING this long after its last heartbeat was interrupted (renders take seconds). */
+export const STALE_RENDER_MINUTES = 30;
+
+/**
+ * Sweep: a line the app was rendering when it stopped (a deploy, an out-of-memory kill, a reboot)
+ * would otherwise sit in RENDERING for ever — its paid order never printed, and nothing saying so.
+ * Put it back to PENDING (the claim below takes it again) with a note, and count it so the tick
+ * reports it. A line with no claim time was claimed before render_claimed_at existed.
+ */
+async function recoverStaleRenders(db: DbHandle, onlyOrderIds?: string[]): Promise<number> {
+  const cutoff = new Date(Date.now() - STALE_RENDER_MINUTES * 60 * 1000);
+  const scope = onlyOrderIds
+    ? [inArray(orderItemArtwork.orderItemId, db.select({ id: orderItems.id }).from(orderItems).where(inArray(orderItems.orderId, onlyOrderIds)))]
+    : [];
+  const rows = await db
+    .update(orderItemArtwork)
+    .set({ status: 'PENDING', renderClaimedAt: null, renderError: 'recovered: rendering was interrupted — retrying' })
+    .where(and(eq(orderItemArtwork.status, 'RENDERING'), or(isNull(orderItemArtwork.renderClaimedAt), lt(orderItemArtwork.renderClaimedAt, cutoff)), ...scope))
+    .returning({ id: orderItemArtwork.id });
+  return rows.length;
+}
+
 export async function processFulfilment(
   db: DbHandle,
   opts?: { limit?: number; env?: GateEnv; onlyOrderIds?: string[] },
 ): Promise<FulfilmentSummary> {
   const env = opts?.env ?? gateEnv();
   const limit = opts?.limit ?? 50;
+
+  // 0. RECOVER lines a previous tick never finished (the app stopped mid-render).
+  const recovered = await recoverStaleRenders(db, opts?.onlyOrderIds);
 
   // 1. CLAIM — lock the PENDING artwork of PAID orders, skip rows another tick holds,
   //    and flip them to RENDERING atomically so they can't be re-claimed.
@@ -80,15 +106,17 @@ export async function processFulfilment(
     if (rows.length === 0) return [];
     await tx
       .update(orderItemArtwork)
-      .set({ status: 'RENDERING' })
+      .set({ status: 'RENDERING', renderClaimedAt: new Date() })
       .where(inArray(orderItemArtwork.id, rows.map((r) => r.artworkId)));
     return rows.map((r) => ({ ...r, transform: r.transform as RawTransform }));
   });
 
-  const summary: FulfilmentSummary = { claimed: claimed.length, ready: 0, blocked: 0, failed: 0, items: [] };
+  const summary: FulfilmentSummary = { recovered, claimed: claimed.length, ready: 0, blocked: 0, failed: 0, items: [] };
 
   // 2. PROCESS each claimed item OUTSIDE the lock (render is slow).
   for (const item of claimed) {
+    // heartbeat: a long batch is still alive, so its later lines are never taken for stuck ones
+    await db.update(orderItemArtwork).set({ renderClaimedAt: new Date() }).where(eq(orderItemArtwork.id, item.artworkId));
     const result = await processItem(db, item, env);
     if (result.status === 'READY') summary.ready++;
     else if (result.status === 'BLOCKED_GATE') summary.blocked++;

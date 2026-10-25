@@ -18,11 +18,13 @@ steps are in [`project-office/ops/AWS-LONDON-RUNBOOK.md`](../../project-office/o
 | `bin/deploy.sh` | Pull → migrate → check the new image on the side → swap → health-check (auto-rollback) → smoke. `--restart` reloads settings. |
 | `bin/rollback.sh` | Back to the previous image (kept on the box) in seconds. |
 | `bin/smoke.sh` | The post-deploy check: health, home page + security headers, http→https, jobs closed, one mockup render. |
-| `bin/backup-db.sh` / `restore-db.sh` | Nightly KMS-encrypted dump to S3 (14 days); restore + erasure-ledger replay, site offline until it's clean. |
-| `bin/fetch-env.sh` | SSM Parameter Store → `/run/snickerdoodle` (memory only). Refuses dev-only switches and missing essentials. |
+| `bin/backup-db.sh` / `restore-db.sh` | Nightly KMS-encrypted dump to S3 (14 days), read back and fully restore-checked, with a sha256 manifest; restore only verified dumps → migrations → erasure-ledger replay, site offline until it's clean. |
+| `bin/fetch-env.sh` | SSM Parameter Store → `/run/snickerdoodle` (memory only, readable by root + the app's uid). Refuses dev-only switches, `AWS_ENDPOINT_URL*` and missing essentials. |
+| `bin/start.mjs` | The image's entry point: loads the settings FILE (never container env, which Docker keeps on disk), then `next start` or a script. |
+| `bin/watchdog.sh` | Hourly: services, health, disk, backup age, certificate expiry, and the log lines that mean a promise to families may be broken → email. |
 | `bin/logs.sh`, `bin/make-admin.sh`, `bin/up.sh` | Logs/status · admin flag (box version of `scripts/make-admin.ts`) · start at boot. |
-| `bin/migrate.mjs` | Applies `src/db/migrations` with production deps only (copied into the image). |
+| `bin/migrate.mjs` | Applies `src/db/migrations` with production deps only (copied into the image; run via `start.mjs`). |
 | `iam/`, `s3/` | Least-privilege IAM policies and the bucket policy / CORS / lifecycle / encryption documents. |
-| `systemd/`, `docker/` | Boot + nightly-backup units; Docker log rotation, optional CloudWatch logging. |
+| `systemd/`, `docker/` | Boot, nightly-backup and hourly-watchdog units; Docker log rotation, optional CloudWatch logging. |
 
 Build locally (repo root): `docker buildx build --platform linux/amd64 -f infra/aws-london/Dockerfile -t snickerdoodle:test .`
