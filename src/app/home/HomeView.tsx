@@ -26,6 +26,8 @@ import { exampleBySlug } from '@/lib/examples';
 import { Toggle } from '@/ui/primitives/Toggle';
 import type { HomeData, HomeKeepsake } from '@/server/home';
 import type { VisibilityTier } from '@/domain/types';
+import { isChristmasSeason } from '@/lib/season';
+import { useNow } from '@/ui/useNow';
 
 const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', FAMILY: 'Family', EXTENDED: 'Extended' };
 const AVATAR_COLORS = ['#C8402A', '#2F5DA8', '#7FA65E', '#E8786E', '#8E2A1A']; // Scrapbook stickers (white initials ≥3:1 at this size)
@@ -65,6 +67,8 @@ export function HomeView({ data }: { data: HomeData }) {
   const [active, setActive] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
+  const nowForSeason = useNow();
+  const christmasNow = nowForSeason !== null && isChristmasSeason(nowForSeason); // D24 seasonal copy
   const [highlightNew, setHighlightNew] = useState(false);
   const newestRef = useRef<HTMLDivElement>(null);
 
@@ -470,6 +474,7 @@ export function HomeView({ data }: { data: HomeData }) {
             </p>
             <div className="mt-4 flex flex-col items-start gap-4 rounded-2xl border border-line bg-paper-2 p-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-ink-soft">
+                {christmasNow ? <b className="block text-cocoa">christmas sorted: send it to the grandparents.</b> : null}
                 Pick anything you&apos;ve saved and send it to family — they check out in a tap, and it ticks itself off.
               </p>
               <Button size="md" className="shrink-0 whitespace-nowrap" onClick={() => setGiftOpen(true)}>

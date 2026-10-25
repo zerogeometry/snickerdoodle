@@ -273,6 +273,11 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'derived/card-blank.png', material: 'PAPER', register: 'face-cover', mask: true };
     }
     case 'bauble':
+      // the PLASTIC BALL (D24): a staged photo blank if there is one, else the drawn ball
+      if (size === 'plastic ball') {
+        const ball = findBlank(/plastic.*(bauble|ball)|(bauble|ball).*plastic/i);
+        return ball ? { file: ball, material: 'GLOSS', register: 'face-cover', mask: true } : { material: 'GLOSS', register: 'drawn', key: 'plasticBauble' };
+      }
       return { file: 'prodigi-ceramic-christmas-tree-ornament-blank-asset/Prodigi-ceramic-christmas-ornament-blank.jpg', material: 'CERAMIC', register: 'face-cover', mask: true };
     case 'sack': // official panel 320×500mm on a 19×30″ (483mm-wide) sack, above the bottom seam
       return { file: 'prodigi-christmas-sack-blank-asset/Prodigi-Christmas-Sack blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-physical', mask: true, productWidthMm: 483, bottomInsetFrac: 0.06 };
@@ -347,6 +352,8 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // the sheet is a WINDOW onto the paper: its full width and a section of its length (a 5 m roll
       // is far too long and thin to aspect-lock — it would show as a sliver down the middle)
       const dir = layeredFlatDir('wrappingPaper');
+      // the founder's photo set is WHITE paper — kraft always uses the drawn kraft sheet (D24)
+      if (attrs.colour === 'kraft') return { material: 'PAPER', register: 'drawn', key: 'wrappingPaper' };
       return dir ? { material: 'PAPER', register: 'layered-flat', dir, window: true } : { material: 'PAPER', register: 'drawn', key: 'wrappingPaper' };
     }
     case 'playingCards': {

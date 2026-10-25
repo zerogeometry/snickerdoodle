@@ -94,6 +94,25 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(baby!.spec).toMatchObject({ providerSku: 'GLOBAL-BB-RS-4411' }); // GB long-sleeve white
   });
 
+  it('things packed in the same parcel earn the same-parcel saving (D24) — persisted on the order', async () => {
+    const res = await placeOrder(db, {
+      items: [
+        { productKey: 'bauble', qty: 1 }, // 2100 — ceramic, uk9
+        { productKey: 'mug', qty: 1 }, // 1800 — uk9, same parcel
+        { productKey: 'card', qty: 1 }, // 550 — Guernsey, its own parcel: no saving
+      ],
+      account: null,
+      joinProvenance: null,
+    });
+    await track(res);
+    expect(res.ok).toBe(true);
+    const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
+    expect(order!.subtotalPence).toBe(4450);
+    expect(order!.parcelSavingPence).toBe(300); // one extra item in the uk9 parcel
+    expect(order!.familySetSavingPence).toBe(0);
+    expect(order!.totalPence).toBe(4450 - 300);
+  });
+
   it('a joined member earns the 5%, and it is consumed (one-time) when the order is paid', async () => {
     // Rosie is an EXTENDED member of the Hartleys from a VERIFIED invite (seed).
     const [row] = await db

@@ -42,7 +42,7 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
     expect(prices('babyBodysuit')).toEqual([2200]);
     expect(prices('calendar')).toEqual([1900, 2100]);
     expect(prices('apron')).toEqual([2500, 2900]);
-    expect(prices('bauble')).toEqual([2100]);
+    expect(prices('bauble')).toEqual([1900, 2100]); // plastic ball £19 · ceramic disc £21 (D24)
     expect(prices('sack')).toEqual([3500]);
     expect(prices('phoneCase')).toEqual([2500, 3000]); // snap / tough
   });
@@ -92,7 +92,8 @@ describe('range expansion — new products', () => {
       'POSTER-HANGER-20-CAN-ROL-SC-8X60': 3400, 'POSTER-HANGER-30-CAN-ROL-SC-12X60': 3600,
     });
     // rolls only (founder, 22 Oct) — no sheet packs
-    expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800 });
+    // white + brown kraft (D24) — the same price per length
+    expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800, 'WRAP-KFT-ROL-70X200': 2300, 'WRAP-KFT-ROL-70X300': 2800, 'WRAP-KFT-ROL-70X500': 3800 });
     expect(skuPrice('petBandana')).toEqual({ 'PET-BANDANA-SML': 1800, 'PET-BANDANA-MED': 1800, 'PET-BANDANA-LRG': 1900 });
   });
 
@@ -100,7 +101,7 @@ describe('range expansion — new products', () => {
     const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
     expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '6141x5433' });
     expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
-    expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527' });
+    expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527', 'WRAP-KFT-ROL-70X200': '8280x23610', 'WRAP-KFT-ROL-70X300': '8280x35430', 'WRAP-KFT-ROL-70X500': '8280x59070' });
     expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '8208x5492' }); // designed landscape; the file turns back to 5492×8208
     expect(px('petBandana')).toEqual({ 'PET-BANDANA-SML': '7500x2244', 'PET-BANDANA-MED': '9447x2952', 'PET-BANDANA-LRG': '10158x3306' });
     expect(px('playingCards')).toEqual({ 'PLAY-CARD': '820x1122' });

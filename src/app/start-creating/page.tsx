@@ -21,6 +21,7 @@ import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
+import { ChosenProduct } from '@/ui/components/ChosenProduct';
 
 export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
@@ -287,6 +288,7 @@ export default function StartCreatingPage() {
                         start) while the loader plays on top; then it fades in. */}
                     {products ? (
                       <div inert={!rangeReady} className={`transition-opacity duration-500 ${rangeReady ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
+                        <ChosenProduct products={products} />
                         <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setRangeSettled(true)} />
                       </div>
                     ) : (

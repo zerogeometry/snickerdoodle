@@ -76,11 +76,36 @@ export const HOODIE_PRINT_MM = { w: 260, h: 260 } as const; // kids AND adult (G
 export const KIDS_HOODIE_CHEST_MM: Record<string, number> = { '3-4 years': 340, '5-6 years': 370, '7-8 years': 400, '9-11 years': 430, '12-14 years': 460 };
 export const ADULT_HOODIE_CHEST_MM: Record<string, number> = { XS: 510, S: 540, M: 570, L: 600, XL: 630, '2XL': 660, '3XL': 690 };
 
+// ── Christmas jumpers (D24, 2026-10-25) — sweatshirts, not knitwear ──
+/** Kids: Stanley/Stella Mini Changer (STSK913, Prodigi SWEAT-SS-STSK913), organic. uk9, Tracked 48 — every
+ * size quoted in varsity green 2026-10-25. Front 3070×3070px, the same as the kids tee/hoodie. Varsity green
+ * leads (the Christmas colour); the rest are Prodigi's other STSK913 colours. */
+export const KIDS_JUMPER_COLOURS: GarmentColour[] = [
+  { name: 'varsity green', attr: 'varsity green', hex: '#1f5a3d' },
+  { name: 'white', attr: 'white', hex: '#ffffff' },
+  { name: 'heather grey', attr: 'heather grey', hex: '#a9aaad' },
+  { name: 'french navy', attr: 'french navy', hex: '#232c46' },
+  { name: 'black', attr: 'black', hex: '#232325' },
+];
+export const KIDS_JUMPER_SIZES = KIDS_HOODIE_SIZES;
+/** Adult: AWDis JH030 crew sweatshirt (Prodigi GLOBAL-SWEAT-AWD-JH030), 80% cotton / 20% polyester — NOT
+ * organic. Prodigi routes it to uk2 (Royal Mail 1st Class, untracked) OR uk9 (Tracked 48) by colour + size,
+ * so it is priced on the dearer uk9 postage and never joins a parcel saving. Front 4606×5787px. */
+export const ADULT_JUMPER_COLOURS: GarmentColour[] = [
+  { name: 'fire red', attr: 'fire red', hex: '#c8202f' },
+  { name: 'bottle green', attr: 'bottle green', hex: '#1d4a32' },
+];
+export const ADULT_JUMPER_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
+export const ADULT_JUMPER_PRINT_MM = { w: 390, h: 490 } as const; // 4606×5787px @300dpi
+/** Approximate ½-chest widths for the size-true preview — confirm against Prodigi's size guide. */
+export const KIDS_JUMPER_CHEST_MM: Record<string, number> = { ...KIDS_HOODIE_CHEST_MM };
+export const ADULT_JUMPER_CHEST_MM: Record<string, number> = { S: 510, M: 560, L: 610, XL: 660, '2XL': 710 };
+
 /** The garment products (printed direct-to-garment). */
-export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie'] as const;
+export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie', 'kidsJumper', 'christmasJumper'] as const;
 export const isGarmentKey = (key: string | null | undefined): boolean => !!key && (GARMENT_PRODUCT_KEYS as readonly string[]).includes(key);
 
-const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS];
+const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS, ...KIDS_JUMPER_COLOURS, ...ADULT_JUMPER_COLOURS];
 export const garmentHex = (name: string): string | null => ALL.find((c) => c.name === name)?.hex ?? null;
 
 /**

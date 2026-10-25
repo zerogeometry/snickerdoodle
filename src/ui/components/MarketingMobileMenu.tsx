@@ -21,10 +21,12 @@ const LINKS = [
  * left inside the header opened UNDER the page. While open the page behind doesn't scroll, Escape
  * closes it, and focus moves in (and back to the button on close).
  */
-export function MarketingMobileMenu({ signedIn = false }: { signedIn?: boolean }) {
+export function MarketingMobileMenu({ signedIn = false, christmas = false }: { signedIn?: boolean; christmas?: boolean }) {
+  // In the Christmas season (D24) the christmas range leads the menu.
+  const base = christmas ? [{ href: '/christmas', label: 'christmas' }, ...LINKS] : LINKS;
   const links = signedIn
-    ? [{ href: '/home', label: 'your keepsakes' }, { href: '/account', label: 'your account' }, ...LINKS]
-    : [...LINKS, { href: '/login', label: 'log in' }];
+    ? [{ href: '/home', label: 'your keepsakes' }, { href: '/account', label: 'your account' }, ...base]
+    : [...base, { href: '/login', label: 'log in' }];
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const navRef = useRef<HTMLElement>(null);

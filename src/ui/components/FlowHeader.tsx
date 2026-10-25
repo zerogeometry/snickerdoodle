@@ -2,6 +2,7 @@ import { IconArrowLeft } from '@tabler/icons-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Icon } from '../primitives/Icon';
+import { ChristmasStrip } from './ChristmasStrip';
 import { Logo } from './Logo';
 
 /**
@@ -50,6 +51,10 @@ export function FlowHeader({
         </div>
         {middle ? <div className="hidden min-w-0 sm:block">{middle}</div> : null}
         {right ? <div className="flex shrink-0 items-center gap-2">{right}</div> : null}
+      </div>
+      {/* Christmas (D24): one compact line under the bar, in season only. */}
+      <div className="mx-auto w-full max-w-7xl">
+        <ChristmasStrip compact />
       </div>
     </header>
   );

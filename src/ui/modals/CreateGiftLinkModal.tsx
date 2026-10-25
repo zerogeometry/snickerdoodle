@@ -18,6 +18,8 @@ import type { AccessLevel, Relationship } from '@/domain/types';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
+import { isChristmasSeason } from '@/lib/season';
+import { useNow } from '@/ui/useNow';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { cn } from '@/ui/cn';
 import { gbp, toast } from '@/lib/store';
@@ -207,12 +209,15 @@ export function CreateGiftLinkModal({
   };
 
   const nothingToPick = keepsakes.length === 0 && designs.length === 0;
+  // Christmas (D24): the same gift link, framed for the season.
+  const now = useNow();
+  const christmas = now !== null && isChristmasSeason(now);
 
   return (
     <Modal
       open={open}
       onClose={close}
-      title="Create a gift request"
+      title={christmas ? 'Send it to the grandparents for christmas' : 'Create a gift request'}
       subtitle={url ? 'now send it to someone special' : 'pick what you’d love them to give'}
       footer={
         url ? (

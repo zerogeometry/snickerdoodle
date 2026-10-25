@@ -33,6 +33,9 @@ export type ProductKey =
   | 'wrappingPaper'
   | 'teaTowel'
   | 'petBandana'
+  // christmas jumpers (D24)
+  | 'kidsJumper'
+  | 'christmasJumper'
   | 'playingCards';
 
 function House({ transform }: { transform: string }) {
@@ -70,6 +73,20 @@ function Hoodie({ stroke, wide }: { stroke: string; wide: boolean }) {
       <path d={wide ? 'M34 22 Q34 8 48 8 Q62 8 62 22' : 'M36 25 Q36 12 48 12 Q60 12 60 25'} fill="var(--color-paper)" stroke={stroke} strokeWidth="4" strokeLinejoin="round" />
       <path d={d} fill="var(--color-paper)" stroke={stroke} strokeWidth="4" strokeLinejoin="round" />
       <path d={wide ? 'M38 72 h20 l4 12 h-28 Z' : 'M39 70 h18 l3 11 h-24 Z'} fill="none" stroke={stroke} strokeWidth="2.4" strokeLinejoin="round" />
+    </>
+  );
+}
+
+/** A crew-neck jumper (sweatshirt): no hood, ribbed cuffs + hem — the Christmas jumpers (D24). */
+function Jumper({ stroke, fill, wide }: { stroke: string; fill: string; wide: boolean }) {
+  const d = wide
+    ? 'M12 34 L34 20 Q48 28 62 20 L84 34 L74 52 L64 46 L64 86 L32 86 L32 46 L22 52 Z'
+    : 'M16 36 L36 23 Q48 30 60 23 L80 36 L71 52 L62 47 L62 84 L34 84 L34 47 L25 52 Z';
+  return (
+    <>
+      <path d={d} fill={fill} stroke={stroke} strokeWidth="4" strokeLinejoin="round" />
+      <path d={wide ? 'M32 80 H64' : 'M34 78 H62'} stroke={stroke} strokeWidth="2.4" />
+      <path d={wide ? 'M36 21 Q48 29 60 21' : 'M38 24 Q48 31 58 24'} fill="none" stroke={stroke} strokeWidth="2.4" />
     </>
   );
 }
@@ -252,6 +269,18 @@ const ART: Record<ProductKey, ReactNode> = {
   adultHoodie: (
     <>
       <Hoodie stroke="var(--color-cobalt)" wide />
+      <House transform="translate(37,44) scale(0.62)" />
+    </>
+  ),
+  kidsJumper: (
+    <>
+      <Jumper stroke="var(--color-cocoa)" fill="var(--color-leaf-pale)" wide={false} />
+      <House transform="translate(38,43) scale(0.56)" />
+    </>
+  ),
+  christmasJumper: (
+    <>
+      <Jumper stroke="var(--color-cocoa)" fill="var(--color-berry-pale)" wide />
       <House transform="translate(37,44) scale(0.62)" />
     </>
   ),

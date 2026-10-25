@@ -13,7 +13,7 @@ import { Resvg } from '@resvg/resvg-js';
  * Shapes only — no text — so there are no fonts to bundle.
  */
 
-export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards'] as const;
+export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards', 'plasticBauble'] as const;
 export type DrawnProductKey = (typeof DRAWN_PRODUCT_KEYS)[number];
 export const isDrawnProduct = (key: string): key is DrawnProductKey => (DRAWN_PRODUCT_KEYS as readonly string[]).includes(key);
 
@@ -35,6 +35,8 @@ const H = 1250;
 const OAT = '#FBF5E9';
 const INK = '#2B2118';
 const HANGER: Record<string, string> = { natural: '#C9A27A', black: '#2B2118', white: '#F4F1EA' };
+/** Brown kraft wrapping paper (D24) — the print multiplies over it, as CMYK on kraft does. */
+const KRAFT = '#B98B5E';
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -127,9 +129,11 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
       const r = fit(a, 820, 1100);
       const c = Math.round(Math.min(r.w, r.h) * 0.14);
       const curl = `M${r.x + r.w} ${r.y + r.h - c} L${r.x + r.w - c} ${r.y + r.h} L${r.x + r.w - c * 0.95} ${r.y + r.h - c * 0.95} Z`;
+      const sheet = attrs.colour === 'kraft' ? KRAFT : '#fff';
+      const back = attrs.colour === 'kraft' ? '#A57A50' : '#F3EDE2';
       return {
-        blank: png(svg(`${SHADOW_DEFS}<rect x="${r.x + 10}" y="${r.y + 14}" width="${r.w}" height="${r.h}" fill="#000" opacity="0.16" filter="url(#s)"/><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="#fff"/>`, OAT)),
-        overlay: png(svg(`<path d="M${r.x + r.w} ${r.y + r.h - c} L${r.x + r.w} ${r.y + r.h} L${r.x + r.w - c} ${r.y + r.h} Z" fill="${OAT}"/><path d="${curl}" fill="#F3EDE2" stroke="${INK}" stroke-opacity="0.25" stroke-width="2"/>`)),
+        blank: png(svg(`${SHADOW_DEFS}<rect x="${r.x + 10}" y="${r.y + 14}" width="${r.w}" height="${r.h}" fill="#000" opacity="0.16" filter="url(#s)"/><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${sheet}"/>`, OAT)),
+        overlay: png(svg(`<path d="M${r.x + r.w} ${r.y + r.h - c} L${r.x + r.w} ${r.y + r.h} L${r.x + r.w - c} ${r.y + r.h} Z" fill="${OAT}"/><path d="${curl}" fill="${back}" stroke="${INK}" stroke-opacity="0.25" stroke-width="2"/>`)),
         quad: quadOf(r),
         material: 'PAPER',
         W, H,
@@ -160,6 +164,31 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
         overlay: png(svg(`<path d="${shape}" fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="3"/>`)),
         quad: quadOf(r),
         material: 'LIGHT_FABRIC',
+        W, H,
+      };
+    }
+    case 'plasticBauble': {
+      // the plastic BALL (D24): the print file wraps the ball, so the visible face is a circle inside
+      // the print area; a chrome cap + silver string on top, and a soft gloss highlight over the print
+      const r = fit(a, 620, 660, W / 2, H / 2 + 60);
+      const cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2, ry = r.h / 2;
+      const ball = `M${cx - rx} ${cy} A${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
+      const capW = rx * 0.34, capH = ry * 0.13, capY = r.y - capH * 0.7;
+      return {
+        blank: png(svg(`${SHADOW_DEFS}<path d="${ball}" fill="#000" opacity="0.18" filter="url(#s)" transform="translate(12 18)"/><path d="${ball}" fill="#fff"/>`, OAT)),
+        mask: maskOf(ball),
+        overlay: png(
+          svg(
+            `<defs><radialGradient id="g" cx="0.35" cy="0.3" r="0.75"><stop offset="0" stop-color="#fff" stop-opacity="0.55"/><stop offset="0.35" stop-color="#fff" stop-opacity="0"/><stop offset="0.85" stop-color="#000" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity="0.22"/></radialGradient>` +
+              `<linearGradient id="c" x1="0" x2="1"><stop offset="0" stop-color="#8E8E8E"/><stop offset="0.45" stop-color="#F2F2F2"/><stop offset="1" stop-color="#7A7A7A"/></linearGradient></defs>` +
+              `<path d="${ball}" fill="url(#g)"/>` +
+              `<path d="M${cx} ${capY} C${cx - 40} ${capY - 140} ${cx + 40} ${capY - 140} ${cx} ${capY}" fill="none" stroke="#B9B6AE" stroke-width="4"/>` +
+              `<rect x="${cx - capW / 2}" y="${capY}" width="${capW}" height="${capH}" rx="6" fill="url(#c)" stroke="${INK}" stroke-opacity="0.35" stroke-width="2"/>` +
+              `<path d="${ball}" fill="none" stroke="${INK}" stroke-opacity="0.2" stroke-width="2"/>`,
+          ),
+        ),
+        quad: quadOf(r),
+        material: 'GLOSS',
         W, H,
       };
     }

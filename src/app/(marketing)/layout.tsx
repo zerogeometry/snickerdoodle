@@ -6,11 +6,14 @@ import { AccountNav } from '@/ui/components/AccountNav';
 import { getCurrentAccount } from '@/server/session';
 import { Logo } from '@/ui/components/Logo';
 import { COMPANY } from '@/lib/company';
+import { ChristmasStrip } from '@/ui/components/ChristmasStrip';
+import { isChristmasSeason, seasonClock } from '@/lib/season';
 
 /** Marketing surface: nav + footer, goal is "start creating". A signed-in parent also gets a way
  * back to their keepsakes + account (never a dead-end "log in"). */
 export default async function MarketingLayout({ children }: { children: ReactNode }) {
   const signedIn = (await getCurrentAccount()) !== null;
+  const christmas = isChristmasSeason(seasonClock(new Date()));
   return (
     <div className="kraft relative flex min-h-dvh flex-col overflow-x-hidden">
       <header className="pt-safe relative z-10">
@@ -19,6 +22,11 @@ export default async function MarketingLayout({ children }: { children: ReactNod
             <Logo height={46} className="md:!h-[56px]" />
           </Link>
           <div className="hidden items-center gap-7 text-sm text-ink-soft md:flex">
+            {christmas ? (
+              <Link href="/christmas" className="font-bold text-cinnamon hover:text-cta-deep">
+                christmas
+              </Link>
+            ) : null}
             <Link href="/how-it-works" className="hover:text-cinnamon">
               how it works
             </Link>
@@ -33,8 +41,10 @@ export default async function MarketingLayout({ children }: { children: ReactNod
               start creating
             </Button>
           </div>
-          <MarketingMobileMenu signedIn={signedIn} />
+          <MarketingMobileMenu signedIn={signedIn} christmas={christmas} />
         </nav>
+        {/* Christmas (D24): the honest last-order line, 1 Nov → 6 Jan only. */}
+        <ChristmasStrip serverNowIso={new Date().toISOString()} />
       </header>
 
       <main id="main" className="relative z-10 flex-1">

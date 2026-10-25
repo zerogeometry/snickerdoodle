@@ -426,6 +426,8 @@ export const orders = pgTable(
     deliveryPence: integer('delivery_pence').notNull(),
     joinSavingPence: integer('join_saving_pence').notNull().default(0),
     familySetSavingPence: integer('family_set_saving_pence').notNull().default(0),
+    /** Same-parcel saving (src/pricing/parcels.ts, D24). */
+    parcelSavingPence: integer('parcel_saving_pence').notNull().default(0),
     totalPence: integer('total_pence').notNull(),
     currency: text('currency').notNull().default('GBP'),
     isGift: boolean('is_gift').notNull().default(false),

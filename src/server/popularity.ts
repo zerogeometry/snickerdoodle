@@ -1,6 +1,7 @@
 import { and, gte, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm';
 import { orderItems, orders, products } from '@/db/schema';
 import type { DbHandle } from './db';
+import { seasonalExpected, seasonClock } from '@/lib/season';
 
 /**
  * The order products appear in on the range — "most popular" first.
@@ -57,7 +58,9 @@ export async function unitsSold(db: DbHandle, now = new Date()): Promise<Map<str
 /** Re-rank the range from the expected order + recent sales, and store it on the products. */
 export async function recomputePopularity(db: DbHandle, now = new Date()): Promise<{ order: string[]; sold: Record<string, number> }> {
   const sold = await unitsSold(db, now);
-  const order = rankByPopularity(sold);
+  // Christmas (D24): while the season is on, the festive range leads in a fixed order, the rest
+  // follows by popularity; outside it this is just the popularity order (src/lib/season.ts).
+  const order = seasonalExpected(rankByPopularity(sold), seasonClock(now));
   for (const [i, key] of order.entries()) {
     await db.update(products).set({ popularRank: i + 1 }).where(sql`${products.key} = ${key}`);
   }

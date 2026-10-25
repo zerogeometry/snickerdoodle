@@ -17,6 +17,7 @@ import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile, familySetRequests } from '@/ui/components/FamilySetTile';
 import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
+import { ChristmasPromise } from './ChristmasPromise';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { instantContext, mockupKey, prefetchContexts, prefetchMockups, revealPlan, whenMockupsSettled, type MockupRequest } from '@/lib/mockupPrefetch';
 import { uploadGuestImage } from '@/lib/guestUpload';
@@ -386,6 +387,11 @@ export function FlowCatalogue({
             <div className="text-[11px] font-semibold text-green-save">{deliveryLine(items.map((i) => i.product))}</div>
           </div>
         </div>
+        {count > 0 ? (
+          <div className="mt-2">
+            <ChristmasPromise lineKeys={items.map((i) => i.sku ?? i.product)} labelFor={(k) => items.find((i) => (i.sku ?? i.product) === k)?.name ?? k} />
+          </div>
+        ) : null}
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
           {upload ? (
             <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>

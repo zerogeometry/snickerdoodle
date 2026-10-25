@@ -3,6 +3,7 @@ import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joi
 import { formatPence } from './format';
 import { evaluatePromo, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
+import { parcelSaving } from './parcels';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -26,10 +27,13 @@ export interface Quote {
   joinSavingPence: number;
   /** The family-set saving: 5% off garment lines when 3+ garments ship together. */
   familySetSavingPence: number;
+  /** The same-parcel saving: £3 off each extra item that ships in the same Prodigi parcel (src/pricing/parcels.ts). */
+  parcelSavingPence: number;
   totalPence: number;
   gift: boolean;
   joinSavingApplied: boolean;
   familySetApplied: boolean;
+  parcelSavingApplied: boolean;
   /** Client-supplied keys we don't sell — dropped, never priced, surfaced for honesty. */
   rejectedKeys: string[];
   /** Pence a promo code took off the goods (0 if none / not used). */
@@ -138,12 +142,17 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence - joinSavingPence)
     : 0;
 
+  // Same-parcel saving: resolved from the priced lines alone (keys + quantities), like the family set.
+  // Clamped so the savings together never exceed the goods.
+  const parcelSavingPence = Math.max(0, Math.min(parcelSaving(lines).savingPence, subtotalPence - joinSavingPence - familySetSavingPence));
+
   // Promo code — best single saving, margin-guarded (src/pricing/promo.ts).
   let promoSavingPence = 0;
   let partnerCommissionPence = 0;
   let promo: Quote['promo'] = null;
   let finalJoin = joinSavingPence;
   let finalSet = familySetSavingPence;
+  let finalParcel = parcelSavingPence;
   if (opts.promo && lines.length > 0) {
     const outcome = evaluatePromo(
       opts.promo,
@@ -151,7 +160,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
         const cost = catalogue[l.productKey]?.unitCostPence;
         return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
       }),
-      joinSavingPence + familySetSavingPence,
+      joinSavingPence + familySetSavingPence + parcelSavingPence,
     );
     if (outcome.applied) {
       promoSavingPence = outcome.discountPence;
@@ -159,6 +168,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       if (outcome.replacesOtherSavings) {
         finalJoin = 0;
         finalSet = 0;
+        finalParcel = 0;
       }
       promo = { code: opts.promo.code, applied: true, capped: outcome.capped };
     } else {
@@ -166,7 +176,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     }
   }
 
-  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - promoSavingPence + deliveryPence);
+  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - finalParcel - promoSavingPence + deliveryPence);
   const creditPence = lines.length > 0 ? applicableCredit(beforeCredit, opts.creditAvailablePence ?? 0) : 0;
   const totalPence = beforeCredit - creditPence;
 
@@ -176,10 +186,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     deliveryPence,
     joinSavingPence: finalJoin,
     familySetSavingPence: finalSet,
+    parcelSavingPence: finalParcel,
     totalPence,
     gift,
     joinSavingApplied: joinSavingApplied && finalJoin > 0,
     familySetApplied: familySetApplied && finalSet > 0,
+    parcelSavingApplied: finalParcel > 0,
     rejectedKeys,
     promoSavingPence,
     promo,

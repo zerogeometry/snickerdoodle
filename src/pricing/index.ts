@@ -29,3 +29,4 @@ export {
   type Quote,
   type RequestedLine,
 } from './engine';
+export { parcelSaving, parcelGroupOf, PARCEL_SAVING_PER_EXTRA_PENCE, type ParcelGroup } from './parcels';

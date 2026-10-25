@@ -85,7 +85,7 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     paidAt: o.paidAt,
     totalPence: o.totalPence,
     deliveryPence: o.deliveryPence,
-    savings: { joinPence: o.joinSavingPence, familySetPence: o.familySetSavingPence, codePence: o.promoSavingPence, creditPence: o.creditAppliedPence },
+    savings: { joinPence: o.joinSavingPence, familySetPence: o.familySetSavingPence, parcelPence: o.parcelSavingPence, codePence: o.promoSavingPence, creditPence: o.creditAppliedPence },
     isGift: o.isGift,
     giftSignedAs: o.giftFromName,
     buyerEmail: o.buyerEmail,

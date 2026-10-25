@@ -282,6 +282,7 @@ export async function placeOrder(
       deliveryPence: q.deliveryPence,
       joinSavingPence: q.joinSavingPence,
       familySetSavingPence: q.familySetSavingPence,
+      parcelSavingPence: q.parcelSavingPence,
       totalPence: q.totalPence,
       isGift: q.gift,
       familyId: input.giftLink?.familyId ?? null,
@@ -342,6 +343,7 @@ export async function placeOrder(
       deliveryPence: q.deliveryPence,
       joinSavingPence: q.joinSavingPence,
       familySetSavingPence: q.familySetSavingPence,
+      parcelSavingPence: q.parcelSavingPence,
       promoSavingPence: q.promoSavingPence + q.creditPence, // credit rides the same one-off coupon
       promoLabel: q.promo?.applied ? q.promo.code : undefined,
       cancelPath: input.cancelPath,

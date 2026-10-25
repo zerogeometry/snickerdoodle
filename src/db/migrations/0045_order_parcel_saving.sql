@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "parcel_saving_pence" integer DEFAULT 0 NOT NULL;

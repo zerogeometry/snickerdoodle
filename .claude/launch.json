@@ -4,22 +4,55 @@
     {
       "name": "dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 3000,
       "autoPort": false
     },
     {
       "name": "preview",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["cross-env", "NEXT_DIST_DIR=.next-preview", "APP_URL=http://localhost:3007", "AUTH_URL=http://localhost:3007", "next", "dev", "-p", "3007"],
+      "runtimeArgs": [
+        "cross-env",
+        "NEXT_DIST_DIR=.next-preview",
+        "APP_URL=http://localhost:3007",
+        "AUTH_URL=http://localhost:3007",
+        "next",
+        "dev",
+        "-p",
+        "3007"
+      ],
       "port": 3007,
       "autoPort": false
     },
     {
       "name": "mockups",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8137"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8137"
+      ],
       "port": 8137
+    },
+    {
+      "name": "preview-christmas",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "cross-env",
+        "NEXT_DIST_DIR=.next-xmas",
+        "NEXT_PUBLIC_SEASON_PREVIEW_DATE=2026-11-20",
+        "APP_URL=http://localhost:3008",
+        "AUTH_URL=http://localhost:3008",
+        "next",
+        "dev",
+        "-p",
+        "3008"
+      ],
+      "port": 3008,
+      "autoPort": false
     }
   ]
 }

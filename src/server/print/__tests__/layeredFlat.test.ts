@@ -109,7 +109,8 @@ describe('assertQuadFitsBlank — the seeder’s print-area check', () => {
 // seeder's own plan + the seeder's own print-area check, so a set that can't be seeded fails here.
 const STAGED = layeredFlatPath('socks/ankle') !== null;
 describe.skipIf(!STAGED)('every founder-photographed variant can be seeded', () => {
-  const variants = definedPriceList().filter((v) => ['socks', 'teaTowel', 'wrappingPaper', 'playingCards'].includes(v.productKey));
+  // (kraft wrapping paper always uses the drawn kraft sheet — the founder's photo set is white paper, D24)
+  const variants = definedPriceList().filter((v) => ['socks', 'teaTowel', 'wrappingPaper', 'playingCards'].includes(v.productKey) && v.attributes.colour !== 'kraft');
   for (const v of variants) {
     it(`${v.sku}`, async () => {
       const attrsPlan = plan(v.productKey, v.attributes); // the variant exactly as the seeder sees it

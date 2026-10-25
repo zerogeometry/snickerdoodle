@@ -53,7 +53,7 @@ export const CATALOGUE = {
   calendar: { pricePence: 1900, label: 'calendar' },
   adultTee: { pricePence: 3200, label: 'adult tee' },
   apron: { pricePence: 2500, label: 'apron' },
-  bauble: { pricePence: 2100, label: 'ceramic bauble' },
+  bauble: { pricePence: 2100, label: 'bauble' }, // ceramic disc (plastic ball £19 — DB per variant)
   sack: { pricePence: 3500, label: 'christmas sack' },
   phoneCase: { pricePence: 2500, label: 'phone case' }, // the default: snap (tough £30 — DB per variant)
   // Range expansion (D21, 2026-10-21) — seeded hidden until samples + mockups are in.
@@ -64,6 +64,9 @@ export const CATALOGUE = {
   wrappingPaper: { pricePence: 2300, label: 'wrapping paper' }, // the default: the 2 m roll (rolls only)
   teaTowel: { pricePence: 2700, label: 'tea towel' },
   petBandana: { pricePence: 1800, label: 'pet bandana' },
+  // Christmas jumpers (D24, 2026-10-25) — seeded hidden until a sweatshirt packshot is in.
+  kidsJumper: { pricePence: 3800, label: 'kids jumper' },
+  christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
   giftWrap: { pricePence: 300, label: 'gift wrap' },

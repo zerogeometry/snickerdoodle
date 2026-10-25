@@ -4,6 +4,7 @@ node_modules/
 .next-e2e/
 .next-preview/
 .next-verify/
+.next-xmas/
 out/
 dist/
 build/

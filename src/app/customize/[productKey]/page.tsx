@@ -11,6 +11,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
+import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
 import { CARD_FONTS, CARD_FONT_DEFAULT, cardFontCss } from '@/lib/card-fonts';
@@ -850,7 +851,8 @@ function CustomizeProduct() {
             <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">
               {gbp(variant?.pricePence ?? product.fromPence)}
             </span>
-            <span className="text-xs font-semibold text-green-save">{deliveryLine(product.key)}</span>
+            <span className="text-xs font-semibold text-green-save">{deliveryLine(variant?.sku ?? product.key)}</span>
+            <ChristmasPromise productKey={product.key} attrs={{ size, colour }} />
           </div>
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
@@ -868,13 +870,14 @@ function CustomizeProduct() {
           ) : /* A single-size product needs no picker — the size lives in the product details. */
           product.sizes.length > 1 ? (
             <Picker
-              label="Size"
+              // The bauble's "sizes" are its two STYLES (ceramic disc / plastic ball — D24).
+              label={product.key === 'bauble' ? 'Style' : 'Size'}
               options={product.sizes}
               value={size}
               onChange={setSize}
               // Show the physical size under word-sized buttons (the blanket's medium/large); the
               // frame/jigsaw/mug sizes already state their own measure in the name.
-              describe={product.key === 'blanket' ? (s) => sizeDimsCm(product, s) : undefined}
+              describe={product.key === 'blanket' ? (s) => sizeDimsCm(product, s) : product.key === 'bauble' ? (s) => BAUBLE_STYLE_BLURB[s] ?? '' : undefined}
             />
           ) : null}
           {product.orientations.length > 0 ? (
@@ -1310,6 +1313,12 @@ function Picker({
   );
 }
 
+/** The bauble's two styles, in a line each (D24). */
+const BAUBLE_STYLE_BLURB: Record<string, string> = {
+  'ceramic disc': 'flat & glossy, 7.5 cm · tracked post',
+  'plastic ball': 'printed all the way round, won’t break · 8 cm',
+};
+
 function swatchColour(name: string, productKey?: string): string {
   if (productKey === 'mug' && MUG_SWATCH[name]) return MUG_SWATCH[name];
   if (isGarmentKey(productKey)) return garmentHex(name) ?? 'var(--color-line)';
@@ -1317,6 +1326,7 @@ function swatchColour(name: string, productKey?: string): string {
     oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
     natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
     brown: '#6B4A32', 'dark grey': '#4D4C4A', 'light grey': '#CFCDC8', silver: '#B9B6AE',
+    kraft: '#B98B5E', // brown kraft wrapping paper (D24)
   };
   return map[name] ?? 'var(--color-line)';
 }

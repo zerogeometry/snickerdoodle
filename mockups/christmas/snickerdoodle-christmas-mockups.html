@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Snickerdoodle — Christmas mockups</title>
+<!-- Concept mockups (2026-10-25). Same scrapbook tokens as src/app/globals.css; Tabler 3.31.0 (the pinned set). -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.31.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Gaegu:wght@700&display=swap">
+<style>
+:root{
+  --oat:#F8F5E9;--paper:#FFFBF2;--paper-2:#F6EEDF;--line:#D9C7A9;--cocoa:#2B2118;--ink-soft:#5A4A3A;--ink-faint:#6E5D4B;
+  --cta:#C8402A;--cta-deep:#8E2A1A;--cinnamon:#A8331F;--honey:#F6C445;--honey-deep:#C99A1E;--honey-band:#FBE9B7;
+  --cobalt:#2F5DA8;--cobalt-deep:#1F4280;--sky:#8FB5D6;--sky-pale:#E3EDF6;--berry:#E8786E;--berry-pale:#FCE6E1;
+  --leaf:#7FA65E;--leaf-pale:#E6EFDC;--green-save:#3F6E29;
+  --hand:'Gaegu',cursive;--sans:'Bricolage Grotesque',system-ui,sans-serif;
+  /* Christmas layer = existing tokens only, recombined (no new hex). */
+  --holly-tape:repeating-linear-gradient(-45deg,rgb(200 64 42/.85) 0 7px,rgb(255 251 242/.9) 7px 14px);
+  --leaf-tape:repeating-linear-gradient(-45deg,rgb(127 166 94/.85) 0 7px,rgb(255 251 242/.9) 7px 14px);
+  --gold-tape:rgb(246 196 69/.8);
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:var(--sans);color:var(--cocoa);background:#E9E1CF;}
+.kraft{background-color:var(--oat);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .27 0 0 0 0 .18 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23n)'/%3E%3C/svg%3E");}
+.hand{font-family:var(--hand);font-weight:700}
+.ti{line-height:1}
+
+/* page chrome */
+.intro{max-width:1180px;margin:0 auto;padding:40px 24px 8px}
+.intro h1{font-size:38px;font-weight:800;margin:0 0 6px;letter-spacing:-.5px}
+.intro p{color:var(--ink-soft);max-width:760px;line-height:1.55;margin:6px 0}
+.row{display:flex;flex-wrap:wrap;justify-content:center;gap:44px 36px;padding:30px 20px 10px}
+.unit{display:flex;flex-direction:column;align-items:center;gap:12px;max-width:100%}
+.lab{font-weight:800;font-size:15px}
+.lab small{display:block;font-weight:400;color:var(--ink-faint);font-size:12.5px;max-width:330px;text-align:center;margin-top:3px;line-height:1.4}
+.note{max-width:1180px;margin:10px auto 60px;padding:0 24px;color:var(--ink-soft);font-size:14px;line-height:1.6}
+.note h2{font-size:20px;color:var(--cocoa);margin:24px 0 6px}
+
+/* phone frame */
+.phone{width:360px;background:#171310;border-radius:46px;padding:9px;box-shadow:0 24px 50px rgb(43 33 24/.28)}
+.scr{position:relative;border-radius:38px;overflow:hidden;height:760px;display:flex;flex-direction:column}
+.sb{display:flex;justify-content:space-between;align-items:center;padding:12px 24px 4px;font-size:13px;font-weight:800;flex:0 0 auto}
+.sb .isl{width:76px;height:20px;background:#171310;border-radius:12px}
+.body{flex:1;overflow:hidden;position:relative}
+.hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 8px;flex:0 0 auto}
+.hdr img{height:34px}
+.hdr .acts{display:flex;gap:8px}
+.ibtn{width:44px;height:44px;border-radius:14px;border:2px solid var(--cocoa);background:var(--paper);box-shadow:0 3px 0 var(--cocoa);display:grid;place-items:center;font-size:20px;position:relative}
+.ibtn .dot{position:absolute;top:-6px;right:-6px;background:var(--cta);color:#fff;font-size:11px;font-weight:800;border-radius:99px;min-width:20px;height:20px;display:grid;place-items:center;border:2px solid var(--paper)}
+
+/* deadline strip */
+.strip{display:flex;align-items:center;gap:8px;margin:0 12px;padding:8px 12px;border-radius:14px;background:var(--leaf-pale);border:2px solid var(--cocoa);font-size:13px;font-weight:600;color:var(--cocoa)}
+.strip i{font-size:18px;color:var(--green-save)}
+.strip b{font-weight:800}
+.strip .more{margin-left:auto;color:var(--cinnamon);font-weight:800;white-space:nowrap}
+
+/* buttons */
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border-radius:16px;font-weight:800;font-size:16px;border:0;width:100%;font-family:var(--sans)}
+.btn.primary{background:var(--cta);color:#fff;box-shadow:0 4px 0 var(--cta-deep)}
+.btn.secondary{background:var(--paper);color:var(--cocoa);border:2px solid var(--cocoa);box-shadow:0 3px 0 var(--cocoa)}
+.btn.design{background:var(--cobalt);color:#fff;box-shadow:0 4px 0 var(--cobalt-deep)}
+.btn.sm{min-height:44px;font-size:14px;width:auto;padding:0 16px}
+
+/* tab bar: floating pill in the thumb zone */
+.tabbar{position:absolute;left:14px;right:14px;bottom:18px;height:64px;border-radius:99px;background:var(--paper);border:2px solid var(--cocoa);box-shadow:0 4px 0 var(--cocoa);display:flex;justify-content:space-around;align-items:center;z-index:5}
+.tab{display:flex;flex-direction:column;align-items:center;gap:1px;font-size:10.5px;font-weight:800;color:var(--ink-faint)}
+.tab i{font-size:22px}
+.tab.on{color:var(--cta)}
+.tab.on i{background:var(--honey-band);border-radius:12px;padding:3px 10px}
+
+/* scrapbook bits */
+.polaroid{background:#fff;padding:8px 8px 10px;box-shadow:0 6px 14px rgb(43 33 24/.16);rotate:var(--tilt,0deg);position:relative}
+.polaroid img{display:block;width:100%;height:100%;object-fit:cover}
+.tape::before{content:'';position:absolute;top:-10px;left:50%;width:70px;height:20px;translate:-50% 0;rotate:var(--tape-rot,-3deg);background:var(--tape,var(--gold-tape));z-index:2}
+.tape.holly{--tape:var(--holly-tape)}
+.tape.leafy{--tape:var(--leaf-tape)}
+.sticker{border:2px solid var(--cocoa);box-shadow:0 3px 0 var(--cocoa);border-radius:16px;background:var(--paper)}
+.stk{position:absolute;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:24px;border:2px solid var(--cocoa);box-shadow:0 3px 0 var(--cocoa);rotate:var(--r,0deg);z-index:3}
+.chip{flex:0 0 auto;min-height:40px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:99px;border:2px solid var(--cocoa);background:var(--paper);font-weight:800;font-size:13px}
+.chip.on{background:var(--cocoa);color:var(--paper)}
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:800;color:var(--green-save);background:var(--leaf-pale);border-radius:99px;padding:3px 9px}
+.price{font-weight:800}
+.honey{background:linear-gradient(transparent 55%,var(--honey) 55% 92%,transparent 92%)}
+
+/* CSS-only snow, hero only; off under reduced motion (transform/opacity only) */
+.snow{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:1}
+.snow span{position:absolute;top:-10px;width:7px;height:7px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.5px rgb(143 181 214/.6);animation:fall var(--d,9s) linear infinite;animation-delay:var(--dl,0s);left:var(--x)}
+@keyframes fall{from{transform:translateY(-20px)}to{transform:translateY(560px)}}
+@keyframes wiggle{0%,100%{rotate:var(--r,0deg)}50%{rotate:calc(var(--r,0deg) + 7deg)}}
+.wig{animation:wiggle 2.6s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.snow span,.wig{animation:none}.snow{display:none}}
+
+/* bottom sheet */
+.scrim{position:absolute;inset:0;background:rgb(43 33 24/.45);z-index:6}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:26px 26px 0 0;border-top:2px solid var(--cocoa);z-index:7;padding:10px 18px 26px}
+.grab{width:44px;height:5px;border-radius:9px;background:var(--line);margin:0 auto 10px}
+
+/* desktop frame */
+.browser{width:1180px;max-width:calc(100vw - 40px);border-radius:16px;overflow:hidden;box-shadow:0 24px 50px rgb(43 33 24/.25);background:#fff}
+.bbar{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#EFE7D8;border-bottom:1px solid var(--line)}
+.bbar span{width:11px;height:11px;border-radius:50%;background:#D9C7A9}
+.bbar .url{margin-left:14px;flex:1;background:#fff;border-radius:8px;padding:5px 12px;font-size:12.5px;color:var(--ink-faint)}
+.dnav{display:flex;align-items:center;gap:26px;padding:14px 34px;border-bottom:2px solid var(--cocoa);background:var(--paper)}
+.dnav img{height:40px}
+.dnav a{font-weight:800;font-size:15px;color:var(--cocoa);text-decoration:none}
+.dnav a.on{color:var(--cta)}
+.dnav .sp{flex:1}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:22px}
+.pcard{background:var(--paper);border:2px solid var(--cocoa);box-shadow:0 4px 0 var(--cocoa);border-radius:18px;overflow:hidden;position:relative}
+.pcard .pic{aspect-ratio:1/1;background:var(--paper-2);position:relative;overflow:hidden}
+.pcard .pic img{width:100%;height:100%;object-fit:cover}
+.pcard .meta{padding:10px 12px 12px}
+.pcard .nm{font-weight:800;font-size:15px}
+.pcard .bl{font-size:12.5px;color:var(--ink-faint);margin:2px 0 8px}
+.pcard .ft{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body class="kraft">
+
+<div class="intro">
+  <p class="hand" style="color:var(--cinnamon);font-size:24px;margin:0">christmas in the scrapbook</p>
+  <h1>Snickerdoodle — Christmas UI mockups</h1>
+  <p>Five concept screens for the Christmas season (1 Nov → 6 Jan). They layer stickers, tape and copy onto the existing
+  scrapbook look, as decided in D12, and add no new colours. The tokens are the same as <code>globals.css</code>. The festive washi
+  tape mixes tomato, leaf and paper, and the gold is honey. Photos are <b>concept images generated locally with Qwen</b>, standing in
+  for real product mockups. They don't show any real child's art or real product renders. Delivery dates are <b>placeholders</b>
+  until Prodigi publishes its 2026 cut-offs.</p>
+</div>
+
+<div class="row">
+
+<!-- ================= 1. HOME (mobile) ================= -->
+<div class="unit">
+<div class="lab">1 · Home, Christmas season <small>Deadline strip under the header. One Gaegu line. The polaroid becomes a bauble. CSS-only snow behind the hero, off under reduced motion. "start creating" keeps its wobble.</small></div>
+<div class="phone"><div class="scr kraft">
+  <div class="sb"><span>9:41</span><span class="isl"></span><span><i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+  <div class="hdr"><img src="../../public/brand/snickerdoodle-logo.webp" alt="snickerdoodle"><div class="acts"><span class="ibtn" aria-label="basket"><i class="ti ti-shopping-bag"></i></span><span class="ibtn" aria-label="account"><i class="ti ti-user"></i></span></div></div>
+  <div class="strip"><i class="ti ti-truck-delivery"></i><span>order by <b>mon 14 dec</b> for christmas</span><span class="more">dates <i class="ti ti-chevron-right" style="font-size:14px;color:inherit"></i></span></div>
+  <div class="body">
+    <div class="snow" aria-hidden="true">
+      <span style="--x:8%;--d:11s"></span><span style="--x:22%;--d:8s;--dl:-3s"></span><span style="--x:38%;--d:12s;--dl:-6s"></span>
+      <span style="--x:55%;--d:9s;--dl:-1s"></span><span style="--x:70%;--d:13s;--dl:-8s"></span><span style="--x:86%;--d:10s;--dl:-4s"></span>
+    </div>
+    <div style="position:relative;z-index:2;padding:18px 22px 0">
+      <p class="hand" style="color:var(--cinnamon);font-size:24px;margin:0;rotate:-2deg">the present they made themselves</p>
+      <h2 style="font-size:40px;line-height:1.02;font-weight:800;margin:6px 0 0;letter-spacing:-.8px">Keep the<br><span class="honey">magic</span> this<br>christmas.</h2>
+    </div>
+    <div style="position:relative;z-index:2;display:flex;justify-content:center;margin-top:18px">
+      <div class="polaroid tape holly" style="--tilt:3deg;width:196px;height:236px"><img src="img/bauble-tree.jpg" alt="a ceramic bauble printed with a child's snowman drawing, hanging on a tree"></div>
+      <span class="stk wig" style="--r:-12deg;left:46px;top:30px;background:var(--leaf-pale);color:var(--green-save)"><i class="ti ti-christmas-tree"></i></span>
+      <span class="stk" style="--r:10deg;right:42px;top:150px;background:var(--honey-band);color:var(--cocoa)"><i class="ti ti-cookie-man"></i></span>
+      <span class="stk" style="--r:0deg;left:58px;top:196px;width:38px;height:38px;font-size:20px;background:var(--sky-pale);color:var(--cobalt)"><i class="ti ti-snowflake"></i></span>
+    </div>
+    <p style="position:relative;z-index:2;text-align:center;font-size:14px;color:var(--ink-soft);margin:16px 30px 0;line-height:1.45">draw it this weekend. under the tree by christmas.</p>
+  </div>
+  <div style="padding:0 16px 96px;flex:0 0 auto">
+    <button class="btn primary">start creating</button>
+    <p style="text-align:center;font-size:12px;color:var(--ink-faint);margin:9px 0 0"><i class="ti ti-lock" style="color:var(--green-save)"></i> everything you make is yours</p>
+  </div>
+  <nav class="tabbar" aria-label="app"><span class="tab on"><i class="ti ti-home-heart"></i>home</span><span class="tab"><i class="ti ti-palette"></i>create</span><span class="tab"><i class="ti ti-gift"></i>gifts</span><span class="tab"><i class="ti ti-box"></i>keepsakes</span></nav>
+</div></div>
+</div>
+
+<!-- ================= 3. PRODUCT PAGE (mobile) ================= -->
+<div class="unit">
+<div class="lab">2 · "This year's bauble" product page <small>An annual collectable. Optional year and first name on the back, screened, first name only. The "arrives by christmas" promise comes from the server per lab. The sticky CTA sits in the thumb zone.</small></div>
+<div class="phone"><div class="scr kraft">
+  <div class="sb"><span>9:41</span><span class="isl"></span><span><i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+  <div class="hdr"><span class="ibtn" aria-label="back"><i class="ti ti-arrow-left"></i></span><img src="../../public/brand/snickerdoodle-logo.webp" alt="snickerdoodle"><span class="ibtn" aria-label="basket"><i class="ti ti-shopping-bag"></i><span class="dot">2</span></span></div>
+  <div class="body" style="padding:6px 18px 0">
+    <div style="position:relative;display:flex;justify-content:center">
+      <div class="polaroid tape leafy" style="--tilt:-2deg;width:250px;height:250px"><img src="img/bauble-tree.jpg" alt="bauble preview with the drawing on it"></div>
+      <span class="stk" style="--r:8deg;right:8px;top:12px;background:var(--honey-band);font-size:12px;font-weight:800;width:62px;height:62px;line-height:1.05;text-align:center">2026<br><span style="font-size:10px">edition</span></span>
+    </div>
+    <p class="hand" style="text-align:center;color:var(--ink-soft);font-size:19px;margin:12px 0 2px">drawn by ava, christmas 2026</p>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:6px">
+      <h2 style="font-size:24px;font-weight:800;margin:0">this year's bauble</h2><span class="price" style="font-size:20px">£21</span>
+    </div>
+    <p style="font-size:13.5px;color:var(--ink-soft);margin:4px 0 10px;line-height:1.45">ceramic, 3″. one for every christmas they're little — the tree fills up with a timeline of their drawings.</p>
+    <div class="sticker" style="padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:14px">on the back</b><span style="font-size:12px;color:var(--ink-faint)">optional</span></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <span class="chip on" style="font-size:12.5px">ava · 2026</span><span class="chip" style="font-size:12.5px">2026</span><span class="chip" style="font-size:12.5px">blank</span>
+      </div>
+      <p style="font-size:11.5px;color:var(--ink-faint);margin:7px 0 0"><i class="ti ti-shield-heart" style="color:var(--green-save)"></i> first name only — never a surname</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;background:var(--leaf-pale);border-radius:14px;padding:10px 12px">
+      <i class="ti ti-christmas-tree" style="font-size:24px;color:var(--green-save)"></i>
+      <div style="font-size:13px;line-height:1.35"><b>arrives by christmas</b> if you order by <b>mon 14 dec</b><br><span style="color:var(--ink-faint)">tracked · usually 3–5 days</span></div>
+    </div>
+  </div>
+  <div style="padding:12px 16px 26px;background:var(--paper);border-top:2px solid var(--cocoa);flex:0 0 auto;display:flex;gap:10px">
+    <button class="btn secondary" style="width:56px;flex:0 0 56px" aria-label="send to family"><i class="ti ti-send" style="font-size:20px"></i></button>
+    <button class="btn primary">add to basket · £21</button>
+  </div>
+</div></div>
+</div>
+
+<!-- ================= 4. STUDIO FESTIVE MAGIC EDITS (mobile) ================= -->
+<div class="unit">
+<div class="lab">3 · Studio: "festive touches" sheet <small>One-tap preset magic edits in cobalt, the colour for design tools. Holly tape, a gold frame, snowflakes, the gingerbread sticker. "Wrap it" feeds the repeat-pattern edit. All of it is self-hosted and deterministic: no free text, no third party.</small></div>
+<div class="phone"><div class="scr" style="background:var(--paper-2)">
+  <div class="sb"><span>9:41</span><span class="isl"></span><span><i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+  <div class="hdr"><span class="ibtn" aria-label="close"><i class="ti ti-x"></i></span><b style="font-size:16px">your creation</b><span class="ibtn" aria-label="undo"><i class="ti ti-arrow-back-up"></i></span></div>
+  <div class="body" style="display:flex;justify-content:center;padding-top:14px">
+    <div style="position:relative;width:250px;height:300px;background:#fff;border:12px solid var(--honey);box-shadow:inset 0 0 0 2px var(--honey-deep),0 8px 18px rgb(43 33 24/.2);rotate:-1deg">
+      <img src="img/drawing-tree.jpg" alt="the drawing being edited (synthetic sample art)" style="width:100%;height:100%;object-fit:cover">
+      <span style="position:absolute;top:-16px;left:-22px;width:96px;height:22px;background:var(--holly-tape);rotate:-24deg"></span>
+      <span style="position:absolute;bottom:-14px;right:-20px;width:96px;height:22px;background:var(--holly-tape);rotate:-24deg"></span>
+      <span class="stk" style="--r:-10deg;right:-18px;top:32px;background:var(--honey-band)"><i class="ti ti-cookie-man"></i></span>
+      <i class="ti ti-snowflake" style="position:absolute;left:10px;bottom:16px;font-size:26px;color:#fff;text-shadow:0 0 2px var(--cobalt)"></i>
+      <i class="ti ti-snowflake" style="position:absolute;left:46px;bottom:48px;font-size:16px;color:#fff;text-shadow:0 0 2px var(--cobalt)"></i>
+    </div>
+    <p class="hand" style="position:absolute;bottom:4px;left:0;right:0;text-align:center;color:var(--ink-soft);font-size:18px;margin:0">frame the wonky bits in gold</p>
+  </div>
+  <div class="sheet" style="position:relative;padding-bottom:22px">
+    <div class="grab"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:17px">festive touches</b><span style="font-size:12px;color:var(--ink-faint)">your original stays safe</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 14px">
+      <div style="text-align:center"><div class="sticker" style="height:62px;display:grid;place-items:center;background:var(--holly-tape);border-radius:14px"></div><div style="font-size:11.5px;font-weight:800;margin-top:5px">holly tape</div></div>
+      <div style="text-align:center"><div class="sticker" style="height:62px;display:grid;place-items:center;outline:3px solid var(--cobalt);outline-offset:2px;background:var(--honey)"><i class="ti ti-frame" style="font-size:28px"></i></div><div style="font-size:11.5px;font-weight:800;margin-top:5px;color:var(--cobalt)">gold frame ✓</div></div>
+      <div style="text-align:center"><div class="sticker" style="height:62px;display:grid;place-items:center;background:var(--sky-pale);color:var(--cobalt)"><i class="ti ti-snowflake" style="font-size:28px"></i></div><div style="font-size:11.5px;font-weight:800;margin-top:5px">snowfall</div></div>
+      <div style="text-align:center"><div class="sticker" style="height:62px;display:grid;place-items:center;background:var(--honey-band)"><i class="ti ti-cookie-man" style="font-size:28px"></i></div><div style="font-size:11.5px;font-weight:800;margin-top:5px">stickers</div></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn design" style="flex:1"><i class="ti ti-gift"></i> wrap it</button>
+      <button class="btn primary" style="flex:1.2">looks magic →</button>
+    </div>
+  </div>
+</div></div>
+</div>
+
+<!-- ================= 5. SEND TO GRANDPARENTS + CHRISTMAS CHAPTER (mobile) ================= -->
+<div class="unit">
+<div class="lab">4 · Keepsake Home "christmas 2026" chapter + the gift-link sheet <small>The existing gift link, framed for Christmas. The parent picks the circle (extended) and access (view &amp; buy). Trust is shown through control. The 5% join saving is computed on the server.</small></div>
+<div class="phone"><div class="scr kraft">
+  <div class="sb"><span>9:41</span><span class="isl"></span><span><i class="ti ti-wifi"></i> <i class="ti ti-battery-3"></i></span></div>
+  <div class="hdr"><img src="../../public/brand/snickerdoodle-logo.webp" alt="snickerdoodle"><div class="acts"><span class="ibtn"><i class="ti ti-shopping-bag"></i></span></div></div>
+  <div class="body" style="padding:4px 18px">
+    <div style="display:flex;align-items:center;gap:8px"><i class="ti ti-christmas-tree" style="font-size:22px;color:var(--green-save)"></i><h2 style="font-size:22px;font-weight:800;margin:0">christmas 2026</h2><span class="badge" style="margin-left:auto">4 drawings</span></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+      <div class="polaroid tape holly" style="--tilt:-3deg;height:120px"><img src="img/sack-fireside.jpg" alt=""></div>
+      <div class="polaroid tape" style="--tilt:2deg;height:120px"><img src="img/wrapped-presents.jpg" alt=""></div>
+    </div>
+  </div>
+  <div class="scrim"></div>
+  <div class="sheet">
+    <div class="grab"></div>
+    <p class="hand" style="color:var(--cinnamon);font-size:20px;margin:0">they'll cry, in a good way</p>
+    <h3 style="font-size:21px;font-weight:800;margin:2px 0 10px;line-height:1.15">send it to the grandparents for christmas</h3>
+    <div class="sticker" style="padding:10px 12px;display:flex;gap:10px;align-items:center">
+      <div class="polaroid" style="width:54px;height:54px;padding:3px;--tilt:-4deg"><img src="img/bauble-tree.jpg" alt=""></div>
+      <div style="font-size:13px;line-height:1.35"><b>this year's bauble</b> · ready to buy<br><span style="color:var(--ink-faint)">they just tap, check out, done</span></div>
+    </div>
+    <div style="margin:12px 0 6px;font-size:12px;font-weight:800;color:var(--ink-faint)">who's it for</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="chip on"><i class="ti ti-heart"></i> nana &amp; grandad</span><span class="chip">auntie jo</span><span class="chip"><i class="ti ti-plus"></i></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:13px;background:var(--paper-2);border-radius:14px;padding:9px 12px">
+      <span><i class="ti ti-eye" style="color:var(--cobalt)"></i> extended family · <b>view &amp; buy</b></span><span style="color:var(--cinnamon);font-weight:800">change</span>
+    </div>
+    <p style="font-size:12px;color:var(--ink-faint);margin:9px 0 12px;line-height:1.4"><i class="ti ti-lock" style="color:var(--green-save)"></i> only people you send this to can see it. the link expires in 14 days, and you can switch it off any time. if they join the family they save 5%.</p>
+    <button class="btn primary"><i class="ti ti-send"></i> share a ready-to-buy link</button>
+  </div>
+</div></div>
+</div>
+
+</div><!-- /row -->
+
+<!-- ================= 2. CHRISTMAS GIFT SHOP (desktop) ================= -->
+<div class="row" style="padding-top:20px">
+<div class="unit">
+<div class="lab">5 · /christmas gift shop (desktop) <small>Shop by who it's for, not just by product. Every card carries an "arrives by christmas" badge from the server. Bundles are priced honestly from the real postage saving.</small></div>
+<div class="browser">
+  <div class="bbar"><span></span><span></span><span></span><div class="url">snickerdoodle.co.uk/christmas</div></div>
+  <div class="kraft">
+  <div class="dnav"><img src="../../public/brand/snickerdoodle-logo.webp" alt="snickerdoodle"><a href="#">start creating</a><a href="#" class="on">christmas</a><a href="#">gifts</a><a href="#">how it works</a><span class="sp"></span><span class="ibtn"><i class="ti ti-shopping-bag"></i></span><span class="ibtn"><i class="ti ti-user"></i></span></div>
+  <div style="display:flex;align-items:center;gap:10px;justify-content:center;background:var(--leaf-pale);border-bottom:2px solid var(--cocoa);padding:9px;font-size:14px;font-weight:600"><i class="ti ti-truck-delivery" style="color:var(--green-save);font-size:19px"></i> order by <b>mon 14 dec</b> for standard delivery · <b>fri 18 dec</b> express · <a href="#" style="color:var(--cinnamon);font-weight:800">all christmas dates</a></div>
+
+  <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center;padding:40px 60px 26px;position:relative">
+    <div style="position:relative;z-index:2">
+      <p class="hand" style="color:var(--cinnamon);font-size:28px;margin:0;rotate:-1.5deg">the present they made themselves</p>
+      <h2 style="font-size:58px;line-height:.98;font-weight:800;margin:8px 0 14px;letter-spacing:-1.2px">Christmas,<br>drawn by <span class="honey">them</span>.</h2>
+      <p style="font-size:17px;color:var(--ink-soft);line-height:1.5;max-width:470px;margin:0 0 22px">baubles, cards, wrapping paper and the 2027 calendar — made from your little one's drawings and posted to whoever needs a happy cry this year.</p>
+      <div style="display:flex;gap:14px"><button class="btn primary" style="width:auto;padding:0 28px">start creating</button><button class="btn secondary" style="width:auto;padding:0 24px">see christmas dates</button></div>
+    </div>
+    <div style="position:relative;height:340px">
+      <div class="polaroid tape holly" style="--tilt:-3deg;position:absolute;left:10px;top:10px;width:380px;height:262px"><img src="img/hero-flatlay.jpg" alt="flat lay of a bauble and wrapped present with a child's drawing"></div>
+      <div class="polaroid tape leafy" style="--tilt:6deg;position:absolute;right:0;bottom:0;width:170px;height:200px"><img src="img/bauble-tree.jpg" alt=""></div>
+      <span class="stk wig" style="--r:-8deg;left:-12px;bottom:40px;width:56px;height:56px;font-size:30px;background:var(--honey-band)"><i class="ti ti-cookie-man"></i></span>
+    </div>
+  </div>
+
+  <div style="padding:0 60px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <b style="font-size:15px;margin-right:6px">who's it for?</b>
+      <span class="chip on">everyone</span><span class="chip"><i class="ti ti-heart"></i> grandparents</span><span class="chip"><i class="ti ti-school"></i> teacher</span><span class="chip">aunties &amp; uncles</span><span class="chip"><i class="ti ti-users"></i> the whole family</span><span class="chip"><i class="ti ti-christmas-tree"></i> for the tree</span>
+    </div>
+  </div>
+
+  <div class="grid4" style="padding:24px 60px 10px">
+    <div class="pcard"><div class="pic"><img src="img/bauble-tree.jpg" alt=""></div><div class="meta"><div class="nm">this year's bauble</div><div class="bl">one for every christmas they're little</div><div class="ft"><span class="price">£21</span><span class="badge"><i class="ti ti-check"></i> by christmas</span></div></div></div>
+    <div class="pcard"><div class="pic"><img src="img/wrapped-presents.jpg" alt=""></div><div class="meta"><div class="nm">wrapping paper</div><div class="bl">every present wrapped in their art</div><div class="ft"><span class="price">from £23</span><span class="badge"><i class="ti ti-check"></i> by christmas</span></div></div></div>
+    <div class="pcard"><div class="pic"><img src="img/calendar-hands.jpg" alt=""></div><div class="meta"><div class="nm">2027 calendar</div><div class="bl">a year of their masterpieces</div><div class="ft"><span class="price">from £24</span><span class="badge"><i class="ti ti-check"></i> by christmas</span></div></div></div>
+    <div class="pcard"><div class="pic"><img src="img/sack-fireside.jpg" alt=""></div><div class="meta"><div class="nm">christmas sack</div><div class="bl">where the magic waits on christmas eve</div><div class="ft"><span class="price">£35</span><span class="badge"><i class="ti ti-check"></i> by christmas</span></div></div></div>
+  </div>
+
+  <div style="margin:22px 60px 40px;padding:20px 24px;background:var(--honey-band);border:2px solid var(--cocoa);box-shadow:0 4px 0 var(--cocoa);border-radius:20px;display:flex;align-items:center;gap:24px">
+    <div class="stk" style="position:static;width:64px;height:64px;font-size:32px;background:var(--paper)"><i class="ti ti-gift"></i></div>
+    <div style="flex:1"><b style="font-size:19px">the grandparents' box</b><div style="font-size:14px;color:var(--ink-soft);margin-top:3px">bauble + mug from one drawing, posted together in one parcel, so the postage saving goes straight to you.</div></div>
+    <div style="text-align:right"><div style="font-size:13px;color:var(--ink-faint);text-decoration:line-through">£39</div><div class="price" style="font-size:22px">£38</div></div>
+    <button class="btn primary" style="width:auto;padding:0 24px">make it</button>
+  </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div class="note">
+  <h2>Deadline strip — every state (one data source, computed on the server)</h2>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:520px">
+    <div class="strip" style="margin:0"><i class="ti ti-truck-delivery"></i><span>order by <b>mon 14 dec</b> for christmas</span></div>
+    <div class="strip" style="margin:0;background:var(--honey-band)"><i class="ti ti-bolt" style="color:var(--cocoa)"></i><span>standard's closed — <b>express</b> still makes it if you order by <b>fri 18 dec</b></span></div>
+    <div class="strip" style="margin:0;background:var(--berry-pale)"><i class="ti ti-mail-heart" style="color:var(--cinnamon)"></i><span>missed the post? print a <b>"it's on its way"</b> card for under the tree</span></div>
+    <div class="strip" style="margin:0;background:var(--sky-pale)"><i class="ti ti-pencil" style="color:var(--cobalt)"></i><span>christmas done? <b>draw a thank-you</b> — card packs from £12</span></div>
+  </div>
+  <h2>Rules these mockups keep</h2>
+  <ul>
+    <li><b>Tokens only.</b> The Christmas look recombines tomato, leaf, honey, sky and paper. There's no red/green palette swap and no new hex values.</li>
+    <li><b>Motion:</b> snow and the sticker wiggle are CSS-only and transform/opacity-only. Both are off under <code>prefers-reduced-motion</code>. They're never on an ancestor of the tab bar or sheets.</li>
+    <li><b>One Gaegu moment per view.</b> Primary actions sit in the thumb zone. Every tap target is 44px or more.</li>
+    <li><b>Trust:</b> no public gallery and no "share your drawing" competition. The gift link is parent-initiated, with circle and access shown. First name only on the bauble.</li>
+    <li><b>No "AI"</b> anywhere in the copy. Festive touches are deterministic presets.</li>
+    <li><b>Bundle price</b> in screen 5 is illustrative. Bauble £21 + mug £18 = £39. The real saving on a same-lab parcel is about £3.30 (4.30 + 4.30 − 5.30), so the bundle can honestly be £1–2 off.</li>
+  </ul>
+</div>
+</body>
+</html>

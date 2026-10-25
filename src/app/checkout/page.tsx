@@ -15,6 +15,7 @@ import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { ClientQuote } from '@/app/actions/quote';
+import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
 
 
 export default function CheckoutPage() {
@@ -127,6 +128,7 @@ export default function CheckoutPage() {
   const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
   const savingPence = quote?.joinSavingPence ?? 0;
   const setSavingPence = quote?.familySetSavingPence ?? 0;
+  const parcelSavingPence = quote?.parcelSavingPence ?? 0;
   const promoSavingPence = quote?.promoSavingPence ?? 0;
   const creditPence = quote?.creditPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
@@ -225,6 +227,7 @@ export default function CheckoutPage() {
   );
 
   const summaryRows = (
+    <>
     <dl className="mt-3 space-y-2 text-[13px] text-ink-soft">
       <div className="flex justify-between">
         <dt>Subtotal</dt>
@@ -240,6 +243,13 @@ export default function CheckoutPage() {
         <div className="flex justify-between text-green-save">
           <dt>Family set saving (5%)</dt>
           <dd>−{gbp(setSavingPence)}</dd>
+        </div>
+      ) : null}
+      {parcelSavingPence > 0 ? (
+        <div className="flex justify-between text-green-save">
+          {/* D24: the postage we save by packing them together, handed back (src/pricing/parcels.ts) */}
+          <dt>Same-parcel saving</dt>
+          <dd>−{gbp(parcelSavingPence)}</dd>
         </div>
       ) : null}
       {creditPence > 0 ? (
@@ -263,6 +273,13 @@ export default function CheckoutPage() {
         <dd>{gbp(total)}</dd>
       </div>
     </dl>
+    {/* Christmas (D24): will it ALL arrive in time? Honest per-line answer, in season only. */}
+    {!empty ? (
+      <div className="mt-2">
+        <ChristmasPromise lineKeys={items.map((i) => i.sku ?? i.product)} labelFor={(k) => items.find((i) => (i.sku ?? i.product) === k)?.name ?? k} />
+      </div>
+    ) : null}
+    </>
   );
 
   return (

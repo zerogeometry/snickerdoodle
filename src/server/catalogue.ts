@@ -8,6 +8,7 @@ import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
 import {
   ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, HOODIE_PRINT_MM, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
   KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES, type GarmentColour,
+  ADULT_JUMPER_COLOURS, ADULT_JUMPER_PRINT_MM, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 
@@ -289,9 +290,9 @@ const HANGER_COLOURS = ['natural', 'black', 'white'];
 // — UNTRACKED (sandbox 2026-10-21); tracked (Express, RM Tracked 24) is +£1.05. Founder to decide.
 // ROLLS ONLY (founder, 22 Oct) — the 3-sheet packs (WRAP-3-50X70 / -75X90) are off the range.
 const WRAPPING_PAPER = [
-  { size: '2 m roll', sku: 'WRAP-ROL-70X200', px: { w: 4133, h: 11811 }, pricePence: 2300 },
-  { size: '3 m roll', sku: 'WRAP-ROL-70X300', px: { w: 4133, h: 17716 }, pricePence: 2800 },
-  { size: '5 m roll', sku: 'WRAP-ROL-70X500', px: { w: 4133, h: 29527 }, pricePence: 3800 },
+  { size: '2 m roll', sku: 'WRAP-ROL-70X200', px: { w: 4133, h: 11811 }, kraftSku: 'WRAP-KFT-ROL-70X200', kraftPx: { w: 8280, h: 23610 }, pricePence: 2300 },
+  { size: '3 m roll', sku: 'WRAP-ROL-70X300', px: { w: 4133, h: 17716 }, kraftSku: 'WRAP-KFT-ROL-70X300', kraftPx: { w: 8280, h: 35430 }, pricePence: 2800 },
+  { size: '5 m roll', sku: 'WRAP-ROL-70X500', px: { w: 4133, h: 29527 }, kraftSku: 'WRAP-KFT-ROL-70X500', kraftPx: { w: 8280, h: 59070 }, pricePence: 3800 },
 ] as const;
 
 // Pet bandana: polyester, sublimated. uk9, Tracked 48. Each SKU also lists a non-GB route with a
@@ -424,15 +425,23 @@ const DEFS: Record<string, ProductDef> = {
       { size: 'adult', pricePence: 2900, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
     ],
   },
+  // Christmas 2026 (D24, founder 2026-10-25): ON SHOW, and ONE bauble in two styles (the picker says
+  // "style"). The CERAMIC disc is uk9 → Royal Mail Tracked 48 (£8 + £4.30), so it shares a parcel with the
+  // sack / mug / tea towel. The PLASTIC BALL (XMAS-PLAS-BAUB) is printed on both sides and shatterproof,
+  // from uk5 → Royal Mail RM24 (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
   bauble: {
-    category: 'FESTIVE', label: 'ceramic bauble', blurb: 'a little masterpiece for the tree', print: true,
-    description: "A ceramic bauble carrying their drawing — the ornament you'll unwrap and smile at every Christmas.",
-    specs: { material: 'ceramic', size: '3″' },
-    // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
-    variants: [{ size: '3″', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+    category: 'FESTIVE', label: 'bauble', blurb: "this year's bauble — one for every christmas they're little", print: true, visibleInShop: true,
+    description: "Their drawing on a bauble for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. Ceramic is a flat glossy disc on a gold string; the plastic ball is printed all the way round and won't break if little hands drop it.",
+    specs: { styles: 'ceramic disc (7.5 cm) or plastic ball (8 cm)', ceramic: 'flat, gloss, printed on one side, gold string', 'plastic ball': 'shatterproof, printed both sides, chrome cap, silver string', made: 'in the UK' },
+    variants: [
+      // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
+      { size: 'ceramic disc', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' },
+      // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
+      { size: 'plastic ball', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' },
+    ],
   },
   sack: {
-    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true,
+    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: true, // D24
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
     // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
@@ -479,9 +488,14 @@ const DEFS: Record<string, ProductDef> = {
   },
   wrappingPaper: {
     category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
-    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres.',
+    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres, in white or brown kraft (on kraft the colours come out a little earthier, and the paper shows through where the drawing is white).',
     specs: { material: 'FSC-certified 95gsm paper', formats: 'a 70cm-wide roll — 2, 3 or 5 m', made: 'in the UK' },
-    variants: WRAPPING_PAPER.map((w) => ({ size: w.size, pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
+    // Two papers (D24): white, and brown KRAFT (the scrapbook look). Kraft is a 300dpi file at the same
+    // cost (£8/£11/£17 + £5.70, gb2). Printing is CMYK on brown, so the paper shows where the drawing is white.
+    variants: WRAPPING_PAPER.flatMap((w) => [
+      { size: w.size, colour: 'white', pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku },
+      { size: w.size, colour: 'kraft', pricePence: w.pricePence, ...exactPx(w.kraftPx, 300), prodigiSku: w.kraftSku },
+    ]),
   },
   teaTowel: {
     category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,
@@ -490,6 +504,22 @@ const DEFS: Record<string, ProductDef> = {
     // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
     // designed LANDSCAPE (DESIGNED_TURNED): Prodigi's file is 5492×8208 portrait; we design 8208×5492
     variants: [{ size: 'one size', pricePence: 2700, ...exactPx({ w: 8208, h: 5492 }, 300), prodigiSku: 'H-TEATOWEL-SUB' }],
+  },
+  // ── Christmas jumpers (D24, 2026-10-25): printed SWEATSHIRTS in Christmas colours (Prodigi makes no
+  // knitwear). Held until a sweatshirt packshot is staged, like the hoodies. Priced ~15% net after all costs. ──
+  kidsJumper: {
+    category: 'APPAREL', label: 'kids jumper', blurb: 'the christmas jumper they drew themselves', print: true,
+    description: "A cosy organic-cotton sweatshirt with their own drawing on the front — in Christmas green, or every day in white, grey, navy or black.",
+    specs: { material: '100% organic cotton (Stanley/Stella)', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
+    // £19 + £4.30 (uk9, Tracked 48)
+    variants: garmentVariants({ sku: 'SWEAT-SS-STSK913', sizes: KIDS_JUMPER_SIZES, colours: KIDS_JUMPER_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 3800, defaultSize: '5-6 years' }),
+  },
+  christmasJumper: {
+    category: 'APPAREL', label: 'christmas jumper', blurb: 'matching jumpers for the grown-ups', print: true,
+    description: "A soft crew-neck sweatshirt in fire red or bottle green with your little one's drawing on the front — the family Christmas jumper, designed by the smallest person in the house.",
+    specs: { material: '80% cotton, 20% polyester (AWDis)', fit: 'unisex, S–2XL', print: 'up to 39 × 49 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
+    // £15 + up to £4.30 (uk2 1st Class OR uk9 Tracked 48 — Prodigi's pick per colour/size)
+    variants: garmentVariants({ sku: 'GLOBAL-SWEAT-AWD-JH030', sizes: ADULT_JUMPER_SIZES, colours: ADULT_JUMPER_COLOURS, printMm: ADULT_JUMPER_PRINT_MM, pricePence: 3200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   petBandana: {
     category: 'APPAREL', label: 'pet bandana', blurb: 'the dog, wearing their drawing of the dog', print: true,

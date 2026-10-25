@@ -12,6 +12,15 @@
  * no corporate tone, no pushy upsell, no "AI" as a feature (it appears only where the privacy promise
  * talks about it — never training on children's pictures).
  */
+import { CHRISTMAS_LAST_ORDER } from './season';
+
+/** "Monday 14 December" from the season's last-order table — the FAQ never types a date twice. */
+function longDate(iso: string): string {
+  const [Y, M, D] = iso.split('-').map(Number) as [number, number, number];
+  return new Date(Date.UTC(Y, M - 1, D, 12)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+}
+const XMAS = CHRISTMAS_LAST_ORDER[2026]!.byRoute;
+
 export interface FaqItem {
   id: string;
   q: string;
@@ -27,7 +36,7 @@ export interface FaqSection {
 }
 
 /** When the answers were last checked against the product + policies (shown, and in the schema). */
-export const FAQ_UPDATED = '2026-10-23';
+export const FAQ_UPDATED = '2026-10-25';
 
 /** Friendly names for the price table — every product in the shop needs one (unit-tested). */
 export const FAQ_PRODUCT_NAMES: Record<string, string> = {
@@ -46,6 +55,11 @@ export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   wrappingPaper: 'Wrapping paper (roll)',
   teaTowel: 'Tea towel',
   playingCards: 'Playing cards',
+  bauble: 'Christmas bauble (ceramic or plastic ball)',
+  sack: 'Christmas sack',
+  kidsJumper: 'Kids’ organic jumper',
+  christmasJumper: 'Christmas jumper (adult)',
+  calendar: '2027 wall calendar',
 };
 
 export const FAQ: FaqSection[] = [
@@ -124,6 +138,37 @@ export const FAQ: FaqSection[] = [
         id: 'height-chart',
         q: 'How does the Snickerdoodle height chart work?',
         a: 'The Snickerdoodle height chart is a canvas on wooden hangers with your child’s drawing running beside a printed ruler in centimetres and feet and inches. Hang it with the bottom edge 40 cm off the floor and it reads true from 50 cm up — so you can mark every birthday as they grow past it.',
+      },
+    ],
+  },
+  {
+    id: 'christmas',
+    title: 'Christmas',
+    items: [
+      {
+        id: 'christmas-last-order',
+        q: 'What’s the last day to order from Snickerdoodle for Christmas?',
+        a: `Snickerdoodle’s last day to order for Christmas 2026 is ${longDate(XMAS.uk9)} for most things, including baubles, sacks, mugs, tea towels and T-shirts. Cards and card packs close earlier, on ${longDate(XMAS.uk7)}, and wrapping paper on ${longDate(XMAS.gb2)}. These are safe dates with time to make and post everything; every date is on [our Christmas dates page](/christmas/delivery-dates).`,
+      },
+      {
+        id: 'christmas-bauble',
+        q: 'Can I turn my child’s drawing into a Christmas bauble?',
+        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof plastic ball printed all the way round. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; [see the Christmas range](/christmas).',
+      },
+      {
+        id: 'christmas-grandparents',
+        q: 'What’s a good Christmas present for grandparents from a toddler?',
+        a: 'Snickerdoodle’s most-loved present for grandparents is something with the grandchild’s own drawing on it — a bauble, a mug, a tea towel or the 2027 calendar with a different drawing each month. You can also send them a private ready-to-buy link so they can choose for themselves. See [gifts](/gifts).',
+      },
+      {
+        id: 'christmas-cards-wrap',
+        q: 'Can I make Christmas cards and wrapping paper from my child’s drawing?',
+        a: 'Yes — Snickerdoodle makes Christmas cards in packs of 5 or 10 with a different drawing on each front, and wrapping paper with their drawing as a repeating pattern, on white or brown kraft paper. The inside of the cards is left blank for your own message. Cards close for Christmas a few days before everything else.',
+      },
+      {
+        id: 'christmas-same-parcel',
+        q: 'Do I save anything if I order a few Christmas things together?',
+        a: 'Yes — when two or more things from your Snickerdoodle order are made and packed in the same parcel, we take £3 off each extra one, because posting them together costs us less. It happens automatically at checkout; for example a bauble and a mug, or two rolls of wrapping paper. We don’t run Black Friday discounts.',
       },
     ],
   },
