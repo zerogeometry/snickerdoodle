@@ -1,9 +1,11 @@
+import { useSyncExternalStore } from 'react';
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import { createJSONStorage, persist, type StorageValue } from 'zustand/middleware';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
 import { basketLineId } from '@/lib/basket-line';
+import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadSessionState } from '@/lib/uploadSession';
 
 /**
  * Lightweight client-side stores so the docs/03 flows are walkable end-to-end
@@ -32,7 +34,12 @@ export const gbp = formatPence;
 // `scratch` = a blank canvas made for "design from scratch" (no drawing to edit — the Studio hides
 // its image tools, and the range shows the design rather than the empty canvas).
 export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
-export const useUpload = create<{
+// Kept for THIS TAB only (sessionStorage — src/lib/uploadSession.ts), so a refresh doesn't lose it.
+// Hydrated after mount (skipHydration + <UploadSession/> in the root layout): the server and the
+// first client render both see "no drawing yet", so there's never a hydration mismatch. Screens that
+// must not act before then read useUploadHydrated().
+let uploadTabRead = false;
+type UploadStore = {
   upload: Upload;
   setUpload: (u: Upload) => void;
   setAssetId: (id: string) => void;
@@ -41,15 +48,45 @@ export const useUpload = create<{
   /** The DESIGN products render from (bg-removed / studio-edited); null = the original. */
   setCutout: (c: { url: string; sourceObjectId: string } | null) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
-}>((set) => ({
-  upload: null,
-  setUpload: (upload) => set({ upload }),
-  setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
-  setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
-  setAspect: (aspect) => set((s) => (s.upload ? { upload: { ...s.upload, aspect } } : {})),
-  setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout: cutout ?? undefined } } : {})),
-  resetUpload: () => set({ upload: null }),
-}));
+};
+export const useUpload = create<UploadStore>()(
+  persist(
+    (set) => ({
+      upload: null,
+      setUpload: (upload) => set({ upload }),
+      setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
+      setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
+      setAspect: (aspect) => set((s) => (s.upload ? { upload: { ...s.upload, aspect } } : {})),
+      setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout: cutout ?? undefined } } : {})),
+      resetUpload: () => set({ upload: null }),
+    }),
+    {
+      name: UPLOAD_SESSION_KEY,
+      storage: (() => {
+        const tab = uploadSessionStorage(() => (typeof window === 'undefined' ? undefined : window.sessionStorage));
+        // Nothing is written until the tab's copy has been read (<UploadSession/> then writes the
+        // merged state back) — so an early "no drawing" can never wipe the one a refresh restores.
+        return { ...tab, setItem: (name: string, value: StorageValue<UploadSessionState>) => (uploadTabRead ? tab.setItem(name, value) : undefined) };
+      })(),
+      onRehydrateStorage: () => () => {
+        uploadTabRead = true;
+      },
+      partialize: (s) => ({ upload: toSessionUpload(s.upload) }),
+      // a drawing put on screen before the tab's copy was read wins over the stored one
+      merge: (persisted, current) => ({ ...current, upload: current.upload ?? ((persisted as UploadSessionState | undefined)?.upload ?? null) }),
+      skipHydration: true,
+    },
+  ),
+);
+
+/** Has this tab's kept drawing been read yet? Always false on the server and the first client render. */
+export function useUploadHydrated(): boolean {
+  return useSyncExternalStore(
+    (cb) => useUpload.persist.onFinishHydration(cb),
+    () => useUpload.persist.hasHydrated(),
+    () => false,
+  );
+}
 
 /**
  * The image's width/height (aspect ratio) — for auto-orienting catalogue tiles. Decodes only

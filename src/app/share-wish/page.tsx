@@ -163,6 +163,8 @@ export default function ShareWishPage() {
           <div className="pop-in rounded-[22px] border-2 border-dashed border-cocoa/25 bg-paper p-7 text-center">
             <h1 className="font-display text-2xl leading-tight text-cocoa">Nothing to share yet</h1>
             <p className="mt-2 text-sm text-ink-soft">Add a creation to your basket first, then share it as a ready-to-buy wish.</p>
+            {/* a full page load, as before the Next 16 upgrade (fresh range, fresh basket state) */}
+            {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination */}
             <Button size="lg" className="mt-5 w-full" onClick={() => (window.location.href = '/catalogue')}>
               back to the range
             </Button>
@@ -186,6 +188,8 @@ export default function ShareWishPage() {
               We keep little ones safe by storing their <b>first name only</b> — no surnames. Pop back and pick who it’s
               for again.
             </p>
+            {/* a full page load, as before the Next 16 upgrade (fresh range, fresh basket state) */}
+            {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination */}
             <Button size="lg" className="mt-5 w-full" onClick={() => (window.location.href = '/catalogue')}>
               back to the range
             </Button>
@@ -278,6 +282,8 @@ export default function ShareWishPage() {
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">
               <Icon icon={IconShieldCheck} size={13} /> Private &amp; unguessable. Revoke it any time from your keepsakes.
             </p>
+            {/* a full page load, as before the Next 16 upgrade (the keepsake home re-reads the server) */}
+            {/* eslint-disable-next-line @next/next/no-location-assign-relative-destination */}
             <Button variant="secondary" size="lg" className="mt-4 w-full" onClick={() => (window.location.href = '/home?new=1')}>
               <Icon icon={IconHome} size={16} /> see it in your keepsake home
             </Button>

@@ -3,7 +3,7 @@ import { TEST_GATE_COOKIE, gateCookieValid, isGateExempt, isTestSite } from '@/l
 import { buildCsp, cspMode, newNonce, storageOrigins } from '@/lib/csp';
 
 /**
- * Every page request:
+ * The proxy (Next 16's name for middleware; it runs on Node). Every page request:
  *  1. gets a fresh script nonce and the Content-Security-Policy built from it (src/lib/csp.ts).
  *     The policy also goes on the REQUEST, with `x-nonce`: Next.js reads the nonce from there and
  *     puts it on its own <script> tags. (Pages render per request — see the root layout — so the
@@ -11,7 +11,7 @@ import { buildCsp, cspMode, newNonce, storageOrigins } from '@/lib/csp';
  *  2. on the TEST SITE only (`SITE_MODE=test`): sits behind the shared password and is never
  *     indexed. On the real site that part is a pass-through.
  */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const nonce = newNonce();
   const csp = buildCsp({ nonce, mode: cspMode(), storageOrigins: storageOrigins() });
   const testSite = isTestSite();

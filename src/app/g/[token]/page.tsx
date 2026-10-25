@@ -76,6 +76,8 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
 
   return (
     <Shell>
+      {/* the list's title band and the list itself are the page's main content */}
+      <main id="main" className="flex flex-1 flex-col">
       <div className="flex items-center gap-3.5 bg-honey-band px-6 py-4">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-honey bg-paper">
           <Icon icon={IconGift} size={24} className="text-cinnamon" />
@@ -88,7 +90,7 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
         </div>
       </div>
 
-      <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
+      <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
         <GiftCheckout
           token={token}
           items={view.items.map(({ assetId, productKey, label, unitPricePence, imageUrl, purchased }) => ({ assetId, productKey, label, unitPricePence, imageUrl, purchased }))}
@@ -97,14 +99,15 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
           familyName={view.familyName}
           pricing={pricing}
         />
+      </div>
       </main>
 
-      <div className="flex flex-col items-center justify-center gap-0.5 bg-paper-2 px-6 py-2 text-center">
+      <footer className="flex flex-col items-center justify-center gap-0.5 bg-paper-2 px-6 py-2 text-center">
         <span className="flex items-center gap-1.5 text-[11px] text-green-save">
           <Icon icon={IconShieldCheck} size={14} /> Secure. Your details are yours — never shared, never sold.
         </span>
         <ReportGiftLink token={token} />
-      </div>
+      </footer>
     </Shell>
   );
 }

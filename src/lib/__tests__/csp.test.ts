@@ -126,7 +126,7 @@ describe('storage origin — exactly what the AWS SDK signs', () => {
   });
 });
 
-describe('middleware — sends the policy and hands the nonce to Next', () => {
+describe('proxy — sends the policy and hands the nonce to Next', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.resetModules();
@@ -139,8 +139,8 @@ describe('middleware — sends the policy and hands the nonce to Next', () => {
     vi.stubEnv('S3_FORCE_PATH_STYLE', '');
     for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v);
     vi.resetModules();
-    const { middleware } = await import('@/middleware');
-    return middleware(new NextRequest(new URL(path, 'http://localhost:3100')));
+    const { proxy } = await import('@/proxy');
+    return proxy(new NextRequest(new URL(path, 'http://localhost:3100')));
   }
 
   it('every page gets a strict policy whose nonce is also passed on the request (x-nonce + CSP)', async () => {

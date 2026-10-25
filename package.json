@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:visual": "playwright test -c tests/visual/playwright.config.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
@@ -18,7 +19,7 @@
     "db:push": "drizzle-kit push"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.7",
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4.3.1",
     "@types/node": "^22.10.2",
@@ -28,10 +29,10 @@
     "cross-env": "^10.1.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^15.5.19",
+    "eslint-config-next": "^16.4.3",
     "tailwindcss": "^4.3.1",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "@google/model-viewer": {
@@ -57,7 +58,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@tabler/icons-react": "3.44.0",
     "drizzle-orm": "^0.45.2",
-    "next": "^15.5.19",
+    "next": "^16.4.3",
     "next-auth": "^5.0.0-beta.31",
     "postgres": "^3.4.9",
     "react": "^19.2.7",

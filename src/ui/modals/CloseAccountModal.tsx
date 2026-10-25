@@ -55,6 +55,8 @@ export function CloseAccountModal({ open, onClose, onDownload }: { open: boolean
         );
       }
       toast('your account is closed');
+      // a full load on purpose: nothing of the closed account stays in the page's memory
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.assign('/');
     });
   };
