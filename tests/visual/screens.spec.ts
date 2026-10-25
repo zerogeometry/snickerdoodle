@@ -48,6 +48,15 @@ for (const vp of WIDTHS) {
       await shot(page, `${vp.name}-help`);
     });
 
+    test('christmas page + last order dates (D24)', async ({ page }) => {
+      await quietCookies(page);
+      await page.goto('/christmas');
+      // the seasonal pills/strip depend on today's date — held out of the picture
+      await shot(page, `${vp.name}-christmas`, { mask: [page.locator('p:has(svg.tabler-icon-christmas-tree)')] });
+      await page.goto('/christmas/delivery-dates');
+      await shot(page, `${vp.name}-christmas-delivery-dates`, { mask: [page.locator('tbody')] });
+    });
+
     test('the range, customize, studio, placement, checkout', async ({ page }) => {
       test.setTimeout(180_000);
       await quietCookies(page);

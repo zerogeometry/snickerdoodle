@@ -4,7 +4,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { definedPriceList } from '@/server/catalogue';
 import { FAQ, plainAnswer } from '@/lib/faq';
-import { exampleBySlug } from '@/lib/examples';
 import { PARCEL_SAVING_PER_EXTRA_PENCE } from '@/pricing/parcels';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
@@ -46,6 +45,20 @@ function shown(): Map<string, number> {
 }
 const gbp = (p: number) => `£${p % 100 ? (p / 100).toFixed(2) : p / 100}`;
 
+/**
+ * Placeholder product photos (founder, 2026-10-25: "use the placeholders … in time I'll produce some
+ * examples"). Brand-safe CONCEPT images — the drawings are synthetic sample art, not a real child's —
+ * made to match the real product: the flat ceramic disc on its gold string, the plastic ball with its
+ * chrome cap + silver string, the natural cotton sack with its cream drawstring, and wrap where each
+ * paper is ONE drawing on repeat (as ours is), on white and kraft. Swap for real
+ * photos of samples when they land.
+ */
+const PHOTO: Record<string, { src: string; w: number; h: number; alt: string }> = {
+  bauble: { src: '/christmas/bauble.webp', w: 896, h: 1152, alt: 'A flat round ceramic bauble printed with a child’s crayon snowman, hanging on a gold string on a Christmas tree' },
+  sack: { src: '/christmas/sack.webp', w: 1000, h: 778, alt: 'A natural cotton Christmas sack printed with a child’s crayon reindeer, by a fireplace' },
+  wrappingPaper: { src: '/christmas/presents.webp', w: 1200, h: 800, alt: 'A pile of presents, each wrapped in a different paper printed with a child’s drawing on repeat — stars, trees, reindeer and holly, on white and brown kraft' },
+};
+
 const LABELS: Record<string, { name: string; line: string }> = {
   bauble: { name: 'this year’s bauble', line: 'one for every christmas they’re little' },
   sack: { name: 'christmas sack', line: 'where the magic waits on christmas eve' },
@@ -67,8 +80,6 @@ const LABELS: Record<string, { name: string; line: string }> = {
 
 export default function ChristmasPage() {
   const prices = shown();
-  const card = exampleBySlug('christmascard');
-  const tee = exampleBySlug('christmastee');
   const christmasFaq = FAQ.find((s) => s.id === 'christmas')?.items ?? [];
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -107,12 +118,12 @@ export default function ChristmasPage() {
           </div>
         </div>
         <div className="relative mx-auto mb-6 h-[420px] w-full max-w-[440px] sm:h-[380px] md:mb-0">
-          <figure className="polaroid tape absolute left-0 top-2 w-[68%]" style={{ ['--tilt' as string]: '-3deg', ['--tape' as string]: 'repeating-linear-gradient(-45deg, rgb(200 64 42 / 0.85) 0 7px, rgb(255 251 242 / 0.9) 7px 14px)' }}>
-            <Image src={card.src} alt={card.alt} width={card.width} height={card.height} className="h-auto w-full" priority />
-            <figcaption className="mt-1 text-center font-hand text-sm text-ink-soft">{card.caption}</figcaption>
+          <figure className="polaroid tape absolute left-0 top-2 w-[82%]" style={{ ['--tilt' as string]: '-3deg', ['--tape' as string]: 'repeating-linear-gradient(-45deg, rgb(200 64 42 / 0.85) 0 7px, rgb(255 251 242 / 0.9) 7px 14px)' }}>
+            <Image src="/christmas/ball-and-present.webp" alt="A plastic ball bauble printed with a child’s crayon Christmas tree, beside a present wrapped in that tree on repeat" width={1200} height={800} className="h-auto w-full" priority />
           </figure>
-          <figure className="polaroid tape absolute bottom-0 right-0 w-[52%]" style={{ ['--tilt' as string]: '5deg', ['--tape' as string]: 'repeating-linear-gradient(-45deg, rgb(127 166 94 / 0.85) 0 7px, rgb(255 251 242 / 0.9) 7px 14px)' }}>
-            <Image src={tee.src} alt={tee.alt} width={tee.width} height={tee.height} className="h-auto w-full" />
+          <figure className="polaroid tape absolute bottom-0 right-0 w-[40%]" style={{ ['--tilt' as string]: '6deg', ['--tape' as string]: 'repeating-linear-gradient(-45deg, rgb(127 166 94 / 0.85) 0 7px, rgb(255 251 242 / 0.9) 7px 14px)' }}>
+            <Image src={PHOTO.bauble!.src} alt={PHOTO.bauble!.alt} width={PHOTO.bauble!.w} height={PHOTO.bauble!.h} className="h-auto w-full" />
+            <figcaption className="mt-1 text-center font-hand text-sm text-ink-soft">this year’s bauble</figcaption>
           </figure>
         </div>
       </section>
@@ -143,8 +154,12 @@ export default function ChristmasPage() {
                       href={`/start-creating?for=${k}`}
                       className="press flex flex-1 flex-col overflow-hidden rounded-[18px] border-2 border-cocoa bg-paper shadow-[0_4px_0_var(--color-cocoa)]"
                     >
-                      <span className="flex aspect-square items-center justify-center bg-paper-2">
-                        <ProductArt product={k} size={120} />
+                      <span className="relative flex aspect-square items-center justify-center overflow-hidden bg-paper-2">
+                        {PHOTO[k] ? (
+                          <Image src={PHOTO[k].src} alt={PHOTO[k].alt} fill sizes="(min-width: 768px) 25vw, 50vw" className="object-cover" />
+                        ) : (
+                          <ProductArt product={k} size={120} />
+                        )}
                       </span>
                       <span className="flex flex-1 flex-col p-3">
                         <span className="font-extrabold text-cocoa">{LABELS[k]?.name ?? k}</span>
