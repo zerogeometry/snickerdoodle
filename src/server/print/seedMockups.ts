@@ -15,7 +15,11 @@ import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases
 // grade at the print file's exact pixels; a grade without its own template borrows the other
 // grade's (same phone, same camera — e.g. the iPhone 13 snap templates are PSDs we can't read);
 // a phone with neither keeps the drawn mockup.
-const CASE_TEMPLATES = path.join(process.cwd(), '.prodigi-assets', 'templates', 'phone-cases');
+// The product photos live OUTSIDE the app (gitignored, copied to the box separately) and are read at
+// run time — never bundled. The marker stops Next 16's bundler tracing this folder at build time (it
+// crashed `next build` wherever the folder exists but a file it guessed at doesn't).
+const ASSETS_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), '.prodigi-assets');
+const CASE_TEMPLATES = path.join(ASSETS_DIR, 'templates', 'phone-cases');
 const caseTraces = new Map<string, TracedCase | null>();
 async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: TracedCase | null; source: string }> {
   const key = `${model}|${grade}`;
@@ -67,7 +71,7 @@ import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawn
  * bodysuit), the card and the storybook use DERIVED/synthetic flat-lays until real photography.
  */
 
-const ROOT = path.join(process.cwd(), '.prodigi-assets', 'blanks');
+const ROOT = path.join(ASSETS_DIR, 'blanks');
 const DETECT_EDGE = 1200; // detection + mask working resolution
 
 type Quad = [number, number][];
