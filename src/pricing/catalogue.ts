@@ -50,7 +50,7 @@ export const CATALOGUE = {
   blanket: { pricePence: 6000, label: 'fleece blanket' },
   babyBodysuit: { pricePence: 2200, label: 'baby bodysuit' },
   card: { pricePence: 550, label: 'greetings card' },
-  calendar: { pricePence: 1900, label: 'calendar' },
+  calendar: { pricePence: 2200, label: 'calendar' }, // A5 (A4 £24 — DB per variant)
   adultTee: { pricePence: 3200, label: 'adult tee' },
   apron: { pricePence: 2500, label: 'apron' },
   bauble: { pricePence: 2100, label: 'ceramic bauble' },

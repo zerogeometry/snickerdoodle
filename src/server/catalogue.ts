@@ -400,14 +400,26 @@ const DEFS: Record<string, ProductDef> = {
       { size: 'pack of 10', pricePence: 2100, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
+  // The DATED 2027 wall calendar (founder, 2026-10-25 — CHRISTMAS-range-and-postage.md §5): Prodigi
+  // prints the 2027 date grid; we send THIRTEEN files, the cover + one picture per month, each to its
+  // own print area (printTo = CALENDAR_PAGES in src/lib/calendar.ts, pinned equal by a test). Up to
+  // 12 drawings + a cover; gaps repeat, so one drawing still makes a whole calendar. The optional
+  // 'back cover' area is not sent (Prodigi's plain back). Sandbox GET /v4.0/products/{sku}: a page is
+  // A4 3507×2480 px / A5 2480×1748 px; cost as undated (A4 £10 / A5 £9 + £4.35, lab uk15, no Express).
+  // Re-priced A5 £22 · A4 £24 (founder, 2026-10-25). Swap to the 2028 SKUs when Prodigi lists them.
   calendar: {
-    category: 'PRINT', label: 'calendar', blurb: 'a year of their masterpieces', print: true,
-    description: 'A wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month.',
-    specs: { material: 'silk 300gsm', format: 'landscape wall calendar' },
-    variants: [
-      { size: 'A5', pricePence: 1900, wMm: 210, hMm: 148, dpi: 300, prodigiSku: 'CALENDAR-A5-L-UNDATED' },
-      { size: 'A4', pricePence: 2100, wMm: 297, hMm: 210, dpi: 300, prodigiSku: 'CALENDAR-A4-L-UNDATED' },
-    ],
+    category: 'PRINT', label: 'calendar', blurb: 'a year of their masterpieces', print: true, visibleInShop: true,
+    description: 'A 2027 wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month, and one on the cover.',
+    specs: { material: 'silk 300gsm', format: 'landscape wall calendar', dates: 'includes 2027 calendar dates', pages: 'a cover + 12 months' },
+    variants: (
+      [
+        { size: 'A5', pricePence: 2200, px: { w: 2480, h: 1748 }, sku: 'CALENDAR-A5-L-DATED' },
+        { size: 'A4', pricePence: 2400, px: { w: 3507, h: 2480 }, sku: 'CALENDAR-A4-L-DATED' },
+      ] as const
+    ).map((c) => ({
+      size: c.size, pricePence: c.pricePence, ...exactPx(c.px, 300), prodigiSku: c.sku,
+      printTo: ['cover', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'],
+    })),
   },
   adultTee: {
     category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,

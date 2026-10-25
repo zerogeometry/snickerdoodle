@@ -19,6 +19,8 @@ export const EXPECTED_POPULARITY = [
   'framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
   // the range expansion (D21) joins the same range — one collection, shown together (founder, 2026-10-21)
   'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
+  // the dated 2027 wall calendar (D23, Christmas 2026 → mid-January)
+  'calendar',
 ];
 
 export const POPULARITY_WINDOW_DAYS = 90;

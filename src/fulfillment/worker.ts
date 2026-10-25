@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { assets, orderItemArtwork, orderItems, orders } from '@/db/schema';
 import { renderPrintFile } from '@/server/print/render';
-import { resolveViewerContext } from '@/server/assets';
+import { getViewableAssetOrThrow, resolveViewerContext } from '@/server/assets';
 import type { RawTransform } from '@/server/print/geometry';
 import type { DbHandle } from '@/server/db';
 import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
@@ -17,6 +17,7 @@ export interface FulfilmentSummary {
 
 interface ClaimedItem {
   artworkId: string;
+  orderItemId: string;
   assetId: string | null;
   variantId: string;
   controllerAccountId: string;
@@ -81,6 +82,7 @@ export async function processFulfilment(
     const rows = await tx
       .select({
         artworkId: orderItemArtwork.id,
+        orderItemId: orderItemArtwork.orderItemId,
         assetId: orderItemArtwork.assetId,
         variantId: orderItemArtwork.variantId,
         controllerAccountId: orderItemArtwork.controllerAccountId,
@@ -131,6 +133,23 @@ async function fail(db: DbHandle, artworkId: string, note: string): Promise<{ st
   return { status: 'RENDER_FAILED', note };
 }
 
+/**
+ * A page of the SAME line already rendered from the same drawing (asset + cutout) on the same variant
+ * — the print file is keyed by asset + variant (src/server/print/render.ts), and placeOrder gives every
+ * calendar page of one drawing the same placement, so the file is the same. Only a page that sends
+ * its own file per print area has twins; a single-file line has just the one row.
+ */
+async function renderedTwin(db: DbHandle, item: ClaimedItem): Promise<{ printObjectId: string; renderedDpi: number; upscaled: boolean } | null> {
+  if (!item.assetId) return null;
+  const rows = await db
+    .select({ id: orderItemArtwork.id, printObjectId: orderItemArtwork.printObjectId, renderedDpi: orderItemArtwork.renderedDpi, upscaled: orderItemArtwork.upscaled, sourceObjectId: orderItemArtwork.sourceObjectId, transform: orderItemArtwork.transform, printArea: orderItemArtwork.printArea })
+    .from(orderItemArtwork)
+    .where(and(eq(orderItemArtwork.orderItemId, item.orderItemId), eq(orderItemArtwork.assetId, item.assetId), eq(orderItemArtwork.variantId, item.variantId), inArray(orderItemArtwork.status, ['READY', 'BLOCKED_GATE'])));
+  const same = JSON.stringify(item.transform);
+  const twin = rows.find((r) => r.id !== item.artworkId && r.printArea !== null && r.printObjectId && r.renderedDpi !== null && (r.sourceObjectId ?? null) === (item.sourceObjectId ?? null) && JSON.stringify(r.transform) === same);
+  return twin ? { printObjectId: twin.printObjectId!, renderedDpi: twin.renderedDpi!, upscaled: twin.upscaled } : null;
+}
+
 async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promise<{ status: string; note?: string }> {
   if (!item.assetId) return fail(db, item.artworkId, 'no source asset (purged?)');
   const [asset] = await db
@@ -140,10 +159,14 @@ async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promi
   if (!asset) return fail(db, item.artworkId, 'source asset not found');
 
   // RENDER (in-VPC; no egress). Authz via the controller's viewer context.
-  let render;
+  let render: { printObjectId: string; renderedDpi: number; upscaled: boolean };
   try {
     const viewer = await resolveViewerContext(db, item.controllerAccountId, asset.familyId);
-    render = await renderPrintFile(db, viewer, {
+    // A calendar page with the SAME drawing as a page of this line already rendered reuses that print
+    // file (one drawing on all 13 pages renders once) — after the very same authz check.
+    const twin = await renderedTwin(db, item);
+    if (twin) await getViewableAssetOrThrow(db, item.assetId, viewer); // ← the gate
+    render = twin ?? await renderPrintFile(db, viewer, {
       assetId: item.assetId,
       variantId: item.variantId,
       transform: item.transform,

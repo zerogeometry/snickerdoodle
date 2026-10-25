@@ -25,6 +25,7 @@ import { savePendingKeep } from '@/lib/pending-keep';
 import { basketLineId } from '@/lib/basket-line';
 import { defaultPlacementFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { isCardPackKey } from '@/lib/card-packs';
+import { isCalendarKey } from '@/lib/calendar';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 function variantSub(v: CatalogueVariant): string | undefined {
@@ -186,8 +187,9 @@ export function FlowCatalogue({
       void customize(p);
       return;
     }
-    // A card pack needs its N drawings chosen — "+" opens the pack builder, never a blank pack.
-    if (isCardPackKey(p.key)) {
+    // A card pack needs its N drawings chosen — "+" opens the pack builder, never a blank pack. A
+    // calendar likewise opens its builder (the drawing goes on the cover, ready to flip through).
+    if (isCardPackKey(p.key) || isCalendarKey(p.key)) {
       void customize(p);
       return;
     }

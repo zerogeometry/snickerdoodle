@@ -10,7 +10,7 @@ import { Toggle } from '@/ui/primitives/Toggle';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -353,7 +353,7 @@ export default function CheckoutPage() {
                             <Icon icon={IconPlus} size={12} />
                           </button>
                         </div>
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
                           customize
                         </button>
                       </div>

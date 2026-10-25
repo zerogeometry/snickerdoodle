@@ -59,6 +59,14 @@ for (const vp of WIDTHS) {
       await expect(page.getByRole('button', { name: /edit placement/i })).toBeVisible();
       await shot(page, `${vp.name}-customize-mug`);
 
+      // the 2027 calendar builder: the drawing on the cover, the flip-through, the 13 pages
+      await push(page, '/customize/calendar');
+      await expect(page.getByRole('heading', { name: '2027 calendar' })).toBeVisible();
+      await expect(page.getByText('1 of 13 chosen')).toBeVisible();
+      await shot(page, `${vp.name}-customize-calendar`);
+      await push(page, '/customize/mug');
+      await expect(page.getByRole('button', { name: /edit placement/i })).toBeVisible();
+
       await page.getByRole('button', { name: /edit placement/i }).click();
       await expect(page.locator('[role="application"]')).toBeVisible({ timeout: 30_000 });
       await shot(page, `${vp.name}-placement-mug`, { fullPage: false });

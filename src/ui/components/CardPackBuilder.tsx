@@ -37,9 +37,9 @@ import { gbp, toast, useBasket, useUpload, type PackCardLine, type PlacementTran
  */
 
 /** A drawing that can go on a card. */
-type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean };
+export type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean };
 type Slot = PackCardLine | null;
-type PickerState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; signedIn: boolean; keepsakes: PickerKeepsake[]; at: number };
+export type PickerState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; signedIn: boolean; keepsakes: PickerKeepsake[]; at: number };
 
 const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)'];
 const PICKER_TTL_MS = 8 * 60_000; // signed URLs live 10 min — refresh the list before they lapse
@@ -411,23 +411,28 @@ export function CardPackBuilder() {
   );
 }
 
-/** The sheet's body: loading skeleton · error · empty keepsake box · the drawings to choose from. */
-function PickerBody({
+/** The sheet's body: loading skeleton · error · empty keepsake box · the drawings to choose from.
+ * Shared with the calendar builder (`next` = where log-in returns to, `forWhat` = the empty-box copy). */
+export function PickerBody({
   picker,
   drawings,
   chosen,
   onChoose,
   onRetry,
+  next = '/customize/cardPack',
+  forWhat = 'a card',
 }: {
   picker: PickerState;
   drawings: Drawing[];
   chosen: string | null;
   onChoose: (assetId: string) => void;
   onRetry: () => void;
+  next?: string;
+  forWhat?: string;
 }) {
   const signedIn = picker.status === 'ready' && picker.signedIn;
   const login = (
-    <Link href={`/login?next=${encodeURIComponent('/customize/cardPack')}`} className="font-bold text-cinnamon underline-offset-2 hover:underline">
+    <Link href={`/login?next=${encodeURIComponent(next)}`} className="font-bold text-cinnamon underline-offset-2 hover:underline">
       log in
     </Link>
   );
@@ -452,7 +457,7 @@ function PickerBody({
         </span>
         <p className="mt-3 max-w-xs text-sm text-ink-soft">
           {signedIn ? (
-            <>your keepsake box is empty for now — keep a drawing and it’ll be here, ready for a card.</>
+            <>your keepsake box is empty for now — keep a drawing and it’ll be here, ready for {forWhat}.</>
           ) : (
             <>{login} to pick from your keepsake box — or start with a drawing.</>
           )}

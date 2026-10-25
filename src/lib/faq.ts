@@ -40,6 +40,7 @@ export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   blanket: 'Fleece blanket',
   card: 'Greetings card',
   cardPack: 'Pack of greetings cards (5 or 10)',
+  calendar: '2027 wall calendar (A5 or A4)',
   phoneCase: 'Phone case',
   socks: 'Socks',
   heightChart: 'Height chart',

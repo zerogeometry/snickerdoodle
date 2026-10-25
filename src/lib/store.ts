@@ -4,6 +4,7 @@ import { createJSONStorage, persist, type StorageValue } from 'zustand/middlewar
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
+import { isCalendarKey } from '@/lib/calendar';
 import { basketLineId } from '@/lib/basket-line';
 import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadSessionState } from '@/lib/uploadSession';
 
@@ -237,6 +238,10 @@ export type BasketItem = {
   /** A CARD PACK line only: its N cards (which drawing + placement each), in pack order. The line
    * is always qty 1 — the server prices it as ONE pack and checks the exact card count. */
   cards?: PackCardLine[];
+  /** A CALENDAR line only: its 13 pages in order (the cover, then January…December — gaps already
+   * filled by repeating). `artwork` mirrors the cover, for the thumbnails. The server re-fills and
+   * re-checks every page at order time; qty = copies of the same calendar. */
+  pages?: PackCardLine[];
   /** DISPLAY ONLY (pack lines): the single-card variant the pack's fronts preview on, so the basket
    * can show the real first card. Never sent to the server. */
   previewVariantId?: string;
@@ -245,6 +250,8 @@ export type BasketItem = {
 export type PackCardLine = { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
 /** Is this basket line a card pack? (Its quantity is fixed at 1.) */
 export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.product);
+/** Is this basket line a calendar? (Its pages are edited in the calendar builder.) */
+export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(i.product);
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
@@ -329,12 +336,13 @@ export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n 
  * The basket as the order action receives it: product keys (the variant sku when chosen) + qty, and
  * WHICH drawings — never a price. A personalised line folds its per-print details (cushion back,
  * card inside message, span) into `artwork`; a card PACK sends qty 1 + its `cards` (+ its one base
- * colour) instead.
+ * colour) instead, and a CALENDAR its 13 `pages`.
  */
 export function orderItemsFor(items: BasketItem[]) {
   return items.map((i) => {
     const productKey = i.sku ?? i.product;
     if (isPackLine(i)) return { productKey, qty: 1, ...(i.ground ? { ground: i.ground } : {}), cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
+    if (isCalendarLine(i) && i.pages?.length) return { productKey, qty: i.qty, pages: i.pages.map((p) => ({ assetId: p.assetId, transform: p.transform, ...(p.sourceObjectId ? { sourceObjectId: p.sourceObjectId } : {}) })) };
     return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });
 }
