@@ -26,7 +26,9 @@ export default defineConfig({
     // Production refuses unencrypted originals, so the e2e server uses local MinIO's built-in
     // KMS key (docker-compose.yml) — the real encrypted-storage path, not a bypass.
     command:
-      'cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local npm run start -- -p 3100',
+      // …and its own address (sign-in links come back to :3100, not a dev server's :3000) and the console mailer
+      // (production refuses to start without a mail provider; the complaint form insists its acknowledgement is sent).
+      'cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local APP_URL=http://localhost:3100 AUTH_URL=http://localhost:3100 MAIL_PROVIDER=console npm run start -- -p 3100',
     url: 'http://localhost:3100',
     reuseExistingServer: true,
     timeout: 300_000,

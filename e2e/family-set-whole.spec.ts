@@ -25,7 +25,8 @@ for (const vp of [{ w: 390, h: 844 }, { w: 1280, h: 900 }]) {
     let appeared = false;
     for (let i = 0; i < 400 && !appeared; i++) {
       const s = await tile.evaluate((el) => {
-        const layer = el.querySelector<HTMLElement>('.transition-opacity')!;
+        // the role=img element IS the fading layer (or, in older markup, wraps it)
+        const layer = el.classList.contains('transition-opacity') ? el : el.querySelector<HTMLElement>('.transition-opacity')!;
         const imgs = [...layer.querySelectorAll<HTMLImageElement>('img')];
         return {
           visible: getComputedStyle(layer).opacity !== '0',

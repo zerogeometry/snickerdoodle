@@ -9,6 +9,11 @@ import { expect, type Page } from '@playwright/test';
  */
 export async function expectAccessible(page: Page, label: string) {
   await page.addStyleTag({ content: '.kraft{background-image:none!important}' });
+  // Judge the page as it SETTLES, not mid-animation: an entrance fade (pop-in, the range reveal) makes
+  // text read lighter for a moment and axe would flag it. Reduced motion switches every animation off
+  // (globals.css), and we let any transition still running finish first.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running' || (a.effect?.getComputedTiming().iterations ?? 1) === Infinity), undefined, { timeout: 5_000 }).catch(() => {});
   const res = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']).analyze();
   const found = res.violations.map(
     (v) => `${v.id} (${v.impact}) — ${v.help}\n${v.nodes
