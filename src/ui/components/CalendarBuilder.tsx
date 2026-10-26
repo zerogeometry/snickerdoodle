@@ -146,7 +146,7 @@ export function CalendarBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
       }
     }
     return list;

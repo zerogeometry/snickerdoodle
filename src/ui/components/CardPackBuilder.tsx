@@ -118,10 +118,15 @@ export function CardPackBuilder() {
           if (d.variantId) setVariantId(d.variantId);
           setSlots(d.slots);
           if (d.ground) setGround(d.ground);
+          return;
         }
       } catch {
         /* no storage */
       }
+      // otherwise the drawing in progress goes on card 1 (as it goes on the calendar's cover — founder,
+      // 26 Oct: the pack page should remember the drawing you came from)
+      const u = useUpload.getState().upload;
+      if (u?.assetId) setSlots([{ assetId: u.assetId, transform: COVER, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) }]);
       return;
     }
     setEdit(line.id);
@@ -141,7 +146,7 @@ export function CardPackBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
       }
     }
     return list;
@@ -530,23 +535,23 @@ export function PickerBody({
               <button
                 type="button"
                 onClick={() => onChoose(d.assetId)}
-                disabled={!d.printable}
                 aria-pressed={on}
-                aria-label={d.printable ? d.label : `${d.label} — not quite ready to print`}
+                aria-label={d.label}
                 className={`press relative w-full rounded-[14px] border-2 bg-paper p-1.5 text-left disabled:opacity-60 ${on ? 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]' : 'border-cocoa/15 hover:border-cocoa/50'}`}
               >
                 <span className="block aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
                   {d.imageUrl ? <img src={d.imageUrl} alt="" className="h-full w-full object-contain" /> : null}
                 </span>
                 <span className="mt-1 block truncate text-[11px] font-bold text-cocoa">{d.label}</span>
-                {!d.printable ? <span className="block text-[10px] text-ink-faint">not quite ready to print</span> : null}
                 {on ? (
                   <span aria-hidden className="absolute right-1 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-paper bg-cocoa text-paper">
                     <Icon icon={IconCircleCheck} size={14} />
                   </span>
                 ) : null}
               </button>
-              {tools && d.printable ? (
+              {/* (any keepsake can be designed with, like the drawing on the create page — the ORDER is
+                  what holds anything not yet cleared by screening: orders.ts, D8) */}
+              {tools ? (
                 <div className="mt-1 flex flex-col gap-1">
                   <button
                     type="button"
@@ -637,8 +642,8 @@ function PackFan({ cards, imageFor, ground, packSize }: { cards: Array<PackCardL
   return (
     <div className="relative mx-auto mt-5 flex h-56 w-full max-w-md items-end justify-center sm:h-64" aria-label={`your pack of ${packSize} cards`} role="img">
       {shown.map((c, i) => {
-        const mid = (n - 1) / 2;
-        const off = i - mid;
+        // card 1 at the front, in the middle; the others fan out behind it, alternating left / right
+        const off = i === 0 ? 0 : (i % 2 ? -1 : 1) * Math.ceil(i / 2) * (n > 1 ? 1 : 0);
         const url = c ? imageFor(c.assetId) : null;
         return (
           <div
@@ -647,11 +652,11 @@ function PackFan({ cards, imageFor, ground, packSize }: { cards: Array<PackCardL
             style={{ transform: `translateX(${off * 34}%) rotate(${off * 7}deg) translateY(${Math.abs(off) * 6}px)`, zIndex: 10 - Math.abs(Math.round(off * 2)) }}
           >
             <div
-              className="pop-in rounded-[6px] border-2 border-cocoa/15 shadow-[0_4px_10px_rgb(43_33_24/0.18)]"
+              className="pop-in overflow-hidden rounded-[4px] shadow-[0_4px_10px_rgb(43_33_24/0.22)]"
               style={{ aspectRatio: '5 / 7', background: c ? ground : 'var(--color-paper)', ['--i' as string]: i }}
             >
               {url ? (
-                <img src={url} alt="" className="h-full w-full rounded-[4px] object-cover" />
+                <img src={url} alt="" className="h-full w-full object-cover" />
               ) : (
                 <span className="flex h-full w-full items-center justify-center rounded-[4px] border-2 border-dashed border-cocoa/20 text-[10px] font-bold text-ink-faint">card {i + 1}</span>
               )}
