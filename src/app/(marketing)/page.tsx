@@ -12,6 +12,10 @@ import { RangeHero } from '@/ui/components/RangeHero';
 import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
+import { ChristmasHeroVisual } from '@/ui/components/ChristmasHeroVisual';
+import { isChristmasSeason, seasonClock } from '@/lib/season';
+import Image from 'next/image';
+import Link from 'next/link';
 
 /** The range strip: real keepsakes, one per product we sell (founder-made examples). */
 const RANGE = [
@@ -38,8 +42,17 @@ const STEPS: Step[] = [
 
 const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)', 'rgb(246 196 69 / .8)'];
 
+/** The Christmas shelf under the hero, in season (D24): three placeholder photos into /christmas. */
+const XMAS_SHELF = [
+  { src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s bauble', alt: 'A ceramic bauble printed with a child’s crayon snowman' },
+  { src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
+  { src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
+];
+
 export default function LandingPage() {
-  const heroVisual = rangeHeroReady() ? <RangeHero /> : <ExampleMorph />;
+  // Christmas (D24): 1 Nov → 6 Jan the hero becomes the Christmas one (mockups/christmas, screen 1).
+  const christmas = isChristmasSeason(seasonClock(new Date()));
+  const heroVisual = christmas ? <ChristmasHeroVisual /> : rangeHeroReady() ? <RangeHero /> : <ExampleMorph />;
   return (
     <>
       {/* Hero — the one handwritten moment, the headline, and the drawing taped to the page */}
@@ -47,7 +60,11 @@ export default function LandingPage() {
         <FloatingDoodles tone="warm" />
         <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-6 pb-16 pt-10 md:grid-cols-[1.4fr_1fr] md:gap-12 md:py-24">
           <div>
-            <CaveatNote className="pop-in -rotate-2 whitespace-nowrap text-[30px] leading-none tracking-tight md:text-[40px]">they&apos;re only little once</CaveatNote>
+            <CaveatNote
+              className={`pop-in -rotate-2 leading-none tracking-tight md:text-[40px] ${christmas ? 'text-[26px] leading-tight md:whitespace-nowrap' : 'whitespace-nowrap text-[30px]'}`}
+            >
+              {christmas ? 'the present they made themselves' : <>they&apos;re only little once</>}
+            </CaveatNote>
             <h1
               className="pop-in mt-3 font-display text-[58px] leading-[0.95] tracking-tight md:text-7xl xl:whitespace-nowrap"
               style={{ ['--i' as string]: 1 }}
@@ -67,20 +84,35 @@ export default function LandingPage() {
                   />
                 </svg>
               </span>
-              .
+              {christmas ? <span className="mt-1 block text-[46px] md:text-6xl">this christmas.</span> : '.'}
             </h1>
             {/* Phones: the keepsakes come straight after the headline — no scrolling to see the magic */}
             <div className="mx-auto mt-6 w-full max-w-[300px] md:hidden">{heroVisual}</div>
             <p className="pop-in mt-7 max-w-md text-lg leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
-              Turn your little one&apos;s drawings into beautiful things you&apos;ll treasure forever — framed prints,
-              mugs, cushions, jigsaws, blankets and cards.
+              {christmas ? (
+                <>
+                  Baubles, cards, wrapping paper and the 2027 calendar — made from their own drawings, and posted in time
+                  for christmas. Draw it this weekend.
+                </>
+              ) : (
+                <>
+                  Turn your little one&apos;s drawings into beautiful things you&apos;ll treasure forever — framed prints,
+                  mugs, cushions, jigsaws, blankets and cards.
+                </>
+              )}
             </p>
             <div className="hidden md:block">
               <div className="pop-in mt-9 flex flex-wrap items-center gap-3" style={{ ['--i' as string]: 3 }}>
                 <Button href="/start-creating" size="lg" attention>
                   start creating
                 </Button>
-                <DesignFromScratch />
+                {christmas ? (
+                  <Button href="/christmas" variant="secondary" size="lg">
+                    the christmas range
+                  </Button>
+                ) : (
+                  <DesignFromScratch />
+                )}
               </div>
               <TrustLine className="mt-6">everything you make is yours</TrustLine>
             </div>
@@ -89,6 +121,38 @@ export default function LandingPage() {
           <div className="relative mx-auto hidden w-full max-w-[420px] md:block">{heroVisual}</div>
         </div>
       </section>
+
+      {/* Christmas shelf (in season only) — three taped snapshots into /christmas */}
+      {christmas ? (
+        <section className="relative bg-honey-band px-6 py-12 md:py-16" aria-labelledby="xmas-shelf">
+          <div className="relative z-10 mx-auto max-w-6xl">
+            <h2 id="xmas-shelf" className="text-center font-display text-3xl text-cocoa md:text-4xl">
+              Christmas, drawn by them
+            </h2>
+            <ul className="mt-9 grid grid-cols-3 gap-4 md:gap-8">
+              {XMAS_SHELF.map((it, i) => (
+                <li key={it.label}>
+                  <Link
+                    href="/christmas"
+                    className="polaroid tape lift block text-center"
+                    style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
+                  >
+                    <span className="relative mb-2 block aspect-square overflow-hidden bg-paper-2">
+                      <Image src={it.src} alt={it.alt} fill sizes="(min-width: 768px) 30vw, 33vw" className="object-cover" />
+                    </span>
+                    <span className="text-xs font-extrabold text-cocoa md:text-sm">{it.label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-8 text-center">
+              <Button href="/christmas" size="lg">
+                see the christmas range
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       {/* Range strip — every product as a taped snapshot */}
       <section className="relative bg-sky-pale px-6 py-16 md:py-24">
