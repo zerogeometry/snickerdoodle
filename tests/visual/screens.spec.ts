@@ -58,7 +58,7 @@ for (const vp of WIDTHS) {
       test.setTimeout(180_000);
       await quietCookies(page);
       await uploadAndOpenRange(page);
-      await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+      await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
       await shot(page, `${vp.name}-range`);
 
       await push(page, '/customize/mug');
@@ -102,7 +102,7 @@ for (const vp of WIDTHS) {
       await signInByEmailLink(page, parent, '/start-creating');
       await sql()`update accounts set display_name = 'Sam' where email = ${parent}`; // a steady name on screen
       await uploadAndOpenRange(page);
-      await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+      await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
       await page.getByRole('button', { name: /\+ keepsake/ }).click();
       await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
       await clearForTest(parent);

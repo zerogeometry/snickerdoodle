@@ -57,12 +57,16 @@ export default function StartCreatingPage() {
   };
   useEffect(loadCatalogue, []);
 
-  // Hold the "making your range" loader over the catalogue until the TOP HALF of the tiles have their
+  // Hold the "making your collection" loader over the catalogue until the TOP HALF of the tiles have their
   // real photos (founder, 23 Oct) — what's seen first is never a grid still filling in, and the
   // bottom half lands just after (src/lib/mockupPrefetch.ts revealPlan). A generous safety timeout
   // lifts it regardless.
-  const [rangeReady, setRangeReady] = useState(false);
-  const [rangeSettled, setRangeSettled] = useState(false);
+  // Both are tied to the drawing + edit they're FOR (rangeKey below): the catalogue can report a cached
+  // range "settled" in the same commit the key changes — an effect resetting a plain flag afterwards
+  // wiped that signal and stranded the loader until its safety timeout (founder, 26 Oct: "every time I
+  // remove or add a background it takes longer"). A signal for an old key simply doesn't count.
+  const [readyKey, setReadyKey] = useState<string | null>(null);
+  const [settledKey, setSettledKey] = useState<string | null>(null);
   const drawingKey = upload ? (upload.key ?? upload.dataUrl.slice(-64)) : null;
   // Back from signing in after a guest's "+ keepsake": put their drawing back on screen (same
   // browser) and finish the keep (server-side — works on any device the link was opened on).
@@ -122,13 +126,15 @@ export default function StartCreatingPage() {
   // A new drawing — or a new EDIT of it (remove background, the Studio): the loader comes back and waits
   // for the new range's photos, so tiles never swap one by one under the shopper (founder, 26 Oct).
   const rangeKey = drawingKey ? `${drawingKey}|${upload?.cutout?.sourceObjectId ?? ''}` : null;
+  const rangeKeyRef = useRef(rangeKey);
+  rangeKeyRef.current = rangeKey; // current during the catalogue's effects (they run before this page's)
+  const rangeReady = !!rangeKey && readyKey === rangeKey;
+  const rangeSettled = !!rangeKey && settledKey === rangeKey;
   const shownAtRef = useRef(0);
   useEffect(() => {
     if (!rangeKey) return;
-    setRangeReady(false);
-    setRangeSettled(false);
     shownAtRef.current = Date.now();
-    const safety = setTimeout(() => setRangeReady(true), 45_000); // never strand the shopper
+    const safety = setTimeout(() => setReadyKey(rangeKey), 45_000); // never strand the shopper
     return () => clearTimeout(safety);
   }, [rangeKey]);
   // The top half's photos are ready: give the tiles a beat to swap them in, and let the loader play at least
@@ -137,9 +143,10 @@ export default function StartCreatingPage() {
     if (!rangeSettled || rangeReady) return;
     const MIN_LOADER_MS = 1200;
     const SWAP_MS = 450; // a tile's instant preview → photo cross-fade
-    const t = setTimeout(() => setRangeReady(true), Math.max(SWAP_MS, MIN_LOADER_MS - (Date.now() - shownAtRef.current)));
+    const key = rangeKey;
+    const t = setTimeout(() => setReadyKey(key), Math.max(SWAP_MS, MIN_LOADER_MS - (Date.now() - shownAtRef.current)));
     return () => clearTimeout(t);
-  }, [rangeSettled, rangeReady]);
+  }, [rangeSettled, rangeReady, rangeKey]);
 
   /** Set the upload, then detect whether its background is opaque (drives the
    * "remove background" nudge — only shown when removing would actually do something). */
@@ -243,7 +250,7 @@ export default function StartCreatingPage() {
         wide={!!upload}
         middle={
           <span className="text-xs text-ink-soft">
-            <b className={upload ? '' : 'text-cinnamon'}>upload</b> · <b className={upload ? 'text-cinnamon' : ''}>your range</b> · checkout
+            <b className={upload ? '' : 'text-cinnamon'}>upload</b> · <b className={upload ? 'text-cinnamon' : ''}>your collection</b> · checkout
           </span>
         }
         right={
@@ -374,7 +381,7 @@ export default function StartCreatingPage() {
                 {loadError ? (
                   <div role="alert" className="pop-in rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper p-6 text-center">
                     <Icon icon={IconRefresh} size={28} className="mx-auto text-cinnamon" />
-                    <p className="mt-2 text-sm text-ink-soft">we couldn’t load the range just now.</p>
+                    <p className="mt-2 text-sm text-ink-soft">we couldn’t load your collection just now.</p>
                     <Button variant="secondary" size="lg" className="mt-3" onClick={loadCatalogue}>
                       try again
                     </Button>
@@ -386,7 +393,7 @@ export default function StartCreatingPage() {
                     {products ? (
                       <div inert={!rangeReady} className={`transition-opacity duration-500 ${rangeReady ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
                         <ChosenProduct products={products} />
-                        <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setRangeSettled(true)} />
+                        <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setSettledKey(rangeKeyRef.current)} />
                       </div>
                     ) : (
                       <div className="h-[55dvh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />

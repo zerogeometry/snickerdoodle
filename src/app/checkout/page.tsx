@@ -286,7 +286,7 @@ export default function CheckoutPage() {
     <div className="flex min-h-dvh flex-col bg-oat pb-40 md:pb-0">
       <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-1">
-          <Link href="/start-creating" aria-label="Back to your range" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center">
+          <Link href="/start-creating" aria-label="Back to your collection" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center">
             <Icon icon={IconArrowLeft} size={20} className="text-ink-soft" />
           </Link>
           <Link href="/" className="truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>

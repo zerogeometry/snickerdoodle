@@ -318,7 +318,7 @@ export function FlowCatalogue({
           <div className="flex min-h-0 min-w-0 flex-col">
           {/* No visible header: the catalogue starts level with the basket. The heading stays for
               screen readers; "full catalogue" sits at the foot of the list. */}
-          <h2 className="sr-only">{picks.length > 0 ? 'your range' : 'the range'}</h2>
+          <h2 className="sr-only">{picks.length > 0 ? 'your collection' : 'the range'}</h2>
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
           <div className="brand-scroll h-[52dvh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (

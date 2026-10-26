@@ -1021,7 +1021,7 @@ function StudioEditor() {
     return (
       <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-oat px-6 text-center">
         <h1 className="font-display text-3xl text-cocoa">nothing in the studio yet</h1>
-        <p className="mt-2 max-w-sm text-sm text-ink-soft">pop a drawing in first, then open the studio from your range.</p>
+        <p className="mt-2 max-w-sm text-sm text-ink-soft">pop a drawing in first, then open the studio from your collection.</p>
         <Button href="/start-creating" size="lg" className="mt-6">
           upload a drawing
         </Button>
@@ -1225,8 +1225,8 @@ function StudioEditor() {
       {/* header: always a clear way back to the range */}
       <header className="pt-safe kraft z-20 flex min-h-[60px] items-center gap-2 border-b-2 border-cocoa/10 px-3 md:px-5">
         {/* narrow phones: just the arrow (the words come back from 400px) — the header never wraps */}
-        <button type="button" onClick={onBack} aria-label="back to your range" className="press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-2.5 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] min-[400px]:px-3">
-          <Icon icon={IconArrowLeft} size={17} /> <span className="hidden whitespace-nowrap min-[400px]:inline">your range</span>
+        <button type="button" onClick={onBack} aria-label="back to your collection" className="press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-2.5 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] min-[400px]:px-3">
+          <Icon icon={IconArrowLeft} size={17} /> <span className="hidden whitespace-nowrap min-[400px]:inline">your collection</span>
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <span className="hidden font-display text-lg text-cocoa min-[420px]:inline">studio</span>
@@ -1376,7 +1376,7 @@ function StudioEditor() {
         </div>
       </Modal>
       <noscript>
-        <Link href="/start-creating">back to your range</Link>
+        <Link href="/start-creating">back to your collection</Link>
       </noscript>
     </div>
   );

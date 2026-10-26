@@ -251,7 +251,7 @@ export function CardPackBuilder() {
     return (
       <Shell>
         <div className="pop-in mx-auto mt-10 max-w-sm rounded-[18px] border-2 border-dashed border-cocoa/25 bg-paper p-7 text-center text-sm text-ink-soft">
-          That product isn’t available. <Link href="/start-creating" className="font-bold text-cinnamon underline">back to the range</Link>.
+          That product isn’t available. <Link href="/start-creating" className="font-bold text-cinnamon underline">back to your collection</Link>.
         </div>
       </Shell>
     );
@@ -513,7 +513,7 @@ const OPT_OFF = 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa';
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <FlowHeader back={{ href: '/start-creating', label: 'Back to your range' }} />
+      <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-36 on phones clears the fixed thumb-zone action dock. */}
       <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10">{children}</main>
     </div>

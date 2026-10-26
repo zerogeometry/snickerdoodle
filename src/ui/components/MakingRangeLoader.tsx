@@ -9,7 +9,7 @@ import { Icon } from '@/ui/primitives/Icon';
  * CSS only (transform/opacity, no JS timers) — see `.loader-*` in globals.css. The copy lines are
  * stacked in one grid cell and take turns fading in; under prefers-reduced-motion everything sits
  * still and only the first line shows. The changing line is
- * aria-hidden; screen readers hear one calm status ("making your range…") instead of a ticker.
+ * aria-hidden; screen readers hear one calm status ("making your collection…") instead of a ticker.
  */
 // 7 lines — the .loader-line cycle in globals.css is timed for exactly this many.
 const LINES = [
@@ -60,7 +60,7 @@ export function MakingRangeLoader({ drawing, className = '' }: { drawing?: strin
         </div>
       </div>
 
-      <p className="mt-12 font-display text-xl text-cocoa">making your range</p>
+      <p className="mt-12 font-display text-xl text-cocoa">making your collection</p>
       <p aria-hidden className="mt-1.5 grid text-[15px] text-ink-soft">
         {LINES.map((l, i) => (
           <span key={l} className="loader-line col-start-1 row-start-1" style={{ ['--k' as string]: i }}>
@@ -68,7 +68,7 @@ export function MakingRangeLoader({ drawing, className = '' }: { drawing?: strin
           </span>
         ))}
       </p>
-      <span className="sr-only">making your range…</span>
+      <span className="sr-only">making your collection…</span>
     </div>
   );
 }
