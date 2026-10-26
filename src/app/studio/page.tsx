@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
+import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -864,7 +865,8 @@ function StudioEditor() {
   // `saved`: a design was just saved — the range opens at "your masterpiece, made real" on a
   // phone (with its loader right there) rather than back at the top.
   const backToRange = (saved = false) => {
-    const to = saved ? '/start-creating?edited=1' : '/start-creating';
+    // opened from the calendar / card-pack picker: back there (src/ui/components/usePickerEdits.ts)
+    const to = studioReturnTo() ?? (saved ? '/start-creating?edited=1' : '/start-creating');
     if (guardRef.current) {
       guardRef.current = false;
       router.replace(to);

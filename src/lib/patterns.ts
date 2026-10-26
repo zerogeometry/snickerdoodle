@@ -14,14 +14,14 @@ export const isPatternProduct = (key: string | null | undefined): boolean => !!k
  * the fleece blanket, the jigsaw, the framed print (the paper fills the frame), the playing cards'
  * backs and the pet bandana. And (founder, 26 Oct — "all the items, including the new ones") the mug (its
  * printed wrap), the christmas sack (its printed panel), both ornaments (the disc / the ball) and the
- * height chart (the art area; the ruler band stays white so its marks always read) and the calendar (one
- * colour under the drawing on every page; the dates pad is Prodigi's own). NOT the garments
+ * height chart (the art area; the ruler band stays white so its marks always read). NOT the calendar: a
+ * gallery page — the whole drawing on white inside a 1 cm margin (founder, 26 Oct; geometry.ts galleryRect). NOT the garments
  * (DTG on the fabric's own colour) — pending the founder's call.
  * The greetings card and the card pack take it on the OUTSIDE only: the outer front panel (and the
  * outer rear too when the drawing spans the whole outside) — the inside stays white for the words
  * (cardPrint.ts).
  */
-export const GROUND_PRODUCT_KEYS = [...PATTERN_PRODUCT_KEYS, 'phoneCase', 'cushion', 'blanket', 'jigsaw', 'framedPrint', 'playingCards', 'petBandana', 'card', 'cardPack', 'mug', 'sack', 'ceramicOrnament', 'christmasBauble', 'heightChart', 'calendar'] as const;
+export const GROUND_PRODUCT_KEYS = [...PATTERN_PRODUCT_KEYS, 'phoneCase', 'cushion', 'blanket', 'jigsaw', 'framedPrint', 'playingCards', 'petBandana', 'card', 'cardPack', 'mug', 'sack', 'ceramicOrnament', 'christmasBauble', 'heightChart'] as const;
 /** Can this product sit on a base colour? Takes a product key OR a variant sku (`cushion-heart`). */
 export const isGroundProduct = (key: string | null | undefined): boolean => !!key && GROUND_PRODUCT_KEYS.some((k) => key === k || key.startsWith(`${k}-`));
 

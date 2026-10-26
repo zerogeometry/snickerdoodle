@@ -7,7 +7,7 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { canvasSizePx, clampTransform, computeLayerRect, type RawTransform, type Transform } from './geometry';
+import { type RawTransform, type Transform, canvasSizePx, clampTransform, computeLayerRect, galleryRect, isGalleryProduct } from './geometry';
 import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
 import { renderRepeatPatternPixels } from './pattern';
 import { isHeightChart } from './height-chart-geometry';
@@ -425,7 +425,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
     .innerJoin(products, eq(productVariants.productId, products.id))
     .where(eq(productVariants.id, input.variantId));
   const face: Face | undefined = !input.fill && (!input.view || PRIMARY_VIEWS.has(input.view))
-    ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : undefined
+    ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : isGalleryProduct(prod?.key) ? 'gallery' : undefined
     : undefined;
   const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
   if (!blank) throw new NoMockupTemplateError('blank template asset missing');
@@ -468,7 +468,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
   const ground = !fill && (face === 'pattern' || isGroundProduct(prod?.key)) ? normalizeGround(input.ground) : null;
   const gTag = groundTag(ground);
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}${gTag}` : gTag;
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. Cache hit → no sharp work.
@@ -513,7 +513,9 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   }
 }
 
-type Face = 'pattern' | 'heightChart';
+/** the PRINTED FACE a product's mockup shows (the print code's own render): the repeat, the height chart,
+ * the calendar's gallery page (the whole drawing inside a white margin) */
+type Face = 'pattern' | 'heightChart' | 'gallery';
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
 const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
 /** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
@@ -538,6 +540,18 @@ export async function renderPrintedFace(
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
   if (face === 'pattern') return renderRepeatPatternPixels(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale });
+  if (face === 'gallery') {
+    // the page as it prints (no bleed — the mockup shows the trimmed page): white, the whole drawing in the margin
+    const r = galleryRect(geom, await designSize(srcBuf));
+    const W = Math.max(1, Math.round(print.widthPx * scale)), H = Math.max(1, Math.round(print.heightPx * scale));
+    const art = await sharp(srcBuf).resize(Math.max(1, Math.round(r.width * scale)), Math.max(1, Math.round(r.height * scale)), { fit: 'fill' }).png().toBuffer();
+    const { data, info } = await sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
+      .composite([{ input: art, left: Math.round(r.x * scale), top: Math.round(r.y * scale) }])
+      .flatten({ background: '#ffffff' })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { data, width: info.width, height: info.height, channels: info.channels as 3 };
+  }
   return renderHeightChartFacePixels(srcBuf, geom, transform, { scale, groundHex: groundHex === '#ffffff' ? undefined : groundHex });
 }
 
@@ -557,7 +571,7 @@ export async function renderTemplatePreview(args: {
   /** the placement (default: the product's default) */
   transform?: Transform;
 }): Promise<Buffer> {
-  const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : undefined;
+  const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : isGalleryProduct(args.productKey) ? 'gallery' : undefined;
   let transform: Transform = args.transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   let designBuf: Design = args.design;
   if (face) {

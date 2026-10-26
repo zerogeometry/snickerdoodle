@@ -191,3 +191,25 @@ export function assessResolution(
   if (effectiveDpi >= floor) return { decision: 'UPSCALE', tier: 1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
   return { decision: 'BLOCK', tier: -1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
 }
+
+/**
+ * GALLERY layout (founder, 26 Oct — the calendar): the WHOLE drawing, as the shopper made it (with our
+ * edits and theirs), scaled by its longest side to fit inside a 1 cm white margin — every page the same
+ * gallery look. Nothing is cropped and there's no placement to choose. One geometry for the print file,
+ * the mockup, the flip-through preview and the resolution gate, so they can never disagree.
+ */
+export const GALLERY_MARGIN_MM = 10;
+export const isGalleryProduct = (key: string | null | undefined): boolean => !!key && (key === 'calendar' || key.startsWith('calendar-'));
+/** the whole drawing, fitted (the contain sentinel) */
+export const GALLERY_FIT: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+/** The area the drawing fits into: the page less the margin all round (no bleed — the margin is white). */
+export function galleryArtGeom(t: TemplateGeom): TemplateGeom {
+  const m = mmToPx(GALLERY_MARGIN_MM, t.requiredDpi);
+  return { printWidthPx: Math.max(1, t.printWidthPx - 2 * m), printHeightPx: Math.max(1, t.printHeightPx - 2 * m), bleedMm: 0, requiredDpi: t.requiredDpi };
+}
+/** Where the whole drawing sits on the PAGE (print-area px, the trimmed page — add the bleed for the file). */
+export function galleryRect(t: TemplateGeom, src: { width: number; height: number }): { x: number; y: number; width: number; height: number } {
+  const m = mmToPx(GALLERY_MARGIN_MM, t.requiredDpi);
+  const r = computeLayerRect(galleryArtGeom(t), src, GALLERY_FIT);
+  return { x: m + r.x, y: m + r.y, width: r.width, height: r.height };
+}

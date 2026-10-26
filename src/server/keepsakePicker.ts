@@ -18,6 +18,8 @@ export interface PickerKeepsake {
   /** The child it's filed under (first name only), or null. */
   childFirstName: string | null;
   printable: boolean;
+  /** the table-trimmed copy, when the photo was trimmed at upload — what's shown and printed */
+  sourceObjectId?: string;
 }
 
 export type PickerRow = {

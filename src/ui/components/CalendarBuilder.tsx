@@ -10,9 +10,8 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
 import { CalendarFlipPreview } from './CalendarFlipPreview';
-import { BaseColourPicker } from './BaseColourPicker';
-import { groundHex, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
+import { usePickerEdits } from './usePickerEdits';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { keepsakePickerAction } from '@/app/actions/keepsakePicker';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -76,8 +75,6 @@ export function CalendarBuilder() {
   const [variantId, setVariantId] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>(() => Array.from({ length: CALENDAR_PAGE_COUNT }, () => null));
   const [edit, setEdit] = useState<string | null>(null);
-  // one base colour under the drawing on every page (founder, 26 Oct: a colour for every product's print area)
-  const [ground, setGround] = useState<string>(PATTERN_GROUND_WHITE);
   const [picker, setPicker] = useState<PickerState>({ status: 'loading' });
   // Which page the sheet is filling (null = closed), and whether it steps on to the next page after
   // placing one (true when it was opened to FILL, false when swapping one).
@@ -120,7 +117,6 @@ export function CalendarBuilder() {
     if (line) {
       setEdit(line.id);
       if (line.variantId) setVariantId(line.variantId);
-      if (line.ground) setGround(line.ground);
       setSlots(Array.from({ length: CALENDAR_PAGE_COUNT }, (_, i) => (line.pages![i] ? { ...line.pages![i]! } : null)));
       return;
     }
@@ -141,7 +137,7 @@ export function CalendarBuilder() {
   }, [slots, variant, edit]);
 
   // Every drawing on offer: the one in progress first, then the keepsake box. One entry per drawing.
-  const drawings = useMemo(() => {
+  const drawingsRaw = useMemo(() => {
     const list: Drawing[] = [];
     if (upload?.assetId) {
       list.push({ assetId: upload.assetId, imageUrl: shownSrc(upload) ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
@@ -150,11 +146,29 @@ export function CalendarBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
       }
     }
     return list;
   }, [upload, picker]);
+  const tools = usePickerEdits({ returnTo: NEXT, onUploaded: loadPicker });
+  const applyEdits = tools.apply;
+  const drawings = useMemo(() => applyEdits(drawingsRaw), [applyEdits, drawingsRaw]);
+  // a drawing edited here (remove background, the Studio) → every page already showing it shows the edit
+  useEffect(() => {
+    setSlots((old) => {
+      let changed = false;
+      const next = old.map((c) => {
+        if (!c) return c;
+        const sid = drawings.find((d) => d.assetId === c.assetId)?.sourceObjectId;
+        if (sid === c.sourceObjectId) return c;
+        changed = true;
+        const { sourceObjectId: _was, ...rest } = c;
+        return sid ? { ...rest, sourceObjectId: sid } : rest;
+      });
+      return changed ? next : old;
+    });
+  }, [drawings]);
   const drawingFor = useCallback((assetId: string) => drawings.find((d) => d.assetId === assetId) ?? null, [drawings]);
 
   // What prints: every page, the gaps repeating the chosen drawings (the server does the same).
@@ -234,7 +248,7 @@ export function CalendarBuilder() {
   const ready = filledCount > 0;
   const addToBasket = () => {
     if (!variant || !ready || blockedAt >= 0) return;
-    const line = calendarLine({ id: edit ?? newCalendarLineId(), variant, slots, ground });
+    const line = calendarLine({ id: edit ?? newCalendarLineId(), variant, slots });
     if (edit) {
       const { id, ...fields } = line;
       update(edit, fields, id); // same line, same place, same copies
@@ -321,13 +335,8 @@ export function CalendarBuilder() {
               geom={printGeom}
               page={page}
               onPage={setPage}
-              ground={groundHex(ground)}
             />
-          </div>
-
-          {/* a base colour under the drawing, on every page */}
-          <div className="mt-6">
-            <BaseColourPicker title="background colour" noun="page" value={ground} onChange={setGround} />
+            <p className="mt-2 text-center text-xs text-ink-soft">every page shows the whole drawing on white, with a little border — like a gallery print</p>
           </div>
 
           {/* The pages */}
@@ -461,7 +470,7 @@ export function CalendarBuilder() {
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
-        <PickerBody picker={picker} drawings={drawings} chosen={chosen} onChoose={setChosen} onRetry={loadPicker} next={NEXT} forWhat="a calendar page" />
+        <PickerBody picker={picker} drawings={drawings} chosen={chosen} onChoose={setChosen} onRetry={loadPicker} next={NEXT} forWhat="a calendar page" tools={tools} />
         {drawings.length > 0 ? (
           <p className="pb-3 text-center text-xs text-ink-soft">
             <Link href="/start-creating" className="inline-flex min-h-11 items-center gap-1 font-bold text-cinnamon underline-offset-2 hover:underline">

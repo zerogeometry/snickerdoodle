@@ -5,7 +5,7 @@
  */
 import { isPatternProduct } from '@/lib/patterns';
 import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
-import { assessResolution, canvasSizePx, mmToPx, type ResolutionAssessment, type TemplateGeom, type Transform } from './geometry';
+import { GALLERY_FIT, type ResolutionAssessment, type TemplateGeom, type Transform, assessResolution, canvasSizePx, galleryArtGeom, isGalleryProduct, mmToPx } from './geometry';
 
 /** The motif's default printed size, and how much of its cell it fills (the rest is breathing room). */
 export const PATTERN_MOTIF_MM = 90;
@@ -146,6 +146,8 @@ export function patternMotifCentres(layout: PatternLayout, canvas: { width: numb
 export function assessPrintResolution(t: TemplateGeom, src: { width: number; height: number }, transform: Transform, productKey?: string | null): ResolutionAssessment {
   // A height chart prints the drawing in the ART AREA beside its ruler — judged on that area.
   if (isHeightChart(productKey)) return assessResolution(heightChartArtGeom(t), src, transform);
+  // the calendar: the whole drawing inside the page's margin, whatever placement was sent
+  if (isGalleryProduct(productKey)) return assessResolution(galleryArtGeom(t), src, GALLERY_FIT);
   if (!isPatternProduct(productKey)) return assessResolution(t, src, transform);
   const layout = patternLayout(canvasSizePx(t), t.requiredDpi, src, transform);
   return assessResolution(

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconCards, IconCircleCheck, IconPlus, IconShoppingBag, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowBackUp, IconCards, IconCircleCheck, IconPencil, IconPlus, IconShoppingBag, IconSparkles, IconUpload, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -8,6 +8,7 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
+import { usePickerEdits } from './usePickerEdits';
 import { FlowHeader } from './FlowHeader';
 import { BaseColourPicker } from './BaseColourPicker';
 import { MockupPreview } from './MockupPreview';
@@ -42,6 +43,7 @@ type Slot = PackCardLine | null;
 export type PickerState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; signedIn: boolean; keepsakes: PickerKeepsake[]; at: number };
 
 const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)'];
+const PACK_DRAFT_KEY = 'sd_cardpack_draft'; // per tab: picks survive a trip to the Studio
 const PICKER_TTL_MS = 8 * 60_000; // signed URLs live 10 min — refresh the list before they lapse
 const COVER: PlacementTransform = defaultTransformFor(CARD_PACK_KEY);
 
@@ -108,7 +110,20 @@ export function CardPackBuilder() {
     seededRef.current = true;
     const id = new URLSearchParams(window.location.search).get('edit');
     const line = id ? useBasket.getState().items.find((i) => i.id === id && i.cards) : null;
-    if (!line) return;
+    if (!line) {
+      // this tab's picks, kept while the shopper was in the Studio / adding drawings
+      try {
+        const d = JSON.parse(sessionStorage.getItem(PACK_DRAFT_KEY) ?? 'null') as { variantId?: string | null; slots?: Slot[]; ground?: string } | null;
+        if (d?.slots?.some(Boolean)) {
+          if (d.variantId) setVariantId(d.variantId);
+          setSlots(d.slots);
+          if (d.ground) setGround(d.ground);
+        }
+      } catch {
+        /* no storage */
+      }
+      return;
+    }
     setEdit(line.id);
     if (line.variantId) setVariantId(line.variantId);
     setSlots(line.cards!.map((c) => ({ ...c })));
@@ -117,7 +132,7 @@ export function CardPackBuilder() {
 
   // Every drawing on offer: the one in progress first (so a guest can make a pack of a favourite
   // before signing up), then the keepsake box. One entry per drawing.
-  const drawings = useMemo(() => {
+  const drawingsRaw = useMemo(() => {
     const list: Drawing[] = [];
     if (upload?.assetId) {
       list.push({ assetId: upload.assetId, imageUrl: shownSrc(upload) ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
@@ -126,12 +141,40 @@ export function CardPackBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: k.printable });
       }
     }
     return list;
   }, [upload, picker]);
+  const tools = usePickerEdits({ returnTo: '/customize/cardPack?resume=1', onUploaded: loadPicker });
+  const applyEdits = tools.apply;
+  const drawings = useMemo(() => applyEdits(drawingsRaw), [applyEdits, drawingsRaw]);
+  // a drawing edited here (remove background, the Studio) → every card already showing it shows the edit
+  useEffect(() => {
+    setSlots((old) => {
+      let changed = false;
+      const next = old.map((c) => {
+        if (!c) return c;
+        const sid = drawings.find((d) => d.assetId === c.assetId)?.sourceObjectId;
+        if (sid === c.sourceObjectId) return c;
+        changed = true;
+        const { sourceObjectId: _was, ...rest } = c;
+        return sid ? { ...rest, sourceObjectId: sid } : rest;
+      });
+      return changed ? next : old;
+    });
+  }, [drawings]);
   const drawingFor = (assetId: string) => drawings.find((d) => d.assetId === assetId) ?? null;
+  // keep this tab's picks (not while editing a basket line — that line IS the saved state)
+  useEffect(() => {
+    if (!seededRef.current || edit) return;
+    try {
+      if (slots.some(Boolean)) sessionStorage.setItem(PACK_DRAFT_KEY, JSON.stringify({ variantId, slots, ground }));
+      else sessionStorage.removeItem(PACK_DRAFT_KEY);
+    } catch {
+      /* no storage */
+    }
+  }, [slots, variantId, ground, edit]);
 
   // The pixel size of each drawing on a card — fed to the SAME assessment the order-time gate runs.
   useEffect(() => {
@@ -405,7 +448,7 @@ export function CardPackBuilder() {
         <p className="sr-only" aria-live="polite">
           {announce}
         </p>
-        <PickerBody picker={picker} drawings={drawings} chosen={chosen} onChoose={setChosen} onRetry={loadPicker} />
+        <PickerBody picker={picker} drawings={drawings} chosen={chosen} onChoose={setChosen} onRetry={loadPicker} tools={tools} />
       </Modal>
     </Shell>
   );
@@ -421,6 +464,7 @@ export function PickerBody({
   onRetry,
   next = '/customize/cardPack',
   forWhat = 'a card',
+  tools,
 }: {
   picker: PickerState;
   drawings: Drawing[];
@@ -429,6 +473,8 @@ export function PickerBody({
   onRetry: () => void;
   next?: string;
   forWhat?: string;
+  /** the picker's workshop (usePickerEdits): upload to the keepsake box; remove background / the Studio per drawing */
+  tools?: PickerTools;
 }) {
   const signedIn = picker.status === 'ready' && picker.signedIn;
   const login = (
@@ -449,9 +495,11 @@ export function PickerBody({
       </div>
     );
   }
+  const uploadBar = tools ? <UploadToKeepsake tools={tools} signedIn={signedIn} login={login} /> : null;
   if (drawings.length === 0) {
     return (
       <div className="flex flex-col items-center py-8 text-center">
+        {uploadBar}
         <span className="flex h-14 w-14 items-center justify-center rounded-full border-2 border-dashed border-cocoa/30 text-ink-soft" aria-hidden>
           <Icon icon={IconCards} size={24} />
         </span>
@@ -470,6 +518,7 @@ export function PickerBody({
   }
   return (
     <div className="pb-3">
+      {uploadBar}
       <ul className="grid grid-cols-3 gap-3 pt-2 sm:grid-cols-4">
         {drawings.map((d) => {
           const on = chosen === d.assetId;
@@ -494,6 +543,28 @@ export function PickerBody({
                   </span>
                 ) : null}
               </button>
+              {tools && d.printable ? (
+                <div className="mt-1 flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => void tools.toggleBackground(d)}
+                    disabled={!!tools.busy[d.assetId]}
+                    className="press inline-flex min-h-11 items-center justify-center gap-1 rounded-pill border-2 border-cocoa/25 bg-paper px-2 text-[11px] font-bold text-cocoa hover:border-cocoa disabled:opacity-60"
+                  >
+                    <Icon icon={tools.edits[d.assetId] ? IconArrowBackUp : IconSparkles} size={13} />
+                    {tools.busy[d.assetId] === 'lifting…' ? 'lifting…' : tools.edits[d.assetId] ? 'put it back' : 'remove background'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void tools.editInStudio(d)}
+                    disabled={!!tools.busy[d.assetId]}
+                    className="press inline-flex min-h-11 items-center justify-center gap-1 rounded-pill border-2 border-cocoa/25 bg-paper px-2 text-[11px] font-bold text-cocoa hover:border-cocoa disabled:opacity-60"
+                  >
+                    <Icon icon={IconPencil} size={13} />
+                    {tools.busy[d.assetId] === 'opening…' ? 'opening…' : 'edit in studio'}
+                  </button>
+                </div>
+              ) : null}
             </li>
           );
         })}
@@ -516,6 +587,37 @@ function Shell({ children }: { children: React.ReactNode }) {
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-36 on phones clears the fixed thumb-zone action dock. */}
       <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10">{children}</main>
+    </div>
+  );
+}
+
+export type PickerTools = Pick<ReturnType<typeof usePickerEdits>, 'edits' | 'busy' | 'uploading' | 'toggleBackground' | 'editInStudio' | 'uploadToKeepsake'>;
+
+/** "upload to keepsake": one or more photos from the computer or the phone's gallery, into the keepsake
+ * box (an account keeps them — a guest is asked to log in first). */
+function UploadToKeepsake({ tools, signedIn, login }: { tools: PickerTools; signedIn: boolean; login: React.ReactNode }) {
+  const ref = useRef<HTMLInputElement>(null);
+  if (!signedIn) {
+    return <p className="mb-3 text-center text-xs text-ink-soft">{login} to upload drawings to your keepsake box.</p>;
+  }
+  const u = tools.uploading;
+  return (
+    <div className="mb-3 flex w-full flex-col items-center">
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files?.length) void tools.uploadToKeepsake(e.target.files);
+          e.target.value = '';
+        }}
+      />
+      <Button variant="secondary" size="md" onClick={() => ref.current?.click()} disabled={!!u} aria-busy={!!u}>
+        <Icon icon={IconUpload} size={16} /> {u ? `adding ${Math.min(u.done + 1, u.of)} of ${u.of}…` : 'upload to keepsake'}
+      </Button>
+      <span className="mt-1 text-[11px] text-ink-faint">one or more, from your computer or your phone’s photos</span>
     </div>
   );
 }

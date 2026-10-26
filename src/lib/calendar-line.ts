@@ -1,4 +1,3 @@
-import { isColouredGround } from '@/lib/patterns';
 import type { BasketItem, PackCardLine } from '@/lib/store';
 import { CALENDAR_KEY, CALENDAR_YEAR, fillCalendarPages } from '@/lib/calendar';
 
@@ -18,8 +17,6 @@ export function calendarLine(opts: {
   variant: { id: string; sku: string; pricePence: number; attributes?: Record<string, string> };
   /** The shopper's picks (0 = the cover, 1–12 = the months); null = not chosen, filled by repeats. */
   slots: ReadonlyArray<PackCardLine | null>;
-  /** one base colour for every page (a palette token / #rrggbb; white = none) */
-  ground?: string;
 }): Omit<BasketItem, 'qty'> {
   const pages = fillCalendarPages(opts.slots).map(({ printArea: _area, ...p }) => ({
     assetId: p.assetId,
@@ -37,6 +34,5 @@ export function calendarLine(opts: {
     sub: [opts.variant.attributes?.size, String(CALENDAR_YEAR), drawings === 1 ? 'one favourite drawing' : `${drawings} drawings`].filter(Boolean).join(' · '),
     artwork: pages[0]!,
     pages,
-    ...(opts.ground && isColouredGround(opts.ground) ? { ground: opts.ground } : {}),
   };
 }

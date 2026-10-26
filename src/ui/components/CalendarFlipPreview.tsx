@@ -4,7 +4,7 @@ import { IconChevronLeft, IconChevronRight } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 import { CALENDAR_PAGE_COUNT, CALENDAR_YEAR, monthWeeks, pageLabel } from '@/lib/calendar';
-import { clampTransform, computeLayerRect, type TemplateGeom } from '@/server/print/geometry';
+import { galleryRect, type TemplateGeom } from '@/server/print/geometry';
 import type { PackCardLine } from '@/lib/store';
 
 /**
@@ -26,7 +26,6 @@ export function CalendarFlipPreview({
   geom,
   page,
   onPage,
-  ground = '#ffffff',
 }: {
   /** All 13 pages, filled (null only while nothing is chosen yet). */
   pages: ReadonlyArray<PackCardLine | null>;
@@ -35,8 +34,6 @@ export function CalendarFlipPreview({
   geom: TemplateGeom | null;
   page: number;
   onPage: (i: number) => void;
-  /** the page's base colour under the drawing (#rrggbb) */
-  ground?: string;
 }) {
   const swipe = useRef<number | null>(null);
   const [turns, setTurns] = useState(0); // re-keys the page so each turn pops in
@@ -79,7 +76,7 @@ export function CalendarFlipPreview({
           ))}
         </div>
         <div key={turns} className="pop-in polaroid !p-2.5" style={{ ['--tilt' as string]: page % 2 ? '0.6deg' : '-0.6deg', ['--pop-rot' as string]: '0deg' }}>
-          <PicturePage page={p} imageFor={imageFor} dimsFor={dimsFor} geom={geom} label={name} ground={ground} />
+          <PicturePage page={p} imageFor={imageFor} dimsFor={dimsFor} geom={geom} label={name} />
           {month >= 0 ? <DatePad monthIndex={month} /> : (
             <p className="mt-2 text-center text-[11px] font-bold text-ink-soft">the cover · the twelve months are underneath</p>
           )}
@@ -116,16 +113,15 @@ export function CalendarFlipPreview({
   );
 }
 
-/** The picture page: the drawing placed on the print area exactly as the renderer will place it. */
+/** The picture page as it prints: white, the WHOLE drawing fitted inside the 1 cm margin (galleryRect —
+ * the same geometry as the print file). */
 function PicturePage({
   page,
   imageFor,
   dimsFor,
   geom,
   label,
-  ground,
 }: {
-  ground: string;
   page: PackCardLine | null;
   imageFor: (p: PackCardLine) => string | null;
   dimsFor: (p: PackCardLine) => { width: number; height: number } | null;
@@ -135,29 +131,25 @@ function PicturePage({
   const aspect = geom ? geom.printWidthPx / geom.printHeightPx : 297 / 210;
   const url = page ? imageFor(page) : null;
   const src = page ? dimsFor(page) : null;
-  const r = page && geom && src ? computeLayerRect(geom, src, clampTransform(page.transform)) : null;
-  // the layer box is the drawing AFTER rotation; the <img> is drawn upright and turned about its centre
-  const swap = r ? r.rotationDeg % 180 !== 0 : false;
-  const rect = r
-    ? { ...r, x: r.x + r.width / 2 - (swap ? r.height : r.width) / 2, y: r.y + r.height / 2 - (swap ? r.width : r.height) / 2, width: swap ? r.height : r.width, height: swap ? r.width : r.height }
-    : null;
+  const rect = page && geom && src ? galleryRect(geom, src) : null;
+  const W = geom?.printWidthPx ?? 1, H = geom?.printHeightPx ?? 1;
   return (
-    <div className="relative w-full overflow-hidden" style={{ aspectRatio: String(aspect), background: ground }}>
+    <div className="relative w-full overflow-hidden bg-white" style={{ aspectRatio: String(aspect) }}>
       {url && rect ? (
         <img
           src={url}
           alt={`your drawing on ${label}`}
           className="absolute max-w-none"
           style={{
-            left: `${(rect.x / rect.canvasWidth) * 100}%`,
-            top: `${(rect.y / rect.canvasHeight) * 100}%`,
-            width: `${(rect.width / rect.canvasWidth) * 100}%`,
-            height: `${(rect.height / rect.canvasHeight) * 100}%`,
-            ...(rect.rotationDeg ? { rotate: `${rect.rotationDeg}deg` } : {}),
+            left: `${(rect.x / W) * 100}%`,
+            top: `${(rect.y / H) * 100}%`,
+            width: `${(rect.width / W) * 100}%`,
+            height: `${(rect.height / H) * 100}%`,
           }}
         />
       ) : url ? (
-        <img src={url} alt={`your drawing on ${label}`} className="h-full w-full object-cover" />
+        // (its size not measured yet) the same look: the whole drawing inside the margin
+        <img src={url} alt={`your drawing on ${label}`} className="h-full w-full object-contain p-[4%]" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-paper-2 text-xs font-bold text-ink-faint">
           {page ? 'your drawing' : 'pick a drawing to see it here'}

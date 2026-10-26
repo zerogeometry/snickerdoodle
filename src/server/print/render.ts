@@ -11,7 +11,7 @@ import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { assessResolution, canvasSizePx, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { GALLERY_FIT, type RawTransform, assessResolution, canvasSizePx, clampTransform, computeLayerRect, galleryArtGeom, galleryRect, isGalleryProduct } from './geometry';
 import { renderRepeatPattern } from './pattern';
 import { renderHeightChartFace } from './heightChart';
 import { isHeightChart } from './height-chart-geometry';
@@ -129,6 +129,24 @@ export async function renderPrintFile(
     const chartGround = normalizeGround(input.ground);
     const face = await renderHeightChartFace(srcBuf, geom, transform, { groundHex: chartGround ? groundHex(chartGround) : undefined });
     return persistPrintFile(db, input.assetId, input.variantId, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height, groundTag(chartGround));
+  }
+
+  // THE CALENDAR: a gallery page — the whole drawing fitted inside a 1 cm white margin (founder, 26 Oct).
+  if (variantRow?.key && isGalleryProduct(variantRow.key)) {
+    const galleryAssess = assessResolution(galleryArtGeom(geom), src, GALLERY_FIT);
+    if (galleryAssess.decision === 'BLOCK') {
+      throw new Error(`source too low-res for this product (would need ${galleryAssess.upscaleFactor.toFixed(1)}× upscale)`);
+    }
+    const canvas = canvasSizePx(geom);
+    const r = galleryRect(geom, src);
+    const art = await sharp(srcBuf).resize(r.width, r.height, { fit: 'fill' }).png().toBuffer();
+    const png = await sharp({ create: { width: canvas.width, height: canvas.height, channels: 3, background: '#ffffff' } })
+      .composite([{ input: art, left: canvas.bleedPx + r.x, top: canvas.bleedPx + r.y }])
+      .flatten({ background: '#ffffff' })
+      .png()
+      .withMetadata({ density: tpl.requiredDpi })
+      .toBuffer();
+    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
   }
 
   const assess = assessResolution(geom, src, transform);

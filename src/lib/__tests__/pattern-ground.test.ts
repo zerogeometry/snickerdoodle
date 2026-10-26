@@ -35,9 +35,9 @@ describe('base colours — any colour off the wheel, checked on the server', () 
   it('only EDGE-TO-EDGE products take a base colour (the whole face must be printable)', () => {
     for (const k of ['socks', 'socks-tube', 'wrappingPaper', 'teaTowel', 'phoneCase', 'cushion', 'cushion-heart', 'blanket', 'jigsaw', 'framedPrint', 'playingCards', 'petBandana', 'card', 'cardPack', 'cardPack-10']) expect(isGroundProduct(k), k).toBe(true);
     // garments print on the fabric's own colour (pending the founder's call); the apron isn't on show
-    for (const k of ['kidsTee', 'adultTee', 'kidsHoodie', 'babyBodysuit', 'apron', null, undefined, '']) expect(isGroundProduct(k), String(k)).toBe(false);
+    for (const k of ['kidsTee', 'adultTee', 'kidsHoodie', 'babyBodysuit', 'apron', 'calendar', null, undefined, '']) expect(isGroundProduct(k), String(k)).toBe(false);
     // founder, 26 Oct: every other product takes one — incl. the mug, the christmas range and the calendar
-    for (const k of ['mug', 'sack', 'ceramicOrnament', 'christmasBauble', 'heightChart', 'calendar']) expect(isGroundProduct(k), k).toBe(true);
+    for (const k of ['mug', 'sack', 'ceramicOrnament', 'christmasBauble', 'heightChart']) expect(isGroundProduct(k), k).toBe(true);
   });
 
   it('a picked colour gets a friendly name for the basket line', () => {
