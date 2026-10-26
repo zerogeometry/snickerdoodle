@@ -14,6 +14,10 @@ import '@fontsource/patrick-hand';
 import '@fontsource/gochi-hand';
 import '@fontsource/shadows-into-light';
 import '@fontsource-variable/baloo-2';
+// …and the Christmas greeting fonts (offered in season; always printable). Latin only.
+import '@fontsource/emilys-candy/latin-400.css';
+import '@fontsource/berkshire-swash/latin-400.css';
+import '@fontsource/henny-penny/latin-400.css';
 import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';

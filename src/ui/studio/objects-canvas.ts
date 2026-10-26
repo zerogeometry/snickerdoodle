@@ -1,5 +1,6 @@
 import { cardFontCss } from '@/lib/card-fonts';
-import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { MAX_SHAPE_SIZE, MAX_STICKER_SIZE, SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StickerObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { stickerDataUrl, type StickerId } from '@/lib/stickers';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { normAngle } from '@/lib/studio-geometry';
 
@@ -21,6 +22,26 @@ const shapePath = (k: ShapeObject['shape']) => {
   if (!p) pathCache.set(k, (p = new Path2D(SHAPE_PATHS[k])));
   return p;
 };
+
+// ── stickers: each one's own SVG as an image, loaded once; the canvas redraws when one arrives ──
+const stickerImgs = new Map<StickerId, HTMLImageElement>();
+const stickerListeners = new Set<() => void>();
+/** The sticker's art, ready to draw — or null while it loads (listeners hear when it's ready). */
+export function stickerImage(id: StickerId): HTMLImageElement | null {
+  let img = stickerImgs.get(id);
+  if (!img) {
+    img = new Image();
+    img.onload = () => stickerListeners.forEach((f) => f());
+    img.src = stickerDataUrl(id);
+    stickerImgs.set(id, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+/** Hear when a sticker's art has loaded (to redraw); returns the unsubscribe. */
+export function onStickerLoad(f: () => void): () => void {
+  stickerListeners.add(f);
+  return () => stickerListeners.delete(f);
+}
 
 /** A box in geometry px: centre, size, rotation (deg). */
 export interface Box {
@@ -57,6 +78,7 @@ function strokeBounds(o: StrokeObject, f: Frame): Box {
 export function boxOf(o: StudioObject, f: Frame): Box {
   if (o.type === 'stroke') return strokeBounds(o, f);
   if (o.type === 'shape') return { cx: o.x * f.gw, cy: o.y * f.gh, w: o.w * S(f), h: o.h * S(f), rotation: o.rotation };
+  if (o.type === 'sticker') return { cx: o.x * f.gw, cy: o.y * f.gh, w: o.size * S(f), h: o.size * S(f), rotation: o.rotation };
   const m = textMetrics(o, f);
   return { cx: o.x * f.gw, cy: o.y * f.gh, w: m.w, h: m.h, rotation: o.rotation };
 }
@@ -80,7 +102,13 @@ export function drawObject(ctx: CanvasRenderingContext2D, o: StudioObject, f: Fr
   ctx.save();
   ctx.translate(o.x * f.gw, o.y * f.gh);
   ctx.rotate((o.rotation * Math.PI) / 180);
-  if (o.type === 'shape') {
+  if (o.type === 'sticker') {
+    // turn, then mirror, then the art centred on its point — the server does the same (studioOverlay)
+    const img = stickerImage(o.sticker);
+    const w = o.size * S(f);
+    if (o.flip) ctx.scale(-1, 1);
+    if (img) ctx.drawImage(img, -w / 2, -w / 2, w, w);
+  } else if (o.type === 'shape') {
     const w = o.w * S(f), h = o.h * S(f);
     ctx.translate(-w / 2, -h / 2);
     ctx.scale(w / 100, h / 100);
@@ -172,7 +200,8 @@ export function turnObject(o: StudioObject, f: Frame, to: number): StudioObject 
 export function scaleObject(o: StudioObject, f: Frame, k: number): StudioObject {
   k = Math.max(0.05, Math.min(20, k));
   if (o.type === 'text') return { ...o, size: Math.min(1, Math.max(0.01, o.size * k)) };
-  if (o.type === 'shape') return { ...o, w: Math.min(2, Math.max(0.01, o.w * k)), h: Math.min(2, Math.max(0.01, o.h * k)) };
+  if (o.type === 'shape') return { ...o, w: Math.min(MAX_SHAPE_SIZE, Math.max(0.01, o.w * k)), h: Math.min(MAX_SHAPE_SIZE, Math.max(0.01, o.h * k)) };
+  if (o.type === 'sticker') return { ...o, size: Math.min(MAX_STICKER_SIZE, Math.max(0.02, o.size * k)) } satisfies StickerObject;
   const b = strokeBounds(o, f);
   const p = o.points.slice();
   for (let i = 0; i < p.length; i += 3) {
@@ -207,7 +236,7 @@ let scratch: HTMLCanvasElement | null = null;
  */
 export function drawTextured(
   ctx: CanvasRenderingContext2D,
-  o: Pick<StudioObject, 'texture'> & ({ draw: (c: CanvasRenderingContext2D) => void }),
+  o: { texture: TextureKind; draw: (c: CanvasRenderingContext2D) => void },
   f: Frame,
   M: DOMMatrix,
   clip: { x: number; y: number; w: number; h: number },

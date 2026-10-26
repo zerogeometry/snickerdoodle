@@ -20,8 +20,9 @@ import {
   IconTypography,
 } from '@tabler/icons-react';
 import { useState, type ReactNode } from 'react';
-import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
-import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { cardFontCss, pickerFonts, type CardFontToken } from '@/lib/card-fonts';
+import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_STICKER_SIZE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { Icon } from '@/ui/primitives/Icon';
@@ -168,10 +169,10 @@ function TTextures({ value, onChange }: { value: TextureKind; onChange: (t: Text
   );
 }
 
-function TFonts({ value, onChange }: { value: CardFontToken; onChange: (f: CardFontToken) => void }) {
+function TFonts({ value, festive, onChange }: { value: CardFontToken; festive: boolean; onChange: (f: CardFontToken) => void }) {
   return (
     <>
-      {CARD_FONTS.map((f) => (
+      {pickerFonts(festive).map((f) => (
         <TChip key={f.token} on={value === f.token} onClick={() => onChange(f.token)} className="!text-[16px] !font-normal">
           <span style={{ fontFamily: cardFontCss(f.token) }}>{f.label}</span>
         </TChip>
@@ -238,6 +239,8 @@ export interface TrayProps {
   setTextStyle: (s: TextStyle) => void;
   shapeStyle: ShapeStyle;
   setShapeStyle: (s: ShapeStyle) => void;
+  /** Christmas season: the font picker offers the festive greeting fonts too. */
+  festive: boolean;
   objects: StudioObject[];
   selected: StudioObject | null;
   baseLabel: string;
@@ -377,7 +380,7 @@ export function StudioTray(p: TrayProps): ReactNode {
       if (p.selected?.type === 'text') return <ItemEditor {...p} o={p.selected} />;
       return row(
         <>
-          <TFonts value={p.textStyle.font} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
+          <TFonts value={p.textStyle.font} festive={p.festive} onChange={(font) => p.setTextStyle({ ...p.textStyle, font })} />
           <TSep />
           <TSwatches value={p.textStyle.colour} onChange={(colour) => p.setTextStyle({ ...p.textStyle, colour })} label="text colour" />
           <TSep />
@@ -388,8 +391,8 @@ export function StudioTray(p: TrayProps): ReactNode {
       if (p.selected?.type === 'shape') return <ItemEditor {...p} o={p.selected} />;
       return row(
         <>
-          {SHAPE_KINDS.map((k) => (
-            <button key={k} type="button" aria-label={`add a ${k}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
+          {PLAIN_SHAPES.map((k) => (
+            <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
               <svg viewBox="-12 -12 124 124" className="h-7 w-7" aria-hidden>
                 <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
               </svg>
@@ -436,7 +439,7 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
           <Icon icon={IconPencil} size={16} /> type
         </TChip>
         {quick}
-        <TFonts value={o.font} onChange={(font) => p.onUpdate({ font })} />
+        <TFonts value={o.font} festive={p.festive} onChange={(font) => p.onUpdate({ font })} />
         <TSep />
         <TLabel>size</TLabel>
         <TIcon icon={IconMinus} label="smaller words" onClick={() => p.onUpdate({ size: Math.max(0.02, Math.round((o.size - 0.02) * 100) / 100) })} disabled={o.size <= 0.02} />
@@ -453,7 +456,7 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
   }
   if (o.type === 'shape') {
     return (
-      <TrayRow label={`changing the ${o.shape}`}>
+      <TrayRow label={`changing the ${SHAPE_LABELS[o.shape]}`}>
         {quick}
         <TChip on={part === 'fill'} onClick={() => setPart('fill')}>
           fill
@@ -480,7 +483,25 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
         <TSep />
         <TTextures value={o.texture} onChange={(texture) => p.onUpdate({ texture })} />
         <TSep />
-        <TTurn angle={o.rotation} onAngle={p.onTurn} what={`the ${o.shape}`} />
+        <TTurn angle={o.rotation} onAngle={p.onTurn} what={`the ${SHAPE_LABELS[o.shape]}`} />
+        {actions}
+      </TrayRow>
+    );
+  }
+  if (o.type === 'sticker') {
+    const name = stickerLabel(o.sticker);
+    return (
+      <TrayRow label={`changing the ${name} sticker`}>
+        {quick}
+        <TChip on={o.flip} onClick={() => p.onUpdate({ flip: !o.flip } as Partial<StudioObject>)} label={`flip the ${name}`}>
+          <Icon icon={IconArrowsHorizontal} size={16} /> flip
+        </TChip>
+        <TSep />
+        <TLabel>size</TLabel>
+        <TIcon icon={IconMinus} label={`smaller ${name}`} onClick={() => p.onUpdate({ size: Math.max(0.05, Math.round((o.size - 0.05) * 100) / 100) } as Partial<StudioObject>)} disabled={o.size <= 0.05} />
+        <TIcon icon={IconPlus} label={`bigger ${name}`} onClick={() => p.onUpdate({ size: Math.min(MAX_STICKER_SIZE, Math.round((o.size + 0.05) * 100) / 100) } as Partial<StudioObject>)} disabled={o.size >= MAX_STICKER_SIZE} />
+        <TSep />
+        <TTurn angle={o.rotation} onAngle={p.onTurn} what={`the ${name}`} />
         {actions}
       </TrayRow>
     );
@@ -535,7 +556,9 @@ function LayersTray(p: TrayProps) {
           const on = o.id === p.selected?.id;
           return (
             <TChip key={o.id} on={on} onClick={() => p.onSelect(on ? null : o.id)} label={`layer: ${layerName(o)}`}>
-              {o.type === 'shape' ? (
+              {o.type === 'sticker' ? (
+                <img src={stickerDataUrl(o.sticker)} alt="" className="h-5 w-5" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
+              ) : o.type === 'shape' ? (
                 <svg viewBox="-10 -10 120 120" className="h-4 w-4" aria-hidden>
                   <path d={SHAPE_PATHS[o.shape]} fill={o.fill} fillRule="evenodd" />
                 </svg>

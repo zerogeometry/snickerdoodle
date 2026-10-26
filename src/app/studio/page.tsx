@@ -27,10 +27,14 @@ import { StudioTray } from '@/ui/studio/Tray';
 import { ToolGlyph } from '@/ui/studio/ToolGlyph';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
-import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
+import { ChristmasPanel, ChristmasSheet } from '@/ui/studio/ChristmasDrawer';
+import type { StickerId } from '@/lib/stickers';
+import { isChristmasSeason, seasonClock } from '@/lib/season';
+import { toggleFestive, type FestivePreset } from '@/lib/studio-festive';
+import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, onStickerLoad, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
-import { flipObjects, MAX_TEXT_LENGTH, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { flipObjects, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
@@ -130,6 +134,10 @@ function StudioEditor() {
   const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false, texture: 'crayon' });
   const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118', texture: 'smooth' });
   const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', stroke: '#2b2118', strokeWidth: 0.05, texture: 'smooth' });
+  // Christmas (1 Nov–6 Jan, UK): the christmas drawer + festive fonts. `?festive` previews them in development.
+  const [festive] = useState(() => isChristmasSeason(seasonClock(new Date())) || (process.env.NODE_ENV !== 'production' && typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('festive')));
+  // a sticker's art arrives a moment after it's first drawn: redraw then
+  useEffect(() => onStickerLoad(() => setTick((t) => t + 1)), []);
   const liveStroke = useRef<number[] | null>(null);
   const lastEditPush = useRef(0);
   const selected = objects.find((o) => o.id === selectedId) ?? null;
@@ -301,7 +309,7 @@ function StudioEditor() {
       const f: Frame = { gw, gh };
       const M = new DOMMatrix([dpr, 0, 0, dpr, 0, 0]).multiply(V);
       // (the words being typed into are shown by the editor over the picture, not twice)
-      for (const o of objects) if (o.id !== editingId) drawTextured(ctx, { texture: o.texture, draw: (c) => drawObject(c, o, f) }, f, M, content);
+      for (const o of objects) if (o.id !== editingId) drawTextured(ctx, { texture: textureOf(o), draw: (c) => drawObject(c, o, f) }, f, M, content);
       const live = liveStroke.current;
       if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content);
 
@@ -911,6 +919,28 @@ function StudioEditor() {
     setSelectedId(o.id);
     setTool('select');
   };
+  /** A festive touch: on in one tap (over what's on show, after crop), off with another — one undo step either way. */
+  const onFestive = (preset: FestivePreset) => {
+    if (!workRef.current) return;
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const next = toggleFestive(objects, preset, { gw, gh, crop: geo.crop }, newId);
+    if (!next) return toast('there’s no room for more — take something off first');
+    pushUndo();
+    setObjects(next);
+    if (selectedId && !next.some((o) => o.id === selectedId)) setSelectedId(null);
+  };
+  /** Add a sticker in the middle of what's on screen, picked up ready to move, size, turn or flip. */
+  const addSticker = (sticker: StickerId) => {
+    if (!workRef.current) return;
+    if (objects.length >= MAX_OBJECTS) return toast('there’s no room for more — take something off first');
+    pushUndo();
+    const [cxG, cyG] = toGeoSpace(stageSize.w / 2, stageSize.h / 2);
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const o: StudioObject = { id: newId(), type: 'sticker', sticker, x: cxG / gw, y: cyG / gh, size: 0.3, rotation: 0, flip: false };
+    setObjects((os) => [...os, o]);
+    setSelectedId(o.id);
+    setTool('select');
+  };
   const onBack = () => (dirty ? setLeaving(true) : backToRange());
 
   // The phone's BACK GESTURE (iOS swipe, Android back) with unsaved edits: ask, exactly like the
@@ -968,7 +998,7 @@ function StudioEditor() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1077,7 +1107,9 @@ function StudioEditor() {
     setGeo((g) => ({ ...g, background: bg }));
   };
 
-  const toolOptions = tool && ADDING.includes(tool) ? (
+  const toolOptions = tool === 'christmas' ? (
+    <ChristmasPanel objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} />
+  ) : tool && ADDING.includes(tool) ? (
     <AddedOptions
       tool={tool}
       pen={pen}
@@ -1086,6 +1118,7 @@ function StudioEditor() {
       setTextStyle={setTextStyle}
       shapeStyle={shapeStyle}
       setShapeStyle={setShapeStyle}
+      festive={festive}
       objects={objects}
       selected={selected}
       baseLabel={scratch ? 'your canvas' : 'your drawing'}
@@ -1127,7 +1160,8 @@ function StudioEditor() {
   const def = tool ? toolById(tool) : null;
   // PHONES: the same options as one slim frosted row over the picture (no pane, no "where to start")
   const tray =
-    tool && def?.kind === 'mode'
+    // (the christmas drawer is its own bottom sheet on a phone, not a row over the picture)
+    tool && tool !== 'christmas' && def?.kind === 'mode'
       ? StudioTray({
           tool,
           onTool,
@@ -1155,6 +1189,7 @@ function StudioEditor() {
           setTextStyle,
           shapeStyle,
           setShapeStyle,
+          festive,
           objects,
           selected,
           baseLabel: scratch ? 'your canvas' : 'your drawing',
@@ -1215,10 +1250,11 @@ function StudioEditor() {
           disabled={disabled}
           onTool={onTool}
           onHold={(id, down) => id === 'compare' && setComparing(down)}
-          hidden={scratch ? IMAGE_ONLY : []}
+          hidden={[...(scratch ? IMAGE_ONLY : []), ...(festive ? [] : ['christmas' as const])]}
           tray={tray}
           trayKey={tool ?? undefined}
         />
+        {tool === 'christmas' ? <ChristmasSheet objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} /> : null}
 
         {/* stage */}
         <div ref={stageRef} className="relative order-first min-h-0 flex-1 overflow-hidden bg-paper-2 md:order-none">

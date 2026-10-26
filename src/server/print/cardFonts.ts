@@ -20,6 +20,9 @@ const FONT_FILES: Record<CardFontToken, string> = {
   gochi: '@fontsource/gochi-hand/files/gochi-hand-latin-400-normal.woff',
   shadows: '@fontsource/shadows-into-light/files/shadows-into-light-latin-400-normal.woff',
   baloo: '@fontsource/baloo-2/files/baloo-2-latin-400-normal.woff',
+  candy: '@fontsource/emilys-candy/files/emilys-candy-latin-400-normal.woff',
+  swash: '@fontsource/berkshire-swash/files/berkshire-swash-latin-400-normal.woff',
+  elfin: '@fontsource/henny-penny/files/henny-penny-latin-400-normal.woff',
 };
 
 // Find the font file: first from the app's own node_modules (what the Next.js server bundle needs —

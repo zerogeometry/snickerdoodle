@@ -1,5 +1,6 @@
 import { CARD_FONTS, type CardFontToken } from '@/lib/card-fonts';
 import { cleanTexture, type TextureKind } from '@/lib/textures';
+import { isStickerId, type StickerId } from '@/lib/stickers';
 
 /**
  * The Studio's added things — text, shapes and pen strokes — as VECTOR objects in the recipe.
@@ -11,7 +12,10 @@ import { cleanTexture, type TextureKind } from '@/lib/textures';
  * survive rotation. Re-cropping never moves an object relative to the picture.
  */
 
-export type ShapeKind = 'heart' | 'star' | 'circle' | 'square' | 'triangle' | 'cloud' | 'flower' | 'sun';
+export type ShapeKind =
+  | 'heart' | 'star' | 'circle' | 'square' | 'triangle' | 'cloud' | 'flower' | 'sun'
+  // only placed by the festive touches (src/lib/studio-festive.ts) — not in the picker
+  | 'snowflake' | 'tape' | 'frame';
 
 export interface TextObject {
   id: string;
@@ -55,7 +59,22 @@ export interface StrokeObject {
   /** How far it's been turned (degrees). The points already ARE turned — this is the dial's reading. */
   rotation?: number;
 }
-export type StudioObject = TextObject | ShapeObject | StrokeObject;
+/** A multi-colour sticker from the manifest (src/lib/stickers) — drawn from its own SVG, never client art. */
+export interface StickerObject {
+  id: string;
+  type: 'sticker';
+  sticker: StickerId;
+  x: number;
+  y: number;
+  /** Width = height (the art is square), as a fraction of S. */
+  size: number;
+  rotation: number;
+  /** Mirrored left to right (before it turns). */
+  flip: boolean;
+}
+export type StudioObject = TextObject | ShapeObject | StrokeObject | StickerObject;
+/** Its crayon / chalk / paint grain (stickers are printed art — always smooth). */
+export const textureOf = (o: StudioObject): TextureKind => (o.type === 'sticker' ? 'smooth' : o.texture);
 
 /** Shape outlines on a 100×100 box — drawn by Path2D in the browser and by SVG on the server. */
 export const SHAPE_PATHS: Record<ShapeKind, string> = {
@@ -68,14 +87,30 @@ export const SHAPE_PATHS: Record<ShapeKind, string> = {
   flower:
     'M50 30 C44 6 26 10 30 30 C10 26 6 44 28 50 C6 56 10 74 30 70 C26 90 44 94 50 70 C56 94 74 90 70 70 C90 74 94 56 72 50 C94 44 90 26 70 30 C74 10 56 6 50 30 Z',
   sun: 'M50 26 A24 24 0 1 1 49.99 26 Z M47 2 H53 L52 18 H48 Z M47 98 H53 L52 82 H48 Z M2 47 V53 L18 52 V48 Z M98 47 V53 L82 52 V48 Z M14 18 L18 14 L29 26 L26 29 Z M86 82 L82 86 L71 74 L74 71 Z M86 18 L82 14 L71 26 L74 29 Z M14 82 L18 86 L29 74 L26 71 Z',
+  // ── placed by the festive touches only: snowflakes (snowfall), washi tape (its gaps let the drawing through) and a frame ──
+  snowflake:
+    'M43.5 38.7 L43.5 31.8 L30.6 24.3 L29.2 17.8 L35.6 15.7 L43.5 20.2 L43.5 12.5 L46.4 6 L50 5 L53.6 6 L56.5 12.5 L56.5 20.2 L64.4 15.7 L70.8 17.8 L69.4 24.3 L56.5 31.8 L56.5 38.7 L62.5 35.3 L62.5 20.4 L67.5 15.9 L72.5 20.4 L72.5 29.5 L79.2 25.6 L86.3 24.9 L89 27.5 L89.9 31.1 L85.7 36.9 L79 40.7 L86.9 45.3 L88.3 51.9 L81.9 54 L69 46.5 L63 50 L69 53.5 L81.9 46 L88.3 48.1 L86.9 54.7 L79 59.3 L85.7 63.1 L89.9 68.9 L89 72.5 L86.3 75.1 L79.2 74.4 L72.5 70.5 L72.5 79.6 L67.5 84.1 L62.5 79.6 L62.5 64.7 L56.5 61.3 L56.5 68.2 L69.4 75.7 L70.8 82.3 L64.4 84.3 L56.5 79.8 L56.5 87.5 L53.6 94 L50 95 L46.4 94 L43.5 87.5 L43.5 79.8 L35.6 84.3 L29.2 82.3 L30.6 75.7 L43.5 68.2 L43.5 61.3 L37.5 64.7 L37.5 79.6 L32.5 84.1 L27.5 79.6 L27.5 70.5 L20.8 74.4 L13.7 75.1 L11 72.5 L10.1 68.9 L14.3 63.1 L21 59.3 L13.1 54.7 L11.7 48.1 L18.1 46 L31 53.5 L37 50 L31 46.5 L18.1 54 L11.7 51.9 L13.1 45.3 L21 40.7 L14.3 36.9 L10.1 31.1 L11 27.5 L13.7 24.9 L20.8 25.6 L27.5 29.5 L27.5 20.4 L32.5 15.9 L37.5 20.4 L37.5 35.3 Z M52 46.5 L54 50 L52 53.5 L48 53.5 L46 50 L48 46.5 Z',
+  tape: 'M25 0 L98 0 L96.4 7 L23.4 7 Z M3.6 93 L76.6 93 L75 100 L2 100 Z M3.6 93 L23.4 7 L33.4 7 L13.6 93 Z M24.6 93 L44.4 7 L54.4 7 L34.6 93 Z M45.6 93 L65.4 7 L75.4 7 L55.6 93 Z M66.6 93 L86.4 7 L96.4 7 L76.6 93 Z',
+  frame: 'M0 0 H100 V100 H0 Z M7 7 V93 H93 V7 Z',
 };
 export const SHAPE_KINDS = Object.keys(SHAPE_PATHS) as ShapeKind[];
+/** The shapes in the picker (snowflake, tape and frame arrive with the festive touches). */
+export const PLAIN_SHAPES: ShapeKind[] = ['heart', 'star', 'circle', 'square', 'triangle', 'cloud', 'flower', 'sun'];
+/** What a shape is called, to a parent and to a screen reader. */
+export const SHAPE_LABELS: Record<ShapeKind, string> = {
+  heart: 'heart', star: 'star', circle: 'circle', square: 'square', triangle: 'triangle', cloud: 'cloud', flower: 'flower', sun: 'sun',
+  snowflake: 'snowflake', tape: 'washi tape', frame: 'gold frame',
+};
 
 export const TEXT_LINE_HEIGHT = 1.2;
 export const MAX_OBJECTS = 120;
 export const MAX_TEXT_LENGTH = 200;
 export const MAX_STROKE_POINTS = 4000;
 export const MAX_SHAPE_STROKE = 0.2;
+/** A sticker's size cap, in S (rasterised whole at print size, so kept sensible). */
+export const MAX_STICKER_SIZE = 1.5;
+/** A shape's width / height cap, in S — room for a frame round a long, thin design. */
+export const MAX_SHAPE_SIZE = 4;
 const MAX_TOTAL_POINTS = 40000;
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -106,8 +141,12 @@ export function cleanObjects(raw: unknown): StudioObject[] {
       const legacy = r.strokeWidth === undefined ? (r.outline === true ? 0.05 : 0) : 0;
       out.push({
         id: id(r.id), type: 'shape', shape, fill: colour(r.fill, '#f6c445'), stroke: colour(r.stroke), strokeWidth: num(r.strokeWidth, 0, MAX_SHAPE_STROKE, legacy),
-        x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, 2, 0.2), h: num(r.h, 0.01, 2, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture),
+        x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, MAX_SHAPE_SIZE, 0.2), h: num(r.h, 0.01, MAX_SHAPE_SIZE, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture),
       });
+    } else if (r.type === 'sticker') {
+      // only stickers we drew ourselves: an unknown id is dropped, and no art ever comes from the client
+      if (!isStickerId(r.sticker)) continue;
+      out.push({ id: id(r.id), type: 'sticker', sticker: r.sticker, x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), size: num(r.size, 0.02, MAX_STICKER_SIZE, 0.3), rotation: num(r.rotation, -360, 360, 0), flip: r.flip === true });
     } else if (r.type === 'stroke') {
       if (!Array.isArray(r.points)) continue;
       const pts = (r.points as unknown[]).slice(0, MAX_STROKE_POINTS * 3).map((n, i) => (i % 3 === 2 ? num(n, 0, 1, 0.5) : num(n, -0.5, 1.5, 0)));
