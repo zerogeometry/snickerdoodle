@@ -3,7 +3,7 @@ import { and, eq, gte } from 'drizzle-orm';
 import sharp from 'sharp';
 import { mlOperations, storageObjects } from '@/db/schema';
 import { runImageOp } from '@/ml/client';
-import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import { cropToSheet } from '@/ml/sheetCrop';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
@@ -109,7 +109,8 @@ async function trimmedObject(db: DbHandle, assetId: string): Promise<{ id: strin
 /**
  * TRIM THE TABLE at upload (founder, 26 Oct): when the photo shows the sheet lying on a table, store a
  * copy cropped (and squared up) to the sheet — a DERIVATIVE under the asset, so retention and deletion
- * cover it; the original is never touched. Only when it's sure (src/ml/sheetCrop.ts); null otherwise.
+ * cover it; the original is never touched (kept, private) but no longer used — once the table's gone, it's
+ * gone for good (founder, 26 Oct). Only when it's sure (src/ml/sheetCrop.ts); null otherwise.
  * Called by the upload action for the asset it has just ingested — the same request that wrote it.
  */
 export async function trimTableOnUpload(db: DbHandle, assetId: string): Promise<{ objectId: string } | null> {
@@ -132,26 +133,6 @@ export async function trimTableOnUpload(db: DbHandle, assetId: string): Promise<
   return { objectId: row!.id };
 }
 
-/**
- * Undo the trim: the whole photo again. The trimmed copy goes, and so does a cut-out made from it (it
- * was cut from the trimmed copy's pixels, so it no longer lines up). Returns the original (already past the gate) for the page.
- */
-export async function untrimForAsset(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<{ original: Buffer; contentType: string }> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
-  for (const kind of ['trimmed', 'cutout']) {
-    const key = derivativeKey(assetId, kind);
-    const [row] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
-    if (!row) continue;
-    await deleteObjectConfirmed(key);
-    await db.delete(storageObjects).where(eq(storageObjects.id, row.id));
-  }
-  const [orig] = await db
-    .select({ key: storageObjects.key, contentType: storageObjects.contentType })
-    .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
-  if (!orig) throw new Error('no original');
-  return { original: await getObjectBytes(orig.key), contentType: orig.contentType ?? 'image/jpeg' };
-}
 
 async function cutoutBytes(db: DbHandle, assetId: string): Promise<Buffer | null> {
   const key = derivativeKey(assetId, 'cutout');

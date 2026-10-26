@@ -2,7 +2,7 @@
 
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
-import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset, untrimForAsset } from '@/server/magic';
+import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
 import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
@@ -49,20 +49,6 @@ export async function designUrlAction(input: { assetId: string; sourceObjectId: 
     const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
     const grant = await getStorageObjectGrant(db, String(input.sourceObjectId), viewer, 600);
     return { ok: true, url: grant.url };
-  } catch {
-    return { ok: false };
-  }
-}
-
-/** Undo the table trim: the whole photo again — the original, for the page. */
-export async function untrimAction(input: { assetId: string }): Promise<{ ok: true; dataUrl: string } | { ok: false }> {
-  try {
-    const account = await getCurrentAccount();
-    const claims = await getUploadClaims();
-    const db = getDb();
-    const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
-    const { original, contentType } = await untrimForAsset(db, viewer, String(input.assetId));
-    return { ok: true, dataUrl: `data:${contentType};base64,${original.toString('base64')}` };
   } catch {
     return { ok: false };
   }

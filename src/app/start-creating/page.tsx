@@ -21,7 +21,7 @@ import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
-import { designUrlAction, removeBackgroundAction, untrimAction } from '@/app/actions/magic';
+import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
 
@@ -202,22 +202,14 @@ export default function StartCreatingPage() {
   };
 
   const previewImg = shownSrc(upload);
-  // "undo" the table trim: the whole photo again (any edit made from the trimmed copy goes with it)
-  const [untrimming, setUntrimming] = useState(false);
-  const untrim = async () => {
-    const u = useUpload.getState().upload;
-    if (!u?.assetId || !u.trim || untrimming) return;
-    setUntrimming(true);
-    try {
-      const r = await untrimAction({ assetId: u.assetId });
-      if (!r.ok) return void toast('couldn’t do that — try again');
-      setUpload({ ...u, dataUrl: r.dataUrl, trim: undefined, cutout: undefined, aspect: undefined });
-      void detectAspect(r.dataUrl).then((a) => { if (a) setAspect(a); });
-      toast('the whole photo — just as you took it');
-    } finally {
-      setUntrimming(false);
-    }
-  };
+  const [ingestFailed, setIngestFailed] = useState(false);
+  useEffect(() => {
+    setIngestFailed(false);
+    if (!upload || upload.assetId) return;
+    const t = setTimeout(() => setIngestFailed(true), 12_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drawingKey, upload?.assetId]);
   // the edited design is shown through a short-lived link: if it has expired, fetch a fresh one
   const refreshing = useRef(false);
   const refreshDesignUrl = async () => {
@@ -323,23 +315,16 @@ export default function StartCreatingPage() {
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
-                    <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} onError={() => void refreshDesignUrl()} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
+                    {upload.assetId || upload.scratch || ingestFailed ? (
+                      <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} onError={() => void refreshDesignUrl()} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
+                    ) : (
+                      // until the upload is stored (and the table trimmed off), a soft placeholder — the
+                      // table never flashes up (founder, 26 Oct)
+                      <div role="status" aria-label="getting your drawing ready" className="h-[18rem] w-[14rem] max-w-full animate-pulse bg-paper-2 md:h-[20rem] md:w-[16rem] motion-reduce:animate-none" />
+                    )}
                   </div>
                 </div>
               </div>
-              {upload.trim ? (
-                <p className="mt-3 flex w-full flex-wrap items-center justify-center gap-x-1 text-center text-[13px] text-ink-soft">
-                  we trimmed the table off your photo ·
-                  <button
-                    type="button"
-                    onClick={() => void untrim()}
-                    disabled={untrimming}
-                    className="inline-flex min-h-11 items-center px-1 font-extrabold text-cinnamon underline underline-offset-2"
-                  >
-                    {untrimming ? 'putting it back…' : 'undo'}
-                  </button>
-                </p>
-              ) : null}
               <div className="mt-5 flex w-full flex-col gap-2.5">
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image

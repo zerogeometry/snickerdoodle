@@ -90,7 +90,9 @@ export function ProductTile({
   // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
   const shown = tileMockupInputs(p, upload, sel, savedTf);
   // the instant preview: the drawing as this browser already holds it (the cutout once made)
-  const localSrc = useLocalPreview(upload?.cutout ? null : upload?.dataUrl);
+  // the instant preview waits for the STORED drawing (the table trimmed off at upload — founder, 26 Oct:
+  // it must never flash up); a trim is the drawing itself, so it previews from the page's own copy
+  const localSrc = useLocalPreview(!upload?.assetId || (upload.cutout && !upload.cutout.trim) ? null : upload.dataUrl);
   const instantSrc = (upload?.cutout && !upload.cutout.trim ? upload.cutout.url : null) ?? localSrc;
   return (
     // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
