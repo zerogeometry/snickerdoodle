@@ -191,7 +191,7 @@ function StudioEditor() {
           setObjects(st.objects);
           // the stored cut-out only while the drawing is USING it (a parent can put the background back
           // from the upload screen — then the Studio opens on the untouched original)
-          if (st.mask && upload.cutout) {
+          if (st.mask && upload.cutout && !upload.cutout.trim) { // an EDIT in use — the table trim is just the drawing
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
           }

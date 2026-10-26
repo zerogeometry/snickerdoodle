@@ -185,7 +185,7 @@ export function FamilySetModal({
               </button>
             ))}
           </div>
-          {setColour !== 'white' && upload?.opaqueBg && !upload?.cutout ? (
+          {setColour !== 'white' && upload?.opaqueBg && (!upload?.cutout || upload.cutout.trim) ? (
             <p role="status" className="mt-2 rounded-xl border-2 border-cocoa bg-honey-band px-3 py-2 text-[12px] font-semibold text-cocoa">
               on a coloured tee the paper prints too —{' '}
               <Link href="/studio" className="text-cinnamon underline underline-offset-2">

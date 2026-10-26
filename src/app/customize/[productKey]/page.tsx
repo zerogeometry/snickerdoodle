@@ -1113,7 +1113,7 @@ function CustomizeProduct() {
 
           {isGarmentKey(product.key) ? (
             <div className="mt-5 space-y-2">
-              {isDarkGarment(colour) && upload?.opaqueBg && !upload?.cutout ? (
+              {isDarkGarment(colour) && upload?.opaqueBg && (!upload?.cutout || upload.cutout.trim) ? (
                 <div role="status" className="rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                   <p className="font-semibold">on a coloured tee, the paper prints too — you’d get a pale square behind the drawing.</p>
                   <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => router.push('/studio')}>
