@@ -43,7 +43,9 @@ export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku)
  *    unknown → not turned.
  *  - everything else: CONTAIN (the scale-0 sentinel) — the whole drawing visible.
  */
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug']);
+// + the calendar and the baubles (founder, 26 Oct): the drawing FILLS each page / the disc / the ball,
+// scaled without stretching (a little of the edges may crop).
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug', 'calendar', 'bauble']);
 export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
 /**
  * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate): a quarter turn

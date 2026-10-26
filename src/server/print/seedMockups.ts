@@ -259,8 +259,13 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // (a landscape variant then rotates the finished blank the other way via the generic flag).
       return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
     }
-    case 'calendar': // page photo is portrait; our calendar canvas is LANDSCAPE (297×210) → rotate to match
+    case 'calendar': {
+      // the founder's hanging calendar (26 Oct): its top page is the print area, art fills it (cover)
+      const dir = layeredFlatDir('calendar');
+      if (dir) return { material: 'PAPER', register: 'layered-flat', dir };
+      // fallback, the old flat blank: page photo is portrait; our canvas is LANDSCAPE → rotate to match
       return { file: 'prodigi-calendar-blank-assets/Blank Calendars/calendar blank.png', material: 'PAPER', register: 'face-cover', mask: false, rotate: 90 };
+    }
     case 'storybook': // derived from Prodigi's hardcover photo-book back shot (thumbnails in-painted, portrait crop)
       return { file: 'derived/storybook-blank.jpg', material: 'PAPER', register: 'face-cover', mask: false };
     case 'card':
@@ -273,14 +278,26 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: 'derived/card-blank.png', material: 'PAPER', register: 'face-cover', mask: true };
     }
     case 'bauble':
+      // the founder's layered sets (26 Oct): the art fills the disc / ball (cover); edge blur + string, or
+      // the glass highlights + cap, laid over it
+      {
+        const dir = layeredFlatDir(size === 'plastic ball' ? 'bauble/ball' : 'bauble/ceramic');
+        if (dir) return { material: 'GLOSS', register: 'layered-flat', dir };
+      }
       // the PLASTIC BALL (D24): a staged photo blank if there is one, else the drawn ball
       if (size === 'plastic ball') {
         const ball = findBlank(/plastic.*(bauble|ball)|(bauble|ball).*plastic/i);
         return ball ? { file: ball, material: 'GLOSS', register: 'face-cover', mask: true } : { material: 'GLOSS', register: 'drawn', key: 'plasticBauble' };
       }
       return { file: 'prodigi-ceramic-christmas-tree-ornament-blank-asset/Prodigi-ceramic-christmas-ornament-blank.jpg', material: 'CERAMIC', register: 'face-cover', mask: true };
-    case 'sack': // official panel 320×500mm on a 19×30″ (483mm-wide) sack, above the bottom seam
+    case 'sack': {
+      // the founder's sack laid flat (26 Oct): the panel is measured onto it at true scale by
+      // scripts/compose-founder-layers.mjs (320×500 mm on a 483 mm-wide sack)
+      const dir = layeredFlatDir('sack');
+      if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-flat', dir };
+      // fallback: official panel 320×500mm on a 19×30″ (483mm-wide) sack, above the bottom seam
       return { file: 'prodigi-christmas-sack-blank-asset/Prodigi-Christmas-Sack blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-physical', mask: true, productWidthMm: 483, bottomInsetFrac: 0.06 };
+    }
     case 'apron': // chest-to-hem centre panel; aspect locked to the print canvas, offsets pending official spec
       return { file: 'prodigi-apron-blank-asset/Prodigi-Apron-blank.jpg', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, region: { x0: 0.24, y0: 0.38, x1: 0.76, y1: 0.92 } };
     // Garments: REAL Prodigi packshots (founder call 2026-07-07 — standard flat photo, 2D

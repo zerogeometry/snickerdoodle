@@ -152,7 +152,7 @@ function PicturePage({
           }}
         />
       ) : url ? (
-        <img src={url} alt={`your drawing on ${label}`} className="h-full w-full object-contain" />
+        <img src={url} alt={`your drawing on ${label}`} className="h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full items-center justify-center bg-paper-2 text-xs font-bold text-ink-faint">
           {page ? 'your drawing' : 'pick a drawing to see it here'}

@@ -6,6 +6,7 @@
 //   (--ground: a repeat-pattern base colour token from src/lib/patterns.ts; use a see-through drawing)
 //
 // Re-run scripts/compose-founder-layers.mjs first if a photo changed.
+import { defaultTransformFor } from '@/lib/catalogue-view';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { definedPriceList } from '@/server/catalogue';
@@ -30,6 +31,11 @@ const SETS: { key: string; set: string; sku?: string; material: string; dpi: num
   { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-ROL-70X300', material: 'PAPER', dpi: 150, window: true },
   { key: 'wrappingPaper', set: 'wrappingPaper', sku: 'WRAP-ROL-70X500', material: 'PAPER', dpi: 150, window: true },
   { key: 'playingCards', set: 'playingCards', material: 'PAPER', dpi: 300, tilted: true },
+  // Christmas (founder, 26 Oct)
+  { key: 'calendar', set: 'calendar', sku: 'CALENDAR-A4-L-DATED', material: 'PAPER', dpi: 300 },
+  { key: 'sack', set: 'sack', material: 'LIGHT_FABRIC', dpi: 150 },
+  { key: 'bauble', set: 'bauble/ceramic', sku: 'XMAS-PORC-BAUB', material: 'GLOSS', dpi: 300 },
+  { key: 'bauble', set: 'bauble/ball', sku: 'XMAS-PLAS-BAUB', material: 'GLOSS', dpi: 300 },
 ];
 
 const variants = definedPriceList();
@@ -43,6 +49,7 @@ for (const s of SETS) {
   for (const q of [t.quad, ...(t.extraQuads ?? [])]) assertQuadFitsBlank(q, { warped: !!t.extraQuads?.length });
   const webp = await renderTemplatePreview({
     blank: t.blank, mask: t.mask, overlay: t.overlay, quad: t.quad, extraQuads: t.extraQuads, materialClass: s.material, design, productKey: s.key, ground,
+    transform: defaultTransformFor(s.key), // the product's own default placement (fill / fit), as the shop shows it
     print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: 0, requiredDpi: s.dpi },
   });
   const file = path.join(outDir, `${s.set.replace('/', '-')}${s.sku ? '-' + s.sku : ''}${ground ? '-' + ground : ''}.webp`);

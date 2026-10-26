@@ -37,6 +37,17 @@ const SETS = [
   { out: 'teaTowel', product: 'tea-towel.png', overlay: 'tea-towel-fold.png', fill: 0.82 },
   { out: 'wrappingPaper', product: 'wrapping-paper-flat.png', overlay: 'wrapping-paper-roll.png', fill: 0.82 },
   { out: 'playingCards', product: 'playing-cards-base.png', printmap: 'playing-cards-print.png', fill: 0.8 },
+  // ── Christmas (founder, 26 Oct) ──
+  // the calendar: the hanging calendar, its top page is the print area
+  { out: 'calendar', product: 'calendar.png', printmap: 'calendar-print.png', fill: 0.82 },
+  // the sack laid flat: Prodigi's print panel is 320×500 mm on a 483 mm-wide sack, just above the bottom
+  // seam — measured off the sack in the photo (no separate print map)
+  { out: 'sack', product: 'sack.png', sackPanel: { sackWidthMm: 483, panelMm: { w: 320, h: 500 }, bottomInsetFrac: 0.06 }, fill: 0.84 },
+  // ceramic disc: the print area IS the disc (glossy white under the art); the edge blur, then the gold
+  // string, go on top
+  { out: 'bauble/ceramic', productFromPrintmap: true, printmap: 'ceramic-print.png', overlays: ['ceramic-edgeblur.png', 'ceramic-string.png'], fill: 0.72 },
+  // plastic ball: the print area is the ball; the glass highlights + chrome cap + string go on top
+  { out: 'bauble/ball', productFromPrintmap: true, printmap: 'bauble-print.png', overlays: ['bauble-overlay.png'], fill: 0.8 },
 ];
 
 /** Load as RGBA raw, turned if asked. */
@@ -130,10 +141,52 @@ async function whiteFrom(png) {
 }
 
 if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
+/** Layers stacked in order onto one (an edge blur, then a string on top of it). */
+async function stack(files, rotate) {
+  const layers = await Promise.all(files.map((f) => load(f, rotate)));
+  const { W, H } = layers[0];
+  const out = Buffer.from(layers[0].data);
+  for (const l of layers.slice(1)) {
+    if (l.W !== W || l.H !== H) throw new Error('overlays must share one canvas');
+    for (let i = 0; i < W * H; i++) {
+      const a = l.data[i * 4 + 3] / 255, b = out[i * 4 + 3] / 255;
+      const o = a + b * (1 - a);
+      for (let c = 0; c < 3; c++) out[i * 4 + c] = o ? Math.round((l.data[i * 4 + c] * a + out[i * 4 + c] * b * (1 - a)) / o) : 0;
+      out[i * 4 + 3] = Math.round(o * 255);
+    }
+  }
+  return { data: out, W, H };
+}
+
+/** The print map's shape, as a glossy-white product (a ceramic disc / plastic ball under the art). */
+function whiteShape({ data, W, H }) {
+  const out = Buffer.alloc(W * H * 4);
+  for (let i = 0; i < W * H; i++) { out[i * 4] = 248; out[i * 4 + 1] = 247; out[i * 4 + 2] = 244; out[i * 4 + 3] = data[i * 4 + 3]; }
+  return { data: out, W, H };
+}
+
+/** The sack's print panel at true scale: measure the bag's body width (across 70 % of its height, below
+ * the drawstrings), turn mm into px, centre the panel and sit it bottomInsetFrac above the bottom. */
+async function sackPanel(productPng, spec) {
+  const a = await alphaOf(productPng);
+  let y0 = CANVAS, y1 = -1;
+  for (let y = 0; y < CANVAS; y++) for (let x = 0; x < CANVAS; x++) if (a[y * CANVAS + x] > 128) { if (y < y0) y0 = y; if (y > y1) y1 = y; break; }
+  const row = Math.round(y0 + (y1 - y0) * 0.7);
+  let bx0 = CANVAS, bx1 = -1;
+  for (let x = 0; x < CANVAS; x++) if (a[row * CANVAS + x] > 128) { if (x < bx0) bx0 = x; bx1 = x; }
+  const pxPerMm = (bx1 - bx0 + 1) / spec.sackWidthMm;
+  const w = Math.round(spec.panelMm.w * pxPerMm), h = Math.round(spec.panelMm.h * pxPerMm);
+  const cx = (bx0 + bx1) / 2;
+  const bottom = Math.round(y1 - (y1 - y0) * spec.bottomInsetFrac);
+  const left = Math.round(cx - w / 2), top = bottom - h;
+  const rect = await sharp({ create: { width: w, height: h, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } }).png().toBuffer();
+  return sharp({ create: { width: CANVAS, height: CANVAS, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: rect, left, top }]).png().toBuffer();
+}
+
 for (const set of SETS) {
-  const product = despeckle(await load(set.product, set.rotate));
-  const overlay = set.overlay ? despeckle(await load(set.overlay, set.rotate)) : null;
   const printmap = set.printmap ? despeckle(await load(set.printmap, set.rotate)) : null;
+  const product = set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate));
+  const overlay = set.overlays ? await stack(set.overlays, set.rotate) : set.overlay ? despeckle(await load(set.overlay, set.rotate)) : null;
   for (const l of [overlay, printmap]) {
     if (l && (l.W !== product.W || l.H !== product.H)) throw new Error(`${set.out}: layers must share one canvas`);
   }
@@ -148,7 +201,9 @@ for (const set of SETS) {
 
   const productPng = await place(product, box, scale, left, top);
   const overlayPng = overlay ? await place(overlay, box, scale, left, top) : null;
-  const printmapPng = printmap ? await whiteFrom(await place(printmap, box, scale, left, top)) : await whiteFrom(productPng);
+  const printmapPng = set.sackPanel
+    ? await sackPanel(productPng, set.sackPanel)
+    : printmap ? await whiteFrom(await place(printmap, box, scale, left, top)) : await whiteFrom(productPng);
 
   // Shadow from everything that sits on the table: the product, plus the overlay where it overhangs.
   const pa = await alphaOf(productPng);

@@ -36,7 +36,7 @@ type Slot = PackCardLine | null;
 
 const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)'];
 const PICKER_TTL_MS = 8 * 60_000; // signed URLs live 10 min — refresh the list before they lapse
-const PLACE: PackCardLine['transform'] = defaultTransformFor(CALENDAR_KEY); // the whole drawing, never cropped
+const PLACE: PackCardLine['transform'] = defaultTransformFor(CALENDAR_KEY); // fills each page without stretching (founder, 26 Oct)
 const DRAFT_KEY = 'sd_calendar_draft'; // per tab: picks survive a trip to upload a new drawing
 const NEXT = '/customize/calendar';
 
