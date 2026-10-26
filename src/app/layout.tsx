@@ -19,6 +19,7 @@ import '@fontsource/emilys-candy/latin-400.css';
 import '@fontsource/berkshire-swash/latin-400.css';
 import '@fontsource/henny-penny/latin-400.css';
 import './globals.css';
+import { seasonPreviewDate } from '@/lib/season';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
@@ -48,7 +49,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   // carry no nonce, and the CSP would (rightly) refuse to run it.
   await connection();
   return (
-    <html lang="en">
+    <html lang="en" data-season-preview={seasonPreviewDate() ?? undefined}>
       <body className="kraft min-h-dvh font-sans">
         <a
           href="#main"

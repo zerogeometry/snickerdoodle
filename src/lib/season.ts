@@ -13,15 +13,31 @@
 
 const TZ = 'Europe/London';
 
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
- * PREVIEW the season before it starts, in DEVELOPMENT only: `NEXT_PUBLIC_SEASON_PREVIEW_DATE=2026-11-20`
- * makes every season check behave as if it were that date (midday UK). Ignored in any production
- * build (the live shop and the test site), so it can never fake a date for a real customer.
+ * PREVIEW the season before it starts — every season check behaves as if it were that date (midday UK).
+ * Honoured ONLY in development or on the password-locked TEST SITE (SITE_MODE=test), never on the real
+ * shop, so it can never fake a date for a customer (the box's fetch-env.sh also refuses the setting
+ * unless SITE_MODE=test).
+ *  - on the server: `SEASON_PREVIEW_DATE=2026-11-20` (runtime; or NEXT_PUBLIC_SEASON_PREVIEW_DATE in dev);
+ *  - in the browser: the root layout copies the server's answer onto <html data-season-preview>, so the
+ *    client agrees with the server without a build-time variable.
  */
+export function seasonPreviewDate(): string | null {
+  if (typeof document !== 'undefined') {
+    const v = document.documentElement.dataset.seasonPreview;
+    return v && ISO_DAY.test(v) ? v : null;
+  }
+  const allowed = process.env.NODE_ENV !== 'production' || process.env.SITE_MODE === 'test';
+  const v = process.env.SEASON_PREVIEW_DATE || process.env.NEXT_PUBLIC_SEASON_PREVIEW_DATE;
+  return allowed && v && ISO_DAY.test(v) ? v : null;
+}
+
+/** `now`, or the preview date when one is set (see {@link seasonPreviewDate}). */
 export function seasonClock(real: Date): Date {
-  const preview = process.env.NEXT_PUBLIC_SEASON_PREVIEW_DATE;
-  if (process.env.NODE_ENV === 'production' || !preview || !/^\d{4}-\d{2}-\d{2}$/.test(preview)) return real;
-  return new Date(`${preview}T12:00:00Z`);
+  const preview = seasonPreviewDate();
+  return preview ? new Date(`${preview}T12:00:00Z`) : real;
 }
 
 /** The UK calendar date (y, m 1–12, d) of an instant. */

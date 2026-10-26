@@ -45,6 +45,10 @@ done
 for k in DEV_UPLOADS_ARE_BRAND_SAFE_FIXTURES S3_ENDPOINT S3_FORCE_PATH_STYLE NEXT_DIST_DIR; do
   has "$k" && die "$k is set in SSM — it is for local development only; delete that parameter"
 done
+# the Christmas season PREVIEW date is for the password-locked test site only (src/lib/season.ts)
+if has SEASON_PREVIEW_DATE && ! grep -q '^SITE_MODE=test$' "$tmp.env"; then
+  die "SEASON_PREVIEW_DATE is set but SITE_MODE is not test — it would fake the date for real customers; delete it"
+fi
 # The AWS SDK obeys AWS_ENDPOINT_URL / AWS_ENDPOINT_URL_<SERVICE>: one of these could send
 # children's pictures (S3, Rekognition) somewhere other than AWS London. Never allowed.
 if grep -q '^AWS_ENDPOINT_URL' "$tmp.env"; then

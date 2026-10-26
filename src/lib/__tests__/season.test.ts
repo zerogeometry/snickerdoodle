@@ -107,3 +107,29 @@ describe('formatShortDate', () => {
     expect(formatShortDate('2026-12-14')).toBe('mon 14 dec');
   });
 });
+
+describe('the season PREVIEW date — development + the test site only, never the real shop', () => {
+  const run = async (env: Record<string, string | undefined>) => {
+    const { vi } = await import('vitest');
+    vi.unstubAllEnvs();
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v as string);
+    const { seasonPreviewDate, seasonClock } = await import('@/lib/season');
+    const out = { date: seasonPreviewDate(), clock: seasonClock(new Date('2026-10-26T09:00:00Z')).toISOString() };
+    vi.unstubAllEnvs();
+    return out;
+  };
+  it('is ignored on the real shop (production, not the test site)', async () => {
+    const r = await run({ NODE_ENV: 'production', SITE_MODE: '', SEASON_PREVIEW_DATE: '2026-11-20' });
+    expect(r.date).toBeNull();
+    expect(r.clock).toBe('2026-10-26T09:00:00.000Z');
+  });
+  it('works on the password-locked test site', async () => {
+    const r = await run({ NODE_ENV: 'production', SITE_MODE: 'test', SEASON_PREVIEW_DATE: '2026-11-20' });
+    expect(r.date).toBe('2026-11-20');
+    expect(r.clock).toBe('2026-11-20T12:00:00.000Z');
+  });
+  it('ignores anything that is not a plain date', async () => {
+    const r = await run({ NODE_ENV: 'production', SITE_MODE: 'test', SEASON_PREVIEW_DATE: 'tomorrow' });
+    expect(r.date).toBeNull();
+  });
+});
