@@ -123,7 +123,18 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
     }
     const png0 = await sharp(filled, { raw: { width: FW, height: FH, channels: 3 } }).png({ compressionLevel: 1 }).toBuffer();
     const lifted = await liftOnce(png0, opts, {});
-    if (lifted) return dropEdgeDebris(lifted, surface);
+    if (lifted) {
+      let res = await dropEdgeDebris(lifted, surface);
+      if (direct.touchesFrame) {
+        // the outline ran into the photo's edge (a sunlit patch of wood as pale as the paper): loose bits
+        // lying mostly along the photo's edge are table too
+        const frame = new Uint8Array(FW * FH);
+        for (let x = 0; x < FW; x++) { frame[x] = 1; frame[(FH - 1) * FW + x] = 1; }
+        for (let y = 0; y < FH; y++) { frame[y * FW] = 1; frame[y * FW + FW - 1] = 1; }
+        res = await dropEdgeDebris(res, frame, 12);
+      }
+      return dropTableColour(res, surface, direct.surface, direct.touchesFrame);
+    }
   }
 
   // 2) Otherwise: a plain first lift, then look for a sheet left behind on a liftable (incl. white) surface.
@@ -159,11 +170,11 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
  * along where the table was. Drop any kept blob that lies MOSTLY (≥ 60 %) within a margin round the
  * table area — a drawing that merely touches the edge (grass along the bottom) stays.
  */
-async function dropEdgeDebris(res: InkLiftResult, table: Uint8Array): Promise<InkLiftResult> {
+async function dropEdgeDebris(res: InkLiftResult, table: Uint8Array, marginDiv = 60): Promise<InkLiftResult> {
   const { width: W, height: H } = res;
   const N = W * H;
   const px = await sharp(res.buffer).raw().toBuffer();
-  const M = Math.max(4, Math.round(Math.min(W, H) / 60));
+  const M = Math.max(4, Math.round(Math.min(W, H) / marginDiv));
   // margin = table dilated by M (separable max)
   const tmp = new Uint8Array(N), near = new Uint8Array(N);
   for (let y = 0; y < H; y++) {
@@ -202,6 +213,39 @@ async function dropEdgeDebris(res: InkLiftResult, table: Uint8Array): Promise<In
     changed = true;
   }
   if (!changed) return res;
+  const buffer = await sharp(px, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
+  return { ...res, buffer, removedFraction: Math.min(1, res.removedFraction + removedPx / N) };
+}
+
+/**
+ * After a sheet-on-table lift: right along the sheet's edge, anything still kept that is the TABLE'S
+ * colour (a sliver of wood the outline took in, the sheet's shadow on it) goes. Only in a narrow band
+ * by the table — drawing further in is never touched.
+ */
+async function dropTableColour(res: InkLiftResult, table: Uint8Array, surface: [number, number, number], touchesFrame = false): Promise<InkLiftResult> {
+  const { width: W, height: H } = res;
+  const N = W * H;
+  // (a sheet whose outline ran into the photo's edge took in table there too — a sunlit patch of wood
+  // as pale as the paper — so the photo's edge counts as table for this)
+  let edge = table;
+  if (touchesFrame) {
+    edge = Uint8Array.from(table);
+    for (let x = 0; x < W; x++) { edge[x] = 1; edge[(H - 1) * W + x] = 1; }
+    for (let y = 0; y < H; y++) { edge[y * W] = 1; edge[y * W + W - 1] = 1; }
+  }
+  const near = growMask(edge, W, H, Math.max(6, Math.round(Math.min(W, H) / 40)));
+  const px = await sharp(res.buffer).raw().toBuffer();
+  const sl = lab(surface[0], surface[1], surface[2]);
+  let removedPx = 0;
+  for (let k = 0; k < N; k++) {
+    if (!near[k] || table[k] || px[k * 4 + 3]! < 32) continue;
+    const q = lab(px[k * 4]!, px[k * 4 + 1]!, px[k * 4 + 2]!);
+    const dE = Math.hypot(q[0] - sl[0], q[1] - sl[1], q[2] - sl[2]);
+    // the table, or its shadow (same hue, darker)
+    const shadow = q[0] < sl[0] && Math.hypot(q[1] - sl[1], q[2] - sl[2]) < 14;
+    if (dE < 18 || shadow) { px[k * 4 + 3] = 0; removedPx++; }
+  }
+  if (!removedPx) return res;
   const buffer = await sharp(px, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
   return { ...res, buffer, removedFraction: Math.min(1, res.removedFraction + removedPx / N) };
 }
@@ -617,11 +661,40 @@ async function liftOnce(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftD
 
   // Optional: paper enclosed by the drawing stays, as clean paper colour.
   if (opts.keepEnclosedPaper) {
-    // white-ish paper reads as clean white; coloured paper (kraft) keeps its own colour
-    const fill: RGB = paperLum >= 185 ? [255, 255, 255] : [paperMid[0], paperMid[1], paperMid[2]];
+    // white-ish paper reads as clean white; coloured paper (kraft) keeps its own colour…
+    const paperFill: RGB = paperLum >= 185 ? [255, 255, 255] : [paperMid[0], paperMid[1], paperMid[2]];
+    // …but an enclosed area that was COLOURED IN (the sand of an island on parchment — lighter crayon the
+    // lift read as paper) keeps what's actually there, not a flat white. Judged per enclosed area: its
+    // average distance from the paper.
+    // (against the paper as seen round the sheet's edge — the local paper estimate inside a big
+    // coloured-in shape is that colouring)
+    const bSum = pl * 3, borderPaper = lab(...([pcr * bSum, pcg * bSum, Math.max(0, bSum - pcr * bSum - pcg * bSum)].map((v) => Math.max(0, Math.min(255, Math.round(v)))) as [number, number, number]));
+    const encl = new Int32Array(N).fill(-1);
+    const colouredIn: boolean[] = [];
+    for (let s0 = 0; s0 < N; s0++) {
+      if (reach[s0] || out[s0 * 4 + 3]! >= 255 || encl[s0] !== -1) continue;
+      const id = colouredIn.length;
+      const st = [s0];
+      encl[s0] = id;
+      let sum = 0, n = 0;
+      while (st.length) {
+        const k = st.pop()!;
+        const a = lab(px[k * 3]!, px[k * 3 + 1]!, px[k * 3 + 2]!), b = borderPaper;
+        sum += Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        n++;
+        const x = k % FW;
+        for (const j of [x > 0 ? k - 1 : -1, x < FW - 1 ? k + 1 : -1, k - FW, k + FW]) {
+          if (j < 0 || j >= N || reach[j] || out[j * 4 + 3]! >= 255 || encl[j] !== -1) continue;
+          encl[j] = id;
+          st.push(j);
+        }
+      }
+      colouredIn.push(n > 0 && sum / n > 10);
+    }
     for (let k = 0; k < N; k++) {
       const o = k * 4;
       if (reach[k] || out[o + 3]! >= 255) continue;
+      const fill: RGB = colouredIn[encl[k]!] ? [px[k * 3]!, px[k * 3 + 1]!, px[k * 3 + 2]!] : paperFill;
       // blend under any soft ink edge so outlines stay crisp
       const a = out[o + 3]! / 255;
       out[o] = Math.round(out[o]! * a + fill[0] * (1 - a));
@@ -929,6 +1002,37 @@ function sheetOutline(m: Uint8Array, W: number, H: number): Uint8Array {
   return out;
 }
 
+/** The filled CONVEX HULL of a mask (from each row's extreme pixels; monotone chain + scanline fill). */
+function convexHullMask(m: Uint8Array, W: number, H: number): Uint8Array {
+  const pts: [number, number][] = [];
+  for (let y = 0; y < H; y++) {
+    let a = -1, b = -1;
+    for (let x = 0; x < W; x++) if (m[y * W + x]) { if (a < 0) a = x; b = x; }
+    if (a >= 0) { pts.push([a, y]); if (b !== a) pts.push([b, y]); }
+  }
+  const out = new Uint8Array(W * H);
+  if (pts.length < 3) { for (const [x, y] of pts) out[y * W + x] = 1; return out; }
+  pts.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [], upper: [number, number][] = [];
+  for (const p of pts) { while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, p) <= 0) lower.pop(); lower.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]!; while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, p) <= 0) upper.pop(); upper.push(p); }
+  const hull = [...lower.slice(0, -1), ...upper.slice(0, -1)];
+  for (let y = 0; y < H; y++) {
+    let lo = Infinity, hi = -Infinity;
+    for (let i = 0; i < hull.length; i++) {
+      const [ax, ay] = hull[i]!, [bx, by] = hull[(i + 1) % hull.length]!;
+      if ((y < Math.min(ay, by)) || (y > Math.max(ay, by))) continue;
+      if (ay === by) { lo = Math.min(lo, ax, bx); hi = Math.max(hi, ax, bx); continue; }
+      const x = ax + ((y - ay) * (bx - ax)) / (by - ay);
+      lo = Math.min(lo, x); hi = Math.max(hi, x);
+    }
+    if (lo > hi) continue;
+    for (let x = Math.max(0, Math.ceil(lo - 0.5)); x <= Math.min(W - 1, Math.floor(hi + 0.5)); x++) out[y * W + x] = 1;
+  }
+  return out;
+}
+
 /** A mask grown by r pixels (separable max). */
 function growMask(m: Uint8Array, W: number, H: number, r: number): Uint8Array {
   const N = W * H;
@@ -958,7 +1062,7 @@ function growMask(m: Uint8Array, W: number, H: number, r: number): Uint8Array {
  *     slightly angled rectangle), and NOT the whole frame (a surface must show round it).
  * Returns the sheet mask at the copy's size and the paper colour, or null.
  */
-async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: [number, number, number]; w: number; h: number } | null> {
+async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: [number, number, number]; w: number; h: number; surface: [number, number, number]; touchesFrame: boolean } | null> {
   const { data: d, info } = await sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().flatten({ background: '#ffffff' })
     .resize(700, 700, { fit: 'inside', withoutEnlargement: true }).median(3).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, N = W * H;
@@ -968,87 +1072,200 @@ async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: 
   for (let y = 0; y < H; y += 2) ring.push(y * W, y * W + W - 1);
   const med = (ch: number) => ring.map((k) => d[k * 3 + ch]!).sort((a, b) => a - b)[Math.floor(ring.length / 2)]!;
   const sr = med(0), sg = med(1), sb = med(2);
-  if (Math.min(sr, sg, sb) > 200 && Math.max(sr, sg, sb) - Math.min(sr, sg, sb) < 25) return null;
-
-  // the paper colour: commonest chromaticity+lightness bucket in the middle half
-  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+  // A WHITE desk: only an unmistakable sheet counts (strict) — a big painted shape on white paper must
+  // never be mistaken for "a sheet" and lifted away.
+  const whiteDesk = Math.min(sr, sg, sb) > 200 && Math.max(sr, sg, sb) - Math.min(sr, sg, sb) < 25;
+  const sc = chroma(sr, sg, sb);
+  const nearSurface = (c: { cr: number; cg: number; l: number }) => Math.hypot(sc.cr - c.cr, sc.cg - c.cg) < 0.02 && Math.abs(sc.l - c.l) < Math.max(sc.l, 1) * 0.18;
+  // The SURFACE = the colours actually seen round the border (wood grain, its light and dark, a white
+  // desk's shading): a coarse Lab occupancy grid of the border ring — a colour the border shows a few
+  // times over, or its next-door neighbour, is "surface".
+  const CELL_L = 6;
+  const cellOf = (r: number, g: number, b: number) => {
+    const q = lab(r, g, b);
+    return [Math.floor(q[0] / CELL_L), Math.floor((q[1] + 128) / CELL_L), Math.floor((q[2] + 128) / CELL_L)] as const;
+  };
+  const GD = Math.ceil(256 / CELL_L) + 2;
+  const seen = new Uint16Array(GD * GD * GD);
+  for (const k of ring) { const [a, b, c] = cellOf(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!); const at = (a * GD + b) * GD + c; seen[at] = seen[at]! + 1; }
+  const occ = new Uint8Array(GD * GD * GD);
+  for (let a = 1; a < GD - 1; a++) for (let b = 1; b < GD - 1; b++) for (let c = 1; c < GD - 1; c++) {
+    if (seen[(a * GD + b) * GD + c]! < 3) continue;
+    for (let da = -1; da <= 1; da++) for (let db = -1; db <= 1; db++) for (let dc = -1; dc <= 1; dc++) occ[((a + da) * GD + b + db) * GD + c + dc] = 1;
+  }
+  const surfaceLike = new Uint8Array(N);
+  for (let k = 0; k < N; k++) { const [a, b, c] = cellOf(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!); surfaceLike[k] = occ[(Math.max(0, a) * GD + Math.max(0, b)) * GD + Math.max(0, c)]!; }
+  const sL = lab(sr, sg, sb)[0];
+  const sLab0 = lab(sr, sg, sb);
+  /** Could this pixel be table after all — its shadow (darker), or just a shade of it (near its typical colour)? */
+  const maybeTable = (k: number) => {
+    const q = lab(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!);
+    return q[0] < sL + 4 || Math.hypot(q[0] - sLab0[0], q[1] - sLab0[1], q[2] - sLab0[2]) < 25;
+  };
+  // A "surface" that also fills the middle of the photo is the PAPER running off the frame (a red sheet
+  // photographed edge to edge) — no sheet to find; the plain lift handles it.
+  let mid = 0, midSurface = 0;
+  const sLab = lab(sr, sg, sb);
   for (let y = Math.floor(H * 0.25); y < H * 0.75; y += 2) {
     for (let x = Math.floor(W * 0.25); x < W * 0.75; x += 2) {
+      const i = (y * W + x) * 3, q = lab(d[i]!, d[i + 1]!, d[i + 2]!);
+      mid++;
+      if (Math.hypot(q[0] - sLab[0], q[1] - sLab[1], q[2] - sLab[2]) < 8) midSurface++; // the border's own typical colour
+    }
+  }
+  if (midSurface / Math.max(1, mid) > 0.3) return null;
+
+  // The paper colour candidates: the commonest colours in the photo that AREN'T the surface — over the
+  // whole frame, not just the middle (a big lion fills the middle of its sheet). Tried in order; the
+  // first that makes a sheet-shaped region wins.
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let y = 0; y < H; y += 2) {
+    for (let x = 0; x < W; x += 2) {
       const i = (y * W + x) * 3;
       const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
+      if (c.l < 70 || nearSurface(c)) continue; // paper is light-ish; and it isn't the surface
       const key = (Math.round(c.cr * 30) << 12) | (Math.round(c.cg * 30) << 6) | Math.round(c.l / 20);
       const e = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
       e.n++; e.r += d[i]!; e.g += d[i + 1]!; e.b += d[i + 2]!;
       buckets.set(key, e);
     }
   }
-  const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
-  if (!top) return null;
-  const pc = chroma(top.r / top.n, top.g / top.n, top.b / top.n);
-  const phs = hueSat(top.r / top.n, top.g / top.n, top.b / top.n);
-  const sat = phs.s >= SATURATED;
-  if (pc.l < 70) return null; // paper is light-ish; a dark "sheet" is more likely the surface
-  const sc = chroma(sr, sg, sb);
-  // the surface must look different from the paper (else the "sheet" is just the whole photo)
-  if (Math.hypot(sc.cr - pc.cr, sc.cg - pc.cg) < 0.02 && Math.abs(sc.l - pc.l) < pc.l * 0.18) return null;
-
-  const isPaper = new Uint8Array(N);
-  for (let k = 0; k < N; k++) {
-    const c = chroma(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!);
-    // saturated paper (orange, deep red, bright blue card) is matched by HUE — stable across the light
-    const same = sat
-      ? (() => { const h = hueSat(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!); return h.s >= SATURATED * 0.7 && hueGap(h.h, phs.h) < 14 && Math.abs(h.s - phs.s) < 0.25; })()
-      : Math.hypot(c.cr - pc.cr, c.cg - pc.cg) < 0.035;
-    isPaper[k] = same && c.l > pc.l * 0.55 && c.l < pc.l * 1.35 + 4 ? 1 : 0;
+  // Of the candidates that make a sheet, the PAPER is the one running round the sheet's EDGE — not
+  // simply the most common (snow painted over most of a navy card is still drawing).
+  const candidates = [...buckets.values()].sort((a, b) => b.n - a.n).slice(0, 4);
+  let best: { sheet: Uint8Array; colour: [number, number, number]; w: number; h: number; edge: number } | null = null;
+  for (const top of candidates) {
+    if (top.n < (N / 4) * 0.05) break; // too rare to be the paper
+    const found = sheetFor(top);
+    if (!found) continue;
+    if (!best || found.edge > best.edge) best = found;
   }
-  // largest connected paper region
-  const lab = new Int32Array(N).fill(-1);
-  let bestId = -1, bestN = 0;
-  for (let s0 = 0; s0 < N; s0++) {
-    if (!isPaper[s0] || lab[s0] !== -1) continue;
-    let n = 0;
-    const st = [s0];
-    lab[s0] = s0;
+  if (!best || best.edge < 0.25) return null;
+  let onFrame = 0;
+  for (const k of ring) onFrame += best.sheet[k]!;
+  return { sheet: best.sheet, colour: best.colour, w: W, h: H, surface: [sr, sg, sb], touchesFrame: onFrame / ring.length > 0.02 };
+
+  function sheetFor(top: { n: number; r: number; g: number; b: number }): { sheet: Uint8Array; colour: [number, number, number]; w: number; h: number; edge: number } | null {
+    const pc = chroma(top.r / top.n, top.g / top.n, top.b / top.n);
+    const phs = hueSat(top.r / top.n, top.g / top.n, top.b / top.n);
+    const sat = phs.s >= SATURATED;
+    const pr = top.r / top.n, pg = top.g / top.n, pb = top.b / top.n;
+    // on a white desk the paper must be clearly coloured (white-on-white has no edge to find)
+    if (whiteDesk && phs.s < 0.08) return null;
+    const isPaper = new Uint8Array(N);
+    for (let k = 0; k < N; k++) {
+      const c = chroma(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!);
+      // saturated paper (orange, deep red, bright blue card) is matched by HUE — stable across the light
+      const same = sat
+        ? (() => { const h = hueSat(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!); return h.s >= SATURATED * 0.7 && hueGap(h.h, phs.h) < 14 && Math.abs(h.s - phs.s) < 0.25; })()
+        : Math.hypot(c.cr - pc.cr, c.cg - pc.cg) < 0.035;
+      // …and nearer the paper than the surface (orange card on an oak table share a hue)
+      const r = d[k * 3]!, g = d[k * 3 + 1]!, b = d[k * 3 + 2]!;
+      const toPaper = (r - pr) ** 2 + (g - pg) ** 2 + (b - pb) ** 2, toSurface = (r - sr) ** 2 + (g - sg) ** 2 + (b - sb) ** 2;
+      isPaper[k] = same && toPaper < toSurface && c.l > pc.l * 0.55 && c.l < pc.l * 1.35 + 4 ? 1 : 0;
+    }
+    // connected paper regions
+    const labels = new Int32Array(N).fill(-1);
+    let bestId = -1, bestN = 0;
+    const comps: { id: number; n: number; x0: number; y0: number; x1: number; y1: number; cx: number; cy: number; surf: number }[] = [];
+    for (let s0 = 0; s0 < N; s0++) {
+      if (!isPaper[s0] || labels[s0] !== -1) continue;
+      let n = 0;
+      const st = [s0];
+      labels[s0] = s0;
+      const cmp = { id: s0, n: 0, x0: W, y0: H, x1: 0, y1: 0, cx: 0, cy: 0, surf: 0 };
+      while (st.length) {
+        const k = st.pop()!;
+        n++;
+        const x = k % W;
+        const y = (k - x) / W;
+        if (x < cmp.x0) cmp.x0 = x; if (x > cmp.x1) cmp.x1 = x; if (y < cmp.y0) cmp.y0 = y; if (y > cmp.y1) cmp.y1 = y;
+        cmp.cx += x; cmp.cy += y; cmp.surf += surfaceLike[k]!;
+        if (x > 0 && isPaper[k - 1] && labels[k - 1] === -1) { labels[k - 1] = s0; st.push(k - 1); }
+        if (x < W - 1 && isPaper[k + 1] && labels[k + 1] === -1) { labels[k + 1] = s0; st.push(k + 1); }
+        if (k >= W && isPaper[k - W] && labels[k - W] === -1) { labels[k - W] = s0; st.push(k - W); }
+        if (k < N - W && isPaper[k + W] && labels[k + W] === -1) { labels[k + W] = s0; st.push(k + W); }
+      }
+      cmp.n = n;
+      if (n >= N * 0.005) comps.push(cmp);
+      if (n > bestN) { bestN = n; bestId = s0; }
+    }
+    if (bestId < 0 || bestN < N * 0.15) return null;
+    // The sheet's paper can be split in two by the drawing (an ice floe painted right across a navy
+    // card): every sizeable piece of paper colour beside the biggest one belongs to the same sheet.
+    const best = comps.find((c) => c.id === bestId)!;
+    const mx = (best.x1 - best.x0) * 0.25, my = (best.y1 - best.y0) * 0.25;
+    const member = new Set<number>();
+    for (const c of comps) {
+      const cx = c.cx / c.n, cy = c.cy / c.n;
+      // (a patch that's mostly table colours is a highlight on the wood, not more sheet)
+      if (c.id === bestId || (c.surf / c.n < 0.5 && cx >= best.x0 - mx && cx <= best.x1 + mx && cy >= best.y0 - my && cy <= best.y1 + my)) member.add(c.id);
+    }
+    // the sheet = those pieces + everything they enclose (not reachable from the border without crossing them)
+    const outside = new Uint8Array(N);
+    const st: number[] = [];
+    const seed = (k: number) => { if (!outside[k] && !member.has(labels[k]!)) { outside[k] = 1; st.push(k); } };
+    for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+    for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
     while (st.length) {
       const k = st.pop()!;
-      n++;
       const x = k % W;
-      if (x > 0 && isPaper[k - 1] && lab[k - 1] === -1) { lab[k - 1] = s0; st.push(k - 1); }
-      if (x < W - 1 && isPaper[k + 1] && lab[k + 1] === -1) { lab[k + 1] = s0; st.push(k + 1); }
-      if (k >= W && isPaper[k - W] && lab[k - W] === -1) { lab[k - W] = s0; st.push(k - W); }
-      if (k < N - W && isPaper[k + W] && lab[k + W] === -1) { lab[k + W] = s0; st.push(k + W); }
+      if (x > 0) seed(k - 1);
+      if (x < W - 1) seed(k + 1);
+      if (k >= W) seed(k - W);
+      if (k < N - W) seed(k + W);
     }
-    if (n > bestN) { bestN = n; bestId = s0; }
+    // …plus whatever ISN'T table that touches it (snow painted to the sheet's bottom edge is still sheet)…
+    {
+      const st2: number[] = [];
+      for (let k = 0; k < N; k++) if (!outside[k]) st2.push(k);
+      while (st2.length) {
+        const k = st2.pop()!;
+        const x = k % W;
+        for (const j of [x > 0 ? k - 1 : -1, x < W - 1 ? k + 1 : -1, k - W, k + W]) {
+          // (only what's clearly NOT table: never the sheet's shadow on it, or a shade of the wood)
+          if (j < 0 || j >= N || !outside[j] || surfaceLike[j] || maybeTable(j)) continue;
+          outside[j] = 0;
+          st2.push(j);
+        }
+      }
+    }
+    // …and then its CONVEX HULL — a sheet is a (turned) four-sided shape — so drawing right at the
+    // sheet's edge, or painted clean across it, is kept too
+    const region = new Uint8Array(N);
+    let regionArea = 0;
+    for (let k = 0; k < N; k++) { region[k] = outside[k] ? 0 : 1; regionArea += region[k]!; }
+    const sheet = convexHullMask(region, W, H);
+    let area = 0, x0 = W, y0 = H, x1 = 0, y1 = 0, onBorder = 0;
+    for (let k = 0; k < N; k++) {
+      if (!sheet[k]) continue;
+      area++;
+      const x = k % W, y = (k - x) / W;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    for (const k of ring) onBorder += sheet[k]!;
+    if (area < N * 0.25) return null; // too small to be the sheet
+    if (onBorder / ring.length > 0.6) return null; // the sheet fills the frame — no surface to remove
+    const box = (x1 - x0 + 1) * (y1 - y0 + 1);
+    if (area / box < 0.75) return null; // not sheet-shaped
+    // a white desk: the paper itself (not just its outline) must fill its box like a sheet does
+    if (whiteDesk && regionArea / box < 0.9) return null;
+    // …and fill most of the photo, as a sheet photographed on a desk does (a painted rectangle on white
+    // paper is smaller — and must never be lifted away as "a sheet")
+    if (whiteDesk && area < N * 0.5) return null;
+    // how much of the sheet's edge band (a few px in) is this paper colour
+    const D = Math.max(3, Math.round(Math.min(W, H) / 120));
+    let band = 0, onPaper = 0;
+    for (let y = D; y < H - D; y += 2) {
+      for (let x = D; x < W - D; x += 2) {
+        const k = y * W + x;
+        if (!sheet[k] || (sheet[k - D] && sheet[k + D] && sheet[k - D * W] && sheet[k + D * W])) continue;
+        band++;
+        // (a pixel or two either side: the very edge is the cut / its shadow)
+        if (isPaper[k] || isPaper[k + 1] || isPaper[k - 1] || isPaper[k + W] || isPaper[k - W]) onPaper++;
+      }
+    }
+    return { sheet, colour: [Math.round(top.r / top.n), Math.round(top.g / top.n), Math.round(top.b / top.n)], w: W, h: H, edge: band ? onPaper / band : 0 };
   }
-  if (bestId < 0 || bestN < N * 0.15) return null;
-  // the sheet = that region + everything it encloses (not reachable from the border without crossing it)
-  const outside = new Uint8Array(N);
-  const st: number[] = [];
-  const seed = (k: number) => { if (!outside[k] && lab[k] !== bestId) { outside[k] = 1; st.push(k); } };
-  for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
-  for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
-  while (st.length) {
-    const k = st.pop()!;
-    const x = k % W;
-    if (x > 0) seed(k - 1);
-    if (x < W - 1) seed(k + 1);
-    if (k >= W) seed(k - W);
-    if (k < N - W) seed(k + W);
-  }
-  // …and then its OUTLINE, so drawing right at the sheet's edge (not enclosed by paper) is kept too
-  const region = new Uint8Array(N);
-  for (let k = 0; k < N; k++) region[k] = outside[k] ? 0 : 1;
-  const sheet = sheetOutline(region, W, H);
-  let area = 0, x0 = W, y0 = H, x1 = 0, y1 = 0, onBorder = 0;
-  for (let k = 0; k < N; k++) {
-    if (!sheet[k]) continue;
-    area++;
-    const x = k % W, y = (k - x) / W;
-    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
-  }
-  for (const k of ring) onBorder += sheet[k]!;
-  if (area < N * 0.25) return null; // too small to be the sheet
-  if (onBorder / ring.length > 0.6) return null; // the sheet fills the frame — no surface to remove
-  if (area / ((x1 - x0 + 1) * (y1 - y0 + 1)) < 0.75) return null; // not sheet-shaped
-  return { sheet, colour: [Math.round(top.r / top.n), Math.round(top.g / top.n), Math.round(top.b / top.n)], w: W, h: H };
 }
+

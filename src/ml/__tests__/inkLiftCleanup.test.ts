@@ -110,6 +110,65 @@ describe('remove background — one click, ready to go', () => {
     expect(a(300, 240)).toBe(255); // the painted circle stays
   });
 
+  // ── founder's second round (26 Oct): the lion, the birthday card, and no new breakages ──
+  const oak = (w: number, h: number) => `<rect width="${w}" height="${h}" fill="#c99a62"/>` +
+    Array.from({ length: Math.ceil(h / 12) }, (_, i) => `<rect x="0" y="${i * 12}" width="${w}" height="5" fill="#a87a48" opacity="0.6"/>`).join('');
+
+  it('lifts a GREEN sheet whose middle is mostly the drawing (a big lion) off an oak table', async () => {
+    const buf = await svgPng(640, 480, `${oak(640, 480)}
+      <rect x="50" y="40" width="540" height="400" fill="#a6d79a"/>
+      <circle cx="320" cy="240" r="150" fill="#f2b632"/><circle cx="320" cy="240" r="95" fill="#e8a020"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(10, 10)).toBe(0); // the table
+    expect(a(90, 80)).toBe(0); // the green paper
+    expect(a(560, 400)).toBe(0);
+    expect(a(320, 240)).toBe(255); // the lion
+  });
+
+  it('lifts a PALE PINK sheet off a WHITE desk — no pink scraps left round the drawing', async () => {
+    const buf = await svgPng(600, 760, `<rect width="600" height="760" fill="#eeeeec"/>
+      <rect x="40" y="20" width="520" height="720" fill="#f3c5ca"/>
+      <rect x="140" y="360" width="320" height="300" fill="#7b4fc4"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(10, 10)).toBe(0); // the desk
+    expect(a(80, 60)).toBe(0); // the pink paper
+    expect(a(300, 700)).toBe(0); // the pink paper below the cake
+    expect(a(520, 500)).toBe(0); // …and beside it
+    expect(a(300, 500)).toBe(255); // the cake
+  });
+
+  it('keeps SNOW painted right across a navy card to its edges (it is still the sheet, not table)', async () => {
+    const buf = await svgPng(640, 480, `${oak(640, 480)}
+      <rect x="60" y="40" width="520" height="400" fill="#1d4a8f"/>
+      <rect x="60" y="300" width="520" height="140" fill="#f2f4f8"/>
+      <ellipse cx="300" cy="200" rx="60" ry="90" fill="#111111"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(10, 10)).toBe(0); // the table
+    expect(a(120, 80)).toBe(0); // the navy card
+    expect(a(100, 400)).toBe(255); // the snow, right to the sheet's edge
+    expect(a(560, 330)).toBe(255);
+    expect(a(300, 200)).toBe(255); // the penguin
+  });
+
+  it('a RED sheet photographed edge to edge (white showing only at the sides) is never mistaken for a table', async () => {
+    const buf = await svgPng(560, 800, `<rect width="560" height="800" fill="#f4f4f2"/>
+      <rect x="40" y="0" width="480" height="800" fill="#e45a5e"/>
+      <rect x="200" y="250" width="160" height="300" fill="#2f5da8"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(280, 400)).toBe(255); // the blue figure stays
+    expect(a(100, 100)).toBe(0); // the red paper goes
+  });
+
+  it('an enclosed area that was COLOURED IN (sand on a parchment island) keeps its colour, not white', async () => {
+    const buf = await svgPng(600, 480, `<rect width="600" height="480" fill="#e9cf9a"/>
+      <ellipse cx="300" cy="240" rx="180" ry="120" fill="#d2ad72" stroke="#3a2a1a" stroke-width="8"/>`);
+    const res = await liftInk(buf, { keepEnclosedPaper: true });
+    const { data, info } = await sharp(res!.buffer).raw().toBuffer({ resolveWithObject: true });
+    const i = (240 * info.width + 300) * 4;
+    expect(data[i + 3]).toBe(255);
+    expect(Math.min(data[i]!, data[i + 1]!, data[i + 2]!)).toBeLessThan(200); // sand, not flat white
+  });
+
   it('can be switched off (the old single pass)', async () => {
     const buf = await svgPng(600, 480, `<rect width="600" height="480" fill="#c53134"/><rect x="250" y="200" width="100" height="100" fill="#1f7a2e"/>`);
     const res = await liftInk(buf, { cleanup: false });
