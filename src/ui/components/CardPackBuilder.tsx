@@ -21,7 +21,7 @@ import { clampTransform, type ResolutionAssessment } from '@/server/print/geomet
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { CARD_PACK_KEY, packSizeOf } from '@/lib/card-packs';
 import { cardPackLine, newPackLineId } from '@/lib/card-pack-line';
-import { isColouredGround, PATTERN_GROUND_WHITE } from '@/lib/patterns';
+import { PATTERN_GROUND_WHITE, groundHex, isColouredGround } from '@/lib/patterns';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
 
@@ -309,6 +309,9 @@ export function CardPackBuilder() {
         <div>
           <h1 className="font-display text-3xl font-extrabold text-cocoa">card pack</h1>
           <p className="mt-1 text-sm text-ink-soft">{pack.blurb ?? 'a stack of little masterpieces, ready to send'}</p>
+
+          {/* the pack at a glance: the chosen fronts fanned out, as they'll arrive */}
+          <PackFan cards={cards} imageFor={(a) => drawingFor(a)?.imageUrl ?? null} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
 
           {/* Pack size */}
           <div className="mt-5">
@@ -618,6 +621,47 @@ function UploadToKeepsake({ tools, signedIn, login }: { tools: PickerTools; sign
         <Icon icon={IconUpload} size={16} /> {u ? `adding ${Math.min(u.done + 1, u.of)} of ${u.of}…` : 'upload to keepsake'}
       </Button>
       <span className="mt-1 text-[11px] text-ink-faint">one or more, from your computer or your phone’s photos</span>
+    </div>
+  );
+}
+
+/**
+ * The pack at a glance (founder, 26 Oct): the chosen card FRONTS fanned out like a little stack, a
+ * "pack of N" sticker on top. Each front is the print's own shape (7×5″, portrait) with the drawing
+ * filling it (the pack's cover-fit default) on the chosen background colour; empty cards wait, dashed.
+ * The individual card photos stay below for the detail.
+ */
+function PackFan({ cards, imageFor, ground, packSize }: { cards: Array<PackCardLine | null>; imageFor: (assetId: string) => string | null; ground: string; packSize: number }) {
+  const shown = cards.slice(0, 5);
+  const n = shown.length;
+  return (
+    <div className="relative mx-auto mt-5 flex h-56 w-full max-w-md items-end justify-center sm:h-64" aria-label={`your pack of ${packSize} cards`} role="img">
+      {shown.map((c, i) => {
+        const mid = (n - 1) / 2;
+        const off = i - mid;
+        const url = c ? imageFor(c.assetId) : null;
+        return (
+          <div
+            key={i}
+            className="absolute bottom-3 w-[30%] max-w-[8.5rem] origin-bottom"
+            style={{ transform: `translateX(${off * 34}%) rotate(${off * 7}deg) translateY(${Math.abs(off) * 6}px)`, zIndex: 10 - Math.abs(Math.round(off * 2)) }}
+          >
+            <div
+              className="pop-in rounded-[6px] border-2 border-cocoa/15 shadow-[0_4px_10px_rgb(43_33_24/0.18)]"
+              style={{ aspectRatio: '5 / 7', background: c ? ground : 'var(--color-paper)', ['--i' as string]: i }}
+            >
+              {url ? (
+                <img src={url} alt="" className="h-full w-full rounded-[4px] object-cover" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center rounded-[4px] border-2 border-dashed border-cocoa/20 text-[10px] font-bold text-ink-faint">card {i + 1}</span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <span className="absolute -top-1 right-6 z-20 rotate-6 rounded-pill border-2 border-cocoa bg-honey px-3 py-1 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
+        pack of {packSize}
+      </span>
     </div>
   );
 }
