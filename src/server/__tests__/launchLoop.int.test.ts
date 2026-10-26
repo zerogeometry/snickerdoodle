@@ -47,15 +47,22 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   const extraAccounts: string[] = [];
 
   const prevStripeKey = process.env.STRIPE_SECRET_KEY;
+  let prevFramedCost: number | null = null;
   beforeAll(async () => {
     delete process.env.STRIPE_SECRET_KEY; // dev "mark paid" path — never create real Checkout sessions in tests
     client = postgres(DB!, { prepare: false });
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
+    // The promo margin guard never discounts a product with no known landed cost (costs come
+    // from scripts/discount-headroom.mjs, not the seed) — give the framed print one for these tests.
+    const [fp] = await db.select({ cost: schema.productVariants.unitCostPence }).from(schema.productVariants).where(eq(schema.productVariants.sku, 'framedPrint'));
+    prevFramedCost = fp?.cost ?? null;
+    await db.update(schema.productVariants).set({ unitCostPence: 2600 }).where(eq(schema.productVariants.sku, 'framedPrint'));
   });
 
   afterAll(async () => {
+    await db.update(schema.productVariants).set({ unitCostPence: prevFramedCost }).where(eq(schema.productVariants.sku, 'framedPrint'));
     for (const k of keys) await deleteObject(k).catch(() => {});
     if (orderRefs.length) await db.delete(orders).where(inArray(orders.ref, orderRefs));
     await db.delete(giftLinks).where(inArray(giftLinks.familyId, [ids.hartleyId, ids.bloomId]));
