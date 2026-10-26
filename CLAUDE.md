@@ -175,6 +175,8 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (added later) ·
   visual diff: `npm run test:visual` (added later) · db: `npm run db:*` (added later) ·
   jobs: `npm run jobs` (added later) · lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
+- Integration suites (`*.int.test.ts`) skip themselves without `DATABASE_URL` + `S3_ENDPOINT`: run
+  `docker compose up -d && npm run db:migrate` first. CI (`.github/workflows/ci.yml`) runs them all.
 
 ## STOP AND ASK
 If a task seems to require breaking ANY non-negotiable — or trusting the client for visibility/
