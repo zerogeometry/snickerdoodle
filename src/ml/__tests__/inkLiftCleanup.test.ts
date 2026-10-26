@@ -76,6 +76,33 @@ describe('remove background — one click, ready to go', () => {
     expect(a(320, 240)).toBe(255); // the drawing
   });
 
+  it('lifts a DEEP RED sheet lit from one side (bright edge to deep shadow — one hue)', async () => {
+    const buf = await svgPng(600, 800, `<defs><linearGradient id="l" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#eb3735"/><stop offset="1" stop-color="#a60b13"/></linearGradient></defs>
+      <rect width="600" height="800" fill="url(#l)"/><rect x="220" y="300" width="160" height="200" fill="#1f7a2e"/>`);
+    const a = await alphaAt(buf);
+    expect(a(20, 20)).toBe(0); // bright corner
+    expect(a(580, 780)).toBe(0); // shadowed corner
+    expect(a(300, 400)).toBe(255);
+  });
+
+  it('keeps a SATURATED yellow chick on PALE yellow paper (same hue, far more colour)', async () => {
+    const buf = await svgPng(600, 480, `<rect width="600" height="480" fill="#ede080"/><circle cx="300" cy="240" r="70" fill="#fad700"/>`);
+    const a = await alphaAt(buf);
+    expect(a(10, 10)).toBe(0);
+    expect(a(300, 240)).toBe(255);
+  });
+
+  it('keeps drawing right at the EDGE of a coloured sheet on a table (never painted over as table)', async () => {
+    const grain = Array.from({ length: 40 }, (_, i) => `<rect x="0" y="${i * 12}" width="640" height="5" fill="#b8936a" opacity="0.6"/>`).join('');
+    const buf = await svgPng(640, 480, `<rect width="640" height="480" fill="#d1ac81"/>${grain}
+      <rect x="40" y="40" width="560" height="400" fill="#65cdfc"/>
+      <ellipse cx="110" cy="200" rx="70" ry="45" fill="#f67d30"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(10, 10)).toBe(0); // the table
+    expect(a(400, 300)).toBe(0); // the blue sheet
+    expect(a(110, 200)).toBe(255); // the orange fish near the sheet's edge
+  });
+
   it('never mistakes a big painted shape on WHITE paper for a sheet (it would be erased)', async () => {
     const buf = await svgPng(600, 480, `<rect width="600" height="480" fill="#fbfaf6"/><circle cx="300" cy="240" r="210" fill="#c8402a"/>`);
     const a = await alphaAt(buf);

@@ -66,6 +66,21 @@ function chroma(r: number, g: number, b: number): { cr: number; cg: number; l: n
   return { cr: r / s, cg: g / s, l: s / 3 };
 }
 
+/** Hue (0–360°) and saturation (0–1) — a SATURATED paper (deep red, royal blue craft card) keeps its
+ * hue in shadow, while its rg-chromaticity swings as the weak channels fall to zero. */
+function hueSat(r: number, g: number, b: number): { h: number; s: number } {
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  const s = mx === 0 ? 0 : d / mx;
+  if (d === 0) return { h: 0, s };
+  let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  h *= 60;
+  if (h < 0) h += 360;
+  return { h, s };
+}
+const hueGap = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; };
+/** A paper this saturated is matched by HUE (stable under the photo's light), not chromaticity. */
+const SATURATED = 0.35;
+
 /** Why liftInk declined (null): DARK paper (light-on-dark art — a plain colour flood is safe there)
  * or NO paper at all (painted / busy background — a judgement for the parent, never automatic). */
 export interface InkLiftDiagnosis {
@@ -265,23 +280,15 @@ async function sheetOnTable(first: InkLiftResult, strict = false): Promise<{ tab
   let inBox = 0;
   for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!table[y * W + x]) inBox++;
   if (inBox / bboxArea < (strict ? 0.9 : 0.8)) return null; // photographed sheets ~0.85–0.9 (slightly turned); a circle is 0.785
-  const fill = new Uint8Array(N);
-  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < x0 - D || x > x1 + D || y < y0 - D || y > y1 + D) fill[y * W + x] = 1;
-  const B = Math.max(3, Math.round(Math.min(W, H) / 130));
-  // dilate the table by B (separable max), then add it
-  const tmp = new Uint8Array(N);
-  for (let y = 0; y < H; y++) {
-    let last = -1e9;
-    for (let x = 0; x < W; x++) { if (table[y * W + x]) last = x; if (x - last <= B) tmp[y * W + x] = 1; }
-    last = 1e9;
-    for (let x = W - 1; x >= 0; x--) { if (table[y * W + x]) last = x; if (last - x <= B) tmp[y * W + x] = 1; }
-  }
-  for (let x = 0; x < W; x++) {
-    let last = -1e9;
-    for (let y = 0; y < H; y++) { if (tmp[y * W + x]) last = y; if (y - last <= B) fill[y * W + x] = 1; }
-    last = 1e9;
-    for (let y = H - 1; y >= 0; y--) { if (tmp[y * W + x]) last = y; if (last - y <= B) fill[y * W + x] = 1; }
-  }
+  // The table = everything OUTSIDE the sheet's outline (a thin band in, for its cut edge / shadow).
+  // Never "whatever the first pass cleared": that pass measured against the table, so drawing close to
+  // the table's colour was cleared too — and painting that over erased real drawing.
+  const notTable = new Uint8Array(N);
+  for (let k = 0; k < N; k++) notTable[k] = table[k] ? 0 : 1;
+  const outline = sheetOutline(notTable, W, H);
+  const outside = new Uint8Array(N);
+  for (let k = 0; k < N; k++) outside[k] = outline[k] ? 0 : 1;
+  const fill = growMask(outside, W, H, Math.max(3, Math.round(Math.min(W, H) / 130)));
   return { table: fill, colour: [Math.round(top.r / top.n), Math.round(top.g / top.n), Math.round(top.b / top.n)] };
 }
 
@@ -308,15 +315,22 @@ async function liftOnce(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftD
   const inset = Math.max(1, Math.round(Math.min(W, H) * 0.01)); // skip the very edge (vignette / camera fringe)
   for (let x = inset; x < W - inset; x += 2) ring.push((inset * W + x) * 3, ((H - 1 - inset) * W + x) * 3);
   for (let y = inset; y < H - inset; y += 2) ring.push((y * W + inset) * 3, (y * W + W - 1 - inset) * 3);
-  const buckets = new Map<number, { n: number; cr: number; cg: number; l: number }>();
+  // Bucket the border: pale/neutral colours by chromaticity, SATURATED ones by hue (a deep red sheet
+  // lit from one side is one hue from its bright edge to its shadowed one).
+  const buckets = new Map<number, { n: number; cr: number; cg: number; l: number; hx: number; hy: number; s: number; sat: boolean }>();
   for (const i of ring) {
     const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
-    const key = (Math.round(c.cr * 40) << 8) | Math.round(c.cg * 40);
-    const e = buckets.get(key) ?? { n: 0, cr: 0, cg: 0, l: 0 };
+    const hs = hueSat(d[i]!, d[i + 1]!, d[i + 2]!);
+    const sat = hs.s >= SATURATED && c.l > 25;
+    const key = sat ? 1_000_000 + Math.round(hs.h / 12) % 30 : (Math.round(c.cr * 40) << 8) | Math.round(c.cg * 40);
+    const e = buckets.get(key) ?? { n: 0, cr: 0, cg: 0, l: 0, hx: 0, hy: 0, s: 0, sat };
     e.n++;
     e.cr += c.cr;
     e.cg += c.cg;
     e.l += c.l;
+    e.hx += Math.cos((hs.h * Math.PI) / 180);
+    e.hy += Math.sin((hs.h * Math.PI) / 180);
+    e.s += hs.s;
     buckets.set(key, e);
   }
   const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
@@ -327,12 +341,25 @@ async function liftOnce(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftD
   const pcr = top.cr / top.n;
   const pcg = top.cg / top.n;
   const pl = top.l / top.n;
-  // Coverage of the border by that chromaticity family: low ⇒ no paper visible at the edge ⇒ the
+  const paperSat = top.sat;
+  const pHue = ((Math.atan2(top.hy, top.hx) * 180) / Math.PI + 360) % 360;
+  const pSat = top.s / top.n;
+  /** Same paper family? Saturated paper: same hue, still clearly coloured. Pale paper: same chromaticity. */
+  const family = (i: number, chromaTol: number, hueTol: number) => {
+    if (paperSat) {
+      const hs = hueSat(d[i]!, d[i + 1]!, d[i + 2]!);
+      // same hue AND similar saturation: a yellow chick on pale-yellow paper shares the hue but is far
+      // more saturated, so it stays drawing; a deep red sheet in shadow keeps its saturation
+      return hs.s >= SATURATED * 0.7 && hueGap(hs.h, pHue) < hueTol && Math.abs(hs.s - pSat) < 0.25;
+    }
+    const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
+    return Math.hypot(c.cr - pcr, c.cg - pcg) < chromaTol;
+  };
+  // Coverage of the border by that family: low ⇒ no paper visible at the edge ⇒ the
   // "background" is paint or a busy scene — a judgement call, not an automatic lift.
   let fam = 0;
   for (const i of ring) {
-    const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
-    if (Math.hypot(c.cr - pcr, c.cg - pcg) < 0.03 && c.l > pl * 0.45) fam++;
+    if (family(i, 0.03, 14) && (d[i]! + d[i + 1]! + d[i + 2]! + 1) / 3 > pl * 0.45) fam++;
   }
   if (fam / ring.length < 0.4) {
     diag.declined = 'no-paper';
@@ -345,8 +372,8 @@ async function liftOnce(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftD
 
   // Every paper-like pixel in the image (same chromaticity family, plausibly lit).
   const isPaper = (i: number) => {
-    const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
-    return Math.hypot(c.cr - pcr, c.cg - pcg) < 0.025 && c.l > pl * 0.5 && c.l <= pl * 1.35 + 2;
+    const l = (d[i]! + d[i + 1]! + d[i + 2]! + 1) / 3;
+    return family(i, 0.025, 12) && l > pl * 0.5 && l <= pl * 1.35 + 2;
   };
 
   // ── Paper field: per-cell median of paper pixels, holes diffused from neighbours, smoothed ──
@@ -878,6 +905,30 @@ function cleanupResidue(
 }
 
 
+/**
+ * The SHEET'S OUTLINE, filled: per row the span from the first to the last set pixel, together with
+ * the same per column — for a (turned, slightly angled) four-sided sheet that's the sheet itself, with
+ * everything ON it protected whatever its colour (an orange fish near the edge of a blue sheet on an oak
+ * table is inside the outline, so it can never be mistaken for table).
+ */
+function sheetOutline(m: Uint8Array, W: number, H: number): Uint8Array {
+  const out = new Uint8Array(W * H);
+  const rowA = new Int32Array(H).fill(-1), rowB = new Int32Array(H).fill(-1);
+  const colA = new Int32Array(W).fill(-1), colB = new Int32Array(W).fill(-1);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    if (!m[y * W + x]) continue;
+    if (rowA[y] === -1) rowA[y] = x;
+    rowB[y] = x;
+    if (colA[x] === -1) colA[x] = y;
+    colB[x] = y;
+  }
+  // inside = within the sheet's span along its row OR along its column: for a four-sided (convex) sheet
+  // each is already inside it, and either one closes a notch where drawing meets the sheet's edge
+  for (let y = 0; y < H; y++) if (rowA[y] !== -1) for (let x = rowA[y]!; x <= rowB[y]!; x++) out[y * W + x] = 1;
+  for (let x = 0; x < W; x++) if (colA[x] !== -1) for (let y = colA[x]!; y <= colB[x]!; y++) out[y * W + x] = 1;
+  return out;
+}
+
 /** A mask grown by r pixels (separable max). */
 function growMask(m: Uint8Array, W: number, H: number, r: number): Uint8Array {
   const N = W * H;
@@ -934,6 +985,8 @@ async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: 
   const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
   if (!top) return null;
   const pc = chroma(top.r / top.n, top.g / top.n, top.b / top.n);
+  const phs = hueSat(top.r / top.n, top.g / top.n, top.b / top.n);
+  const sat = phs.s >= SATURATED;
   if (pc.l < 70) return null; // paper is light-ish; a dark "sheet" is more likely the surface
   const sc = chroma(sr, sg, sb);
   // the surface must look different from the paper (else the "sheet" is just the whole photo)
@@ -942,7 +995,11 @@ async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: 
   const isPaper = new Uint8Array(N);
   for (let k = 0; k < N; k++) {
     const c = chroma(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!);
-    isPaper[k] = Math.hypot(c.cr - pc.cr, c.cg - pc.cg) < 0.035 && c.l > pc.l * 0.6 && c.l < pc.l * 1.3 + 4 ? 1 : 0;
+    // saturated paper (orange, deep red, bright blue card) is matched by HUE — stable across the light
+    const same = sat
+      ? (() => { const h = hueSat(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!); return h.s >= SATURATED * 0.7 && hueGap(h.h, phs.h) < 14 && Math.abs(h.s - phs.s) < 0.25; })()
+      : Math.hypot(c.cr - pc.cr, c.cg - pc.cg) < 0.035;
+    isPaper[k] = same && c.l > pc.l * 0.55 && c.l < pc.l * 1.35 + 4 ? 1 : 0;
   }
   // largest connected paper region
   const lab = new Int32Array(N).fill(-1);
@@ -978,11 +1035,13 @@ async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: 
     if (k >= W) seed(k - W);
     if (k < N - W) seed(k + W);
   }
-  const sheet = new Uint8Array(N);
+  // …and then its OUTLINE, so drawing right at the sheet's edge (not enclosed by paper) is kept too
+  const region = new Uint8Array(N);
+  for (let k = 0; k < N; k++) region[k] = outside[k] ? 0 : 1;
+  const sheet = sheetOutline(region, W, H);
   let area = 0, x0 = W, y0 = H, x1 = 0, y1 = 0, onBorder = 0;
   for (let k = 0; k < N; k++) {
-    if (outside[k]) continue;
-    sheet[k] = 1;
+    if (!sheet[k]) continue;
     area++;
     const x = k % W, y = (k - x) / W;
     if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
