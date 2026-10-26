@@ -13,7 +13,7 @@ import { CalendarFlipPreview } from './CalendarFlipPreview';
 import { ChristmasPromise } from './ChristmasPromise';
 import { ProductDetails } from './ProductDetails';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
-import { usePickerEdits } from './usePickerEdits';
+import { forgetResumeVisit, isResumeVisit, usePickerEdits } from './usePickerEdits';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { keepsakePickerAction } from '@/app/actions/keepsakePicker';
 import type { CatalogueProduct } from '@/server/catalogue';
@@ -123,7 +123,11 @@ export function CalendarBuilder() {
       setSlots(Array.from({ length: CALENDAR_PAGE_COUNT }, (_, i) => (line.pages![i] ? { ...line.pages![i]! } : null)));
       return;
     }
-    const draft = readDraft();
+    // this tab's draft — only on the way back from the Studio; any other visit starts fresh
+    const resuming = isResumeVisit();
+    forgetResumeVisit();
+    if (!resuming) writeDraft(null);
+    const draft = resuming ? readDraft() : null;
     if (draft?.slots.some(Boolean)) {
       if (draft.variantId) setVariantId(draft.variantId);
       setSlots(Array.from({ length: CALENDAR_PAGE_COUNT }, (_, i) => draft.slots[i] ?? null));
@@ -154,7 +158,7 @@ export function CalendarBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: NEXT, onUploaded: loadPicker, sheet });
+  const tools = usePickerEdits({ returnTo: `${NEXT}?resume=1`, onUploaded: loadPicker, sheet });
   // back from the Studio: the picker open again on the page it was filling, the edited drawing chosen
   const { resume, clearResume } = tools;
   useEffect(() => {
@@ -319,7 +323,7 @@ export function CalendarBuilder() {
 
   return (
     <Shell>
-      <div className="grid gap-7 md:grid-cols-2 md:items-start">
+      <div className="grid gap-7 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start lg:gap-12">
         {/* Left (like every product page): the calendar, big — flip through it — with its pages under it */}
         <div className="min-w-0">
           {/* The flip-through */}
@@ -499,7 +503,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-40 on phones clears the fixed thumb-zone action dock. */}
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10 2xl:max-w-[1600px]">{children}</main>
     </div>
   );
 }

@@ -31,13 +31,40 @@ const DETOUR_KEY = 'sd_studio_detour'; // { assetId, returnTo, sheet } while a k
 /** the picker as it was when the Studio was opened from it — which card / page it was filling */
 export type PickerSheet = { slot: number; advance: boolean };
 
-/** Where the Studio goes back to when it was opened from a picker (null = the usual collection). */
-export function studioReturnTo(): string | null {
+/** Where the Studio goes back to when it was opened from a picker for THIS drawing (null = the usual
+ * collection — a note left by a detour abandoned some other way never hijacks a later Studio visit). */
+export function studioReturnTo(assetId?: string | null): string | null {
   try {
-    const d = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null') as { returnTo?: string } | null;
-    return d?.returnTo ?? null;
+    const d = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null') as { returnTo?: string; assetId?: string } | null;
+    if (!d?.returnTo || (assetId && d.assetId && d.assetId !== assetId)) return null;
+    return d.returnTo;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Does this visit to a builder CARRY ON the last one? Only on the way back from the Studio (its return
+ * address carries ?resume=1). Any other arrival starts fresh — the drawing in progress, nothing from a
+ * pack or calendar bailed on earlier (founder, 26 Oct: "I don't want it to be pre-populated with things
+ * from a session I bailed on earlier").
+ */
+export function isResumeVisit(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get('resume') === '1';
+  } catch {
+    return false;
+  }
+}
+/** Drop ?resume=1 once used, so a reload / a later "back" to this entry starts fresh. */
+export function forgetResumeVisit(): void {
+  try {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('resume')) return;
+    url.searchParams.delete('resume');
+    window.history.replaceState(window.history.state, '', url.pathname + (url.search ? url.search : '') + url.hash);
+  } catch {
+    /* fine */
   }
 }
 
@@ -51,6 +78,15 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
   useEffect(() => {
     if (!editsRead.current) {
       editsRead.current = true;
+      // a fresh visit: no edits carried over from a builder bailed on earlier
+      if (!isResumeVisit()) {
+        try {
+          sessionStorage.removeItem(editsKey);
+        } catch {
+          /* no storage */
+        }
+        return;
+      }
       try {
         const saved = JSON.parse(sessionStorage.getItem(editsKey) ?? '{}') as Record<string, DrawingEdit>;
         if (saved && Object.keys(saved).length) {
@@ -99,7 +135,9 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     }
     if (!detour) return;
     const u = useUpload.getState().upload;
-    if (u?.assetId === detour.assetId) {
+    // (a detour abandoned some other way: just put the drawing in progress back, below)
+    const back = isResumeVisit();
+    if (back && u?.assetId === detour.assetId) {
       if (u.cutout && !u.cutout.trim) {
         const design = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
         setEdits((e) => ({ ...e, [detour!.assetId]: design }));
@@ -108,7 +146,7 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
         setEdits(({ [detour!.assetId]: _gone, ...rest }) => rest);
       }
     }
-    if (detour.sheet) setResume({ assetId: detour.assetId, sheet: detour.sheet });
+    if (back && detour.sheet) setResume({ assetId: detour.assetId, sheet: detour.sheet });
     try {
       // (only when one WAS set aside — editing the drawing in progress itself sets nothing aside)
       const stash = sessionStorage.getItem(STASH_KEY);

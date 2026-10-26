@@ -8,7 +8,7 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { usePickerEdits } from './usePickerEdits';
+import { forgetResumeVisit, isResumeVisit, usePickerEdits } from './usePickerEdits';
 import { FlowHeader } from './FlowHeader';
 import { BaseColourPicker } from './BaseColourPicker';
 import { ChristmasPromise } from './ChristmasPromise';
@@ -114,9 +114,12 @@ export function CardPackBuilder() {
     const id = new URLSearchParams(window.location.search).get('edit');
     const line = id ? useBasket.getState().items.find((i) => i.id === id && i.cards) : null;
     if (!line) {
-      // this tab's picks, kept while the shopper was in the Studio / adding drawings
+      // this tab's picks — only on the way back from the Studio; any other visit starts fresh
+      const resuming = isResumeVisit();
+      forgetResumeVisit();
       try {
-        const d = JSON.parse(sessionStorage.getItem(PACK_DRAFT_KEY) ?? 'null') as { variantId?: string | null; slots?: Slot[]; ground?: string } | null;
+        if (!resuming) sessionStorage.removeItem(PACK_DRAFT_KEY);
+        const d = !resuming ? null : JSON.parse(sessionStorage.getItem(PACK_DRAFT_KEY) ?? 'null') as { variantId?: string | null; slots?: Slot[]; ground?: string } | null;
         if (d?.slots?.some(Boolean)) {
           if (d.variantId) setVariantId(d.variantId);
           setSlots(d.slots);
@@ -322,10 +325,10 @@ export function CardPackBuilder() {
 
   return (
     <Shell>
-      <div className="grid gap-7 md:grid-cols-2 md:items-start">
+      <div className="grid gap-7 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start lg:gap-12">
         {/* Left (like every product page): the pack at a glance, big, with the card fronts under it */}
         <div className="min-w-0">
-          <div className="polaroid tape relative mt-3">
+          <div className="polaroid tape relative mx-auto mt-3 w-full md:max-w-[min(100%,calc(100dvh-25rem))]">
             <div className="flex w-full items-center justify-center bg-paper-2 p-3">
               <PackFan cards={cards} imageFor={(a) => { const d = drawingFor(a); return d?.thumbUrl ?? d?.imageUrl ?? null; }} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
             </div>
@@ -613,7 +616,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-36 on phones clears the fixed thumb-zone action dock. */}
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10 2xl:max-w-[1600px]">{children}</main>
     </div>
   );
 }
@@ -659,31 +662,35 @@ function PackFan({ cards, imageFor, ground, packSize }: { cards: Array<PackCardL
   const shown = cards.slice(0, 5);
   const n = shown.length;
   return (
-    <div className="relative mx-auto flex h-64 w-full max-w-md items-end justify-center sm:h-72" aria-label={`your pack of ${packSize} cards`} role="img">
-      {shown.map((c, i) => {
-        // card 1 at the front, in the middle; the others fan out behind it, alternating left / right
-        const off = i === 0 ? 0 : (i % 2 ? -1 : 1) * Math.ceil(i / 2) * (n > 1 ? 1 : 0);
-        const url = c ? imageFor(c.assetId) : null;
-        return (
-          <div
-            key={i}
-            className="absolute bottom-3 w-[30%] max-w-[8.5rem] origin-bottom"
-            style={{ transform: `translateX(${off * 34}%) rotate(${off * 7}deg) translateY(${Math.abs(off) * 6}px)`, zIndex: 10 - Math.abs(Math.round(off * 2)) }}
-          >
+    // a square frame like every product's photo, the stack centred in it (founder, 26 Oct)
+    <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden" aria-label={`your pack of ${packSize} cards`} role="img">
+      {/* card 1's footprint, dead centre; the others fan out behind it from the same spot */}
+      <div className="relative w-[30%]" style={{ aspectRatio: '5 / 7' }}>
+        {shown.map((c, i) => {
+          // card 1 at the front, in the middle; the others fan out behind it, alternating left / right
+          const off = i === 0 ? 0 : (i % 2 ? -1 : 1) * Math.ceil(i / 2) * (n > 1 ? 1 : 0);
+          const url = c ? imageFor(c.assetId) : null;
+          return (
             <div
-              className="pop-in overflow-hidden rounded-[4px] shadow-[0_4px_10px_rgb(43_33_24/0.22)]"
-              style={{ aspectRatio: '5 / 7', background: c ? ground : 'var(--color-paper)', ['--i' as string]: i }}
+              key={i}
+              className="absolute inset-0"
+              style={{ transform: `translateX(${off * 34}%) rotate(${off * 7}deg) translateY(${Math.abs(off) * 6}px)`, zIndex: 10 - Math.abs(Math.round(off * 2)) }}
             >
-              {url ? (
-                <img src={url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center rounded-[4px] border-2 border-dashed border-cocoa/20 text-[10px] font-bold text-ink-faint">card {i + 1}</span>
-              )}
+              <div
+                className="pop-in h-full w-full overflow-hidden rounded-[4px] shadow-[0_4px_10px_rgb(43_33_24/0.22)]"
+                style={{ background: c ? ground : 'var(--color-paper)', ['--i' as string]: i }}
+              >
+                {url ? (
+                  <img src={url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="flex h-full w-full items-center justify-center rounded-[4px] border-2 border-dashed border-cocoa/20 text-[10px] font-bold text-ink-faint">card {i + 1}</span>
+                )}
+              </div>
             </div>
-          </div>
-        );
-      })}
-      <span className="absolute -top-1 right-6 z-20 rotate-6 rounded-pill border-2 border-cocoa bg-honey px-3 py-1 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
+          );
+        })}
+      </div>
+      <span className="absolute right-3 top-3 z-20 rotate-6 rounded-pill border-2 border-cocoa bg-honey px-3 py-1 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
         pack of {packSize}
       </span>
     </div>

@@ -578,7 +578,7 @@ function CustomizeProduct() {
           />
         </div>
       </Modal>
-      <div className="grid gap-7 md:grid-cols-2 md:items-start">
+      <div className="grid gap-7 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start lg:gap-12">
         {/* Left: ONE photo preview (+20% vs the old view) with the colour strip under it */}
         <div>
           {canSpin && !isMug ? (
@@ -607,7 +607,7 @@ function CustomizeProduct() {
               </Link>
             </div>
           ) : null}
-          <div className="polaroid tape relative mt-3">
+          <div className="polaroid tape relative mx-auto mt-3 w-full md:max-w-[min(100%,calc(100dvh-25rem))]">
             <div className="flex w-full items-center justify-center bg-paper-2 p-3">
             {view === 'spin' && canSpin && previewImg && variant?.printWmm && variant?.printHmm ? (
               <div className="h-96 w-full">
@@ -1318,7 +1318,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-36 on phones clears the fixed thumb-zone action dock. */}
-      <main id="main" className="mx-auto w-full max-w-4xl flex-1 px-4 pb-36 pt-6 md:px-6 md:pb-10">{children}</main>
+      <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-36 pt-6 md:px-6 md:pb-10 2xl:max-w-[1600px]">{children}</main>
     </div>
   );
 }

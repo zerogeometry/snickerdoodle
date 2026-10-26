@@ -866,7 +866,7 @@ function StudioEditor() {
   // phone (with its loader right there) rather than back at the top.
   const backToRange = (saved = false) => {
     // opened from the calendar / card-pack picker: back there (src/ui/components/usePickerEdits.ts)
-    const to = studioReturnTo() ?? (saved ? '/start-creating?edited=1' : '/start-creating');
+    const to = studioReturnTo(useUpload.getState().upload?.assetId) ?? (saved ? '/start-creating?edited=1' : '/start-creating');
     if (guardRef.current) {
       guardRef.current = false;
       router.replace(to);
