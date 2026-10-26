@@ -7,6 +7,7 @@
 //
 // Re-run scripts/compose-founder-layers.mjs first if a photo changed.
 import { defaultTransformFor } from '@/lib/catalogue-view';
+import type { Transform } from '@/server/print/geometry';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { definedPriceList } from '@/server/catalogue';
@@ -49,7 +50,7 @@ for (const s of SETS) {
   for (const q of [t.quad, ...(t.extraQuads ?? [])]) assertQuadFitsBlank(q, { warped: !!t.extraQuads?.length });
   const webp = await renderTemplatePreview({
     blank: t.blank, mask: t.mask, overlay: t.overlay, quad: t.quad, extraQuads: t.extraQuads, materialClass: s.material, design, productKey: s.key, ground,
-    transform: defaultTransformFor(s.key), // the product's own default placement (fill / fit), as the shop shows it
+    transform: defaultTransformFor(s.key) as Transform, // the product's own default placement (fill / fit), as the shop shows it
     print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: 0, requiredDpi: s.dpi },
   });
   const file = path.join(outDir, `${s.set.replace('/', '-')}${s.sku ? '-' + s.sku : ''}${ground ? '-' + ground : ''}.webp`);
