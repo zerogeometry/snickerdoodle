@@ -60,7 +60,7 @@ export function christmasYear(now: Date): number {
 }
 
 /** While the season is on, these lead the range, in this order (then everything else as usual). */
-export const CHRISTMAS_FEATURED = ['bauble', 'cardPack', 'wrappingPaper', 'calendar', 'sack', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
+export const CHRISTMAS_FEATURED = ['ceramicOrnament', 'christmasBauble', 'cardPack', 'wrappingPaper', 'calendar', 'sack', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
 
 /**
  * The expected-popularity list with the Christmas products moved to the front while the season is on.
@@ -109,7 +109,7 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
 
 /** product key → route (variant overrides in {@link routeOf}). Verified by sandbox quotes 2026-10-25. */
 const ROUTE_BY_PRODUCT: Record<string, Route> = {
-  bauble: 'uk9', sack: 'uk9', mug: 'uk9', teaTowel: 'uk9', petBandana: 'uk9', socks: 'uk9',
+  ceramicOrnament: 'uk9', sack: 'uk9', mug: 'uk9', teaTowel: 'uk9', petBandana: 'uk9', socks: 'uk9',
   kidsTee: 'uk9', adultTee: 'uk9', kidsHoodie: 'uk9', adultHoodie: 'uk9', kidsJumper: 'uk9',
   apron: 'uk3', cushion: 'uk3', blanket: 'uk3',
   card: 'uk7', cardPack: 'uk7',
@@ -118,18 +118,17 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3',
   christmasJumper: 'uk2', babyBodysuit: 'uk2',
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
+  christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24
   phoneCase: 'uk6',
 };
-
+/** The route for a product (a variant can refine it — none do today: the two ornaments are separate products). */
 /** The route for a product, optionally refined by the chosen variant's attributes. */
-export function routeOf(productKey: string, attrs?: { size?: string | null; colour?: string | null }): Route {
-  if (productKey === 'bauble' && attrs?.size === 'plastic ball') return 'uk5';
+export function routeOf(productKey: string, _attrs?: { size?: string | null; colour?: string | null }): Route {
   return ROUTE_BY_PRODUCT[productKey] ?? 'other';
 }
 
-/** The route for a priced-line key (product key or variant sku, e.g. `bauble-plasticball`). */
+/** The route for a priced-line key (product key or variant sku, e.g. `calendar-a4`). */
 export function routeOfLineKey(lineKey: string): Route {
-  if (lineKey === 'bauble-plasticball' || lineKey.startsWith('bauble-plasticball-')) return 'uk5';
   const dash = lineKey.indexOf('-');
   return routeOf(dash > 0 ? lineKey.slice(0, dash) : lineKey);
 }

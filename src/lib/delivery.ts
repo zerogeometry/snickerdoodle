@@ -7,7 +7,7 @@
  */
 // D24 (2026-10-25): + the plastic ball (uk5, Royal Mail RM24) and the AWDis christmas jumper (Prodigi may
 // route it to uk2, Royal Mail 1st Class) — both untracked on Standard.
-export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'bauble-plasticball', 'christmasJumper'];
+export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper'];
 
 /** A product key OR a variant sku (`wrappingPaper-2mroll`). */
 export const shipsTracked = (key: string): boolean => !UNTRACKED_STANDARD_KEYS.some((k) => key === k || key.startsWith(`${k}-`));

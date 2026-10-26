@@ -10,6 +10,8 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
 import { CalendarFlipPreview } from './CalendarFlipPreview';
+import { BaseColourPicker } from './BaseColourPicker';
+import { groundHex, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { keepsakePickerAction } from '@/app/actions/keepsakePicker';
@@ -74,6 +76,8 @@ export function CalendarBuilder() {
   const [variantId, setVariantId] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>(() => Array.from({ length: CALENDAR_PAGE_COUNT }, () => null));
   const [edit, setEdit] = useState<string | null>(null);
+  // one base colour under the drawing on every page (founder, 26 Oct: a colour for every product's print area)
+  const [ground, setGround] = useState<string>(PATTERN_GROUND_WHITE);
   const [picker, setPicker] = useState<PickerState>({ status: 'loading' });
   // Which page the sheet is filling (null = closed), and whether it steps on to the next page after
   // placing one (true when it was opened to FILL, false when swapping one).
@@ -116,6 +120,7 @@ export function CalendarBuilder() {
     if (line) {
       setEdit(line.id);
       if (line.variantId) setVariantId(line.variantId);
+      if (line.ground) setGround(line.ground);
       setSlots(Array.from({ length: CALENDAR_PAGE_COUNT }, (_, i) => (line.pages![i] ? { ...line.pages![i]! } : null)));
       return;
     }
@@ -229,7 +234,7 @@ export function CalendarBuilder() {
   const ready = filledCount > 0;
   const addToBasket = () => {
     if (!variant || !ready || blockedAt >= 0) return;
-    const line = calendarLine({ id: edit ?? newCalendarLineId(), variant, slots });
+    const line = calendarLine({ id: edit ?? newCalendarLineId(), variant, slots, ground });
     if (edit) {
       const { id, ...fields } = line;
       update(edit, fields, id); // same line, same place, same copies
@@ -316,7 +321,13 @@ export function CalendarBuilder() {
               geom={printGeom}
               page={page}
               onPage={setPage}
+              ground={groundHex(ground)}
             />
+          </div>
+
+          {/* a base colour under the drawing, on every page */}
+          <div className="mt-6">
+            <BaseColourPicker title="background colour" noun="page" value={ground} onChange={setGround} />
           </div>
 
           {/* The pages */}

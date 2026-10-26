@@ -5,10 +5,10 @@ import { DRAWN_PRODUCT_KEYS, drawProductMockup } from '../drawnMockups';
 
 
 describe('drawn mockups — the print area IS the print file’s shape (preview == print)', () => {
-  // a drawn key is a product key, except the plastic ball — a VARIANT of the bauble (D24)
+  // a drawn key is a product key, except the plastic ball — the christmas bauble (D24)
   type DrawnKey = (typeof DRAWN_PRODUCT_KEYS)[number];
   const drawnOf = (v: { productKey: string; attributes: Record<string, string> }): DrawnKey | null =>
-    v.productKey === 'bauble' ? (v.attributes.size === 'plastic ball' ? 'plasticBauble' : null) : (DRAWN_PRODUCT_KEYS as readonly string[]).includes(v.productKey) ? (v.productKey as DrawnKey) : null;
+    v.productKey === 'christmasBauble' ? 'plasticBauble' : (DRAWN_PRODUCT_KEYS as readonly string[]).includes(v.productKey) ? (v.productKey as DrawnKey) : null;
   const variants = definedPriceList()
     .map((v) => ({ ...v, drawn: drawnOf(v) }))
     .filter((v): v is typeof v & { drawn: DrawnKey } => v.drawn !== null);

@@ -386,6 +386,10 @@ interface ResolvedTemplate {
 /** Views served off the PRIMARY template (not a mockup_views row): the plain primary, the AR
  * 'board', and the mug's cylinder 'front'/'back' (both wrap the same front photo). */
 const PRIMARY_VIEWS = new Set(['primary', 'board', 'front', 'back']);
+/** "the back" of these is the same product photo turned over (flipped) — the founder's photo, nothing invented
+ * (founder, 26 Oct). A single-sided print shows it unprinted (the page asks with a white fill); the bauble,
+ * printed on both sides, shows the drawing again — reading the right way round. */
+export const FLIP_BACK_KEYS = new Set(['sack', 'ceramicOrnament', 'christmasBauble']);
 async function loadResolvedTemplate(db: DbHandle, variantId: string, view: string | undefined): Promise<ResolvedTemplate | null> {
   if (view && !PRIMARY_VIEWS.has(view)) {
     const [v] = await db.select().from(mockupViews).where(and(eq(mockupViews.variantId, variantId), eq(mockupViews.view, view)));
@@ -462,7 +466,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   const spanHalf = (input.spanHalf === 'front' || input.spanHalf === 'back') && !isAxisAligned(tpl.printQuad) ? input.spanHalf : undefined;
   const spanTag = spanHalf ? `-span${spanHalf}` : '';
   // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
-  const ground = !fill && (face === 'pattern' || (!face && isGroundProduct(prod?.key))) ? normalizeGround(input.ground) : null;
+  const ground = !fill && (face === 'pattern' || isGroundProduct(prod?.key)) ? normalizeGround(input.ground) : null;
   const gTag = groundTag(ground);
   const faceTag = face ? `-face${face === 'pattern' ? 'rep' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
@@ -496,6 +500,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
       mugMode: input.view === 'back' ? 'back' : input.view === 'centre' ? 'centre' : 'front',
+      flipBack: input.view === 'back' && FLIP_BACK_KEYS.has(prod?.key ?? ''),
       face,
       paperTone: PAPER_TONE[prod?.key ?? ''],
     }),
@@ -533,7 +538,7 @@ export async function renderPrintedFace(
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
   if (face === 'pattern') return renderRepeatPatternPixels(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale });
-  return renderHeightChartFacePixels(srcBuf, geom, transform, { scale });
+  return renderHeightChartFacePixels(srcBuf, geom, transform, { scale, groundHex: groundHex === '#ffffff' ? undefined : groundHex });
 }
 
 /**
@@ -590,6 +595,8 @@ async function renderAndPersist(
     thumb?: boolean; memo?: ComposeMemo;
     /** preview-only paper tone (PAPER_TONE) */
     paperTone?: number;
+    /** "the back": render the front, turned over (FLIP_BACK_KEYS) */
+    flipBack?: boolean;
   },
 ): Promise<MockupResult> {
   // A solid-colour fill (cushion plain back) is synthesised in-process — no child pixels; it
@@ -616,6 +623,10 @@ async function renderAndPersist(
   } else {
     designBuf = await source();
   }
+  if (args.flipBack && !args.fillHex) {
+    designBuf = await sharp(Buffer.isBuffer(designBuf) ? designBuf : await sharp(designBuf.data, { raw: { width: designBuf.width, height: designBuf.height, channels: designBuf.channels } }).png().toBuffer()).flop().png().toBuffer();
+    transform = { ...transform, offsetX: -transform.offsetX, rotationDeg: ((360 - transform.rotationDeg) % 360) as Transform['rotationDeg'] };
+  }
   const out = await renderMockupLayers({
     blank: await templateBytes(args.blankKey),
     mask: args.maskKey ? await templateBytes(args.maskKey) : undefined,
@@ -635,6 +646,10 @@ async function renderAndPersist(
     groundHex: args.face ? undefined : args.groundHex,
     paperTone: args.paperTone,
   });
+  if (args.flipBack) {
+    const flopped = await sharp(out.buffer).flop().toBuffer();
+    out.buffer = flopped;
+  }
 
   // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
   // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
@@ -668,7 +683,7 @@ export async function renderMockupLayers(args: {
   transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   materialClass: string; mugMode?: 'front' | 'back' | 'centre';
-  /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area. Flat + perspective only. */
+  /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area (flat, perspective, the mug's wrap). */
   groundHex?: string;
   /** Preview-only paper tone (PAPER_TONE), multiplied over the printed surface. Perspective only. */
   paperTone?: number;
@@ -687,7 +702,7 @@ export async function renderMockupLayers(args: {
   const out = perspective
     ? await renderPerspective({ ...common, extraQuads: extra, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex, paperTone: args.paperTone })
     : cylinder
-      ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask! })
+      ? await renderCylinder({ ...common, mode: args.mugMode ?? 'front', ellipseCx: args.mugMode === 'centre' ? MUG_CENTRE_ELLIPSE_CX : MUG_ELLIPSE_CX, printmapBuf: args.mask!, groundHex: args.groundHex })
       : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex });
   return { ...out, tier: perspective ? 'PERSPECTIVE' : 'FLAT' };
 }
@@ -1094,8 +1109,11 @@ async function renderCylinder(args: {
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   mode: 'front' | 'back' | 'centre';
   ellipseCx: number;
+  /** a base colour under the drawing, all round the printed wrap (#rrggbb) */
+  groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
   const { blankBuf, printmapBuf, designBuf, ids, transform, workEdge, outputEdge, print, mode, ellipseCx } = args;
+  const wrapBg = args.groundHex ?? '#ffffff';
   const back = mode === 'back';
 
   // Working photo (cap the longest edge; the quad is normalised so it scales with it). The BACK
@@ -1120,9 +1138,9 @@ async function renderCylinder(args: {
   // Opaque WHITE wrap canvas (not transparent): multiply reads white as "no ink", so the unprinted
   // margins are an identity op over the ceramic instead of a premultiplied-black edge line.
   const wrap = await toRaw(
-    sharp({ create: { width: dw, height: dh, channels: 4, background: '#ffffff' } })
+    sharp({ create: { width: dw, height: dh, channels: 4, background: wrapBg } })
       .composite([overlayOf(part, { left: ox, top: oy })])
-      .flatten({ background: '#ffffff' })
+      .flatten({ background: wrapBg })
       .ensureAlpha(),
   );
 

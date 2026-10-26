@@ -126,8 +126,9 @@ export async function renderPrintFile(
     if (chartAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${chartAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
-    const face = await renderHeightChartFace(srcBuf, geom, transform);
-    return persistPrintFile(db, input.assetId, input.variantId, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height);
+    const chartGround = normalizeGround(input.ground);
+    const face = await renderHeightChartFace(srcBuf, geom, transform, { groundHex: chartGround ? groundHex(chartGround) : undefined });
+    return persistPrintFile(db, input.assetId, input.variantId, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height, groundTag(chartGround));
   }
 
   const assess = assessResolution(geom, src, transform);

@@ -115,7 +115,7 @@ describe('softBody engine', () => {
 describe('buildProduct — the full range', () => {
   const MM: Record<string, [number, number]> = {
     mug: [209, 98], framedPrint: [279, 356],
-    cushion: [280, 280], blanket: [600, 1000], sack: [320, 500],
+    cushion: [280, 280], blanket: [600, 1000],
     storybook: [148, 210], jigsaw: [250, 200], calendar: [297, 210],
     card: [127, 178], bauble: [82, 82],
   };
@@ -142,19 +142,5 @@ describe('buildProduct — the full range', () => {
   it('giftWrap has no 3D; unknown kinds return null', () => {
     expect(has3D('giftWrap')).toBe(false);
     expect(buildProduct('giftWrap', new THREE.Texture(), 10, 10)).toBeNull();
-  });
-
-  it('sack print patch spans the official 320mm panel (physical registration in mm)', () => {
-    const model = buildProduct('sack', new THREE.Texture(), 320, 500)!;
-    // the patch is the only mesh with MultiplyBlending (ink-on-fabric)
-    let patchWidth = 0;
-    model.traverse((o) => {
-      const mesh = o as THREE.Mesh;
-      if (mesh.isMesh && (mesh.material as THREE.Material).blending === THREE.MultiplyBlending) {
-        const box = new THREE.Box3().setFromObject(mesh);
-        patchWidth = box.getSize(new THREE.Vector3()).x;
-      }
-    });
-    expect(patchWidth).toBeCloseTo(320, 0); // Prodigi's 320×500mm sack panel, true mm
   });
 });

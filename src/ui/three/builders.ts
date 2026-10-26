@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { buildMug, buildFrame } from './models';
-import { buildPrintPatch, buildSoftBody, pathToPolygon, polygonBounds, type Pt } from './softBody';
+import { buildSoftBody, polygonBounds, type Pt } from './softBody';
 
 /**
  * Parametric 3D builders for the SPINNABLE products — built in code (no licensed
@@ -21,14 +21,6 @@ const fleece = (color: string) =>
   new THREE.MeshPhysicalMaterial({ color, roughness: 1, metalness: 0, sheen: 0.9, sheenRoughness: 0.9, side: THREE.DoubleSide });
 const paper = (color = '#f2efe8') => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0 });
 
-/** The printed design over fabric: MULTIPLY, unlit — the framebuffer already holds
- * the LIT fabric, so ink × lit-fabric mirrors the compositor's LIGHT_FABRIC blend
- * (white background vanishes; folds show through the print). */
-const inkOnFabric = (tex: THREE.Texture) => {
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  return new THREE.MeshBasicMaterial({ map: tex, blending: THREE.MultiplyBlending, premultipliedAlpha: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 });
-};
 /** The printed design AS a lit surface (all-over prints, paper faces). */
 const printedSurface = (tex: THREE.Texture, opts: { roughness?: number; sheen?: number } = {}) => {
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -117,35 +109,6 @@ function buildBlanket(texture: THREE.Texture, wMm: number, hMm: number, colour: 
   return centred(group);
 }
 
-// Christmas sack: 19×30″ (483 wide) with a cinched top band; official 320×500 panel
-// sits above the bottom seam (the seeder's panel-physical registration in real mm).
-const SACK_PATH =
-  'M120 40 L363 40 C420 60 455 100 458 160 C468 350 466 550 452 690 C448 735 420 755 380 758 L103 758 C63 755 35 735 31 690 ' +
-  'C17 550 15 350 25 160 C28 100 63 60 120 40 Z';
-function buildSack(texture: THREE.Texture): THREE.Group {
-  const outline = pathToPolygon(SACK_PATH); // authored directly in mm (483×~760)
-  const body = buildSoftBody({
-    outline,
-    puff: 26,
-    backPuff: 18,
-    plateau: 90,
-    fold: (x, y) => 2.4 * Math.sin(x * 0.06) * Math.max(0, 1 - y / 700) ** 1.4 + 1.4 * Math.sin(x * 0.018 + y * 0.01),
-  });
-  const group = new THREE.Group();
-  const mat = cotton('#f3ead9'); // natural cotton, slightly cream
-  group.add(new THREE.Mesh(body.front, mat), new THREE.Mesh(body.back, mat));
-  const rect = { x: (483 - 320) / 2, y: 760 - 0.06 * 760 - 500, w: 320, h: 500 };
-  const patch = new THREE.Mesh(buildPrintPatch(body, rect), inkOnFabric(texture));
-  patch.renderOrder = 1;
-  group.add(patch);
-  // drawstring: a soft rope across the cinch
-  const rope = new THREE.Mesh(new THREE.TorusGeometry(150, 5, 12, 48, Math.PI * 0.9), cotton('#e3d5bd'));
-  rope.position.set(0, 760 / 2 - 60, 20);
-  rope.rotation.z = Math.PI * 0.05;
-  group.add(rope);
-  return centred(group);
-}
-
 // ── rigid goods: storybook, jigsaw, calendar, card, bauble ───────────────────
 function buildStorybook(texture: THREE.Texture, wMm: number, hMm: number): THREE.Group {
   const group = new THREE.Group();
@@ -215,8 +178,6 @@ export function buildProduct(kind: string, texture: THREE.Texture, printWmm: num
       return buildCushion(texture, printWmm, attrs.size ?? 'heart');
     case 'blanket':
       return buildBlanket(texture, printWmm, printHmm, attrs.colour ?? 'white');
-    case 'sack':
-      return buildSack(texture);
     case 'storybook':
       return buildStorybook(texture, printWmm, printHmm);
     case 'jigsaw':

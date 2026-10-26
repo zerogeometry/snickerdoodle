@@ -246,7 +246,7 @@ export async function placeOrder(
       const prepared: Array<{ art: PreparedArt; printArea: string }> = [];
       for (const p of pages) {
         const k = p.assetId;
-        if (!byDesign.has(k)) byDesign.set(k, await prepareArtwork({ assetId: p.assetId, transform: p.transform, sourceObjectId: p.sourceObjectId ?? undefined }, line.productKey, variantId));
+        if (!byDesign.has(k)) byDesign.set(k, await prepareArtwork({ assetId: p.assetId, transform: p.transform, sourceObjectId: p.sourceObjectId ?? undefined, ground: line.artwork?.ground }, line.productKey, variantId));
         const art = byDesign.get(k)!;
         if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
         if (!art) throw new Error('calendar has no print template');

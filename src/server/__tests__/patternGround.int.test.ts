@@ -70,7 +70,7 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
         { productKey: 'socks-tube', qty: 1, artwork: { assetId, transform: tf, ground: '#0B6623' } },
         { productKey: 'teaTowel', qty: 1, artwork: { assetId, transform: tf, ground: 'not-a-colour' } }, // junk → white
         { productKey: 'phoneCase', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // edge to edge: kept
-        { productKey: 'mug', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // the wrap stops at the handle: none
+        { productKey: 'kidsTee', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // a garment prints on its own colour: none
       ],
       account: { id: ids.samId },
       joinProvenance: null,
@@ -87,7 +87,7 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
     const by = Object.fromEntries(rows.map((r) => [r.sku, r.ground]));
     expect(by).toMatchObject({ socks: '#26334f', 'socks-tube': '#0b6623', teaTowel: null });
     expect(Object.entries(by).find(([sku]) => sku.startsWith('phoneCase'))?.[1]).toBe('#c8402a');
-    expect(Object.entries(by).find(([sku]) => sku.startsWith('mug'))?.[1]).toBeNull();
+    expect(Object.entries(by).find(([sku]) => sku.startsWith('kidsTee'))?.[1]).toBeNull();
   });
 
   it('red and navy socks of one drawing print as two files, each on its own colour', async () => {
@@ -170,7 +170,7 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
   it('a saved design keeps its colour (edge-to-edge products only)', async () => {
     const account = { id: ids.samId, name: 'Sam' };
     const a = await saveDesign(db, account, [], { assetId, variantSku: 'socks', transform: { scale: 0 }, ground: '#8FB5D6' });
-    const b = await saveDesign(db, account, [], { assetId, variantSku: 'mug', transform: { scale: 0 }, ground: '#8fb5d6' });
+    const b = await saveDesign(db, account, [], { assetId, variantSku: 'kidsTee', transform: { scale: 0 }, ground: '#8fb5d6' });
     expect(a.ok && b.ok).toBe(true);
     const rows = await db.select({ id: savedDesigns.id, ground: savedDesigns.ground }).from(savedDesigns).where(inArray(savedDesigns.id, [(a as { id: string }).id, (b as { id: string }).id]));
     const by = Object.fromEntries(rows.map((r) => [r.id, r.ground]));

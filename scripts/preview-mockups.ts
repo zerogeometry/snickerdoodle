@@ -35,8 +35,8 @@ const SETS: { key: string; set: string; sku?: string; material: string; dpi: num
   // Christmas (founder, 26 Oct)
   { key: 'calendar', set: 'calendar', sku: 'CALENDAR-A4-L-DATED', material: 'PAPER', dpi: 300 },
   { key: 'sack', set: 'sack', material: 'LIGHT_FABRIC', dpi: 150 },
-  { key: 'bauble', set: 'bauble/ceramic', sku: 'XMAS-PORC-BAUB', material: 'GLOSS', dpi: 300 },
-  { key: 'bauble', set: 'bauble/ball', sku: 'XMAS-PLAS-BAUB', material: 'GLOSS', dpi: 300 },
+  { key: 'ceramicOrnament', set: 'bauble/ceramic', sku: 'XMAS-PORC-BAUB', material: 'GLOSS', dpi: 300 },
+  { key: 'christmasBauble', set: 'bauble/ball', sku: 'XMAS-PLAS-BAUB', material: 'GLOSS', dpi: 300 },
 ];
 
 const variants = definedPriceList();

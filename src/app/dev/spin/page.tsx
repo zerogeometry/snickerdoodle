@@ -16,12 +16,10 @@ const HARNESS: Record<string, { mm: [number, number]; attrs?: Record<string, str
   framedPrint: { mm: [279, 356], attrs: { colour: 'gold' } },
   cushion: { mm: [280, 280], attrs: { size: 'heart' } },
   blanket: { mm: [600, 1000], attrs: { colour: 'pink' } },
-  sack: { mm: [320, 500] },
   storybook: { mm: [148, 210] },
   jigsaw: { mm: [250, 200] },
   calendar: { mm: [297, 210] },
   card: { mm: [127, 178] },
-  bauble: { mm: [82, 82] },
 };
 
 function sampleDrawing(): string {

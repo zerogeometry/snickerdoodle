@@ -29,7 +29,7 @@ export type MockupContext = {
  * The BRAND-SAFE product context for a variant — the blank product photo, its print-area
  * quad and (optional) silhouette mask — so the positioner can show the image being placed
  * ON the product, live. Structurally NON-child data (the same imagery the public catalogue
- * renders), so no viewer gate; short-lived signed URLs.
+ * renders), so no viewer gate; a short-lived signed link for the photo, the mask inline (see maskDataUrl).
  */
 export async function mockupContextAction(input: { variantId: string }): Promise<MockupContext> {
   const db = getDb();
@@ -42,12 +42,33 @@ export async function mockupContextAction(input: { variantId: string }): Promise
   return {
     ok: true,
     blankUrl: await presignDownload(blank.key, 600),
-    maskUrl: mask ? await presignDownload(mask.key, 600) : null,
+    maskUrl: mask ? await maskDataUrl(mask.key) : null,
     quad: tpl.printQuad,
     blankW: blank.widthPx,
     blankH: blank.heightPx,
     overlayUrl: overlay?.widthPx && overlay.heightPx ? await croppedOverlayDataUrl(overlay.key, tpl.printQuad, overlay.widthPx, overlay.heightPx) : null,
   };
+}
+
+/**
+ * The product's SILHOUETTE MASK as a data URL (white = printable), for the positioner's CSS mask. A CSS
+ * mask-image is a cross-origin fetch that needs CORS — and the private bucket allows only uploads — so a
+ * signed link silently masked the drawing away to nothing on the live site (founder, 26 Oct: "edit
+ * placement on the product views isn't working on a number"). Inline, it always works. Brand-safe
+ * template imagery only. Transparent → black (not printable), so alpha-shaped print maps work too.
+ */
+async function maskDataUrl(key: string): Promise<string | null> {
+  try {
+    const png = await sharp(await getObjectBytes(key), { limitInputPixels: 50_000_000 })
+      .resize(1000, 1000, { fit: 'inside', withoutEnlargement: true })
+      .flatten({ background: '#000000' })
+      .greyscale()
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    return `data:image/png;base64,${png.toString('base64')}`;
+  } catch {
+    return null; // without a mask the drawing shows unclipped — better than vanishing
+  }
 }
 
 /**

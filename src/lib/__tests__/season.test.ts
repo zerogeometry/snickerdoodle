@@ -49,11 +49,11 @@ describe('seasonal range order', () => {
 });
 
 describe('routes (which lab makes it)', () => {
-  it('the ceramic bauble and the plastic ball come from different labs', () => {
-    expect(routeOf('bauble', { size: 'ceramic disc' })).toBe('uk9');
-    expect(routeOf('bauble', { size: 'plastic ball' })).toBe('uk5');
-    expect(routeOfLineKey('bauble-plasticball')).toBe('uk5');
-    expect(routeOfLineKey('bauble')).toBe('uk9');
+  it('the ceramic ornament and the christmas bauble come from different labs', () => {
+    expect(routeOf('ceramicOrnament')).toBe('uk9');
+    expect(routeOf('christmasBauble')).toBe('uk5');
+    expect(routeOfLineKey('christmasBauble')).toBe('uk5');
+    expect(routeOfLineKey('ceramicOrnament')).toBe('uk9');
   });
   it('variant skus resolve by their product', () => {
     expect(routeOfLineKey('wrappingPaper-3mroll-kraft')).toBe('gb2');
@@ -68,19 +68,19 @@ describe('routes (which lab makes it)', () => {
 
 describe('the "arrives by christmas" promise', () => {
   it('is silent outside the season', () => {
-    expect(deliveryPromise('bauble', at('2026-10-20T12:00:00Z'))).toEqual({ state: 'off' });
+    expect(deliveryPromise('ceramicOrnament', at('2026-10-20T12:00:00Z'))).toEqual({ state: 'off' });
   });
   it('is in time up to and including the last order date', () => {
-    const p = deliveryPromise('bauble', at('2026-12-14T21:00:00Z'));
+    const p = deliveryPromise('ceramicOrnament', at('2026-12-14T21:00:00Z'));
     expect(p).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-14', daysLeft: 0 });
   });
   it('is missed the day after', () => {
-    expect(deliveryPromise('bauble', at('2026-12-15T08:00:00Z'))).toEqual({ state: 'missed', lastOrderDate: '2026-12-14' });
+    expect(deliveryPromise('ceramicOrnament', at('2026-12-15T08:00:00Z'))).toEqual({ state: 'missed', lastOrderDate: '2026-12-14' });
   });
   it('cards close before baubles (Guernsey)', () => {
     const now = at('2026-12-12T12:00:00Z');
     expect(deliveryPromise('card', now).state).toBe('missed');
-    expect(deliveryPromise('bauble', now).state).toBe('in-time');
+    expect(deliveryPromise('ceramicOrnament', now).state).toBe('in-time');
   });
   it('the headline strip follows the main uk9 parcel', () => {
     expect(headlinePromise(at('2026-11-10T12:00:00Z'))).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-14' });
@@ -89,11 +89,11 @@ describe('the "arrives by christmas" promise', () => {
 
 describe('the basket promise — one honest answer for the whole basket', () => {
   it('takes the EARLIEST last order date among the lines', () => {
-    const p = basketPromise(['bauble', 'card'], at('2026-12-01T12:00:00Z'));
+    const p = basketPromise(['ceramicOrnament', 'card'], at('2026-12-01T12:00:00Z'));
     expect(p).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-10' });
   });
   it('names the lines that are too late', () => {
-    const p = basketPromise(['bauble', 'card', 'cardPack-packof10'], at('2026-12-12T12:00:00Z'));
+    const p = basketPromise(['ceramicOrnament', 'card', 'cardPack-packof10'], at('2026-12-12T12:00:00Z'));
     expect(p.state).toBe('missed');
     expect(p.lateLineKeys).toEqual(['card', 'cardPack-packof10']);
   });

@@ -4,11 +4,11 @@ import { parcelGroupOf, parcelSaving, PARCEL_SAVING_PER_EXTRA_PENCE, priceBasket
 // The same-parcel saving (D24): £3 off each EXTRA item that Prodigi ships in the same parcel.
 // Groups are verified against sandbox quotes (src/pricing/parcels.ts).
 describe('parcelGroupOf — which parcel a line ships in', () => {
-  it('ceramic bauble, sack, mug and tea towel share the uk9 homeware parcel', () => {
-    for (const k of ['bauble', 'sack', 'mug', 'teaTowel', 'mug-11oz-red']) expect(parcelGroupOf(k)).toBe('uk9-home');
+  it('ceramic ornament, sack, mug and tea towel share the uk9 homeware parcel', () => {
+    for (const k of ['ceramicOrnament', 'sack', 'mug', 'teaTowel', 'mug-11oz-red']) expect(parcelGroupOf(k)).toBe('uk9-home');
   });
-  it('the plastic ball ships from uk5, not with the ceramic bauble', () => {
-    expect(parcelGroupOf('bauble-plasticball')).toBe('uk5-ornament');
+  it('the christmas bauble ships from uk5, not with the ceramic ornament', () => {
+    expect(parcelGroupOf('christmasBauble')).toBe('uk5-ornament');
   });
   it('wrap variants (white and kraft) share one parcel', () => {
     expect(parcelGroupOf('wrappingPaper')).toBe('gb2-wrap');
@@ -23,31 +23,31 @@ describe('parcelGroupOf — which parcel a line ships in', () => {
 
 describe('parcelSaving', () => {
   it('one item → no saving', () => {
-    expect(parcelSaving([{ productKey: 'bauble', qty: 1, linePence: 2100 }]).savingPence).toBe(0);
+    expect(parcelSaving([{ productKey: 'ceramicOrnament', qty: 1, linePence: 2100 }]).savingPence).toBe(0);
   });
   it('bauble + sack (one uk9 parcel) → £3 off', () => {
     const r = parcelSaving([
-      { productKey: 'bauble', qty: 1, linePence: 2100 },
+      { productKey: 'ceramicOrnament', qty: 1, linePence: 2100 },
       { productKey: 'sack', qty: 1, linePence: 3500 },
     ]);
     expect(r.savingPence).toBe(PARCEL_SAVING_PER_EXTRA_PENCE);
     expect(r.byGroup['uk9-home']).toEqual({ qty: 2, savingPence: 300 });
   });
   it('quantity counts: 3 baubles → £6 off (two extras)', () => {
-    expect(parcelSaving([{ productKey: 'bauble', qty: 3, linePence: 6300 }]).savingPence).toBe(600);
+    expect(parcelSaving([{ productKey: 'ceramicOrnament', qty: 3, linePence: 6300 }]).savingPence).toBe(600);
   });
   it('items in DIFFERENT parcels save nothing (bauble + calendar + plastic ball)', () => {
     expect(
       parcelSaving([
-        { productKey: 'bauble', qty: 1, linePence: 2100 },
+        { productKey: 'ceramicOrnament', qty: 1, linePence: 2100 },
         { productKey: 'calendar', qty: 1, linePence: 2400 },
-        { productKey: 'bauble-plasticball', qty: 1, linePence: 1900 },
+        { productKey: 'christmasBauble', qty: 1, linePence: 1900 },
       ]).savingPence,
     ).toBe(0);
   });
   it('each group saves on its own', () => {
     const r = parcelSaving([
-      { productKey: 'bauble', qty: 2, linePence: 4200 },
+      { productKey: 'ceramicOrnament', qty: 2, linePence: 4200 },
       { productKey: 'wrappingPaper', qty: 2, linePence: 4600 },
     ]);
     expect(r.savingPence).toBe(600);
@@ -60,7 +60,7 @@ describe('parcelSaving', () => {
 describe('priceBasket — same-parcel saving is server-derived', () => {
   it('bauble + mug: total drops by £3 and the flag is set', () => {
     const q = priceBasket([
-      { productKey: 'bauble', qty: 1 },
+      { productKey: 'ceramicOrnament', qty: 1 },
       { productKey: 'mug', qty: 1 },
     ]);
     expect(q.subtotalPence).toBe(2100 + 1800);
@@ -69,7 +69,7 @@ describe('priceBasket — same-parcel saving is server-derived', () => {
     expect(q.totalPence).toBe(2100 + 1800 - 300);
   });
   it('a single item gets no saving', () => {
-    const q = priceBasket([{ productKey: 'bauble', qty: 1 }]);
+    const q = priceBasket([{ productKey: 'ceramicOrnament', qty: 1 }]);
     expect(q.parcelSavingPence).toBe(0);
     expect(q.parcelSavingApplied).toBe(false);
   });

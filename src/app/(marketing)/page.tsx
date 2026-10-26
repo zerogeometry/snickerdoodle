@@ -45,7 +45,7 @@ const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110
 /** The Christmas shelf under the hero, in season (D24): three placeholder photos, each straight into the
  * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough). */
 const XMAS_SHELF = [
-  { key: 'bauble', src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s bauble', alt: 'A ceramic bauble printed with a child’s crayon snowman' },
+  { key: 'ceramicOrnament', src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s ornament', alt: 'A ceramic christmas ornament printed with a child’s crayon snowman' },
   { key: 'wrappingPaper', src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
   { key: 'sack', src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
 ];

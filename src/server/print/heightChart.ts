@@ -17,7 +17,7 @@ export async function renderHeightChartFace(
   srcBuf: Buffer,
   t: TemplateGeom,
   transform: Transform,
-  opts: { scale?: number; floorCm?: number } = {},
+  opts: { scale?: number; floorCm?: number; groundHex?: string } = {},
 ): Promise<{ png: Buffer; width: number; height: number }> {
   const f = await faceAssembly(srcBuf, t, transform, opts);
   const png = await f.pipeline.png().withMetadata({ density: Math.round(f.dpi) }).toBuffer();
@@ -29,7 +29,7 @@ export async function renderHeightChartFacePixels(
   srcBuf: Buffer,
   t: TemplateGeom,
   transform: Transform,
-  opts: { scale?: number; floorCm?: number } = {},
+  opts: { scale?: number; floorCm?: number; groundHex?: string } = {},
 ): Promise<{ data: Buffer; width: number; height: number; channels: 3 | 4 }> {
   const f = await faceAssembly(srcBuf, t, transform, opts);
   const { data, info } = await f.pipeline.raw().toBuffer({ resolveWithObject: true });
@@ -42,7 +42,7 @@ async function faceAssembly(
   srcBuf: Buffer,
   t: TemplateGeom,
   transform: Transform,
-  opts: { scale?: number; floorCm?: number },
+  opts: { scale?: number; floorCm?: number; groundHex?: string },
 ): Promise<{ pipeline: Sharp; dpi: number; width: number; height: number }> {
   const s = opts.scale ?? 1;
   const W = Math.max(1, Math.round(t.printWidthPx * s));
@@ -68,11 +68,13 @@ async function faceAssembly(
     new Resvg(rulerBandSvg(lay, opts.floorCm ?? HEIGHT_CHART_FLOOR_CM), { fitTo: { mode: 'original' }, background: 'white' }).render().asPng(),
   );
 
-  const pipeline = sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
+  // a base colour fills the art area (the ruler band stays white, so its marks always read)
+  const bg = opts.groundHex ?? '#ffffff';
+  const pipeline = sharp({ create: { width: W, height: H, channels: 3, background: bg } })
     .composite([
       { input: part, left: lay.art.x + ox, top: oy },
       { input: band, left: 0, top: 0 },
     ])
-    .flatten({ background: '#ffffff' });
+    .flatten({ background: bg });
   return { pipeline, dpi, width: W, height: H };
 }

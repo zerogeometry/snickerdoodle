@@ -53,7 +53,8 @@ export const CATALOGUE = {
   calendar: { pricePence: 2200, label: 'calendar' }, // A5 (A4 £24 — DB per variant)
   adultTee: { pricePence: 3200, label: 'adult tee' },
   apron: { pricePence: 2500, label: 'apron' },
-  bauble: { pricePence: 2100, label: 'bauble' }, // ceramic disc (plastic ball £19 — DB per variant)
+  ceramicOrnament: { pricePence: 2100, label: 'ceramic christmas ornament' },
+  christmasBauble: { pricePence: 1900, label: 'christmas bauble' },
   sack: { pricePence: 3500, label: 'christmas sack' },
   phoneCase: { pricePence: 2500, label: 'phone case' }, // the default: snap (tough £30 — DB per variant)
   // Range expansion (D21, 2026-10-21) — seeded hidden until samples + mockups are in.

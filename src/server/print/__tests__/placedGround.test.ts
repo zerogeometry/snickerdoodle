@@ -43,8 +43,8 @@ describe('a placed drawing on a base colour — the preview', () => {
     }
   });
 
-  it('a product that can’t be printed edge to edge ignores it (the mug: its wrap stops at the handle)', async () => {
-    const out = await renderTemplatePreview({ blank: await blank(), quad: STRAIGHT, materialClass: 'PAPER', design: await drawing(), productKey: 'mug', print, ground: '#0b6623' });
+  it('a product that can’t take a base colour ignores it (a garment prints on its own colour)', async () => {
+    const out = await renderTemplatePreview({ blank: await blank(), quad: STRAIGHT, materialClass: 'PAPER', design: await drawing(), productKey: 'kidsTee', print, ground: '#0b6623' });
     expect(blankish(await at(out, 0.3, 0.3))).toBe(true);
   });
 });

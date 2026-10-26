@@ -277,19 +277,19 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // Fallback: the interim studio synth (flat 7×5 card, soft shadow) until the layers land.
       return { file: 'derived/card-blank.png', material: 'PAPER', register: 'face-cover', mask: true };
     }
-    case 'bauble':
-      // the founder's layered sets (26 Oct): the art fills the disc / ball (cover); edge blur + string, or
-      // the glass highlights + cap, laid over it
-      {
-        const dir = layeredFlatDir(size === 'plastic ball' ? 'bauble/ball' : 'bauble/ceramic');
-        if (dir) return { material: 'GLOSS', register: 'layered-flat', dir };
-      }
-      // the PLASTIC BALL (D24): a staged photo blank if there is one, else the drawn ball
-      if (size === 'plastic ball') {
-        const ball = findBlank(/plastic.*(bauble|ball)|(bauble|ball).*plastic/i);
-        return ball ? { file: ball, material: 'GLOSS', register: 'face-cover', mask: true } : { material: 'GLOSS', register: 'drawn', key: 'plasticBauble' };
-      }
+    // the founder's layered sets (26 Oct): the art fills the ball / the disc (cover); the glass highlights
+    // + cap, or the edge blur + string, laid over it
+    case 'christmasBauble': {
+      const dir = layeredFlatDir('bauble/ball');
+      if (dir) return { material: 'GLOSS', register: 'layered-flat', dir };
+      const ball = findBlank(/plastic.*(bauble|ball)|(bauble|ball).*plastic/i);
+      return ball ? { file: ball, material: 'GLOSS', register: 'face-cover', mask: true } : { material: 'GLOSS', register: 'drawn', key: 'plasticBauble' };
+    }
+    case 'ceramicOrnament': {
+      const dir = layeredFlatDir('bauble/ceramic');
+      if (dir) return { material: 'GLOSS', register: 'layered-flat', dir };
       return { file: 'prodigi-ceramic-christmas-tree-ornament-blank-asset/Prodigi-ceramic-christmas-ornament-blank.jpg', material: 'CERAMIC', register: 'face-cover', mask: true };
+    }
     case 'sack': {
       // the founder's sack laid flat (26 Oct): the panel is measured onto it at true scale by
       // scripts/compose-founder-layers.mjs (320×500 mm on a 483 mm-wide sack)

@@ -437,20 +437,24 @@ const DEFS: Record<string, ProductDef> = {
       { size: 'adult', pricePence: 2900, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
     ],
   },
-  // Christmas 2026 (D24, founder 2026-10-25): ON SHOW, and ONE bauble in two styles (the picker says
-  // "style"). The CERAMIC disc is uk9 → Royal Mail Tracked 48 (£8 + £4.30), so it shares a parcel with the
-  // sack / mug / tea towel. The PLASTIC BALL (XMAS-PLAS-BAUB) is printed on both sides and shatterproof,
-  // from uk5 → Royal Mail RM24 (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
-  bauble: {
-    category: 'FESTIVE', label: 'bauble', blurb: "this year's bauble — one for every christmas they're little", print: true, visibleInShop: true,
-    description: "Their drawing on a bauble for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. Ceramic is a flat glossy disc on a gold string; the plastic ball is printed all the way round and won't break if little hands drop it.",
-    specs: { styles: 'ceramic disc (7.5 cm) or plastic ball (8 cm)', ceramic: 'flat, gloss, printed on one side, gold string', 'plastic ball': 'shatterproof, printed both sides, chrome cap, silver string', made: 'in the UK' },
-    variants: [
-      // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
-      { size: 'ceramic disc', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' },
-      // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
-      { size: 'plastic ball', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' },
-    ],
+  // Christmas 2026 (D24): two separate products (founder, 26 Oct — "separate them out, label them as I have").
+  // The CERAMIC ornament is uk9 → Royal Mail Tracked 48 (£8 + £4.30), sharing a parcel with the sack / mug /
+  // tea towel; printed on ONE side (Prodigi: "single-sided print").
+  ceramicOrnament: {
+    category: 'FESTIVE', label: 'ceramic christmas ornament', blurb: "this year's ornament — one for every christmas they're little", print: true, visibleInShop: true,
+    description: "Their drawing on a glossy ceramic ornament for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. A flat 7.5 cm disc on a gold string.",
+    specs: { size: '7.5 cm disc', finish: 'flat, gloss ceramic, printed on one side', string: 'gold', made: 'in the UK' },
+    // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
+    variants: [{ size: '7.5 cm', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+  },
+  // The plastic BALL (XMAS-PLAS-BAUB): printed on BOTH sides, shatterproof, from uk5 → Royal Mail RM24
+  // (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
+  christmasBauble: {
+    category: 'FESTIVE', label: 'christmas bauble', blurb: "this year's bauble — one for every christmas they're little", print: true, visibleInShop: true,
+    description: "Their drawing on a shatterproof bauble for the tree, printed on both sides — so it looks lovely from every angle and won't break if little hands drop it.",
+    specs: { size: '8 cm ball', print: 'both sides', finish: 'shatterproof clear plastic, chrome cap, silver string', made: 'in the UK' },
+    // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
+    variants: [{ size: '8 cm', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' }],
   },
   sack: {
     category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: true, // D24
@@ -828,7 +832,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
   // Retire any whole product no longer in the DEFS (e.g. the discontinued tote bag) so removing a
   // line from the catalogue actually takes it off the shelf — and clear its popular rank so it
   // can't collide with a live product's rank. Cascade to its variants so none linger active.
-  await db.update(products).set({ active: false, popularRank: null }).where(notInArray(products.key, keys));
+  await db.update(products).set({ active: false, popularRank: null, visibleInShop: false }).where(notInArray(products.key, keys)); // a retired product is never on show
   await db
     .update(productVariants)
     .set({ active: false })

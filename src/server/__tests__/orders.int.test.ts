@@ -97,7 +97,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('things packed in the same parcel earn the same-parcel saving (D24) — persisted on the order', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'bauble', qty: 1 }, // 2100 — ceramic, uk9
+        { productKey: 'ceramicOrnament', qty: 1 }, // 2100 — ceramic, uk9
         { productKey: 'mug', qty: 1 }, // 1800 — uk9, same parcel
         { productKey: 'card', qty: 1 }, // 550 — Guernsey, its own parcel: no saving
       ],

@@ -16,9 +16,10 @@
 // same single-view treatment as the frame. No spin.
 export const SPINNABLE = [
   'mug',
-  'sack',
   'storybook', 'calendar',
 ] as const;
+// (the sack and the ornaments turn over between their FRONT and BACK photos — the founder's photo, flipped;
+// no invented back: founder, 26 Oct)
 // (the baubles turn over between their FRONT and BACK photos instead — the founder's layers, no 3D model:
 // founder, 26 Oct)
 

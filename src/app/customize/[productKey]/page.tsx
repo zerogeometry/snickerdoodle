@@ -228,12 +228,12 @@ function CustomizeProduct() {
   // white reverse. `backFill` drives the "turn it around" preview — undefined = the image (both
   // sides, or the front); a hex = a plain coloured/white back rendered plush via the fill mode.
   const supportsBack = product?.key === 'cushion' && cushionSupportsBack(size);
-  // BAUBLE "the back" (founder, 26 Oct): the same photo layers turned over. The ceramic disc is printed on
-  // ONE side (Prodigi: "single-sided print") — its back is the plain glazed disc (white fill = no print);
-  // the plastic ball is printed on BOTH sides — its back shows the drawing again (the image itself).
+  // "the back" of the ornaments + the sack (founder, 26 Oct): the same photo, turned over (flipped — see
+  // FLIP_BACK in the compositor). Single-sided prints (Prodigi: the ceramic ornament, the sack) show it
+  // unprinted (white fill = no ink on the multiply); the bauble is printed on both sides — the drawing again.
   const backFill: string | undefined =
-    product?.key === 'bauble'
-      ? size === 'plastic ball' ? undefined : '#FFFFFF'
+    product && FLIP_BACK_KEYS.has(product.key)
+      ? product.key === 'christmasBauble' ? undefined : '#FFFFFF'
       : product?.key !== 'cushion'
       ? undefined
       : !supportsBack
@@ -546,6 +546,8 @@ function CustomizeProduct() {
         : undefined
       : isMug
         ? mugSide // 'centre' | 'front' | 'back'
+        : FLIP_BACK_KEYS.has(product.key) && showBack
+          ? 'back'
         : mockupView === 'tin'
           ? 'tin'
           : undefined;
@@ -676,7 +678,7 @@ function CustomizeProduct() {
           ) : null}
           {/* Cushion "turn it around" — flip the preview between the image side and the back
               (the chosen colour, or the plain white reverse for heart/round). */}
-          {product.key === 'cushion' || product.key === 'bauble' ? (
+          {product.key === 'cushion' || FLIP_BACK_KEYS.has(product.key) ? (
             <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="turn it around">
               {([['the front', false], ['the back', true]] as const).map(([label, b]) => (
                 <button
@@ -880,14 +882,13 @@ function CustomizeProduct() {
           ) : /* A single-size product needs no picker — the size lives in the product details. */
           product.sizes.length > 1 ? (
             <Picker
-              // The bauble's "sizes" are its two STYLES (ceramic disc / plastic ball — D24).
-              label={product.key === 'bauble' ? 'Style' : 'Size'}
+              label="Size"
               options={product.sizes}
               value={size}
               onChange={setSize}
               // Show the physical size under word-sized buttons (the blanket's medium/large); the
               // frame/jigsaw/mug sizes already state their own measure in the name.
-              describe={product.key === 'blanket' ? (s) => sizeDimsCm(product, s) : product.key === 'bauble' ? (s) => BAUBLE_STYLE_BLURB[s] ?? '' : undefined}
+              describe={product.key === 'blanket' ? (s) => sizeDimsCm(product, s) : undefined}
             />
           ) : null}
           {product.orientations.length > 0 ? (
@@ -1324,11 +1325,8 @@ function Picker({
   );
 }
 
-/** The bauble's two styles, in a line each (D24). */
-const BAUBLE_STYLE_BLURB: Record<string, string> = {
-  'ceramic disc': 'flat & glossy, 7.5 cm · tracked post',
-  'plastic ball': 'printed all the way round, won’t break · 8 cm',
-};
+/** Products whose "the back" is the same photo turned over (the ornaments, the sack). */
+const FLIP_BACK_KEYS = new Set(['ceramicOrnament', 'christmasBauble', 'sack']);
 
 function swatchColour(name: string, productKey?: string): string {
   if (productKey === 'mug' && MUG_SWATCH[name]) return MUG_SWATCH[name];

@@ -27,7 +27,8 @@ export type ParcelGroup = 'uk9-home' | 'uk3-textile' | 'gb2-wrap' | 'uk15-calend
 
 /** Product key → its parcel group. Variant overrides come first (see {@link parcelGroupOf}). */
 const BY_PRODUCT: Record<string, ParcelGroup> = {
-  bauble: 'uk9-home', // the CERAMIC bauble; the plastic ball is overridden below
+  ceramicOrnament: 'uk9-home',
+  christmasBauble: 'uk5-ornament', // the plastic ball ships from uk5
   sack: 'uk9-home',
   mug: 'uk9-home',
   teaTowel: 'uk9-home',
@@ -41,7 +42,7 @@ const BY_PRODUCT: Record<string, ParcelGroup> = {
 };
 
 /** Variant skus (`${key}-${slug}…`) that ship from a different lab than their product. */
-const BY_VARIANT_PREFIX: Array<[string, ParcelGroup]> = [['bauble-plasticball', 'uk5-ornament']];
+const BY_VARIANT_PREFIX: Array<[string, ParcelGroup]> = [];
 
 /** The parcel group a priced-line key (product key OR variant sku) ships in, or null. */
 export function parcelGroupOf(lineKey: string): ParcelGroup | null {

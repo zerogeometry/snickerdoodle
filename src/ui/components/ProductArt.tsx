@@ -20,6 +20,8 @@ export type ProductKey =
   | 'blanket'
   | 'calendar'
   | 'bauble'
+  | 'ceramicOrnament'
+  | 'christmasBauble'
   | 'sack'
   | 'storybook'
   | 'jigsaw'
@@ -226,6 +228,24 @@ const ART: Record<ProductKey, ReactNode> = {
     </>
   ),
   bauble: (
+    <>
+      <path d="M48 20 q0 -7 6 -7" fill="none" stroke="var(--color-tomato)" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="43" y="18" width="10" height="8" rx="1.5" fill="var(--color-sunshine)" stroke="var(--color-tomato)" strokeWidth="2" />
+      <circle cx="48" cy="53" r="28" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="4" />
+      <House transform="translate(33,39) scale(0.78)" />
+    </>
+  ),
+
+  ceramicOrnament: (
+    <>
+      <path d="M48 20 q0 -7 6 -7" fill="none" stroke="var(--color-tomato)" strokeWidth="2.4" strokeLinecap="round" />
+      <rect x="43" y="18" width="10" height="8" rx="1.5" fill="var(--color-sunshine)" stroke="var(--color-tomato)" strokeWidth="2" />
+      <circle cx="48" cy="53" r="28" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="4" />
+      <House transform="translate(33,39) scale(0.78)" />
+    </>
+  ),
+
+  christmasBauble: (
     <>
       <path d="M48 20 q0 -7 6 -7" fill="none" stroke="var(--color-tomato)" strokeWidth="2.4" strokeLinecap="round" />
       <rect x="43" y="18" width="10" height="8" rx="1.5" fill="var(--color-sunshine)" stroke="var(--color-tomato)" strokeWidth="2" />

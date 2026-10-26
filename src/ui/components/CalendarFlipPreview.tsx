@@ -26,6 +26,7 @@ export function CalendarFlipPreview({
   geom,
   page,
   onPage,
+  ground = '#ffffff',
 }: {
   /** All 13 pages, filled (null only while nothing is chosen yet). */
   pages: ReadonlyArray<PackCardLine | null>;
@@ -34,6 +35,8 @@ export function CalendarFlipPreview({
   geom: TemplateGeom | null;
   page: number;
   onPage: (i: number) => void;
+  /** the page's base colour under the drawing (#rrggbb) */
+  ground?: string;
 }) {
   const swipe = useRef<number | null>(null);
   const [turns, setTurns] = useState(0); // re-keys the page so each turn pops in
@@ -76,7 +79,7 @@ export function CalendarFlipPreview({
           ))}
         </div>
         <div key={turns} className="pop-in polaroid !p-2.5" style={{ ['--tilt' as string]: page % 2 ? '0.6deg' : '-0.6deg', ['--pop-rot' as string]: '0deg' }}>
-          <PicturePage page={p} imageFor={imageFor} dimsFor={dimsFor} geom={geom} label={name} />
+          <PicturePage page={p} imageFor={imageFor} dimsFor={dimsFor} geom={geom} label={name} ground={ground} />
           {month >= 0 ? <DatePad monthIndex={month} /> : (
             <p className="mt-2 text-center text-[11px] font-bold text-ink-soft">the cover · the twelve months are underneath</p>
           )}
@@ -120,7 +123,9 @@ function PicturePage({
   dimsFor,
   geom,
   label,
+  ground,
 }: {
+  ground: string;
   page: PackCardLine | null;
   imageFor: (p: PackCardLine) => string | null;
   dimsFor: (p: PackCardLine) => { width: number; height: number } | null;
@@ -137,7 +142,7 @@ function PicturePage({
     ? { ...r, x: r.x + r.width / 2 - (swap ? r.height : r.width) / 2, y: r.y + r.height / 2 - (swap ? r.width : r.height) / 2, width: swap ? r.height : r.width, height: swap ? r.width : r.height }
     : null;
   return (
-    <div className="relative w-full overflow-hidden bg-white" style={{ aspectRatio: String(aspect) }}>
+    <div className="relative w-full overflow-hidden" style={{ aspectRatio: String(aspect), background: ground }}>
       {url && rect ? (
         <img
           src={url}
