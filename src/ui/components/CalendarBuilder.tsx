@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconPlus, IconRepeat, IconShoppingBag, IconUpload, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconPlus, IconRepeat, IconShoppingBag, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -146,7 +146,7 @@ export function CalendarBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, thumbUrl: k.thumbUrl ?? null, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
       }
     }
     return list;
@@ -471,14 +471,6 @@ export function CalendarBuilder() {
           {announce}
         </p>
         <PickerBody picker={picker} drawings={drawings} chosen={chosen} onChoose={setChosen} onRetry={loadPicker} next={NEXT} forWhat="a calendar page" tools={tools} />
-        {drawings.length > 0 ? (
-          <p className="pb-3 text-center text-xs text-ink-soft">
-            <Link href="/start-creating" className="inline-flex min-h-11 items-center gap-1 font-bold text-cinnamon underline-offset-2 hover:underline">
-              <Icon icon={IconUpload} size={14} /> upload a new drawing
-            </Link>
-            <span className="block">your pages are saved while you do.</span>
-          </p>
-        ) : null}
       </Modal>
     </Shell>
   );

@@ -20,6 +20,8 @@ export interface PickerKeepsake {
   printable: boolean;
   /** the table-trimmed copy, when the photo was trimmed at upload — what's shown and printed */
   sourceObjectId?: string;
+  /** a small (400px) copy for the picker's grid — not the multi-MB photo per tile */
+  thumbUrl?: string | null;
 }
 
 export type PickerRow = {

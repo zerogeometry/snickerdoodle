@@ -16,7 +16,7 @@ import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 import { firmAlpha } from './apparel';
 import { perspectiveWarp } from './perspective';
 import { cylinderWarp } from './cylinder';
-import { ByteLru, faceCache } from './previewCache';
+import { ByteLru, designCache, faceCache } from './previewCache';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -124,15 +124,17 @@ const THUMB_WORK_EDGE = 800;
 const THUMB_DESIGN_EDGE = 1200;
 
 /** The design's bytes — shrunk for a thumb, memoised per request when a memo is given. */
-async function designBytes(key: string, edge: number | null, memo?: ComposeMemo): Promise<Buffer> {
+async function designBytes(key: string, edge: number | null, memo?: ComposeMemo, shared?: { assetId: string; tag: string }): Promise<Buffer> {
   const id = `${key}@${edge ?? 'full'}`;
   const hit = memo?.get(id);
   if (hit) return hit;
-  const p = (async () => {
+  const make = async () => {
     const buf = await getObjectBytes(key);
     if (!edge) return buf;
     return sharp(buf, { limitInputPixels: MAX_INPUT_PIXELS }).resize(edge, edge, { fit: 'inside', withoutEnlargement: true }).png({ compressionLevel: 1 }).toBuffer();
-  })();
+  };
+  // a thumb-size drawing is shared across requests for a few minutes (previewCache.ts designCache)
+  const p = edge && shared ? designCache.get(`${shared.assetId}|${shared.tag}@${edge}`, make) : make();
   memo?.set(id, p);
   return p;
 }
@@ -619,7 +621,7 @@ async function renderAndPersist(
   // (shared across a batch via `memo`) and every template layer comes from the in-process cache,
   // decoded at the thumb's working size — far less to download, decode and composite (the
   // catalogue reveal).
-  const source = () => (args.fillHex ? solidFill(args.fillHex) : designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo));
+  const source = () => (args.fillHex ? solidFill(args.fillHex) : designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo, { assetId: args.assetId, tag: args.designTag }));
   let designBuf: Design;
   let transform = args.transform;
   if (args.face) {

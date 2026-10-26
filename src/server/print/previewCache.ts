@@ -93,7 +93,17 @@ export class ByteLru<T> {
 export const FACE_IDLE_MS = 10 * 60 * 1000;
 export const faceCache = new ByteLru<{ data: Buffer; width: number; height: number; channels: 1 | 2 | 3 | 4 }>(96 * 1024 * 1024, (f) => f.data.byteLength, FACE_IDLE_MS);
 
+/**
+ * The DRAWING at a thumb's working size, shared ACROSS requests (a catalogue reveal sends several single
+ * + batch requests at once; each used to download + decode the full photo again — founder, 26 Oct: "the
+ * more I upload the slower it gets"). Same rules as the faces: reached only past composeMockup's authz
+ * gate, keyed by the asset + its exact content (object + hash — an edit is never served stale), kept
+ * briefly (idle lifetime), dropped the moment the asset is erased, never written anywhere.
+ */
+export const designCache = new ByteLru<Buffer>(96 * 1024 * 1024, (b) => b.byteLength, FACE_IDLE_MS);
+
 /** Erasing an asset drops anything made from it here at once (the idle lifetime is the backstop). */
 export function forgetAssetPreviews(assetId: string): void {
   faceCache.forget(`${assetId}|`);
+  designCache.forget(`${assetId}|`);
 }

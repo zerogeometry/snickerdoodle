@@ -38,7 +38,7 @@ import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type Pla
  */
 
 /** A drawing that can go on a card. */
-export type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean };
+export type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean; /** a small copy for tiles (the picker grid, the fan) */ thumbUrl?: string | null };
 type Slot = PackCardLine | null;
 export type PickerState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; signedIn: boolean; keepsakes: PickerKeepsake[]; at: number };
 
@@ -146,7 +146,7 @@ export function CardPackBuilder() {
       for (const k of picker.keepsakes) {
         if (list.some((d) => d.assetId === k.id)) continue;
         const when = shortDate(k.createdAtISO);
-        list.push({ assetId: k.id, imageUrl: k.imageUrl, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
+        list.push({ assetId: k.id, imageUrl: k.imageUrl, thumbUrl: k.thumbUrl ?? null, ...(k.sourceObjectId ? { sourceObjectId: k.sourceObjectId } : {}), label: k.childFirstName ? `${k.childFirstName} · ${when}` : `kept ${when}`, printable: true }); // the ORDER holds anything screening hasn't cleared (orders.ts, D8) — designing with it is fine, as on the create page
       }
     }
     return list;
@@ -316,7 +316,7 @@ export function CardPackBuilder() {
           <p className="mt-1 text-sm text-ink-soft">{pack.blurb ?? 'a stack of little masterpieces, ready to send'}</p>
 
           {/* the pack at a glance: the chosen fronts fanned out, as they'll arrive */}
-          <PackFan cards={cards} imageFor={(a) => drawingFor(a)?.imageUrl ?? null} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
+          <PackFan cards={cards} imageFor={(a) => { const d = drawingFor(a); return d?.thumbUrl ?? d?.imageUrl ?? null; }} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
 
           {/* Pack size */}
           <div className="mt-5">
@@ -518,9 +518,12 @@ export function PickerBody({
             <>{login} to pick from your keepsake box — or start with a drawing.</>
           )}
         </p>
-        <Button href="/start-creating" variant="secondary" size="md" className="mt-4">
-          upload a drawing
-        </Button>
+        {/* (with the picker's own upload above, nothing here sends the shopper away from their cards / pages) */}
+        {tools ? null : (
+          <Button href="/start-creating" variant="secondary" size="md" className="mt-4">
+            upload a drawing
+          </Button>
+        )}
       </div>
     );
   }
@@ -540,7 +543,7 @@ export function PickerBody({
                 className={`press relative w-full rounded-[14px] border-2 bg-paper p-1.5 text-left disabled:opacity-60 ${on ? 'border-cocoa shadow-[0_3px_0_var(--color-cocoa)]' : 'border-cocoa/15 hover:border-cocoa/50'}`}
               >
                 <span className="block aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
-                  {d.imageUrl ? <img src={d.imageUrl} alt="" className="h-full w-full object-contain" /> : null}
+                  {d.thumbUrl ?? d.imageUrl ? <img src={(d.thumbUrl ?? d.imageUrl)!} alt="" loading="lazy" className="h-full w-full object-contain" /> : null}
                 </span>
                 <span className="mt-1 block truncate text-[11px] font-bold text-cocoa">{d.label}</span>
                 {on ? (
