@@ -65,6 +65,17 @@ describe('remove background — one click, ready to go', () => {
     expect(a(320, 240)).toBe(255); // the drawing
   });
 
+  it('lifts a white sheet off a DARK table (walnut / a black desk) — both go in one click', async () => {
+    const grain = Array.from({ length: 40 }, (_, i) => `<rect x="0" y="${i * 12}" width="640" height="4" fill="#4a3020" opacity="0.7"/>`).join('');
+    const buf = await svgPng(640, 480, `<rect width="640" height="480" fill="#2a1a10"/>${grain}
+      <polygon points="90,60 560,40 580,430 70,440" fill="#f4f1e8"/>
+      <circle cx="320" cy="240" r="80" fill="#2f5da8"/>`);
+    const a = await alphaAt(buf, { keepEnclosedPaper: true });
+    expect(a(15, 15)).toBe(0); // the dark table
+    expect(a(140, 110)).toBe(0); // the sheet
+    expect(a(320, 240)).toBe(255); // the drawing
+  });
+
   it('never mistakes a big painted shape on WHITE paper for a sheet (it would be erased)', async () => {
     const buf = await svgPng(600, 480, `<rect width="600" height="480" fill="#fbfaf6"/><circle cx="300" cy="240" r="210" fill="#c8402a"/>`);
     const a = await alphaAt(buf);

@@ -88,6 +88,30 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
   const small = Math.max(FW, FH) > DETECT_EDGE
     ? await sharp(full.data, { raw: { width: FW, height: FH, channels: 3 } }).resize(DETECT_EDGE, DETECT_EDGE, { fit: 'inside' }).png({ compressionLevel: 1 }).toBuffer()
     : input;
+  // 1) FIND THE SHEET DIRECTLY on any non-white surface (a dark desk, walnut, carpet, wood): the paper's
+  //    colour from the middle of the photo, the big connected region of it (drawing included), shaped like
+  //    a sheet. This doesn't depend on the surface being liftable — a dark table makes the lift decline.
+  const direct = await detectSheet(small);
+  if (direct) {
+    const sheetFull = new Uint8Array(FW * FH);
+    for (let y = 0; y < FH; y++) {
+      const sy = Math.min(direct.h - 1, Math.floor((y * direct.h) / FH));
+      for (let x = 0; x < FW; x++) sheetFull[y * FW + x] = direct.sheet[sy * direct.w + Math.min(direct.w - 1, Math.floor((x * direct.w) / FW))]!;
+    }
+    const outside = new Uint8Array(FW * FH);
+    for (let k = 0; k < outside.length; k++) outside[k] = sheetFull[k] ? 0 : 1;
+    const surface = growMask(outside, FW, FH, Math.max(3, Math.round(Math.min(FW, FH) / 130))); // + the sheet's own cut edge / shadow
+    const filled = Buffer.from(full.data);
+    for (let k = 0; k < surface.length; k++) {
+      if (!surface[k]) continue;
+      filled[k * 3] = direct.colour[0]; filled[k * 3 + 1] = direct.colour[1]; filled[k * 3 + 2] = direct.colour[2];
+    }
+    const png0 = await sharp(filled, { raw: { width: FW, height: FH, channels: 3 } }).png({ compressionLevel: 1 }).toBuffer();
+    const lifted = await liftOnce(png0, opts, {});
+    if (lifted) return dropEdgeDebris(lifted, surface);
+  }
+
+  // 2) Otherwise: a plain first lift, then look for a sheet left behind on a liftable (incl. white) surface.
   const first = await liftOnce(small, { ...opts, cleanup: false, keepEnclosedPaper: false }, diag);
   if (!first) return null;
   // A WHITE first background means the art was on white paper already — a big painted shape on it must
@@ -851,4 +875,121 @@ function cleanupResidue(
     }
   }
   return cleared;
+}
+
+
+/** A mask grown by r pixels (separable max). */
+function growMask(m: Uint8Array, W: number, H: number, r: number): Uint8Array {
+  const N = W * H;
+  const tmp = new Uint8Array(N), out = new Uint8Array(N);
+  for (let y = 0; y < H; y++) {
+    let last = -1e9;
+    for (let x = 0; x < W; x++) { if (m[y * W + x]) last = x; if (x - last <= r) tmp[y * W + x] = 1; }
+    last = 1e9;
+    for (let x = W - 1; x >= 0; x--) { if (m[y * W + x]) last = x; if (last - x <= r) tmp[y * W + x] = 1; }
+  }
+  for (let x = 0; x < W; x++) {
+    let last = -1e9;
+    for (let y = 0; y < H; y++) { if (tmp[y * W + x]) last = y; if (y - last <= r) out[y * W + x] = 1; }
+    last = 1e9;
+    for (let y = H - 1; y >= 0; y--) { if (tmp[y * W + x]) last = y; if (last - y <= r) out[y * W + x] = 1; }
+  }
+  return out;
+}
+
+/**
+ * Find a SHEET OF PAPER photographed on a NON-WHITE surface (a dark desk, walnut, carpet, wood).
+ *  1. the paper colour = the commonest colour family in the middle half of the photo (paper outnumbers
+ *     a child's lines there), and the surface must NOT be white (white desks take the strict route);
+ *  2. the sheet = the largest connected region of paper-coloured pixels, plus everything it encloses
+ *     (the drawing on it);
+ *  3. it must look like a sheet: ≥ 25 % of the photo, ≥ 75 % of its bounding box (a turned or
+ *     slightly angled rectangle), and NOT the whole frame (a surface must show round it).
+ * Returns the sheet mask at the copy's size and the paper colour, or null.
+ */
+async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: [number, number, number]; w: number; h: number } | null> {
+  const { data: d, info } = await sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().flatten({ background: '#ffffff' })
+    .resize(700, 700, { fit: 'inside', withoutEnlargement: true }).median(3).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const W = info.width, H = info.height, N = W * H;
+  // the surface: the border ring's median — skip white desks (the strict route handles those)
+  const ring: number[] = [];
+  for (let x = 0; x < W; x += 2) ring.push(x, (H - 1) * W + x);
+  for (let y = 0; y < H; y += 2) ring.push(y * W, y * W + W - 1);
+  const med = (ch: number) => ring.map((k) => d[k * 3 + ch]!).sort((a, b) => a - b)[Math.floor(ring.length / 2)]!;
+  const sr = med(0), sg = med(1), sb = med(2);
+  if (Math.min(sr, sg, sb) > 200 && Math.max(sr, sg, sb) - Math.min(sr, sg, sb) < 25) return null;
+
+  // the paper colour: commonest chromaticity+lightness bucket in the middle half
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (let y = Math.floor(H * 0.25); y < H * 0.75; y += 2) {
+    for (let x = Math.floor(W * 0.25); x < W * 0.75; x += 2) {
+      const i = (y * W + x) * 3;
+      const c = chroma(d[i]!, d[i + 1]!, d[i + 2]!);
+      const key = (Math.round(c.cr * 30) << 12) | (Math.round(c.cg * 30) << 6) | Math.round(c.l / 20);
+      const e = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+      e.n++; e.r += d[i]!; e.g += d[i + 1]!; e.b += d[i + 2]!;
+      buckets.set(key, e);
+    }
+  }
+  const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0];
+  if (!top) return null;
+  const pc = chroma(top.r / top.n, top.g / top.n, top.b / top.n);
+  if (pc.l < 70) return null; // paper is light-ish; a dark "sheet" is more likely the surface
+  const sc = chroma(sr, sg, sb);
+  // the surface must look different from the paper (else the "sheet" is just the whole photo)
+  if (Math.hypot(sc.cr - pc.cr, sc.cg - pc.cg) < 0.02 && Math.abs(sc.l - pc.l) < pc.l * 0.18) return null;
+
+  const isPaper = new Uint8Array(N);
+  for (let k = 0; k < N; k++) {
+    const c = chroma(d[k * 3]!, d[k * 3 + 1]!, d[k * 3 + 2]!);
+    isPaper[k] = Math.hypot(c.cr - pc.cr, c.cg - pc.cg) < 0.035 && c.l > pc.l * 0.6 && c.l < pc.l * 1.3 + 4 ? 1 : 0;
+  }
+  // largest connected paper region
+  const lab = new Int32Array(N).fill(-1);
+  let bestId = -1, bestN = 0;
+  for (let s0 = 0; s0 < N; s0++) {
+    if (!isPaper[s0] || lab[s0] !== -1) continue;
+    let n = 0;
+    const st = [s0];
+    lab[s0] = s0;
+    while (st.length) {
+      const k = st.pop()!;
+      n++;
+      const x = k % W;
+      if (x > 0 && isPaper[k - 1] && lab[k - 1] === -1) { lab[k - 1] = s0; st.push(k - 1); }
+      if (x < W - 1 && isPaper[k + 1] && lab[k + 1] === -1) { lab[k + 1] = s0; st.push(k + 1); }
+      if (k >= W && isPaper[k - W] && lab[k - W] === -1) { lab[k - W] = s0; st.push(k - W); }
+      if (k < N - W && isPaper[k + W] && lab[k + W] === -1) { lab[k + W] = s0; st.push(k + W); }
+    }
+    if (n > bestN) { bestN = n; bestId = s0; }
+  }
+  if (bestId < 0 || bestN < N * 0.15) return null;
+  // the sheet = that region + everything it encloses (not reachable from the border without crossing it)
+  const outside = new Uint8Array(N);
+  const st: number[] = [];
+  const seed = (k: number) => { if (!outside[k] && lab[k] !== bestId) { outside[k] = 1; st.push(k); } };
+  for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
+  while (st.length) {
+    const k = st.pop()!;
+    const x = k % W;
+    if (x > 0) seed(k - 1);
+    if (x < W - 1) seed(k + 1);
+    if (k >= W) seed(k - W);
+    if (k < N - W) seed(k + W);
+  }
+  const sheet = new Uint8Array(N);
+  let area = 0, x0 = W, y0 = H, x1 = 0, y1 = 0, onBorder = 0;
+  for (let k = 0; k < N; k++) {
+    if (outside[k]) continue;
+    sheet[k] = 1;
+    area++;
+    const x = k % W, y = (k - x) / W;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  for (const k of ring) onBorder += sheet[k]!;
+  if (area < N * 0.25) return null; // too small to be the sheet
+  if (onBorder / ring.length > 0.6) return null; // the sheet fills the frame — no surface to remove
+  if (area / ((x1 - x0 + 1) * (y1 - y0 + 1)) < 0.75) return null; // not sheet-shaped
+  return { sheet, colour: [Math.round(top.r / top.n), Math.round(top.g / top.n), Math.round(top.b / top.n)], w: W, h: H };
 }
