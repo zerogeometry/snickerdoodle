@@ -38,7 +38,7 @@ const UNAVAILABLE: Record<string, { title: string; body: string }> = {
   'not-found': { title: "This gift link isn't valid", body: 'It may have been mistyped. Ask whoever shared it to send a fresh one.' },
   revoked: { title: 'This gift list was turned off', body: 'The family switched this link off. Ask them for a new one if you still need it.' },
   expired: { title: 'This gift list has expired', body: 'Gift links don’t last forever. Ask the family to share a fresh one.' },
-  gone: { title: 'This gift list is no longer available', body: 'One of these keepsakes was removed by the family.' },
+  gone: { title: 'This gift list is no longer available', body: 'One of these keepsakes isn’t available right now. Ask the family to share a fresh link.' },
 };
 
 export default async function GiftLinkPage({ params }: { params: Promise<{ token: string }> }) {

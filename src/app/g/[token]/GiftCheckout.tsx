@@ -1,10 +1,12 @@
 'use client';
 
-import { IconShieldCheck, IconUsersPlus } from '@tabler/icons-react';
+import { IconFlag, IconShieldCheck, IconUsersPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { checkoutGiftLinkAction } from '@/app/actions/giftLink';
+import { reportGiftItemAction } from '@/app/actions/report';
+import { ReportKeepsakeModal } from '@/ui/modals/ReportKeepsakeModal';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
@@ -43,6 +45,8 @@ export function GiftCheckout({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<GiftItem | null>(null);
+  const [reportSent, setReportSent] = useState(false);
 
   // The gift is bought straight from the link: the server rebuilds the order from the
   // token's frozen snapshot (keepsake + product), so the client never carries the art.
@@ -91,9 +95,31 @@ export function GiftCheckout({
               ) : (
                 <span className="text-[13px] font-bold text-cocoa">{gbp(item.unitPricePence)}</span>
               )}
+              <button
+                type="button"
+                onClick={() => setReporting(item)}
+                aria-label={`report a problem with this ${item.label}`}
+                className="-mr-1.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-ink-faint hover:text-cinnamon focus-visible:outline-2"
+              >
+                <Icon icon={IconFlag} size={16} />
+              </button>
             </div>
           ))}
         </div>
+        <ReportKeepsakeModal
+          open={!!reporting}
+          image={reporting?.imageUrl}
+          onClose={() => {
+            setReporting(null);
+            // a reported item is paused, so the list changes — show the family's latest
+            if (reportSent) router.refresh();
+          }}
+          onSend={async (reason) => {
+            const ok = reporting ? (await reportGiftItemAction(token, reporting.assetId, reason)).ok : false;
+            if (ok) setReportSent(true);
+            return ok;
+          }}
+        />
       </div>
 
       <aside className="self-start rounded-2xl border border-line bg-white p-4">

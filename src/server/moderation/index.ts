@@ -93,12 +93,18 @@ const RANK: Record<ModerationState | 'PENDING', number> = { CLEAR: 0, PENDING: 1
 type Stored = { status: ModerationState | 'PENDING'; labels: string[] };
 const worse = (a: Stored, b: Stored): Stored => (RANK[b.status] > RANK[a.status] ? b : a);
 
-async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {
+type StoredReport = Stored & { reports?: unknown[] };
+
+/** The upload's own verdict, plus any unresolved viewer REPORT (src/server/reports.ts) — a
+ * re-screen keeps the report and can never quietly clear it; only a reviewer can. */
+async function storedVerdicts(db: DbHandle, assetId: string): Promise<{ original: Stored; report: StoredReport | null }> {
   const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
-  const d = (row?.detail ?? {}) as { labels?: string[]; original?: Stored; design?: Stored };
+  const d = (row?.detail ?? {}) as { labels?: string[]; original?: Stored; design?: Stored; report?: StoredReport };
   // assets screened before designs were tracked: the stored status IS the upload's
-  return d.original ?? { status: row?.status ?? 'PENDING', labels: d.labels ?? [] };
+  const original = d.original ?? { status: row?.status ?? 'PENDING', labels: d.labels ?? [] };
+  return { original, report: d.report ?? null };
 }
+const openReportOf = (r: StoredReport | null): Stored => (r?.status === 'FLAGGED' ? { status: 'FLAGGED', labels: r.labels ?? [] } : { status: 'CLEAR', labels: [] });
 
 /** Screen a Studio design (anything drawn / added) and fold its verdict into the asset's. */
 export async function moderateDesignAndRecord(
@@ -119,11 +125,15 @@ export async function moderateDesignAndRecord(
     else if (words.length && containsAbusiveText(words.join(' '))) labels.push('drawn-words');
     design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
   }
-  const original = await originalVerdict(db, input.assetId);
-  const combined = worse(original, design);
+  const { original, report } = await storedVerdicts(db, input.assetId);
+  const combined = worse(worse(original, design), openReportOf(report));
   await db
     .update(assets)
-    .set({ moderationStatus: combined.status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels: [...new Set([...original.labels, ...design.labels])], original, design } })
+    .set({
+      moderationStatus: combined.status,
+      moderatedAt: input.now ?? new Date(),
+      moderationDetail: { labels: [...new Set([...original.labels, ...design.labels])], original, design, ...(report ? { report } : {}) },
+    })
     .where(eq(assets.id, input.assetId));
   if (design.status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -143,8 +153,12 @@ export async function clearDesignModeration(db: DbHandle, assetId: string): Prom
   const [row] = await db.select({ detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
   const d = (row?.detail ?? {}) as { design?: Stored };
   if (!d.design) return;
-  const original = await originalVerdict(db, assetId);
-  await db.update(assets).set({ moderationStatus: original.status, moderationDetail: { labels: original.labels, original } }).where(eq(assets.id, assetId));
+  const { original, report } = await storedVerdicts(db, assetId);
+  const status = worse(original, openReportOf(report)).status;
+  await db
+    .update(assets)
+    .set({ moderationStatus: status, moderationDetail: { labels: original.labels, original, ...(report ? { report } : {}) } })
+    .where(eq(assets.id, assetId));
 }
 
 export { defaultProviders, isModerationConfigured } from './providers';
