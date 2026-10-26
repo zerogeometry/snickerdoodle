@@ -1,8 +1,8 @@
 import { CHRISTMAS_STICKER_SVG } from './christmas-art';
 
 /**
- * The Studio's stickers — multi-colour, hand-drawn vector art (scrapbook finish: ink line, white
- * die-cut border, soft shadow). The manifest is the ONLY list the server accepts: a saved sticker
+ * The Studio's stickers — multi-colour, hand-drawn vector art with an ink line, straight on the
+ * canvas (no white die-cut border or shadow — founder, 26 Oct). The manifest is the ONLY list the server accepts: a saved sticker
  * is an id + placement, never client SVG, and both the live preview and the print render draw the
  * same SVG string for that id (preview == print).
  *

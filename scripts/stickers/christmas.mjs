@@ -6,8 +6,8 @@
 //   node scripts/stickers/christmas.mjs            → SVGs + art module + contact sheet
 //
 // One family, shared rules: chubby, head ≈ half the height, dot eyes with a tiny highlight, berry
-// cheeks, small smiles, ONE brand-coloured accessory each; a chunky cocoa ink line, a white die-cut
-// border round the whole silhouette and a soft offset shadow (the .sticker look); brand tokens only.
+// cheeks, small smiles, ONE brand-coloured accessory each; a chunky cocoa ink line; brand tokens only.
+// No white die-cut border or shadow (founder, 26 Oct): they sit straight on the canvas.
 // A touch of wonk: every sticker sits a few degrees off true.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -39,17 +39,16 @@ const stripes = (id, clip, a, b, { angle = -40, w = 9 } = {}) =>
   `<g transform="rotate(${angle} 100 100)">${Array.from({ length: 24 }, (_, i) => `<rect x="${-100 + i * w * 2}" y="-100" width="${w}" height="400" fill="${a}"/>`).join('')}</g></g>`;
 
 /**
- * A sticker: shadow + die-cut from the silhouette, then the art. `sil` is the outer silhouette as
+ * A sticker: the art, straight on the canvas (no die-cut border, no shadow — founder, 26 Oct). `sil` is the outer silhouette as
  * plain shapes (they inherit the border's fill and stroke). Ids are prefixed, so many can share a page.
  */
 function sticker(id, { sil, art, wonk = 0 }) {
-  const s = (attrs) => `<g ${attrs} stroke-width="${CUT}" stroke-linejoin="round" stroke-linecap="round"><use href="#${id}-sil"/></g>`;
   return (
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">` +
     `<defs><g id="${id}-sil">${sil}</g></defs>` +
     `<g transform="rotate(${wonk} 100 100)">` +
-    s(`fill="${C.ink}" stroke="${C.ink}" opacity="0.2" transform="translate(1.5 5)"`) +
-    s(`fill="#ffffff" stroke="#ffffff"`) +
+    // founder (26 Oct): NO white die-cut outline and no drop shadow — the art goes straight on the canvas
+    // (the silhouette stays defined: it's still the sticker's hit/selection shape)
     art +
     `</g></svg>`
   );
