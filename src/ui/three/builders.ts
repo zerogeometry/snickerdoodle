@@ -203,71 +203,173 @@ function buildCard(texture: THREE.Texture, wMm: number, hMm: number): THREE.Grou
   return centred(group);
 }
 
+// ── the baubles: made from the founder's OWN photo layers (founder, 26 Oct: "use the same print map and
+// layers for the rear side") — public/three/bauble/<set>/{product,printmap,overlay}.png, cropped to the
+// ornament by scripts/export-bauble-3d-layers.mjs. Each face is the shop photo's recipe: the product, the
+// drawing laid into the print map, the overlay (gloss, edge) on top. Per Prodigi's product sheets the
+// CERAMIC disc is a "single-sided print" (its rear: the same layers, no print) and the PLASTIC BALL a
+// "double-sided print" (its rear: the same drawing again, reading the right way round).
+
+const LAYER_EDGE = 768;
+const layerCache = new Map<string, Promise<HTMLImageElement>>();
+function layerImage(set: 'ceramic' | 'ball', layer: 'product' | 'printmap' | 'overlay'): Promise<HTMLImageElement> {
+  const src = `/three/bauble/${set}/${layer}.png`;
+  let p = layerCache.get(src);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+    layerCache.set(src, p);
+  }
+  return p;
+}
+
+/** The print map's box (where the drawing goes), from its alpha. */
+function alphaBox(img: HTMLImageElement): { x: number; y: number; w: number; h: number } {
+  const c = document.createElement('canvas');
+  c.width = img.width;
+  c.height = img.height;
+  const g = c.getContext('2d')!;
+  g.drawImage(img, 0, 0);
+  const d = g.getImageData(0, 0, c.width, c.height).data;
+  let x0 = c.width, y0 = c.height, x1 = 0, y1 = 0;
+  for (let y = 0; y < c.height; y += 2) {
+    for (let x = 0; x < c.width; x += 2) {
+      if (d[(y * c.width + x) * 4 + 3]! < 128) continue;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+    }
+  }
+  return x1 > x0 ? { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 } : { x: 0, y: 0, w: c.width, h: c.height };
+}
+
 /**
- * The CERAMIC ornament (Prodigi XMAS-PORC-BAUB): a flat glossy white disc, 7.5 cm, with a hole near the
- * top and a gold string through it. Printed on ONE side — the back is plain white ceramic (founder,
- * 26 Oct: the flip side must be right). The print fills the face (cover), the hole cut through it.
+ * One face of a bauble as a texture: product, then the drawing clipped to the print map, then the overlay.
+ * `mirror` draws it flipped — for a REAR face, which the turned-round surface flips back, so a printed
+ * rear reads the right way round. Starts as a plain disc; fills in when the layers load.
+ */
+function baubleFace(set: 'ceramic' | 'ball', drawing: CanvasImageSource | null, mirror: boolean): THREE.Texture {
+  // (no browser — the model's shape is still built: a plain white face)
+  if (typeof document === 'undefined') return new THREE.DataTexture(new Uint8Array([247, 246, 242, 255]), 1, 1);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = LAYER_EDGE;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#f7f6f2';
+  g.beginPath();
+  g.arc(LAYER_EDGE / 2, LAYER_EDGE / 2, LAYER_EDGE / 2, 0, Math.PI * 2);
+  g.fill();
+  void Promise.all([layerImage(set, 'product'), layerImage(set, 'printmap'), layerImage(set, 'overlay')])
+    .then(([product, printmap, overlay]) => {
+      g.clearRect(0, 0, LAYER_EDGE, LAYER_EDGE);
+      g.save();
+      if (mirror) {
+        g.translate(LAYER_EDGE, 0);
+        g.scale(-1, 1);
+      }
+      g.drawImage(product, 0, 0, LAYER_EDGE, LAYER_EDGE);
+      if (drawing) {
+        // the drawing fills the print map's box (the print file IS that area), clipped to its shape
+        const box = alphaBox(printmap);
+        const k = LAYER_EDGE / printmap.width;
+        const ink = document.createElement('canvas');
+        ink.width = ink.height = LAYER_EDGE;
+        const ig = ink.getContext('2d')!;
+        ig.drawImage(drawing, box.x * k, box.y * k, box.w * k, box.h * k);
+        ig.globalCompositeOperation = 'destination-in';
+        ig.drawImage(printmap, 0, 0, LAYER_EDGE, LAYER_EDGE);
+        g.globalCompositeOperation = 'multiply'; // ink on the glaze: the product's own light and shade come through
+        g.drawImage(ink, 0, 0);
+        // …and only on the product (multiply would paint into its hole and round its edge)
+        g.globalCompositeOperation = 'destination-in';
+        g.drawImage(product, 0, 0, LAYER_EDGE, LAYER_EDGE);
+        g.globalCompositeOperation = 'source-over';
+      }
+      // (the flat photo's glass-rim highlight would show as a seam where the ball's halves meet — the 3D
+      // light gives the ball its shine; the disc keeps its edge blur)
+      if (set === 'ceramic') g.drawImage(overlay, 0, 0, LAYER_EDGE, LAYER_EDGE);
+      g.restore();
+      tex.needsUpdate = true;
+    })
+    .catch(() => {
+      /* stays the plain disc */
+    });
+  return tex;
+}
+
+/**
+ * The CERAMIC ornament (Prodigi XMAS-PORC-BAUB): a flat glossy disc, 7.5 cm, hole near the top, gold
+ * string. FRONT = the shop photo's layers with the drawing; REAR = the same layers, no print.
  */
 function buildCeramicOrnament(texture: THREE.Texture, wMm: number): THREE.Group {
   const group = new THREE.Group();
   const R = wMm / 2;
   const T = 4.5; // thickness, mm
-  const holeR = R * 0.07;
-  const holeY = R * 0.82; // centre of the hole, from the disc's centre (the founder's print map)
-  const disc = new THREE.Shape();
-  disc.absarc(0, 0, R, 0, Math.PI * 2, false);
-  const hole = new THREE.Path();
-  hole.absarc(0, holeY, holeR, 0, Math.PI * 2, true);
-  disc.holes.push(hole);
-  const body = new THREE.Mesh(new THREE.ExtrudeGeometry(disc, { depth: T, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.6, bevelSegments: 3, curveSegments: 72 }), ceramic('#f7f6f2'));
-  body.position.z = -T / 2;
-  group.add(body);
-  // the printed FRONT: the same disc-with-a-hole, its UVs spanning the disc (the print is a square
-  // file, the disc its inscribed circle — as the 2D mockup crops it)
-  const faceGeo = new THREE.ShapeGeometry(disc, 72);
-  const pos = faceGeo.attributes.position!, uv = faceGeo.attributes.uv!;
-  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + R) / (2 * R), (pos.getY(i) + R) / (2 * R));
-  uv.needsUpdate = true;
-  const face = new THREE.Mesh(faceGeo, printedSurface(texture, { roughness: 0.3, sheen: 0 }));
-  face.position.z = T / 2 + 0.65;
-  group.add(face);
-  // the back is left as the plain glossy ceramic body (single-sided print)
-  // the gold string: a loop through the hole, up to a knot
+  const drawing = texture.image as CanvasImageSource;
+  // (a touch of the face's own colour as glow, so white glaze reads white under the studio light, not grey)
+  const faceMat = (tex: THREE.Texture) => new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color(0.22, 0.22, 0.22), roughness: 0.28, metalness: 0.02, alphaTest: 0.5 });
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(2 * R, 2 * R), faceMat(baubleFace('ceramic', drawing, false)));
+  front.position.z = T / 2;
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(2 * R, 2 * R), faceMat(baubleFace('ceramic', null, true)));
+  back.position.z = -T / 2;
+  back.rotation.y = Math.PI;
+  // the glazed rim between the two faces
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.995, R * 0.995, T, 96, 1, true), ceramic('#f7f6f2'));
+  rim.rotation.x = Math.PI / 2;
+  group.add(front, back, rim);
+  // the gold string through the hole (where the founder's product photo has it), up to a knot
+  const holeY = R * 0.79;
   const gold = new THREE.MeshStandardMaterial({ color: '#C9A227', metalness: 0.85, roughness: 0.35 });
   const loop = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, holeY, T / 2 + 0.8),
+    new THREE.Vector3(0, holeY, T / 2 + 0.6),
     new THREE.Vector3(-R * 0.18, holeY + R * 0.55, 1),
     new THREE.Vector3(0, holeY + R * 0.95, 0),
     new THREE.Vector3(R * 0.18, holeY + R * 0.55, -1),
-    new THREE.Vector3(0, holeY, -T / 2 - 0.8),
+    new THREE.Vector3(0, holeY, -T / 2 - 0.6),
   ]);
   group.add(new THREE.Mesh(new THREE.TubeGeometry(loop, 64, 0.45, 8, false), gold));
   return centred(group);
 }
 
 /**
- * The PLASTIC BALL (Prodigi XMAS-PLAS-BAUB): an 8 cm shatterproof ball with a chrome cap and a silver
- * string, printed on BOTH sides — the same drawing front and back, each reading the right way round.
- * The print is projected flat onto each half (the way a pad-printed ball looks), filling it (cover).
+ * The PLASTIC BALL (Prodigi XMAS-PLAS-BAUB): 8 cm, shatterproof, chrome cap, silver string. Each half
+ * wears the shop photo's layers with the drawing (printed both sides), projected flat onto it the way a
+ * pad-printed ball looks.
  */
 function buildPlasticBall(texture: THREE.Texture, wMm: number): THREE.Group {
   const group = new THREE.Group();
   const R = wMm / 2;
-  const geo = new THREE.SphereGeometry(R, 96, 64);
-  const pos = geo.attributes.position!, uv = geo.attributes.uv!;
-  const K = 0.92; // the printed circle reaches ~92 % of the ball's radius (the founder's print map)
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
-    const u = (x / (R * K) + 1) / 2;
-    // the back half is printed too: mirror it so it reads correctly when the ball is turned round
-    uv.setXY(i, z >= 0 ? u : 1 - u, (y / (R * K) + 1) / 2);
-  }
-  uv.needsUpdate = true;
-  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-  const shell = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ map: texture, roughness: 0.18, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08 }));
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.anisotropy = 8;
-  group.add(shell);
+  const drawing = texture.image as CanvasImageSource;
+  const half = (rear: boolean) => {
+    const geo = new THREE.SphereGeometry(R, 72, 48);
+    const pos = geo.attributes.position!, uv = geo.attributes.uv!;
+    for (let i = 0; i < pos.count; i++) {
+      // the photo's ball fills its square crop: x, y across the ball → u, v (the rear's mirror undoes the flip)
+      const u = (pos.getX(i) / R + 1) / 2;
+      uv.setXY(i, u, (pos.getY(i) / R + 1) / 2);
+    }
+    uv.needsUpdate = true;
+    // keep just this half (front: +z, rear: −z)
+    const idx = geo.index!;
+    const keep: number[] = [];
+    for (let t = 0; t < idx.count; t += 3) {
+      const a = idx.getX(t), b = idx.getX(t + 1), c = idx.getX(t + 2);
+      const z = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+      if (rear ? z <= 0 : z >= 0) keep.push(a, b, c);
+    }
+    geo.setIndex(keep);
+    const face = baubleFace('ball', drawing, rear);
+    const mat = new THREE.MeshPhysicalMaterial({ map: face, emissiveMap: face, emissive: new THREE.Color(0.18, 0.18, 0.18), roughness: 0.25, metalness: 0, clearcoat: 0.6, clearcoatRoughness: 0.1 });
+    return new THREE.Mesh(geo, mat);
+  };
+  group.add(half(false), half(true));
   const chrome = new THREE.MeshStandardMaterial({ color: '#d8d8d8', metalness: 1, roughness: 0.18 });
   const cap = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.2, R * 0.22, R * 0.2, 32), chrome);
   cap.position.y = R * 0.98;
