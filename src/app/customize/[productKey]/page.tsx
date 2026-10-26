@@ -228,8 +228,13 @@ function CustomizeProduct() {
   // white reverse. `backFill` drives the "turn it around" preview — undefined = the image (both
   // sides, or the front); a hex = a plain coloured/white back rendered plush via the fill mode.
   const supportsBack = product?.key === 'cushion' && cushionSupportsBack(size);
+  // BAUBLE "the back" (founder, 26 Oct): the same photo layers turned over. The ceramic disc is printed on
+  // ONE side (Prodigi: "single-sided print") — its back is the plain glazed disc (white fill = no print);
+  // the plastic ball is printed on BOTH sides — its back shows the drawing again (the image itself).
   const backFill: string | undefined =
-    product?.key !== 'cushion'
+    product?.key === 'bauble'
+      ? size === 'plastic ball' ? undefined : '#FFFFFF'
+      : product?.key !== 'cushion'
       ? undefined
       : !supportsBack
         ? CUSHION_SUEDE_BACK_HEX // heart / round: fixed faux-suede stone reverse
@@ -671,7 +676,7 @@ function CustomizeProduct() {
           ) : null}
           {/* Cushion "turn it around" — flip the preview between the image side and the back
               (the chosen colour, or the plain white reverse for heart/round). */}
-          {product.key === 'cushion' ? (
+          {product.key === 'cushion' || product.key === 'bauble' ? (
             <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="turn it around">
               {([['the front', false], ['the back', true]] as const).map(([label, b]) => (
                 <button

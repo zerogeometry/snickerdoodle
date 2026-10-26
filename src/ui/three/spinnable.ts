@@ -17,7 +17,9 @@
 export const SPINNABLE = [
   'mug',
   'sack',
-  'storybook', 'calendar', 'bauble',
+  'storybook', 'calendar',
 ] as const;
+// (the baubles turn over between their FRONT and BACK photos instead — the founder's layers, no 3D model:
+// founder, 26 Oct)
 
 export const has3D = (kind: string): boolean => (SPINNABLE as readonly string[]).includes(kind);
