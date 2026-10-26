@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconHeartPlus, IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
+import { IconAlertTriangle, IconHeartPlus, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
@@ -12,6 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
+import { ProductDetails } from '@/ui/components/ProductDetails';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
 import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
@@ -104,7 +105,6 @@ function CustomizeProduct() {
   // effect — which runs in the SAME flush as the restore effect — sees an explicit choice
   // immediately and doesn't clobber a restored/editor-chosen orientation with a guess.
   const orientationLockedRef = useRef(false);
-  const [descOpen, setDescOpen] = useState(false);
   const [zoomOpen, setZoomOpen] = useState(false);
   const [view, setView] = useState<'photo' | 'spin'>('photo'); // preview mode
   const [canSpin, setCanSpin] = useState(false);
@@ -1082,34 +1082,7 @@ function CustomizeProduct() {
           ) : null}
 
           {/* collapsible, scrollable-in-container description */}
-          {product.description ? (
-            <div className="mt-5 rounded-[16px] border-2 border-cocoa/15 bg-paper">
-              <button
-                type="button"
-                onClick={() => setDescOpen((o) => !o)}
-                aria-expanded={descOpen}
-                className="flex min-h-11 w-full items-center justify-between px-4 py-3 text-left text-sm font-extrabold text-cocoa"
-              >
-                product details
-                <Icon icon={IconChevronDown} size={16} className={`text-ink-faint transition-transform ${descOpen ? 'rotate-180' : ''}`} />
-              </button>
-              {descOpen ? (
-                <div className="brand-scroll max-h-44 overflow-y-auto border-t-2 border-cocoa/10 px-4 py-3 text-[13px] leading-relaxed text-ink-soft">
-                  <p>{product.description}</p>
-                  {Object.keys(product.specs).length > 0 ? (
-                    <dl className="mt-3 space-y-1">
-                      {Object.entries(product.specs).map(([k, v]) => (
-                        <div key={k} className="flex gap-2">
-                          <dt className="min-w-20 font-bold capitalize text-cocoa">{k}</dt>
-                          <dd>{v}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <ProductDetails description={product.description} specs={product.specs} />
 
           {isGarmentKey(product.key) ? (
             <div className="mt-5 space-y-2">

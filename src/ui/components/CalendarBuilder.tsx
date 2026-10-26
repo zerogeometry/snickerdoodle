@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconCalendar, IconCircleCheck, IconPlus, IconRepeat, IconShoppingBag, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCircleCheck, IconPlus, IconRepeat, IconShoppingBag, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -10,6 +10,8 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
 import { CalendarFlipPreview } from './CalendarFlipPreview';
+import { ChristmasPromise } from './ChristmasPromise';
+import { ProductDetails } from './ProductDetails';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
 import { usePickerEdits } from './usePickerEdits';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -20,6 +22,7 @@ import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { CALENDAR_KEY, CALENDAR_PAGE_COUNT, CALENDAR_YEAR, fillCalendarPages, MONTH_SHORT, pageLabel } from '@/lib/calendar';
 import { calendarLine, newCalendarLineId } from '@/lib/calendar-line';
 import { defaultTransformFor } from '@/lib/catalogue-view';
+import { deliveryLine } from '@/lib/delivery';
 import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine } from '@/lib/store';
 
 /**
@@ -316,26 +319,11 @@ export function CalendarBuilder() {
 
   return (
     <Shell>
-      <div className="md:grid md:grid-cols-[1fr_18rem] md:items-start md:gap-8">
+      <div className="grid gap-7 md:grid-cols-2 md:items-start">
+        {/* Left (like every product page): the calendar, big — flip through it — with its pages under it */}
         <div className="min-w-0">
-          <h1 className="font-display text-3xl font-extrabold text-cocoa">{CALENDAR_YEAR} calendar</h1>
-          <p className="mt-1 text-sm text-ink-soft">{product.blurb ?? 'a year of their masterpieces'} — a drawing for every month, and one on the cover.</p>
-
-          {/* Size */}
-          <div className="mt-5">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Size</p>
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="calendar size">
-              {variants.map((v) => (
-                <button key={v.id} type="button" onClick={() => setVariantId(v.id)} aria-pressed={v.id === variant.id} className={`${OPT} ${v.id === variant.id ? OPT_ON : OPT_OFF}`}>
-                  {v.attributes.size ?? 'calendar'} · {gbp(v.pricePence)}
-                </button>
-              ))}
-            </div>
-            <p className="mt-1.5 text-xs text-ink-faint">landscape, to hang on the wall · the {CALENDAR_YEAR} dates printed under every month</p>
-          </div>
-
           {/* The flip-through */}
-          <div className="mt-6">
+          <div className="mt-3">
             <CalendarFlipPreview
               pages={pages}
               imageFor={(p) => drawingFor(p.assetId)?.imageUrl ?? null}
@@ -357,7 +345,7 @@ export function CalendarBuilder() {
           {ready && filledCount < CALENDAR_PAGE_COUNT ? (
             <CaveatNote className="mt-1 text-lg">the rest repeat your favourite{distinct === 1 ? '' : 's'} ↻</CaveatNote>
           ) : null}
-          <ol className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 lg:grid-cols-5" aria-label="the pages of your calendar">
+          <ol className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4" aria-label="the pages of your calendar">
             {pages.map((c, i) => {
               const own = slots[i];
               const d = c ? drawingFor(c.assetId) : null;
@@ -372,7 +360,7 @@ export function CalendarBuilder() {
                       style={{ ['--tilt' as string]: i % 2 ? '1.2deg' : '-1.4deg', ['--tape' as string]: TAPES[i % TAPES.length], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
                     >
                       <div className={`relative aspect-[297/210] w-full overflow-hidden bg-white ${own ? '' : 'opacity-60'}`}>
-                        {d?.imageUrl ? <img src={d.imageUrl} alt="" className="h-full w-full object-contain" /> : <span className="flex h-full items-center justify-center text-[10px] font-bold text-ink-faint">a drawing</span>}
+                        {d?.thumbUrl ?? d?.imageUrl ? <img src={(d.thumbUrl ?? d.imageUrl)!} alt="" loading="lazy" className="h-full w-full object-contain" /> : <span className="flex h-full items-center justify-center text-[10px] font-bold text-ink-faint">a drawing</span>}
                         <button
                           type="button"
                           onClick={() => openSheet(i, !own)}
@@ -426,16 +414,33 @@ export function CalendarBuilder() {
           </ol>
         </div>
 
-        {/* Summary + the primary action: a thumb-zone dock on phones, a side card from md. */}
-        <div className="md:sticky md:top-24">
-          <div className="mt-6 hidden rounded-[18px] border-2 border-cocoa bg-paper p-4 shadow-[0_3px_0_var(--color-cocoa)] md:mt-0 md:block">
-            <p className="flex items-center gap-2 font-display text-lg font-extrabold text-cocoa">
-              <Icon icon={IconCalendar} size={20} className="text-cinnamon" /> {variant.attributes.size ?? ''} calendar {CALENDAR_YEAR}
-            </p>
-            <p className="mt-1 text-sm text-ink-soft">a cover + twelve months, the dates printed for you. one drawing or twelve — it’s yours.</p>
-            <p className="mt-3 text-2xl font-extrabold text-cocoa">{gbp(variant.pricePence)}</p>
+        {/* Right: title → options → description → add to basket (bottom-right) */}
+        <div className="flex flex-col">
+          <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">{CALENDAR_YEAR} calendar</h1>
+          <p className="mt-1 text-sm text-ink-soft">{product.blurb ?? 'a year of their masterpieces'} — a drawing for every month, and one on the cover.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2.5">
+            <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">{gbp(variant.pricePence)}</span>
+            <span className="text-xs font-semibold text-green-save">{deliveryLine(variant.sku)}</span>
+            <ChristmasPromise productKey={product.key} attrs={variant.attributes} />
           </div>
-          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-4 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
+
+          {/* Size */}
+          <div className="mt-5">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Size</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="calendar size">
+              {variants.map((v) => (
+                <button key={v.id} type="button" onClick={() => setVariantId(v.id)} aria-pressed={v.id === variant.id} className={`${OPT} ${v.id === variant.id ? OPT_ON : OPT_OFF}`}>
+                  {v.attributes.size ?? 'calendar'} · {gbp(v.pricePence)}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-xs text-ink-faint">landscape, to hang on the wall · the {CALENDAR_YEAR} dates printed under every month</p>
+          </div>
+
+
+          <ProductDetails description={product.description} specs={product.specs} />
+
+          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-6 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none md:flex md:flex-col md:items-end">
             {blockedAt >= 0 ? (
               <p role="status" className="mb-2 flex items-start gap-1.5 text-[12px] font-semibold text-cocoa">
                 <Icon icon={IconAlertTriangle} size={15} className="mt-px shrink-0 text-cinnamon" />
@@ -443,11 +448,11 @@ export function CalendarBuilder() {
               </p>
             ) : null}
             {ready ? (
-              <Button size="lg" className="w-full whitespace-nowrap" onClick={addToBasket} disabled={blockedAt >= 0}>
+              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={addToBasket} disabled={blockedAt >= 0}>
                 <Icon icon={IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant.pricePence)}
               </Button>
             ) : (
-              <Button size="lg" className="w-full whitespace-nowrap" onClick={() => openSheet(0, true)}>
+              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={() => openSheet(0, true)}>
                 <Icon icon={IconPlus} size={16} /> pick a drawing for the cover
               </Button>
             )}

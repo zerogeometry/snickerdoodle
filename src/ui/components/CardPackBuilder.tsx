@@ -11,6 +11,8 @@ import { Modal } from '@/ui/primitives/Modal';
 import { usePickerEdits } from './usePickerEdits';
 import { FlowHeader } from './FlowHeader';
 import { BaseColourPicker } from './BaseColourPicker';
+import { ChristmasPromise } from './ChristmasPromise';
+import { ProductDetails } from './ProductDetails';
 import { MockupPreview } from './MockupPreview';
 import { TileSkeletonGrid } from './TileSkeleton';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -23,6 +25,7 @@ import { CARD_PACK_KEY, packSizeOf } from '@/lib/card-packs';
 import { cardPackLine, newPackLineId } from '@/lib/card-pack-line';
 import { PATTERN_GROUND_WHITE, groundHex, isColouredGround } from '@/lib/patterns';
 import { defaultTransformFor } from '@/lib/catalogue-view';
+import { deliveryLine } from '@/lib/delivery';
 import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
 
 /**
@@ -319,46 +322,23 @@ export function CardPackBuilder() {
 
   return (
     <Shell>
-      <div className="md:grid md:grid-cols-[1fr_18rem] md:items-start md:gap-8">
-        <div>
-          <h1 className="font-display text-3xl font-extrabold text-cocoa">card pack</h1>
-          <p className="mt-1 text-sm text-ink-soft">{pack.blurb ?? 'a stack of little masterpieces, ready to send'}</p>
-
-          {/* the pack at a glance: the chosen fronts fanned out, as they'll arrive */}
-          <PackFan cards={cards} imageFor={(a) => { const d = drawingFor(a); return d?.thumbUrl ?? d?.imageUrl ?? null; }} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
-
-          {/* Pack size */}
-          <div className="mt-5">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">How many cards</p>
-            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="pack size">
-              {sizes.map(({ v, n }) => (
-                <button
-                  key={v.id}
-                  type="button"
-                  onClick={() => setVariantId(v.id)}
-                  aria-pressed={v.id === variant.id}
-                  className={`${OPT} ${v.id === variant.id ? OPT_ON : OPT_OFF}`}
-                >
-                  pack of {n} · {gbp(v.pricePence)}
-                </button>
-              ))}
+      <div className="grid gap-7 md:grid-cols-2 md:items-start">
+        {/* Left (like every product page): the pack at a glance, big, with the card fronts under it */}
+        <div className="min-w-0">
+          <div className="polaroid tape relative mt-3">
+            <div className="flex w-full items-center justify-center bg-paper-2 p-3">
+              <PackFan cards={cards} imageFor={(a) => { const d = drawingFor(a); return d?.thumbUrl ?? d?.imageUrl ?? null; }} ground={groundOrNone ? groundHex(groundOrNone) : '#ffffff'} packSize={packSize} />
             </div>
-            {perCard ? <p className="mt-1.5 text-xs text-ink-faint">that’s {gbp(perCard)} a card, 7×5″ on thick Fedrigoni card</p> : null}
           </div>
 
-          {/* The pack's base colour — the same picker + copy as every edge-to-edge product. */}
-          <BaseColourPicker title="background colour" noun="card front" value={ground} onChange={setGround} />
-
-          <CaveatNote className="mt-4 text-xl">blank inside, for your own words ✎</CaveatNote>
-
           {/* The fronts */}
-          <div className="mt-5 flex items-baseline justify-between gap-2">
+          <div className="mt-6 flex items-baseline justify-between gap-2">
             <h2 className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Your {packSize} cards</h2>
             <span className="text-xs font-bold text-ink-soft" aria-live="polite">
               {filled} of {packSize} chosen
             </span>
           </div>
-          <ol className="mt-4 grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-5" aria-label="the fronts of your cards">
+          <ol className="mt-4 grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-5 md:grid-cols-4 lg:grid-cols-5" aria-label="the fronts of your cards">
             {cards.map((c, i) => {
               const d = c ? drawingFor(c.assetId) : null;
               const q = c ? assess(c) : null;
@@ -413,16 +393,43 @@ export function CardPackBuilder() {
           </ol>
         </div>
 
-        {/* Summary + the primary action: a thumb-zone dock on phones, a side card from md. */}
-        <div className="md:sticky md:top-24">
-          <div className="mt-6 hidden rounded-[18px] border-2 border-cocoa bg-paper p-4 shadow-[0_3px_0_var(--color-cocoa)] md:mt-0 md:block">
-            <p className="flex items-center gap-2 font-display text-lg font-extrabold text-cocoa">
-              <Icon icon={IconCards} size={20} className="text-cinnamon" /> pack of {packSize}
-            </p>
-            <p className="mt-1 text-sm text-ink-soft">a drawing on every front, the same one or all different — blank inside.</p>
-            <p className="mt-3 text-2xl font-extrabold text-cocoa">{gbp(variant.pricePence)}</p>
+        {/* Right: title → options → description → add to basket (bottom-right) */}
+        <div className="flex flex-col">
+          <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">{pack.label}</h1>
+          <p className="mt-1 text-sm text-ink-soft">{pack.blurb ?? 'a stack of little masterpieces, ready to send'}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2.5">
+            <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">{gbp(variant.pricePence)}</span>
+            <span className="text-xs font-semibold text-green-save">{deliveryLine(variant.sku)}</span>
+            <ChristmasPromise productKey={pack.key} attrs={variant.attributes} />
           </div>
-          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-4 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
+
+          {/* Pack size */}
+          <div className="mt-5">
+            <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">How many cards</p>
+            <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="pack size">
+              {sizes.map(({ v, n }) => (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => setVariantId(v.id)}
+                  aria-pressed={v.id === variant.id}
+                  className={`${OPT} ${v.id === variant.id ? OPT_ON : OPT_OFF}`}
+                >
+                  pack of {n} · {gbp(v.pricePence)}
+                </button>
+              ))}
+            </div>
+            {perCard ? <p className="mt-1.5 text-xs text-ink-faint">that’s {gbp(perCard)} a card, 7×5″ on thick Fedrigoni card</p> : null}
+          </div>
+
+          {/* The pack's base colour — the same picker + copy as every edge-to-edge product. */}
+          <BaseColourPicker title="background colour" noun="card front" value={ground} onChange={setGround} />
+
+          <CaveatNote className="mt-4 text-xl">blank inside, for your own words ✎</CaveatNote>
+
+          <ProductDetails description={pack.description} specs={pack.specs} />
+
+          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-6 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none md:flex md:flex-col md:items-end">
             {blockedAt >= 0 ? (
               <p role="status" className="mb-2 flex items-start gap-1.5 text-[12px] font-semibold text-cocoa">
                 <Icon icon={IconAlertTriangle} size={15} className="mt-px shrink-0 text-cinnamon" />
@@ -430,11 +437,11 @@ export function CardPackBuilder() {
               </p>
             ) : null}
             {complete ? (
-              <Button size="lg" className="w-full whitespace-nowrap" onClick={addToBasket} disabled={blockedAt >= 0}>
+              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={addToBasket} disabled={blockedAt >= 0}>
                 <Icon icon={IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant.pricePence)}
               </Button>
             ) : (
-              <Button size="lg" className="w-full whitespace-nowrap" onClick={() => openSheet(firstEmpty(cards), true)}>
+              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={() => openSheet(firstEmpty(cards), true)}>
                 <Icon icon={IconPlus} size={16} /> pick {packSize - filled} more drawing{packSize - filled === 1 ? '' : 's'}
               </Button>
             )}
@@ -652,7 +659,7 @@ function PackFan({ cards, imageFor, ground, packSize }: { cards: Array<PackCardL
   const shown = cards.slice(0, 5);
   const n = shown.length;
   return (
-    <div className="relative mx-auto mt-5 flex h-56 w-full max-w-md items-end justify-center sm:h-64" aria-label={`your pack of ${packSize} cards`} role="img">
+    <div className="relative mx-auto flex h-64 w-full max-w-md items-end justify-center sm:h-72" aria-label={`your pack of ${packSize} cards`} role="img">
       {shown.map((c, i) => {
         // card 1 at the front, in the middle; the others fan out behind it, alternating left / right
         const off = i === 0 ? 0 : (i % 2 ? -1 : 1) * Math.ceil(i / 2) * (n > 1 ? 1 : 0);

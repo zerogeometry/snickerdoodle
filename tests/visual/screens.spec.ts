@@ -70,6 +70,11 @@ for (const vp of WIDTHS) {
       await expect(page.getByRole('heading', { name: '2027 calendar' })).toBeVisible();
       await expect(page.getByText('1 of 13 chosen')).toBeVisible();
       await shot(page, `${vp.name}-customize-calendar`);
+      // the card pack builder: laid out like every product page (the pack + its fronts left, options right)
+      await push(page, '/customize/cardPack');
+      await expect(page.getByRole('heading', { name: 'card pack' })).toBeVisible();
+      await expect(page.getByText(/1 of \d+ chosen/)).toBeVisible();
+      await shot(page, `${vp.name}-customize-cardpack`);
       await push(page, '/customize/mug');
       await expect(page.getByRole('button', { name: /edit placement/i })).toBeVisible();
 
