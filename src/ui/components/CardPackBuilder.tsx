@@ -151,7 +151,16 @@ export function CardPackBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: '/customize/cardPack?resume=1', onUploaded: loadPicker });
+  const tools = usePickerEdits({ returnTo: '/customize/cardPack?resume=1', onUploaded: loadPicker, sheet });
+  // back from the Studio: the picker open again on the card it was filling, the edited drawing chosen
+  const { resume, clearResume } = tools;
+  useEffect(() => {
+    if (!resume || packSize === 0) return;
+    clearResume();
+    if (resume.sheet.slot >= packSize) return;
+    setSheet(resume.sheet);
+    setChosen(resume.assetId);
+  }, [resume, clearResume, packSize]);
   const applyEdits = tools.apply;
   const drawings = useMemo(() => applyEdits(drawingsRaw), [applyEdits, drawingsRaw]);
   // a drawing edited here (remove background, the Studio) → every card already showing it shows the edit

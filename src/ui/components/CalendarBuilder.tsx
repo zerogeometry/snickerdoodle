@@ -151,7 +151,15 @@ export function CalendarBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: NEXT, onUploaded: loadPicker });
+  const tools = usePickerEdits({ returnTo: NEXT, onUploaded: loadPicker, sheet });
+  // back from the Studio: the picker open again on the page it was filling, the edited drawing chosen
+  const { resume, clearResume } = tools;
+  useEffect(() => {
+    if (!resume || !product) return;
+    clearResume();
+    setSheet(resume.sheet);
+    setChosen(resume.assetId);
+  }, [resume, clearResume, product]);
   const applyEdits = tools.apply;
   const drawings = useMemo(() => applyEdits(drawingsRaw), [applyEdits, drawingsRaw]);
   // a drawing edited here (remove background, the Studio) → every page already showing it shows the edit

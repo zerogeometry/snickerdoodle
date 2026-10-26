@@ -27,7 +27,9 @@ type Stashed = Omit<NonNullable<Upload>, 'dataUrl'>;
 
 const STASH_KEY = 'sd_upload_stash'; // the drawing in progress, set aside while a keepsake is in the Studio
 const EDITS_KEY = 'sd_picker_edits'; // + the builder: this tab's per-drawing edits, separate for the calendar and the cards
-const DETOUR_KEY = 'sd_studio_detour'; // { assetId, returnTo } while a keepsake is in the Studio
+const DETOUR_KEY = 'sd_studio_detour'; // { assetId, returnTo, sheet } while a keepsake is in the Studio
+/** the picker as it was when the Studio was opened from it — which card / page it was filling */
+export type PickerSheet = { slot: number; advance: boolean };
 
 /** Where the Studio goes back to when it was opened from a picker (null = the usual collection). */
 export function studioReturnTo(): string | null {
@@ -39,7 +41,7 @@ export function studioReturnTo(): string | null {
   }
 }
 
-export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void }) {
+export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void; /** the open picker (put back on return) */ sheet?: PickerSheet | null }) {
   const editsKey = `${EDITS_KEY}:${opts.returnTo.split('?')[0]}`;
   const router = useRouter();
   // kept for the tab, so a trip to the Studio (or a reload) doesn't undo the edits on other pages / cards
@@ -68,13 +70,17 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<{ done: number; of: number } | null>(null);
   const restored = useRef(false);
+  // Back from the Studio (founder, 26 Oct: "clicked done … out of the picker, with no card picked"):
+  // the picker reopens on the card / page it was filling, with the drawing just edited chosen.
+  const [resume, setResume] = useState<{ assetId: string; sheet: PickerSheet } | null>(null);
+  const clearResume = useCallback(() => setResume(null), []);
 
   // Back from the Studio: the keepsake's saved design becomes its edit here, and the drawing that was
   // in progress is put back where it was.
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    let detour: { assetId: string } | null = null;
+    let detour: { assetId: string; sheet?: PickerSheet | null } | null = null;
     try {
       detour = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null');
     } catch {
@@ -82,10 +88,16 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
     }
     if (!detour) return;
     const u = useUpload.getState().upload;
-    if (u?.assetId === detour.assetId && u.cutout && !u.cutout.trim) {
-      const design = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
-      setEdits((e) => ({ ...e, [detour!.assetId]: design }));
+    if (u?.assetId === detour.assetId) {
+      if (u.cutout && !u.cutout.trim) {
+        const design = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
+        setEdits((e) => ({ ...e, [detour!.assetId]: design }));
+      } else {
+        // saved back to the plain drawing: no edit of it here any more
+        setEdits(({ [detour!.assetId]: _gone, ...rest }) => rest);
+      }
     }
+    if (detour.sheet) setResume({ assetId: detour.assetId, sheet: detour.sheet });
     try {
       // (only when one WAS set aside — editing the drawing in progress itself sets nothing aside)
       const stash = sessionStorage.getItem(STASH_KEY);
@@ -133,7 +145,7 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
     // the drawing in progress IS this one: the Studio as usual, back here afterwards
     if (current?.assetId === d.assetId) {
       try {
-        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo }));
+        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
       } catch {
         /* no storage */
       }
@@ -148,7 +160,7 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
         // set aside WITHOUT its picture — the tab can't hold two photos; it's fetched again on return
         const { dataUrl: _picture, ...rest } = current ? (toSessionUpload(current) ?? { dataUrl: '' }) : { dataUrl: '' };
         sessionStorage.setItem(STASH_KEY, JSON.stringify({ upload: current ? rest : null }));
-        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo }));
+        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
       } catch {
         return void toast('couldn’t open the studio from here — try from your collection');
       }
@@ -198,5 +210,5 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
     opts.onUploaded();
   };
 
-  return { edits, busy, uploading, apply, toggleBackground, editInStudio, uploadToKeepsake };
+  return { edits, busy, uploading, apply, toggleBackground, editInStudio, uploadToKeepsake, resume, clearResume };
 }
