@@ -48,7 +48,7 @@ describe('card inside-panel print renderer (satori + resvg)', () => {
       CARD_FONTS.map(async ({ token: font }) => ink((await renderCardInsidePanels(msg({ font }), GEOM)).right)),
     );
     expect(new Set(counts).size).toBe(CARD_FONTS.length); // every face (Christmas ones too) renders distinctly
-  });
+  }, 30_000); // renders every card font at print size — with the 3 Christmas fonts it outgrows 5s under a full parallel run
 
   it('the S/M/L size control scales the print too (bigger fontScale ⇒ more ink)', async () => {
     const small = await ink((await renderCardInsidePanels(msg({ fontScale: 0.8 }), GEOM)).right);
