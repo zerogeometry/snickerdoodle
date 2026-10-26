@@ -36,6 +36,12 @@ export interface InkLiftOptions {
    * outline) as solid paper-white instead of clearing it. On white paper we can't tell "meant to
    * be white" from "paper showing through", so it's the parent's choice; default = clear it. */
   keepEnclosedPaper?: boolean;
+  /** CLEAN-UP (founder, 26 Oct — "one click, ready to go"): after the lift, sweep away what a parent
+   * would otherwise tap off with "remove colour · just that patch": paper-ish leftovers (a darker
+   * corner, fibres, a pink halo round cotton wool) that touch the cleared background, growing only
+   * through colours close to the paper and stopping at outlines; then faint paper-coloured specks.
+   * Default ON. */
+  cleanup?: boolean;
 }
 
 export interface InkLiftResult {
@@ -66,7 +72,196 @@ export interface InkLiftDiagnosis {
   declined?: 'dark-paper' | 'no-paper';
 }
 
+/**
+ * Lift the drawing off its paper. A photo of a sheet lying ON A TABLE has two backgrounds: the first
+ * pass models the table as "paper" and lifts the sheet off it. If what's left is one big sheet whose
+ * edge is mostly a single colour, that sheet is the real paper — so we lift again with the table filled
+ * in as sheet colour, and both go (founder, 26 Oct: "ready to go on the first click").
+ */
 export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftDiagnosis = {}): Promise<InkLiftResult | null> {
+  if (opts.cleanup === false) return liftOnce(input, opts, diag);
+  // Look for the sheet on a PLAIN first pass (the clean-up would already nibble the sheet's edge) — on a
+  // reduced copy: it only has to FIND the sheet, and that keeps a 12-megapixel photo quick.
+  const full = await sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().flatten({ background: '#ffffff' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const FW = full.info.width, FH = full.info.height;
+  const DETECT_EDGE = 1400;
+  const small = Math.max(FW, FH) > DETECT_EDGE
+    ? await sharp(full.data, { raw: { width: FW, height: FH, channels: 3 } }).resize(DETECT_EDGE, DETECT_EDGE, { fit: 'inside' }).png({ compressionLevel: 1 }).toBuffer()
+    : input;
+  const first = await liftOnce(small, { ...opts, cleanup: false, keepEnclosedPaper: false }, diag);
+  if (!first) return null;
+  // A WHITE first background means the art was on white paper already — a big painted shape on it must
+  // never be mistaken for "a sheet" and lifted away. Tables (wood, dark, textured) are what we're after.
+  const p0 = first.paper;
+  const whitePaper = Math.min(p0.r, p0.g, p0.b) > 200 && Math.max(p0.r, p0.g, p0.b) - Math.min(p0.r, p0.g, p0.b) < 25;
+  // (a coloured sheet on a WHITE desk still counts — but only when it's unmistakably a sheet: strict mode)
+  const found = await sheetOnTable(first, whitePaper);
+  if (!found) return liftOnce(input, opts, {});
+  // the table mask at FULL size (nearest neighbour from the detection copy)
+  const table = new Uint8Array(FW * FH);
+  for (let y = 0; y < FH; y++) {
+    const sy = Math.min(first.height - 1, Math.floor((y * first.height) / FH));
+    for (let x = 0; x < FW; x++) table[y * FW + x] = found.table[sy * first.width + Math.min(first.width - 1, Math.floor((x * first.width) / FW))]!;
+  }
+  const sheet = { table, colour: found.colour };
+  const fill = Buffer.from(full.data);
+  for (let k = 0; k < sheet.table.length; k++) {
+    if (!sheet.table[k]) continue;
+    fill[k * 3] = sheet.colour[0]; fill[k * 3 + 1] = sheet.colour[1]; fill[k * 3 + 2] = sheet.colour[2];
+  }
+  const png = await sharp(fill, { raw: { width: FW, height: FH, channels: 3 } }).png({ compressionLevel: 1 }).toBuffer();
+  const second = await liftOnce(png, opts, {});
+  if (!second) return liftOnce(input, opts, {});
+  return dropEdgeDebris(second, sheet.table);
+}
+
+/**
+ * After a sheet-on-table lift: bits of the table / the sheet's cut edge can survive as thin strips
+ * along where the table was. Drop any kept blob that lies MOSTLY (≥ 60 %) within a margin round the
+ * table area — a drawing that merely touches the edge (grass along the bottom) stays.
+ */
+async function dropEdgeDebris(res: InkLiftResult, table: Uint8Array): Promise<InkLiftResult> {
+  const { width: W, height: H } = res;
+  const N = W * H;
+  const px = await sharp(res.buffer).raw().toBuffer();
+  const M = Math.max(4, Math.round(Math.min(W, H) / 60));
+  // margin = table dilated by M (separable max)
+  const tmp = new Uint8Array(N), near = new Uint8Array(N);
+  for (let y = 0; y < H; y++) {
+    let last = -1e9;
+    for (let x = 0; x < W; x++) { if (table[y * W + x]) last = x; if (x - last <= M) tmp[y * W + x] = 1; }
+    last = 1e9;
+    for (let x = W - 1; x >= 0; x--) { if (table[y * W + x]) last = x; if (last - x <= M) tmp[y * W + x] = 1; }
+  }
+  for (let x = 0; x < W; x++) {
+    let last = -1e9;
+    for (let y = 0; y < H; y++) { if (tmp[y * W + x]) last = y; if (y - last <= M) near[y * W + x] = 1; }
+    last = 1e9;
+    for (let y = H - 1; y >= 0; y--) { if (tmp[y * W + x]) last = y; if (last - y <= M) near[y * W + x] = 1; }
+  }
+  const seen = new Uint8Array(N);
+  let changed = false;
+  let removedPx = 0;
+  for (let s0 = 0; s0 < N; s0++) {
+    if (seen[s0] || px[s0 * 4 + 3]! < 32) continue;
+    const blob: number[] = [];
+    const st = [s0];
+    seen[s0] = 1;
+    let inMargin = 0;
+    while (st.length) {
+      const k = st.pop()!;
+      blob.push(k);
+      inMargin += near[k]!;
+      const x = k % W;
+      if (x > 0 && !seen[k - 1] && px[(k - 1) * 4 + 3]! >= 32) { seen[k - 1] = 1; st.push(k - 1); }
+      if (x < W - 1 && !seen[k + 1] && px[(k + 1) * 4 + 3]! >= 32) { seen[k + 1] = 1; st.push(k + 1); }
+      if (k >= W && !seen[k - W] && px[(k - W) * 4 + 3]! >= 32) { seen[k - W] = 1; st.push(k - W); }
+      if (k < N - W && !seen[k + W] && px[(k + W) * 4 + 3]! >= 32) { seen[k + W] = 1; st.push(k + W); }
+    }
+    if (inMargin / blob.length < 0.6) continue;
+    for (const k of blob) { px[k * 4 + 3] = 0; removedPx++; }
+    changed = true;
+  }
+  if (!changed) return res;
+  const buffer = await sharp(px, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
+  return { ...res, buffer, removedFraction: Math.min(1, res.removedFraction + removedPx / N) };
+}
+
+/**
+ * Is the first pass's result a SHEET on a table? = the kept pixels just inside the cleared border are
+ * dominated (≥ 60 %) by one colour family and that region is large (≥ 35 % of the picture). Returns the
+ * table mask (border-connected cleared pixels) and the sheet's colour.
+ */
+async function sheetOnTable(first: InkLiftResult, strict = false): Promise<{ table: Uint8Array; colour: [number, number, number] } | null> {
+  const { width: W, height: H } = first;
+  const px = await sharp(first.buffer).raw().toBuffer();
+  const N = W * H;
+  const table = new Uint8Array(N);
+  const stack: number[] = [];
+  const seed = (k: number) => {
+    if (!table[k] && px[k * 4 + 3]! < 128) {
+      table[k] = 1;
+      stack.push(k);
+    }
+  };
+  for (let x = 0; x < W; x++) { seed(x); seed((H - 1) * W + x); }
+  for (let y = 0; y < H; y++) { seed(y * W); seed(y * W + W - 1); }
+  while (stack.length) {
+    const k = stack.pop()!;
+    const x = k % W;
+    if (x > 0) seed(k - 1);
+    if (x < W - 1) seed(k + 1);
+    if (k >= W) seed(k - W);
+    if (k < N - W) seed(k + W);
+  }
+  let tableArea = 0;
+  for (let k = 0; k < N; k++) tableArea += table[k]!;
+  if (tableArea < N * 0.03 || tableArea > N * 0.65) return null; // no table border, or nothing left to be a sheet
+  // The edge ring: solid kept pixels a few px inside the table boundary.
+  const D = Math.max(3, Math.round(Math.min(W, H) / 60)); // a little way IN — past the sheet's own edge shadow
+  const ring: number[] = [];
+  for (let y = D; y < H - D; y += 2) {
+    for (let x = D; x < W - D; x += 2) {
+      const k = y * W + x;
+      if (table[k] || px[k * 4 + 3]! < 250) continue;
+      if (table[k - D] || table[k + D] || table[k - D * W] || table[k + D * W]) ring.push(k);
+    }
+  }
+  if (ring.length < 50) return null;
+  const buckets = new Map<number, { n: number; r: number; g: number; b: number }>();
+  for (const k of ring) {
+    const r = px[k * 4]!, g = px[k * 4 + 1]!, b = px[k * 4 + 2]!;
+    const c = chroma(r, g, b);
+    const key = (Math.round(c.cr * 30) << 12) | (Math.round(c.cg * 30) << 6) | Math.round(c.l / 24);
+    const e = buckets.get(key) ?? { n: 0, r: 0, g: 0, b: 0 };
+    e.n++; e.r += r; e.g += g; e.b += b;
+    buckets.set(key, e);
+  }
+  const top = [...buckets.values()].sort((a, b) => b.n - a.n)[0]!;
+  // neighbouring buckets of the same family count too (light falls off across a sheet)
+  const tc = chroma(top.r / top.n, top.g / top.n, top.b / top.n);
+  let fam = 0;
+  for (const k of ring) {
+    const c = chroma(px[k * 4]!, px[k * 4 + 1]!, px[k * 4 + 2]!);
+    if (Math.hypot(c.cr - tc.cr, c.cg - tc.cg) < 0.03 && Math.abs(c.l - tc.l) < tc.l * 0.35) fam++;
+  }
+  if (fam / ring.length < (strict ? 0.75 : 0.6)) return null; // real sheets measure ~0.68–0.72, drawings' own edges ~0.2–0.35
+  // …and it must LOOK like a sheet: large, and nearly rectangular (a big painted heart or blob on white
+  // paper has a one-colour edge too, but it's neither — and lifting it as "paper" would erase it).
+  if ((N - tableArea) < N * 0.45) return null;
+  // What to paint over as "table" before the second pass: the cleared table itself, everything outside
+  // the sheet's extent (wood-grain streaks the first pass kept), and a thin band along the sheet's edge
+  // (its own shadow / cut edge).
+  let x0 = W, y0 = H, x1 = 0, y1 = 0;
+  for (const k of ring) {
+    const x = k % W, y = (k - x) / W;
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  const bboxArea = Math.max(1, (x1 - x0 + 1) * (y1 - y0 + 1));
+  let inBox = 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!table[y * W + x]) inBox++;
+  if (inBox / bboxArea < (strict ? 0.9 : 0.8)) return null; // photographed sheets ~0.85–0.9 (slightly turned); a circle is 0.785
+  const fill = new Uint8Array(N);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x < x0 - D || x > x1 + D || y < y0 - D || y > y1 + D) fill[y * W + x] = 1;
+  const B = Math.max(3, Math.round(Math.min(W, H) / 130));
+  // dilate the table by B (separable max), then add it
+  const tmp = new Uint8Array(N);
+  for (let y = 0; y < H; y++) {
+    let last = -1e9;
+    for (let x = 0; x < W; x++) { if (table[y * W + x]) last = x; if (x - last <= B) tmp[y * W + x] = 1; }
+    last = 1e9;
+    for (let x = W - 1; x >= 0; x--) { if (table[y * W + x]) last = x; if (last - x <= B) tmp[y * W + x] = 1; }
+  }
+  for (let x = 0; x < W; x++) {
+    let last = -1e9;
+    for (let y = 0; y < H; y++) { if (tmp[y * W + x]) last = y; if (y - last <= B) fill[y * W + x] = 1; }
+    last = 1e9;
+    for (let y = H - 1; y >= 0; y--) { if (tmp[y * W + x]) last = y; if (last - y <= B) fill[y * W + x] = 1; }
+  }
+  return { table: fill, colour: [Math.round(top.r / top.n), Math.round(top.g / top.n), Math.round(top.b / top.n)] };
+}
+
+async function liftOnce(input: Buffer, opts: InkLiftOptions = {}, diag: InkLiftDiagnosis = {}): Promise<InkLiftResult | null> {
   const edge = opts.edge ?? 'soft';
   const src = sharp(input, { limitInputPixels: MAX_PIXELS }).rotate();
   const meta = await src.metadata();
@@ -201,6 +396,13 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
         b += f[2];
         n++;
       }
+    }
+    // (a corner with no estimate anywhere near falls back to the paper colour found on the border)
+    if (!n || !Number.isFinite(r + g + b)) {
+      const t = top!;
+      const L = t.l / t.n, cr = t.cr / t.n, cg = t.cg / t.n; // chromaticity + brightness of the border paper
+      const sum = L * 3;
+      return [cr * sum, cg * sum, Math.max(0, sum - cr * sum - cg * sum)];
     }
     return [r / n, g / n, b / n];
   });
@@ -337,10 +539,10 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
 
   const paperMid = smooth[Math.floor(smooth.length / 2)]!;
 
-  // Optional: paper enclosed by the drawing stays, as clean paper colour. "Enclosed" = cleared
-  // pixels that can't reach the image border through other cleared pixels.
-  if (opts.keepEnclosedPaper) {
-    const reach = new Uint8Array(N);
+  // The BACKGROUND = cleared pixels that reach the image border through other cleared pixels
+  // (everything else that's cleared is paper ENCLOSED by the drawing).
+  const reach = new Uint8Array(N);
+  {
     const stack: number[] = [];
     const seed = (k: number) => {
       if (!reach[k] && out[k * 4 + 3]! < 128) {
@@ -358,6 +560,12 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
       if (k >= FW) seed(k - FW);
       if (k < N - FW) seed(k + FW);
     }
+  }
+
+  if (opts.cleanup ?? true) removed += cleanupResidue(px, out, reach, FW, FH, (x, y) => paperAt((x + 0.5) * sx, (y + 0.5) * sy));
+
+  // Optional: paper enclosed by the drawing stays, as clean paper colour.
+  if (opts.keepEnclosedPaper) {
     // white-ish paper reads as clean white; coloured paper (kraft) keeps its own colour
     const fill: RGB = paperLum >= 185 ? [255, 255, 255] : [paperMid[0], paperMid[1], paperMid[2]];
     for (let k = 0; k < N; k++) {
@@ -380,4 +588,267 @@ export async function liftInk(input: Buffer, opts: InkLiftOptions = {}, diag: In
     removedFraction: removed / (FW * FH),
     paper: { r: Math.round(paperMid[0]), g: Math.round(paperMid[1]), b: Math.round(paperMid[2]) },
   };
+}
+
+
+// ── CLEAN-UP ─────────────────────────────────────────────────────────────────────
+// sRGB → CIELAB (D65), for perceptual "how close to the paper" distances.
+const LIN = new Float32Array(256).map((_, c) => (c / 255 <= 0.04045 ? c / 255 / 12.92 : Math.pow((c / 255 + 0.055) / 1.055, 2.4)));
+function lab(r: number, g: number, b: number): [number, number, number] {
+  const R = LIN[r]!, G = LIN[g]!, B = LIN[b]!;
+  const f = (t: number) => (t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116);
+  const fx = f((R * 0.4124 + G * 0.3576 + B * 0.1805) / 0.95047);
+  const fy = f(R * 0.2126 + G * 0.7152 + B * 0.0722);
+  const fz = f((R * 0.0193 + G * 0.1192 + B * 0.9505) / 1.08883);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+/** Lab of a colour quantised to 6 bits a channel (262 144 entries, filled as they're first met) —
+ * converting 12 million pixels one by one was most of a big photo's time; the rounding moves a colour
+ * by ≲ 2 Lab units, far below the clean-up's tolerances. */
+const LAB_Q = new Float32Array(262144 * 3).fill(Number.NaN);
+function labQ(r: number, g: number, b: number, outArr: Float32Array, at: number): void {
+  const q = ((r >> 2) << 12) | ((g >> 2) << 6) | (b >> 2);
+  let o = q * 3;
+  if (Number.isNaN(LAB_Q[o]!)) {
+    const c = lab(((r >> 2) << 2) + 2, ((g >> 2) << 2) + 2, ((b >> 2) << 2) + 2);
+    LAB_Q[o] = c[0]; LAB_Q[o + 1] = c[1]; LAB_Q[o + 2] = c[2];
+  }
+  outArr[at] = LAB_Q[o++]!; outArr[at + 1] = LAB_Q[o++]!; outArr[at + 2] = LAB_Q[o]!;
+}
+
+/** Lab distance below which a leftover still counts as "paper" (a darker/lighter shade, fibres, a tint). */
+export const CLEANUP_PAPER_DE = 24;
+/** A step this big between two neighbouring pixels is an OUTLINE — the sweep never crosses it. */
+export const CLEANUP_EDGE_DE = 16;
+/** Faint specks: kept blobs smaller than this fraction of the shorter side (squared) … */
+const SPECK_SIDE = 1 / 70;
+/** … whose average colour is this close to the paper are dust/fibres, not drawing (snowflakes are far). */
+const SPECK_DE = 30;
+
+/**
+ * Sweep paper-ish leftovers into the background, then clear faint specks. Mutates `out` (RGBA) and
+ * `reach` (background mask). Returns how many pixels it cleared.
+ *
+ * 1. GROW from the background into any kept/soft pixel whose colour is within CLEANUP_PAPER_DE of
+ *    the LOCAL paper colour, moving only between neighbours less than CLEANUP_EDGE_DE apart — so it
+ *    behaves like the parent's "remove colour · just that patch" tapped all round the drawing:
+ *    it eats a darker corner or a pink fringe, and stops dead at an outline. Paper enclosed by the
+ *    drawing is never reached (it's walled in), so "keep the white inside shapes" still works.
+ * 2. SPECKS: small kept blobs (not touching anything big) whose mean colour is close to the paper.
+ */
+function cleanupResidue(
+  px: Buffer,
+  out: Buffer,
+  reach: Uint8Array,
+  W: number,
+  H: number,
+  paperAt: (x: number, y: number) => [number, number, number],
+): number {
+  const N = W * H;
+  // Per-pixel Lab and distance to the local paper (paper sampled per 8×8 block — the field is smooth).
+  const L = new Float32Array(N * 3);
+  const dP = new Float32Array(N);
+  const BLK = 8;
+  const clamp255 = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  // the median paper over the picture, for any block whose local estimate is missing
+  const mid = paperAt(Math.floor(W / 2), Math.floor(H / 2));
+  const fallbackLab = Number.isFinite(mid[0]) ? lab(clamp255(mid[0]), clamp255(mid[1]), clamp255(mid[2])) : lab(255, 255, 255);
+  for (let by = 0; by < H; by += BLK) {
+    for (let bx = 0; bx < W; bx += BLK) {
+      const p = paperAt(Math.min(W - 1, bx + BLK / 2), Math.min(H - 1, by + BLK / 2));
+      // a missing paper estimate must never read as "ink" (NaN compares false everywhere)
+      const ok = Number.isFinite(p[0]) && Number.isFinite(p[1]) && Number.isFinite(p[2]);
+      const pl = ok ? lab(clamp255(p[0]), clamp255(p[1]), clamp255(p[2])) : fallbackLab;
+      for (let y = by; y < Math.min(H, by + BLK); y++) {
+        for (let x = bx; x < Math.min(W, bx + BLK); x++) {
+          const k = y * W + x, i = k * 3;
+          labQ(px[i]!, px[i + 1]!, px[i + 2]!, L, i);
+          const d0 = L[i]! - pl[0], d1 = L[i + 1]! - pl[1], d2 = L[i + 2]! - pl[2];
+          dP[k] = Math.sqrt(d0 * d0 + d1 * d1 + d2 * d2);
+        }
+      }
+    }
+  }
+  const step = (a: number, b: number) => Math.hypot(L[a * 3]! - L[b * 3]!, L[a * 3 + 1]! - L[b * 3 + 1]!, L[a * 3 + 2]! - L[b * 3 + 2]!);
+
+  let cleared = 0;
+  // Solid ink, grown by 2px — the anti-aliased edge of a line or shape lives in here and is never
+  // touched by the clean-up (it's the line's own softness, not leftover paper).
+  // genuine ink only: solid AND clearly not paper (a solid patch of a lighter paper shade isn't ink);
+  // grown by 2px with a separable (row, then column) max — linear time on a 12-megapixel photo
+  const nearInk = new Uint8Array(N);
+  {
+    const rowGrown = new Uint8Array(N);
+    for (let y = 0; y < H; y++) {
+      const row = y * W;
+      for (let x = 0; x < W; x++) {
+        const k = row + x;
+        if (out[k * 4 + 3]! < 200 || dP[k]! < CLEANUP_PAPER_DE) continue;
+        for (let dx = Math.max(0, x - 2); dx <= Math.min(W - 1, x + 2); dx++) rowGrown[row + dx] = 1;
+      }
+    }
+    for (let k = 0; k < N; k++) {
+      if (!rowGrown[k]) continue;
+      const x = k % W, y = (k - x) / W;
+      for (let dy = Math.max(0, y - 2); dy <= Math.min(H - 1, y + 2); dy++) nearInk[dy * W + x] = 1;
+    }
+  }
+
+  // 1. Grow the background through paper-close colours, never across an outline.
+  // seed only from background pixels on its EDGE (next to something kept) — the inside can't grow
+  const stack: number[] = [];
+  for (let k = 0; k < N; k++) {
+    if (!reach[k]) continue;
+    const x = k % W;
+    if ((x > 0 && !reach[k - 1]) || (x < W - 1 && !reach[k + 1]) || (k >= W && !reach[k - W]) || (k < N - W && !reach[k + W])) stack.push(k);
+  }
+  const tryGrow = (from: number, k: number) => {
+    if (reach[k] || nearInk[k]) return;
+    if (dP[k]! >= CLEANUP_PAPER_DE || step(from, k) >= CLEANUP_EDGE_DE) return;
+    reach[k] = 1;
+    if (out[k * 4 + 3]! >= 128) cleared++;
+    out[k * 4] = 0; out[k * 4 + 1] = 0; out[k * 4 + 2] = 0; out[k * 4 + 3] = 0;
+    stack.push(k);
+  };
+  while (stack.length) {
+    const k = stack.pop()!;
+    const x = k % W;
+    if (x > 0) tryGrow(k, k - 1);
+    if (x < W - 1) tryGrow(k, k + 1);
+    if (k >= W) tryGrow(k, k - W);
+    if (k < N - W) tryGrow(k, k + W);
+  }
+
+  // 1a. Anything left FAINT in the background (alpha < 128 already counted it as background, but a
+  // lighter/darker patch of paper keeps a see-through tint — the corner a parent taps away) goes fully.
+  for (let k = 0; k < N; k++) {
+    const o = k * 4;
+    if (!reach[k] || nearInk[k] || out[o + 3] === 0 || dP[k]! >= CLEANUP_PAPER_DE) continue;
+    out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = 0;
+  }
+
+  // 1b. DECONTAMINATE the fringe. Where ink fades into the paper (fluffy cotton wool, a soft crayon
+  // edge) the photo's pixels are ink MIXED with paper — kept as seen, white cotton wool on red paper
+  // grows a pink outline. For each kept pixel in a thin band along the background, take the most
+  // ink-like colour close by (the furthest from the paper) as the ink, and re-express the pixel as
+  // that ink at partial opacity: the rim becomes white fading out, not pink.
+  {
+    const F = Math.max(4, Math.round(Math.min(W, H) / 40)); // fringe depth (a fluffy edge is ~2–3 % of the picture)
+    const dist = new Uint16Array(N).fill(65535);
+    let frontier: number[] = [];
+    for (let k = 0; k < N; k++) {
+      if (!reach[k]) continue;
+      dist[k] = 0;
+      const x = k % W;
+      if ((x > 0 && !reach[k - 1]) || (x < W - 1 && !reach[k + 1]) || (k >= W && !reach[k - W]) || (k < N - W && !reach[k + W])) frontier.push(k);
+    }
+    const visit = (n: number, d: number, next: number[]) => {
+      if (dist[n] !== 65535) return;
+      dist[n] = d;
+      next.push(n);
+    };
+    for (let d = 1; d <= F && frontier.length; d++) {
+      const next: number[] = [];
+      for (const k of frontier) {
+        const x = k % W;
+        if (x > 0) visit(k - 1, d, next);
+        if (x < W - 1) visit(k + 1, d, next);
+        if (k >= W) visit(k - W, d, next);
+        if (k < N - W) visit(k + W, d, next);
+      }
+      frontier = next;
+    }
+    // The ink for each fringe pixel = the nearest SOLID pixel just inside the fringe: spread each such
+    // pixel's index outward through the fringe in one breadth-first sweep (no per-pixel searching).
+    const src = new Int32Array(N).fill(-1);
+    let wave: number[] = [];
+    for (let k = 0; k < N; k++) {
+      if (dist[k] !== 65535 || out[k * 4 + 3]! < 250) continue;
+      const x = k % W;
+      const edge = (x > 0 && dist[k - 1]! <= F) || (x < W - 1 && dist[k + 1]! <= F) || (k >= W && dist[k - W]! <= F) || (k < N - W && dist[k + W]! <= F);
+      if (edge) { src[k] = k; wave.push(k); }
+    }
+    for (let d = 0; d <= F && wave.length; d++) {
+      const next: number[] = [];
+      const pass = (n: number, from: number) => {
+        if (src[n] !== -1 || dist[n] === 0 || dist[n]! > F) return;
+        src[n] = src[from]!;
+        next.push(n);
+      };
+      for (const k of wave) {
+        const x = k % W;
+        if (x > 0) pass(k - 1, k);
+        if (x < W - 1) pass(k + 1, k);
+        if (k >= W) pass(k - W, k);
+        if (k < N - W) pass(k + W, k);
+      }
+      wave = next;
+    }
+    const upd: Array<[number, number, number, number, number]> = [];
+    for (let k = 0; k < N; k++) {
+      const d = dist[k]!;
+      if (d === 0 || d > F || out[k * 4 + 3] === 0) continue;
+      const x = k % W, y = (k - x) / W;
+      const best = src[k]!;
+      if (best < 0 || dP[best]! < CLEANUP_PAPER_DE * 1.5) continue; // no clearly different ink nearby
+      const pp = paperAt(x, y);
+      const c = [px[k * 3]!, px[k * 3 + 1]!, px[k * 3 + 2]!];
+      const ink = [px[best * 3]!, px[best * 3 + 1]!, px[best * 3 + 2]!];
+      let num = 0, den = 0;
+      for (let ch = 0; ch < 3; ch++) {
+        num += (c[ch]! - pp[ch]!) * (ink[ch]! - pp[ch]!);
+        den += (ink[ch]! - pp[ch]!) ** 2;
+      }
+      const a = den > 0 ? Math.min(1, Math.max(0, num / den)) : 1;
+      // only if the pixel really IS that ink mixed with paper (it lies near the paper→ink line);
+      // anything else (a highlight, a different colour) is left exactly as it was
+      let res = 0;
+      for (let ch = 0; ch < 3; ch++) res += (c[ch]! - (pp[ch]! + a * (ink[ch]! - pp[ch]!))) ** 2;
+      if (Math.sqrt(res) > 28) continue;
+      upd.push([k, ink[0]!, ink[1]!, ink[2]!, Math.round(Math.min(out[k * 4 + 3]!, a * 255))]);
+    }
+    for (const [k, r, g, b, a] of upd) {
+      const o = k * 4;
+      if (a < 8) { out[o] = 0; out[o + 1] = 0; out[o + 2] = 0; out[o + 3] = 0; continue; }
+      out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = a;
+    }
+  }
+
+  // 2. Specks: 8-connected kept blobs, small, and paper-close on average.
+  const maxArea = Math.max(6, Math.round((Math.min(W, H) * SPECK_SIDE) ** 2));
+  const label = new Int32Array(N).fill(-1);
+  const blob: number[] = [];
+  for (let s0 = 0; s0 < N; s0++) {
+    if (label[s0] !== -1 || out[s0 * 4 + 3]! < 32) continue;
+    blob.length = 0;
+    const st = [s0];
+    label[s0] = s0;
+    let sum = 0, big = false;
+    while (st.length) {
+      const k = st.pop()!;
+      blob.push(k);
+      sum += dP[k]!;
+      if (blob.length > maxArea) big = true;
+      const x = k % W, y = (k - x) / W;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const nx = x + dx, ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const n = ny * W + nx;
+          if (label[n] !== -1 || out[n * 4 + 3]! < 32) continue;
+          label[n] = s0;
+          st.push(n);
+        }
+      }
+    }
+    if (big || sum / blob.length >= SPECK_DE) continue;
+    for (const k of blob) {
+      if (out[k * 4 + 3]! >= 128) cleared++;
+      out[k * 4 + 3] = 0;
+      reach[k] = 1;
+    }
+  }
+  return cleared;
 }

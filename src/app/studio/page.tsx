@@ -115,7 +115,8 @@ function StudioEditor() {
   const [everywhere, setEverywhere] = useState(true);
   const [fussy, setFussy] = useState(28);
   const [brush, setBrush] = useState(36);
-  const [keepWhite, setKeepWhite] = useState(false);
+  // keep the white inside shapes by default (founder, 26 Oct — it's how parents use it)
+  const [keepWhite, setKeepWhite] = useState(true);
   const [hadCutout, setHadCutout] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -189,7 +190,9 @@ function StudioEditor() {
           // a fresh blank canvas starts on white paper (switch to see-through in background)
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
-          if (st.mask) {
+          // the stored cut-out only while the drawing is USING it (a parent can put the background back
+          // from the upload screen — then the Studio opens on the untouched original)
+          if (st.mask && upload.cutout) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
           }

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCamera, IconCircleCheck, IconLock, IconPencil, IconRefresh, IconUpload } from '@tabler/icons-react';
+import { IconArrowBackUp, IconCamera, IconCircleCheck, IconLock, IconPencil, IconRefresh, IconSparkles, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -21,10 +21,19 @@ import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
+import { removeBackgroundAction } from '@/app/actions/magic';
+import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
+
+const TOO_MANY = 'that’s a lot of pictures for now — try again in a little while';
 
 export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
+  const setAssetId = useUpload((s) => s.setAssetId);
+  const setCutout = useUpload((s) => s.setCutout);
+  const [removingBg, setRemovingBg] = useState(false);
+  // the cut-out came from THIS button (so undoing it can't throw away work done in the Studio)
+  const [oneTap, setOneTap] = useState(false);
   const setUpload = useUpload((s) => s.setUpload);
   const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
   const setAspect = useUpload((s) => s.setAspect);
@@ -149,6 +158,49 @@ export default function StartCreatingPage() {
     reader.readAsDataURL(file);
   };
 
+  // ── ONE-TAP "remove background" (founder, 26 Oct): the drawing, lifted off its paper and tidied in one
+  // go (src/ml/inkLift.ts — lift + clean-up, white inside shapes kept), ready for the whole range on any
+  // colour. The Studio stays for fine-tuning. The original is never touched: "put the background back"
+  // simply stops using the cut-out (originals are sacred).
+  const removeBackground = async () => {
+    if (!upload || removingBg) return;
+    if (upload.cutout && oneTap) {
+      setCutout(null);
+      setOneTap(false);
+      toast('background back — just as it was');
+      return;
+    }
+    setRemovingBg(true);
+    try {
+      let id = upload.assetId ?? null;
+      if (!id) {
+        const blob = await fetch(upload.dataUrl).then((r) => r.blob());
+        const up = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
+        if (!up.ok || !up.assetId) {
+          toast(up.blocked ? 'we couldn’t use that image — try another' : up.tooMany ? TOO_MANY : 'hmm, that didn’t work — try again');
+          return;
+        }
+        id = up.assetId;
+        setAssetId(id);
+      }
+      const res = await removeBackgroundAction({ assetId: id, keepEnclosedPaper: true });
+      if (res.ok) {
+        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
+        setOneTap(true);
+        toast('background removed ✨');
+      } else if (res.reason === 'nochange') {
+        // no plain paper to lift it off (a painted background) — the Studio's "remove colour" is for that
+        toast('no plain paper on this one — try remove colour in the studio');
+      } else {
+        toast(res.reason === 'budget' ? 'that’s all your magic edits for now' : res.reason === 'too-many' ? TOO_MANY : 'couldn’t do that — try again');
+      }
+    } catch {
+      toast('couldn’t do that — try again');
+    } finally {
+      setRemovingBg(false);
+    }
+  };
+
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
 
   return (
@@ -250,16 +302,25 @@ export default function StartCreatingPage() {
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image
                 </Button>
+                {/* the one-tap magic edit leads; the Studio is the advanced editor */}
+                {upload.cutout && !oneTap ? null : (
                 <Button
                   variant="design"
                   size="lg"
                   className="w-full"
-                  onClick={() => router.push('/studio')}
+                  onClick={() => void removeBackground()}
+                  disabled={removingBg}
+                  aria-busy={removingBg}
                   // Nudge (same wobble as start-creating) when the photo still has its paper/background.
-                  attention={!upload.cutout && upload.opaqueBg === true}
+                  attention={!removingBg && !upload.cutout && upload.opaqueBg === true}
                 >
+                  <Icon icon={upload.cutout ? IconArrowBackUp : IconSparkles} size={16} />
+                  {removingBg ? 'lifting it off the paper…' : upload.cutout ? 'put the background back' : 'remove background'}
+                </Button>
+                )}
+                <Button variant="designOutline" size="lg" className="w-full" onClick={() => router.push('/studio')}>
                   <Icon icon={upload.cutout ? IconCircleCheck : IconPencil} size={16} />
-                  {upload.cutout ? 'edited · back to studio' : 'edit in studio'}
+                  {upload.cutout ? (oneTap ? 'fine-tune in studio' : 'edited · back to studio') : 'edit in studio'}
                 </Button>
               </div>
               <div className="mt-4 flex w-full items-start gap-2.5 rounded-[14px] border-2 border-leaf bg-leaf-pale p-3">
