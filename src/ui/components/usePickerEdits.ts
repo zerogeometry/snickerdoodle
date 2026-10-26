@@ -22,6 +22,8 @@ import { toSessionUpload } from '@/lib/uploadSession';
  */
 export type DrawingEdit = { url: string; sourceObjectId: string };
 type Drawingish = { assetId: string; imageUrl: string | null; sourceObjectId?: string };
+/** the drawing in progress, set aside without its picture */
+type Stashed = Omit<NonNullable<Upload>, 'dataUrl'>;
 
 const STASH_KEY = 'sd_upload_stash'; // the drawing in progress, set aside while a keepsake is in the Studio
 const EDITS_KEY = 'sd_picker_edits'; // + the builder: this tab's per-drawing edits, separate for the calendar and the cards
@@ -88,9 +90,14 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
       // (only when one WAS set aside — editing the drawing in progress itself sets nothing aside)
       const stash = sessionStorage.getItem(STASH_KEY);
       if (stash !== null) {
-        const prev = (JSON.parse(stash) as { upload: Upload | null }).upload ?? null;
-        useUpload.getState().setUpload(prev);
         sessionStorage.removeItem(STASH_KEY);
+        const prev = (JSON.parse(stash) as { upload: Stashed | null }).upload ?? null;
+        // the picture itself wasn't set aside (two photos overflow a tab's storage): fetch it again
+        if (prev?.assetId) {
+          void keepsakeForStudioAction({ assetId: prev.assetId }).then((r) => {
+            useUpload.getState().setUpload(r.ok ? { ...prev, dataUrl: r.dataUrl } : null);
+          });
+        } else useUpload.getState().setUpload(null);
       }
       sessionStorage.removeItem(DETOUR_KEY);
     } catch {
@@ -138,7 +145,9 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void 
       const res = await keepsakeForStudioAction({ assetId: d.assetId });
       if (!res.ok) return void toast('couldn’t open that one — try again');
       try {
-        sessionStorage.setItem(STASH_KEY, JSON.stringify({ upload: current ? toSessionUpload(current) : null }));
+        // set aside WITHOUT its picture — the tab can't hold two photos; it's fetched again on return
+        const { dataUrl: _picture, ...rest } = current ? (toSessionUpload(current) ?? { dataUrl: '' }) : { dataUrl: '' };
+        sessionStorage.setItem(STASH_KEY, JSON.stringify({ upload: current ? rest : null }));
         sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo }));
       } catch {
         return void toast('couldn’t open the studio from here — try from your collection');
