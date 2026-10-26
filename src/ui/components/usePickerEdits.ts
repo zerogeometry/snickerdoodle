@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { keepUploadAction } from '@/app/actions/keep';
 import { keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
-import { removeBackgroundAction } from '@/app/actions/magic';
+import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { normalizeUpload, toast, useUpload, type Upload } from '@/lib/store';
 import { toSessionUpload } from '@/lib/uploadSession';
@@ -55,6 +55,17 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
         const saved = JSON.parse(sessionStorage.getItem(editsKey) ?? '{}') as Record<string, DrawingEdit>;
         if (saved && Object.keys(saved).length) {
           setEdits((e) => ({ ...saved, ...e }));
+          // their signed links expire (10 min): fresh ones, so an edit made a while ago still shows
+          for (const [assetId, ed] of Object.entries(saved)) {
+            void designUrlAction({ assetId, sourceObjectId: ed.sourceObjectId }).then((r) =>
+              setEdits((e) => {
+                if (e[assetId]?.sourceObjectId !== ed.sourceObjectId) return e; // changed meanwhile
+                if (r.ok) return { ...e, [assetId]: { ...ed, url: r.url } };
+                const { [assetId]: _gone, ...rest } = e; // the design is gone (erased): the drawing as it is
+                return rest;
+              }),
+            );
+          }
           return;
         }
       } catch {
@@ -118,7 +129,11 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
   }, []);
 
   /** The drawings as they'll print here: an edit made in this builder replaces the picture + source. */
-  const apply = useCallback(<D extends Drawingish>(list: D[]): D[] => list.map((d) => (edits[d.assetId] ? { ...d, imageUrl: edits[d.assetId]!.url, sourceObjectId: edits[d.assetId]!.sourceObjectId } : d)), [edits]);
+  // (its small grid copy is of the drawing BEFORE the edit — so an edited one shows the edit itself)
+  const apply = useCallback(
+    <D extends Drawingish>(list: D[]): D[] => list.map((d) => (edits[d.assetId] ? { ...d, imageUrl: edits[d.assetId]!.url, sourceObjectId: edits[d.assetId]!.sourceObjectId, thumbUrl: null } : d)),
+    [edits],
+  );
 
   const toggleBackground = async (d: Drawingish) => {
     if (busy[d.assetId]) return;
