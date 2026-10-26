@@ -21,7 +21,7 @@ import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
-import { removeBackgroundAction } from '@/app/actions/magic';
+import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
 
@@ -32,8 +32,9 @@ export default function StartCreatingPage() {
   const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
   const [removingBg, setRemovingBg] = useState(false);
-  // the cut-out came from THIS button (so undoing it can't throw away work done in the Studio)
-  const [oneTap, setOneTap] = useState(false);
+  // the cut-out came from the one-tap button (so undoing it can't throw away work done in the Studio) —
+  // kept WITH the drawing, so it's still there after customize / the Studio / anywhere and back
+  const oneTap = upload?.cutout?.oneTap === true;
   const setUpload = useUpload((s) => s.setUpload);
   const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
   const setAspect = useUpload((s) => s.setAspect);
@@ -166,7 +167,6 @@ export default function StartCreatingPage() {
     if (!upload || removingBg) return;
     if (upload.cutout && oneTap) {
       setCutout(null);
-      setOneTap(false);
       toast('background back — just as it was');
       return;
     }
@@ -185,8 +185,7 @@ export default function StartCreatingPage() {
       }
       const res = await removeBackgroundAction({ assetId: id, keepEnclosedPaper: true });
       if (res.ok) {
-        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
-        setOneTap(true);
+        setCutout({ url: res.url, sourceObjectId: res.sourceObjectId, oneTap: true });
         toast('background removed ✨');
       } else if (res.reason === 'nochange') {
         // no plain paper to lift it off (a painted background) — the Studio's "remove colour" is for that
@@ -202,6 +201,19 @@ export default function StartCreatingPage() {
   };
 
   const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  // the edited design is shown through a short-lived link: if it has expired, fetch a fresh one
+  const refreshing = useRef(false);
+  const refreshDesignUrl = async () => {
+    const c = upload?.cutout;
+    if (!c || !upload?.assetId || refreshing.current) return;
+    refreshing.current = true;
+    try {
+      const r = await designUrlAction({ assetId: upload.assetId, sourceObjectId: c.sourceObjectId });
+      if (r.ok) setCutout({ ...c, url: r.url });
+    } finally {
+      refreshing.current = false;
+    }
+  };
 
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
@@ -294,7 +306,7 @@ export default function StartCreatingPage() {
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
-                    <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
+                    <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} onError={() => void refreshDesignUrl()} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
                   </div>
                 </div>
               </div>

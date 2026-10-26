@@ -38,6 +38,12 @@ describe('the drawing kept for the tab (sessionStorage only)', () => {
     expect(back.state.upload).toMatchObject({ dataUrl: drawing().dataUrl, assetId: 'asset-1', aspect: 1.5, kept: true, cutout: { sourceObjectId: 'obj-1' } });
   });
 
+  it('remembers a one-tap "remove background" with the drawing, so "put the background back" survives leaving the page', () => {
+    expect(toSessionUpload({ ...drawing(), cutout: { url: 'https://x/c', sourceObjectId: 'obj-1', oneTap: true } })!.cutout).toEqual({ url: 'https://x/c', sourceObjectId: 'obj-1', oneTap: true });
+    // a Studio edit carries no flag (undoing it there would throw away Studio work)
+    expect(toSessionUpload(drawing())!.cutout).toEqual({ url: 'https://x/c', sourceObjectId: 'obj-1' });
+  });
+
   it('never keeps the file name (it can carry a child’s name) — just its type', () => {
     expect(toSessionUpload(drawing())!.name).toBe('drawing.png');
     expect(toSessionUpload({ dataUrl: 'data:image/jpeg;base64,AA', name: 'Tom Smith.JPG' })!.name).toBe('drawing.jpg');

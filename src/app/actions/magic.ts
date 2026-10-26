@@ -39,6 +39,21 @@ export async function removeBackgroundAction(input: {
 }
 
 /** The touch-up tool's starting transparency (greyscale PNG data URL), or null = start fully kept. */
+/** A FRESH short-lived link to the drawing's edited design (signed links expire — a page left open, or
+ * restored after a while, would show a broken image). Same gate as every other read (src/authz). */
+export async function designUrlAction(input: { assetId: string; sourceObjectId: string }): Promise<{ ok: true; url: string } | { ok: false }> {
+  try {
+    const account = await getCurrentAccount();
+    const claims = await getUploadClaims();
+    const db = getDb();
+    const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+    const grant = await getStorageObjectGrant(db, String(input.sourceObjectId), viewer, 600);
+    return { ok: true, url: grant.url };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function cutoutAlphaAction(input: { assetId: string }): Promise<{ ok: true; mask: string | null } | { ok: false }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();

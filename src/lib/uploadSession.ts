@@ -14,7 +14,7 @@ export type SessionUpload = {
   dataUrl: string;
   name: string;
   assetId?: string;
-  cutout?: { url: string; sourceObjectId: string };
+  cutout?: { url: string; sourceObjectId: string; oneTap?: boolean };
   aspect?: number;
   kept?: boolean;
   opaqueBg?: boolean;
@@ -29,7 +29,10 @@ export function toSessionUpload(u: (SessionUpload & Record<string, unknown>) | n
   const ext = /\.(png|jpe?g|webp|gif|heic)$/i.exec(u.name ?? '')?.[1]?.toLowerCase() ?? (u.dataUrl.startsWith('data:image/png') ? 'png' : 'jpg');
   const out: SessionUpload = { dataUrl: u.dataUrl, name: `drawing.${ext}` };
   if (typeof u.assetId === 'string') out.assetId = u.assetId;
-  if (u.cutout && typeof u.cutout.url === 'string' && typeof u.cutout.sourceObjectId === 'string') out.cutout = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
+  if (u.cutout && typeof u.cutout.url === 'string' && typeof u.cutout.sourceObjectId === 'string') {
+    out.cutout = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
+    if (u.cutout.oneTap === true) out.cutout.oneTap = true;
+  }
   if (typeof u.aspect === 'number' && Number.isFinite(u.aspect) && u.aspect > 0) out.aspect = u.aspect;
   if (u.kept === true) out.kept = true;
   if (typeof u.opaqueBg === 'boolean') out.opaqueBg = u.opaqueBg;

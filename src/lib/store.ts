@@ -34,7 +34,9 @@ export const gbp = formatPence;
 // `kept` = it's in the family's keepsake box ("+ keepsake" done).
 // `scratch` = a blank canvas made for "design from scratch" (no drawing to edit — the Studio hides
 // its image tools, and the range shows the design rather than the empty canvas).
-export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
+// `cutout.oneTap` = it came from the one-tap "remove background" (so "put the background back" can undo it
+// without throwing away Studio work) — remembered with the drawing, so it survives leaving the page.
+export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string; oneTap?: boolean }; scratch?: boolean; kept?: boolean } | null;
 // Kept for THIS TAB only (sessionStorage — src/lib/uploadSession.ts), so a refresh doesn't lose it.
 // Hydrated after mount (skipHydration + <UploadSession/> in the root layout): the server and the
 // first client render both see "no drawing yet", so there's never a hydration mismatch. Screens that
@@ -47,7 +49,7 @@ type UploadStore = {
   setOpaqueBg: (opaque: boolean) => void;
   setAspect: (aspect: number) => void;
   /** The DESIGN products render from (bg-removed / studio-edited); null = the original. */
-  setCutout: (c: { url: string; sourceObjectId: string } | null) => void;
+  setCutout: (c: { url: string; sourceObjectId: string; oneTap?: boolean } | null) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 };
 export const useUpload = create<UploadStore>()(

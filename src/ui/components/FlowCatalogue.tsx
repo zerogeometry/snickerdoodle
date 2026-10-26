@@ -139,7 +139,12 @@ export function FlowCatalogue({
         router.push(`/login?next=${encodeURIComponent('/start-creating?resume=keep')}&keep=${encodeURIComponent(id)}`);
         return;
       }
-      if (res.ok) setKeptId(id);
+      if (res.ok) {
+        setKeptId(id);
+        // remembered with the drawing, so leaving the create flow doesn't let it go
+        const u = useUpload.getState().upload;
+        if (u?.assetId === id) useUpload.getState().setUpload({ ...u, kept: true });
+      }
       toast(res.ok ? 'kept in your keepsake box ♥' : 'couldn’t keep that one — try again');
     } finally {
       setKeeping(false);
