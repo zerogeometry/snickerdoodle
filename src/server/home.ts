@@ -11,6 +11,7 @@ import { hasReminderConsent } from './reminders';
 import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
 import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
 import { familyBannerFor, profileImagesFor } from './profile';
+import { keepsakeThumbUrls } from './keepsakeThumbs';
 
 export interface HomeMember {
   accountId: string;
@@ -30,6 +31,8 @@ export interface HomeKeepsake {
   visibility: VisibilityTier;
   createdAtISO: string;
   imageUrl: string | null;
+  /** a small copy for the grid (the full picture is only for the open keepsake) */
+  thumbUrl: string | null;
   childSubjectId: string | null;
   /** The viewer controls this keepsake (may change who sees it / delete it) — authz-derived. */
   canManage: boolean;
@@ -132,8 +135,10 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
   // FLAGGED/PENDING stay visible to the family — the flag gates ordering, not viewing.
   const visible = rows.filter((r) => canViewAsset(refOf(r.asset), viewer).allowed && r.asset.moderationStatus !== 'BLOCKED');
 
+  const thumbs = await keepsakeThumbUrls(db, visible.map((r) => r.asset.id), 300);
   const keepsakes: HomeKeepsake[] = await Promise.all(
     visible.map(async (r) => ({
+      thumbUrl: thumbs.get(r.asset.id) ?? null,
       id: r.asset.id,
       visibility: r.asset.visibility,
       createdAtISO: r.asset.createdAt.toISOString(),

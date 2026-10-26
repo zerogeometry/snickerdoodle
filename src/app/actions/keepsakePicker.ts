@@ -3,14 +3,14 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { assets, children, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { createHash } from 'node:crypto';
-import { derivativeKey, getS3, presignDownload, putObject } from '@/storage';
+import { derivativeKey, presignDownload } from '@/storage';
 import sharp from 'sharp';
 import { getViewableAssetOrThrow, resolveAssetViewer } from '@/server/assets';
 import { getUploadClaims } from '@/server/session';
 import { workingBytes } from '@/server/magic';
 import { resolveViewerContext } from '@/server/assets';
 import { pickableKeepsakes, type PickerKeepsake } from '@/server/keepsakePicker';
+import { keepsakeThumbUrls } from '@/server/keepsakeThumbs';
 import { resolveHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 
@@ -53,19 +53,16 @@ async function loadKeepsakePicker(): Promise<PickerKeepsake[] | null> {
     : [];
   const trimOf = new Map(trims.map((t) => [t.assetId, t]));
 
-  // the picker's small copies (made once, the first time one is needed)
-  const thumbKeys = visible.map(({ row }) => derivativeKey(row.asset.id, 'picker-thumb'));
-  const thumbs = thumbKeys.length ? await db.select({ key: storageObjects.key, assetId: storageObjects.assetId }).from(storageObjects).where(inArray(storageObjects.key, thumbKeys)) : [];
-  const hasThumb = new Set(thumbs.map((t) => t.assetId));
+  // the grid's small copies (made once, the first time one is needed) — only for the cleared keepsakes
+  const thumbs = await keepsakeThumbUrls(db, visible.map(({ row }) => row.asset.id), 600);
 
   // Authz FIRST, then mint — a URL is never minted for a keepsake the viewer can't see.
   return Promise.all(
     visible.map(async ({ row, printable }) => {
       const trim = trimOf.get(row.asset.id);
       const key = trim?.key ?? row.key;
-      const thumbKey = hasThumb.has(row.asset.id) ? derivativeKey(row.asset.id, 'picker-thumb') : await makePickerThumb(db, row.asset.id).catch(() => null);
       return {
-        thumbUrl: thumbKey ? await presignDownload(thumbKey, 600) : null,
+        thumbUrl: thumbs.get(row.asset.id) ?? null,
         id: row.asset.id,
         imageUrl: key ? await presignDownload(key, 600) : null,
         createdAtISO: row.asset.createdAt.toISOString(),
@@ -105,20 +102,3 @@ export async function keepsakeForStudioAction(input: { assetId: string }): Promi
   }
 }
 
-/**
- * A keepsake's small copy for the picker grid (founder, 26 Oct: "the more items I upload, the slower the
- * app gets" — every tile downloaded the full multi-MB photo). 400px WebP of its working drawing (the
- * table-trimmed one), a DERIVATIVE under the asset (retention + deletion cover it). Called only for a
- * keepsake the viewer was just cleared to see (loadKeepsakePicker filters through the gate first).
- */
-async function makePickerThumb(db: ReturnType<typeof getDb>, assetId: string): Promise<string> {
-  const key = derivativeKey(assetId, 'picker-thumb');
-  const buf = await sharp(await workingBytes(db, assetId)).rotate().resize(400, 400, { fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
-  await putObject(key, buf, 'image/webp');
-  const { bucket } = getS3();
-  await db
-    .insert(storageObjects)
-    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/webp', byteSize: buf.byteLength, sha256: createHash('sha256').update(buf).digest('hex'), exifStripped: true, writeOnce: false })
-    .onConflictDoNothing({ target: storageObjects.key });
-  return key;
-}

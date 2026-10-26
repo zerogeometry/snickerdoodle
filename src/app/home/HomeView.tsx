@@ -190,10 +190,10 @@ export function HomeView({ data }: { data: HomeData }) {
       >
         {k.canManage ? (
           <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label="choose who can see this keepsake">
-            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={VIS_LABEL[k.visibility]} />
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} badge={VIS_LABEL[k.visibility]} />
           </button>
         ) : (
-          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} />
+          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} />
         )}
       </div>
     );
@@ -591,7 +591,7 @@ export function HomeView({ data }: { data: HomeData }) {
       <CreateGiftLinkModal
         open={giftOpen}
         onClose={() => setGiftOpen(false)}
-        keepsakes={data.keepsakes.map((k) => ({ id: k.id, imageUrl: k.imageUrl }))}
+        keepsakes={data.keepsakes.map((k) => ({ id: k.id, imageUrl: k.thumbUrl ?? k.imageUrl }))}
         designs={data.savedDesigns.map((d) => ({ id: d.id, label: d.label, pricePence: d.pricePence, imageUrl: d.imageUrl }))}
         recipients={data.members.filter((m) => !m.isYou).map((m) => ({ accountId: m.accountId, name: m.name }))}
       />
