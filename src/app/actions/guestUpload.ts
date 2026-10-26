@@ -6,10 +6,8 @@ import { ingestEphemeralUpload } from '@/server/ingest';
 import sharp from 'sharp';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { trimTableOnUpload } from '@/server/magic';
-import { storageObjects } from '@/db/schema';
-import { eq } from 'drizzle-orm';
 import { RETENTION_DAYS } from '@/server/retention';
-import { getObjectBytes, ImageTooLargeError, MAX_UPLOAD_BYTES } from '@/storage';
+import { ImageTooLargeError, MAX_UPLOAD_BYTES } from '@/storage';
 import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
 import { UPLOAD_CLAIM_COOKIE, appendClaim, signClaims, verifyClaims } from '@/server/uploadClaims';
 import {
@@ -43,21 +41,20 @@ export type GuestUploadResult = {
  * TRIM THE TABLE, as part of the upload (founder, 26 Oct) — so the catalogue's very first mockups are made
  * from the trimmed drawing. Best-effort: anything going wrong just leaves the photo as uploaded.
  */
-async function trimmedFor(assetId: string, claimId: string): Promise<GuestUploadResult['trimmed']> {
+async function trimmedFor(assetId: string, claimId: string, original?: Buffer): Promise<GuestUploadResult['trimmed']> {
   try {
     const db = getDb();
-    const t = await trimTableOnUpload(db, assetId);
+    const t = await trimTableOnUpload(db, assetId, original);
     if (!t) return undefined;
     // the link through the same gate as every read: this browser's claim (granted this request)
     const jar = await cookies();
     const viewer = await resolveAssetViewer(db, assetId, null, [...verifyClaims(jar.get(UPLOAD_CLAIM_COOKIE)?.value), claimId]);
     const grant = await getStorageObjectGrant(db, t.objectId, viewer, 600);
-    const [row] = await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, t.objectId));
-    if (!row) return undefined;
-    const img = sharp(await getObjectBytes(row.key));
+    const img = sharp(t.buffer);
     const meta = await img.metadata();
-    // the page's own copy (the Studio edits it): a JPEG like the upload's own, capped like it (4500px)
-    const jpeg = await img.resize(4500, 4500, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 92 }).toBuffer();
+    // the page's own copy (on screen + the Studio's editing copy, which works at ≤1600px): 2400px is
+    // plenty, and a fraction of the bytes to send back (products are made from the stored copy)
+    const jpeg = await img.resize(2400, 2400, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88 }).toBuffer();
     return { sourceObjectId: t.objectId, url: grant.url, dataUrl: `data:image/jpeg;base64,${jpeg.toString('base64')}`, aspect: (meta.width ?? 1) / (meta.height ?? 1) };
   } catch (e) {
     console.warn('[upload] trim skipped:', (e as Error).message);
@@ -123,7 +120,7 @@ export async function startGuestUpload(formData: FormData): Promise<GuestUploadR
   if (moderationStatus === 'BLOCKED') return { ok: false, blocked: true };
 
   await grantClaim(claimId);
-  return { ok: true, assetId, trimmed: await trimmedFor(assetId, claimId) };
+  return { ok: true, assetId, trimmed: await trimmedFor(assetId, claimId, buffer) };
 }
 
 export type BeginUploadResult =

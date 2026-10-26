@@ -113,24 +113,25 @@ async function trimmedObject(db: DbHandle, assetId: string): Promise<{ id: strin
  * gone for good (founder, 26 Oct). Only when it's sure (src/ml/sheetCrop.ts); null otherwise.
  * Called by the upload action for the asset it has just ingested — the same request that wrote it.
  */
-export async function trimTableOnUpload(db: DbHandle, assetId: string): Promise<{ objectId: string } | null> {
+export async function trimTableOnUpload(db: DbHandle, assetId: string, original?: Buffer): Promise<{ objectId: string; buffer: Buffer } | null> {
   const [orig] = await db
     .select()
     .from(storageObjects)
     .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!orig) return null;
-  const crop = await cropToSheet(await getObjectBytes(orig.key));
+  // (the upload's own bytes when the caller has them in hand — no round trip to storage)
+  const crop = await cropToSheet(original ?? (await getObjectBytes(orig.key)));
   if (!crop) return null;
   const key = derivativeKey(assetId, 'trimmed');
-  await putObject(key, crop.buffer, 'image/png');
+  await putObject(key, crop.buffer, 'image/jpeg');
   const { bucket } = getS3();
   const sha256 = createHash('sha256').update(crop.buffer).digest('hex');
   const [row] = await db
     .insert(storageObjects)
-    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: crop.buffer.byteLength, sha256, exifStripped: true, writeOnce: false })
-    .onConflictDoUpdate({ target: storageObjects.key, set: { byteSize: crop.buffer.byteLength, sha256 } })
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/jpeg', byteSize: crop.buffer.byteLength, sha256, exifStripped: true, writeOnce: false })
+    .onConflictDoUpdate({ target: storageObjects.key, set: { byteSize: crop.buffer.byteLength, sha256, contentType: 'image/jpeg' } })
     .returning({ id: storageObjects.id });
-  return { objectId: row!.id };
+  return { objectId: row!.id, buffer: crop.buffer };
 }
 
 

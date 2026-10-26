@@ -80,8 +80,13 @@ function squareToQuad(q: [number, number][]): (u: number, v: number) => [number,
   return (u, v) => { const z = g * u + h * v + 1; return [(a * u + b * v + c) / z, (d * u + e * v + f) / z]; };
 }
 
+/** The trimmed photo's encoding: it IS a photo (the upload's own kind), so a high-quality JPEG with full
+ * colour detail (no chroma subsampling — crayon edges stay crisp) — a few MB where a PNG was ~20MB, so it
+ * stores, downloads and decodes for every mockup far quicker. */
+const PHOTO_JPEG = { quality: 95, chromaSubsampling: '4:4:4' } as const;
+
 export interface SheetCrop {
-  /** the cropped (and squared-up) drawing, PNG */
+  /** the cropped (and squared-up) drawing, JPEG */
   buffer: Buffer;
   width: number;
   height: number;
@@ -149,7 +154,7 @@ function lab(r: number, g: number, b: number): [number, number, number] {
  */
 async function finish(raw: Buffer, W: number, H: number, found: Found, straightened: boolean): Promise<SheetCrop> {
   if (found.noTrim) {
-    const buffer = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).png({ compressionLevel: 3 }).toBuffer();
+    const buffer = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).jpeg(PHOTO_JPEG).toBuffer();
     return { buffer, width: W, height: H, quad: found.quad, straightened };
   }
   const sl = lab(...found.surface), pl = lab(...found.paper);
@@ -176,7 +181,7 @@ async function finish(raw: Buffer, W: number, H: number, found: Found, straighte
     if (!moved) break;
   }
   const w = right - left + 1, h = bottom - top + 1;
-  const buffer = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).extract({ left, top, width: w, height: h }).png({ compressionLevel: 3 }).toBuffer();
+  const buffer = await sharp(raw, { raw: { width: W, height: H, channels: 3 } }).extract({ left, top, width: w, height: h }).jpeg(PHOTO_JPEG).toBuffer();
   return { buffer, width: w, height: h, quad: found.quad, straightened };
 }
 

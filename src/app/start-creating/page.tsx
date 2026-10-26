@@ -14,6 +14,7 @@ import { CameraCapture } from '@/ui/components/CameraCapture';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
+import { ReadingImageLoader } from '@/ui/components/ReadingImageLoader';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
 import { applyIngested, detectAspect, shownSrc, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { takePendingKeep } from '@/lib/pending-keep';
@@ -118,16 +119,18 @@ export default function StartCreatingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // A new drawing: the loader comes back and waits for the new range.
+  // A new drawing — or a new EDIT of it (remove background, the Studio): the loader comes back and waits
+  // for the new range's photos, so tiles never swap one by one under the shopper (founder, 26 Oct).
+  const rangeKey = drawingKey ? `${drawingKey}|${upload?.cutout?.sourceObjectId ?? ''}` : null;
   const shownAtRef = useRef(0);
   useEffect(() => {
-    if (!drawingKey) return;
+    if (!rangeKey) return;
     setRangeReady(false);
     setRangeSettled(false);
     shownAtRef.current = Date.now();
     const safety = setTimeout(() => setRangeReady(true), 45_000); // never strand the shopper
     return () => clearTimeout(safety);
-  }, [drawingKey]);
+  }, [rangeKey]);
   // The top half's photos are ready: give the tiles a beat to swap them in, and let the loader play at least
   // its little moment so the reveal lands as a reveal, not a flicker.
   useEffect(() => {
@@ -203,6 +206,9 @@ export default function StartCreatingPage() {
 
   const previewImg = shownSrc(upload);
   const [ingestFailed, setIngestFailed] = useState(false);
+  // the picture actually on screen (its load finished) — "reading your image" until then
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const previewLoaded = !!previewImg && loadedSrc === previewImg && (!!upload?.assetId || !!upload?.scratch || ingestFailed);
   useEffect(() => {
     setIngestFailed(false);
     if (!upload || upload.assetId) return;
@@ -310,18 +316,21 @@ export default function StartCreatingPage() {
               <div className="art-stage flex w-full justify-center pt-3">
                 {/* A taped polaroid that HUGS the drawing's own aspect (sized by the image). On
                     desktop, once the aspect is known, .art-fit sizes it to fill the stage. */}
+                {!previewLoaded ? <ReadingImageLoader /> : null}
                 <div
-                  className={`pop-in polaroid tape inline-block max-w-full ${upload.aspect ? 'art-fit' : ''}`}
+                  className={`pop-in polaroid tape inline-block max-w-full ${upload.aspect ? 'art-fit' : ''} ${previewLoaded ? '' : 'hidden'}`}
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
                     {upload.assetId || upload.scratch || ingestFailed ? (
-                      <img src={previewImg ?? ''} alt="your drawing" onLoad={toRange} onError={() => void refreshDesignUrl()} className="block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]" />
-                    ) : (
-                      // until the upload is stored (and the table trimmed off), a soft placeholder — the
-                      // table never flashes up (founder, 26 Oct)
-                      <div role="status" aria-label="getting your drawing ready" className="h-[18rem] w-[14rem] max-w-full animate-pulse bg-paper-2 md:h-[20rem] md:w-[16rem] motion-reduce:animate-none" />
-                    )}
+                      <img
+                        src={previewImg ?? ''}
+                        alt="your drawing"
+                        onLoad={() => { setLoadedSrc(previewImg); toRange(); }}
+                        onError={() => void refreshDesignUrl()}
+                        className={previewLoaded ? 'block h-auto max-h-[18rem] w-auto max-w-full md:max-h-[20rem]' : 'hidden'}
+                      />
+                    ) : null}
                   </div>
                 </div>
               </div>

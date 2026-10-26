@@ -496,11 +496,31 @@ body {
     transform: none;
   }
 }
+/* "reading your image": a honey scan line sweeps down the blank polaroid, the magnifier bobs. */
+.reading-scan {
+  animation: reading-scan 1.6s ease-in-out infinite alternate;
+}
+@keyframes reading-scan {
+  from {
+    transform: translateY(0.5rem);
+  }
+  to {
+    transform: translateY(15rem);
+  }
+}
+.reading-glass {
+  animation: loader-crayon 1.4s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .loader-pop,
   .loader-bob,
-  .loader-crayon {
+  .loader-crayon,
+  .reading-scan,
+  .reading-glass {
     animation: none !important;
+  }
+  .reading-scan {
+    transform: translateY(6rem);
   }
 }
 
