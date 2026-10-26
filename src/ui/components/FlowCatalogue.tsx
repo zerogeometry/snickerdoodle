@@ -15,7 +15,7 @@ import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile, familySetRequests } from '@/ui/components/FamilySetTile';
-import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
+import { applyIngested, basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from './ChristmasPromise';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
@@ -73,7 +73,6 @@ export function FlowCatalogue({
   const onRangeReadyRef = useRef(onRangeReady);
   onRangeReadyRef.current = onRangeReady;
   const upload = useUpload((s) => s.upload);
-  const setAssetId = useUpload((s) => s.setAssetId);
   const items = useBasket((s) => s.items);
   const add = useBasket((s) => s.add);
   const setQty = useBasket((s) => s.setQty);
@@ -105,7 +104,7 @@ export function FlowCatalogue({
         const blob = await fetch(upload.dataUrl).then((r) => r.blob());
         const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
         if (res.ok && res.assetId) {
-          setAssetId(res.assetId);
+          applyIngested(res.assetId, res.trimmed);
           return res.assetId;
         }
         toast(res.blocked ? 'we couldn’t use that image — try another' : res.tooMany ? TOO_MANY_COPY : 'hmm, that didn’t work — try again');
@@ -122,7 +121,7 @@ export function FlowCatalogue({
     } finally {
       ingestRef.current = null;
     }
-  }, [upload, setAssetId]);
+  }, [upload]);
 
   const keepDrawing = async () => {
     if (!guardUpload() || keeping) return;

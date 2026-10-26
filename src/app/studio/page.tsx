@@ -19,7 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { toast, useUpload, useUploadHydrated } from '@/lib/store';
+import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
@@ -95,7 +95,6 @@ export default function StudioPage() {
 function StudioEditor() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
-  const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
   const setAspect = useUpload((s) => s.setAspect);
 
@@ -164,13 +163,13 @@ function StudioEditor() {
     const blob = await fetch(upload.dataUrl).then((r) => r.blob());
     const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
     if (res.ok && res.assetId) {
-      setAssetId(res.assetId);
+      applyIngested(res.assetId, res.trimmed);
       setLocalAssetId(res.assetId);
       return res.assetId;
     }
     toast(res.blocked ? 'we couldn’t use that image — try another' : res.tooMany ? TOO_MANY_COPY : 'hmm, that didn’t work — try again');
     return null;
-  }, [assetId, upload, setAssetId]);
+  }, [assetId, upload]);
 
   // ── load the editing copy + where the parent left off ──
   useEffect(() => {

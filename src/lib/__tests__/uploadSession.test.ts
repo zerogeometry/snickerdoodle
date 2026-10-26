@@ -44,6 +44,13 @@ describe('the drawing kept for the tab (sessionStorage only)', () => {
     expect(toSessionUpload(drawing())!.cutout).toEqual({ url: 'https://x/c', sourceObjectId: 'obj-1' });
   });
 
+  it('remembers a table TRIM with the drawing (the trimmed copy + its undo)', () => {
+    const out = toSessionUpload({ ...drawing(), key: 'k1', trim: { url: 'https://x/t', sourceObjectId: 'trim-1' }, cutout: { url: 'https://x/t', sourceObjectId: 'trim-1', trim: true } })!;
+    expect(out.trim).toEqual({ url: 'https://x/t', sourceObjectId: 'trim-1' });
+    expect(out.cutout).toEqual({ url: 'https://x/t', sourceObjectId: 'trim-1', trim: true });
+    expect(out.key).toBe('k1');
+  });
+
   it('never keeps the file name (it can carry a child’s name) — just its type', () => {
     expect(toSessionUpload(drawing())!.name).toBe('drawing.png');
     expect(toSessionUpload({ dataUrl: 'data:image/jpeg;base64,AA', name: 'Tom Smith.JPG' })!.name).toBe('drawing.jpg');

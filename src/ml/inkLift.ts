@@ -1062,7 +1062,7 @@ function growMask(m: Uint8Array, W: number, H: number, r: number): Uint8Array {
  *     slightly angled rectangle), and NOT the whole frame (a surface must show round it).
  * Returns the sheet mask at the copy's size and the paper colour, or null.
  */
-async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: [number, number, number]; w: number; h: number; surface: [number, number, number]; touchesFrame: boolean } | null> {
+export async function detectSheet(input: Buffer): Promise<{ sheet: Uint8Array; colour: [number, number, number]; w: number; h: number; surface: [number, number, number]; touchesFrame: boolean } | null> {
   const { data: d, info } = await sharp(input, { limitInputPixels: MAX_PIXELS }).rotate().flatten({ background: '#ffffff' })
     .resize(700, 700, { fit: 'inside', withoutEnlargement: true }).median(3).removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height, N = W * H;

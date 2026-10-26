@@ -14,7 +14,9 @@ export type SessionUpload = {
   dataUrl: string;
   name: string;
   assetId?: string;
-  cutout?: { url: string; sourceObjectId: string; oneTap?: boolean };
+  key?: string;
+  cutout?: { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean };
+  trim?: { url: string; sourceObjectId: string };
   aspect?: number;
   kept?: boolean;
   opaqueBg?: boolean;
@@ -32,7 +34,10 @@ export function toSessionUpload(u: (SessionUpload & Record<string, unknown>) | n
   if (u.cutout && typeof u.cutout.url === 'string' && typeof u.cutout.sourceObjectId === 'string') {
     out.cutout = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
     if (u.cutout.oneTap === true) out.cutout.oneTap = true;
+    if (u.cutout.trim === true) out.cutout.trim = true;
   }
+  if (u.trim && typeof u.trim.url === 'string' && typeof u.trim.sourceObjectId === 'string') out.trim = { url: u.trim.url, sourceObjectId: u.trim.sourceObjectId };
+  if (typeof u.key === 'string') out.key = u.key.slice(0, 80);
   if (typeof u.aspect === 'number' && Number.isFinite(u.aspect) && u.aspect > 0) out.aspect = u.aspect;
   if (u.kept === true) out.kept = true;
   if (typeof u.opaqueBg === 'boolean') out.opaqueBg = u.opaqueBg;

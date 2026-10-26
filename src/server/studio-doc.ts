@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { assets, storageObjects } from '@/db/schema';
 import type { ViewerContext } from '@/authz';
 import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import { getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
-import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
+import { applyCutoutMask, cutoutAlphaForAsset, workingBytes } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
 import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
@@ -101,8 +101,8 @@ async function placeInFrame(drawing: Buffer, W: number, H: number, p: Placement)
 
 async function bytesOf(db: DbHandle, assetId: string, which: 'ORIGINAL' | 'cutout'): Promise<Buffer | null> {
   if (which === 'ORIGINAL') {
-    const [o] = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
-    return o ? getObjectBytes(o.key) : null;
+    // the drawing the Studio edits: the table-trimmed copy when there is one (src/server/magic.ts)
+    return workingBytes(db, assetId).catch(() => null);
   }
   const key = derivativeKey(assetId, 'cutout');
   const [o] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));

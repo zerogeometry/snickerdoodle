@@ -36,7 +36,34 @@ export const gbp = formatPence;
 // its image tools, and the range shows the design rather than the empty canvas).
 // `cutout.oneTap` = it came from the one-tap "remove background" (so "put the background back" can undo it
 // without throwing away Studio work) — remembered with the drawing, so it survives leaving the page.
-export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string; oneTap?: boolean }; scratch?: boolean; kept?: boolean } | null;
+// `trim` = the photo showed the sheet on a table and it was trimmed to the sheet at upload (founder, 26 Oct):
+// `dataUrl` is then the trimmed drawing, and the cut-out starts as the trimmed copy (`cutout.trim`) so every
+// product is made from it. "undo" brings the whole photo back.
+// `key` = this drawing's identity (stays put when the trim swaps the picture in).
+export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
+export type Cutout = { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean };
+/** What to SHOW for the drawing: an edit's picture, or the drawing itself (a trim IS the drawing — and its
+ * own copy never expires, unlike the edit's short-lived link). */
+export const shownSrc = (u: Upload): string | null => (u ? (u.cutout && !u.cutout.trim ? u.cutout.url : u.dataUrl) : null);
+/** After an upload is stored: its asset — and, when it was trimmed, the trimmed drawing swapped in. */
+export function applyIngested(assetId: string, trimmed?: { sourceObjectId: string; url: string; dataUrl: string; aspect: number }): void {
+  useUpload.setState((s) => {
+    if (!s.upload) return {};
+    if (!trimmed) return { upload: { ...s.upload, assetId } };
+    const trim = { url: trimmed.url, sourceObjectId: trimmed.sourceObjectId };
+    return {
+      upload: {
+        ...s.upload,
+        assetId,
+        key: s.upload.key ?? s.upload.dataUrl.slice(-64),
+        dataUrl: trimmed.dataUrl,
+        aspect: trimmed.aspect,
+        trim,
+        cutout: s.upload.cutout ?? { ...trim, trim: true },
+      },
+    };
+  });
+}
 // Kept for THIS TAB only (sessionStorage — src/lib/uploadSession.ts), so a refresh doesn't lose it.
 // Hydrated after mount (skipHydration + <UploadSession/> in the root layout): the server and the
 // first client render both see "no drawing yet", so there's never a hydration mismatch. Screens that
@@ -49,7 +76,7 @@ type UploadStore = {
   setOpaqueBg: (opaque: boolean) => void;
   setAspect: (aspect: number) => void;
   /** The DESIGN products render from (bg-removed / studio-edited); null = the original. */
-  setCutout: (c: { url: string; sourceObjectId: string; oneTap?: boolean } | null) => void;
+  setCutout: (c: Cutout | null) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 };
 export const useUpload = create<UploadStore>()(
@@ -60,7 +87,7 @@ export const useUpload = create<UploadStore>()(
       setAssetId: (assetId) => set((s) => (s.upload ? { upload: { ...s.upload, assetId } } : {})),
       setOpaqueBg: (opaqueBg) => set((s) => (s.upload ? { upload: { ...s.upload, opaqueBg } } : {})),
       setAspect: (aspect) => set((s) => (s.upload ? { upload: { ...s.upload, aspect } } : {})),
-      setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout: cutout ?? undefined } } : {})),
+      setCutout: (cutout) => set((s) => (s.upload ? { upload: { ...s.upload, cutout: cutout ?? (s.upload.trim ? { ...s.upload.trim, trim: true } : undefined) } } : {})),
       resetUpload: () => set({ upload: null }),
     }),
     {

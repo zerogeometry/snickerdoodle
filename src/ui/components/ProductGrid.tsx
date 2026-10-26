@@ -91,7 +91,7 @@ export function ProductTile({
   const shown = tileMockupInputs(p, upload, sel, savedTf);
   // the instant preview: the drawing as this browser already holds it (the cutout once made)
   const localSrc = useLocalPreview(upload?.cutout ? null : upload?.dataUrl);
-  const instantSrc = upload?.cutout?.url ?? localSrc;
+  const instantSrc = (upload?.cutout && !upload.cutout.trim ? upload.cutout.url : null) ?? localSrc;
   return (
     // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
     // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape

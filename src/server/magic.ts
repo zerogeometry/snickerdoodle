@@ -3,7 +3,8 @@ import { and, eq, gte } from 'drizzle-orm';
 import sharp from 'sharp';
 import { mlOperations, storageObjects } from '@/db/schema';
 import { runImageOp } from '@/ml/client';
-import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { cropToSheet } from '@/ml/sheetCrop';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
 import { getViewableAssetOrThrow } from './assets';
@@ -47,13 +48,8 @@ export async function removeBackgroundForAsset(
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate (member OR upload-claim holder)
   await assertMlBudget(db, viewer.accountId, assetId);
 
-  const [orig] = await db
-    .select()
-    .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
-  if (!orig) throw new Error('no original to edit');
-
-  const srcBuf = await getObjectBytes(orig.key);
+  // the WORKING copy: the table-trimmed drawing when there is one, else the original
+  const srcBuf = await workingBytes(db, assetId);
   const res = await runImageOp({ kind: 'BG_REMOVE', keepEnclosedPaper: opts.keepEnclosedPaper }, srcBuf); // self-hosted; one image; PNG, no EXIF
 
   // HONESTY GATE: if the edit didn't meaningfully change anything (no clean background
@@ -88,13 +84,73 @@ async function storeCutout(db: DbHandle, assetId: string, buffer: Buffer, sha256
 /** Longest side of the editing copy the touch-up tool works on (and of the masks it sends back). */
 export const TOUCHUP_EDGE = 1600;
 
-async function originalBytes(db: DbHandle, assetId: string): Promise<Buffer> {
+/**
+ * The drawing every edit works from: the TABLE-TRIMMED copy when the upload was trimmed (the parent
+ * hasn't undone it), else the untouched original. One rule for every edit, so a cut-out, a touch-up and
+ * the Studio all line up pixel for pixel — and the table can't come back through an edit.
+ */
+export async function workingBytes(db: DbHandle, assetId: string): Promise<Buffer> {
+  const trimmed = await trimmedObject(db, assetId);
+  if (trimmed) return getObjectBytes(trimmed.key);
   const [orig] = await db
     .select()
     .from(storageObjects)
     .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!orig) throw new Error('no original to edit');
   return getObjectBytes(orig.key);
+}
+
+async function trimmedObject(db: DbHandle, assetId: string): Promise<{ id: string; key: string } | null> {
+  const key = derivativeKey(assetId, 'trimmed');
+  const [row] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+  return row ? { id: row.id, key } : null;
+}
+
+/**
+ * TRIM THE TABLE at upload (founder, 26 Oct): when the photo shows the sheet lying on a table, store a
+ * copy cropped (and squared up) to the sheet — a DERIVATIVE under the asset, so retention and deletion
+ * cover it; the original is never touched. Only when it's sure (src/ml/sheetCrop.ts); null otherwise.
+ * Called by the upload action for the asset it has just ingested — the same request that wrote it.
+ */
+export async function trimTableOnUpload(db: DbHandle, assetId: string): Promise<{ objectId: string } | null> {
+  const [orig] = await db
+    .select()
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!orig) return null;
+  const crop = await cropToSheet(await getObjectBytes(orig.key));
+  if (!crop) return null;
+  const key = derivativeKey(assetId, 'trimmed');
+  await putObject(key, crop.buffer, 'image/png');
+  const { bucket } = getS3();
+  const sha256 = createHash('sha256').update(crop.buffer).digest('hex');
+  const [row] = await db
+    .insert(storageObjects)
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/png', byteSize: crop.buffer.byteLength, sha256, exifStripped: true, writeOnce: false })
+    .onConflictDoUpdate({ target: storageObjects.key, set: { byteSize: crop.buffer.byteLength, sha256 } })
+    .returning({ id: storageObjects.id });
+  return { objectId: row!.id };
+}
+
+/**
+ * Undo the trim: the whole photo again. The trimmed copy goes, and so does a cut-out made from it (it
+ * was cut from the trimmed copy's pixels, so it no longer lines up). Returns the original (already past the gate) for the page.
+ */
+export async function untrimForAsset(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<{ original: Buffer; contentType: string }> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  for (const kind of ['trimmed', 'cutout']) {
+    const key = derivativeKey(assetId, kind);
+    const [row] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+    if (!row) continue;
+    await deleteObjectConfirmed(key);
+    await db.delete(storageObjects).where(eq(storageObjects.id, row.id));
+  }
+  const [orig] = await db
+    .select({ key: storageObjects.key, contentType: storageObjects.contentType })
+    .from(storageObjects)
+    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  if (!orig) throw new Error('no original');
+  return { original: await getObjectBytes(orig.key), contentType: orig.contentType ?? 'image/jpeg' };
 }
 
 async function cutoutBytes(db: DbHandle, assetId: string): Promise<Buffer | null> {
@@ -127,7 +183,7 @@ export async function cutoutAlphaForAsset(db: DbHandle, viewer: ViewerContext, a
  */
 export async function applyCutoutMask(db: DbHandle, viewer: ViewerContext, assetId: string, maskPng: Buffer): Promise<MagicResult> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
-  const orig = sharp(await originalBytes(db, assetId)).rotate();
+  const orig = sharp(await workingBytes(db, assetId)).rotate();
   const { data: rgb, info } = await orig.clone().removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;
 

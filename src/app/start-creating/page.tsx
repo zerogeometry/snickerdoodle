@@ -15,13 +15,13 @@ import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
 import { MakingRangeLoader } from '@/ui/components/MakingRangeLoader';
-import { detectAspect, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
+import { applyIngested, detectAspect, shownSrc, detectOpaqueBg, normalizeUpload, toast, useUpload } from '@/lib/store';
 import { takePendingKeep } from '@/lib/pending-keep';
 import { finishPendingKeepsAction } from '@/app/actions/keep';
 import { fetchCatalogue } from '@/lib/catalogueCache';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
-import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
+import { designUrlAction, removeBackgroundAction, untrimAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
 
@@ -29,12 +29,13 @@ const TOO_MANY = 'that’s a lot of pictures for now — try again in a little w
 
 export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
-  const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
   const [removingBg, setRemovingBg] = useState(false);
   // the cut-out came from the one-tap button (so undoing it can't throw away work done in the Studio) —
   // kept WITH the drawing, so it's still there after customize / the Studio / anywhere and back
   const oneTap = upload?.cutout?.oneTap === true;
+  // an EDIT (remove background / the Studio) — the table trim isn't one: it's just the drawing, trimmed
+  const edited = !!upload?.cutout && !upload.cutout.trim;
   const setUpload = useUpload((s) => s.setUpload);
   const setOpaqueBg = useUpload((s) => s.setOpaqueBg);
   const setAspect = useUpload((s) => s.setAspect);
@@ -61,7 +62,7 @@ export default function StartCreatingPage() {
   // lifts it regardless.
   const [rangeReady, setRangeReady] = useState(false);
   const [rangeSettled, setRangeSettled] = useState(false);
-  const drawingKey = upload?.dataUrl ?? null;
+  const drawingKey = upload ? (upload.key ?? upload.dataUrl.slice(-64)) : null;
   // Back from signing in after a guest's "+ keepsake": put their drawing back on screen (same
   // browser) and finish the keep (server-side — works on any device the link was opened on).
   useEffect(() => {
@@ -165,7 +166,7 @@ export default function StartCreatingPage() {
   // simply stops using the cut-out (originals are sacred).
   const removeBackground = async () => {
     if (!upload || removingBg) return;
-    if (upload.cutout && oneTap) {
+    if (edited && oneTap) {
       setCutout(null);
       toast('background back — just as it was');
       return;
@@ -181,7 +182,7 @@ export default function StartCreatingPage() {
           return;
         }
         id = up.assetId;
-        setAssetId(id);
+        applyIngested(id, up.trimmed);
       }
       const res = await removeBackgroundAction({ assetId: id, keepEnclosedPaper: true });
       if (res.ok) {
@@ -200,7 +201,23 @@ export default function StartCreatingPage() {
     }
   };
 
-  const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const previewImg = shownSrc(upload);
+  // "undo" the table trim: the whole photo again (any edit made from the trimmed copy goes with it)
+  const [untrimming, setUntrimming] = useState(false);
+  const untrim = async () => {
+    const u = useUpload.getState().upload;
+    if (!u?.assetId || !u.trim || untrimming) return;
+    setUntrimming(true);
+    try {
+      const r = await untrimAction({ assetId: u.assetId });
+      if (!r.ok) return void toast('couldn’t do that — try again');
+      setUpload({ ...u, dataUrl: r.dataUrl, trim: undefined, cutout: undefined, aspect: undefined });
+      void detectAspect(r.dataUrl).then((a) => { if (a) setAspect(a); });
+      toast('the whole photo — just as you took it');
+    } finally {
+      setUntrimming(false);
+    }
+  };
   // the edited design is shown through a short-lived link: if it has expired, fetch a fresh one
   const refreshing = useRef(false);
   const refreshDesignUrl = async () => {
@@ -310,12 +327,25 @@ export default function StartCreatingPage() {
                   </div>
                 </div>
               </div>
+              {upload.trim ? (
+                <p className="mt-3 flex w-full flex-wrap items-center justify-center gap-x-1 text-center text-[13px] text-ink-soft">
+                  we trimmed the table off your photo ·
+                  <button
+                    type="button"
+                    onClick={() => void untrim()}
+                    disabled={untrimming}
+                    className="inline-flex min-h-11 items-center px-1 font-extrabold text-cinnamon underline underline-offset-2"
+                  >
+                    {untrimming ? 'putting it back…' : 'undo'}
+                  </button>
+                </p>
+              ) : null}
               <div className="mt-5 flex w-full flex-col gap-2.5">
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
                   change image
                 </Button>
                 {/* the one-tap magic edit leads; the Studio is the advanced editor */}
-                {upload.cutout && !oneTap ? null : (
+                {edited && !oneTap ? null : (
                 <Button
                   variant="design"
                   size="lg"
@@ -324,15 +354,15 @@ export default function StartCreatingPage() {
                   disabled={removingBg}
                   aria-busy={removingBg}
                   // Nudge (same wobble as start-creating) when the photo still has its paper/background.
-                  attention={!removingBg && !upload.cutout && upload.opaqueBg === true}
+                  attention={!removingBg && !edited && upload.opaqueBg === true}
                 >
-                  <Icon icon={upload.cutout ? IconArrowBackUp : IconSparkles} size={16} />
-                  {removingBg ? 'lifting it off the paper…' : upload.cutout ? 'put the background back' : 'remove background'}
+                  <Icon icon={edited ? IconArrowBackUp : IconSparkles} size={16} />
+                  {removingBg ? 'lifting it off the paper…' : edited ? 'put the background back' : 'remove background'}
                 </Button>
                 )}
                 <Button variant="designOutline" size="lg" className="w-full" onClick={() => router.push('/studio')}>
-                  <Icon icon={upload.cutout ? IconCircleCheck : IconPencil} size={16} />
-                  {upload.cutout ? (oneTap ? 'fine-tune in studio' : 'edited · back to studio') : 'edit in studio'}
+                  <Icon icon={edited ? IconCircleCheck : IconPencil} size={16} />
+                  {edited ? (oneTap ? 'fine-tune in studio' : 'edited · back to studio') : 'edit in studio'}
                 </Button>
               </div>
               <div className="mt-4 flex w-full items-start gap-2.5 rounded-[14px] border-2 border-leaf bg-leaf-pale p-3">

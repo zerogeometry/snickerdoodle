@@ -22,7 +22,7 @@ import { CARD_PACK_KEY, packSizeOf } from '@/lib/card-packs';
 import { cardPackLine, newPackLineId } from '@/lib/card-pack-line';
 import { isColouredGround, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { gbp, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
+import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
 
 /**
  * The greetings-card PACK builder (D22): choose a pack of 5 or 10 → put a drawing on every card
@@ -120,7 +120,7 @@ export function CardPackBuilder() {
   const drawings = useMemo(() => {
     const list: Drawing[] = [];
     if (upload?.assetId) {
-      list.push({ assetId: upload.assetId, imageUrl: upload.cutout?.url ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
+      list.push({ assetId: upload.assetId, imageUrl: shownSrc(upload) ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
     }
     if (picker.status === 'ready') {
       for (const k of picker.keepsakes) {

@@ -13,7 +13,7 @@ import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
 import { FlowHeader } from '@/ui/components/FlowHeader';
-import { gbp, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
+import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
 import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
@@ -329,7 +329,7 @@ function CustomizeProduct() {
 
   // The pixel size of the image this line will print from (the cutout if chosen) — fed to the
   // SAME assessment (assessPrintResolution) the server's order-time gate runs, so the badge can't disagree with it.
-  const printSrc = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const printSrc = shownSrc(upload);
   const [srcSize, setSrcSize] = useState<{ width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false); // "+ Keepsake" in flight (declared before any early return)
   useEffect(() => {
@@ -370,7 +370,7 @@ function CustomizeProduct() {
     );
   }
 
-  const previewImg = upload?.cutout?.url ?? upload?.dataUrl ?? null;
+  const previewImg = shownSrc(upload);
   const isPattern = isPatternProduct(product.key);
   // an EDGE-TO-EDGE product (a repeat, a phone case, a cushion…) can sit on any base colour
   const isGround = isGroundProduct(product.key);

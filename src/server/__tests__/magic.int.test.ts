@@ -9,7 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { assertMlBudget, removeBackgroundForAsset } from '@/server/magic';
+import { assertMlBudget, removeBackgroundForAsset, trimTableOnUpload, untrimForAsset, workingBytes } from '@/server/magic';
 import { deleteObject, derivativeKey } from '@/storage';
 import type { DbHandle } from '@/server/db';
 
@@ -60,6 +60,45 @@ describe.skipIf(!DB || !S3)('magic edits — self-hosted, gated, budget-capped (
       .from(mlOperations)
       .where(and(eq(mlOperations.assetId, asset.assetId), eq(mlOperations.op, 'BG_REMOVE')));
     expect(ops).toHaveLength(1); // recorded once, against the budget
+  });
+
+  // TRIM THE TABLE (founder, 26 Oct): a drawing photographed on a table is trimmed to the sheet at upload
+  const onTable = () =>
+    sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480"><rect width="640" height="480" fill="#5a3a22"/>
+      ${Array.from({ length: 40 }, (_, i) => `<rect x="0" y="${i * 12}" width="640" height="4" fill="#4a3020" opacity="0.7"/>`).join('')}
+      <rect x="100" y="70" width="440" height="340" fill="#f4f1e8"/><circle cx="320" cy="240" r="80" fill="#2f5da8"/></svg>`)).png().toBuffer();
+
+  it('trim the table: a separate trimmed DERIVATIVE (the original untouched) that every edit then works from', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const asset = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await onTable(), keptInHome: true });
+    keys.push(asset.key, derivativeKey(asset.assetId, 'trimmed'), derivativeKey(asset.assetId, 'cutout'));
+    const t = await trimTableOnUpload(db, asset.assetId);
+    expect(t).not.toBeNull();
+    const [obj] = await db.select().from(storageObjects).where(eq(storageObjects.id, t!.objectId));
+    expect(obj!.objectClass).toBe('DERIVATIVE');
+    expect(obj!.assetId).toBe(asset.assetId);
+    const work = await sharp(await workingBytes(db, asset.assetId)).metadata();
+    expect(work.width!).toBeLessThan(560); // the sheet (440 wide), not the 640-wide photo
+    // undo: the whole photo again — the trimmed copy is gone
+    const back = await untrimForAsset(db, sam, asset.assetId);
+    expect((await sharp(back.original).metadata()).width).toBe(640);
+    expect((await sharp(await workingBytes(db, asset.assetId)).metadata()).width).toBe(640);
+  });
+
+  it('leaves a photo with no table round the sheet exactly as it is', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const asset = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
+    keys.push(asset.key);
+    expect(await trimTableOnUpload(db, asset.assetId)).toBeNull();
+  });
+
+  it('undoing the trim is gated like every edit (another family is refused)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const asset = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await onTable(), keptInHome: true });
+    keys.push(asset.key, derivativeKey(asset.assetId, 'trimmed'));
+    await trimTableOnUpload(db, asset.assetId);
+    const blake = await resolveViewerContext(db, ids.blakeId, ids.bloomId);
+    await expect(untrimForAsset(db, blake, asset.assetId)).rejects.toBeInstanceOf(AuthzError);
   });
 
   it('refuses a magic edit on a keepsake outside the actor’s family', async () => {

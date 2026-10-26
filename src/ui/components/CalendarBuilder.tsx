@@ -19,7 +19,7 @@ import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { CALENDAR_KEY, CALENDAR_PAGE_COUNT, CALENDAR_YEAR, fillCalendarPages, MONTH_SHORT, pageLabel } from '@/lib/calendar';
 import { calendarLine, newCalendarLineId } from '@/lib/calendar-line';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { gbp, toast, useBasket, useUpload, type PackCardLine } from '@/lib/store';
+import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine } from '@/lib/store';
 
 /**
  * The dated 2027 WALL CALENDAR builder (CHRISTMAS-range-and-postage.md §5): choose A5 or A4 → put
@@ -139,7 +139,7 @@ export function CalendarBuilder() {
   const drawings = useMemo(() => {
     const list: Drawing[] = [];
     if (upload?.assetId) {
-      list.push({ assetId: upload.assetId, imageUrl: upload.cutout?.url ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
+      list.push({ assetId: upload.assetId, imageUrl: shownSrc(upload) ?? upload.dataUrl, sourceObjectId: upload.cutout?.sourceObjectId, label: 'this drawing', printable: true });
     }
     if (picker.status === 'ready') {
       for (const k of picker.keepsakes) {
