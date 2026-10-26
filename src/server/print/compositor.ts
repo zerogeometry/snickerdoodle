@@ -154,6 +154,36 @@ function templateRaw(id: string | undefined, step: string, make: () => Promise<R
   return id ? templateRawCache.get(`${id}|${step}`, make) : make();
 }
 
+/**
+ * Fill the template-layer cache when the server starts (founder, 26 Oct: "the image upload on first
+ * testing seemed to take too long" — a fresh server fetched every product photo from storage during
+ * the first shopper's catalogue reveal). Only BRAND-SAFE, NON-child template images (template_assets);
+ * never a design. Best-effort and bounded: a byte budget below the cache's own, a few at a time, and
+ * any failure simply leaves that layer to load on first use as before.
+ */
+export async function warmTemplateCache(db: DbHandle, budgetBytes = 120 * 1024 * 1024): Promise<{ layers: number; bytes: number }> {
+  const rows = await db.select({ key: templateAssets.key, byteSize: templateAssets.byteSize }).from(templateAssets);
+  let bytes = 0, layers = 0;
+  const todo = rows.filter((r) => {
+    const n = r.byteSize ?? 2 * 1024 * 1024;
+    if (bytes + n > budgetBytes) return false;
+    bytes += n;
+    return true;
+  });
+  bytes = 0;
+  for (let i = 0; i < todo.length; i += 4) {
+    await Promise.all(todo.slice(i, i + 4).map(async (r) => {
+      try {
+        bytes += (await templateBytes(r.key)).byteLength;
+        layers++;
+      } catch {
+        /* loads on first use instead */
+      }
+    }));
+  }
+  return { layers, bytes };
+}
+
 /** Empty the compositor's in-process caches (the parity test and the benchmark measure cold renders). */
 export function clearMockupCaches(): void {
   templateBytesCache.clear();

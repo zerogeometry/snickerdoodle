@@ -12,5 +12,21 @@ export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     const { assertModerationReady } = await import('@/server/moderation/providers');
     await assertModerationReady();
+    // Warm the product photos for the first catalogue reveal (brand-safe templates only, never a
+    // drawing) — in the background, a moment after start, so it never delays the server coming up.
+    if (process.env.NODE_ENV === 'production') {
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const [{ getDb }, { warmTemplateCache }] = await Promise.all([import('@/db/client'), import('@/server/print/compositor')]);
+            const t0 = Date.now();
+            const r = await warmTemplateCache(getDb());
+            console.info(`[warm] ${r.layers} product photos ready in ${Date.now() - t0}ms (${Math.round(r.bytes / 1048576)}MB)`);
+          } catch (e) {
+            console.warn('[warm] skipped:', (e as Error).message);
+          }
+        })();
+      }, 3000);
+    }
   }
 }
