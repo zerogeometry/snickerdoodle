@@ -203,24 +203,86 @@ function buildCard(texture: THREE.Texture, wMm: number, hMm: number): THREE.Grou
   return centred(group);
 }
 
-function buildBauble(texture: THREE.Texture, wMm: number): THREE.Group {
+/**
+ * The CERAMIC ornament (Prodigi XMAS-PORC-BAUB): a flat glossy white disc, 7.5 cm, with a hole near the
+ * top and a gold string through it. Printed on ONE side — the back is plain white ceramic (founder,
+ * 26 Oct: the flip side must be right). The print fills the face (cover), the hole cut through it.
+ */
+function buildCeramicOrnament(texture: THREE.Texture, wMm: number): THREE.Group {
   const group = new THREE.Group();
   const R = wMm / 2;
-  const disc = new THREE.Mesh(new THREE.CylinderGeometry(R, R, 7, 72), ceramic());
-  disc.rotation.x = Math.PI / 2; // flat face toward the viewer
-  group.add(disc);
-  // Print face: a CircleGeometry facing +z — its UVs are the inscribed circle of the
-  // square canvas, upright (a rotated cylinder cap would show the print sideways).
-  // The circle crop = the 2D face-cover mask crop of the 82×82 canvas.
-  const face = new THREE.Mesh(new THREE.CircleGeometry(R - 0.5, 72), printedSurface(texture, { roughness: 0.35, sheen: 0 }));
-  face.position.z = 3.6;
+  const T = 4.5; // thickness, mm
+  const holeR = R * 0.07;
+  const holeY = R * 0.82; // centre of the hole, from the disc's centre (the founder's print map)
+  const disc = new THREE.Shape();
+  disc.absarc(0, 0, R, 0, Math.PI * 2, false);
+  const hole = new THREE.Path();
+  hole.absarc(0, holeY, holeR, 0, Math.PI * 2, true);
+  disc.holes.push(hole);
+  const body = new THREE.Mesh(new THREE.ExtrudeGeometry(disc, { depth: T, bevelEnabled: true, bevelThickness: 0.6, bevelSize: 0.6, bevelSegments: 3, curveSegments: 72 }), ceramic('#f7f6f2'));
+  body.position.z = -T / 2;
+  group.add(body);
+  // the printed FRONT: the same disc-with-a-hole, its UVs spanning the disc (the print is a square
+  // file, the disc its inscribed circle — as the 2D mockup crops it)
+  const faceGeo = new THREE.ShapeGeometry(disc, 72);
+  const pos = faceGeo.attributes.position!, uv = faceGeo.attributes.uv!;
+  for (let i = 0; i < pos.count; i++) uv.setXY(i, (pos.getX(i) + R) / (2 * R), (pos.getY(i) + R) / (2 * R));
+  uv.needsUpdate = true;
+  const face = new THREE.Mesh(faceGeo, printedSurface(texture, { roughness: 0.3, sheen: 0 }));
+  face.position.z = T / 2 + 0.65;
   group.add(face);
-  const gold = new THREE.MeshStandardMaterial({ color: '#C9A227', metalness: 0.85, roughness: 0.3 });
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 5.5, 7, 20), gold);
-  cap.position.y = R + 2.5;
-  const loop = new THREE.Mesh(new THREE.TorusGeometry(4, 1.1, 8, 24), gold);
-  loop.position.y = R + 9;
-  group.add(cap, loop);
+  // the back is left as the plain glossy ceramic body (single-sided print)
+  // the gold string: a loop through the hole, up to a knot
+  const gold = new THREE.MeshStandardMaterial({ color: '#C9A227', metalness: 0.85, roughness: 0.35 });
+  const loop = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, holeY, T / 2 + 0.8),
+    new THREE.Vector3(-R * 0.18, holeY + R * 0.55, 1),
+    new THREE.Vector3(0, holeY + R * 0.95, 0),
+    new THREE.Vector3(R * 0.18, holeY + R * 0.55, -1),
+    new THREE.Vector3(0, holeY, -T / 2 - 0.8),
+  ]);
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(loop, 64, 0.45, 8, false), gold));
+  return centred(group);
+}
+
+/**
+ * The PLASTIC BALL (Prodigi XMAS-PLAS-BAUB): an 8 cm shatterproof ball with a chrome cap and a silver
+ * string, printed on BOTH sides — the same drawing front and back, each reading the right way round.
+ * The print is projected flat onto each half (the way a pad-printed ball looks), filling it (cover).
+ */
+function buildPlasticBall(texture: THREE.Texture, wMm: number): THREE.Group {
+  const group = new THREE.Group();
+  const R = wMm / 2;
+  const geo = new THREE.SphereGeometry(R, 96, 64);
+  const pos = geo.attributes.position!, uv = geo.attributes.uv!;
+  const K = 0.92; // the printed circle reaches ~92 % of the ball's radius (the founder's print map)
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const u = (x / (R * K) + 1) / 2;
+    // the back half is printed too: mirror it so it reads correctly when the ball is turned round
+    uv.setXY(i, z >= 0 ? u : 1 - u, (y / (R * K) + 1) / 2);
+  }
+  uv.needsUpdate = true;
+  texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+  const shell = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ map: texture, roughness: 0.18, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08 }));
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  group.add(shell);
+  const chrome = new THREE.MeshStandardMaterial({ color: '#d8d8d8', metalness: 1, roughness: 0.18 });
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(R * 0.2, R * 0.22, R * 0.2, 32), chrome);
+  cap.position.y = R * 0.98;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(R * 0.06, R * 0.015, 8, 24), chrome);
+  ring.position.y = R * 1.13;
+  group.add(cap, ring);
+  const silver = new THREE.MeshStandardMaterial({ color: '#c9c9c9', metalness: 0.8, roughness: 0.35 });
+  const loop = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, R * 1.13, 0),
+    new THREE.Vector3(-R * 0.22, R * 1.6, 0),
+    new THREE.Vector3(0, R * 1.95, 0),
+    new THREE.Vector3(R * 0.22, R * 1.6, 0),
+    new THREE.Vector3(0, R * 1.13, 0),
+  ]);
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(loop, 64, 0.35, 8, true), silver));
   return centred(group);
 }
 
@@ -248,7 +310,8 @@ export function buildProduct(kind: string, texture: THREE.Texture, printWmm: num
     case 'card':
       return buildCard(texture, printWmm, printHmm);
     case 'bauble':
-      return buildBauble(texture, printWmm);
+      // two different objects (founder, 26 Oct): a one-sided ceramic disc, or a ball printed both sides
+      return attrs.size === 'plastic ball' ? buildPlasticBall(texture, printWmm) : buildCeramicOrnament(texture, printWmm);
     default:
       return null;
   }

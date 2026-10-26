@@ -116,6 +116,10 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       const fill = new THREE.DirectionalLight('#eef3f8', 0.5);
       fill.position.set(-dist, 0.2 * dist, 0.4 * dist);
       scene.add(fill);
+      // a soft rim from behind, so a turned-round back (the ceramic ornament's plain side) reads as white, not grey
+      const back = new THREE.DirectionalLight('#fffaf0', 0.9);
+      back.position.set(-0.3 * dist, 0.5 * dist, -dist);
+      scene.add(back);
 
       try {
         renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
