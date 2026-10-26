@@ -6,6 +6,7 @@ import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
+import { fillCalendarPages, isCalendarKey } from '@/lib/calendar';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -54,6 +55,9 @@ export interface PlaceLine {
   cards?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string }>;
   /** A CARD PACK line only: the pack's ONE base colour (untrusted; every card line gets it, normalised). */
   ground?: string;
+  /** A CALENDAR line only: its pages in order (0 = the cover, 1–12 = January…December); a null page
+   * is "not chosen" and is filled by repeating the chosen drawings (src/lib/calendar.ts). */
+  pages?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string } | null>;
 }
 
 export interface PlaceOrderResult {
@@ -225,9 +229,32 @@ export async function placeOrder(
   const artworkByIndex = new Map<number, PreparedArt>();
   // A card PACK line → one order line per distinct card design, at an equal share of the pack price.
   const packByIndex = new Map<number, Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }>>();
+  // A CALENDAR line → ONE order line carrying 13 artwork rows, one per print area (cover + months).
+  const calendarByIndex = new Map<number, Array<{ art: PreparedArt; printArea: string }>>();
   for (let i = 0; i < valid.length; i++) {
     const line = valid[i]!;
     const variantId = variantByKey.get(line.productKey);
+    if (isCalendarKey(line.productKey)) {
+      if (input.giftLink) throw new Error('a calendar can’t be bought through a gift link');
+      if (!variantId) throw new Error('unknown calendar');
+      // WHICH drawings go where is the client's (re-filled here, so 13 pages whatever it sent); every
+      // page passes the very same gates as any print — authz, moderation, the per-page DPI check.
+      const pages = fillCalendarPages(line.pages ?? (line.artwork ? [line.artwork] : []));
+      // ONE placement per drawing: a print file is keyed by drawing + variant (render.ts), so every
+      // page carrying the same drawing takes its first page's placement + cutout — the same checked art.
+      const byDesign = new Map<string, PreparedArt | 'too-small' | null>(); // a repeated drawing is checked once
+      const prepared: Array<{ art: PreparedArt; printArea: string }> = [];
+      for (const p of pages) {
+        const k = p.assetId;
+        if (!byDesign.has(k)) byDesign.set(k, await prepareArtwork({ assetId: p.assetId, transform: p.transform, sourceObjectId: p.sourceObjectId ?? undefined }, line.productKey, variantId));
+        const art = byDesign.get(k)!;
+        if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
+        if (!art) throw new Error('calendar has no print template');
+        prepared.push({ art, printArea: p.printArea });
+      }
+      calendarByIndex.set(i, prepared);
+      continue;
+    }
     if (isCardPackKey(line.productKey)) {
       if (input.giftLink) throw new Error('a card pack can’t be bought through a gift link');
       const packSize = packSizeOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
@@ -254,9 +281,10 @@ export async function placeOrder(
     if (prepared) artworkByIndex.set(i, prepared);
   }
 
-  const insertArtwork = async (orderItemId: string, art: PreparedArt) => {
+  const insertArtwork = async (orderItemId: string, art: PreparedArt, printArea: string | null = null) => {
     await db.insert(orderItemArtwork).values({
       orderItemId,
+      printArea, // a calendar page's area; null = the one file for the whole line
       assetId: art.assetId,
       variantId: art.variantId,
       controllerAccountId: art.controllerAccountId,
@@ -334,6 +362,8 @@ export async function placeOrder(
       .returning();
     const art = artworkByIndex.get(i);
     if (art) await insertArtwork(oi!.id, art);
+    // a calendar: its 13 pages, each frozen to its own print area (rendered + sent one file each)
+    for (const p of calendarByIndex.get(i) ?? []) await insertArtwork(oi!.id, p.art, p.printArea);
   }
 
   if (isStripeConfigured()) {

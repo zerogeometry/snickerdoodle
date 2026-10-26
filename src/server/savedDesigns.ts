@@ -10,8 +10,8 @@ import { resolveViewerContext } from './assets';
 import { keepAndFileCreations } from './keepsakes';
 
 /** Products that can be saved/gifted as a design (a card needs its buyer's own inside message; a card
- * pack is built from N drawings at the basket). */
-const NOT_SAVABLE = new Set(['card', 'cardPack']);
+ * pack is built from N drawings at the basket, a calendar from its 13 pages). */
+const NOT_SAVABLE = new Set(['card', 'cardPack', 'calendar']);
 
 export interface SaveDesignInput {
   assetId: string;

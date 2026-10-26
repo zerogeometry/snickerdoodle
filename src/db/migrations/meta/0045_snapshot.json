@@ -1,5 +1,5 @@
 {
-  "id": "894c9244-dd47-4f5a-8f8c-4674cc7fda00",
+  "id": "6eee5819-a978-4941-be67-7e06fa4fde5a",
   "prevId": "b5f7bda1-e9be-4b65-813b-be88773744df",
   "version": "7",
   "dialect": "postgresql",
@@ -1667,6 +1667,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "print_area": {
+          "name": "print_area",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "asset_id": {
           "name": "asset_id",
           "type": "uuid",
@@ -1810,6 +1816,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "artwork_item_area_unique": {
+          "name": "artwork_item_area_unique",
+          "columns": [
+            {
+              "expression": "order_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "coalesce(\"print_area\", '')",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -1893,15 +1920,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "order_item_artwork_order_item_id_unique": {
-          "name": "order_item_artwork_order_item_id_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "order_item_id"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2053,13 +2072,6 @@
         },
         "family_set_saving_pence": {
           "name": "family_set_saving_pence",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "parcel_saving_pence": {
-          "name": "parcel_saving_pence",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,

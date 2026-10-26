@@ -21,9 +21,9 @@ import { appUrl, sendMail } from './mail';
 export const GIFT_LINK_TTL_DAYS = 14;
 const DEFAULT_GIFT_PRODUCT = 'framedPrint';
 /** Products a keepsake can be shared as on a gift link: printable, on show in the shop, and
- * needing no extra buyer input (a card needs its inside message, a card pack its N drawings, so
- * neither is giftable here). */
-const NOT_GIFTABLE = new Set(['card', 'cardPack']);
+ * needing no extra buyer input (a card needs its inside message, a card pack its N drawings, a
+ * calendar its 13 pages, so none of them is giftable here). */
+const NOT_GIFTABLE = new Set(['card', 'cardPack', 'calendar']);
 
 /** A frozen line in a gift link — immutable once the link is created. */
 export interface GiftItem {

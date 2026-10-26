@@ -743,8 +743,12 @@ export const orderItemArtwork = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     orderItemId: uuid('order_item_id')
       .notNull()
-      .references(() => orderItems.id, { onDelete: 'cascade' })
-      .unique(),
+      .references(() => orderItems.id, { onDelete: 'cascade' }),
+    // The Prodigi PRINT AREA this row is the picture for, on a line that sends a DIFFERENT file per
+    // area — the dated wall calendar's 13 pages ('cover', 'january'…, src/lib/calendar.ts). Null = the
+    // one file for the whole line (every other product: it fills each area of the frozen printTo).
+    // ONE row per (line, area) — and so still exactly one row for a single-file line.
+    printArea: text('print_area'),
     // Nullable + SET NULL: once a source asset is purged (post-fulfilment, past
     // retention), the link drops but the FROZEN spec (templateSnapshot) survives
     // for the historical order line. The in-flight-order guard prevents purging a
@@ -787,7 +791,11 @@ export const orderItemArtwork = pgTable(
     providerItemId: text('provider_item_id'),
     createdAt,
   },
-  (t) => [index('artwork_asset_idx').on(t.assetId), index('artwork_status_idx').on(t.status)],
+  (t) => [
+    index('artwork_asset_idx').on(t.assetId),
+    index('artwork_status_idx').on(t.status),
+    uniqueIndex('artwork_item_area_unique').on(t.orderItemId, sql`coalesce(${t.printArea}, '')`),
+  ],
 );
 
 // ── gift_link — a shareable, ready-to-buy cart. The item snapshot is FROZEN at

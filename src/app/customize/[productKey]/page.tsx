@@ -27,6 +27,8 @@ import { CASE_GRADE_BLURB, gradesFor } from '@/lib/phone-cases';
 import { PhoneModelPicker } from '@/ui/components/PhoneModelPicker';
 import { CardPackBuilder } from '@/ui/components/CardPackBuilder';
 import { isCardPackKey } from '@/lib/card-packs';
+import { CalendarBuilder } from '@/ui/components/CalendarBuilder';
+import { isCalendarKey } from '@/lib/calendar';
 import { cachedCatalogue, loadCatalogueCached } from '@/lib/catalogueCache';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -61,7 +63,9 @@ const GROUND_NOUN: Record<string, string> = {
 /** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
 export default function CustomizePage() {
   const params = useParams<{ productKey: string }>();
-  return isCardPackKey(params.productKey) ? <CardPackBuilder /> : <CustomizeProduct />;
+  if (isCardPackKey(params.productKey)) return <CardPackBuilder />;
+  if (isCalendarKey(params.productKey)) return <CalendarBuilder />; // 13 pages: its own picker + flip-through
+  return <CustomizeProduct />;
 }
 
 /**

@@ -8,6 +8,7 @@ import { resolvePromo } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
+import { CALENDAR_PAGE_COUNT } from '@/lib/calendar';
 
 /** Never more cards than the biggest pack could hold, whatever the request says. */
 const MAX_PACK_CARDS = 20;
@@ -33,6 +34,8 @@ export async function placeOrderAction(input: {
     cards?: { assetId: string; transform: RawTransform; sourceObjectId?: string }[];
     /** A card PACK line: its one base colour (untrusted — normalised in placeOrder). */
     ground?: string;
+    /** A CALENDAR line: its pages (cover + months; null = not chosen). Re-filled + checked server-side. */
+    pages?: ({ assetId: string; transform: RawTransform; sourceObjectId?: string } | null)[];
   }[];
   gift?: boolean;
   subject?: string;
@@ -67,10 +70,21 @@ export async function placeOrderAction(input: {
           })),
         }
       : {}),
+    // Untrusted: only WHICH drawing on which page — never more than a calendar's 13; placeOrder
+    // fills the gaps and checks every page.
+    ...(Array.isArray(i.pages)
+      ? {
+          pages: i.pages.slice(0, CALENDAR_PAGE_COUNT).map((p) =>
+            p && typeof p === 'object' && typeof p.assetId === 'string'
+              ? { assetId: p.assetId, transform: p.transform ?? {}, sourceObjectId: typeof p.sourceObjectId === 'string' ? p.sourceObjectId : undefined }
+              : null,
+          ),
+        }
+      : {}),
   }));
 
   const account = await getCurrentAccount();
-  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length);
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean));
   // Personalised orders require the controlling parent — a guest signs up first.
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
@@ -80,7 +94,7 @@ export async function placeOrderAction(input: {
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
-    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId)]).filter((x): x is string => !!x))];
+    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId)]).filter((x): x is string => !!x))];
     // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
     // keep it in their keepsake box, or have it erased as soon as the order ships.
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });

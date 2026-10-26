@@ -91,6 +91,31 @@ export function resolveShippingMethod(productKeys: string[]): 'Standard' | 'Expr
   return productKeys.some((k) => k === 'phoneCase' || k.startsWith('phoneCase-')) ? 'Express' : 'Standard';
 }
 
+/**
+ * Which print file goes to which Prodigi print area, for ONE order line (its artwork rows + the
+ * FROZEN spec's `printTo`). A single-file line (every product but the calendar: one row, no
+ * printArea) fills EVERY area with its one file — 'default' for most, 'front' for garments, both
+ * 'jigsaw' + 'lid' for a jigsaw. A PER-AREA line (the dated calendar's cover + 12 months) sends each
+ * row's OWN file to its own area — and must cover exactly the areas in printTo, once each, or it is
+ * refused here (deny by default: a calendar with a missing month must never reach the printer).
+ */
+export function printAreaAssets(printTo: string[] | null | undefined, rows: Array<{ printArea: string | null; printObjectId: string }>): Array<{ printArea: string; printObjectId: string }> {
+  const areas = printTo?.length ? printTo : ['default'];
+  const perArea = rows.filter((r) => r.printArea !== null);
+  if (perArea.length === 0) {
+    if (rows.length !== 1) throw new Error(`a single-file line has ${rows.length} print files`);
+    return areas.map((printArea) => ({ printArea, printObjectId: rows[0]!.printObjectId }));
+  }
+  if (perArea.length !== rows.length) throw new Error('a line mixes a single file with per-area files');
+  const byArea = new Map(perArea.map((r) => [r.printArea!, r.printObjectId]));
+  const missing = areas.filter((a) => !byArea.has(a));
+  const extra = [...byArea.keys()].filter((a) => !areas.includes(a));
+  if (byArea.size !== perArea.length || missing.length || extra.length) {
+    throw new Error(`print areas don’t match the product (missing: ${missing.join(', ') || 'none'}; unexpected: ${extra.join(', ') || 'none'})`);
+  }
+  return areas.map((printArea) => ({ printArea, printObjectId: byArea.get(printArea)! }));
+}
+
 /** Is this frozen line spec fulfilled by Prodigi? (Legacy specs lack `provider`; for
  * those a providerSku is the best signal.) */
 function isProdigiLine(spec: LineSpec): boolean {
@@ -245,6 +270,7 @@ async function submitOne(
       renderError: orderItemArtwork.renderError,
       printObjectId: orderItemArtwork.printObjectId,
       assetId: orderItemArtwork.assetId,
+      printArea: orderItemArtwork.printArea,
     })
     .from(orderItems)
     .leftJoin(orderItemArtwork, eq(orderItemArtwork.orderItemId, orderItems.id))
@@ -360,6 +386,23 @@ async function submitOne(
     return { ref: order.ref, status: 'failed', note: 'no shipping address' };
   }
 
+  // ONE Prodigi item per order line, whatever its artwork rows: a calendar's 13 pages are one item
+  // with 13 assets. Its print areas are checked BEFORE the claim — a mismatch is a permanent refusal.
+  const byItem = new Map<string, typeof fulfillable>();
+  for (const l of fulfillable) byItem.set(l.itemId, [...(byItem.get(l.itemId) ?? []), l]);
+  const itemAssets = new Map<string, Array<{ printArea: string; printObjectId: string }>>();
+  try {
+    for (const [itemId, rows] of byItem) {
+      const cfg = ((rows[0]!.spec as NonNullable<LineSpec>).providerConfig ?? null) as { printTo?: string[] } | null;
+      itemAssets.set(itemId, printAreaAssets(cfg?.printTo, rows.map((r) => ({ printArea: r.printArea, printObjectId: r.printObjectId! }))));
+    }
+  } catch (e) {
+    const msg = redactUrls((e as Error).message).slice(0, 500);
+    summary.failed++;
+    await parkFailure(db, order.id, order.submitAttempts, msg, 'permanent');
+    return { ref: order.ref, status: 'failed', note: msg };
+  }
+
   const shippingMethod = resolveShippingMethod(fulfillable.map((l) => l.productKey));
 
   // CLAIM: PAID → FULFILLING (stamped), guarded on the current status so overlapping
@@ -383,14 +426,23 @@ async function submitOne(
     const keyByObjectId = new Map(objectRows.map((o) => [o.id, o.key]));
 
     const items: CreateOrderRequest['items'] = [];
-    for (const l of fulfillable) {
-      const key = keyByObjectId.get(l.printObjectId!);
-      if (!key) throw new Error(`print object ${l.printObjectId} has no storage key`);
+    for (const [itemId, rows] of byItem) {
+      const l = rows[0]!;
       const spec = l.spec as NonNullable<LineSpec>;
       const cfg = (spec.providerConfig ?? null) as { prodigiAttrs?: Record<string, string>; printTo?: string[] } | null;
-      const url = await presignProviderIngest(key);
+      // one URL per distinct print file (a single-file line's one file may fill several areas)
+      const urlByObject = new Map<string, string>();
+      const assets: Array<{ printArea: string; url: string }> = [];
+      for (const a of itemAssets.get(itemId)!) {
+        if (!urlByObject.has(a.printObjectId)) {
+          const key = keyByObjectId.get(a.printObjectId);
+          if (!key) throw new Error(`print object ${a.printObjectId} has no storage key`);
+          urlByObject.set(a.printObjectId, await presignProviderIngest(key));
+        }
+        assets.push({ printArea: a.printArea, url: urlByObject.get(a.printObjectId)! });
+      }
       items.push({
-        merchantReference: l.itemId,
+        merchantReference: itemId,
         sku: spec.providerSku!,
         copies: l.qty,
         // The print file IS the full bleed canvas (renderer output) — fill exactly.
@@ -400,8 +452,9 @@ async function submitOne(
         // most (incl. the DUAL cushions' one 2:1 double-wide area — DUAL-CUSHION-fulfilment.md),
         // 'front' for the garments, and BOTH 'jigsaw' + 'lid' for a jigsaw (same picture; Prodigi
         // fills each). Re-verified for every SKU against the sandbox product specs, 2026-10-15; the
-        // catalogue sync warns if a SKU gains a required area we don't fill.
-        assets: (cfg?.printTo?.length ? cfg.printTo : ['default']).map((printArea) => ({ printArea, url })),
+        // catalogue sync warns if a SKU gains a required area we don't fill. The dated CALENDAR sends
+        // a DIFFERENT file to each of its 13 areas (cover + months) — printAreaAssets above.
+        assets,
       });
     }
 
