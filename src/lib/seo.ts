@@ -21,8 +21,7 @@ export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: 'w
   { path: '/help', priority: 0.7, changeFrequency: 'monthly' },
   { path: '/how-it-works', priority: 0.8, changeFrequency: 'monthly' },
   { path: '/gifts', priority: 0.8, changeFrequency: 'monthly' },
-  // Christmas (D24): evergreen URLs — never /christmas-2026 — so the pages gain age year on year
-  { path: '/christmas', priority: 0.9, changeFrequency: 'weekly' },
+  // Christmas (D24): an evergreen URL — never /christmas-2026 — so the page gains age year on year
   { path: '/christmas/delivery-dates', priority: 0.7, changeFrequency: 'weekly' },
   { path: '/our-story', priority: 0.6, changeFrequency: 'yearly' },
   { path: '/trust/family-promise', priority: 0.6, changeFrequency: 'yearly' },

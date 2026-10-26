@@ -153,7 +153,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'christmas-bauble',
         q: 'Can I turn my child’s drawing into a Christmas bauble?',
-        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof plastic ball printed all the way round. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; [see the Christmas range](/christmas).',
+        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof plastic ball printed all the way round. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; see [how it works](/how-it-works).',
       },
       {
         id: 'christmas-grandparents',

@@ -42,11 +42,12 @@ const STEPS: Step[] = [
 
 const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)', 'rgb(246 196 69 / .8)'];
 
-/** The Christmas shelf under the hero, in season (D24): three placeholder photos into /christmas. */
+/** The Christmas shelf under the hero, in season (D24): three placeholder photos, each straight into the
+ * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough). */
 const XMAS_SHELF = [
-  { src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s bauble', alt: 'A ceramic bauble printed with a child’s crayon snowman' },
-  { src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
-  { src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
+  { key: 'bauble', src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s bauble', alt: 'A ceramic bauble printed with a child’s crayon snowman' },
+  { key: 'wrappingPaper', src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
+  { key: 'sack', src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
 ];
 
 export default function LandingPage() {
@@ -106,13 +107,7 @@ export default function LandingPage() {
                 <Button href="/start-creating" size="lg" attention>
                   start creating
                 </Button>
-                {christmas ? (
-                  <Button href="/christmas" variant="secondary" size="lg">
-                    the christmas range
-                  </Button>
-                ) : (
-                  <DesignFromScratch />
-                )}
+                <DesignFromScratch />
               </div>
               <TrustLine className="mt-6">everything you make is yours</TrustLine>
             </div>
@@ -122,7 +117,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Christmas shelf (in season only) — three taped snapshots into /christmas */}
+      {/* Christmas shelf (in season only) — three taped snapshots into the create flow */}
       {christmas ? (
         <section className="relative bg-honey-band px-6 py-12 md:py-16" aria-labelledby="xmas-shelf">
           <div className="relative z-10 mx-auto max-w-6xl">
@@ -133,7 +128,7 @@ export default function LandingPage() {
               {XMAS_SHELF.map((it, i) => (
                 <li key={it.label}>
                   <Link
-                    href="/christmas"
+                    href={`/start-creating?for=${it.key}`}
                     className="polaroid tape lift block text-center"
                     style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
                   >
@@ -146,8 +141,8 @@ export default function LandingPage() {
               ))}
             </ul>
             <div className="mt-8 text-center">
-              <Button href="/christmas" size="lg">
-                see the christmas range
+              <Button href="/start-creating" size="lg">
+                start creating
               </Button>
             </div>
           </div>

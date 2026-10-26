@@ -96,8 +96,8 @@ export default function DeliveryDatesPage() {
         <Button href="/start-creating" size="lg">
           start creating
         </Button>
-        <Link href="/christmas" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-cinnamon underline underline-offset-2">
-          <Icon icon={IconChristmasTree} size={16} /> the christmas range
+        <Link href="/" className="inline-flex min-h-11 items-center gap-1.5 font-bold text-cinnamon underline underline-offset-2">
+          <Icon icon={IconChristmasTree} size={16} /> back to the shop
         </Link>
       </div>
     </div>
