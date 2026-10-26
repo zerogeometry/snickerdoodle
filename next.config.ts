@@ -11,8 +11,8 @@ const nextConfig: NextConfig = {
   // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
   // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
   serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
-  // Security headers (CSP, app/gift noindex) are layered in with the trust-spine
-  // and gift-link surfaces; marketing stays indexable.
+  // noindex: set by src/middleware.ts for every path outside the public list in
+  // src/lib/indexing.ts (marketing/trust/shop front stay indexable).
   experimental: {
     // Drawings/photos are uploaded to the ingest server action as FormData. The
     // default Server Actions body limit is 1MB — far too small for real phone
