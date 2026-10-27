@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "metrics": "node --env-file=.env scripts/gtm-metrics.mjs"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
