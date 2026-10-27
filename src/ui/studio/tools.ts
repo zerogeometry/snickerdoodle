@@ -13,11 +13,12 @@ import {
   IconPencil,
   IconStack2,
   IconShape,
+  IconSticker,
   IconTypography,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'stickers' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -109,6 +110,16 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'P',
     info: 'Draw on top with a finger, mouse or stylus — pressing harder with a stylus makes a thicker line. Turn on “stylus only” so a resting hand doesn’t leave marks.',
+  },
+  {
+    id: 'stickers',
+    group: 'add',
+    hint: 'tap a sticker to add it — or frame the whole thing in gold.',
+    label: 'stickers',
+    icon: IconSticker,
+    kind: 'mode',
+    key: 'S',
+    info: 'Hearts, stars, suns, rainbows and more — chunky little stickers to pop on. Drag one to move it, use the corner to resize. Or frame the whole design in gold.',
   },
   {
     id: 'shapes',

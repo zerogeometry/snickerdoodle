@@ -1,5 +1,6 @@
 import { CARD_FONTS, type CardFontToken } from '@/lib/card-fonts';
 import { cleanTexture, type TextureKind } from '@/lib/textures';
+import { STICKER_KINDS, type StickerKind } from '@/lib/studio-stickers';
 
 /**
  * The Studio's added things — text, shapes and pen strokes — as VECTOR objects in the recipe.
@@ -63,7 +64,21 @@ export interface StrokeObject extends LayerLook {
   /** How far it's been turned (degrees). The points already ARE turned — this is the dial's reading. */
   rotation?: number;
 }
-export type StudioObject = TextObject | ShapeObject | StrokeObject;
+/** A brand doodle sticker (src/lib/studio-stickers.ts), placed like a shape. */
+export interface StickerObject extends LayerLook {
+  id: string;
+  type: 'sticker';
+  sticker: StickerKind;
+  x: number;
+  y: number;
+  /** Width / height as fractions of S. */
+  w: number;
+  h: number;
+  rotation: number;
+  /** Stickers are printed as drawn (always smooth). */
+  texture: 'smooth';
+}
+export type StudioObject = TextObject | ShapeObject | StrokeObject | StickerObject;
 
 /** Shape outlines on a 100×100 box — drawn by Path2D in the browser and by SVG on the server. */
 export const SHAPE_PATHS: Record<ShapeKind, string> = {
@@ -131,6 +146,10 @@ export function cleanObjects(raw: unknown): StudioObject[] {
         id: id(r.id), type: 'shape', shape, fill: colour(r.fill, '#f6c445'), stroke: colour(r.stroke), strokeWidth: num(r.strokeWidth, 0, MAX_SHAPE_STROKE, legacy),
         x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, 2, 0.2), h: num(r.h, 0.01, 2, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture), ...layerLook(r),
       });
+    } else if (r.type === 'sticker') {
+      const sticker = STICKER_KINDS.includes(r.sticker as StickerKind) ? (r.sticker as StickerKind) : null;
+      if (!sticker) continue;
+      out.push({ id: id(r.id), type: 'sticker', sticker, x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.02, 2, 0.25), h: num(r.h, 0.02, 2, 0.25), rotation: num(r.rotation, -360, 360, 0), texture: 'smooth', ...layerLook(r) });
     } else if (r.type === 'stroke') {
       if (!Array.isArray(r.points)) continue;
       const pts = (r.points as unknown[]).slice(0, MAX_STROKE_POINTS * 3).map((n, i) => (i % 3 === 2 ? num(n, 0, 1, 0.5) : num(n, -0.5, 1.5, 0)));

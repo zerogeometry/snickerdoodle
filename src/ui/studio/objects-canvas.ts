@@ -1,5 +1,6 @@
 import { cardFontCss } from '@/lib/card-fonts';
 import { SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { stickerDataUrl, type StickerKind } from '@/lib/studio-stickers';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { normAngle } from '@/lib/studio-geometry';
 
@@ -21,6 +22,19 @@ const shapePath = (k: ShapeObject['shape']) => {
   if (!p) pathCache.set(k, (p = new Path2D(SHAPE_PATHS[k])));
   return p;
 };
+
+const stickerImgs = new Map<StickerKind, HTMLImageElement>();
+/** The sticker's picture (the same SVG the print uses). Resolves once it can be drawn. */
+export function stickerImage(k: StickerKind): HTMLImageElement {
+  let img = stickerImgs.get(k);
+  if (!img) {
+    img = new Image(512, 512);
+    img.src = stickerDataUrl(k);
+    stickerImgs.set(k, img);
+  }
+  return img;
+}
+export const stickersReady = (kinds: readonly StickerKind[]) => Promise.all(kinds.map((k) => stickerImage(k).decode().catch(() => null)));
 
 /** A box in geometry px: centre, size, rotation (deg). */
 export interface Box {
@@ -56,7 +70,7 @@ function strokeBounds(o: StrokeObject, f: Frame): Box {
 
 export function boxOf(o: StudioObject, f: Frame): Box {
   if (o.type === 'stroke') return strokeBounds(o, f);
-  if (o.type === 'shape') return { cx: o.x * f.gw, cy: o.y * f.gh, w: o.w * S(f), h: o.h * S(f), rotation: o.rotation };
+  if (o.type === 'shape' || o.type === 'sticker') return { cx: o.x * f.gw, cy: o.y * f.gh, w: o.w * S(f), h: o.h * S(f), rotation: o.rotation };
   const m = textMetrics(o, f);
   return { cx: o.x * f.gw, cy: o.y * f.gh, w: m.w, h: m.h, rotation: o.rotation };
 }
@@ -80,7 +94,11 @@ export function drawObject(ctx: CanvasRenderingContext2D, o: StudioObject, f: Fr
   ctx.save();
   ctx.translate(o.x * f.gw, o.y * f.gh);
   ctx.rotate((o.rotation * Math.PI) / 180);
-  if (o.type === 'shape') {
+  if (o.type === 'sticker') {
+    const w = o.w * S(f), h = o.h * S(f);
+    const img = stickerImage(o.sticker);
+    if (img.complete) ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  } else if (o.type === 'shape') {
     const w = o.w * S(f), h = o.h * S(f);
     ctx.translate(-w / 2, -h / 2);
     ctx.scale(w / 100, h / 100);
@@ -172,7 +190,7 @@ export function turnObject(o: StudioObject, f: Frame, to: number): StudioObject 
 export function scaleObject(o: StudioObject, f: Frame, k: number): StudioObject {
   k = Math.max(0.05, Math.min(20, k));
   if (o.type === 'text') return { ...o, size: Math.min(1, Math.max(0.01, o.size * k)) };
-  if (o.type === 'shape') return { ...o, w: Math.min(2, Math.max(0.01, o.w * k)), h: Math.min(2, Math.max(0.01, o.h * k)) };
+  if (o.type === 'shape' || o.type === 'sticker') return { ...o, w: Math.min(2, Math.max(0.02, o.w * k)), h: Math.min(2, Math.max(0.02, o.h * k)) };
   const b = strokeBounds(o, f);
   const p = o.points.slice();
   for (let i = 0; i < p.length; i += 3) {

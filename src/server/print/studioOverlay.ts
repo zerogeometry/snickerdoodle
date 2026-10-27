@@ -4,6 +4,7 @@ import { Resvg } from '@resvg/resvg-js';
 import sharp, { type OverlayOptions } from 'sharp';
 import { layerAlpha, SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StudioObject } from '@/lib/studio-objects';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
+import { stickerSvg } from '@/lib/studio-stickers';
 import { loadCardFontWoff } from './cardFonts';
 
 /**
@@ -33,6 +34,13 @@ export async function renderStudioObjects(
     let cx = 0, cy = 0;
     if (o.type === 'text') {
       png = await renderText(o.text, o.font, o.colour, Math.max(4, o.size * S));
+      [cx, cy] = toPx(o.x, o.y);
+      if (o.rotation) png = await rotate(png, o.rotation);
+    } else if (o.type === 'sticker') {
+      // the same SVG the browser draws, rendered at its final pixel size
+      const w = Math.max(2, Math.round(o.w * S)), h = Math.max(2, Math.round(o.h * S));
+      png = Buffer.from(new Resvg(stickerSvg(o.sticker, Math.max(w, h)), { fitTo: { mode: 'width', value: w } }).render().asPng());
+      if (h !== w) png = await sharp(png).resize(w, h, { fit: 'fill' }).png().toBuffer();
       [cx, cy] = toPx(o.x, o.y);
       if (o.rotation) png = await rotate(png, o.rotation);
     } else if (o.type === 'shape') {

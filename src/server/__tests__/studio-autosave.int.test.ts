@@ -126,4 +126,19 @@ describe.skipIf(!DB || !S3)('studio autosave', () => {
     expect(await at(40, 50)).toEqual([255, 255, 255, 255]); // hidden: just the background prints
     expect((await studioStateForAsset(db, sam, a.assetId)).drawing).toEqual({ hidden: true });
   });
+
+  it('framed in gold: the frame prints round the cropped design and reopens; a sticker reopens as a sticker', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const moderation: ModerationProviders = { hash: { isKnownIllegal: async () => false }, classifier: { classify: async () => ({ flagged: false, labels: [] }) }, textReader: { read: async () => [] } };
+    const objects = [{ id: 's', type: 'sticker', sticker: 'star', x: 0.7, y: 0.5, w: 0.3, h: 0.3, rotation: 0 }];
+    await saveStudio(db, sam, a.assetId, { mask: null, geometry: { ...IDENTITY_GEOMETRY, crop: { x: 0.1, y: 0, w: 0.8, h: 1 } }, objects, frame: 'gold' }, { moderation });
+    const { data, info } = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const at = (x: number, y: number) => [...data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 3)];
+    expect(at(0, Math.round(info.height / 2))).toEqual([43, 33, 24]); // ink edge of the frame
+    expect(at(Math.round(info.width / 2), Math.round(info.height * 0.06 * 0.25))).toEqual([246, 196, 69]); // the honey band
+    const st = await studioStateForAsset(db, sam, a.assetId);
+    expect(st.frame).toBe('gold');
+    expect(st.objects).toMatchObject([{ type: 'sticker', sticker: 'star' }]);
+  });
 });

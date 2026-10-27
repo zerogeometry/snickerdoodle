@@ -31,7 +31,8 @@ import { applyLook, IDENTITY_LOOK, lookIsIdentity, type StudioLook } from '@/lib
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
-import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
+import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, stickersReady, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
+import { framePieces, STICKER_KINDS, type FrameKind, type StickerKind } from '@/lib/studio-stickers';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS } from '@/lib/card-fonts';
 import { flipObjects, layerAlpha, type LayerLook, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
@@ -72,10 +73,11 @@ interface Snapshot {
   keepWhite: boolean;
   look: StudioLook;
   drawingLayer: LayerLook;
+  frame: FrameKind | null;
 }
-const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
+const ADDING: ToolId[] = ['draw', 'text', 'stickers', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
-const EDITING: ToolId[] = ['text', 'shapes', 'select'];
+const EDITING: ToolId[] = ['text', 'stickers', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
 const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
@@ -111,6 +113,8 @@ export default function StudioPage() {
   const [look, setLook] = useState<StudioLook>(IDENTITY_LOOK);
   // the drawing's own layer: shown / hidden, and how solid
   const [drawingLayer, setDrawingLayer] = useState<LayerLook>({});
+  // a frame round the whole design ("framed in gold")
+  const [frame, setFrame] = useState<FrameKind | null>(null);
   const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
@@ -222,6 +226,7 @@ export default function StudioPage() {
           setObjects(st.objects);
           if (st.look) setLook(st.look);
           if (st.drawing) setDrawingLayer(st.drawing);
+          if (st.frame) setFrame(st.frame);
           if (st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
@@ -248,6 +253,7 @@ export default function StudioPage() {
   // canvas text needs the card fonts loaded first
   useEffect(() => {
     void Promise.all(CARD_FONTS.map((f) => document.fonts.load(`40px ${f.css}`).catch(() => null))).then(() => setTick((t) => t + 1));
+    void stickersReady(STICKER_KINDS).then(() => setTick((t) => t + 1));
   }, []);
 
   // ── stage size ──
@@ -356,6 +362,16 @@ export default function StudioPage() {
       for (const o of objects) drawTextured(ctx, { texture: o.texture, draw: (c) => drawObject(c, o, f) }, f, M, content, layerAlpha(o));
       const live = liveStroke.current;
       if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content, pen.opacity);
+      // the frame sits on top of everything, round the (cropped) design — as the print draws it
+      if (frame && !cropping) {
+        ctx.save();
+        ctx.setTransform(M);
+        for (const r of framePieces(frame, content.w, content.h)) {
+          ctx.fillStyle = r.fill;
+          ctx.fillRect(content.x + r.x, content.y + r.y, r.w, r.h);
+        }
+        ctx.restore();
+      }
 
       // selection: dashed box, corner resize handle, top turn handle (screen space)
       const selB = tool && EDITING.includes(tool) ? selectedBox(f) : null;
@@ -413,7 +429,7 @@ export default function StudioPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, look, drawingLayer]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, look, drawingLayer, frame]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
   const drawingBox = (f: Frame, g: Geometry = geo): Box => {
@@ -429,7 +445,7 @@ export default function StudioPage() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLayer });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLayer, frame });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -446,6 +462,7 @@ export default function StudioPage() {
     setKeepWhite(s.keepWhite);
     setLook(s.look);
     setDrawingLayer(s.drawingLayer);
+    setFrame(s.frame);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -567,7 +584,7 @@ export default function StudioPage() {
         }
       }
       const slop = 10 / viewMatrix(geo).a;
-      const hit = [...objects].reverse().find((o) => !o.hidden && (tool === 'text' ? o.type === 'text' : tool === 'shapes' ? o.type === 'shape' : true) && hits(o, f, gx, gy, slop));
+      const hit = [...objects].reverse().find((o) => !o.hidden && (tool === 'text' ? o.type === 'text' : tool === 'shapes' ? o.type === 'shape' : tool === 'stickers' ? o.type === 'sticker' : true) && hits(o, f, gx, gy, slop));
       if (hit) {
         setSelectedId(hit.id);
         pushUndo();
@@ -828,7 +845,7 @@ export default function StudioPage() {
 
   const onTool = (id: ToolId) => {
     // keep the selection only where it can still be edited
-    if (selected && !(id === 'select' || (id === 'text' && selected.type === 'text') || (id === 'shapes' && selected.type === 'shape'))) setSelectedId(null);
+    if (selected && !(id === 'select' || (id === 'text' && selected.type === 'text') || (id === 'shapes' && selected.type === 'shape') || (id === 'stickers' && selected.type === 'sticker'))) setSelectedId(null);
     if (id === 'startAgain') return setConfirmStart(true);
     setTool((t) => (t === id ? null : id));
     if (id === 'removeBg' && !hadCutout && !busy) void runRemoveBg(keepWhite);
@@ -846,6 +863,7 @@ export default function StudioPage() {
     setKeepWhite(false);
     setLook(IDENTITY_LOOK);
     setDrawingLayer({});
+    setFrame(null);
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -863,7 +881,7 @@ export default function StudioPage() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -893,7 +911,7 @@ export default function StudioPage() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -917,7 +935,7 @@ export default function StudioPage() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, look, drawingLayer, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, drawingLayer, frame, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -968,6 +986,22 @@ export default function StudioPage() {
     [next[i], next[j]] = [next[j]!, next[i]!];
     setObjects(next);
   };
+  const addSticker = (sticker: StickerKind) => {
+    if (!workRef.current) return;
+    pushUndo();
+    // in the middle of what's on screen, a little scattered so a few in a row don't stack exactly
+    const [cxG, cyG] = toGeoSpace(stageSize.w / 2, stageSize.h / 2);
+    const [gw, gh] = rotatedSize(workRef.current.w, workRef.current.h, geo.rotate);
+    const jitter = () => (Math.random() - 0.5) * 0.12;
+    const o: StudioObject = { id: newId(), type: 'sticker', sticker, x: cxG / gw + jitter(), y: cyG / gh + jitter(), w: 0.22, h: 0.22, rotation: Math.round((Math.random() - 0.5) * 16), texture: 'smooth' };
+    setObjects((os) => [...os, o]);
+    setSelectedId(o.id);
+  };
+  const changeFrame = (f: FrameKind | null) => {
+    if (f === frame) return;
+    pushUndo();
+    setFrame(f);
+  };
   const addShape = (shape: ShapeKind) => {
     if (!workRef.current) return;
     pushUndo();
@@ -1014,7 +1048,7 @@ export default function StudioPage() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { s: 'stickers', a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1109,6 +1143,9 @@ export default function StudioPage() {
       onTurn={turnSelected}
       onUpdate={updateSelected}
       onAddShape={addShape}
+      onAddSticker={addSticker}
+      frame={frame}
+      onFrame={changeFrame}
       onDelete={deleteSelected}
       onDuplicate={duplicateSelected}
       onForward={() => reorder(1)}

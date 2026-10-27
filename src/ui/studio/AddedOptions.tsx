@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
 import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
+import { STICKER_KINDS, stickerDataUrl, type FrameKind, type StickerKind } from '@/lib/studio-stickers';
 import type { Placement } from '@/lib/studio-geometry';
 import { Icon } from '@/ui/primitives/Icon';
 import { ColourPicker } from './ColourPicker';
@@ -75,6 +76,10 @@ export function AddedOptions(p: {
   onTurn: (deg: number, group?: boolean) => void;
   onUpdate: (patch: Partial<StudioObject>, group?: boolean) => void;
   onAddShape: (k: ShapeKind) => void;
+  onAddSticker: (k: StickerKind) => void;
+  /** The design's frame (null = none). */
+  frame: FrameKind | null;
+  onFrame: (f: FrameKind | null) => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onForward: () => void;
@@ -131,6 +136,15 @@ export function AddedOptions(p: {
           <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
           <OpacitySection value={o.opacity ?? 1} onChange={(opacity) => p.onUpdate({ opacity }, true)} />
           <AngleControl angle={o.rotation} onAngle={p.onTurn} what="the words" />
+        </Stack>
+      );
+    }
+    if (o.type === 'sticker') {
+      return (
+        <Stack>
+          <Section>{actions}</Section>
+          <OpacitySection value={o.opacity ?? 1} onChange={(opacity) => p.onUpdate({ opacity }, true)} />
+          <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${o.sticker}`} />
         </Stack>
       );
     }
@@ -231,6 +245,46 @@ export function AddedOptions(p: {
     );
   }
 
+  if (tool === 'stickers') {
+    return (
+      <Stack>
+        {selected?.type === 'sticker' ? (
+          <Section
+            label={`editing · ${layerName(selected)}`}
+            aside={
+              <button type="button" onClick={() => p.onSelect(null)} className="min-h-11 px-1 text-[11px] font-bold text-cinnamon">
+                done
+              </button>
+            }
+          >
+            {editor(selected)}
+          </Section>
+        ) : null}
+        <Section label={selected?.type === 'sticker' ? 'add another' : 'add a sticker'}>
+          <div className="grid grid-cols-3 gap-1.5" role="group" aria-label="stickers">
+            {STICKER_KINDS.map((k) => (
+              <button key={k} type="button" aria-label={`add a ${k} sticker`} onClick={() => p.onAddSticker(k)} className="press wiggle flex h-16 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper-2 hover:border-cocoa">
+                <img src={stickerDataUrl(k, 96)} alt="" className="h-12 w-12" draggable={false} />
+              </button>
+            ))}
+          </div>
+        </Section>
+        <Section label="frame it">
+          <Segmented
+            label="frame"
+            value={p.frame ?? 'none'}
+            onChange={(v) => p.onFrame(v === 'none' ? null : (v as FrameKind))}
+            options={[
+              { value: 'none', label: 'no frame' },
+              { value: 'gold', label: <><span aria-hidden className="inline-block h-3.5 w-3.5 rounded-[3px] border-2 border-cocoa bg-honey" /> framed in gold</> },
+            ]}
+          />
+          <p className="text-[11px] text-ink-soft">a chunky gold border round the whole design — the wonky bits included.</p>
+        </Section>
+      </Stack>
+    );
+  }
+
   // add text
   if (selected?.type === 'text') return editor(selected);
   return (
@@ -304,7 +358,7 @@ const TextureSection = (p: { value: TextureKind; colour: string; onChange: (t: T
 );
 
 export const layerName = (o: StudioObject) =>
-  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? o.shape : 'pen line';
+  o.type === 'text' ? `“${o.text.split('\n')[0]!.slice(0, 22)}${o.text.length > 22 ? '…' : ''}”` : o.type === 'shape' ? o.shape : o.type === 'sticker' ? `${o.sticker} sticker` : 'pen line';
 
 /** Every added thing as its own layer, top first; the drawing itself is the locked bottom layer. */
 function LayersList({
@@ -337,7 +391,9 @@ function LayersList({
                 className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 px-2.5 text-left text-xs font-bold ${on ? 'border-cocoa bg-honey-band text-cocoa' : 'border-cocoa/15 bg-paper text-cocoa hover:border-cocoa/50'} ${o.hidden ? 'opacity-60' : ''}`}
               >
                 <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cocoa/20 bg-paper-2">
-                  {o.type === 'shape' ? (
+                  {o.type === 'sticker' ? (
+                    <img src={stickerDataUrl(o.sticker, 48)} alt="" className="h-6 w-6" draggable={false} />
+                  ) : o.type === 'shape' ? (
                     <svg viewBox="-10 -10 120 120" className="h-5 w-5">
                       <path d={SHAPE_PATHS[o.shape]} fill={o.fill} fillRule="evenodd" stroke={o.strokeWidth > 0 ? o.stroke : 'none'} strokeWidth={Math.max(4, o.strokeWidth * 100)} />
                     </svg>
