@@ -1,7 +1,7 @@
 'use client';
 
 import { IconHomeHeart, IconLock, IconShieldCheck, IconTrash, IconUser, IconUsers } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
@@ -89,6 +89,7 @@ export function PerAssetVisibilityModal({
   onSave,
   onDelete,
   people = [],
+  extra,
 }: {
   open: boolean;
   name: string;
@@ -100,6 +101,8 @@ export function PerAssetVisibilityModal({
   onDelete?: () => void;
   /** The family's OTHER members (not the viewer) — drives the real "who's included". */
   people?: VisibilityPerson[];
+  /** Anything else this keepsake can do here (e.g. the Studio's "make a copy"), above delete. */
+  extra?: ReactNode;
 }) {
   const [tier, setTier] = useState<Tier>(initialTier);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -182,6 +185,7 @@ export function PerAssetVisibilityModal({
           New keepsakes start as <b>Family</b>. Widen to Extended any time — nothing is ever public.
         </span>
       </p>
+      {extra ? <div className="mt-3 border-t border-line pt-3">{extra}</div> : null}
       {onDelete ? (
         <div className="mt-3 border-t border-line pt-3">
           <button

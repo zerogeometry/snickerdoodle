@@ -24,7 +24,7 @@ import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store'
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
-import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
+import { deleteCreationAction, duplicateCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
 import { LookPanel } from '@/ui/studio/LookPanel';
@@ -216,6 +216,22 @@ function StudioEditor() {
     const r = await setAssetVisibilityAction(assetId, tier);
     toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
     await refreshInfo(assetId);
+  };
+  /** Branch a new edit: the server copies this keepsake (recipe + original); we carry on in the copy. */
+  const duplicate = async () => {
+    if (!assetId) return;
+    if (pendingRef.current && !(await autosave())) return toast('that didn’t save — try again');
+    setBusy('making a copy…');
+    const r = await duplicateCreationAction({ assetId });
+    setBusy(null);
+    if (!r.ok) return toast('couldn’t make a copy — try again');
+    // the copy is its own keepsake: its own (trimmed) drawing, and no design until "done" makes one
+    useUpload.setState((s) => (s.upload ? { upload: { ...s.upload, assetId: r.assetId, trim: r.trim ?? undefined, cutout: r.trim ? { ...r.trim, trim: true } : undefined } } : {}));
+    setLocalAssetId(r.assetId);
+    setMaskInProgress(hadCutout ? r.assetId : null); // its copied cut-out is the one in use here
+    setDirty(true); // the copy's design is made on "done"
+    setSaveState('saved');
+    toast('a copy to play with — the first one’s kept just as it was');
   };
   const deleteCreation = async () => {
     if (!assetId) return;
@@ -1250,7 +1266,7 @@ function StudioEditor() {
   }
 
   // who can see it + delete it for good (one pill: in the phone's glass column, top-left on bigger screens)
-  const keepsakePill = <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} />;
+  const keepsakePill = <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} onDuplicate={duplicate} />;
 
   const disabled: Partial<Record<ToolId, string>> = {};
   if (!transparent && !geo.background) disabled.background = 'remove the background first';

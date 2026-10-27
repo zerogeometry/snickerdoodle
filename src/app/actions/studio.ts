@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getDb } from '@/db/client';
-import { resolveAssetViewer } from '@/server/assets';
-import { deleteStudioCreation, studioKeepsakeInfo, type StudioKeepsakeInfo } from '@/server/studio-manage';
+import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
+import { deleteStudioCreation, duplicateCreation, studioKeepsakeInfo, type StudioKeepsakeInfo } from '@/server/studio-manage';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 
 async function viewerFor(assetId: string) {
@@ -39,4 +39,19 @@ export async function deleteCreationAction(input: { assetId: string }): Promise<
   }
   revalidatePath('/home');
   return { ok: true };
+}
+
+/** A copy of this keepsake to try something else on — the first one stays just as it is. */
+export async function duplicateCreationAction(input: { assetId: string }): Promise<{ ok: true; assetId: string; trim: { url: string; sourceObjectId: string } | null } | { ok: false }> {
+  const assetId = String(input.assetId);
+  const { db, viewer } = await viewerFor(assetId);
+  try {
+    const res = await duplicateCreation(db, viewer, assetId);
+    revalidatePath('/home');
+    // a trimmed upload: the copy's own trimmed drawing (what its products are made from), via the gate
+    const trim = res.trimmedObjectId ? { url: (await getStorageObjectGrant(db, res.trimmedObjectId, viewer, 600)).url, sourceObjectId: res.trimmedObjectId } : null;
+    return { ok: true, assetId: res.assetId, trim };
+  } catch {
+    return { ok: false };
+  }
 }
