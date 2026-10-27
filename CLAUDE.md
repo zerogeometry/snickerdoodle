@@ -174,7 +174,12 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - dev: (added with the Next.js app shell) · test: `npm test` (watch: `npm run test:watch`)
 - typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (added later) ·
   visual diff: `npm run test:visual` (added later) · db: `npm run db:*` (added later) ·
-  jobs: `npm run jobs` (added later) · lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
+  lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
+- jobs: `npm run jobs` runs the /api/jobs/* schedule against APP_URL (or JOBS_BASE_URL) with
+  JOBS_SECRET; `npm run jobs -- --once <job>` runs one (exit 1 on failure); `-- --list` shows
+  them. The schedule lives ONLY in `scripts/jobs/core.mjs`; on the box it becomes systemd timers.
+- Launch home (D18): `infra/README.md` is the go-live runbook (CloudFormation in `infra/aws/`,
+  the Lightsail box in `infra/lightsail/`). Job routes are closed to the internet there.
 - Integration suites (`*.int.test.ts`) skip themselves without `DATABASE_URL` + `S3_ENDPOINT`: run
   `docker compose up -d && npm run db:migrate` first. CI (`.github/workflows/ci.yml`) runs them all.
 
