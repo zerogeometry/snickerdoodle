@@ -5,6 +5,7 @@ import { getDb } from '@/db/client';
 import { ingestEphemeralUpload } from '@/server/ingest';
 import { RETENTION_DAYS } from '@/server/retention';
 import { UPLOAD_CLAIM_COOKIE, appendClaim, signClaims, verifyClaims } from '@/server/uploadClaims';
+import { allowVisitor } from '@/server/rateLimit';
 
 /** The terms version a guest accepts at the upload moment. Bump on any change so
  * the recorded consent always points at the exact terms that were shown. */
@@ -21,6 +22,7 @@ export async function startGuestUpload(
   formData: FormData,
 ): Promise<{ ok: boolean; assetId?: string; needsTerms?: boolean; blocked?: boolean }> {
   if (formData.get('termsAccepted') !== 'true') return { ok: false, needsTerms: true };
+  if (!(await allowVisitor('guest-upload'))) return { ok: false };
   const file = formData.get('image');
   if (!(file instanceof File) || file.size === 0) return { ok: false };
   if (file.size > 25 * 1024 * 1024) return { ok: false }; // 25MB guard

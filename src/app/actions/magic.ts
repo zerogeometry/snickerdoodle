@@ -6,6 +6,7 @@ import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '
 import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { allowVisitor } from '@/server/rateLimit';
 
 /**
  * "Remove background" magic edit — self-hosted, gated, budget-capped. Runs
@@ -19,6 +20,7 @@ export async function removeBackgroundAction(input: {
   /** Keep paper fully enclosed by the drawing (whites of eyes, a snowman) as white. */
   keepEnclosedPaper?: boolean;
 }): Promise<{ ok: true; url: string; sourceObjectId: string } | { ok: false; needsAuth?: boolean; reason?: 'budget' | 'nochange' }> {
+  if (!(await allowVisitor('magic-edit'))) return { ok: false, reason: 'budget' };
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();

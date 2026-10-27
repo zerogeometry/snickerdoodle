@@ -5,6 +5,7 @@ import { getDb } from '@/db/client';
 import { listActiveFamilies } from '@/server/onboarding';
 import { removeProfileImage, requestEmailChange, setProfileImage, updateDisplayName, type ProfileImageKind } from '@/server/profile';
 import { getCurrentAccount } from '@/server/session';
+import { allow } from '@/server/rateLimit';
 
 const KINDS: ProfileImageKind[] = ['AVATAR', 'ACCOUNT_HEADER', 'FAMILY_BANNER'];
 
@@ -23,6 +24,7 @@ async function ownedFamilyId(accountId: string): Promise<string | null> {
 export async function uploadProfileImageAction(form: FormData): Promise<{ ok: boolean; reason?: 'not-an-image' | 'too-big' | 'not-owner'; pending?: boolean }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
+  if (!allow('account-upload', account.id)) return { ok: false };
   const kind = String(form.get('kind') ?? '') as ProfileImageKind;
   const file = form.get('image');
   if (!KINDS.includes(kind) || !(file instanceof Blob)) return { ok: false, reason: 'not-an-image' };
@@ -61,6 +63,7 @@ export async function updateNameAction(name: string): Promise<{ ok: boolean; nam
 export async function requestEmailChangeAction(email: string): Promise<{ ok: boolean; reason?: 'invalid' | 'same' | 'taken' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
+  if (!allow('send-email', account.id)) return { ok: false };
   try {
     return await requestEmailChange(getDb(), account.id, String(email ?? ''));
   } catch {

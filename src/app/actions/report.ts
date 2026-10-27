@@ -7,6 +7,7 @@ import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
 import { isReportReason, reportAsMember, reportViaGiftLink } from '@/server/reports';
 import { getCurrentAccount } from '@/server/session';
+import { allow, allowVisitor } from '@/server/rateLimit';
 
 /**
  * One-tap report (D8). Both actions answer `{ ok: true }` for anything well-formed — whether or
@@ -15,6 +16,7 @@ import { getCurrentAccount } from '@/server/session';
  */
 export async function reportGiftItemAction(token: string, assetId: string, reason: string): Promise<{ ok: boolean }> {
   if (!isReportReason(reason) || typeof token !== 'string' || typeof assetId !== 'string') return { ok: false };
+  if (!(await allowVisitor('report'))) return { ok: true }; // same friendly reply; nothing recorded
   const account = await getCurrentAccount();
   try {
     await reportViaGiftLink(getDb(), token, assetId, reason, account?.id ?? null);
@@ -28,6 +30,7 @@ export async function reportKeepsakeAction(assetId: string, reason: string): Pro
   if (!isReportReason(reason) || typeof assetId !== 'string') return { ok: false };
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
+  if (!allow('report', account.id)) return { ok: true };
   const db = getDb();
   try {
     const [asset] = await db.select({ familyId: assets.familyId }).from(assets).where(eq(assets.id, assetId));

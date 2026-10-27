@@ -7,6 +7,7 @@ import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { resolvePromo } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount } from '@/server/session';
+import { allow, clientIp, isOver } from '@/server/rateLimit';
 
 /**
  * The authoritative basket quote. The client sends ONLY product keys + quantities
@@ -38,9 +39,14 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const db = getDb();
   const catalogue = await getCatalogue(db);
   const account = await getCurrentAccount();
+  // Only failed look-ups count, so re-quoting a good code never runs out — guessing does.
+  const ip = req.promoCode ? await clientIp() : '';
   const resolved = req.promoCode
-    ? await resolvePromo(db, req.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
+    ? isOver('promo-check', ip)
+      ? ({ ok: false, reason: 'unknown' } as const)
+      : await resolvePromo(db, req.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
     : null;
+  if (resolved && !resolved.ok) allow('promo-check', ip);
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   const { partnerCommissionPence: _hidden, ...q } = quote(items, {
     gift: req.gift ?? false,

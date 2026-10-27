@@ -7,6 +7,7 @@ import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import type { AccessLevel, Relationship } from '@/domain/types';
+import { allow, allowVisitor } from '@/server/rateLimit';
 
 /** Create a real, shareable gift link from chosen keepsakes (owner-only). */
 export async function createGiftLinkAction(input: {
@@ -54,6 +55,7 @@ export async function checkoutGiftLinkAction(
   reason?: 'unavailable' | 'too-small' | 'all-bought' | 'error';
 }> {
   if (typeof token !== 'string' || !token) return { ok: false, reason: 'unavailable' };
+  if (!(await allowVisitor('checkout'))) return { ok: false, reason: 'error' };
   const account = await getCurrentAccount();
   const joinProvenance = account ? await resolveSessionJoinProvenance() : null;
   try {
@@ -81,6 +83,7 @@ export async function sendGiftRequestAction(input: {
 }): Promise<{ ok: boolean; sent?: number }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
+  if (!allow('send-email', account.id)) return { ok: false };
   const db = getDb();
   const familyId = await ensureHomeFamily(db, account.id, account.name);
   const viewer = await resolveViewerContext(db, account.id, familyId);
