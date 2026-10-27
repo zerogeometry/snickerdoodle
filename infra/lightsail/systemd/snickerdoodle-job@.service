@@ -1,0 +1,35 @@
+# One run of one job: `snickerdoodle-job@retention.service` runs `scripts/jobs.mjs --once retention`.
+# Started by the snickerdoodle-job-*.timer units (written by `scripts/jobs.mjs --write-timers`).
+# systemd never starts a second copy while one is still running.
+[Unit]
+Description=Snickerdoodle job %i
+After=snickerdoodle-app.service
+OnFailure=snickerdoodle-alert@job-%i.service
+
+[Service]
+Type=oneshot
+User=snickerdoodle
+Group=snickerdoodle
+WorkingDirectory=/opt/snickerdoodle/current
+# Only the jobs URL + secret: the runner needs nothing else.
+EnvironmentFile=/etc/snickerdoodle/jobs.env
+ExecStart=/usr/bin/node scripts/jobs.mjs --once %i
+TimeoutStartSec=45min
+
+# It only ever talks to the app on this machine.
+IPAddressDeny=any
+IPAddressAllow=localhost
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native

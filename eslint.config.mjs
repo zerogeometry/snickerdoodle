@@ -13,6 +13,7 @@ const config = [
   {
     ignores: [
       '.next/**',
+      '.claude/**', // local agent worktrees
       '.next-*/**',
       'node_modules/**',
       'test-results/**',

@@ -10,6 +10,7 @@ import { ensureHomeFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { VisibilityTier } from '@/domain/types';
+import { allow, allowVisitor } from '@/server/rateLimit';
 
 /**
  * Keep an uploaded drawing into the signed-in family's keepsake home: the bytes
@@ -19,6 +20,7 @@ import type { VisibilityTier } from '@/domain/types';
 export async function keepCreation(formData: FormData): Promise<{ ok: boolean; needsAuth?: boolean; assetId?: string }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
+  if (!allow('account-upload', account.id)) return { ok: false };
 
   const file = formData.get('image');
   if (!(file instanceof File) || file.size === 0) return { ok: false };
@@ -57,6 +59,7 @@ export async function keepUploadAction(assetId: string): Promise<{ ok: boolean; 
 /** On the sign-in page: a guest's "+ keepsake" — keep it once THIS email signs in (claim-checked). */
 export async function rememberKeepAction(assetId: string, email: string): Promise<{ ok: boolean }> {
   if (typeof assetId !== 'string' || typeof email !== 'string') return { ok: false };
+  if (!(await allowVisitor('send-email'))) return { ok: false };
   return { ok: await rememberKeepForEmail(getDb(), { assetId, email, uploadClaims: await getUploadClaims() }) };
 }
 

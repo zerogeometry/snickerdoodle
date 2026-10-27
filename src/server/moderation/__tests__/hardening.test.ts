@@ -19,7 +19,7 @@ describe('content-safety hardening', () => {
   });
 
   it('"real" can never silently mean the pass-everything stub', () => {
-    expect(() => defaultProviders({ MODERATION_PROVIDER: 'real' })).toThrow(/not wired/);
+    expect(() => defaultProviders({ MODERATION_PROVIDER: 'real' })).toThrow(/not fully configured/);
   });
 
   it('production with no real screening FAILS CLOSED: held for review (never CLEAR, never rejected)', async () => {

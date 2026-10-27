@@ -2,12 +2,12 @@
 
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
-import { renderPrintFile } from '@/server/print/render';
+import { renderPrintFile, type UpscaleMethod } from '@/server/print/render';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 
 export type RenderPreviewResult =
-  | { ok: true; url: string; widthPx: number; heightPx: number; renderedDpi: number; effectiveDpi: number; upscaled: boolean }
+  | { ok: true; url: string; widthPx: number; heightPx: number; renderedDpi: number; effectiveDpi: number; upscaled: boolean; upscaleMethod: UpscaleMethod }
   | { ok: false; blocked?: boolean; needsAuth?: boolean };
 
 /**
@@ -44,6 +44,7 @@ export async function renderPreviewAction(input: {
       renderedDpi: res.renderedDpi,
       effectiveDpi: res.effectiveDpi,
       upscaled: res.upscaled,
+      upscaleMethod: res.upscaleMethod,
     };
   } catch (e) {
     const msg = String(e);

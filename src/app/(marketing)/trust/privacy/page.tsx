@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'privacy notice',
   description: 'How Snickerdoodle (Launch Mode Ltd) collects, uses and looks after your personal information.',
-};
+  path: '/trust/privacy',
+});
 
 export default function PrivacyNoticePage() {
   return (
@@ -38,6 +40,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Your creations</strong> — the drawings and photos you upload, and the designs we make from them.</li>
           <li><strong>Your orders</strong> — what you bought, your delivery address, and a secure payment token (we never see or store your full card details).</li>
           <li><strong>Your preferences</strong> — your marketing and reminder choices.</li>
+          <li><strong>Our founding-families list</strong> — just your email address, if you sign up for our news (nothing about your children, ever).</li>
           <li><strong>Wishlists and shares</strong> — the wishlists you create and the private links you share with family.</li>
           <li><strong>Basic technical data</strong> — device and cookie data, for security and to keep the site working.</li>
         </ul>
@@ -91,6 +94,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
           <li><strong>Account data:</strong> until you close your account.</li>
           <li><strong>Marketing choices:</strong> until you change them.</li>
+          <li><strong>Founding-families list:</strong> if you never tap the confirmation link, we delete your email after 30 days. Once you&apos;ve confirmed, until you unsubscribe — after that we keep only a note of your address and that you said no, so we never email you by mistake.</li>
           <li><strong>Backups:</strong> when we delete something it&apos;s gone from our live systems straight away, and from our backups within 14 days. Backups are only ever used to recover from a fault — never for anything else — and if we ever restore one, we re-apply every deletion made since.</li>
           <li><strong>A record of what we did:</strong> a minimal log of actions — for example &ldquo;a keepsake was deleted&rdquo; — with no names, pictures or words in it, kept for six years so we can show we did what we said.</li>
         </ul>

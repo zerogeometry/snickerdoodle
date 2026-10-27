@@ -1,15 +1,17 @@
 import { IconHeart, IconLock, IconSparkles } from '@tabler/icons-react';
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'our story',
   description: "Why we built snickerdoodle — to keep the magic of childhood drawings, and frame the wonky bits in gold.",
-};
+  path: '/our-story',
+});
 
 export default function OurStoryPage() {
   return (

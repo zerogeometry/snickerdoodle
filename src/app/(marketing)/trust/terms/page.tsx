@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'terms of service',
   description: 'The terms for using Snickerdoodle — including how we process the drawings you upload.',
-};
+  path: '/trust/terms',
+});
 
 export default function TermsPage() {
   return (

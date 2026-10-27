@@ -2,10 +2,13 @@
 
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
-import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
+import { after } from 'next/server';
+import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset, upscaleForPrint, type PrintSharpResult } from '@/server/magic';
+import type { RawTransform } from '@/server/print/geometry';
 import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { allowVisitor } from '@/server/rateLimit';
 
 /**
  * "Remove background" magic edit — self-hosted, gated, budget-capped. Runs
@@ -19,6 +22,7 @@ export async function removeBackgroundAction(input: {
   /** Keep paper fully enclosed by the drawing (whites of eyes, a snowman) as white. */
   keepEnclosedPaper?: boolean;
 }): Promise<{ ok: true; url: string; sourceObjectId: string } | { ok: false; needsAuth?: boolean; reason?: 'budget' | 'nochange' }> {
+  if (!(await allowVisitor('magic-edit'))) return { ok: false, reason: 'budget' };
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
@@ -33,6 +37,35 @@ export async function removeBackgroundAction(input: {
     if (msg.includes('budget')) return { ok: false, reason: 'budget' };
     if (msg.includes('no-clean-background')) return { ok: false, reason: 'nochange' };
     return { ok: false, needsAuth: account === null && viewer.uploadClaim == null };
+  }
+}
+
+/**
+ * "Upscale to print quality" — one tap. The server re-judges the placement itself (template,
+ * clamped transform, the source's real pixels) and starts the print-sharp copy in the
+ * background (in-process, self-hosted; no third party sees the image), so this answers at once.
+ */
+export async function upscaleForPrintAction(input: {
+  assetId: string;
+  variantId: string;
+  transform: RawTransform;
+  sourceObjectId?: string;
+}): Promise<({ ok: true } & PrintSharpResult) | { ok: false; reason?: 'budget' }> {
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const db = getDb();
+  const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+  try {
+    const res = await upscaleForPrint(
+      db,
+      viewer,
+      { assetId: String(input.assetId), variantId: String(input.variantId), transform: input.transform, sourceObjectId: input.sourceObjectId ? String(input.sourceObjectId) : null },
+      { defer: (job) => after(job) },
+    );
+    return { ok: true, ...res };
+  } catch (e) {
+    if (String(e).includes('budget')) return { ok: false, reason: 'budget' };
+    return { ok: false };
   }
 }
 

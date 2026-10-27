@@ -7,6 +7,7 @@ import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { appUrl, sendMail } from '@/server/mail';
 import type { AccessLevel, Relationship } from '@/domain/types';
+import { allow } from '@/server/rateLimit';
 
 /**
  * Send a family invite. Parent-initiated only (the server checks ownership). Delivered
@@ -21,6 +22,7 @@ export async function createInviteAction(input: {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
   if (!input.email.trim()) return { ok: false };
+  if (!allow('send-email', account.id)) return { ok: false };
 
   const db = getDb();
   const familyId = await ensureHomeFamily(db, account.id, account.name);

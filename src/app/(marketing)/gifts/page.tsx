@@ -1,15 +1,17 @@
 import { IconCheck, IconGift, IconLink, IconShieldCheck, IconUsersPlus } from '@tabler/icons-react';
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { ExampleWall } from '@/ui/components/ExampleWall';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'gifts',
   description: 'Share a ready-to-buy link so family can treat your little one — guest checkout in a tap, or join the family for 5% off.',
-};
+  path: '/gifts',
+});
 
 const POINTS = [
   'Pick the pieces, share one private link',

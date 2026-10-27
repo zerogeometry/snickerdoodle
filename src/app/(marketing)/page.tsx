@@ -1,4 +1,4 @@
-import { IconGift, IconUpload, IconWand } from '@tabler/icons-react';
+import { IconGift, IconHeartHandshake, IconUpload, IconWand } from '@tabler/icons-react';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Button } from '@/ui/primitives/Button';
@@ -9,9 +9,12 @@ import { TrustLine } from '@/ui/primitives/TrustLine';
 import { ExampleMorph } from '@/ui/components/ExampleMorph';
 import { ExampleWall } from '@/ui/components/ExampleWall';
 import { RangeHero } from '@/ui/components/RangeHero';
+import type { Metadata } from 'next';
 import { exampleBySlug } from '@/lib/examples';
+import { publicMetadata } from '@/lib/seo';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
+import { WaitlistSignup } from '@/ui/components/WaitlistSignup';
 
 /** The range strip: real keepsakes, one per product we sell (founder-made examples). */
 const RANGE = [
@@ -37,6 +40,14 @@ const STEPS: Step[] = [
 ];
 
 const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)', 'rgb(246 196 69 / .8)'];
+
+export const metadata: Metadata = publicMetadata({
+  title: 'snickerdoodle — keep the magic',
+  absoluteTitle: true,
+  description:
+    "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+  path: '/',
+});
 
 export default function LandingPage() {
   const heroVisual = rangeHeroReady() ? <RangeHero /> : <ExampleMorph />;
@@ -155,6 +166,33 @@ export default function LandingPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* Founding families — the waitlist (email only, PECR consent). A taped note on the kraft page. */}
+      <section id="founding-families" aria-labelledby="founding-families-title" className="relative scroll-mt-6 px-6 py-16 md:py-24">
+        <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-10 md:grid-cols-[1fr_1.15fr] md:gap-14">
+          <div className="text-center md:text-left">
+            <span
+              className="sticker inline-flex -rotate-3 items-center gap-1.5 rounded-full bg-honey px-3.5 py-1.5 text-xs font-extrabold uppercase tracking-wide text-cocoa"
+            >
+              <Icon icon={IconHeartHandshake} size={16} />
+              founding families
+            </span>
+            <h2 id="founding-families-title" className="mt-5 font-display text-3xl leading-tight text-cocoa md:text-4xl">
+              Be one of our first families
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft md:mx-0">
+              We&apos;re just getting started, and we&apos;d love you along for it. Pop your email in to hear first when new
+              keepsakes land — and help shape what we make next.
+            </p>
+          </div>
+          <div
+            className="tape rounded-[22px] border-2 border-cocoa bg-paper p-5 shadow-[0_4px_0_var(--color-cocoa)] md:rotate-[0.6deg] md:p-7"
+            style={{ ['--tape' as string]: TAPE[1], ['--tape-rot' as string]: '-4deg' }}
+          >
+            <WaitlistSignup />
+          </div>
         </div>
       </section>
 

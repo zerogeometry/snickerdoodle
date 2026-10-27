@@ -3,7 +3,9 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'scripts/**/*.test.ts'],
+    // The *.int.test.ts suites do real Postgres + object-store + image work; 5s flakes on a busy runner.
+    testTimeout: 20_000,
   },
   resolve: {
     alias: {

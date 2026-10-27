@@ -33,11 +33,34 @@ export async function moderateImage(
   const hashInput = input.originalBuffer
     ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
     : { buffer: input.buffer, sha256: input.sha256 };
-  if (await providers.hash.isKnownIllegal(hashInput)) {
-    return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+  // Fail-safe: a check that errors or answers oddly sends the picture to review —
+  // never CLEAR, and never BLOCKED by mistake (only a real `true` is a match).
+  const labels: string[] = [];
+  let flagged = false;
+  try {
+    const match = await providers.hash.isKnownIllegal(hashInput);
+    if (match === true) return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+    if (match !== false) throw new Error('unexpected hash-check answer');
+  } catch (e) {
+    // error name only — never the hash list, never the image
+    console.warn(`[moderation] hash check unavailable (${e instanceof Error ? e.name : 'UnknownError'}) — held for review`);
+    flagged = true;
+    labels.push('hash-check-unavailable');
   }
-  const c = await providers.classifier.classify(input.buffer);
-  if (c.flagged) return { status: 'FLAGGED', labels: c.labels };
+  try {
+    const c = await providers.classifier.classify(input.buffer);
+    if (c?.flagged === true) {
+      flagged = true;
+      if (Array.isArray(c.labels)) labels.push(...c.labels.map(String));
+    } else if (c?.flagged !== false) {
+      flagged = true;
+      labels.push('screening-unavailable');
+    }
+  } catch {
+    flagged = true;
+    labels.push('screening-unavailable');
+  }
+  if (flagged) return { status: 'FLAGGED', labels: [...new Set(labels)] };
   return { status: 'CLEAR', labels: [] };
 }
 
@@ -58,7 +81,7 @@ export async function moderateAndRecord(
   const unscreened = !providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
   const raw: ModerationVerdict = unscreened
     ? { status: 'FLAGGED', labels: ['screening-not-configured'] }
-    : await moderateImage({ buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer }, providers);
+    : await moderateImage({ buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer }, providers ?? defaultProviders(env));
   // Fail-safe (D8): a malformed/unrecognised verdict routes to human review — NEVER
   // silently CLEAR. Defends the gate against a future provider returning garbage.
   const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
@@ -118,10 +141,14 @@ export async function moderateDesignAndRecord(
     design = { status: 'FLAGGED', labels: ['screening-not-configured'] };
   } else {
     const p = providers ?? defaultProviders(env);
-    const [c, words] = await Promise.all([p.classifier.classify(input.buffer), p.textReader ? p.textReader.read(input.buffer).catch(() => null) : Promise.resolve([])]);
+    const [c, words] = await Promise.all([
+      // a classifier that FAILED is not a clean result either
+      p.classifier.classify(input.buffer).catch(() => ({ flagged: true, labels: ['screening-unavailable'] })),
+      p.textReader ? p.textReader.read(input.buffer).catch(() => null) : Promise.resolve([]),
+    ]);
     const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
     // a reader that FAILED is not a clean read — route to review rather than wave it through
-    if (words === null) labels.push('text-unreadable');
+    if (!Array.isArray(words)) labels.push('text-unreadable');
     else if (words.length && containsAbusiveText(words.join(' '))) labels.push('drawn-words');
     design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
   }
@@ -161,5 +188,5 @@ export async function clearDesignModeration(db: DbHandle, assetId: string): Prom
     .where(eq(assets.id, assetId));
 }
 
-export { defaultProviders, isModerationConfigured } from './providers';
+export { defaultProviders, isModerationConfigured, readRealModerationConfig, realProviders } from './providers';
 export type { ModerationProviders, HashMatchProvider, ClassifierProvider, TextReaderProvider } from './providers';

@@ -6,7 +6,7 @@ import * as schema from '@/db/schema';
 import { assets, auditRecords, children, invites, memberships, sessions } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, canViewAsset } from '@/authz';
-import { resolveViewerContext } from '@/server/assets';
+import { assetRefOf, resolveViewerContext } from '@/server/assets';
 import { addChild, deleteChild, updateChild } from '@/server/children';
 import { leaveFamily, removeMember, revokeInvite, setMemberAccess } from '@/server/members';
 import type { DbHandle } from '@/server/db';
@@ -39,7 +39,7 @@ describe.skipIf(!DB)('parent controls — members, invites, children', () => {
     (await db.select().from(auditRecords).where(and(eq(auditRecords.event, event), eq(auditRecords.targetId, targetId)))).length > 0;
   const assetRef = async (id: string) => {
     const [a] = await db.select().from(assets).where(eq(assets.id, id));
-    return { id: a!.id, familyId: a!.familyId, uploaderAccountId: a!.uploaderAccountId, controllerAccountId: a!.controllerAccountId, visibility: a!.visibility };
+    return assetRefOf(a!);
   };
 
   it('a non-owner can change nothing', async () => {
