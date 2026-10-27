@@ -17,6 +17,20 @@ import { clearDesignModeration, moderateDesignAndRecord, type ModerationProvider
 /** Small designs are scaled up to this longest edge before added things are drawn, so text and
  * pen lines are crisp on big prints (the print path would upscale the picture anyway). */
 const OVERLAY_EDGE = 3000;
+/** The most a design is ever enlarged for crisp added things. */
+export const DESIGN_MAX_ENLARGE = 4;
+
+/**
+ * The design's REAL pixel size — the drawing's own pixels across it, before any enlarging for
+ * crisp overlays (and divided by any scaling-up of the drawing inside its frame). Stored with the
+ * design's content hash, so the print-quality gate judges the drawing, never the enlarged file
+ * (src/server/print/upscale.ts printSourceDims).
+ */
+export interface DesignPx {
+  width: number;
+  height: number;
+  sha256: string;
+}
 
 /**
  * The Studio's non-destructive recipe (Studio spec §16 "always-recoverable original"). Geometry is
@@ -149,6 +163,8 @@ export interface StudioSaveResult {
   objectKey: string | null;
   /** The design's width/height, for auto-orienting product tiles. */
   aspect: number;
+  /** A design's REAL pixel size (what print quality is judged on) — absent when it's the original or cutout. */
+  realPx?: { width: number; height: number };
 }
 
 /**
@@ -200,10 +216,13 @@ export async function saveStudio(
   const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
   const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
   let designed = await applyGeometry(base, g);
+  // the drawing's own detail across the design (a drawing scaled up in its frame spreads it thinner)
+  const spread = Math.max(1, g.place?.scale ?? 1);
+  const real = { width: Math.max(1, Math.round(designed.width / spread)), height: Math.max(1, Math.round(designed.height / spread)) };
   // Added things: draw them at a resolution that stays crisp in print.
   let k = 1;
   if (objects.length) {
-    k = Math.min(4, Math.max(1, OVERLAY_EDGE / Math.max(designed.width, designed.height)));
+    k = Math.min(DESIGN_MAX_ENLARGE, Math.max(1, OVERLAY_EDGE / Math.max(designed.width, designed.height)));
     if (k > 1) {
       const w = Math.round(designed.width * k), h = Math.round(designed.height * k);
       designed = { buffer: await sharp(designed.buffer).resize(w, h, { kernel: 'lanczos3' }).png().toBuffer(), width: w, height: h };
@@ -234,12 +253,15 @@ export async function saveStudio(
       .returning();
     objectId = row!.id;
   }
+  // the real pixel size goes with THIS design's hash — a stale record can never vouch for new bytes
+  const designPx: DesignPx = { ...real, sha256 };
+  await db.update(assets).set({ studioDoc: { ...docOf(g, objects, look, drawing), designPx } }).where(eq(assets.id, assetId));
   // Anything drawn or added is new content: screen it before it can reach a print order. A colour
   // change can bring out what was hard to see, so that's screened too (the more careful choice).
   // (Rotate / crop / background / removals only ever show less of the screened upload.)
   if (objects.length || look) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
   else await clearDesignModeration(db, assetId);
-  return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height };
+  return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height, realPx: real };
 }
 
 /**
@@ -262,7 +284,13 @@ export async function autosaveStudioDoc(
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   else if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: docOf(g, objects, look, drawing) }).where(eq(assets.id, assetId));
+  // the last saved design is still what prints, so its real pixel size stays with it
+  const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
+  const designPx = (row?.doc as { designPx?: DesignPx } | null)?.designPx;
+  await db
+    .update(assets)
+    .set({ studioDoc: { ...docOf(g, objects, look, drawing), ...(designPx ? { designPx } : {}) } })
+    .where(eq(assets.id, assetId));
 }
 
 /** Remove a derivative for real: bytes first (confirmed), then the row. */

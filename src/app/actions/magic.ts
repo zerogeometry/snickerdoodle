@@ -108,7 +108,7 @@ export async function saveStudioAction(input: {
   look?: StudioLook | null;
   drawing?: LayerLook | null;
   clearCutout?: boolean;
-}): Promise<{ ok: true; design: { url: string; sourceObjectId: string } | null; aspect: number } | { ok: false; reason?: 'text' }> {
+}): Promise<{ ok: true; design: { url: string; sourceObjectId: string; px?: { width: number; height: number } } | null; aspect: number } | { ok: false; reason?: 'text' }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
@@ -123,7 +123,7 @@ export async function saveStudioAction(input: {
     const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, look: input.look, drawing: input.drawing, clearCutout: input.clearCutout === true });
     if (!res.sourceObjectId) return { ok: true, design: null, aspect: res.aspect };
     const grant = await getStorageObjectGrant(db, res.sourceObjectId, viewer, 600);
-    return { ok: true, design: { url: grant.url, sourceObjectId: res.sourceObjectId }, aspect: res.aspect };
+    return { ok: true, design: { url: grant.url, sourceObjectId: res.sourceObjectId, ...(res.realPx ? { px: res.realPx } : {}) }, aspect: res.aspect };
   } catch (e) {
     if (e instanceof StudioTextError) return { ok: false, reason: 'text' };
     console.warn('[studio] save failed:', e instanceof Error ? e.message : e);
