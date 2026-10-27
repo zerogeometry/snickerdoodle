@@ -53,6 +53,25 @@ describe('studio objects — cleaned, carried through turns/flips, rendered cris
     expect((await px(out))(300, 200).slice(0, 3)).toEqual([79, 157, 58]);
   });
 
+  it('a faded layer blends as one layer; a hidden layer is kept but never printed', async () => {
+    const sq = { id: 'a', type: 'shape' as const, shape: 'square' as const, fill: '#000000', stroke: '#2b2118', strokeWidth: 0, texture: 'smooth' as const, x: 0.5, y: 0.5, w: 0.3, h: 0.3, rotation: 0 };
+    const half = await px(await renderStudioObjects(await white(), frame, [{ ...sq, opacity: 0.5 }]));
+    expect(half(300, 200)[0]).toBeGreaterThan(120);
+    expect(half(300, 200)[0]).toBeLessThan(136); // ~half way from white to black
+    // a pen line that crosses itself fades evenly (it isn't darker where it overlaps)
+    const loop: StudioObject = { id: 'p', type: 'stroke', colour: '#000000', width: 0.05, points: [0.3, 0.5, 0.5, 0.7, 0.5, 0.5, 0.5, 0.3, 0.5, 0.5, 0.7, 0.5], texture: 'smooth', opacity: 0.5 };
+    const l = await px(await renderStudioObjects(await white(), frame, [loop]));
+    expect(Math.abs(l(300, 200)[0]! - l(240, 200)[0]!)).toBeLessThan(6);
+    const hidden = await px(await renderStudioObjects(await white(), frame, [{ ...sq, hidden: true }]));
+    expect(hidden(300, 200).slice(0, 3)).toEqual([255, 255, 255]);
+    // and it all survives the trip through the browser-cleaning
+    expect(cleanObjects([{ ...sq, opacity: 0.01, hidden: true }, { ...sq, opacity: 3 }, { ...sq, opacity: 'x' }]).map((o) => [o.opacity, o.hidden])).toEqual([
+      [0.05, true],
+      [undefined, undefined],
+      [undefined, undefined],
+    ]);
+  });
+
   it('never trusts the client: unknown types/fonts/colours dropped or defaulted, sizes clamped', () => {
     const objs = cleanObjects([
       { type: 'text', text: 'hi', font: 'comic-sans', colour: 'red', size: 99, x: 0.5, y: 0.5 },

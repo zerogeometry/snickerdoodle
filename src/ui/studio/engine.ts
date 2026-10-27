@@ -200,6 +200,40 @@ export function dab(work: Work, x: number, y: number, size: number, mode: 'erase
   }
 }
 
+/**
+ * One eraser / bring-back STROKE with a strength (opacity): every dab reaches from where the
+ * stroke STARTED toward its target, at most `strength` of the way — so going over the same spot
+ * within one stroke never builds past it (like a real see-through brush). A new stroke can.
+ */
+export interface PaintStroke {
+  start: Uint8ClampedArray;
+  cover: Uint8Array;
+}
+let coverBuf: Uint8Array | null = null;
+export function beginPaint(work: Work, start: Uint8ClampedArray): PaintStroke {
+  if (!coverBuf || coverBuf.length !== work.w * work.h) coverBuf = new Uint8Array(work.w * work.h);
+  else coverBuf.fill(0);
+  return { start, cover: coverBuf };
+}
+export function paintDab(work: Work, st: PaintStroke, x: number, y: number, size: number, mode: 'erase' | 'restore', strength = 1): void {
+  const { w, h, alpha } = work;
+  const r = size / 2, feather = Math.max(1.5, r * 0.25);
+  const target = mode === 'erase' ? 0 : 255;
+  const k1 = Math.max(0, Math.min(1, strength));
+  for (let yy = Math.max(0, Math.floor(y - r - 1)); yy <= Math.min(h - 1, Math.ceil(y + r + 1)); yy++) {
+    for (let xx = Math.max(0, Math.floor(x - r - 1)); xx <= Math.min(w - 1, Math.ceil(x + r + 1)); xx++) {
+      const dist = Math.hypot(xx - x, yy - y);
+      if (dist > r) continue;
+      const k = yy * w + xx;
+      const c = Math.round(Math.min(1, (r - dist) / feather) * 255);
+      if (c <= st.cover[k]!) continue;
+      st.cover[k] = c;
+      const s0 = st.start[k]!;
+      alpha[k] = s0 + (target - s0) * (c / 255) * k1;
+    }
+  }
+}
+
 // ── Geometry ──────────────────────────────────────────────────────────────────
 
 export { rotatedSize };
