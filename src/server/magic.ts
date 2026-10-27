@@ -8,7 +8,7 @@ import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
 import { getViewableAssetOrThrow } from './assets';
 import { assessResolution, clampTransform, PRINT_SHARP_FACTOR, readinessState, type PrintSharp, type RawTransform, type Readiness } from './print/geometry';
-import { canMakePrintSharp, ensurePrintSharp, findPrintSharp, resolvePrintSource } from './print/upscale';
+import { canMakePrintSharp, ensurePrintSharp, findPrintSharp, printSourceDims, resolvePrintSource } from './print/upscale';
 
 const PER_CREATION = Number(process.env.ML_BUDGET_PER_CREATION ?? 20);
 const PER_ACCOUNT_30D = Number(process.env.ML_BUDGET_PER_ACCOUNT ?? 500);
@@ -195,8 +195,10 @@ export async function upscaleForPrint(
   const meta = await sharp(buf).metadata();
   const dims = { width: meta.width ?? 0, height: meta.height ?? 0 };
   if (!dims.width || !dims.height) throw new Error('unreadable source image');
+  // judged on the REAL pixels (a Studio design's overlay enlarging never counts); `dims` is the file
+  const real = (await printSourceDims(db, input.assetId, src, buf)) ?? dims;
   const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
-  const assess = assessResolution(geom, dims, clampTransform(input.transform));
+  const assess = assessResolution(geom, real, clampTransform(input.transform));
 
   // OK / ≤2× (classical, at render) / below the floor: nothing to make.
   if (assess.decision !== 'UPSCALE' || assess.tier === 0) return { state: readinessState(assess, null), sharp: null, pending: false };

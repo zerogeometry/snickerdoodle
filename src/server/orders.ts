@@ -1,15 +1,13 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { assessResolution, clampTransform, type RawTransform } from '@/server/print/geometry';
-import { resolvePrintSource } from '@/server/print/upscale';
-import { getObjectBytes } from '@/storage';
-import sharp from 'sharp';
+import { printSourceDims, resolvePrintSource } from '@/server/print/upscale';
 import type { DbHandle, Tx } from './db';
 import { assetRefOf, resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
@@ -20,16 +18,11 @@ import { settlePaidOrderCredits } from './referrals';
  * else the ORIGINAL) — read from the stored bytes' header, in-VPC. null if unreadable,
  * in which case the renderer's own gate still applies. */
 async function sourceDimensions(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<{ width: number; height: number } | null> {
-  const [obj] = sourceObjectId
-    ? await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, sourceObjectId))
-    : await db
-        .select({ key: storageObjects.key })
-        .from(storageObjects)
-        .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  const obj = await resolvePrintSource(db, assetId, sourceObjectId);
   if (!obj) return null;
   try {
-    const meta = await sharp(await getObjectBytes(obj.key)).metadata();
-    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+    // the REAL pixels: a Studio design enlarged for crisp stickers/words is judged as the drawing
+    return await printSourceDims(db, assetId, obj);
   } catch {
     return null;
   }

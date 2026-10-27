@@ -29,7 +29,7 @@ export const gbp = formatPence;
 // `kept` = it's in the family's keepsake box ("+ keepsake" done).
 // `scratch` = a blank canvas made for "design from scratch" (no drawing to edit — the Studio hides
 // its image tools, and the range shows the design rather than the empty canvas).
-export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
+export type Upload = { dataUrl: string; name: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: { url: string; sourceObjectId: string; px?: { width: number; height: number } }; scratch?: boolean; kept?: boolean } | null;
 export const useUpload = create<{
   upload: Upload;
   setUpload: (u: Upload) => void;
@@ -37,7 +37,8 @@ export const useUpload = create<{
   setOpaqueBg: (opaque: boolean) => void;
   setAspect: (aspect: number) => void;
   /** The DESIGN products render from (bg-removed / studio-edited); null = the original. */
-  setCutout: (c: { url: string; sourceObjectId: string } | null) => void;
+  /** `px` = a Studio design's REAL pixel size (it may be stored enlarged for crisp stickers/words). */
+  setCutout: (c: { url: string; sourceObjectId: string; px?: { width: number; height: number } } | null) => void;
   resetUpload: () => void; // "Create Another" — new drawing, keep the basket
 }>((set) => ({
   upload: null,

@@ -270,12 +270,16 @@ export default function CustomizePage() {
   const printSrc = upload?.cutout?.url ?? upload?.dataUrl ?? null;
   const [srcSize, setSrcSize] = useState<{ width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false); // "+ Keepsake" in flight (declared before any early return)
+  const realPx = upload?.cutout?.px;
   useEffect(() => {
     if (!printSrc) return setSrcSize(null);
+    // a Studio design is judged on its drawing's real pixels, like the server's gate
+    if (realPx && printSrc === upload?.cutout?.url) return setSrcSize({ width: realPx.width, height: realPx.height });
     const img = new window.Image();
     img.onload = () => setSrcSize(img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null);
     img.src = printSrc;
-  }, [printSrc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- realPx travels with the cutout url
+  }, [printSrc, realPx?.width, realPx?.height]);
 
   if (products && !product) {
     return (

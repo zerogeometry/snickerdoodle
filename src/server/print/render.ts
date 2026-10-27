@@ -10,7 +10,7 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
-import { ensurePrintSharp, resolvePrintSource } from './upscale';
+import { ensurePrintSharp, printSourceDims, resolvePrintSource } from './upscale';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
@@ -71,9 +71,9 @@ export async function renderPrintFile(
   if (!srcObj) throw new Error('no source object to render from');
 
   const srcBuf = await getObjectBytes(srcObj.key);
-  const meta = await sharp(srcBuf).metadata();
-  const src = { width: meta.width ?? 0, height: meta.height ?? 0 };
-  if (!src.width || !src.height) throw new Error('unreadable source image');
+  // the gate judges the drawing's REAL pixels (a Studio design's enlarging never counts)
+  const src = await printSourceDims(db, input.assetId, srcObj, srcBuf);
+  if (!src) throw new Error('unreadable source image');
 
   const transform = clampTransform(input.transform);
   const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };

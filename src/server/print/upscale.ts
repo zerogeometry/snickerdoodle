@@ -1,7 +1,7 @@
 import { and, eq, like, ne } from 'drizzle-orm';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
-import { storageObjects } from '@/db/schema';
+import { assets, storageObjects } from '@/db/schema';
 import { superResAvailable, superResolve, srAccepts, SR_MODEL_TAG } from '@/ml/superRes';
 import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -38,6 +38,35 @@ export async function resolvePrintSource(db: DbHandle, assetId: string, sourceOb
     : await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!obj || !isPrintSourceKey(assetId, obj)) return null;
   return obj;
+}
+
+/** A Studio design is enlarged at most this much (studio-doc.ts DESIGN_MAX_ENLARGE) for crisp overlays. */
+const DESIGN_MAX_ENLARGE = 4;
+
+/**
+ * The REAL pixel size a print source carries — what the DPI gate must judge. The original and the
+ * cutout are their own pixels. A Studio design may have been ENLARGED (up to 4×) so added words
+ * and stickers print crisp; its real size — the drawing's own pixels — is recorded with the
+ * design's content hash when it's saved. No matching record (an older design) → assume the most
+ * it could have been enlarged: the gate can be too careful, never too generous.
+ */
+export async function printSourceDims(
+  db: DbHandle,
+  assetId: string,
+  src: Pick<StorageRow, 'key' | 'sha256'>,
+  buf?: Buffer,
+): Promise<{ width: number; height: number } | null> {
+  const meta = await sharp(buf ?? (await getObjectBytes(src.key))).metadata().catch(() => null);
+  if (!meta?.width || !meta.height) return null;
+  const bytes = { width: meta.width, height: meta.height };
+  if (src.key !== derivativeKey(assetId, 'design')) return bytes;
+  const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
+  const rec = (row?.doc as { designPx?: { width?: unknown; height?: unknown; sha256?: unknown } } | null)?.designPx;
+  if (rec && src.sha256 && rec.sha256 === src.sha256 && typeof rec.width === 'number' && typeof rec.height === 'number' && rec.width > 0 && rec.height > 0) {
+    // never more than the file itself holds
+    return { width: Math.min(bytes.width, Math.round(rec.width)), height: Math.min(bytes.height, Math.round(rec.height)) };
+  }
+  return { width: Math.max(1, Math.floor(bytes.width / DESIGN_MAX_ENLARGE)), height: Math.max(1, Math.floor(bytes.height / DESIGN_MAX_ENLARGE)) };
 }
 
 const prefixFor = (assetId: string, src: PrintSource) => derivativeKey(assetId, `upscale-${src.id}.`);
