@@ -10,7 +10,14 @@ const nextConfig: NextConfig = {
   // @resvg/resvg-js ships a platform .node binary (the card's inside-message + back-badge print
   // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
   // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
-  serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
+  // onnxruntime-node (the self-hosted print-sharp upscaler, src/ml/superRes.ts) likewise.
+  serverExternalPackages: ['@resvg/resvg-js', 'sharp', 'onnxruntime-node'],
+  // The upscaler's model is read from disk at runtime; ship it with the server. And only the
+  // Linux x64 runtime binary is ever used on the server (~46MB of the package's ~300MB).
+  outputFileTracingIncludes: { '/**': ['./models/sr/*.onnx'] },
+  outputFileTracingExcludes: {
+    '/**': ['./node_modules/onnxruntime-node/bin/napi-v*/darwin/**', './node_modules/onnxruntime-node/bin/napi-v*/win32/**', './node_modules/onnxruntime-node/bin/napi-v*/linux/arm64/**'],
+  },
   // Security headers (CSP, app/gift noindex) are layered in with the trust-spine
   // and gift-link surfaces; marketing stays indexable.
   experimental: {
