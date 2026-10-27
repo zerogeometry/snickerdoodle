@@ -1,7 +1,7 @@
 'use client';
 
-import { IconLock } from '@tabler/icons-react';
-import { useState } from 'react';
+import { IconLock, IconTrash } from '@tabler/icons-react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
@@ -19,21 +19,25 @@ export interface KeepsakeInfo {
 }
 
 /**
- * The Studio's persistent, quiet "this stays yours" line — and the way in to who-can-see-it.
- * A draft is only ever seen by the person who made it; a kept keepsake shows its circle, and its
- * controlling parent can change it here (re-checked on the server).
+ * The Studio's persistent, quiet "this stays yours" line — and the way in to who-can-see-it and
+ * delete-it-for-good. A draft is only ever seen by the person who made it; a kept keepsake shows
+ * its circle, and its controlling parent can change it or delete it here (re-checked on the server).
  */
 export function KeepsakePill({
   info,
   image,
   onVisibility,
+  onDelete,
 }: {
   info: KeepsakeInfo | null;
   image?: string;
   onVisibility: (tier: Tier) => Promise<void> | void;
+  /** Delete this creation and its source (two taps). */
+  onDelete: () => Promise<void> | void;
 }) {
   const [open, setOpen] = useState(false);
   const who = !info ? null : info.draft ? 'just you' : TIER_LABEL[info.visibility];
+  const canDelete = !!info && (info.draft || info.canManage);
   return (
     <>
       <button
@@ -60,14 +64,16 @@ export function KeepsakePill({
             setOpen(false);
             if (tier !== info.visibility) await onVisibility(tier);
           }}
+          onDelete={async () => {
+            setOpen(false);
+            await onDelete();
+          }}
         />
       ) : (
         <Modal open={open} onClose={() => setOpen(false)} title="this stays yours" subtitle={info?.draft ? 'only you can see it' : info ? `seen by ${who}` : undefined}>
           <p className="text-sm leading-relaxed text-cocoa">
             {info?.draft || !info ? (
-              <>
-                only you can see this right now. we use it to make your bits, then it’s gone — unless you keep it. your original is never changed.
-              </>
+              <>only you can see this right now. we use it to make your bits, then it’s gone — unless you keep it. your original is never changed.</>
             ) : (
               <>the parent who keeps it chooses who in the family can see it. nothing is ever public.</>
             )}
@@ -75,8 +81,38 @@ export function KeepsakePill({
           <Button size="lg" className="mt-4 w-full" onClick={() => setOpen(false)}>
             got it
           </Button>
+          {canDelete ? (
+            <DeleteForGood
+              open={open}
+              label="delete this drawing"
+              onDelete={async () => {
+                setOpen(false);
+                await onDelete();
+              }}
+            />
+          ) : null}
         </Modal>
       )}
     </>
+  );
+}
+
+/** Two taps to delete for good, with a plain line about what that means. */
+function DeleteForGood({ open, label, onDelete }: { open: boolean; label: string; onDelete: () => void }) {
+  const [sure, setSure] = useState(false);
+  useEffect(() => {
+    if (open) setSure(false);
+  }, [open]);
+  return (
+    <div className="mt-3 border-t border-line pt-3">
+      <button
+        type="button"
+        onClick={() => (sure ? onDelete() : setSure(true))}
+        className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-bold text-cinnamon hover:underline"
+      >
+        <Icon icon={IconTrash} size={15} /> {sure ? 'tap again to delete for good' : label}
+      </button>
+      {sure ? <p className="text-[11px] leading-relaxed text-ink-soft">this removes your upload and every edit from our store — it can’t be undone.</p> : null}
+    </div>
   );
 }

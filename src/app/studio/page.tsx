@@ -24,7 +24,7 @@ import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store'
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
-import { studioInfoAction } from '@/app/actions/studio';
+import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { StudioTray } from '@/ui/studio/Tray';
@@ -101,6 +101,7 @@ function StudioEditor() {
   const upload = useUpload((s) => s.upload);
   const setCutout = useUpload((s) => s.setCutout);
   const setAspect = useUpload((s) => s.setAspect);
+  const resetUpload = useUpload((s) => s.resetUpload);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -171,6 +172,21 @@ function StudioEditor() {
     const r = await setAssetVisibilityAction(assetId, tier);
     toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
     await refreshInfo(assetId);
+  };
+  const deleteCreation = async () => {
+    if (!assetId) return;
+    setBusy('deleting…');
+    const r = await deleteCreationAction({ assetId });
+    setBusy(null);
+    if (!r.ok) return toast('couldn’t delete that — try again');
+    setDirty(false);
+    toast('deleted — gone for good');
+    // (the back-gesture guard's extra history entry is replaced, so "back" never lands here again)
+    if (guardRef.current) {
+      guardRef.current = false;
+      router.replace('/start-creating');
+    } else router.push('/start-creating');
+    resetUpload();
   };
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1076,6 +1092,9 @@ function StudioEditor() {
     };
   }
 
+  // who can see it + delete it for good (one pill: in the phone's glass column, top-left on bigger screens)
+  const keepsakePill = <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} />;
+
   const disabled: Partial<Record<ToolId, string>> = {};
   if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
@@ -1344,9 +1363,7 @@ function StudioEditor() {
                   {readiness.label}
                 </span>
                 {ready ? (
-                  <span className="pointer-events-auto max-w-full">
-                    <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
-                  </span>
+                  <span className="pointer-events-auto max-w-full">{keepsakePill}</span>
                 ) : null}
               </>
             )}
@@ -1356,7 +1373,7 @@ function StudioEditor() {
             <span className="absolute left-3 top-3 hidden rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper md:inline">your original</span>
           ) : ready ? (
             <div className="absolute left-3 top-3 hidden max-w-[60%] md:block">
-              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
+              {keepsakePill}
             </div>
           ) : null}
           {busy ? (

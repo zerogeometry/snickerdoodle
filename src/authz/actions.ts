@@ -57,6 +57,17 @@ export function canDeleteAsset(asset: AssetRef, viewer: ViewerContext): boolean 
   );
 }
 
+/**
+ * Discard a pre-account DRAFT (a guest-style upload not yet kept in any family) — ONLY the holder
+ * of its single-use upload claim, the same person who alone can see it. A real (family) asset is
+ * never discardable this way, whatever claim is presented: that is canDeleteAsset's job.
+ */
+export function canDiscardDraft(asset: AssetRef, viewer: ViewerContext): boolean {
+  if (asset.ephemeralClaimId == null) return false;
+  const claim = viewer.uploadClaim ?? null;
+  return claim !== null && claim === asset.ephemeralClaimId;
+}
+
 /** The frozen gift link, as authz needs it (resolved server-side from the token). */
 export interface GiftLinkGrant {
   familyId: string;

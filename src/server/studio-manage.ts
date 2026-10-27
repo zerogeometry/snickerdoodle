@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { accounts, assets, memberships } from '@/db/schema';
-import { canSetAssetVisibility, type ViewerContext } from '@/authz';
+import { AuthzError, canDiscardDraft, canSetAssetVisibility, type ViewerContext } from '@/authz';
 import type { VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
-import { getViewableAssetOrThrow } from './assets';
+import { deleteAsset, eraseAsset, getViewableAssetOrThrow } from './assets';
 
 /** What the Studio's "this stays yours" pill shows about the creation being edited. */
 export interface StudioKeepsakeInfo {
@@ -36,4 +36,16 @@ export async function studioKeepsakeInfo(db: DbHandle, viewer: ViewerContext, as
       .map((r) => ({ initial: (r.name ?? r.email.split('@')[0] ?? 'M').charAt(0).toUpperCase(), circle: r.circle }));
   }
   return { draft, kept: row?.kept === true, visibility: ref.visibility, canManage, people };
+}
+
+/**
+ * Delete the creation open in the Studio, and its source, for good (NN8): a kept keepsake by its
+ * controlling parent (deleteAsset), a draft by the person holding its upload claim. Either way
+ * the same cascading erase runs — every stored version's bytes (confirmed), the row, the ledger.
+ */
+export async function deleteStudioCreation(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<void> {
+  const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate (also refuses BLOCKED content)
+  if (ref.ephemeralClaimId == null) return deleteAsset(db, assetId, viewer);
+  if (!canDiscardDraft(ref, viewer)) throw new AuthzError({ allowed: false, reason: 'not found' });
+  await eraseAsset(db, { id: ref.id, familyId: ref.familyId }, { accountId: viewer.accountId, actorType: viewer.accountId ? 'MEMBER' : 'GUEST' }, { via: 'studio' });
 }
