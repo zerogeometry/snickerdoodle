@@ -1,6 +1,6 @@
 import './sharp-init';
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import sharp, { type OverlayOptions, type Sharp } from 'sharp';
 import { mockupViews, printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
@@ -414,42 +414,32 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   //    cache-hit caller is still authorised here before any byte is returned).
   await getViewableAssetOrThrow(db, input.assetId, viewer);
 
-  // 2. Template — the PRIMARY product view (print_templates) or an alternate display view
-  //    (mockup_views, e.g. the tin). Its brand-safe blank is NON-child. No template ⇒ fallback.
-  const tpl = await loadResolvedTemplate(db, input.variantId, input.view);
+  // 2. Everything the render needs, fetched TOGETHER (each is one indexed lookup, and on a
+  //    distant database every round trip in a row costs a full trip — this keeps a tile to three):
+  //    - the template: the PRIMARY product view (print_templates) or an alternate display view
+  //      (mockup_views, e.g. the tin). Its brand-safe blank is NON-child. No template ⇒ fallback;
+  //    - the product key: products whose print file is NOT "the drawing, placed" — a repeat pattern
+  //      (socks, wrapping paper, tea towel) and the height chart (drawing + ruler) — preview the
+  //      PRINTED FACE, rendered by the same code as the print file, just smaller (preview == print);
+  //    - the DESIGN — read from storage_objects, scoped to THIS asset (never from template_assets).
+  //      A specific source object (e.g. a bg-removed cutout) must belong to the asset; otherwise the
+  //      preserved ORIGINAL. Metadata only: no picture byte is read before step 6.
+  const [tpl, [prod], [srcObj]] = await Promise.all([
+    loadResolvedTemplate(db, input.variantId, input.view),
+    db
+      .select({ key: products.key })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(eq(productVariants.id, input.variantId)),
+    input.sourceObjectId
+      ? db.select().from(storageObjects).where(and(eq(storageObjects.id, input.sourceObjectId), eq(storageObjects.assetId, input.assetId)))
+      : db.select().from(storageObjects).where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, 'ORIGINAL'))),
+  ]);
   if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
-  // Products whose print file is NOT "the drawing, placed": a repeat pattern (socks, wrapping
-  // paper, tea towel) and the height chart (drawing + ruler). Their preview shows the PRINTED FACE
-  // — rendered by the same code as the print file, just smaller — so preview == print.
-  const [prod] = await db
-    .select({ key: products.key })
-    .from(productVariants)
-    .innerJoin(products, eq(productVariants.productId, products.id))
-    .where(eq(productVariants.id, input.variantId));
+  if (!srcObj) throw new NoMockupTemplateError('no source object for the design');
   const face: Face | undefined = !input.fill && (!input.view || PRIMARY_VIEWS.has(input.view))
     ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : isGalleryProduct(prod?.key) ? 'gallery' : undefined
     : undefined;
-  const [blank] = await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.blankObjectId));
-  if (!blank) throw new NoMockupTemplateError('blank template asset missing');
-  // Optional product-silhouette mask: the design is clipped to it (shaped product edges).
-  const [mask] = tpl.maskObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.maskObjectId)) : [undefined];
-  // Optional FOREGROUND overlay: authored on-top detail composited OVER the design — e.g.
-  // the jigsaw's die-cut piece lines, so the art reads as physically cut.
-  const [overlay] = tpl.overlayObjectId ? await db.select().from(templateAssets).where(eq(templateAssets.id, tpl.overlayObjectId)) : [undefined];
-
-  // 3. The DESIGN — read from storage_objects, scoped to THIS asset (never from
-  //    template_assets). A specific source object (e.g. a bg-removed cutout) must
-  //    belong to the asset; otherwise the preserved ORIGINAL.
-  const [srcObj] = input.sourceObjectId
-    ? await db
-        .select()
-        .from(storageObjects)
-        .where(and(eq(storageObjects.id, input.sourceObjectId), eq(storageObjects.assetId, input.assetId)))
-    : await db
-        .select()
-        .from(storageObjects)
-        .where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
-  if (!srcObj) throw new NoMockupTemplateError('no source object for the design');
 
   // 4. Deterministic, VERSIONED cache key. templateVersion + size + the SOURCE OBJECT id
   //    are all load-bearing: the source id keeps the ORIGINAL and a bg-removed cutout
@@ -473,8 +463,20 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
-  // 5. Cache hit → no sharp work.
-  const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+  // 5. The template's picture layers (blank; optional product-silhouette mask the design is clipped
+  //    to; optional FOREGROUND overlay composited OVER the design, e.g. the jigsaw's die-cut lines)
+  //    in ONE query, alongside the cache check.
+  const layerIds = [tpl.blankObjectId, tpl.maskObjectId, tpl.overlayObjectId].filter((id): id is string => Boolean(id));
+  const [layers, [existing]] = await Promise.all([
+    db.select().from(templateAssets).where(inArray(templateAssets.id, layerIds)),
+    db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)),
+  ]);
+  const blank = layers.find((l) => l.id === tpl.blankObjectId);
+  if (!blank) throw new NoMockupTemplateError('blank template asset missing');
+  const mask = tpl.maskObjectId ? layers.find((l) => l.id === tpl.maskObjectId) : undefined;
+  const overlay = tpl.overlayObjectId ? layers.find((l) => l.id === tpl.overlayObjectId) : undefined;
+
+  // Cache hit → no sharp work.
   if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: isAxisAligned(tpl.printQuad) && !tpl.extraQuads.length ? 'FLAT' : 'PERSPECTIVE', cached: true };
 
   // 6. In-flight dedup → render + persist once (concurrency-capped) and share the result.
