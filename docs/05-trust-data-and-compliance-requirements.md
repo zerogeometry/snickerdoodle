@@ -52,6 +52,8 @@ Generative (P3 only): **preset magic edits only — no free-text prompt box**; t
 
 Processor note: the moderation classifier (Rekognition, or a future self-hosted model) joins the processor/transfer register; in-region keeps it off the international-transfer path.
 
+Build status (2026-10-27): the real providers are wired behind `MODERATION_PROVIDER=real` — IWF hash list held locally and matched in-process, Rekognition in `eu-west-2` only; any provider failure holds the upload for review. Config, threshold, costs, the questions for IWF onboarding and the AWS AI-services opt-out (no-training) are in `project-office/briefs/MODERATION-providers.md`.
+
 ## Launch gates (hard blockers — do not go live without)
 1. **DPIA** completed and signed off.
 2. **Children's Code** conformance assessment documented.

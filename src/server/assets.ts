@@ -14,6 +14,7 @@ import {
 import type { VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
+import { openReport } from './reportHold';
 
 /**
  * The server-data layer for assets. EVERY read of an asset leaves this module
@@ -24,17 +25,22 @@ import { recordErasure } from './erasureLedger';
  */
 
 type AssetRow = typeof assets.$inferSelect;
+type RefFields = Pick<AssetRow, 'id' | 'familyId' | 'uploaderAccountId' | 'controllerAccountId' | 'visibility' | 'moderationDetail'> &
+  Partial<Pick<AssetRow, 'ephemeralClaimId'>>;
 
-function toAssetRef(row: AssetRow): AssetRef {
+/** The ONE way to turn an asset row into what src/authz judges — every caller uses this. */
+export function assetRefOf(row: RefFields): AssetRef {
   return {
     id: row.id,
     familyId: row.familyId,
     uploaderAccountId: row.uploaderAccountId,
     controllerAccountId: row.controllerAccountId,
     visibility: row.visibility,
-    ephemeralClaimId: row.ephemeralClaimId,
+    ephemeralClaimId: row.ephemeralClaimId ?? null,
+    heldForReview: openReport(row.moderationDetail) !== null,
   };
 }
+const toAssetRef = assetRefOf;
 
 /** A denial that is indistinguishable from "not found" — never leak existence. */
 function denied(reason: string): AuthzError {

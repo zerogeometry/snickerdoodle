@@ -19,4 +19,14 @@
     "node_modules/@fontsource/*/files/*-latin-400-normal.woff",
     "src/server/print/assets/**",
     "public/examples/range/**",
+    "models/sr/**",
   ]
+
+# Scheduled jobs for the TEST SITE: netlify/functions/jobs-*.mjs call /api/jobs/* with JOBS_SECRET
+# and do nothing unless SITE_MODE=test. Cron times are UTC. The real site uses systemd timers on
+# the Lightsail box instead (scripts/jobs/core.mjs holds that schedule).
+[functions."jobs-frequent"]
+  schedule = "*/10 * * * *"
+
+[functions."jobs-daily"]
+  schedule = "15 3 * * *"

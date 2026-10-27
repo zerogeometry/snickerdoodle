@@ -107,3 +107,18 @@ export function canPurchaseViaGiftLink(link: GiftLinkGrant, asset: GiftLinkAsset
   if (asset.visibility === 'ONLY_ME') return { allowed: false, reason: 'keepsake made private by the parent' };
   return { allowed: true, reason: 'gift link grants purchase of this keepsake' };
 }
+
+/**
+ * REPORT a keepsake shown on a gift link (D8 one-tap report/takedown). The same scope as buying —
+ * live link, item in the frozen snapshot, same family, not pulled back to ONLY_ME — except that it
+ * does NOT need the item to be content-cleared: an item already held for review can be reported
+ * again (a no-op), so the answer never hints at its moderation state. It grants REPORT only.
+ */
+export function canReportViaGiftLink(link: GiftLinkGrant, asset: GiftLinkAssetRef, now: Date): Decision {
+  if (link.status !== 'ACTIVE') return { allowed: false, reason: 'gift link revoked' };
+  if (link.expiresAt.getTime() <= now.getTime()) return { allowed: false, reason: 'gift link expired' };
+  if (!link.assetIds.includes(asset.id)) return { allowed: false, reason: 'keepsake not in this gift link' };
+  if (asset.familyId !== link.familyId) return { allowed: false, reason: 'keepsake not in the gift link family' };
+  if (asset.visibility === 'ONLY_ME') return { allowed: false, reason: 'keepsake made private by the parent' };
+  return { allowed: true, reason: 'gift link holder may report this keepsake' };
+}

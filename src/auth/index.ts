@@ -2,6 +2,7 @@ import NextAuth from 'next-auth';
 import type { EmailConfig } from 'next-auth/providers';
 import { DrizzleAccountsAdapter } from './adapter';
 import { sendMail } from '@/server/mail';
+import { allow } from '@/server/rateLimit';
 
 /**
  * Passwordless magic-link auth (Auth.js v5) over our `accounts` table.
@@ -19,6 +20,8 @@ const magicLink: EmailConfig = {
   server: undefined as unknown as EmailConfig['server'],
   options: {},
   async sendVerificationRequest({ identifier, url }) {
+    // a handful of links per address per hour — stops anyone using us to flood an inbox
+    if (!allow('magic-link', identifier.trim().toLowerCase())) throw new Error('too many sign-in links for this address — try again later');
     await sendMail({
       kind: 'magic-link',
       to: identifier,

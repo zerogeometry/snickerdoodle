@@ -19,7 +19,7 @@ export interface ReviewItem {
   /** What flagged it (classifier labels, "drawn-words", "screening-not-configured"…). */
   labels: string[];
   /** The upload itself, or something drawn/added in the Studio. */
-  source: 'upload' | 'studio design' | 'profile picture' | 'profile header' | 'family banner';
+  source: 'upload' | 'studio design' | 'reported' | 'profile picture' | 'profile header' | 'family banner';
   flaggedAt: Date | null;
 }
 
@@ -31,7 +31,8 @@ const gate = (r: Reviewer, action: Parameters<typeof canReview>[1], item?: { mod
   if (!d.allowed) deny(d.reason);
 };
 
-type Detail = { labels?: string[]; original?: { status: string; labels?: string[] }; design?: { status: string; labels?: string[] } };
+type Verdict = { status: string; labels?: string[] };
+type Detail = { labels?: string[]; original?: Verdict; design?: Verdict; report?: Verdict & { reports?: unknown[] } };
 
 export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ items: ReviewItem[]; blocked: number }> {
   gate(reviewer, 'open-queue');
@@ -50,7 +51,13 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
     ...flagged.map((r) => {
       const d = (r.detail ?? {}) as Detail;
       const fromDesign = d.design?.status === 'FLAGGED';
-      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at };
+      const automated = fromDesign || d.original?.status === 'FLAGGED' || (!d.original && !d.report);
+      // a viewer's report (src/server/reports.ts) on an otherwise-clean keepsake shows as "reported"
+      if (!automated && d.report?.status === 'FLAGGED') {
+        return { kind: 'keepsake' as const, id: r.id, labels: d.report.labels ?? [], source: 'reported' as const, flaggedAt: r.at };
+      }
+      const labels = [...((fromDesign ? d.design?.labels : d.labels) ?? []), ...(d.report?.status === 'FLAGGED' ? (d.report.labels ?? []) : [])];
+      return { kind: 'keepsake' as const, id: r.id, labels, source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at };
     }),
     ...profiles.map((r) => ({
       kind: 'profile' as const,
@@ -80,14 +87,17 @@ export async function reviewImage(db: DbHandle, reviewer: Reviewer, kind: Review
   const d = (a!.moderationDetail ?? {}) as Detail;
   let key: string | null = null;
   let contentType = 'image/png'; // Studio designs are always PNG
-  if (d.design?.status === 'FLAGGED') key = derivativeKey(id, 'design');
+  // the Studio design when that's the culprit — or when a viewer reported it, since the design
+  // is what they were shown
+  const showDesign = d.design?.status === 'FLAGGED' || (d.report?.status === 'FLAGGED' && !!d.design);
+  if (showDesign) key = derivativeKey(id, 'design');
   if (!key) {
     const [o] = await db.select({ key: storageObjects.key, contentType: storageObjects.contentType }).from(storageObjects).where(and(eq(storageObjects.assetId, id), eq(storageObjects.objectClass, 'ORIGINAL')));
     key = o?.key ?? null;
     contentType = o?.contentType ?? 'application/octet-stream';
   }
   if (!key) deny('no picture');
-  await audit(db, reviewer, 'CONTENT_REVIEW_VIEWED', 'asset', id, a!.familyId, { source: d.design?.status === 'FLAGGED' ? 'studio design' : 'upload' });
+  await audit(db, reviewer, 'CONTENT_REVIEW_VIEWED', 'asset', id, a!.familyId, { source: showDesign ? 'studio design' : 'upload' });
   const bytes = await getObjectBytes(key!);
   return { bytes, contentType };
 }
@@ -114,18 +124,18 @@ export async function decideReview(db: DbHandle, reviewer: Reviewer, kind: Revie
   if (!a) deny('not found');
   gate(reviewer, decision, a!);
   const d = (a!.moderationDetail ?? {}) as Detail;
-  await audit(db, reviewer, 'CONTENT_REVIEWED', 'asset', id, a!.familyId, { decision, labels: d.design?.labels ?? d.labels ?? [] });
+  await audit(db, reviewer, 'CONTENT_REVIEWED', 'asset', id, a!.familyId, { decision, labels: [...(d.design?.labels ?? d.labels ?? []), ...(d.report?.labels ?? [])] });
   if (decision === 'remove') {
     await eraseAsset(db, { id, familyId: a!.familyId }, { accountId: reviewer.accountId, actorType: 'ADMIN' }, { reason: 'content review — removed' });
     return;
   }
-  const cleared = (v?: { status: string; labels?: string[] }) => (v ? { ...v, status: 'CLEAR' } : v);
+  const cleared = <V extends Verdict>(v?: V) => (v ? { ...v, status: 'CLEAR' } : v);
   await db
     .update(assets)
     .set({
       moderationStatus: 'CLEAR',
       moderatedAt: now,
-      moderationDetail: { ...d, original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] }, design: cleared(d.design), review: { decision, by: reviewer.accountId, at: now.toISOString() } },
+      moderationDetail: { ...d, original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] }, design: cleared(d.design), report: cleared(d.report), review: { decision, by: reviewer.accountId, at: now.toISOString() } },
     })
     .where(eq(assets.id, id));
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { canPurchaseViaGiftLink, type GiftLinkAssetRef, type GiftLinkGrant } from '../index';
+import { canPurchaseViaGiftLink, canReportViaGiftLink, type GiftLinkAssetRef, type GiftLinkGrant } from '../index';
 
 const NOW = new Date('2026-10-12T12:00:00Z');
 
@@ -54,4 +54,24 @@ describe('canPurchaseViaGiftLink (a capability, not a membership)', () => {
       expect(canPurchaseViaGiftLink(link(), asset({ visibility }), NOW).allowed).toBe(true);
     });
   }
+});
+
+describe('canReportViaGiftLink (report scope = the link, not a membership)', () => {
+  it('a live link may report any snapshotted, same-family, shared keepsake — whatever its screening state', () => {
+    for (const status of ['CLEAR', 'PENDING', 'FLAGGED']) {
+      expect(canReportViaGiftLink(link(), asset({ moderationStatus: status }), NOW).allowed).toBe(true);
+    }
+  });
+
+  it('revoked or expired link -> denied', () => {
+    expect(canReportViaGiftLink(link({ status: 'REVOKED' }), asset(), NOW).allowed).toBe(false);
+    expect(canReportViaGiftLink(link({ expiresAt: NOW }), asset(), NOW).allowed).toBe(false);
+  });
+
+  it('never widened: not in the snapshot, another family, or pulled back to ONLY_ME -> denied', () => {
+    expect(canReportViaGiftLink(link(), asset({ id: 'asset-9' }), NOW).allowed).toBe(false);
+    expect(canReportViaGiftLink(link(), asset({ familyId: 'fam-B' }), NOW).allowed).toBe(false);
+    expect(canReportViaGiftLink(link(), asset({ familyId: null }), NOW).allowed).toBe(false);
+    expect(canReportViaGiftLink(link(), asset({ visibility: 'ONLY_ME' }), NOW).allowed).toBe(false);
+  });
 });

@@ -116,6 +116,7 @@ export const auditEvent = pgEnum('audit_event', [
   'ADMIN_MFA_ENROLLED',
   'CONTENT_REVIEW_VIEWED',
   'CONTENT_REVIEWED',
+  'CONTENT_REPORTED',
 ]);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
@@ -311,14 +312,44 @@ export const storageObjects = pgTable(
   ],
 );
 
+// ── waitlist_signup — the "founding families" list (P0 L, PECR). ──────────────
+// EMAIL ONLY: no name, nothing about any child. A row is NOT consent: marketing consent exists
+// only once the double opt-in is confirmed, as a GRANTED consent_record pointing here.
+// Unconfirmed rows are purged after WAITLIST_UNCONFIRMED_DAYS (src/server/waitlist.ts).
+export const waitlistSignups = pgTable(
+  'waitlist_signups',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    /** Lowercased + trimmed by the service before insert (so the unique index is case-insensitive). */
+    email: text('email').notNull(),
+    /** sha256 of the double-opt-in token (the raw token only ever lives in the email). */
+    confirmTokenHash: text('confirm_token_hash'),
+    confirmTokenExpiresAt: timestamp('confirm_token_expires_at', { withTimezone: true }),
+    /** When the last confirmation email went out — throttles re-sends to the same inbox. */
+    confirmSentAt: timestamp('confirm_sent_at', { withTimezone: true }),
+    /** The consent wording version the person ticked (evidence; copied into the consent_record). */
+    consentVersion: text('consent_version').notNull(),
+    /** Opaque, unguessable, in every email: one tap and they're off the list. */
+    unsubscribeToken: text('unsubscribe_token').notNull(),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [
+    uniqueIndex('waitlist_email_unique').on(t.email),
+    uniqueIndex('waitlist_unsubscribe_token_unique').on(t.unsubscribeToken),
+    uniqueIndex('waitlist_confirm_token_unique').on(t.confirmTokenHash),
+  ],
+);
+
 // ── consent_record — PECR consent log (append a new row per change). ─────────
+// The subject is EITHER an account OR a waitlist sign-up (exactly one — enforced by a check).
 export const consentRecords = pgTable(
   'consent_records',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    accountId: uuid('account_id')
-      .notNull()
-      .references(() => accounts.id),
+    accountId: uuid('account_id').references(() => accounts.id),
+    waitlistSignupId: uuid('waitlist_signup_id').references(() => waitlistSignups.id, { onDelete: 'cascade' }),
     channel: consentChannel('channel').notNull(),
     purpose: consentPurpose('purpose').notNull(),
     status: consentStatus('status').notNull(),
@@ -327,7 +358,11 @@ export const consentRecords = pgTable(
     evidence: jsonb('evidence'),
     createdAt,
   },
-  (t) => [index('consent_lookup_idx').on(t.accountId, t.channel, t.purpose, t.createdAt)],
+  (t) => [
+    index('consent_lookup_idx').on(t.accountId, t.channel, t.purpose, t.createdAt),
+    index('consent_waitlist_idx').on(t.waitlistSignupId, t.createdAt),
+    check('consent_one_subject', sql`num_nonnulls(${t.accountId}, ${t.waitlistSignupId}) = 1`),
+  ],
 );
 
 // ── audit_record — append-only evidence of the control-based trust model. ────

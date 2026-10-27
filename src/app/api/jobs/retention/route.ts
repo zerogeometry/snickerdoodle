@@ -2,6 +2,7 @@ import { getDb } from '@/db/client';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention';
 import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
+import { purgeUnconfirmedWaitlist } from '@/server/waitlist';
 
 /**
  * Retention purge, triggered by a scheduler (cron / Vercel Cron / a scheduled
@@ -16,5 +17,6 @@ export async function POST(req: Request): Promise<Response> {
   const summary = await purgeExpiredAssets(db);
   const audit = await purgeExpiredAuditRecords(db); // the audit trail's own 6-year limit
   const pendingKeepsPurged = await purgeExpiredPendingKeeps(db); // guests' keep requests, a day on
-  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged });
+  const waitlist = await purgeUnconfirmedWaitlist(db); // waitlist addresses never confirmed, 30 days on
+  return Response.json({ ...summary, auditPurged: audit.purged, pendingKeepsPurged, waitlistPurged: waitlist.purged });
 }

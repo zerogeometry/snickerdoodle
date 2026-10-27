@@ -8,6 +8,7 @@ import { resolvePromo } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
+import { allowVisitor } from '@/server/rateLimit';
 
 /**
  * Place an order from the client's basket. The client sends product keys +
@@ -28,6 +29,7 @@ export async function placeOrderAction(input: {
   /** What the customer typed; resolved + priced server-side. */
   promoCode?: string;
 }): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string; reason?: 'too-small'; productKey?: string }> {
+  if (!(await allowVisitor('checkout'))) return { ok: false };
   const items: PlaceLine[] = (input.items ?? []).map((i) => ({
     productKey: String(i.productKey),
     qty: Number(i.qty),

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCake, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
+import { IconCake, IconFlag, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -18,6 +18,8 @@ import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
 import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
+import { reportKeepsakeAction } from '@/app/actions/report';
+import { ReportKeepsakeModal } from '@/ui/modals/ReportKeepsakeModal';
 import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction, setMemberCalendarAction, setReminderConsentAction } from '@/app/actions/family';
 import { Chip } from '@/ui/primitives/Chip';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
@@ -63,6 +65,7 @@ function monthLabel(iso: string): string {
 export function HomeView({ data }: { data: HomeData }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
+  const [reporting, setReporting] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const [highlightNew, setHighlightNew] = useState(false);
@@ -186,10 +189,22 @@ export function HomeView({ data }: { data: HomeData }) {
       >
         {k.canManage ? (
           <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label="choose who can see this keepsake">
-            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={VIS_LABEL[k.visibility]} />
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={k.held ? 'being checked' : VIS_LABEL[k.visibility]} />
           </button>
         ) : (
-          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} />
+          <div className="relative">
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} />
+            <button
+              type="button"
+              onClick={() => setReporting(k)}
+              aria-label="report a problem with this keepsake"
+              className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-ink-faint hover:text-cinnamon focus-visible:outline-2"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-paper/90">
+                <Icon icon={IconFlag} size={14} />
+              </span>
+            </button>
+          </div>
         )}
       </div>
     );
@@ -581,6 +596,12 @@ export function HomeView({ data }: { data: HomeData }) {
         onSave={saveVisibility}
         onDelete={deleteActive}
         people={others}
+      />
+      <ReportKeepsakeModal
+        open={!!reporting}
+        image={reporting?.imageUrl}
+        onClose={() => setReporting(null)}
+        onSend={async (reason) => (reporting ? (await reportKeepsakeAction(reporting.id, reason)).ok : false)}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <CreateGiftLinkModal

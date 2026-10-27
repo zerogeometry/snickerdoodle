@@ -1,0 +1,11 @@
+[Unit]
+Description=Snickerdoodle database backup, nightly
+
+[Timer]
+# London time, outside the clocks-change hour. A night missed while the box was off runs on boot.
+OnCalendar=*-*-* 02:30:00 Europe/London
+Persistent=true
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

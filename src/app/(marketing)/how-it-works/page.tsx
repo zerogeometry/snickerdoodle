@@ -1,15 +1,17 @@
 import { IconCamera, IconGift, IconHeart, IconLock, IconSparkles, IconWand } from '@tabler/icons-react';
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'how it works',
   description: "Upload a drawing, see it made real on lovely things, and keep the magic in your family's private keepsake home.",
-};
+  path: '/how-it-works',
+});
 
 const STEPS = [
   {
