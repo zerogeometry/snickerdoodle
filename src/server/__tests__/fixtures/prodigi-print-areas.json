@@ -1,0 +1,1723 @@
+{
+ "source": "GET api.sandbox.prodigi.com/v4.0/products/{sku} (GB routes)",
+ "fetchedOn": "2026-10-27",
+ "products": {
+  "BOOK-FE-A4-P-HARD-G": {
+   "printAreas": ["cover","default","spine"],
+   "variants": [
+    {"attributes":{"finish":"matte cover","paperType":"Gloss","size":"a4","style":"Hard cover","substrateWeight":"200gsm"},"printAreaSizes":{"cover":{"w":1181,"h":1181},"default":{"w":2480,"h":3507},"spine":{"w":2480,"h":3507}}}
+   ]
+  },
+  "BOOK-FE-A5-P-HARD-G": {
+   "printAreas": ["cover","default","spine"],
+   "variants": [
+    {"attributes":{"finish":"matte cover","paperType":"Gloss","size":"a5","style":"Hard cover","substrateWeight":"200gsm"},"printAreaSizes":{"cover":{"w":1181,"h":1181},"default":{"w":1748,"h":2480},"spine":{"w":1748,"h":2480}}}
+   ]
+  },
+  "CALENDAR-A4-L-DATED": {
+   "printAreas": ["april","august","back cover","cover","december","february","january","july","june","march","may","november","october","september"],
+   "variants": [
+    {"attributes":{"finish":"matte","paperType":"Silk","size":"a4","substrateWeight":"300gsm"},"printAreaSizes":{"april":{"w":3507,"h":2480},"august":{"w":3507,"h":2480},"back cover":{"w":3507,"h":2480},"cover":{"w":3507,"h":2480},"december":{"w":3507,"h":2480},"february":{"w":3507,"h":2480},"january":{"w":3507,"h":2480},"july":{"w":3507,"h":2480},"june":{"w":3507,"h":2480},"march":{"w":3507,"h":2480},"may":{"w":3507,"h":2480},"november":{"w":3507,"h":2480},"october":{"w":3507,"h":2480},"september":{"w":3507,"h":2480}}}
+   ]
+  },
+  "CALENDAR-A5-L-DATED": {
+   "printAreas": ["april","august","back cover","cover","december","february","january","july","june","march","may","november","october","september"],
+   "variants": [
+    {"attributes":{"finish":"matte","paperType":"Silk","size":"a5","substrateWeight":"300gsm"},"printAreaSizes":{"april":{"w":2480,"h":1748},"august":{"w":2480,"h":1748},"back cover":{"w":2480,"h":1748},"cover":{"w":2480,"h":1748},"december":{"w":2480,"h":1748},"february":{"w":2480,"h":1748},"january":{"w":2480,"h":1748},"july":{"w":2480,"h":1748},"june":{"w":2480,"h":1748},"march":{"w":2480,"h":1748},"may":{"w":2480,"h":1748},"november":{"w":2480,"h":1748},"october":{"w":2480,"h":1748},"september":{"w":2480,"h":1748}}}
+   ]
+  },
+  "CLASSIC-GRE-FEDR-7X5-BLA": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"matte","paperType":"Fine art card","style":"Single","substrateWeight":"330gsm"},"printAreaSizes":{"default":{"w":6120,"h":2160}}}
+   ]
+  },
+  "GLOBAL-ANKLE-SOCKS": {
+   "printAreas": ["front"],
+   "variants": [
+    {"attributes":{"color":"white","gender":"Men's","size":"one size"},"printAreaSizes":{"front":{"w":3543,"h":3543}}}
+   ]
+  },
+  "GLOBAL-BB-RS-4411": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":1500,"h":2010},"front":{"w":1500,"h":2010}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light pink","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light pink","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light pink","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light pink","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":1500,"h":2010},"front":{"w":1500,"h":2010}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}}
+   ]
+  },
+  "GLOBAL-CFP-11X14": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}},
+    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3307,"h":4192}}}
+   ]
+  },
+  "GLOBAL-CFP-12X16": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3614,"h":4795}}},
+    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3600,"h":4800}}},
+    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":3614,"h":4795}}}
+   ]
+  },
+  "GLOBAL-CFP-18X24": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}},
+    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5400,"h":7200}}}
+   ]
+  },
+  "GLOBAL-CFP-24X32": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}},
+    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7200,"h":9600}}}
+   ]
+  },
+  "GLOBAL-CUSH-12X12-LIN": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Linen","style":"Single-sided"},"printAreaSizes":{"default":{"w":1875,"h":1875}}}
+   ]
+  },
+  "GLOBAL-CUSH-12X12-LIN-DUAL": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Linen","style":"Double-sided"},"printAreaSizes":{"default":{"w":3750,"h":1875}}}
+   ]
+  },
+  "GLOBAL-CUSH-18R-SCSSS": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Faux Suede","style":"Single-sided"},"printAreaSizes":{"default":{"w":2775,"h":2775}}}
+   ]
+  },
+  "GLOBAL-CUSH-22X22-LIN": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Linen","style":"Single-sided"},"printAreaSizes":{"default":{"w":3375,"h":3375}}}
+   ]
+  },
+  "GLOBAL-CUSH-22X22-LIN-DUAL": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Linen","style":"Double-sided"},"printAreaSizes":{"default":{"w":6750,"h":3375}}}
+   ]
+  },
+  "GLOBAL-CUSH-SH-SCSSS": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"finish":"fibre","paperType":"Faux Suede","style":"Single-sided"},"printAreaSizes":{"default":{"w":2008,"h":1725}}}
+   ]
+  },
+  "GLOBAL-SWEAT-AWD-JH030": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"arctic white","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"arctic white","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"arctic white","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"arctic white","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"arctic white","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"bottle green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"bottle green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"bottle green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"bottle green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"bottle green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"black","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"black","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"black","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"black","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"black","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"burgundy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"burgundy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"burgundy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"burgundy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"burgundy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"caramel latte","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"caramel latte","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"caramel latte","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"caramel latte","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"fire red","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"fire red","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"fire red","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"fire red","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"fire red","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"heather grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"heather grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"heather grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"heather grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"heather grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"hot chocolate","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"hot chocolate","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"hot chocolate","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"hot chocolate","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"kelly green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"kelly green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"kelly green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"kelly green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"kelly green","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"oxford navy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"oxford navy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"oxford navy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"oxford navy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"oxford navy","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"orange crush","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"orange crush","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"orange crush","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"orange crush","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"orange crush","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"red hot chili","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"red hot chili","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"red hot chili","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"red hot chili","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"red hot chili","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"royal blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"royal blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"royal blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"royal blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"royal blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sapphire blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sapphire blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sapphire blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sapphire blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sapphire blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"steel grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"steel grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"steel grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"steel grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"steel grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"storm grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"storm grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"storm grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"storm grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"storm grey","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sun yellow","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sun yellow","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sun yellow","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sun yellow","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sun yellow","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sky blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sky blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sky blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sky blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"sky blue","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"2xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"l","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
+    {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}}
+   ]
+  },
+  "GLOBAL-TECH-GP8-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"gloss","size":"pixel 8","style":"Tough"},"printAreaSizes":{"default":{"w":1230,"h":2130}}}
+   ]
+  },
+  "GLOBAL-TECH-GP8-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"matte","size":"pixel 8","style":"Tough"},"printAreaSizes":{"default":{"w":1230,"h":2130}}}
+   ]
+  },
+  "GLOBAL-TECH-GP8P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"gloss","size":"pixel 8 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1320,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-GP8P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"matte","size":"pixel 8 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1320,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"gloss","size":"pixel 9","style":"Tough"},"printAreaSizes":{"default":{"w":1329,"h":2124}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"matte","size":"pixel 9","style":"Tough"},"printAreaSizes":{"default":{"w":1329,"h":2124}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"gloss","size":"pixel 9 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1329,"h":2124}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"matte","size":"pixel 9 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1329,"h":2124}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9PXL-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"gloss","size":"pixel 9 xl","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-GP9PXL-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Google","finish":"matte","size":"pixel 9 xl","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13","style":"Snap"},"printAreaSizes":{"default":{"w":1204,"h":2019}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13","style":"Snap"},"printAreaSizes":{"default":{"w":1204,"h":2019}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13","style":"Tough"},"printAreaSizes":{"default":{"w":1238,"h":2042}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13","style":"Tough"},"printAreaSizes":{"default":{"w":1238,"h":2042}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13MN-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 mini","style":"Snap"},"printAreaSizes":{"default":{"w":1097,"h":1830}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13MN-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 mini","style":"Snap"},"printAreaSizes":{"default":{"w":1097,"h":1830}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13MN-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 mini","style":"Tough"},"printAreaSizes":{"default":{"w":1122,"h":1830}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13MN-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 mini","style":"Tough"},"printAreaSizes":{"default":{"w":1122,"h":1830}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13P-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1204,"h":2019}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13P-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1204,"h":2019}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1238,"h":2042}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1238,"h":2042}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1286,"h":2185}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1286,"h":2185}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 13 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1322,"h":2219}}}
+   ]
+  },
+  "GLOBAL-TECH-IP13PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 13 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1322,"h":2219}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PL-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PL-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PL-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PL-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PR-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PR-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PR-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 14 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP14PR-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 14 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PL-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PL-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PL-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PL-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PR-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PR-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PR-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 15 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP15PR-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 15 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2100}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16","style":"Snap"},"printAreaSizes":{"default":{"w":1209,"h":2049}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16","style":"Snap"},"printAreaSizes":{"default":{"w":1209,"h":2049}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16","style":"Tough"},"printAreaSizes":{"default":{"w":1245,"h":2085}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16","style":"Tough"},"printAreaSizes":{"default":{"w":1245,"h":2085}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16E-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16e","style":"Tough"},"printAreaSizes":{"default":{"w":1254,"h":2069}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16E-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16e","style":"Tough"},"printAreaSizes":{"default":{"w":1254,"h":2069}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PL-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1311,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PL-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1311,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PL-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PL-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1311,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1311,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PR-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1209,"h":2049}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PR-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1209,"h":2049}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PR-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 16 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1245,"h":2085}}}
+   ]
+  },
+  "GLOBAL-TECH-IP16PR-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 16 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1245,"h":2085}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2094}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2094}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2121}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2121}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17A-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 air","style":"Snap"},"printAreaSizes":{"default":{"w":1272,"h":2172}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17A-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 air","style":"Snap"},"printAreaSizes":{"default":{"w":1272,"h":2172}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17A-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 air","style":"Tough"},"printAreaSizes":{"default":{"w":1305,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17A-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 air","style":"Tough"},"printAreaSizes":{"default":{"w":1305,"h":2196}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1305,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1305,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1338,"h":2274}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1338,"h":2274}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PR-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2091}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PR-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2091}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PR-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 17 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2115}}}
+   ]
+  },
+  "GLOBAL-TECH-IP17PR-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 17 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2115}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PM-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 18 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1305,"h":2251}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PM-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 18 pro max","style":"Snap"},"printAreaSizes":{"default":{"w":1305,"h":2251}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PM-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 18 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1338,"h":2274}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PM-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 18 pro max","style":"Tough"},"printAreaSizes":{"default":{"w":1338,"h":2274}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PR-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 18 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2092}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PR-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 18 pro","style":"Snap"},"printAreaSizes":{"default":{"w":1233,"h":2092}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PR-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"gloss","size":"iphone 18 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2115}}}
+   ]
+  },
+  "GLOBAL-TECH-IP18PR-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"matte","size":"iphone 18 pro","style":"Tough"},"printAreaSizes":{"default":{"w":1266,"h":2115}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23","style":"Snap"},"printAreaSizes":{"default":{"w":1200,"h":2040}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2070}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23","style":"Tough"},"printAreaSizes":{"default":{"w":1260,"h":2070}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23FE-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23 fan edition","style":"Tough"},"printAreaSizes":{"default":{"w":1356,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23FE-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23 fan edition","style":"Tough"},"printAreaSizes":{"default":{"w":1356,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23P-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1290,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23P-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1290,"h":2190}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2220}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1350,"h":2220}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23U-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2280}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23U-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1320,"h":2280}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23U-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s23 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1380,"h":2310}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS23U-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s23 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1380,"h":2310}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24","style":"Snap"},"printAreaSizes":{"default":{"w":1224,"h":2073}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24","style":"Snap"},"printAreaSizes":{"default":{"w":1224,"h":2073}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24","style":"Tough"},"printAreaSizes":{"default":{"w":1251,"h":2097}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24","style":"Tough"},"printAreaSizes":{"default":{"w":1251,"h":2097}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24FE-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24 fan edition","style":"Tough"},"printAreaSizes":{"default":{"w":1320,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24FE-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24 fan edition","style":"Tough"},"printAreaSizes":{"default":{"w":1320,"h":2250}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24P-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1281,"h":2202}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24P-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1281,"h":2202}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1314,"h":2229}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1314,"h":2229}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24U-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1323,"h":2268}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24U-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1323,"h":2268}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24U-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s24 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1362,"h":2295}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS24U-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s24 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1362,"h":2295}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25","style":"Snap"},"printAreaSizes":{"default":{"w":1224,"h":2073}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25","style":"Snap"},"printAreaSizes":{"default":{"w":1224,"h":2073}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25","style":"Tough"},"printAreaSizes":{"default":{"w":1251,"h":2097}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25","style":"Tough"},"printAreaSizes":{"default":{"w":1251,"h":2097}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25P-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1281,"h":2202}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25P-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1281,"h":2202}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1314,"h":2229}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1314,"h":2229}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25U-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1323,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25U-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1323,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25U-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s25 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS25U-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s25 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1359,"h":2244}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26","style":"Snap"},"printAreaSizes":{"default":{"w":1243,"h":2103}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26","style":"Snap"},"printAreaSizes":{"default":{"w":1243,"h":2103}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26","style":"Tough"},"printAreaSizes":{"default":{"w":1269,"h":2121}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26","style":"Tough"},"printAreaSizes":{"default":{"w":1269,"h":2121}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26P-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1290,"h":2208}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26P-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26 plus","style":"Snap"},"printAreaSizes":{"default":{"w":1290,"h":2208}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26P-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1316,"h":2226}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26P-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26 plus","style":"Tough"},"printAreaSizes":{"default":{"w":1316,"h":2226}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26U-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1318,"h":2262}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26U-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26 ultra","style":"Snap"},"printAreaSizes":{"default":{"w":1318,"h":2262}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26U-TCB-CS-G": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"gloss","size":"galaxy s26 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1344,"h":2285}}}
+   ]
+  },
+  "GLOBAL-TECH-SGS26U-TCB-CS-M": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1344,"h":2285}}}
+   ]
+  },
+  "GLOBAL-TUBE-SOCKS": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"gender":"Unisex","size":"l"},"printAreaSizes":{"default":{"w":6141,"h":5433}}}
+   ]
+  },
+  "H-APR-AA-BTIE": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Adult"},"printAreaSizes":{"default":{"w":7500,"h":10500}}}
+   ]
+  },
+  "H-APR-CA-BTIE": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Child"},"printAreaSizes":{"default":{"w":5850,"h":7500}}}
+   ]
+  },
+  "H-BLA-PBLWHITE": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"size":"l"},"printAreaSizes":{"default":{"w":8740,"h":5787}}}
+   ]
+  },
+  "H-BLA-PBMWHITE": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"size":"m"},"printAreaSizes":{"default":{"w":5905,"h":3838}}}
+   ]
+  },
+  "H-COAST-1PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
+   ]
+  },
+  "H-COAST-2PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"2-pack"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
+   ]
+  },
+  "H-COAST-4PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"4-pack"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
+   ]
+  },
+  "H-COAST-6PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"6-pack"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
+   ]
+  },
+  "H-MUG-11OZ-WB": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"black / white","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WBL": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / blue","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WG": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / green","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WO": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / orange","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WP": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / pink","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WR": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / red","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-MUG-11OZ-WY": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"white / yellow","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+   ]
+  },
+  "H-PLACE-1PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single"},"printAreaSizes":{"default":{"w":3425,"h":2421}}}
+   ]
+  },
+  "H-PLACE-2PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"2-pack"},"printAreaSizes":{"default":{"w":3425,"h":2421}}}
+   ]
+  },
+  "H-PLACE-4PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"4-pack"},"printAreaSizes":{"default":{"w":3425,"h":2421}}}
+   ]
+  },
+  "H-PLACE-6PK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"6-pack"},"printAreaSizes":{"default":{"w":3425,"h":2421}}}
+   ]
+  },
+  "H-TEATOWEL-SUB": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"paperType":"Cotton"},"printAreaSizes":{"default":{"w":5492,"h":8208}}}
+   ]
+  },
+  "HOOD-SS-STSK911": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Cruiser 2.0 STSK180"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}}
+   ]
+  },
+  "HOOD-SS-STSU812": {
+   "printAreas": ["back","front","neck label","sleeve"],
+   "variants": [
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"anthracite","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bottle green","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"black","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bright orange","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bright orange","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bright orange","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bright orange","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"bright orange","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"burgundy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"cotton pink","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"dark heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"french navy","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"heather grey","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"khaki","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"khaki","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"khaki","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"khaki","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"khaki","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"red","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"royal blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"spectra yellow","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"spectra yellow","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"spectra yellow","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"spectra yellow","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"spectra yellow","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"sky blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"sky blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"sky blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"sky blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"sky blue","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"vintage white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"2xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"3xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"l","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"m","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"s","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xl","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":4724,"h":4724},"front":{"w":4724,"h":4724}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3307,"h":4606},"front":{"w":3307,"h":4606},"neck label":{"w":3307,"h":4606},"sleeve":{"w":3307,"h":4606}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Drawstring","color":"white","gender":"Unisex","paperType":"85% organic ringspun cotton, 15% polyester","size":"xs","style":"Drummer 2.0 STSU168"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}}
+   ]
+  },
+  "JIGSAW-PUZZLE-110": {
+   "printAreas": ["jigsaw","lid"],
+   "variants": [
+    {"attributes":{"size":"110 pieces"},"printAreaSizes":{"jigsaw":{"w":2952,"h":2362},"lid":{"w":869,"h":674}}}
+   ]
+  },
+  "JIGSAW-PUZZLE-252": {
+   "printAreas": ["jigsaw","lid"],
+   "variants": [
+    {"attributes":{"size":"252 pieces"},"printAreaSizes":{"jigsaw":{"w":4429,"h":3366},"lid":{"w":869,"h":674}}}
+   ]
+  },
+  "JIGSAW-PUZZLE-30": {
+   "printAreas": ["jigsaw","lid"],
+   "variants": [
+    {"attributes":{"size":"30 pieces"},"printAreaSizes":{"jigsaw":{"w":2952,"h":2362},"lid":{"w":869,"h":674}}}
+   ]
+  },
+  "PET-BANDANA-LRG": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"paperType":"Polyester","size":"l"},"printAreaSizes":{"default":{"w":10158,"h":3306}}}
+   ]
+  },
+  "PET-BANDANA-MED": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"paperType":"Polyester","size":"m"},"printAreaSizes":{"default":{"w":9447,"h":2952}}}
+   ]
+  },
+  "PET-BANDANA-SML": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"paperType":"Polyester","size":"s"},"printAreaSizes":{"default":{"w":7500,"h":2244}}}
+   ]
+  },
+  "PLAY-CARD": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{},"printAreaSizes":{"default":{"w":820,"h":1122}}}
+   ]
+  },
+  "POSTER-HANGER-20-CAN-ROL-SC-8X48": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"black","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":7200}}},
+    {"attributes":{"color":"natural","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":7200}}},
+    {"attributes":{"color":"white","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":7200}}}
+   ]
+  },
+  "POSTER-HANGER-20-CAN-ROL-SC-8X60": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"black","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":9000}}},
+    {"attributes":{"color":"natural","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":9000}}},
+    {"attributes":{"color":"white","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1200,"h":9000}}}
+   ]
+  },
+  "POSTER-HANGER-30-CAN-ROL-SC-12X48": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"black","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":7200}}},
+    {"attributes":{"color":"natural","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":7200}}},
+    {"attributes":{"color":"white","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":7200}}}
+   ]
+  },
+  "POSTER-HANGER-30-CAN-ROL-SC-12X60": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"color":"black","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":9000}}},
+    {"attributes":{"color":"natural","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":9000}}},
+    {"attributes":{"color":"white","paperType":"Standard canvas (SC)","substrateWeight":"400gsm"},"printAreaSizes":{"default":{"w":1800,"h":9000}}}
+   ]
+  },
+  "SWEAT-SS-STSK913": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","size":"12-14 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","size":"3-4 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","size":"5-6 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","size":"7-8 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","size":"9-11 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","size":"12-14 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","size":"3-4 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","size":"5-6 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","size":"7-8 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","size":"9-11 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","size":"12-14 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","size":"3-4 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","size":"5-6 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","size":"7-8 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","size":"9-11 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"varsity green","gender":"Kids","size":"12-14 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"varsity green","gender":"Kids","size":"3-4 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"varsity green","gender":"Kids","size":"5-6 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"varsity green","gender":"Kids","size":"7-8 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"varsity green","gender":"Kids","size":"9-11 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","size":"12-14 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","size":"3-4 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","size":"5-6 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","size":"7-8 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","size":"9-11 years","style":"STSK913"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}}
+   ]
+  },
+  "TEE-SS-STTK909": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"anthracite","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"anthracite","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"anthracite","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"anthracite","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"anthracite","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"bright orange","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"bright orange","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"bright orange","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"bright orange","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"bright orange","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"burgundy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"caribbean blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"caribbean blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"caribbean blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"caribbean blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"caribbean blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"cotton pink","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"ochre","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"ochre","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"ochre","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"ochre","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"ochre","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"royal blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"royal blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"royal blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"royal blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"royal blue","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% organic ringspun cotton","size":"12-14 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% organic ringspun cotton","size":"3-4 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% organic ringspun cotton","size":"5-6 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% organic ringspun cotton","size":"7-8 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% organic ringspun cotton","size":"9-11 years","style":"Mini Creator 2.0 STTK184"},"printAreaSizes":{"back":{"w":3070,"h":3070},"front":{"w":3070,"h":3070}}}
+   ]
+  },
+  "TEE-SS-STTM559": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"2xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"l","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"m","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"s","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"black","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xs","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"2xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"l","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"m","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"s","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"french navy","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xs","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"2xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"l","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"m","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"s","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"heather grey","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xs","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"2xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"l","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"m","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"s","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"khaki","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xs","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"2xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"l","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"m","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"s","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xl","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}},
+    {"attributes":{"brand":"Stanley / Stella","edge":"Crew neck","color":"white","gender":"Men's","paperType":"100% organic ringspun cotton","size":"xs","style":"Sparker 2.0 STTU171"},"printAreaSizes":{"back":{"w":4677,"h":5881},"front":{"w":4677,"h":5881}}}
+   ]
+  },
+  "WRAP-KFT-ROL-70X200": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":8280,"h":23610}}}
+   ]
+  },
+  "WRAP-KFT-ROL-70X300": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":8280,"h":35430}}}
+   ]
+  },
+  "WRAP-KFT-ROL-70X500": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":8280,"h":59070}}}
+   ]
+  },
+  "WRAP-ROL-70X200": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":4133,"h":11811}}}
+   ]
+  },
+  "WRAP-ROL-70X300": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":4133,"h":17716}}}
+   ]
+  },
+  "WRAP-ROL-70X500": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"style":"Single","substrateWeight":"95gsm"},"printAreaSizes":{"default":{"w":4133,"h":29527}}}
+   ]
+  },
+  "XMAS-PLAS-BAUB": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{},"printAreaSizes":{"default":{"w":1003,"h":1062}}}
+   ]
+  },
+  "XMAS-PORC-BAUB": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{},"printAreaSizes":{"default":{"w":885,"h":885}}}
+   ]
+  },
+  "XMAS-SACK": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{},"printAreaSizes":{"default":{"w":3779,"h":5905}}}
+   ]
+  }
+ }
+}

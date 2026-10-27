@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { productVariantProviders, productVariants, products } from '@/db/schema';
+import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { syncProdigiCatalogue, type SyncReport } from '@/server/prodigi/sync';
 import type { ProdigiClient } from '@/server/prodigi/client';
 import type { DbHandle } from '@/server/db';
@@ -26,7 +26,9 @@ const mockClient: ProdigiClient = {
         ? [{ attributes: {}, shipsTo: ['US', 'CA'] }]
         : sku === 'TEST-MIXED-GB'
           ? [{ attributes: {}, shipsTo: ['US'] }, { attributes: {}, shipsTo: ['GB'] }]
-          : [{ attributes: {}, shipsTo: ['GB', 'US'] }];
+          : sku === 'TEST-SHAPE'
+            ? [{ attributes: {}, shipsTo: ['GB'], printAreaSizes: { default: { horizontalResolution: 2008, verticalResolution: 1725 } } }]
+            : [{ attributes: {}, shipsTo: ['GB', 'US'] }];
     return {
       sku,
       description: `Desc ${sku}`,
@@ -61,7 +63,11 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
       { sku: `${PK}-colour`, attrs: { colour: 'turquoise' }, sku2: 'TEST-COLOUR', provider: 'PRODIGI', isDefault: false },
       { sku: `${PK}-mixedgb`, attrs: { size: '8x10' }, sku2: 'TEST-MIXED-GB', provider: 'PRODIGI', isDefault: false },
       { sku: `${PK}-manual`, attrs: {}, sku2: 'TEST-MANUAL', provider: 'MANUAL', isDefault: false },
+      // a print template that isn't Prodigi's print-area shape (a square where Prodigi's is 2008×1725)
+      { sku: `${PK}-shape`, attrs: { size: 'heart' }, sku2: 'TEST-SHAPE', provider: 'PRODIGI', isDefault: false },
+      { sku: `${PK}-exact`, attrs: { size: 'heart' }, sku2: 'TEST-SHAPE', provider: 'PRODIGI', isDefault: false },
     ];
+    const templates: Record<string, { w: number; h: number }> = { [`${PK}-shape`]: { w: 1654, h: 1654 }, [`${PK}-exact`]: { w: 2008, h: 1725 } };
     let sort = 0;
     for (const v of variants) {
       const [variant] = await db
@@ -71,6 +77,13 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
       await db
         .insert(productVariantProviders)
         .values({ variantId: variant!.id, provider: v.provider, providerSku: v.sku2, providerConfig: v.config ?? null, isDefault: true });
+      const t = templates[v.sku];
+      if (t) {
+        await db.insert(printTemplates).values({
+          variantId: variant!.id, orientation: t.w === t.h ? 'SQUARE' : 'LANDSCAPE', printWidthMm: 1, printHeightMm: 1, bleedMm: 0, requiredDpi: 150,
+          printWidthPx: t.w, printHeightPx: t.h, aspectMilli: Math.round((t.w / t.h) * 1000), minSourceWidthPx: t.w, minSourceHeightPx: t.h,
+        });
+      }
     }
 
     report = await syncProdigiCatalogue(db, mockClient);
@@ -101,6 +114,13 @@ describe.skipIf(!URL)('prodigi catalogue sync — integration', () => {
   it('reconciles colours against the Prodigi colour axis', () => {
     const e = report.entries.find((x) => x.providerSku === 'TEST-COLOUR');
     expect(e?.warnings.some((w) => /colour/i.test(w))).toBe(true);
+  });
+
+  it("warns when a variant's print file isn't Prodigi's print area (and not when it is)", () => {
+    const shape = report.entries.find((x) => x.internalSku === `${PK}-shape`);
+    expect(shape?.warnings.some((w) => /different shape.*2008×1725/.test(w))).toBe(true);
+    const exact = report.entries.find((x) => x.internalSku === `${PK}-exact`);
+    expect(exact?.warnings).toEqual([]);
   });
 
   it('ignores MANUAL-fulfilled variants (add-ons)', () => {

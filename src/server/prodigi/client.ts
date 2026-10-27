@@ -26,6 +26,8 @@ export interface ProdigiVariant {
   attributes: Record<string, string>;
   /** ISO country codes this variant ships to. */
   shipsTo?: string[];
+  /** Each print area's file size in px, e.g. { default: { horizontalResolution: 2008, verticalResolution: 1725 } }. */
+  printAreaSizes?: Record<string, { horizontalResolution: number; verticalResolution: number }>;
 }
 
 export interface ProdigiProduct {
