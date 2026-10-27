@@ -1,0 +1,9 @@
+# Started when another Snickerdoodle unit fails (OnFailure=). Sends the unit's NAME only, never its
+# log (which could hold personal data), to ALERT_WEBHOOK_URL if one is set.
+[Unit]
+Description=Alert: %i failed
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/snickerdoodle/alert.env
+ExecStart=/usr/local/sbin/sd-alert %i

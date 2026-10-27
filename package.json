@@ -15,7 +15,8 @@
     "lint": "eslint .",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "jobs": "node --env-file-if-exists=.env scripts/jobs.mjs"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.7",
