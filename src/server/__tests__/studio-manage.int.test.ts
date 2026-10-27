@@ -134,6 +134,9 @@ describe.skipIf(!DB || !S3)('studio keepsake info', () => {
     await expect(duplicateCreation(db, blake, a.assetId)).rejects.toBeInstanceOf(AuthzError);
     await db.update(assets).set({ moderationStatus: 'FLAGGED' }).where(eq(assets.id, a.assetId));
     await expect(duplicateCreation(db, sam, a.assetId)).rejects.toBeInstanceOf(AuthzError); // held back for review
+    // reported (held while it's checked): its controller still sees it, but can't copy it
+    await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { reports: [{ reason: 'unsafe', at: new Date().toISOString(), via: 'home' }] } }).where(eq(assets.id, a.assetId));
+    await expect(duplicateCreation(db, sam, a.assetId)).rejects.toBeInstanceOf(AuthzError);
     const d = await ingestEphemeralUpload(db, { buffer: await png(), kind: 'DRAWING', termsVersion: 'test' });
     await expect(duplicateCreation(db, { accountId: null, membership: null, uploadClaim: d.claimId }, d.assetId)).rejects.toBeInstanceOf(AuthzError); // a draft
   });

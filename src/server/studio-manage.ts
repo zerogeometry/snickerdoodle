@@ -63,7 +63,7 @@ export async function deleteStudioCreation(db: DbHandle, viewer: ViewerContext, 
  */
 export async function duplicateCreation(db: DbHandle, viewer: ViewerContext, assetId: string): Promise<{ assetId: string; trimmedObjectId: string | null }> {
   const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
-  if (ref.ephemeralClaimId != null || !canSetAssetVisibility(ref, viewer)) throw new AuthzError({ allowed: false, reason: 'not found' });
+  if (ref.ephemeralClaimId != null || !canSetAssetVisibility(ref, viewer) || ref.heldForReview) throw new AuthzError({ allowed: false, reason: 'not found' });
   const [row] = await db.select().from(assets).where(eq(assets.id, assetId));
   if (!row || row.moderationStatus !== 'CLEAR') throw new AuthzError({ allowed: false, reason: 'not found' });
   const objects = await db.select().from(storageObjects).where(eq(storageObjects.assetId, assetId));
