@@ -330,6 +330,17 @@ const DEFS: Record<string, ProductDef> = {
   },
 };
 
+/**
+ * The products on show in the shop right now, straight from the curated definitions (no DB) —
+ * for the sitemap + product-page metadata, so search engines only ever hear about the
+ * storefront range (never a hidden or paused product).
+ */
+export function shopFrontProducts(): { key: string; label: string; blurb: string; description: string }[] {
+  return Object.entries(DEFS)
+    .filter(([, d]) => d.visibleInShop && !d.paused)
+    .map(([key, d]) => ({ key, label: d.label, blurb: d.blurb, description: d.description }));
+}
+
 // Front-of-shop order: the EXPECTED popularity to begin with, then actual sales (popularity.ts).
 function popularRankOf(key: string): number | null {
   const i = EXPECTED_POPULARITY.indexOf(key);
