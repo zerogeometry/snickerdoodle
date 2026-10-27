@@ -36,11 +36,11 @@ describe('CSP — production is strict', () => {
     for (const v of [...DEV_RELAXATIONS.script, ...DEV_RELAXATIONS.connect]) expect(csp).not.toContain(v);
   });
 
-  it('no third-party script, frame or worker — Stripe Checkout is a redirect, not an embed', () => {
+  it('no third-party script, frame or worker (only our own /sw.js) — Stripe Checkout is a redirect, not an embed', () => {
     const p = prod();
     expect(JSON.stringify(p)).not.toMatch(/stripe/i);
     expect(p['frame-src']).toEqual(["'none'"]);
-    expect(p['worker-src']).toEqual(["'none'"]);
+    expect(p['worker-src']).toEqual(["'self'"]); // the privacy-safe service worker, nothing else
   });
 
   it('keeps the framing/plugin/base/form rules (base tightened to none)', () => {

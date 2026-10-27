@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: '/:path*', headers: SECURITY_HEADERS },
+      // The service worker must never be served stale (a fix to it has to reach phones at once).
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] },
       ...['/_next/static/:path*', '/_next/image'].map((source) => ({ source, headers: [{ key: 'Content-Security-Policy', value: STATIC_ASSET_CSP }] })),
       ...NOINDEX_PATHS.flatMap((p) => [
         { source: p, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },

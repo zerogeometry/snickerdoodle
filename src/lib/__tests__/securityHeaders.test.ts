@@ -18,6 +18,12 @@ describe('security headers on every response', () => {
     expect(h['permissions-policy']).toContain('microphone=()');
   });
 
+  it('the service worker is never served stale (a fix to it reaches phones at once)', async () => {
+    const rules = (await nextConfig.headers!()) as Rule[];
+    const sw = rules.find((r) => r.source === '/sw.js')!;
+    expect(sw.headers.find((x) => x.key === 'Cache-Control')?.value).toMatch(/no-store/);
+  });
+
   it('the static files the proxy skips still get a policy that runs and frames nothing', async () => {
     const rules = (await nextConfig.headers!()) as Rule[];
     for (const source of ['/_next/static/:path*', '/_next/image']) {

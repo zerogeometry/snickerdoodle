@@ -24,6 +24,7 @@ import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 import { UploadSession } from '@/ui/components/UploadSession';
+import { ServiceWorkerRegister } from '@/ui/components/ServiceWorkerRegister';
 
 export const metadata: Metadata = {
   // the canonical public origin — canonical links, sitemaps and share cards resolve against it
@@ -34,7 +35,14 @@ export const metadata: Metadata = {
   openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website' },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
-  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32' }, { url: '/brand/favicon-192.png', sizes: '192x192' }], apple: '/brand/favicon-180.png' },
+  icons: {
+    icon: [
+      { url: '/brand/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/brand/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/brand/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/brand/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 };
 
 export const viewport: Viewport = {
@@ -62,6 +70,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         {children}
         <Toaster />
         <CookieBanner />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
