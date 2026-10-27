@@ -7,6 +7,10 @@ export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: ['src/**/*.test.ts'],
+    // The *.int.test.ts suites do real Postgres + object-store + image work; the 5s/10s defaults
+    // flake on a busy runner (a catalogue seed, a full-size print file).
+    testTimeout: 20_000,
+    hookTimeout: 60_000,
   },
   resolve: {
     alias: {

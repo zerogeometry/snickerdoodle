@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
+import { upscaleTierFor } from '@/server/print/geometry';
 import { liftInk, type InkLiftDiagnosis } from './inkLift';
+import { superResolve } from './superRes';
 
 /**
  * Self-hosted, in-region image ops — the "magic edits" (CLAUDE.md: SELF-HOST
@@ -8,12 +10,11 @@ import { liftInk, type InkLiftDiagnosis } from './inkLift';
  * single image out, re-encoded as PNG with NO metadata (EXIF/GPS gone), nothing
  * retained.
  *
- * These deterministic CPU ops (luma-key background removal, Lanczos upscale) run
- * in-process — no standing GPU, scale-to-zero by nature. This module is also the
- * single-image CONTRACT BOUNDARY: a heavy neural model (complex-photo cutout, ML
- * super-resolution of large enlargements) slots in by swapping the body of these
- * two functions for an HTTP call to a scale-to-zero worker, preserving the exact
- * one-image / no-retention / no-EXIF contract.
+ * These CPU ops run in-process — no standing GPU, scale-to-zero by nature. The upscale
+ * is TIERED: up to 2× it's an instant classical (Lanczos) resample; past that, a small
+ * super-resolution model runs on the CPU in-process (src/ml/superRes.ts), falling back
+ * to classical if the model isn't there. This module is also the single-image CONTRACT
+ * BOUNDARY: one image in, one PNG out, no EXIF, nothing retained.
  */
 
 // Analysis resolution for the background flood (the mask is upsampled smoothly after).
@@ -182,10 +183,27 @@ export async function floodRemoveBackground(input: Buffer): Promise<CutoutResult
   return { buffer, removedFraction: removed / (W * H) };
 }
 
-/** Classical (Lanczos) resample to the target size. Tier-0 of the tiered upscale;
- * a CPU ML super-resolution model is the tier-1 worker swap for large enlargements. */
+/** Classical (Lanczos) resample to the target size — tier 0 of the tiered upscale. */
 export async function upscale(input: Buffer, targetWidth: number, targetHeight: number): Promise<Buffer> {
   return sharp(input).resize(targetWidth, targetHeight, { kernel: 'lanczos3', fit: 'fill' }).png().toBuffer();
+}
+
+export type UpscaleMethod = 'classical' | 'super-res';
+
+/**
+ * The tiered upscale. Picks the tier from the enlargement factor (geometry.upscaleTierFor):
+ * ≤ 2× → classical (instant); more → CPU super-resolution, or classical when SR is
+ * unavailable / the source is over its size cap. Says which tier actually ran.
+ */
+export async function upscaleTiered(input: Buffer, targetWidth: number, targetHeight: number): Promise<{ buffer: Buffer; method: UpscaleMethod }> {
+  const meta = await sharp(input).metadata();
+  if (!meta.width || !meta.height) throw new Error('unreadable image');
+  const factor = Math.max(targetWidth / meta.width, targetHeight / meta.height);
+  if (upscaleTierFor(factor) === 1) {
+    const sr = await superResolve(input, targetWidth, targetHeight);
+    if (sr) return { buffer: sr, method: 'super-res' };
+  }
+  return { buffer: await upscale(input, targetWidth, targetHeight), method: 'classical' };
 }
 
 export type ImageOp = { kind: 'BG_REMOVE'; keepEnclosedPaper?: boolean } | { kind: 'UPSCALE'; width: number; height: number };
@@ -197,6 +215,8 @@ export interface ImageOpResult {
   sha256: string;
   /** BG_REMOVE only: how much of the image was detected + removed as background. */
   removedFraction?: number;
+  /** UPSCALE only: which tier ran. */
+  method?: UpscaleMethod;
 }
 
 /**
@@ -214,11 +234,12 @@ export async function runImageOp(op: ImageOp, input: Buffer): Promise<ImageOpRes
       removedFraction: cut.removedFraction,
     };
   }
-  const buffer = await upscale(input, op.width, op.height);
+  const { buffer, method } = await upscaleTiered(input, op.width, op.height);
   return {
     buffer,
     contentType: 'image/png',
     byteSize: buffer.byteLength,
     sha256: createHash('sha256').update(buffer).digest('hex'),
+    method,
   };
 }

@@ -1,0 +1,195 @@
+# Runs on every PR and on main: typecheck, lint, and the FULL test suite — including the
+# *.int.test.ts suites, which skip themselves without a database + object store. Postgres and
+# MinIO here mirror docker-compose.yml (throwaway CI-only credentials, never used anywhere real).
+# The authz matrix and the integration suites are launch gates (CLAUDE.md), so they must run here.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_visual_baselines:
+        description: 'Re-record the visual baselines on the CI runner (download the artifact, review, commit)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Shared by every job: the throwaway local stack (docker-compose.yml's credentials).
+env:
+  DATABASE_URL: postgres://snickerdoodle:localdev@localhost:5544/snickerdoodle
+  S3_ENDPOINT: http://localhost:9000
+  S3_REGION: eu-west-2
+  S3_ACCESS_KEY: minioadmin
+  S3_SECRET_KEY: minioadmin
+  S3_BUCKET: snickerdoodle-originals
+  S3_FORCE_PATH_STYLE: 'true'
+  AUTH_SECRET: ci-only-throwaway-secret-not-used-anywhere-real
+  JOBS_SECRET: ci-only-throwaway-jobs-secret
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      APP_URL: http://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # MinIO needs a start command, which a service container can't take — run it directly.
+      # Its built-in KMS key is the same throwaway one docker-compose.yml uses.
+      - name: Start MinIO (private local object store)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Unit + integration tests
+        run: npm test
+
+  # The real user journeys (docs/03) against a production build (Next 16) with the same Postgres +
+  # MinIO (its built-in KMS key, so originals are really encrypted). e2e/global-setup.ts seeds the
+  # catalogue and draws synthetic mockup templates in CI (the photoreal blanks are not in git).
+  # Playwright's own Chromium here — never the system Edge the local config defaults to.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: 'true'
+      # MinIO allows any origin, so the browser → bucket upload path runs too (e2e/direct-upload.spec.ts)
+      S3_DIRECT_UPLOADS: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Start MinIO (private local object store, with its local KMS key)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: npm run db:migrate
+      # playwright.config.ts's webServer builds (.next-e2e) and starts the app on :3100
+      - name: e2e journeys
+        run: npm run test:e2e
+      - name: Upload the e2e report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # Visual regression (tests/visual: 390px phone + laptop) against tests/visual/__screenshots__/linux.
+  # Those baselines were recorded on a different Linux Chromium build than this runner's, so until
+  # they're re-recorded HERE this job REPORTS (diffs uploaded) without blocking: run the workflow
+  # manually with "update visual baselines", download the `visual-baselines` artifact, review +
+  # commit it, then drop `continue-on-error`.
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Start MinIO (private local object store, with its local KMS key)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Visual regression
+        if: ${{ !inputs.update_visual_baselines }}
+        run: npm run test:visual
+      - name: Re-record the visual baselines on this runner
+        if: ${{ inputs.update_visual_baselines }}
+        run: npm run test:visual -- --update-snapshots
+      - name: Upload the re-recorded baselines
+        if: ${{ inputs.update_visual_baselines }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: tests/visual/__screenshots__/
+      - name: Upload the visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

@@ -330,6 +330,13 @@
       "when": 1793005014793,
       "tag": "0046_order_parcel_saving",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1793093680582,
+      "tag": "0047_waitlist",
+      "breakpoints": true
     }
   ]
 }

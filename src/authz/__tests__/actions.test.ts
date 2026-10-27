@@ -63,6 +63,7 @@ describe('canSetAssetVisibility (the asset controller, while an active member)',
     uploaderAccountId: 'acct-uploader',
     controllerAccountId: 'acct-controller',
     visibility: 'FAMILY',
+    heldForReview: false,
   };
   const activeIn = (accountId: string): ViewerContext => ({
     accountId,
@@ -93,6 +94,7 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
     uploaderAccountId: 'acct-uploader',
     controllerAccountId: 'acct-controller',
     visibility: 'FAMILY',
+    heldForReview: false,
   };
   const activeIn = (accountId: string): ViewerContext => ({ accountId, membership: mem({ accountId, familyId: 'fam-A' }) });
 
@@ -116,8 +118,8 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
 });
 
 describe('canDiscardDraft (only the holder of a draft’s upload claim)', () => {
-  const draft: AssetRef = { id: 'd1', familyId: null, uploaderAccountId: null, controllerAccountId: null, visibility: 'FAMILY', ephemeralClaimId: 'claim-1' };
-  const kept: AssetRef = { id: 'a1', familyId: 'fam-A', uploaderAccountId: 'acct-c', controllerAccountId: 'acct-c', visibility: 'FAMILY', ephemeralClaimId: null };
+  const draft: AssetRef = { id: 'd1', familyId: null, uploaderAccountId: null, controllerAccountId: null, visibility: 'FAMILY', ephemeralClaimId: 'claim-1', heldForReview: false };
+  const kept: AssetRef = { id: 'a1', familyId: 'fam-A', uploaderAccountId: 'acct-c', controllerAccountId: 'acct-c', visibility: 'FAMILY', ephemeralClaimId: null, heldForReview: false };
 
   it('the claim holder can discard their own draft', () =>
     expect(canDiscardDraft(draft, { accountId: null, membership: null, uploadClaim: 'claim-1' })).toBe(true));

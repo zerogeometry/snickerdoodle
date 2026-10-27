@@ -21,6 +21,7 @@ function asset(over: Partial<AssetRef> = {}): AssetRef {
     uploaderAccountId: CONTROLLER, // default: uploader IS the controller (a non-child asset)
     controllerAccountId: CONTROLLER,
     visibility: 'FAMILY',
+    heldForReview: false,
     ...over,
   };
 }
@@ -239,5 +240,51 @@ describe('ephemeral upload claim (pre-account guest draft)', () => {
   it('assertCanViewAsset throws for a draft without the matching claim', () => {
     expect(() => assertCanViewAsset(draft(), claimViewer(null))).toThrow(AuthzError);
     expect(() => assertCanViewAsset(draft(), claimViewer(CLAIM))).not.toThrow();
+  });
+});
+
+// ── Held for review after a report (D8; founder decision 2026-10-26) ─────────
+describe('a reported keepsake held for review', () => {
+  const held = (over: Partial<AssetRef> = {}) => asset({ heldForReview: true, uploaderAccountId: UPLOADER, ...over });
+  const TIERS = ['FAMILY', 'EXTENDED'] as const;
+
+  it('stays visible to its controller and its uploader (so they can see why, or delete it)', () => {
+    for (const visibility of TIERS) {
+      expect(canViewAsset(held({ visibility }), viewer(CONTROLLER, mem({ accountId: CONTROLLER, isOwner: true }))).allowed).toBe(true);
+      expect(canViewAsset(held({ visibility }), viewer(UPLOADER, mem({ accountId: UPLOADER, circle: 'EXTENDED', accessLevel: 'CONTRIBUTE' }))).allowed).toBe(true);
+    }
+    // ONLY_ME is unchanged: still the controller alone
+    expect(canViewAsset(held({ visibility: 'ONLY_ME' }), viewer(CONTROLLER, mem({ accountId: CONTROLLER, isOwner: true }))).allowed).toBe(true);
+    expect(canViewAsset(held({ visibility: 'ONLY_ME' }), viewer(UPLOADER, mem({ accountId: UPLOADER }))).allowed).toBe(false);
+  });
+
+  it('is hidden from every other member — every tier × circle × access, the family owner included', () => {
+    for (const visibility of [...TIERS, 'ONLY_ME'] as const) {
+      for (const circle of ['FAMILY', 'EXTENDED'] as const) {
+        for (const accessLevel of ['VIEW', 'VIEW_BUY', 'CONTRIBUTE'] as const) {
+          for (const isOwner of [false, true]) {
+            const m = viewer('acct-member', mem({ circle, accessLevel, isOwner }));
+            expect(canViewAsset(held({ visibility }), m).allowed).toBe(false);
+            expect(() => assertCanViewAsset(held({ visibility }), m)).toThrow(AuthzError);
+          }
+        }
+      }
+    }
+  });
+
+  it('never widens anything: other families, ex-members and anonymous viewers stay denied — the controller too once removed', () => {
+    expect(canViewAsset(held(), viewer('acct-other', mem({ accountId: 'acct-other', familyId: FAM_B }))).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer('acct-member', mem({ status: 'REMOVED' }))).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer(CONTROLLER, mem({ accountId: CONTROLLER, status: 'REMOVED' }))).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer(CONTROLLER, null)).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer(null)).allowed).toBe(false);
+  });
+
+  it('once cleared it is visible again exactly as its tier allows', () => {
+    const famMember = viewer('acct-member', mem({ circle: 'FAMILY' }));
+    const extMember = viewer('acct-member', mem({ circle: 'EXTENDED' }));
+    expect(canViewAsset(held({ heldForReview: false }), famMember).allowed).toBe(true);
+    expect(canViewAsset(held({ heldForReview: false, visibility: 'EXTENDED' }), extMember).allowed).toBe(true);
+    expect(canViewAsset(held({ heldForReview: false, visibility: 'FAMILY' }), extMember).allowed).toBe(false);
   });
 });

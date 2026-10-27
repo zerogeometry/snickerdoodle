@@ -1,7 +1,7 @@
 'use client';
 
 import { tiltedRect } from '@/lib/studio-geometry';
-import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconCircleCheck, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconArrowBackUp, IconArrowForwardUp, IconArrowsMaximize, IconCircleCheck, IconCircleX, IconRotateClockwise, IconShoppingBag, IconSparkles, IconX } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -12,7 +12,7 @@ import { gbp, toast, useBasket, usePlacements, useSelection } from '@/lib/store'
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { ProductKey } from '@/ui/components/ProductArt';
 import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/render';
-import { removeBackgroundAction } from '@/app/actions/magic';
+import { removeBackgroundAction, upscaleForPrintAction } from '@/app/actions/magic';
 import { mockupContextAction, type MockupContext } from '@/app/actions/mockup';
 import {
   canvasSizePx,
@@ -22,6 +22,8 @@ import {
   MAX_ZOOM,
   MIN_SCALE,
   mmToPx,
+  readinessState,
+  type PrintSharp,
   type Rotation,
   type Transform,
 } from '@/server/print/geometry';
@@ -110,6 +112,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // starts on the design the parent is placing (their Studio save / lifted cutout), not the original
   const [cutout, setCutout] = useState<{ url: string; sourceObjectId: string } | null>(data.keepsakes[0]?.design ?? null);
   const [removing, setRemoving] = useState(false);
+  // The print-sharp copy the server made for a source ("<asset>:<source>"), so the pill can say ✓.
+  const [printSharp, setPrintSharp] = useState<{ key: string; sharp: PrintSharp } | null>(null);
+  const [sharpening, setSharpening] = useState(false);
   // The product context: blank photo + print-area quad (+ silhouette mask) — so the image
   // is placed ON the product, not on an abstract canvas. Falls back to the flat canvas.
   const [ctx, setCtx] = useState<MockupContext | null>(null);
@@ -311,6 +316,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   );
   const rect = natural ? computeLayerRect(placeT, { width: natural.w, height: natural.h }, tf) : null;
   const assess = natural ? assessPrintResolution(t, { width: natural.w, height: natural.h }, tf, variant.productKey) : null;
+  // The pill: ready ✓ / needs a one-tap upscale / ready but soft / blocked ✗ (geometry.readinessState).
+  // A repeat pattern is judged on one motif, so the same one tap sharpens every motif it prints.
+  const sourceKey = `${keepsake.id}:${cutout?.sourceObjectId ?? 'original'}`;
+  const readiness = assess ? readinessState(assess, printSharp?.key === sourceKey ? printSharp.sharp : null) : null;
   // "Fit the whole image" scale for THIS product + rotation — the zoom slider's centre.
   // (A pattern's "fit" is its default motif size — scale 0 and 1 are the same repeat.)
   const fitScale = natural && !isPattern ? containScale(placeT, { width: natural.w, height: natural.h }, tf.rotationDeg) : 1;
@@ -426,6 +435,31 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       }
     } finally {
       setRemoving(false);
+    }
+  };
+
+  // One tap: "upscale to print quality". The server re-judges the placement and makes the
+  // print-sharp copy (self-hosted, in the background); the original is never touched.
+  const makePrintSharp = async () => {
+    if (sharpening) return;
+    setSharpening(true);
+    try {
+      const res = await upscaleForPrintAction({ assetId: keepsake.id, variantId: variant.id, transform: tf, sourceObjectId: cutout?.sourceObjectId });
+      if (res.ok && res.sharp) {
+        setPrintSharp({ key: sourceKey, sharp: res.sharp });
+        setResult(null);
+        toast(res.sharp.method === 'super-res' ? 'upscaled to print quality ✨' : 'sharpened as far as it’ll go ✨');
+      } else if (res.ok && res.state === 'blocked') {
+        toast('too small to print well at this size');
+      } else if (!res.ok && res.reason === 'budget') {
+        toast('that’s all your magic edits for now');
+      } else if (!res.ok && res.reason === 'too-many') {
+        toast(TOO_MANY_COPY);
+      } else if (!res.ok) {
+        toast('couldn’t do that — try again');
+      }
+    } finally {
+      setSharpening(false);
     }
   };
 
@@ -1127,37 +1161,61 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           </p>
           {livePlace === 'below' ? renderLivePreview('below') : null}
 
-          {/* DPI status — live (recomputed on every zoom/rotate commit), with the FIX
-              offered right where the warning is, never a dead end. */}
-          {assess ? (
+          {/* Print readiness — live (recomputed on every zoom/rotate commit), with the FIX
+              right where the warning is, never a dead end: one tap to upscale when it's
+              recoverable, or fit a size that prints well. */}
+          {assess && readiness ? (
             <div
-              className={`mt-3 flex flex-wrap items-center gap-2 rounded-[14px] border-2 px-3 py-2 text-[12px] font-semibold ${
-                assess.decision === 'OK'
+              key={readiness}
+              role="status"
+              className={`pop-in mt-3 flex flex-wrap items-center gap-2 rounded-[14px] border-2 px-3 py-2 text-[12px] font-semibold ${
+                readiness === 'ready'
                   ? 'border-leaf bg-leaf-pale text-green-save'
-                  : assess.decision === 'UPSCALE'
-                    ? 'border-sunshine bg-honey-band text-cocoa'
-                    : 'border-cocoa bg-berry-pale text-cocoa'
+                  : readiness === 'blocked'
+                    ? 'border-cocoa bg-berry-pale text-cocoa'
+                    : 'border-sunshine bg-honey-band text-cocoa'
               }`}
             >
-              <Icon icon={assess.decision === 'BLOCK' ? IconAlertTriangle : IconCircleCheck} size={15} />
+              <Icon
+                icon={readiness === 'blocked' ? IconCircleX : readiness === 'needs-upscale' ? IconAlertTriangle : IconCircleCheck}
+                size={15}
+              />
               <span className="min-w-0 flex-1">
-                {assess.decision === 'OK'
-                  ? `print-ready · ${t.requiredDpi} dpi`
-                  : assess.decision === 'UPSCALE'
-                    ? assess.softUpClose
+                {readiness === 'ready'
+                  ? assess.decision === 'OK'
+                    ? `print-ready · ${t.requiredDpi} dpi`
+                    : assess.tier === 1
+                      ? 'print-ready · upscaled to print quality'
+                      : `print-ready · gently enhanced to ${t.requiredDpi} dpi`
+                  : readiness === 'needs-upscale'
+                    ? 'a little small for this size — one tap sharpens it up'
+                    : readiness === 'ready-soft'
                       ? 'lovely from a step back, a little soft up close'
-                      : `we'll gently enhance it (about ${assess.effectiveDpi} dpi here)`
-                    : dpiFix !== null
-                      ? 'image quality too low at this size'
-                      : 'too small to print well here — try a smaller product'}
+                      : dpiFix !== null
+                        ? 'too small to print well at this size'
+                        : 'too small to print well here — try a smaller product'}
               </span>
-              {dpiFix !== null ? (
+              {readiness === 'needs-upscale' ? (
+                <button
+                  type="button"
+                  onClick={makePrintSharp}
+                  disabled={sharpening}
+                  aria-busy={sharpening}
+                  className="press relative inline-flex min-h-11 items-center gap-1.5 rounded-pill border-2 border-cocoa bg-cta px-3.5 text-[12px] font-extrabold text-cta-text shadow-[0_2px_0_var(--color-cta-deep)] disabled:opacity-70"
+                >
+                  <span className={sharpening ? 'loader-bob inline-flex' : 'inline-flex'}>
+                    <Icon icon={IconArrowsMaximize} size={14} />
+                  </span>
+                  {sharpening ? 'sharpening…' : 'upscale to print quality'}
+                </button>
+              ) : null}
+              {dpiFix !== null && readiness !== 'ready' ? (
                 <button
                   type="button"
                   onClick={() => update({ scale: dpiFix.scale })}
-                  className="press relative min-h-9 rounded-pill border-2 border-cocoa bg-paper px-3 text-[11px] font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[4px] before:content-['']"
+                  className="press relative min-h-11 rounded-pill border-2 border-cocoa bg-paper px-3 text-[11px] font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[4px] before:content-['']"
                 >
-                  {dpiFix.kind === 'ok' ? 'zoom out to print-ready' : 'zoom out to fix'}
+                  fit a size that prints well
                 </button>
               ) : null}
             </div>
@@ -1316,19 +1374,19 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           {/* Primary action: a thumb-zone dock on phones (kraft, like the landing's), inline from md. */}
           <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-5 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
           {returnTo ? (
-            <Button size="lg" className="w-full" onClick={saveReturn} disabled={assess?.decision === 'BLOCK'}>
+            <Button size="lg" className="w-full" onClick={saveReturn} disabled={readiness === 'blocked'}>
               <Icon icon={IconArrowBackUp} size={16} /> save &amp; return
             </Button>
           ) : (
-            <Button size="lg" className="w-full" onClick={add} disabled={assess?.decision === 'BLOCK'}>
+            <Button size="lg" className="w-full" onClick={add} disabled={readiness === 'blocked'}>
               <Icon icon={IconShoppingBag} size={16} />{' '}
               {draft ? `keep it & check out · ${gbp(variant.pricePence)}` : `add to basket · ${gbp(variant.pricePence)}`}
             </Button>
           )}
           </div>
-          {/* Why the button is greyed — right where the friction is (the DPI badge + its one-tap
-              "zoom out to fix" sits under the canvas, easy to miss next to a disabled save). */}
-          {assess?.decision === 'BLOCK' ? (
+          {/* Why the button is greyed — right where the friction is (the readiness pill + its
+              "fit a size that prints well" sits under the canvas, easy to miss next to a disabled save). */}
+          {readiness === 'blocked' ? (
             <p role="status" className="mt-2 text-center text-[11px] font-semibold text-cinnamon">
               zoom out a touch or upload another. the image quality is too low at this size.
             </p>
@@ -1336,7 +1394,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           <button
             type="button"
             onClick={generate}
-            disabled={rendering || assess?.decision === 'BLOCK'}
+            disabled={rendering || readiness === 'blocked'}
             className="mt-2 min-h-11 w-full text-center text-xs font-bold text-cinnamon disabled:opacity-50"
           >
             {rendering ? 'rendering…' : 'preview the exact print file'}
@@ -1347,7 +1405,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <p className="mb-2 text-[11px] font-bold text-green-save">your print file — exactly what gets made</p>
               <img src={result.url} alt="rendered print file" className="w-full border border-line" />
               <p className="mt-2 text-[11px] text-ink-soft">
-                {result.widthPx}×{result.heightPx}px · {result.renderedDpi} dpi{result.upscaled ? ' · gently enhanced' : ''}
+                {result.widthPx}×{result.heightPx}px · {result.renderedDpi} dpi
+                {result.upscaleMethod === 'super-res' ? ' · upscaled to print quality' : result.upscaled ? ' · gently enhanced' : ''}
               </p>
             </div>
           ) : result && !result.ok && result.blocked ? (

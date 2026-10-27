@@ -15,6 +15,7 @@ const healthy = (over: Partial<RetentionSteps> = {}): RetentionSteps => ({
   rateLimits: vi.fn(async () => 4),
   quarantine: vi.fn(async () => ({ deleted: 5, failed: 0 })),
   support: vi.fn(async () => 6),
+  waitlist: vi.fn(async () => ({ purged: 7 })),
   ...over,
 });
 
@@ -27,7 +28,7 @@ describe('retention run', () => {
 
   it('a clean run is ok, counts everything, and logs nothing', async () => {
     const r = await runRetention(db, healthy());
-    expect(r).toMatchObject({ ok: true, errors: [], scanned: 3, purged: 3, failed: 0, auditPurged: 1, pendingKeepsPurged: 2, rateLimitsPurged: 4, quarantineSwept: 5, supportPurged: 6 });
+    expect(r).toMatchObject({ ok: true, errors: [], scanned: 3, purged: 3, failed: 0, auditPurged: 1, pendingKeepsPurged: 2, rateLimitsPurged: 4, quarantineSwept: 5, supportPurged: 6, waitlistPurged: 7 });
     expect(errors).not.toHaveBeenCalled();
   });
 
@@ -49,7 +50,7 @@ describe('retention run', () => {
     const r = await runRetention(db, steps);
     expect(r.ok).toBe(false);
     expect(r.errors).toEqual(['assets: S3 unavailable', 'quarantine: S3 unavailable']);
-    for (const s of ['audit', 'pendingKeeps', 'rateLimits', 'support'] as const) expect(steps[s]).toHaveBeenCalledTimes(1);
+    for (const s of ['audit', 'pendingKeeps', 'rateLimits', 'support', 'waitlist'] as const) expect(steps[s]).toHaveBeenCalledTimes(1);
     expect(r).toMatchObject({ auditPurged: 1, pendingKeepsPurged: 2, rateLimitsPurged: 4, supportPurged: 6, quarantineSwept: null });
   });
 

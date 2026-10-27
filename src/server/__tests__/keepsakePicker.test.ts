@@ -20,6 +20,7 @@ const row = (id: string, over: Partial<PickerRow['asset']> = {}): PickerRow => (
     visibility: 'FAMILY',
     keptInHome: true,
     moderationStatus: 'CLEAR',
+    moderationDetail: null,
     createdAt: new Date('2026-10-01'),
     childSubjectId: null,
     ...over,

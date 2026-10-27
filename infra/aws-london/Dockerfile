@@ -23,7 +23,8 @@ ARG NODE_IMAGE=node:22-bookworm-slim
 FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY package.json package-lock.json ./
+# .npmrc skips onnxruntime-node's CUDA download (hundreds of MB we never use — no GPU)
+COPY package.json package-lock.json .npmrc ./
 # An OPTIONAL extra CA for npm, for building behind an intercepting proxy. It is a build secret,
 # so it never lands in a layer. Not needed on a normal network:
 #   --secret id=extra_ca,src=/path/to/ca-bundle.crt
@@ -70,6 +71,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/.next ./.next
 COPY --from=build /app/public ./public
 COPY --from=build /app/src ./src
+# the print-sharp upscaler's model (src/ml/superRes.ts reads it from disk; without it every
+# enlargement quietly falls back to the plain resample)
+COPY --from=build /app/models ./models
 COPY --from=build /app/infra/aws-london/bin/migrate.mjs /app/infra/aws-london/bin/start.mjs ./infra/
 
 # Non-root. The app's files belong to root, so the app user can read but never change them, and
