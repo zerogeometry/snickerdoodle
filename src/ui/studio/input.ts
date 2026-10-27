@@ -7,6 +7,13 @@ export const PEN_GRACE_MS = 1200;
 /** A contact patch wider or taller than this (CSS px) is a palm, not a fingertip. */
 export const PALM_CONTACT_PX = 64;
 
+/** A multi-finger TAP: quick, and no finger travelled. Two fingers = undo, three = redo. */
+export const TAP_MS = 350;
+export function multiTapAction(t: { fingers: number; ms: number; moved: boolean }): 'undo' | 'redo' | null {
+  if (t.moved || t.ms > TAP_MS) return null;
+  return t.fingers === 2 ? 'undo' : t.fingers === 3 ? 'redo' : null;
+}
+
 /**
  * PALM REJECTION: a touch is ignored while a pen is on the glass or was just lifted (the hand
  * holding it is resting there), or when its contact patch is palm-sized on devices that report it.
