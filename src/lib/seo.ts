@@ -16,7 +16,7 @@ export const siteOrigin = (env: Record<string, string | undefined> = process.env
 
 /** Never crawled. Keep in step with NOINDEX_PATHS in next.config.ts (which also sends noindex).
  * `/customize/<productKey>` is crawlable; anything else under /customize is noindex by header. */
-export const PRIVATE_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/studio', '/share-wish', '/admin', '/g/', '/join', '/login', '/api/', '/test-gate', '/dev', '/offline'];
+export const PRIVATE_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/studio', '/share-wish', '/admin', '/g/', '/join', '/login', '/api/', '/test-gate', '/dev', '/offline', '/waitlist/'];
 
 /** A product page's path — the one indexable URL per product on show. */
 export const productPagePath = (productKey: string) => `/customize/${productKey}`;

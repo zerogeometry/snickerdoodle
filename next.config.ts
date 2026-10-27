@@ -31,7 +31,7 @@ const STATIC_ASSET_CSP = "default-src 'none'; img-src 'self'; style-src 'self'; 
  * marketing pages and the shop's front door (/start-creating + one product page per product) are.
  * Belt and braces: these pages are behind sign-in or a token anyway. src/lib/seo.ts lists the same
  * for robots.txt. */
-const NOINDEX_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/studio', '/share-wish', '/admin', '/g', '/join', '/login', '/api', '/dev', '/offline', '/test-gate'];
+const NOINDEX_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/studio', '/share-wish', '/admin', '/g', '/join', '/login', '/api', '/dev', '/offline', '/test-gate', '/waitlist'];
 /** /customize itself, and anything under it that ISN'T exactly one plain product segment
  * (`/customize/framedPrint` is indexable; `/customize/x/y`, `/customize/a.b` are not). A product
  * that isn't on show says noindex from its own metadata (src/app/customize/[productKey]/layout.tsx). */

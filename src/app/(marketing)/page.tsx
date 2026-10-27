@@ -12,6 +12,7 @@ import { RangeHero } from '@/ui/components/RangeHero';
 import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
+import { WaitlistSignup } from '@/ui/components/WaitlistSignup';
 import { ChristmasHeroVisual } from '@/ui/components/ChristmasHeroVisual';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import Image from 'next/image';
@@ -215,6 +216,26 @@ export default function LandingPage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* Hear about new things first — the news list (email only, PECR double opt-in). Quiet, on the kraft page. */}
+      <section id="hear-first" aria-labelledby="hear-first-title" className="relative scroll-mt-6 px-6 py-14 md:py-20">
+        <div className="relative z-10 mx-auto grid max-w-5xl items-center gap-8 md:grid-cols-[1fr_1.15fr] md:gap-12">
+          <div className="text-center md:text-left">
+            <h2 id="hear-first-title" className="font-display text-2xl leading-tight text-cocoa md:text-3xl">
+              Hear about new things first
+            </h2>
+            <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft md:mx-0">
+              New keepsakes, seasonal bits and the odd peek behind the scenes — a couple of emails a month, at most.
+            </p>
+          </div>
+          <div
+            className="tape rounded-[22px] border-2 border-cocoa bg-paper p-5 shadow-[0_4px_0_var(--color-cocoa)] md:rotate-[0.6deg] md:p-7"
+            style={{ ['--tape' as string]: TAPE[1], ['--tape-rot' as string]: '-4deg' }}
+          >
+            <WaitlistSignup />
+          </div>
         </div>
       </section>
 

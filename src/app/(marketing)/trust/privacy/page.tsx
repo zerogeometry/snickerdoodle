@@ -41,6 +41,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Your creations</strong> — the drawings and photos you upload, and the designs we make from them.</li>
           <li><strong>Your orders</strong> — what you bought, your delivery address, and a secure payment token (we never see or store your full card details).</li>
           <li><strong>Your preferences</strong> — your marketing and reminder choices.</li>
+          <li><strong>Our news list</strong> — just your email address, if you ask to hear about new things first (nothing about your children, ever).</li>
           <li><strong>Wishlists and shares</strong> — the wishlists you create and the private links you share with family.</li>
           <li><strong>Messages you send us</strong> — what you tell us through our help page (and any order reference), plus the email address we reply to.</li>
           <li><strong>Basic technical data</strong> — device and cookie data, for security and to keep the site working.</li>
@@ -108,6 +109,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Messages you send us through the help page:</strong> two years after we receive them, so we can look back if an order needs it — then deleted.</li>
           <li><strong>Account data:</strong> until you close your account.</li>
           <li><strong>Marketing choices:</strong> until you change them.</li>
+          <li><strong>Our news list:</strong> if you never tap the confirmation link, we delete your email after 30 days. Once you&apos;ve confirmed, until you unsubscribe — after that we keep only a note of your address and that you said no, so we never email you by mistake.</li>
           <li><strong>Backups:</strong> when we delete something it&apos;s gone from our live systems straight away, and from our backups within 14 days. Backups are only ever used to recover from a fault — never for anything else — and if we ever restore one, we re-apply every deletion made since.</li>
           <li><strong>A record of what we did:</strong> a minimal log of actions — for example &ldquo;a keepsake was deleted&rdquo; — with no names, pictures or words in it, kept for six years so we can show we did what we said.</li>
         </ul>

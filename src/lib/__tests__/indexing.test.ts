@@ -25,7 +25,7 @@ async function noindexed(pathname: string): Promise<boolean> {
 const PRIVATE = [
   '/home', '/home/keepsakes', '/family', '/family/abc', '/studio', '/studio/position', '/checkout', '/checkout/confirmation',
   '/g/abc123', '/join/tok', '/account', '/orders', '/orders/SNK-1', '/login', '/share-wish', '/admin/review',
-  '/api/gift/t/preview/a', '/dev/spin', '/offline', '/test-gate',
+  '/api/gift/t/preview/a', '/dev/spin', '/offline', '/test-gate', '/waitlist/confirm', '/waitlist/unsubscribed', '/api/waitlist/unsubscribe',
 ];
 
 describe('search indexing — the shop front is open, the private app is not', () => {
