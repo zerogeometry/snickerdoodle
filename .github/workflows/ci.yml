@@ -54,14 +54,16 @@ jobs:
           node-version: 22
           cache: npm
 
-      # MinIO needs a start command, which a service container can't take — run it directly. Its
-      # built-in KMS key is the same throwaway LOCAL key as docker-compose.yml.
+      # MinIO needs a start command, which a service container can't take — run it directly. MinIO no
+      # longer publishes public images, so this is Chainguard's maintained build of the same server
+      # (pinned by digest; it runs as non-root, so its data lives under /tmp). Its built-in KMS key is
+      # the same throwaway LOCAL key as docker-compose.yml.
       - name: Start MinIO (private local object store)
         run: |
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
             -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
-            minio/minio:latest server /data
+            cgr.dev/chainguard/minio@sha256:a1d2b3516a41296510f7fb49184c18b88287fa8f35cf3ce5c047289053b94964 server /tmp/data
           for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
           docker logs minio; exit 1
 
