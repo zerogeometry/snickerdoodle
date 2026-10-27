@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
@@ -425,12 +425,34 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     orderIds.push(o!.id);
 
     const transport = fakeTransport();
-    const first = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [o!.id] });
+    const said: string[] = [];
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    const err = vi.spyOn(console, 'error').mockImplementation((m) => void said.push(String(m)));
+    const first = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [o!.id] }).finally(() => {
+      log.mockRestore();
+      err.mockRestore();
+    });
     expect(first.skipped).toBe(1);
+    expect(said).toContain(`[fulfilment] order SNK-manual-${ids.nonce} needs packing by hand: giftWrap`);
     expect((await orderRow(o!.id)).nextSubmitAttemptAt!.getTime()).toBeGreaterThan(Date.now());
 
     const second = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [o!.id] });
     expect(second.considered).toBe(0); // parked — no longer occupies the batch
+  });
+
+  it('a gift-wrap line in a printed order is never dropped silently — the printer gets the print, the packer gets told', async () => {
+    const { orderId } = await paidOrder('framedPrint');
+    await db.insert(orderItems).values({ orderId, productKey: 'giftWrap', qty: 1, unitPricePence: 300, linePence: 300 });
+    await renderUntilReady(orderId);
+    const transport = fakeTransport();
+    const said: string[] = [];
+    const err = vi.spyOn(console, 'error').mockImplementation((m) => void said.push(String(m)));
+    const res = await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId] }).finally(() => err.mockRestore());
+    expect(res.submitted).toBe(1);
+    expect(transport.created).toHaveLength(1);
+    expect(transport.created[0]!.items).toHaveLength(1); // the print only — wrap isn't Prodigi's
+    const ref = (await orderRow(orderId)).ref;
+    expect(said).toContain(`[fulfilment] order ${ref} needs packing by hand: giftWrap`);
   });
 
   it('a transport failure reverts the claim and records the error for retry', async () => {
