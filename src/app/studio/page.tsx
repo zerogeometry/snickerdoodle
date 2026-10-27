@@ -22,6 +22,9 @@ import { Modal } from '@/ui/primitives/Modal';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { setAssetVisibilityAction } from '@/app/actions/keep';
+import { studioInfoAction } from '@/app/actions/studio';
+import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
@@ -125,6 +128,21 @@ export default function StudioPage() {
   // a continuous turn (slider / dial / drag) works from where it started, so it never drifts
   const turnBase = useRef<{ geo: Geometry; objects: StudioObject[]; at: number } | null>(null);
   const scratch = !!upload?.scratch;
+  // who can see it (resolved on the server) — for the "this stays yours" pill
+  const [info, setInfo] = useState<KeepsakeInfo | null>(null);
+  const refreshInfo = useCallback(async (id: string) => {
+    const r = await studioInfoAction({ assetId: id });
+    if (r.ok) setInfo({ draft: r.draft, kept: r.kept, visibility: r.visibility, canManage: r.canManage, people: r.people });
+  }, []);
+  useEffect(() => {
+    if (assetId) void refreshInfo(assetId);
+  }, [assetId, refreshInfo]);
+  const changeVisibility = async (tier: Tier) => {
+    if (!assetId) return;
+    const r = await setAssetVisibilityAction(assetId, tier);
+    toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
+    await refreshInfo(assetId);
+  };
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1044,9 +1062,15 @@ export default function StudioPage() {
               <span className="animate-pulse">getting your drawing ready…</span>
             </div>
           )}
-          {comparing ? <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span> : null}
+          {comparing ? (
+            <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span>
+          ) : ready ? (
+            <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] sm:max-w-[60%]">
+              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
+            </div>
+          ) : null}
           {busy ? (
-            <div role="status" className="absolute inset-x-0 top-3 mx-auto w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
+            <div role="status" className="absolute inset-x-0 top-16 mx-auto sm:top-3 w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
               {busy}
             </div>
           ) : null}
