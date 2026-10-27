@@ -116,6 +116,7 @@ export const LIMITS = {
   complaintPerIp: { bucket: 'complaint:ip', limit: 5, windowSec: 3600 },
   supportPerIp: { bucket: 'support:ip', limit: 6, windowSec: 3600 },
   reportPerIp: { bucket: 'report:ip', limit: 10, windowSec: 3600 },
+  reportPerAccount: { bucket: 'report:account', limit: 10, windowSec: 3600 },
   invitesPerAccount: { bucket: 'invite:account', limit: 20, windowSec: 3600 },
   giftLinksPerAccount: { bucket: 'gift-link:account', limit: 30, windowSec: 3600 },
   giftRequestsPerAccount: { bucket: 'gift-request:account', limit: 20, windowSec: 3600 },
