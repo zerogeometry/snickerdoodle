@@ -176,11 +176,18 @@ export const cushionSupportsBack = (size: string | null | undefined): boolean =>
  * Stone"). Used to preview their reverse — a warm taupe sampled from Prodigi's rear shot. */
 export const CUSHION_SUEDE_BACK_HEX = '#bba585';
 
+/** The size a product is SOLD as, where its print area runs past it: Prodigi's blanket print file
+ * includes a margin round the finished blanket (1000×650mm for the "60x100cm" medium), and Prodigi
+ * names the blankets by their finished size, so the shopper sees that. */
+const SOLD_AS_CM: Record<string, Record<string, string>> = { blanket: { medium: '60 × 100 cm', large: '100 × 150 cm' } };
+
 /** A shopper-facing size → its physical size in cm, read from the size's variant print mm
  * (the same dimensions Prodigi lists). `min × max` so both orientations read the same nominal
  * size. Returns undefined when the size has no print mm. Used as a sub-label on word-sized size
  * buttons (e.g. the blanket's medium/large) so the shopper sees exactly how big it is. */
 export function sizeDimsCm(p: CatalogueProduct, size: string): string | undefined {
+  const nominal = SOLD_AS_CM[p.key]?.[size];
+  if (nominal) return nominal;
   const v = p.variants.find((x) => x.attributes.size === size && x.printWmm != null && x.printHmm != null);
   if (v?.printWmm == null || v.printHmm == null) return undefined;
   const lo = Math.round(Math.min(v.printWmm, v.printHmm) / 10);

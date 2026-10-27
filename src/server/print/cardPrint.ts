@@ -4,16 +4,17 @@ import { renderCardInsidePanels } from './cardText';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 
 /**
- * The Prodigi CLASSIC-GRE-FEDR-7X5 greetings-card artboard, MEASURED from the official template
- * (prodigi-classic-greetings-card-7x5.png): 6236×2220 px @300dpi, FOUR equal panels, a vertical
- * (side) fold in each pair — so NO panel is rotated. Left→right:
+ * The Prodigi CLASSIC-GRE-FEDR-7X5 greetings-card artboard: Prodigi's EXACT printAreaSizes, 6120×2160 px
+ * @300dpi (sandbox, 27 Oct — their template PNG measures 6236×2220, i.e. more bleed, but the order is
+ * sized to the API's area, so a template-sized file was shrunk and trimmed). FOUR equal panels, a
+ * vertical (side) fold in each pair — so NO panel is rotated. Left→right:
  *   [ outer rear | outer front | inside front | inside back ]
  * The design goes on the outer FRONT (spanning the outer REAR too when full-width); the branding on
  * the outer REAR; the note on INSIDE FRONT (the facing/left page) and the greeting/message/signature
  * on INSIDE BACK (the right page). "Cover the entire artboard" — Prodigi trims each 5×7 out.
  */
-export const CARD_SPREAD = { widthPx: 6236, heightPx: 2220 } as const;
-const PANEL_W = CARD_SPREAD.widthPx / 4; // 1559 — even quarters (matches the template trim lines ±1px)
+export const CARD_SPREAD = { widthPx: 6120, heightPx: 2160 } as const;
+const PANEL_W = CARD_SPREAD.widthPx / 4; // 1530 — even quarters
 // The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
 // founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel).
 const BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
@@ -71,7 +72,7 @@ export interface CardPrintInput {
 }
 
 /**
- * Assemble the card's flat 4-panel PRINT file (6236×2220 @300dpi). front-only fills the outer-front
+ * Assemble the card's flat 4-panel PRINT file (6120×2160 @300dpi). front-only fills the outer-front
  * panel with the design; full-width spans outer rear+front. A base colour fills exactly the panels
  * the design covers (front-only leaves the rear white). A blank inside stays white. The screened
  * message and the font token are the single source of truth shared with the on-screen preview, so

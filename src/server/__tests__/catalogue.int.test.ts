@@ -48,7 +48,8 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     const [framed] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     const tpl = await db.select().from(printTemplates).where(eq(printTemplates.variantId, framed!.id));
     expect(tpl).toHaveLength(1);
-    expect(tpl[0]!.printWidthMm).toBe(279); // default framed print is now 11×14″ (279mm wide)
+    // default framed print is 11×14″ — Prodigi's exact print area, 3307×4192px @300dpi (280mm wide), no bleed
+    expect(tpl[0]).toMatchObject({ printWidthPx: 3307, printHeightPx: 4192, requiredDpi: 300, bleedMm: 0, printWidthMm: 280 });
 
     const [wrap] = await db.select().from(productVariants).where(eq(productVariants.sku, 'giftWrap'));
     expect(await db.select().from(printTemplates).where(eq(printTemplates.variantId, wrap!.id))).toHaveLength(0);

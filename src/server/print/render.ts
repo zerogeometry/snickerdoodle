@@ -11,7 +11,7 @@ import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { GALLERY_FIT, type RawTransform, assessResolution, canvasSizePx, clampTransform, computeLayerRect, galleryArtGeom, galleryRect, isGalleryProduct } from './geometry';
+import { GALLERY_FIT, type RawTransform, assessResolution, canvasSizePx, clampTransform, computeLayerRect, galleryArtGeom, galleryRect, isGalleryProduct, templateGeom } from './geometry';
 import { renderRepeatPattern } from './pattern';
 import { renderHeightChartFace } from './heightChart';
 import { isHeightChart } from './height-chart-geometry';
@@ -91,7 +91,7 @@ export async function renderPrintFile(
   const judged = await printSourceDims(db, input.assetId, srcObj, src);
 
   const transform = clampTransform(input.transform);
-  const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
+  const geom = templateGeom(tpl);
 
   const [variantRow] = await db
     .select({ attributes: productVariants.attributes, key: products.key })

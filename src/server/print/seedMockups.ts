@@ -249,14 +249,13 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       return { file: `${JIG}/${f}`, material: 'PAPER', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
     }
     case 'blanket': {
-      // WHITE only for now; the blanket offers portrait/landscape (native PORTRAIT — the print
-      // canvas is 600×1000mm, taller than wide).
+      // WHITE only for now; the blanket offers portrait/landscape. (Prodigi's print file is LANDSCAPE;
+      // the photos below are what's turned, each variant's canvas already has its own shape.)
       const orientation = attrs.orientation === 'landscape' ? 'landscape' : 'portrait';
       const dir = layeredBlanketDir('white');
       // Preferred: the founder's authored layers (background → shadow → white face).
       if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-blanket', dir, orientation };
-      // Flat-photo fallback: the landscape Prodigi photo rotated to the portrait native canvas
-      // (a landscape variant then rotates the finished blank the other way via the generic flag).
+      // Flat-photo fallback: the landscape Prodigi photo, turned 90° for the portrait variant.
       return { file: 'prodigi-fleece-blanket-blank-asset/Prodigi Fleece Blanket blank.jpg', material: 'LIGHT_FABRIC', register: 'face-cover', mask: false, ...(orientation === 'portrait' ? { rotate: 90 as const } : {}) };
     }
     case 'calendar': {
@@ -641,9 +640,10 @@ async function layeredCushion(dir: string): Promise<{ blank: Buffer; mask: Buffe
  * (a white face at the print's true dimensions, transparent surround) is the registration
  * authority: its OPAQUE region is BOTH the print quad and the silhouette mask (the art clips to
  * the blanket face). The stored blank composites background → shadow → the white face. NO overlay
- * (a flat fleece, no plumpness). WITH orientation like the frame/jigsaw: the authored drop is
- * PORTRAIT (native), so a LANDSCAPE variant is the same drop rotated 90° (its print canvas is
- * already swapped, so the quad aspect-locks onto it).
+ * (a flat fleece, no plumpness). WITH orientation like the frame/jigsaw: the founder's drop is
+ * PORTRAIT, so a LANDSCAPE variant is the same drop rotated 90° (its print canvas is already
+ * landscape, so the quad aspect-locks onto it). Prodigi's own file is landscape — that turn
+ * happens at render, not here.
  */
 const layeredBlanketCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
 async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
@@ -693,8 +693,8 @@ async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'
   let out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
 
   // LANDSCAPE: the same blanket turned 90° — rotate blank + mask and carry the window box into
-  // the rotated space (the landscape variant's print canvas is already swapped). Mirrors
-  // layeredFrame's landscape branch (native is portrait).
+  // the rotated space (the landscape variant's print canvas is already landscape). Mirrors
+  // layeredFrame's landscape branch (the drop is portrait).
   if (orientation === 'landscape') {
     const w = out.window;
     out = {
@@ -802,6 +802,22 @@ export async function layeredFlatTemplate(
 /** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
 export function layeredFlatPath(name: string): string | null {
   return layeredFlatDir(name);
+}
+
+/**
+ * A founder-layered CUSHION or BLANKET as a ready mockup template — the seeder's own registration
+ * (the shape's window, aspect-locked (cover) to the print file), so scripts/preview-mockups.ts
+ * shows exactly what gets seeded. null when the product has no layered set staged here.
+ */
+export async function layeredShapeTemplate(
+  key: string,
+  attrs: Record<string, string>,
+  printAspect: number,
+): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; material: Material } | null> {
+  const p = plan(key, attrs);
+  const d = p?.register === 'layered-cushion' ? await layeredCushion(p.dir) : p?.register === 'layered-blanket' ? await layeredBlanket(p.dir, p.orientation) : null;
+  if (!p || !d) return null;
+  return { blank: d.blank, mask: d.mask, overlay: (d as { overlay?: Buffer }).overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), material: p.material };
 }
 
 /**

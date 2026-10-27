@@ -9,7 +9,7 @@ import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { fillCalendarPages, isCalendarKey } from '@/lib/calendar';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
-import { clampTransform, type RawTransform } from '@/server/print/geometry';
+import { clampTransform, templateGeom, type RawTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { getObjectBytes } from '@/storage';
 import { printSourceDims } from '@/server/print/sourceDims';
@@ -190,7 +190,7 @@ export async function placeOrder(
     const transform = clampTransform(art.transform);
     const srcDims = await sourceDimensions(db, art.assetId, sourceObjectId);
     if (srcDims) {
-      const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
+      const geom = templateGeom(tpl);
       if (assessPrintResolution(geom, srcDims, transform, productKey).decision === 'BLOCK') return 'too-small';
     }
     return {

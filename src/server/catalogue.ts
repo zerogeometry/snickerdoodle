@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import { CATALOGUE, type PricedCatalogue } from '@/pricing';
-import { mmToPx } from './print/geometry';
+import { mmToPx, templateGeom, type TemplateGeom } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
 import {
@@ -44,6 +44,10 @@ type VariantDef = {
   /** Prodigi's EXACT print-file pixels, when we have them (phone cases) — the template uses these
    * rather than rounding from mm, so the file is exactly what Prodigi asks for. */
   px?: { w: number; h: number };
+  /** Judge the print's QUALITY at this dpi, when it's lower than the file's (`dpi`): a print Prodigi
+   * asks for at 300 dpi that looks right at 150 where it's seen. Seeded as the template's
+   * minSourceWidthPx/HeightPx (geometry.ts templateGeom → gateDpi). Absent ⇒ judged at `dpi`. */
+  gateDpi?: number;
 };
 type ProductDef = {
   category: 'PRINT' | 'MUG' | 'APPAREL' | 'CUSHION' | 'BLANKET' | 'BOOK' | 'PUZZLE' | 'BAG' | 'CARD' | 'FESTIVE' | 'ADDON' | 'TECH';
@@ -65,21 +69,26 @@ type ProductDef = {
 
 // Framed print: 5 sizes; frame colour is a Prodigi *attribute* of one SKU per size, so the
 // colours share a SKU. "framed in gold" is the brand signature → gold leads (and is the default).
-// Prices are the founder-approved retail (free delivery baked in). Large sizes drop to 150dpi.
+// Prices are the founder-approved retail (free delivery baked in). The large sizes are made at
+// Prodigi's own 300dpi size (printAreaSizes 5400×7200 / 7200×9600px, sandbox 27 Oct) but still JUDGED
+// at 150dpi (gateDpi) — the bar they always had, so no drawing that printed before is refused now.
 // The full Prodigi classic-frame colour range (founder call 2026-07-07: sell all eight).
 // Colour strings are Prodigi's exact `color` attribute values.
 const FRAME_COLOURS = ['gold', 'black', 'white', 'natural', 'brown', 'dark grey', 'light grey', 'silver'];
-const FRAME_SIZES = [
-  { size: '11×14″', sku: 'GLOBAL-CFP-11X14', wMm: 279, hMm: 356, dpi: 300, pricePence: 6500 },
-  { size: '12×16″', sku: 'GLOBAL-CFP-12X16', wMm: 305, hMm: 406, dpi: 300, pricePence: 7000 },
-  { size: '18×24″', sku: 'GLOBAL-CFP-18X24', wMm: 457, hMm: 610, dpi: 150, pricePence: 9000 },
-  { size: '24×32″', sku: 'GLOBAL-CFP-24X32', wMm: 610, hMm: 813, dpi: 150, pricePence: 10500 },
+// Every size is Prodigi's EXACT printAreaSizes (sandbox, 27 Oct), bleed 0 — Prodigi's area already
+// carries its bleed. The 12×16″ black and white frames take a slightly different file from the rest
+// (3614×4795 vs 3600×4800) — Prodigi's own data, so they get their own (`colourPx`).
+const FRAME_SIZES: Array<{ size: string; sku: string; pricePence: number; colourPx?: Record<string, { w: number; h: number }> } & Canvas> = [
+  { size: '11×14″', sku: 'GLOBAL-CFP-11X14', ...exactPx({ w: 3307, h: 4192 }, 300), pricePence: 6500 },
+  { size: '12×16″', sku: 'GLOBAL-CFP-12X16', ...exactPx({ w: 3600, h: 4800 }, 300), colourPx: { black: { w: 3614, h: 4795 }, white: { w: 3614, h: 4795 } }, pricePence: 7000 },
+  { size: '18×24″', sku: 'GLOBAL-CFP-18X24', ...exactPx({ w: 5400, h: 7200 }, 300), gateDpi: 150, pricePence: 9000 },
+  { size: '24×32″', sku: 'GLOBAL-CFP-24X32', ...exactPx({ w: 7200, h: 9600 }, 300), gateDpi: 150, pricePence: 10500 },
   // 28×40″ (GLOBAL-CFP-28X40) withdrawn 2026-10-15: made at Prodigi's NL lab, not GB — the one
   // non-UK item, pricier to post; customs/VAT + delivery time to confirm before it returns.
-] as const;
+];
 function frameVariants(): VariantDef[] {
   // Orientation is OURS, not Prodigi's: their frame print files are fixed-portrait
-  // (printAreaSizes 3307×4192px, verified 2026-07-07), and the frame hangs either
+  // (printAreaSizes, above), and the frame hangs either
   // way. A landscape variant works natively landscape (swapped canvas) through the
   // preview + positioner; the fulfilment render rotates the finished print file 90°
   // back to Prodigi's portrait spec. Portrait skus keep their existing names.
@@ -88,9 +97,7 @@ function frameVariants(): VariantDef[] {
       FRAME_COLOURS.map((colour) => ({
         size: s.size, colour, orientation,
         pricePence: s.pricePence,
-        wMm: orientation === 'landscape' ? s.hMm : s.wMm,
-        hMm: orientation === 'landscape' ? s.wMm : s.hMm,
-        dpi: s.dpi,
+        ...turned(s.colourPx?.[colour] ? { ...s, ...exactPx(s.colourPx[colour], 300) } : s, orientation === 'landscape'),
         prodigiSku: s.sku, prodigiAttrs: { color: colour },
       })),
     ),
@@ -103,19 +110,19 @@ function frameVariants(): VariantDef[] {
 // canvas, the fulfilment render rotating the finished print file 90° back to Prodigi's spec.
 // Landscape leads (the native board) and is the default. NO colour — Prodigi fulfils one board
 // per size (there's no colour SKU), so faking a colour choice would misrepresent the product.
+// The board is Prodigi's EXACT 'jigsaw' printAreaSizes (sandbox, 27 Oct), bleed 0. (The tin 'lid' gets
+// the same file; its area is 869×674px, a touch squarer, so Prodigi trims a sliver off the lid's sides.)
 const JIGSAW_SIZES = [
-  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', wMm: 250, hMm: 200, dpi: 300, pricePence: 2600 },
-  { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', wMm: 250, hMm: 200, dpi: 300, pricePence: 3000 },
-  { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', wMm: 375, hMm: 285, dpi: 300, pricePence: 3500 },
-] as const;
+  { size: '30 pieces', sku: 'JIGSAW-PUZZLE-30', ...exactPx({ w: 2952, h: 2362 }, 300), pricePence: 2600 },
+  { size: '110 pieces', sku: 'JIGSAW-PUZZLE-110', ...exactPx({ w: 2952, h: 2362 }, 300), pricePence: 3000 },
+  { size: '252 pieces', sku: 'JIGSAW-PUZZLE-252', ...exactPx({ w: 4429, h: 3366 }, 300), pricePence: 3500 },
+];
 function jigsawVariants(): VariantDef[] {
   return JIGSAW_SIZES.flatMap((s) =>
     (['landscape', 'portrait'] as const).map((orientation) => ({
       size: s.size, orientation,
       pricePence: s.pricePence,
-      wMm: orientation === 'portrait' ? s.hMm : s.wMm,
-      hMm: orientation === 'portrait' ? s.wMm : s.hMm,
-      dpi: s.dpi,
+      ...turned(s, orientation === 'portrait'),
       prodigiSku: s.sku,
       printTo: ['jigsaw', 'lid'], // Prodigi REQUIRES both: the puzzle and the tin lid (same picture)
     })),
@@ -129,7 +136,7 @@ function jigsawVariants(): VariantDef[] {
 export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'> = {
   framedPrint: 'portrait',
   jigsaw: 'landscape',
-  blanket: 'portrait', // Prodigi's fleece-blanket print file is fixed PORTRAIT (600×1000 / 1000×1500mm)
+  blanket: 'landscape', // Prodigi's fleece-blanket print file is fixed LANDSCAPE (5905×3838 / 8740×5787px)
 };
 
 /**
@@ -150,9 +157,10 @@ const MUG_TWOTONE = [
   { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
 ] as const;
 function mugVariants(): VariantDef[] {
-  // Print canvas from Prodigi's OFFICIAL 11oz template (2473×1157px @300dpi = 209×98mm) — the
-  // wrap the print file must fill.
-  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, wMm: 209, hMm: 98, prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
+  // The wrap the print file must fill: Prodigi's EXACT printAreaSizes (2480×1122px @300dpi, sandbox
+  // 27 Oct), bleed 0. (Their 11oz template PNG is 2473×1157 — a little taller — but the order is sized
+  // to the API's area, so a template-shaped file lost ~3mm top and bottom.)
+  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, ...exactPx({ w: 2480, h: 1122 }, 300), prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
 }
 
 // Kids tee: Stanley/Stella Mini Creator 2.0 — size AND colour are Prodigi attributes of ONE SKU.
@@ -204,21 +212,20 @@ function babyVariants(): VariantDef[] {
 }
 
 // Fleece blanket: WHITE only for now (founder call — no pink/blue). Orientation is OURS like the
-// frame/jigsaw: Prodigi's blanket print file is fixed PORTRAIT (taller than wide); a landscape
-// variant works on a swapped canvas and the fulfilment render rotates the finished file 90° back.
-// Portrait is native (leads + default). Each size+colour is its own Prodigi SKU (white baked in).
+// frame/jigsaw: Prodigi's blanket print file is fixed LANDSCAPE (printAreaSizes 5905×3838 /
+// 8740×5787px @150dpi — their PSDs agree, 27 Oct); a portrait variant works on a swapped canvas and
+// the fulfilment render rotates the finished file 90° back. Portrait still leads (+ default — its
+// sku is the product key, kept for baskets and orders). Each size+colour is its own Prodigi SKU.
 const BLANKET_SIZES = [
-  { size: 'medium', wMm: 600, hMm: 1000, pricePence: 6000, sku: 'H-BLA-PBMWHITE' },
-  { size: 'large', wMm: 1000, hMm: 1500, pricePence: 7500, sku: 'H-BLA-PBLWHITE' },
+  { size: 'medium', px: { w: 5905, h: 3838 }, pricePence: 6000, sku: 'H-BLA-PBMWHITE' },
+  { size: 'large', px: { w: 8740, h: 5787 }, pricePence: 7500, sku: 'H-BLA-PBLWHITE' },
 ] as const;
 function blanketVariants(): VariantDef[] {
   return BLANKET_SIZES.flatMap((s) =>
     (['portrait', 'landscape'] as const).map((orientation) => ({
       size: s.size, orientation,
       pricePence: s.pricePence,
-      wMm: orientation === 'landscape' ? s.hMm : s.wMm,
-      hMm: orientation === 'landscape' ? s.wMm : s.hMm,
-      dpi: 150,
+      ...turned(exactPx(s.px, 150), orientation === 'portrait'),
       prodigiSku: s.sku,
     })),
   );
@@ -254,6 +261,16 @@ function phoneCaseVariants(): VariantDef[] {
 // already carries its own bleed), at the dpi Prodigi specifies them, so nothing rounds from mm.
 function exactPx(px: { w: number; h: number }, dpi: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
   return { wMm: Math.round((px.w / dpi) * 25.4), hMm: Math.round((px.h / dpi) * 25.4), dpi, px, bleedMm: 0 };
+}
+type Canvas = Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm' | 'gateDpi'>;
+/** A print canvas turned 90° when `turn` (the orientation that isn't Prodigi's native one): w↔h, px too. */
+function turned({ wMm, hMm, dpi, px, bleedMm, gateDpi }: Canvas, turn: boolean): Canvas {
+  return {
+    wMm: turn ? hMm : wMm, hMm: turn ? wMm : hMm, dpi,
+    ...(px ? { px: turn ? { w: px.h, h: px.w } : px } : {}),
+    ...(bleedMm !== undefined ? { bleedMm } : {}),
+    ...(gateDpi ? { gateDpi } : {}),
+  };
 }
 
 // Hoodies: like the tees, size + colour are Prodigi attributes of ONE SKU, the print is
@@ -329,16 +346,20 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
       // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
-      { size: 'heart', pricePence: 2200, wMm: 280, hMm: 280, dpi: 150, prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
-      { size: '18″ round', pricePence: 3000, wMm: 457, hMm: 457, dpi: 150, prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
+      // The heart's print area is WIDER than tall (printAreaSizes 2008×1725px, their PSD 2009×1725,
+      // 27 Oct): exact px, bleed 0, so Prodigi has nothing to crop. (It was a 280mm square + bleed.)
+      { size: 'heart', pricePence: 2200, ...exactPx({ w: 2008, h: 1725 }, 150), prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      { size: '18″ round', pricePence: 3000, ...exactPx({ w: 2775, h: 2775 }, 150), prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
       // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
       // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]
       // print file. wMm/hMm here is the per-FACE size: the mockup shows one face either way, and
       // the DUAL fulfilment assembles the side-by-side double-wide from two face renders.
-      { size: '12″ square', sides: 'single', pricePence: 3000, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
-      { size: '12″ square', sides: 'double', pricePence: 3500, wMm: 305, hMm: 305, dpi: 150, prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
-      { size: '22″ square', sides: 'single', pricePence: 4000, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
-      { size: '22″ square', sides: 'double', pricePence: 4500, wMm: 559, hMm: 559, dpi: 150, prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
+      // Round + squares: Prodigi's EXACT printAreaSizes (sandbox, 27 Oct — a DUAL's is two faces wide),
+      // bleed 0; their area is the cushion plus its own bleed (18.5″ for the 18″ round).
+      { size: '12″ square', sides: 'single', pricePence: 3000, ...exactPx({ w: 1875, h: 1875 }, 150), prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
+      { size: '12″ square', sides: 'double', pricePence: 3500, ...exactPx({ w: 1875, h: 1875 }, 150), prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
+      { size: '22″ square', sides: 'single', pricePence: 4000, ...exactPx({ w: 3375, h: 3375 }, 150), prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
+      { size: '22″ square', sides: 'double', pricePence: 4500, ...exactPx({ w: 3375, h: 3375 }, 150), prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
     ],
   },
   storybook: {
@@ -346,8 +367,9 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
     specs: { material: 'hardcover, gloss', pages: '24 pages' },
     variants: [
-      { size: 'A5', pricePence: 2600, wMm: 148, hMm: 210, dpi: 300, prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
-      { size: 'A4', pricePence: 2900, wMm: 210, hMm: 297, dpi: 300, prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
+      // Prodigi's EXACT 'default' page area (printAreaSizes, sandbox 27 Oct) — the trimmed page, no bleed.
+      { size: 'A5', pricePence: 2600, ...exactPx({ w: 1748, h: 2480 }, 300), prodigiSku: 'BOOK-FE-A5-P-HARD-G' },
+      { size: 'A4', pricePence: 2900, ...exactPx({ w: 2480, h: 3507 }, 300), prodigiSku: 'BOOK-FE-A4-P-HARD-G' },
     ],
   },
   kidsTee: {
@@ -433,8 +455,10 @@ const DEFS: Record<string, ProductDef> = {
     description: 'A wipe-clean apron with their artwork on it — for baking days, painting days, and every happy mess.',
     specs: { material: 'poly-cotton', ties: 'black' },
     variants: [
-      { size: 'child', pricePence: 2500, wMm: 220, hMm: 280, dpi: 150, prodigiSku: 'H-APR-CA-BTIE' },
-      { size: 'adult', pricePence: 2900, wMm: 300, hMm: 360, dpi: 150, prodigiSku: 'H-APR-AA-BTIE' },
+      // Prodigi's EXACT print areas (printAreaSizes @300dpi, sandbox 27 Oct; their PSDs are the same
+      // shape at half size) — right before the apron is ever on show. (It was a 220×280 / 300×360mm guess.)
+      { size: 'child', pricePence: 2500, ...exactPx({ w: 5850, h: 7500 }, 300), prodigiSku: 'H-APR-CA-BTIE' },
+      { size: 'adult', pricePence: 2900, ...exactPx({ w: 7500, h: 10500 }, 300), prodigiSku: 'H-APR-AA-BTIE' },
     ],
   },
   // Christmas 2026 (D24): two separate products (founder, 26 Oct — "separate them out, label them as I have").
@@ -444,8 +468,9 @@ const DEFS: Record<string, ProductDef> = {
     category: 'FESTIVE', label: 'ceramic christmas ornament', blurb: "this year's ornament — one for every christmas they're little", print: true, visibleInShop: true,
     description: "Their drawing on a glossy ceramic ornament for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. A flat 7.5 cm disc on a gold string.",
     specs: { size: '7.5 cm disc', finish: 'flat, gloss ceramic, printed on one side', string: 'gold', made: 'in the UK' },
-    // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
-    variants: [{ size: '7.5 cm', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+    // Prodigi's EXACT print area (sandbox GET /v4.0/products, 27 Oct): 885×885 px, no bleed. (It was
+    // 82 mm + 3 mm bleed from their template canvas — a 1038 px file Prodigi shrank to fit, bleed and all.)
+    variants: [{ size: '7.5 cm', pricePence: 2100, ...exactPx({ w: 885, h: 885 }, 300), prodigiSku: 'XMAS-PORC-BAUB' }],
   },
   // The plastic BALL (XMAS-PLAS-BAUB): printed on BOTH sides, shatterproof, from uk5 → Royal Mail RM24
   // (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
@@ -460,8 +485,9 @@ const DEFS: Record<string, ProductDef> = {
     category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: true, // D24
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
-    // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
-    variants: [{ size: 'one size', pricePence: 3500, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
+    // 320×500mm = Prodigi's print panel, NOT the whole sack: made at their printAreaSizes (3779×5905px
+    // @300dpi, sandbox 27 Oct) but judged at 150dpi as it always was (gateDpi).
+    variants: [{ size: 'one size', pricePence: 3500, ...exactPx({ w: 3779, h: 5905 }, 300), gateDpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
   phoneCase: {
     category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
@@ -500,6 +526,10 @@ const DEFS: Record<string, ProductDef> = {
     category: 'APPAREL', label: 'adult hoodie', blurb: 'matching hoodies for the whole fan club', print: true,
     description: "A soft unisex hoodie with your little one's artwork on the front — for the grown-ups who'd wear their masterpiece every day.",
     specs: { material: '85% organic cotton, 15% recycled polyester', fit: 'unisex, XS–3XL', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
+    // TODO(before it's on show): Prodigi's GB front print area for this SKU DIFFERS by colour and size
+    // (printAreaSizes 3070×3070, 4724×4724 and 3307×4606px — src/server/__tests__/fixtures/
+    // prodigi-print-areas.json) but every variant is designed to 3070². Pick per-variant areas (or the
+    // one Prodigi confirms for uk9) before un-hiding; the catalogue sync and print-spec test flag it.
     variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   wrappingPaper: {
@@ -590,7 +620,7 @@ function variantAttributes(v: VariantDef): Record<string, string> {
   return a;
 }
 
-export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; dpi: number; bleedMm: number }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     return def.variants.map((v, i) => ({
@@ -598,6 +628,7 @@ export function definedPriceList(): Array<{ productKey: string; sku: string; isD
       pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
       visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
       px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
+      dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
     }));
   });
 }
@@ -608,6 +639,41 @@ function variantSku(productKey: string, v: VariantDef, isDefault: boolean): stri
   // orientation appears in the sku ONLY for landscape — portrait skus keep their
   // pre-orientation names (no churn in baskets, orders or tests).
   return [productKey, slug(v.size), slug(v.colour), v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double' : null, slug(v.grade), slug(v.finish)].filter(Boolean).join('-');
+}
+
+/** A printed variant's print_templates row (less its variant id) — the ONE place it's built. */
+function printTemplateOf(v: VariantDef) {
+  const dpi = v.dpi ?? 300;
+  const wPx = v.px?.w ?? mmToPx(v.wMm, dpi);
+  const hPx = v.px?.h ?? mmToPx(v.hMm, dpi);
+  return {
+    orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
+    printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,
+    aspectMilli: Math.round((v.wMm / v.hMm) * 1000),
+    // judged at a lower dpi than it's made at (gateDpi) ⇒ it needs proportionally fewer source px
+    minSourceWidthPx: v.gateDpi ? Math.round((wPx * v.gateDpi) / dpi) : wPx,
+    minSourceHeightPx: v.gateDpi ? Math.round((hPx * v.gateDpi) / dpi) : hPx,
+  };
+}
+
+/**
+ * Every printed, Prodigi-made variant as the seed will template it: its Prodigi SKU + order-time
+ * attributes, the print areas it fills, and its print geometry (gate dpi included). Pure — the
+ * print-spec test checks these against Prodigi's own print areas without a database.
+ */
+export function definedPrintSpecs(): Array<{ productKey: string; sku: string; prodigiSku: string; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; printTo: string[]; visibleInShop: boolean; template: TemplateGeom }> {
+  return Object.entries(DEFS).flatMap(([productKey, def]) => {
+    if (!def.print) return [];
+    const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
+    return def.variants.flatMap((v, i) =>
+      v.prodigiSku
+        ? [{
+            productKey, sku: variantSku(productKey, v, i === defaultIndex), prodigiSku: v.prodigiSku, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
+            printTo: v.printTo ?? ['default'], visibleInShop: def.visibleInShop ?? false, template: templateGeom(printTemplateOf(v)),
+          }]
+        : [],
+    );
+  });
 }
 
 /**
@@ -648,7 +714,7 @@ export interface CatalogueVariant {
   printHmm: number | null;
   /** The print template's pixel geometry — so the client runs the SAME DPI assessment
    * (assessResolution) the server's order-time gate does. null ⇒ not a printed product. */
-  printGeom?: { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number } | null;
+  printGeom?: TemplateGeom | null;
 }
 export interface CatalogueProduct {
   key: string;
@@ -683,7 +749,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
       key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
       vId: productVariants.id, vSku: productVariants.sku, vAttrs: productVariants.attributes, vPrice: productVariants.pricePence, vDefault: productVariants.isDefault, vSort: productVariants.sortOrder,
       tWmm: printTemplates.printWidthMm, tHmm: printTemplates.printHeightMm,
-      tWpx: printTemplates.printWidthPx, tHpx: printTemplates.printHeightPx, tBleed: printTemplates.bleedMm, tDpi: printTemplates.requiredDpi,
+      tWpx: printTemplates.printWidthPx, tHpx: printTemplates.printHeightPx, tBleed: printTemplates.bleedMm, tDpi: printTemplates.requiredDpi, tMinW: printTemplates.minSourceWidthPx,
     })
     .from(products)
     .innerJoin(productVariants, eq(productVariants.productId, products.id))
@@ -699,7 +765,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
-    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null, printGeom: r.tWpx && r.tHpx && r.tDpi ? { printWidthPx: r.tWpx, printHeightPx: r.tHpx, bleedMm: r.tBleed ?? 0, requiredDpi: r.tDpi } : null });
+    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null, printGeom: r.tWpx && r.tHpx && r.tDpi ? templateGeom({ printWidthPx: r.tWpx, printHeightPx: r.tHpx, bleedMm: r.tBleed ?? 0, requiredDpi: r.tDpi, minSourceWidthPx: r.tMinW }) : null });
     p.fromPence = Math.min(p.fromPence, r.vPrice);
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);
@@ -772,17 +838,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
     const withIds = rows.map((r) => ({ ...r, id: idBySku.get(r.values.sku)! }));
 
     if (def.print) {
-      const tpls = withIds.map(({ v, id }) => {
-        const dpi = v.dpi ?? 300;
-        const wPx = v.px?.w ?? mmToPx(v.wMm, dpi);
-        const hPx = v.px?.h ?? mmToPx(v.hMm, dpi);
-        return {
-          variantId: id,
-          orientation: (v.wMm > v.hMm ? 'LANDSCAPE' : v.wMm < v.hMm ? 'PORTRAIT' : 'SQUARE') as 'LANDSCAPE' | 'PORTRAIT' | 'SQUARE',
-          printWidthMm: v.wMm, printHeightMm: v.hMm, requiredDpi: dpi, printWidthPx: wPx, printHeightPx: hPx, bleedMm: v.bleedMm ?? 3,
-          aspectMilli: Math.round((v.wMm / v.hMm) * 1000), minSourceWidthPx: wPx, minSourceHeightPx: hPx,
-        };
-      });
+      const tpls = withIds.map(({ v, id }) => ({ variantId: id, ...printTemplateOf(v) }));
       await db
         .insert(printTemplates)
         .values(tpls)

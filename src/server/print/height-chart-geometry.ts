@@ -52,7 +52,7 @@ export function heightChartLayout(canvas: { width: number; height: number }, dpi
  * drawing's transform resolves against THIS, so contain/cover fit beside the ruler, not under it. */
 export function heightChartArtGeom(t: TemplateGeom): TemplateGeom {
   const lay = heightChartLayout({ width: t.printWidthPx, height: t.printHeightPx }, t.requiredDpi);
-  return { printWidthPx: lay.art.width, printHeightPx: lay.art.height, bleedMm: 0, requiredDpi: t.requiredDpi };
+  return { printWidthPx: lay.art.width, printHeightPx: lay.art.height, bleedMm: 0, requiredDpi: t.requiredDpi, gateDpi: t.gateDpi };
 }
 
 /** The y (px, from the top of the print file) of a mark `cm` above the FLOOR. Exact (unrounded). */

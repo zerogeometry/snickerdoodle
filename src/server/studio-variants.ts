@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { printTemplates, productVariants, products } from '@/db/schema';
 import type { DbHandle } from './db';
+import { templateGeom } from './print/geometry';
 
 /**
  * Pure DB loading of the printable product variants for the placement editor — kept
@@ -13,6 +14,8 @@ export interface StudioTemplate {
   bleedMm: number;
   safeInsetMm: number;
   requiredDpi: number;
+  /** The dpi the print is judged at when lower than the file's (TemplateGeom.gateDpi). */
+  gateDpi?: number;
 }
 export interface StudioVariant {
   id: string;
@@ -44,13 +47,7 @@ function toStudioVariant({ v, p, t }: VariantRow): StudioVariant {
     label: variantLabel(p, v),
     pricePence: v.pricePence,
     orientation: a.orientation,
-    template: {
-      printWidthPx: t.printWidthPx,
-      printHeightPx: t.printHeightPx,
-      bleedMm: t.bleedMm,
-      safeInsetMm: t.safeInsetMm,
-      requiredDpi: t.requiredDpi,
-    },
+    template: { ...templateGeom(t), safeInsetMm: t.safeInsetMm },
   };
 }
 

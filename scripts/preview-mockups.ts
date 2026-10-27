@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { definedPriceList } from '@/server/catalogue';
 import { renderTemplatePreview } from '@/server/print/compositor';
-import { layeredFlatPath, layeredFlatTemplate } from '@/server/print/seedMockups';
+import { layeredFlatPath, layeredFlatTemplate, layeredShapeTemplate } from '@/server/print/seedMockups';
 import { assertQuadFitsBlank } from '@/server/print/templates';
 
 const args = process.argv.slice(2);
@@ -51,9 +51,31 @@ for (const s of SETS) {
   const webp = await renderTemplatePreview({
     blank: t.blank, mask: t.mask, overlay: t.overlay, quad: t.quad, extraQuads: t.extraQuads, materialClass: s.material, design, productKey: s.key, ground,
     transform: defaultTransformFor(s.key) as Transform, // the product's own default placement (fill / fit), as the shop shows it
-    print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: 0, requiredDpi: s.dpi },
+    print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: v.bleedMm, requiredDpi: s.dpi },
   });
   const file = path.join(outDir, `${s.set.replace('/', '-')}${s.sku ? '-' + s.sku : ''}${ground ? '-' + ground : ''}.webp`);
+  writeFileSync(file, webp);
+  console.log(`${file}`);
+}
+
+// The founder's layered cushion + blanket shapes, one per print-file shape.
+const SHAPES: { key: string; size: string; orientation?: string }[] = [
+  { key: 'cushion', size: 'heart' },
+  { key: 'blanket', size: 'medium', orientation: 'portrait' },
+  { key: 'blanket', size: 'medium', orientation: 'landscape' },
+  { key: 'blanket', size: 'large', orientation: 'landscape' },
+];
+for (const s of SHAPES) {
+  const v = variants.find((x) => x.productKey === s.key && x.attributes.size === s.size && (!s.orientation || x.attributes.orientation === s.orientation));
+  const t = v?.px ? await layeredShapeTemplate(s.key, v.attributes, v.px.w / v.px.h) : null;
+  if (!v?.px || !t) { console.log(`${s.key} ${s.size}: skipped (${v ? 'set not staged' : 'no variant'})`); continue; }
+  assertQuadFitsBlank(t.quad, { warped: false });
+  const webp = await renderTemplatePreview({
+    blank: t.blank, mask: t.mask, overlay: t.overlay, quad: t.quad, materialClass: t.material, design, productKey: s.key, ground,
+    transform: defaultTransformFor(s.key) as Transform,
+    print: { widthPx: v.px.w, heightPx: v.px.h, bleedMm: v.bleedMm, requiredDpi: v.dpi },
+  });
+  const file = path.join(outDir, `${[s.key, s.size, s.orientation].filter(Boolean).join('-')}${ground ? '-' + ground : ''}.webp`);
   writeFileSync(file, webp);
   console.log(`${file}`);
 }
