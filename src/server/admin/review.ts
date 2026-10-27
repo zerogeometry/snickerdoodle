@@ -128,9 +128,24 @@ export async function decideReview(db: DbHandle, reviewer: Reviewer, kind: Revie
     .set({
       moderationStatus: 'CLEAR',
       moderatedAt: now,
-      moderationDetail: { ...d, original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] }, design: cleared(d.design), review: { decision, by: reviewer.accountId, at: now.toISOString() } },
+      // a clear RESOLVES any open viewer reports (kept as history) — so the keepsake is visible to the
+      // family again, and a later re-screen can't revive a report the reviewer already settled
+      moderationDetail: {
+        ...withoutOpenReports(d),
+        original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] },
+        design: cleared(d.design),
+        review: { decision, by: reviewer.accountId, at: now.toISOString() },
+      },
     })
     .where(eq(assets.id, id));
+}
+
+/** The detail with its open reports moved to `resolvedReports`. */
+function withoutOpenReports<T extends object>(d: T): T {
+  const { reports, ...rest } = d as T & { reports?: unknown; resolvedReports?: unknown };
+  if (!Array.isArray(reports) || reports.length === 0) return d;
+  const before = Array.isArray((rest as { resolvedReports?: unknown }).resolvedReports) ? ((rest as { resolvedReports: unknown[] }).resolvedReports) : [];
+  return { ...rest, resolvedReports: [...before, ...reports] } as T;
 }
 
 async function audit(db: DbHandle, reviewer: Reviewer, event: 'CONTENT_REVIEW_VIEWED' | 'CONTENT_REVIEWED', targetType: string, targetId: string, familyId: string | null, metadata: Record<string, unknown>) {

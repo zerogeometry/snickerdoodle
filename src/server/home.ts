@@ -12,6 +12,7 @@ import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
 import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
 import { familyBannerFor, profileImagesFor } from './profile';
 import { keepsakeThumbUrls } from './keepsakeThumbs';
+import { assetRefOf, isHeldForReport } from './assetRef';
 
 export interface HomeMember {
   accountId: string;
@@ -36,6 +37,10 @@ export interface HomeKeepsake {
   childSubjectId: string | null;
   /** The viewer controls this keepsake (may change who sees it / delete it) — authz-derived. */
   canManage: boolean;
+  /** An open report is holding it for review (only its parent sees it meanwhile). */
+  held: boolean;
+  /** Someone else's keepsake the viewer can see — they may report it (D8). */
+  canReport: boolean;
 }
 
 export interface HomePendingInvite {
@@ -75,13 +80,7 @@ export interface HomeData {
 }
 
 function refOf(row: typeof assets.$inferSelect): AssetRef {
-  return {
-    id: row.id,
-    familyId: row.familyId,
-    uploaderAccountId: row.uploaderAccountId,
-    controllerAccountId: row.controllerAccountId,
-    visibility: row.visibility,
-  };
+  return assetRefOf(row);
 }
 
 /** Everything the keepsake home needs for the signed-in account — null for a guest. */
@@ -145,6 +144,8 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
       imageUrl: r.key ? await presignDownload(r.key, 300) : null,
       childSubjectId: r.asset.childSubjectId,
       canManage: canSetAssetVisibility(refOf(r.asset), viewer),
+      held: isHeldForReport(r.asset),
+      canReport: !canSetAssetVisibility(refOf(r.asset), viewer) && r.asset.uploaderAccountId !== account.id,
     })),
   );
 

@@ -28,6 +28,7 @@ import type { HomeData, HomeKeepsake } from '@/server/home';
 import type { VisibilityTier } from '@/domain/types';
 import { isChristmasSeason } from '@/lib/season';
 import { useNow } from '@/ui/useNow';
+import { ReportKeepsake } from '@/ui/components/ReportKeepsake';
 
 const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', FAMILY: 'Family', EXTENDED: 'Extended' };
 const AVATAR_COLORS = ['#C8402A', '#2F5DA8', '#7FA65E', '#E8786E', '#8E2A1A']; // Scrapbook stickers (white initials ≥3:1 at this size)
@@ -189,11 +190,15 @@ export function HomeView({ data }: { data: HomeData }) {
         className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
       >
         {k.canManage ? (
-          <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label="choose who can see this keepsake">
-            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} badge={VIS_LABEL[k.visibility]} />
+          <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label={k.held ? 'being checked after a report — choose who can see this keepsake' : 'choose who can see this keepsake'}>
+            {/* held after a report: only this parent sees it meanwhile (D8) */}
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} badge={k.held ? 'being checked' : VIS_LABEL[k.visibility]} />
           </button>
         ) : (
-          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} />
+          <>
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} />
+            {k.canReport ? <ReportKeepsake assetId={k.id} /> : null}
+          </>
         )}
       </div>
     );

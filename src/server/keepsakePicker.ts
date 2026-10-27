@@ -1,4 +1,5 @@
 import { canViewAsset, type AssetRef, type ViewerContext } from '@/authz';
+import { assetRefOf } from './assetRef';
 
 /**
  * The keepsake PICKER (the card-pack builder's "pick a drawing" sheet): the drawings in the
@@ -25,7 +26,7 @@ export interface PickerKeepsake {
 }
 
 export type PickerRow = {
-  asset: AssetRef & { keptInHome: boolean; moderationStatus: 'PENDING' | 'CLEAR' | 'FLAGGED' | 'BLOCKED'; createdAt: Date; childSubjectId: string | null };
+  asset: Omit<AssetRef, 'heldForReview'> & { keptInHome: boolean; moderationStatus: 'PENDING' | 'CLEAR' | 'FLAGGED' | 'BLOCKED'; moderationDetail?: unknown; createdAt: Date; childSubjectId: string | null };
   key: string | null;
 };
 
@@ -37,10 +38,4 @@ export function pickableKeepsakes(rows: PickerRow[], viewer: ViewerContext): Arr
     .map((row) => ({ row, printable: row.asset.moderationStatus === 'CLEAR' }));
 }
 
-const refOf = (a: PickerRow['asset']): AssetRef => ({
-  id: a.id,
-  familyId: a.familyId,
-  uploaderAccountId: a.uploaderAccountId,
-  controllerAccountId: a.controllerAccountId,
-  visibility: a.visibility,
-});
+const refOf = (a: PickerRow['asset']): AssetRef => assetRefOf(a);

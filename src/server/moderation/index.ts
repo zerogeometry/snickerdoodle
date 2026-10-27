@@ -128,6 +128,18 @@ async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {
   return d.original ?? { status: row?.status ?? 'PENDING', labels: d.labels ?? [] };
 }
 
+/**
+ * An OPEN viewer report outlives any re-screen (gap audit, 27 Oct): a Studio re-save or a dropped
+ * design re-derives the status from the screening verdicts, and must never quietly clear a keepsake a
+ * viewer reported. Only a reviewer's "clear" resolves a report (src/server/admin/review.ts).
+ */
+async function openReports(db: DbHandle, assetId: string): Promise<{ reports: unknown[]; labels: string[] } | null> {
+  const [row] = await db.select({ detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
+  const d = (row?.detail ?? {}) as { reports?: unknown; labels?: string[] };
+  if (!Array.isArray(d.reports) || d.reports.length === 0) return null;
+  return { reports: d.reports, labels: (d.labels ?? []).filter((l) => l.startsWith('reported')) };
+}
+
 /** Screen a Studio design (anything drawn / added) and fold its verdict into the asset's. */
 export async function moderateDesignAndRecord(
   db: DbHandle,
@@ -154,9 +166,14 @@ export async function moderateDesignAndRecord(
   }
   const original = await originalVerdict(db, input.assetId);
   const combined = worse(original, design);
+  const held = await openReports(db, input.assetId);
   await db
     .update(assets)
-    .set({ moderationStatus: combined.status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels: [...new Set([...original.labels, ...design.labels])], original, design } })
+    .set({
+      moderationStatus: held ? 'FLAGGED' : combined.status,
+      moderatedAt: input.now ?? new Date(),
+      moderationDetail: { labels: [...new Set([...(held?.labels ?? []), ...original.labels, ...design.labels])], original, design, ...(held ? { reports: held.reports } : {}) },
+    })
     .where(eq(assets.id, input.assetId));
   if (design.status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -177,7 +194,14 @@ export async function clearDesignModeration(db: DbHandle, assetId: string): Prom
   const d = (row?.detail ?? {}) as { design?: Stored };
   if (!d.design) return;
   const original = await originalVerdict(db, assetId);
-  await db.update(assets).set({ moderationStatus: original.status, moderationDetail: { labels: original.labels, original } }).where(eq(assets.id, assetId));
+  const held = await openReports(db, assetId);
+  await db
+    .update(assets)
+    .set({
+      moderationStatus: held ? 'FLAGGED' : original.status,
+      moderationDetail: { labels: [...new Set([...(held?.labels ?? []), ...original.labels])], original, ...(held ? { reports: held.reports } : {}) },
+    })
+    .where(eq(assets.id, assetId));
 }
 
 export { defaultProviders, isModerationConfigured } from './providers';

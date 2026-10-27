@@ -21,6 +21,7 @@ function asset(over: Partial<AssetRef> = {}): AssetRef {
     uploaderAccountId: CONTROLLER, // default: uploader IS the controller (a non-child asset)
     controllerAccountId: CONTROLLER,
     visibility: 'FAMILY',
+    heldForReview: false,
     ...over,
   };
 }
@@ -239,5 +240,44 @@ describe('ephemeral upload claim (pre-account guest draft)', () => {
   it('assertCanViewAsset throws for a draft without the matching claim', () => {
     expect(() => assertCanViewAsset(draft(), claimViewer(null))).toThrow(AuthzError);
     expect(() => assertCanViewAsset(draft(), claimViewer(CLAIM))).not.toThrow();
+  });
+});
+
+// ── Held for review after a report (D8; founder, 26 Oct) ─────────────────────────
+describe('a reported keepsake held for review', () => {
+  const held = (over: Partial<AssetRef> = {}) => asset({ heldForReview: true, uploaderAccountId: UPLOADER, ...over });
+
+  it('stays visible to its controller and its uploader (so they can see why, or delete it)', () => {
+    for (const tier of ['FAMILY', 'EXTENDED'] as const) {
+      expect(canViewAsset(held({ visibility: tier }), viewer(CONTROLLER, mem({ accountId: CONTROLLER, isOwner: true }))).allowed).toBe(true);
+      expect(canViewAsset(held({ visibility: tier }), viewer(UPLOADER, mem({ accountId: UPLOADER, circle: 'EXTENDED' }))).allowed).toBe(true);
+    }
+  });
+
+  it('is hidden from every other member, whatever their circle or access', () => {
+    for (const tier of ['FAMILY', 'EXTENDED'] as const) {
+      for (const circle of ['FAMILY', 'EXTENDED'] as const) {
+        for (const accessLevel of ['VIEW', 'VIEW_BUY', 'CONTRIBUTE'] as const) {
+          const m = viewer('acct-member', mem({ circle, accessLevel }));
+          expect(canViewAsset(held({ visibility: tier }), m).allowed).toBe(false);
+          expect(() => assertCanViewAsset(held({ visibility: tier }), m)).toThrow(AuthzError);
+        }
+      }
+    }
+  });
+
+  it('never widens anything: other families, ex-members and anonymous viewers stay denied', () => {
+    expect(canViewAsset(held(), viewer('acct-other', mem({ accountId: 'acct-other', familyId: FAM_B }))).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer('acct-member', mem({ status: 'REMOVED' }))).allowed).toBe(false);
+    expect(canViewAsset(held(), viewer(null)).allowed).toBe(false);
+  });
+
+  it('ONLY_ME stays the controller’s alone, held or not', () => {
+    expect(canViewAsset(held({ visibility: 'ONLY_ME' }), viewer(CONTROLLER, mem({ accountId: CONTROLLER }))).allowed).toBe(true);
+    expect(canViewAsset(held({ visibility: 'ONLY_ME' }), viewer(UPLOADER, mem({ accountId: UPLOADER }))).allowed).toBe(false);
+  });
+
+  it('once cleared it is visible again exactly as its tier allows', () => {
+    expect(canViewAsset(held({ heldForReview: false }), viewer('acct-member', mem({ circle: 'FAMILY' }))).allowed).toBe(true);
   });
 });

@@ -7,6 +7,7 @@ import { ensureHomeFamily } from './onboarding';
 import { getViewableAssetOrThrow, resolveAssetViewer, resolveViewerContext } from './assets';
 import { getCurrentAccount, getUploadClaims } from './session';
 import { loadPrintableVariants, type StudioVariant } from './studio-variants';
+import { assetRefOf } from './assetRef';
 
 export type { StudioTemplate, StudioVariant } from './studio-variants';
 export interface StudioKeepsake {
@@ -36,13 +37,7 @@ async function designOf(db: ReturnType<typeof getDb>, assetId: string, sourceObj
 }
 
 function refOf(row: typeof assets.$inferSelect): AssetRef {
-  return {
-    id: row.id,
-    familyId: row.familyId,
-    uploaderAccountId: row.uploaderAccountId,
-    controllerAccountId: row.controllerAccountId,
-    visibility: row.visibility,
-  };
+  return assetRefOf(row);
 }
 
 /** Everything the positioning editor needs for the signed-in account — null for a guest.

@@ -24,17 +24,12 @@ import { forgetAssetPreviews } from './print/previewCache';
  * server action sits behind, and the place a signed-URL mint is gated.
  */
 
+import { assetRefOf } from './assetRef';
+
 type AssetRow = typeof assets.$inferSelect;
 
 function toAssetRef(row: AssetRow): AssetRef {
-  return {
-    id: row.id,
-    familyId: row.familyId,
-    uploaderAccountId: row.uploaderAccountId,
-    controllerAccountId: row.controllerAccountId,
-    visibility: row.visibility,
-    ephemeralClaimId: row.ephemeralClaimId,
-  };
+  return assetRefOf(row);
 }
 
 /** A denial that is indistinguishable from "not found" — never leak existence. */
