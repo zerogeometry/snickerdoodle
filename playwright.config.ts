@@ -1,34 +1,31 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
+import { BASE_URL, desktop, mobile, webServer } from './e2e/config';
 
 /**
  * e2e config (task #37). Tests the real user journeys against a running app + the dev
- * Postgres/MinIO. Reuses an already-running dev server on :3000 when present, else starts
- * one. Kept serial + un-retried locally; CI can dial these up.
+ * Postgres/MinIO, on a DESKTOP and a ~390px PHONE (touch) — every journey runs on both unless
+ * a spec says why not. Kept serial + un-retried locally; CI retries once and keeps the report.
+ * Visual regression lives in playwright.visual.config.ts (`npm run test:visual`).
  */
 export default defineConfig({
   testDir: './e2e',
+  // catalogue + synthetic mockup templates where none exist (e2e/seed.ts)
+  globalSetup: './e2e/global-setup.ts',
   fullyParallel: false,
   workers: 1,
   retries: process.env.CI ? 1 : 0,
-  reporter: [['list']],
+  timeout: 120_000,
+  reporter: process.env.CI ? [['list'], ['html', { open: 'never', outputFolder: 'playwright-report' }]] : [['list']],
   use: {
-    baseURL: 'http://localhost:3100',
+    baseURL: BASE_URL,
     trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
     actionTimeout: 15_000,
     navigationTimeout: 45_000,
   },
-  // Locally: the system Edge (no browser download). CI: Playwright's bundled Chromium.
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: process.env.CI ? undefined : 'msedge' } }],
-  // A FRESH production server on its own port — never the dev server (whose .next can be
-  // clobbered by a concurrent `next build`). CI builds + starts; locally, reuse a
-  // `next build && next start -p 3100` you leave running.
-  webServer: {
-    // Production refuses unencrypted originals, so the e2e server uses local MinIO's built-in
-    // KMS key (docker-compose.yml) — the real encrypted-storage path, not a bypass.
-    command:
-      'cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local npm run start -- -p 3100',
-    url: 'http://localhost:3100',
-    reuseExistingServer: true,
-    timeout: 300_000,
-  },
+  projects: [
+    { name: 'desktop', use: desktop },
+    { name: 'mobile', use: mobile },
+  ],
+  webServer,
 });

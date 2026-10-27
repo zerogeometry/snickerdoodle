@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import sharp from 'sharp';
+import { quietCookies } from './helpers';
 
 /**
  * Storefront coherence smoke (all LIVE products in one journey).
@@ -78,6 +79,7 @@ async function uploadAndOpenRange(page: Page, art: Buffer) {
 test('storefront: every live product renders, adds, and prices to the server total', async ({ page }) => {
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
+  await quietCookies(page); // the banner would cover the phone's thumb-zone add button
 
   await uploadAndOpenRange(page, await artwork());
 

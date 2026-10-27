@@ -37,10 +37,11 @@ test('wow flow: upload → personalised range → add → checkout → personali
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
   await expect(page.getByText('framed print').first()).toBeVisible();
-  // A personalised line asks a guest to sign up (the controlling-parent gate).
-  await expect(page.getByText(/magic-link sign-up/i)).toBeVisible();
+  // A personalised line asks a guest to sign up (the controlling-parent gate) — in the desktop
+  // summary, or the phone's thumb-zone dock.
+  await expect(page.getByText(/magic-link sign-up|a quick sign-up keeps your keepsake safe/i).filter({ visible: true })).toBeVisible();
 
   // Placing the order as a guest routes to the sign-up gate, not a charge.
-  await page.locator('aside').getByRole('button', { name: /^checkout$/i }).click();
+  await page.getByRole('button', { name: /^checkout$/i }).filter({ visible: true }).click();
   await page.waitForURL(/\/login/, { timeout: 30_000 });
 });
