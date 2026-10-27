@@ -12,6 +12,7 @@ import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
 import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
 import { familyBannerFor, profileImagesFor } from './profile';
 import { keepsakeThumbUrls } from './keepsakeThumbs';
+import { keepsakeLooks } from './keepsakeCopy';
 import { assetRefOf, isHeldForReport } from './assetRef';
 
 export interface HomeMember {
@@ -134,14 +135,16 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
   // FLAGGED/PENDING stay visible to the family — the flag gates ordering, not viewing.
   const visible = rows.filter((r) => canViewAsset(refOf(r.asset), viewer).allowed && r.asset.moderationStatus !== 'BLOCKED');
 
-  const thumbs = await keepsakeThumbUrls(db, visible.map((r) => r.asset.id), 300);
+  // each keepsake's LOOK (its Studio design if it has one — e.g. an edited copy), small for the grid
+  const looks = await keepsakeLooks(db, visible.map((r) => ({ id: r.asset.id, studioDoc: r.asset.studioDoc })));
+  const thumbs = await keepsakeThumbUrls(db, visible.map((r) => ({ assetId: r.asset.id, look: looks.get(r.asset.id) ?? null })), 300);
   const keepsakes: HomeKeepsake[] = await Promise.all(
     visible.map(async (r) => ({
       thumbUrl: thumbs.get(r.asset.id) ?? null,
       id: r.asset.id,
       visibility: r.asset.visibility,
       createdAtISO: r.asset.createdAt.toISOString(),
-      imageUrl: r.key ? await presignDownload(r.key, 300) : null,
+      imageUrl: looks.get(r.asset.id) ? await presignDownload(looks.get(r.asset.id)!.key, 300) : r.key ? await presignDownload(r.key, 300) : null,
       childSubjectId: r.asset.childSubjectId,
       canManage: canSetAssetVisibility(refOf(r.asset), viewer),
       held: isHeldForReport(r.asset),

@@ -40,7 +40,11 @@ export const gbp = formatPence;
 // `dataUrl` is then the trimmed drawing, and the cut-out starts as the trimmed copy (`cutout.trim`) so every
 // product is made from it. "undo" brings the whole photo back.
 // `key` = this drawing's identity (stays put when the trim swaps the picture in).
-export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
+export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean;
+  /** picked from the keepsake box to make real again — its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts) */
+  fromKeepsake?: boolean;
+  /** a copy made for an edit (this visit's) — the keepsake it came from */
+  copyOf?: string } | null;
 /** `px` = a Studio design's REAL pixel size (it may be stored enlarged for crisp stickers / words) —
  * what the print-quality badge judges, like the server's gate (src/server/print/sourceDims.ts). */
 export type Cutout = { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean; px?: { width: number; height: number } };

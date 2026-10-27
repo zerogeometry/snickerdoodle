@@ -158,7 +158,7 @@ export function CalendarBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: `${NEXT}?resume=1`, onUploaded: loadPicker, sheet });
+  const tools = usePickerEdits({ returnTo: `${NEXT}?resume=1`, onUploaded: loadPicker, sheet, onCopied: setChosen });
   // back from the Studio: the picker open again on the page it was filling, the edited drawing chosen
   const { resume, clearResume } = tools;
   useEffect(() => {

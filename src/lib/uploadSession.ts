@@ -21,6 +21,8 @@ export type SessionUpload = {
   kept?: boolean;
   opaqueBg?: boolean;
   scratch?: boolean;
+  fromKeepsake?: boolean;
+  copyOf?: string;
 };
 export type UploadSessionState = { upload: SessionUpload | null };
 
@@ -42,6 +44,8 @@ export function toSessionUpload(u: (SessionUpload & Record<string, unknown>) | n
   if (typeof u.key === 'string') out.key = u.key.slice(0, 80);
   if (typeof u.aspect === 'number' && Number.isFinite(u.aspect) && u.aspect > 0) out.aspect = u.aspect;
   if (u.kept === true) out.kept = true;
+  if (u.fromKeepsake === true) out.fromKeepsake = true;
+  if (typeof u.copyOf === 'string' && /^[0-9a-f-]{36}$/i.test(u.copyOf)) out.copyOf = u.copyOf;
   if (typeof u.opaqueBg === 'boolean') out.opaqueBg = u.opaqueBg;
   if (u.scratch === true) out.scratch = true;
   return out;

@@ -1,6 +1,6 @@
 'use server';
 
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { assets, children, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { derivativeKey, presignDownload } from '@/storage';
@@ -11,6 +11,7 @@ import { workingBytes } from '@/server/magic';
 import { resolveViewerContext } from '@/server/assets';
 import { pickableKeepsakes, type PickerKeepsake } from '@/server/keepsakePicker';
 import { keepsakeThumbUrls } from '@/server/keepsakeThumbs';
+import { copyKeepsake, copyWithoutBackground, discardUnusedCopy, keepsakeLooks } from '@/server/keepsakeCopy';
 import { resolveHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 
@@ -45,30 +46,28 @@ async function loadKeepsakePicker(): Promise<PickerKeepsake[] | null> {
   const kids = await db.select({ id: children.id, firstName: children.firstName }).from(children).where(eq(children.familyId, familyId));
   const nameOf = new Map(kids.map((c) => [c.id, c.firstName]));
 
-  // the table-trimmed copies (the working drawing — src/server/magic.ts) of these keepsakes
+  // each keepsake's LOOK — its Studio design if it has one, else its drawing (src/server/keepsakeCopy.ts)
   const visible = pickableKeepsakes(rows, viewer);
-  const trimKeys = visible.map(({ row }) => derivativeKey(row.asset.id, 'trimmed'));
-  const trims = trimKeys.length
-    ? await db.select({ id: storageObjects.id, key: storageObjects.key, assetId: storageObjects.assetId }).from(storageObjects).where(inArray(storageObjects.key, trimKeys))
-    : [];
-  const trimOf = new Map(trims.map((t) => [t.assetId, t]));
-
-  // the grid's small copies (made once, the first time one is needed) — only for the cleared keepsakes
-  const thumbs = await keepsakeThumbUrls(db, visible.map(({ row }) => row.asset.id), 600);
+  const looks = await keepsakeLooks(db, visible.map(({ row }) => ({ id: row.asset.id, studioDoc: row.asset.studioDoc })));
+  // the grid's small copies (made once per look) — only for the cleared keepsakes
+  const thumbs = await keepsakeThumbUrls(db, visible.map(({ row }) => ({ assetId: row.asset.id, look: looks.get(row.asset.id) ?? null })), 600);
 
   // Authz FIRST, then mint — a URL is never minted for a keepsake the viewer can't see.
   return Promise.all(
     visible.map(async ({ row, printable }) => {
-      const trim = trimOf.get(row.asset.id);
-      const key = trim?.key ?? row.key;
+      const look = looks.get(row.asset.id);
+      // a Studio design is judged on its drawing's real pixels (src/server/print/sourceDims.ts)
+      const designPx = (row.asset.studioDoc as { designPx?: { width: number; height: number; sha256: string } } | null)?.designPx;
+      const px = look?.kind === 'design' && designPx && look.sha256 === designPx.sha256 ? { width: designPx.width, height: designPx.height } : undefined;
       return {
         thumbUrl: thumbs.get(row.asset.id) ?? null,
         id: row.asset.id,
-        imageUrl: key ? await presignDownload(key, 600) : null,
+        imageUrl: look ? await presignDownload(look.key, 600) : null,
         createdAtISO: row.asset.createdAt.toISOString(),
         childFirstName: row.asset.childSubjectId ? (nameOf.get(row.asset.childSubjectId) ?? null) : null,
         printable,
-        ...(trim ? { sourceObjectId: trim.id } : {}),
+        ...(look && look.kind !== 'original' ? { sourceObjectId: look.id } : {}),
+        ...(px ? { px } : {}),
       };
     }),
   );
@@ -102,3 +101,42 @@ export async function keepsakeForStudioAction(input: { assetId: string }): Promi
   }
 }
 
+
+/**
+ * Edit a keepsake from a drawing picker (or the Create screen) → a NEW keepsake (founder, 27 Oct):
+ * the copy is made here, and the edit happens on it — the keepsake it came from is never touched.
+ * `removeBackground`: the copy comes back with the background already lifted.
+ */
+export async function copyKeepsakeAction(input: { assetId: string; removeBackground?: boolean }): Promise<{ ok: true; assetId: string } | { ok: false; reason?: 'nochange' | 'signed-out' }> {
+  try {
+    const account = await getCurrentAccount();
+    if (!account) return { ok: false, reason: 'signed-out' };
+    const db = getDb();
+    const assetId = String(input?.assetId ?? '');
+    const [a] = await db.select({ familyId: assets.familyId }).from(assets).where(eq(assets.id, assetId));
+    if (!a?.familyId) return { ok: false };
+    const viewer = await resolveViewerContext(db, account.id, a.familyId);
+    if (input.removeBackground) {
+      const r = await copyWithoutBackground(db, viewer, assetId, { keepEnclosedPaper: true });
+      return r.ok ? r : { ok: false, reason: r.reason };
+    }
+    return { ok: true, ...(await copyKeepsake(db, viewer, assetId)) };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** A copy made for a Studio edit that was then left without saving — tidied away (only its maker, only while fresh). */
+export async function discardCopyAction(input: { assetId: string }): Promise<{ ok: boolean }> {
+  try {
+    const account = await getCurrentAccount();
+    if (!account) return { ok: false };
+    const db = getDb();
+    const assetId = String(input?.assetId ?? '');
+    const [a] = await db.select({ familyId: assets.familyId }).from(assets).where(eq(assets.id, assetId));
+    if (!a?.familyId) return { ok: false };
+    return { ok: await discardUnusedCopy(db, await resolveViewerContext(db, account.id, a.familyId), assetId) };
+  } catch {
+    return { ok: false };
+  }
+}

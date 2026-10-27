@@ -20,6 +20,7 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { studioReturnTo } from '@/ui/components/usePickerEdits';
+import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -181,7 +182,9 @@ function StudioEditor() {
       origSize.current = [img.naturalWidth, img.naturalHeight];
       const { work } = buildWork(img);
       sourceAlpha.current = work.alpha.slice();
-      const id = await ensureAsset();
+      // a keepsake picked from the box: the Studio edits a NEW keepsake — an exact copy, made now (the
+      // one it came from is never touched; leaving without saving tidies the copy away)
+      const id = upload.fromKeepsake ? await forkPickedKeepsake() : await ensureAsset();
       let g = IDENTITY;
       if (id) {
         const st = await studioStateAction({ assetId: id });
@@ -852,6 +855,8 @@ function StudioEditor() {
       for (const id of new Set([prev, res.design?.sourceObjectId])) if (id) forgetMockupsFor(id);
       setCutout(res.design);
       setAspect(res.aspect);
+      // a copy made for this edit is now a keepsake of its own — never tidied away
+      if (useUpload.getState().upload?.copyOf) useUpload.setState((s) => (s.upload ? { upload: { ...s.upload, copyOf: undefined } } : {}));
       setDirty(false);
       toast('saved ✨');
       then(true);
@@ -864,7 +869,9 @@ function StudioEditor() {
   // once, not twice.
   // `saved`: a design was just saved — the range opens at "your masterpiece, made real" on a
   // phone (with its loader right there) rather than back at the top.
-  const backToRange = (saved = false) => {
+  const backToRange = async (saved = false) => {
+    // a copy made for an edit that wasn't saved: tidied away, the keepsake it came from put back
+    if (!saved && useUpload.getState().upload?.copyOf) await unforkUnsavedCopy();
     // opened from the calendar / card-pack picker: back there (src/ui/components/usePickerEdits.ts)
     const to = studioReturnTo(useUpload.getState().upload?.assetId) ?? (saved ? '/start-creating?edited=1' : '/start-creating');
     if (guardRef.current) {

@@ -23,10 +23,12 @@ export interface PickerKeepsake {
   sourceObjectId?: string;
   /** a small (400px) copy for the picker's grid — not the multi-MB photo per tile */
   thumbUrl?: string | null;
+  /** a Studio design's real pixel size (what print quality is judged on) */
+  px?: { width: number; height: number };
 }
 
 export type PickerRow = {
-  asset: Omit<AssetRef, 'heldForReview'> & { keptInHome: boolean; moderationStatus: 'PENDING' | 'CLEAR' | 'FLAGGED' | 'BLOCKED'; moderationDetail?: unknown; createdAt: Date; childSubjectId: string | null };
+  asset: Omit<AssetRef, 'heldForReview'> & { keptInHome: boolean; moderationStatus: 'PENDING' | 'CLEAR' | 'FLAGGED' | 'BLOCKED'; moderationDetail?: unknown; studioDoc?: unknown; createdAt: Date; childSubjectId: string | null };
   key: string | null;
 };
 

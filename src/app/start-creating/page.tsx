@@ -26,6 +26,7 @@ import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
 import { StartFromKeepsake } from '@/ui/components/StartFromKeepsake';
+import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
 
 const TOO_MANY = 'that’s a lot of pictures for now — try again in a little while';
 
@@ -184,7 +185,9 @@ export default function StartCreatingPage() {
     }
     setRemovingBg(true);
     try {
-      let id = upload.assetId ?? null;
+      // a keepsake picked from the box: the edit makes a NEW keepsake (the one it came from is untouched)
+      let id = upload.fromKeepsake ? await forkPickedKeepsake() : (upload.assetId ?? null);
+      if (upload.fromKeepsake && !id) return;
       if (!id) {
         const blob = await fetch(upload.dataUrl).then((r) => r.blob());
         const up = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
@@ -196,9 +199,15 @@ export default function StartCreatingPage() {
         applyIngested(id, up.trimmed);
       }
       const res = await removeBackgroundAction({ assetId: id, keepEnclosedPaper: true });
+      const forked = !!useUpload.getState().upload?.copyOf;
       if (res.ok) {
         setCutout({ url: res.url, sourceObjectId: res.sourceObjectId, oneTap: true });
-        toast('background removed ✨');
+        // a copy made for this edit is now a keepsake of its own
+        if (forked) useUpload.setState((s) => (s.upload ? { upload: { ...s.upload, copyOf: undefined } } : {}));
+        toast(forked ? 'saved as a new keepsake — background removed ✨' : 'background removed ✨');
+      } else if (forked) {
+        await unforkUnsavedCopy(); // nothing changed: no new keepsake
+        toast(res.reason === 'nochange' ? 'no plain paper on this one — try remove colour in the studio' : 'couldn’t do that — try again');
       } else if (res.reason === 'nochange') {
         // no plain paper to lift it off (a painted background) — the Studio's "remove colour" is for that
         toast('no plain paper on this one — try remove colour in the studio');

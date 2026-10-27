@@ -157,7 +157,7 @@ export function CardPackBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: '/customize/cardPack?resume=1', onUploaded: loadPicker, sheet });
+  const tools = usePickerEdits({ returnTo: '/customize/cardPack?resume=1', onUploaded: loadPicker, sheet, onCopied: setChosen });
   // back from the Studio: the picker open again on the card it was filling, the edited drawing chosen
   const { resume, clearResume } = tools;
   useEffect(() => {
@@ -587,8 +587,8 @@ export function PickerBody({
                     disabled={!!tools.busy[d.assetId]}
                     className="press inline-flex min-h-11 items-center justify-center gap-1 rounded-pill border-2 border-cocoa/25 bg-paper px-2 text-[11px] font-bold text-cocoa hover:border-cocoa disabled:opacity-60"
                   >
-                    <Icon icon={tools.edits[d.assetId] ? IconArrowBackUp : IconSparkles} size={13} />
-                    {tools.busy[d.assetId] === 'lifting…' ? 'lifting…' : tools.edits[d.assetId] ? 'put it back' : 'remove background'}
+                    <Icon icon={tools.hasLiftedBackground(d) ? IconArrowBackUp : IconSparkles} size={13} />
+                    {tools.busy[d.assetId] === 'lifting…' ? 'lifting…' : tools.hasLiftedBackground(d) ? 'put it back' : 'remove background'}
                   </button>
                   <button
                     type="button"
@@ -627,7 +627,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export type PickerTools = Pick<ReturnType<typeof usePickerEdits>, 'edits' | 'busy' | 'uploading' | 'toggleBackground' | 'editInStudio' | 'uploadToKeepsake'>;
+export type PickerTools = Pick<ReturnType<typeof usePickerEdits>, 'hasLiftedBackground' | 'busy' | 'uploading' | 'toggleBackground' | 'editInStudio' | 'uploadToKeepsake'>;
 
 /** "upload to keepsake": one or more photos from the computer or the phone's gallery, into the keepsake
  * box (an account keeps them — a guest is asked to log in first). */

@@ -45,6 +45,7 @@ export function StartFromKeepsake() {
         key: `keepsake-${k.id}`,
         assetId: k.id,
         kept: true,
+        fromKeepsake: true, // its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts)
         aspect: res.aspect,
         ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
       });

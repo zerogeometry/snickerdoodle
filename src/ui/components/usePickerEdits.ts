@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { keepUploadAction } from '@/app/actions/keep';
-import { keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
-import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
+import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
+import { removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { normalizeUpload, toast, useUpload, type Upload } from '@/lib/store';
 import { toSessionUpload } from '@/lib/uploadSession';
@@ -13,20 +13,21 @@ import { toSessionUpload } from '@/lib/uploadSession';
  * The calendar's and the card pack's drawing picker, made a little workshop (founder, 26 Oct):
  *  - "upload to keepsake": one or more photos from the computer / the phone's gallery, each stored,
  *    screened and kept in the family's keepsake box like any other;
- *  - per drawing, "remove background" (and back again) and "edit in studio" — so each card / page
- *    prints exactly as edited.
+ *  - per drawing, "remove background" and "edit in studio" — so each card / page prints exactly as edited.
  *
- * Edits made here are this builder's own (a drawing's design for these cards / pages); the Studio is
- * reached by briefly opening the chosen keepsake as "the drawing" (setting aside the one in progress,
- * put back on return) — every Studio tool works unchanged.
+ * Editing a KEEPSAKE here makes a NEW keepsake (founder, 27 Oct: "save the edited variant … as a new
+ * keepsake, so we don't overwrite a keepsake previously saved"): the copy is made on the server, the
+ * edit happens on the copy, and the copy is chosen. The keepsake it came from is never touched, so
+ * anything already in a basket or an order still prints exactly what was chosen. (The drawing in
+ * progress that isn't a keepsake yet has nothing saved to overwrite — it's edited as itself.)
+ * The Studio is reached by briefly opening the copy as "the drawing" (setting aside the one in
+ * progress, put back on return) — every Studio tool works unchanged; a copy left unsaved is tidied away.
  */
-export type DrawingEdit = { url: string; sourceObjectId: string; /** a Studio design's real pixel size (src/server/print/sourceDims.ts) */ px?: { width: number; height: number } };
 type Drawingish = { assetId: string; imageUrl: string | null; sourceObjectId?: string; px?: { width: number; height: number } };
 /** the drawing in progress, set aside without its picture */
 type Stashed = Omit<NonNullable<Upload>, 'dataUrl'>;
 
 const STASH_KEY = 'sd_upload_stash'; // the drawing in progress, set aside while a keepsake is in the Studio
-const EDITS_KEY = 'sd_picker_edits'; // + the builder: this tab's per-drawing edits, separate for the calendar and the cards
 const DETOUR_KEY = 'sd_studio_detour'; // { assetId, returnTo, sheet } while a keepsake is in the Studio
 /** the picker as it was when the Studio was opened from it — which card / page it was filling */
 export type PickerSheet = { slot: number; advance: boolean };
@@ -68,52 +69,23 @@ export function forgetResumeVisit(): void {
   }
 }
 
-export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void; /** the open picker (put back on return) */ sheet?: PickerSheet | null }) {
-  const editsKey = `${EDITS_KEY}:${opts.returnTo.split('?')[0]}`;
+export function usePickerEdits(opts: {
+  returnTo: string;
+  onUploaded: () => void;
+  /** the open picker (put back on return) */
+  sheet?: PickerSheet | null;
+  /** a new keepsake was made from an edit — choose it */
+  onCopied?: (assetId: string) => void;
+}) {
   const router = useRouter();
-  // kept for the tab, so a trip to the Studio (or a reload) doesn't undo the edits on other pages / cards
-  // (read after mount — the server render and the first client render agree)
-  const [edits, setEdits] = useState<Record<string, DrawingEdit>>({});
-  const editsRead = useRef(false);
+  // (the per-builder edits this replaced lived in the tab: clear what an earlier version left behind)
   useEffect(() => {
-    if (!editsRead.current) {
-      editsRead.current = true;
-      // a fresh visit: no edits carried over from a builder bailed on earlier
-      if (!isResumeVisit()) {
-        try {
-          sessionStorage.removeItem(editsKey);
-        } catch {
-          /* no storage */
-        }
-        return;
-      }
-      try {
-        const saved = JSON.parse(sessionStorage.getItem(editsKey) ?? '{}') as Record<string, DrawingEdit>;
-        if (saved && Object.keys(saved).length) {
-          setEdits((e) => ({ ...saved, ...e }));
-          // their signed links expire (10 min): fresh ones, so an edit made a while ago still shows
-          for (const [assetId, ed] of Object.entries(saved)) {
-            void designUrlAction({ assetId, sourceObjectId: ed.sourceObjectId }).then((r) =>
-              setEdits((e) => {
-                if (e[assetId]?.sourceObjectId !== ed.sourceObjectId) return e; // changed meanwhile
-                if (r.ok) return { ...e, [assetId]: { ...ed, url: r.url } };
-                const { [assetId]: _gone, ...rest } = e; // the design is gone (erased): the drawing as it is
-                return rest;
-              }),
-            );
-          }
-          return;
-        }
-      } catch {
-        /* no storage */
-      }
-    }
     try {
-      sessionStorage.setItem(editsKey, JSON.stringify(edits));
+      for (const k of Object.keys(sessionStorage)) if (k.startsWith('sd_picker_edits')) sessionStorage.removeItem(k);
     } catch {
       /* no storage */
     }
-  }, [edits, editsKey]);
+  }, []);
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<{ done: number; of: number } | null>(null);
   const restored = useRef(false);
@@ -122,12 +94,12 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
   const [resume, setResume] = useState<{ assetId: string; sheet: PickerSheet } | null>(null);
   const clearResume = useCallback(() => setResume(null), []);
 
-  // Back from the Studio: the keepsake's saved design becomes its edit here, and the drawing that was
-  // in progress is put back where it was.
+  // Back from the Studio: the new keepsake is chosen (or, left unsaved, tidied away and the one it came
+  // from chosen again), and the drawing that was in progress is put back where it was.
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    let detour: { assetId: string; sheet?: PickerSheet | null } | null = null;
+    let detour: { assetId: string; copyOf?: string | null; sheet?: PickerSheet | null } | null = null;
     try {
       detour = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null');
     } catch {
@@ -135,18 +107,12 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     }
     if (!detour) return;
     const u = useUpload.getState().upload;
+    const saved = u?.assetId === detour.assetId && !!u.cutout && !u.cutout.trim;
+    // a copy made for the Studio and then never saved: nothing new to keep
+    if (detour.copyOf && !saved) void discardCopyAction({ assetId: detour.assetId }).then(() => opts.onUploaded());
+    const chosen = detour.copyOf && !saved ? detour.copyOf : detour.assetId;
     // (a detour abandoned some other way: just put the drawing in progress back, below)
-    const back = isResumeVisit();
-    if (back && u?.assetId === detour.assetId) {
-      if (u.cutout && !u.cutout.trim) {
-        const design: DrawingEdit = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId, ...(u.cutout.px ? { px: u.cutout.px } : {}) };
-        setEdits((e) => ({ ...e, [detour!.assetId]: design }));
-      } else {
-        // saved back to the plain drawing: no edit of it here any more
-        setEdits(({ [detour!.assetId]: _gone, ...rest }) => rest);
-      }
-    }
-    if (back && detour.sheet) setResume({ assetId: detour.assetId, sheet: detour.sheet });
+    if (isResumeVisit() && detour.sheet) setResume({ assetId: chosen, sheet: detour.sheet });
     try {
       // (only when one WAS set aside — editing the drawing in progress itself sets nothing aside)
       const stash = sessionStorage.getItem(STASH_KEY);
@@ -164,28 +130,46 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     } catch {
       /* no storage */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on arrival
   }, []);
 
-  /** The drawings as they'll print here: an edit made in this builder replaces the picture + source. */
-  // (its small grid copy is of the drawing BEFORE the edit — so an edited one shows the edit itself)
-  const apply = useCallback(
-    <D extends Drawingish>(list: D[]): D[] => list.map((d) => (edits[d.assetId] ? { ...d, imageUrl: edits[d.assetId]!.url, sourceObjectId: edits[d.assetId]!.sourceObjectId, thumbUrl: null, px: edits[d.assetId]!.px } : d)),
-    [edits],
-  );
+  /** The drawings as they'll print here (edits are real keepsakes now — nothing to lay over them). */
+  const apply = useCallback(<D extends Drawingish>(list: D[]): D[] => list, []);
+
+  /** Is this the drawing in progress that isn't a keepsake yet (edited as itself, not copied)? */
+  const isLooseDrawing = (d: Drawingish) => {
+    const u = useUpload.getState().upload;
+    return !!u && u.assetId === d.assetId && !u.kept;
+  };
+  /** The drawing in progress (not a keepsake yet) with its background lifted — "put it back" undoes it. */
+  const hasLiftedBackground = (d: Drawingish) => {
+    const u = useUpload.getState().upload;
+    return isLooseDrawing(d) && !!u?.cutout && !u.cutout.trim;
+  };
 
   const toggleBackground = async (d: Drawingish) => {
     if (busy[d.assetId]) return;
-    if (edits[d.assetId]) {
-      setEdits(({ [d.assetId]: _gone, ...rest }) => rest);
-      toast('background back — just as it was');
-      return;
-    }
     setBusy((b) => ({ ...b, [d.assetId]: 'lifting…' }));
     try {
-      const res = await removeBackgroundAction({ assetId: d.assetId, keepEnclosedPaper: true });
+      if (isLooseDrawing(d)) {
+        // the drawing in progress: its own cutout, and back again
+        if (hasLiftedBackground(d)) {
+          useUpload.getState().setCutout(null);
+          return void toast('background back — just as it was');
+        }
+        const res = await removeBackgroundAction({ assetId: d.assetId, keepEnclosedPaper: true });
+        if (res.ok) {
+          useUpload.getState().setCutout({ url: res.url, sourceObjectId: res.sourceObjectId });
+          toast('background removed ✨');
+        } else toast(res.reason === 'nochange' ? 'no plain paper on this one — try the studio' : 'couldn’t do that — try again');
+        return;
+      }
+      // a keepsake: a NEW keepsake with the background lifted, chosen here
+      const res = await copyKeepsakeAction({ assetId: d.assetId, removeBackground: true });
       if (res.ok) {
-        setEdits((e) => ({ ...e, [d.assetId]: { url: res.url, sourceObjectId: res.sourceObjectId } }));
-        toast('background removed ✨');
+        toast('saved as a new keepsake — background removed ✨');
+        opts.onUploaded();
+        opts.onCopied?.(res.assetId);
       } else toast(res.reason === 'nochange' ? 'no plain paper on this one — try the studio' : 'couldn’t do that — try again');
     } finally {
       setBusy(({ [d.assetId]: _done, ...rest }) => rest);
@@ -195,8 +179,8 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
   const editInStudio = async (d: Drawingish) => {
     if (busy[d.assetId]) return;
     const current = useUpload.getState().upload;
-    // the drawing in progress IS this one: the Studio as usual, back here afterwards
-    if (current?.assetId === d.assetId) {
+    // the drawing in progress, not a keepsake yet: the Studio as usual, back here afterwards
+    if (isLooseDrawing(d)) {
       try {
         sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
       } catch {
@@ -207,22 +191,29 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     }
     setBusy((b) => ({ ...b, [d.assetId]: 'opening…' }));
     try {
-      const res = await keepsakeForStudioAction({ assetId: d.assetId });
-      if (!res.ok) return void toast('couldn’t open that one — try again');
+      // a keepsake: the Studio edits a NEW keepsake (an exact copy, made now)
+      const copy = await copyKeepsakeAction({ assetId: d.assetId });
+      if (!copy.ok) return void toast('couldn’t open that one — try again');
+      const res = await keepsakeForStudioAction({ assetId: copy.assetId });
+      if (!res.ok) {
+        void discardCopyAction({ assetId: copy.assetId });
+        return void toast('couldn’t open that one — try again');
+      }
       try {
         // set aside WITHOUT its picture — the tab can't hold two photos; it's fetched again on return
         const { dataUrl: _picture, ...rest } = current ? (toSessionUpload(current) ?? { dataUrl: '' }) : { dataUrl: '' };
         sessionStorage.setItem(STASH_KEY, JSON.stringify({ upload: current ? rest : null }));
-        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
+        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: copy.assetId, copyOf: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
       } catch {
+        void discardCopyAction({ assetId: copy.assetId });
         return void toast('couldn’t open the studio from here — try from your collection');
       }
       const trim = res.trim;
       useUpload.getState().setUpload({
         dataUrl: res.dataUrl,
         name: 'drawing.jpg',
-        key: `keepsake-${d.assetId}`,
-        assetId: d.assetId,
+        key: `keepsake-${copy.assetId}`,
+        assetId: copy.assetId,
         kept: true,
         aspect: res.aspect,
         ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
@@ -263,5 +254,5 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     opts.onUploaded();
   };
 
-  return { edits, busy, uploading, apply, toggleBackground, editInStudio, uploadToKeepsake, resume, clearResume };
+  return { busy, uploading, apply, hasLiftedBackground, toggleBackground, editInStudio, uploadToKeepsake, resume, clearResume };
 }
