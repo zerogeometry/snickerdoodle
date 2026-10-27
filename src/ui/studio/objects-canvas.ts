@@ -240,7 +240,10 @@ export function drawTextured(
   f: Frame,
   M: DOMMatrix,
   clip: { x: number; y: number; w: number; h: number },
+  /** How solid the whole layer is (0–1) — faded as ONE layer, so overlaps don't darken. */
+  opacity = 1,
 ): void {
+  if (opacity <= 0) return;
   const apply = (c: CanvasRenderingContext2D) => {
     c.setTransform(M);
     c.beginPath();
@@ -248,7 +251,7 @@ export function drawTextured(
     c.clip();
     o.draw(c);
   };
-  if (o.texture === 'smooth') {
+  if (o.texture === 'smooth' && opacity >= 1) {
     ctx.save();
     apply(ctx);
     ctx.restore();
@@ -265,9 +268,20 @@ export function drawTextured(
   s.setTransform(1, 0, 0, 1, 0, 0);
   s.clearRect(0, 0, W, H);
   apply(s);
+  if (o.texture !== 'smooth') grainLayer(s, o.texture, f, clip);
+  s.restore();
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = opacity;
+  ctx.drawImage(scratch, 0, 0);
+  ctx.restore();
+}
+
+/** Cut a layer by its texture's grain mask, then shade it — like the server does. */
+function grainLayer(s: CanvasRenderingContext2D, texture: Exclude<TextureKind, 'smooth'>, f: Frame, clip: { x: number; y: number; w: number; h: number }): void {
   const T = TEXTURE_TILE_FRAC * S(f);
   const grain = (part: 'mask' | 'dark' | 'light', op: GlobalCompositeOperation) => {
-    const tile = tileCanvas(o.texture as Exclude<TextureKind, 'smooth'>, part);
+    const tile = tileCanvas(texture, part);
     const p = s.createPattern(tile, 'repeat')!;
     p.setTransform(new DOMMatrix().scale(T / tile.width));
     s.globalCompositeOperation = op;
@@ -277,9 +291,5 @@ export function drawTextured(
   grain('mask', 'destination-in');
   grain('dark', 'source-atop');
   grain('light', 'source-atop');
-  s.restore();
-  ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(scratch, 0, 0);
-  ctx.restore();
+  s.globalCompositeOperation = 'source-over';
 }

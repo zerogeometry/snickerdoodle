@@ -41,16 +41,19 @@ import { toggleFestive, type FestivePreset } from '@/lib/studio-festive';
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, onStickerLoad, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
-import { flipObjects, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { flipObjects, layerAlpha, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
+import { isPalmTouch } from '@/ui/studio/input';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { forgetMockupsFor } from '@/lib/mockupPrefetch';
 import {
   IDENTITY,
+  beginPaint,
   buildWork,
-  dab,
+  paintDab,
+  type PaintStroke,
   flipGeometry,
   geometryIsIdentity,
   geometryMatrix,
@@ -171,7 +174,9 @@ function StudioEditor() {
   // ── added things (phase 2) ──
   const [objects, setObjects] = useState<StudioObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, stylusOnly: false, texture: 'crayon' });
+  const [pen, setPen] = useState<PenStyle>({ colour: '#2b2118', width: 0.012, smooth: 0.5, opacity: 1, stylusOnly: false, texture: 'crayon' });
+  // eraser / bring back: how strongly a stroke rubs out (or back), and how much wobble is ironed out
+  const [eraser, setEraser] = useState({ strength: 1, smooth: 0.3 });
   const [textStyle, setTextStyle] = useState<TextStyle>({ font: 'caveat', colour: '#2b2118', texture: 'smooth' });
   const [shapeStyle, setShapeStyle] = useState<ShapeStyle>({ fill: '#f6c445', stroke: '#2b2118', strokeWidth: 0.05, texture: 'smooth' });
   // Christmas (1 Nov–6 Jan, UK): the christmas drawer + festive fonts. `?festive` previews them in development.
@@ -398,9 +403,9 @@ function StudioEditor() {
       const f: Frame = { gw, gh };
       const M = new DOMMatrix([dpr, 0, 0, dpr, 0, 0]).multiply(V);
       // (the words being typed into are shown by the editor over the picture, not twice)
-      for (const o of objects) if (o.id !== editingId) drawTextured(ctx, { texture: textureOf(o), draw: (c) => drawObject(c, o, f) }, f, M, content);
+      for (const o of objects) if (o.id !== editingId) drawTextured(ctx, { texture: textureOf(o), draw: (c) => drawObject(c, o, f) }, f, M, content, layerAlpha(o));
       const live = liveStroke.current;
-      if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content);
+      if (live) drawTextured(ctx, { texture: pen.texture, draw: (c) => drawStroke(c, { colour: pen.colour, width: pen.width, points: live }, f) }, f, M, content, pen.opacity);
 
       // selection: dashed box, corner resize handle, top turn handle (screen space)
       const selB = tool && EDITING.includes(tool) ? selectedBox(f) : null;
@@ -514,7 +519,7 @@ function StudioEditor() {
 
   // ── pointer handling: tools, pinch-zoom, pan ──
   const pointers = useRef(new Map<number, { x: number; y: number; type: string }>());
-  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn' | 'spin'; obj?: StudioObject; drawing?: boolean; place0?: Placement; spin0?: number; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
+  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn' | 'spin'; pointerId?: number; paint?: PaintStroke; obj?: StudioObject; drawing?: boolean; place0?: Placement; spin0?: number; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
 
   const local = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -531,10 +536,18 @@ function StudioEditor() {
     return [p.x, p.y];
   };
 
+  // palm rejection: while a pen is down (or was just lifted), touches on the canvas are a resting
+  // hand, not a finger — and a big contact patch is a palm whatever the device
+  const lastPenAt = useRef(0);
+  const isPalm = (e: React.PointerEvent) =>
+    isPalmTouch({ pointerType: e.pointerType, width: e.width, height: e.height, penDown: [...pointers.current.values()].some((p) => p.type === 'pen'), msSincePen: Date.now() - lastPenAt.current });
+
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!workRef.current || busy) return;
     // the canvas never takes focus itself: the words editor keeps it until we say otherwise
     e.preventDefault();
+    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
+    if (isPalm(e)) return; // never tracked, so it can't draw, pan or end a stroke
     e.currentTarget.setPointerCapture(e.pointerId);
     const [sx, sy] = local(e);
     pointers.current.set(e.pointerId, { x: sx, y: sy, type: e.pointerType });
@@ -565,7 +578,7 @@ function StudioEditor() {
       const [gx, gy] = toGeoSpace(sx, sy);
       pushUndo();
       liveStroke.current = [gx / f.gw, gy / f.gh, e.pointerType === 'pen' ? e.pressure || 0.5 : 0.5];
-      gesture.current = { kind: 'stroke', smooth: [gx, gy] };
+      gesture.current = { kind: 'stroke', pointerId: e.pointerId, smooth: [gx, gy] };
       setTick((t) => t + 1);
       return;
     }
@@ -608,7 +621,7 @@ function StudioEditor() {
         }
       }
       const slop = 10 / viewMatrix(geo).a;
-      const hit = [...objects].reverse().find((o) => (tool === 'text' ? o.type === 'text' : tool === 'shapes' ? o.type === 'shape' : true) && hits(o, f, gx, gy, slop));
+      const hit = [...objects].reverse().find((o) => !o.hidden && (tool === 'text' ? o.type === 'text' : tool === 'shapes' ? o.type === 'shape' : true) && hits(o, f, gx, gy, slop));
       if (hit) {
         setSelectedId(hit.id);
         pushUndo();
@@ -645,13 +658,14 @@ function StudioEditor() {
       setTick((t) => t + 1);
       return;
     }
-    if (tool === 'erase' || tool === 'restore') {
+    if ((tool === 'erase' || tool === 'restore') && !(pen.stylusOnly && e.pointerType === 'touch')) {
       const snap = snapshot();
       pushUndo(snap);
       const [ix, iy] = toImage(sx, sy);
       const size = brushInImage() * (e.pointerType === 'pen' ? 0.5 + (e.pressure || 0.5) : 1);
-      dab(workRef.current, ix, iy, size, tool);
-      gesture.current = { kind: 'paint', startSnap: snap, last: [ix, iy] };
+      const paint = beginPaint(workRef.current, snap.alpha);
+      paintDab(workRef.current, paint, ix, iy, size, tool, eraser.strength);
+      gesture.current = { kind: 'paint', pointerId: e.pointerId, paint, startSnap: snap, last: [ix, iy], smooth: [ix, iy] };
       setTick((t) => t + 1);
       return;
     }
@@ -681,7 +695,10 @@ function StudioEditor() {
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const gst = gesture.current;
-    if (!gst || !workRef.current) return;
+    if (!gst || !workRef.current || !pointers.current.has(e.pointerId)) return;
+    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
+    // a line belongs to the pointer that started it
+    if ((gst.kind === 'stroke' || gst.kind === 'paint') && gst.pointerId !== undefined && gst.pointerId !== e.pointerId) return;
     const [sx, sy] = local(e);
     if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: sx, y: sy, type: e.pointerType });
 
@@ -754,12 +771,17 @@ function StudioEditor() {
       setView((v) => ({ ...v, panX: gst.pan0![0] + sx - gst.m0![0], panY: gst.pan0![1] + sy - gst.m0![1] }));
       return;
     }
-    if (gst.kind === 'paint' && (tool === 'erase' || tool === 'restore')) {
-      const [ix, iy] = toImage(sx, sy);
+    if (gst.kind === 'paint' && gst.paint && (tool === 'erase' || tool === 'restore')) {
+      const [rx, ry] = toImage(sx, sy);
+      // smoothing: follow the pointer with a little lag (the same rule as the pen)
+      const k = 1 - eraser.smooth * 0.85;
+      const [px0, py0] = gst.smooth!;
+      const ix = px0 + (rx - px0) * k, iy = py0 + (ry - py0) * k;
+      gst.smooth = [ix, iy];
       const [lx, ly] = gst.last!;
       const size = brushInImage() * (e.pointerType === 'pen' ? 0.5 + (e.pressure || 0.5) : 1);
       const steps = Math.max(1, Math.ceil(Math.hypot(ix - lx, iy - ly) / Math.max(2, size / 4)));
-      for (let i = 1; i <= steps; i++) dab(workRef.current, lx + ((ix - lx) * i) / steps, ly + ((iy - ly) * i) / steps, size, tool);
+      for (let i = 1; i <= steps; i++) paintDab(workRef.current, gst.paint, lx + ((ix - lx) * i) / steps, ly + ((iy - ly) * i) / steps, size, tool, eraser.strength);
       gst.last = [ix, iy];
       setTick((t) => t + 1);
       return;
@@ -787,16 +809,19 @@ function StudioEditor() {
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!pointers.current.has(e.pointerId)) return; // a rejected palm lifting off
+    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
     const pe = pendingEdit.current;
     pendingEdit.current = null;
     if (pe && pointers.current.size === 1) {
       const [sx, sy] = local(e);
       if (pe.isNew || Math.hypot(sx - pe.sx, sy - pe.sy) < 8) startEdit(pe.id, sy);
     }
-    if (gesture.current?.kind === 'stroke' && liveStroke.current) {
+    const gst = gesture.current;
+    if (gst?.kind === 'stroke' && liveStroke.current && (gst.pointerId === undefined || gst.pointerId === e.pointerId)) {
       const points = liveStroke.current;
       liveStroke.current = null;
-      setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points, texture: pen.texture }]);
+      setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points, texture: pen.texture, ...(pen.opacity < 1 ? { opacity: pen.opacity } : {}) }]);
     }
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 0) gesture.current = null;
@@ -1317,6 +1342,10 @@ function StudioEditor() {
       setFussy={setFussy}
       brush={brush}
       setBrush={setBrush}
+      eraser={eraser}
+      setEraser={setEraser}
+      stylusOnly={pen.stylusOnly}
+      setStylusOnly={(stylusOnly) => setPen({ ...pen, stylusOnly })}
       onFlip={onFlip}
       onResetCrop={onResetCrop}
       onDoneCrop={() => setTool(null)}
@@ -1349,6 +1378,8 @@ function StudioEditor() {
           setFussy,
           brush,
           setBrush,
+          eraser,
+          setEraser,
           angle: visualAngle(geo),
           onAngle: (v, group) => turnDesign(v, group),
           onFlip,
@@ -1585,6 +1616,10 @@ function ToolOptions(p: {
   setFussy: (v: number) => void;
   brush: number;
   setBrush: (v: number) => void;
+  eraser: { strength: number; smooth: number };
+  setEraser: (v: { strength: number; smooth: number }) => void;
+  stylusOnly: boolean;
+  setStylusOnly: (v: boolean) => void;
   onFlip: (axis: 'h' | 'v') => void;
   onResetCrop: () => void;
   onDoneCrop: () => void;
@@ -1654,7 +1689,20 @@ function ToolOptions(p: {
         <Stack>
           <Section label="brush">
             <SliderRow label="size" min={6} max={140} value={p.brush} onChange={p.setBrush} ariaLabel="brush size" display={<SizeDot px={p.brush / 4} />} />
+            <SliderRow
+              label="strength"
+              min={10}
+              max={100}
+              value={Math.round(p.eraser.strength * 100)}
+              onChange={(v) => p.setEraser({ ...p.eraser, strength: v / 100 })}
+              ariaLabel={p.tool === 'erase' ? 'how much it rubs out' : 'how much it brings back'}
+              display={`${Math.round(p.eraser.strength * 100)}%`}
+            />
+            <SliderRow label="smoothing" min={0} max={100} value={Math.round(p.eraser.smooth * 100)} onChange={(v) => p.setEraser({ ...p.eraser, smooth: v / 100 })} ariaLabel="smooth out wobbles" display={p.eraser.smooth < 0.2 ? 'off' : p.eraser.smooth > 0.7 ? 'lots' : 'some'} />
             <p className="text-[11px] text-ink-soft">pinch or scroll to zoom in for the fiddly bits.</p>
+          </Section>
+          <Section>
+            <ToggleRow title="stylus only" note="fingers move the picture; only the pen rubs out" on={p.stylusOnly} onChange={p.setStylusOnly} />
           </Section>
           <Section label="switch to">{p.tool === 'erase' ? <div className="flex">{jump('restore', 'bring back')}</div> : <div className="flex">{jump('erase', 'eraser')}</div>}</Section>
         </Stack>

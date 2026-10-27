@@ -208,6 +208,18 @@ function TTurn({ angle, onAngle, what }: { angle: number; onAngle: (deg: number,
   );
 }
 
+/** A slim slider in the row, with its value beside it. */
+function TSlider({ min, max, value, onChange, label, shown }: { min: number; max: number; value: number; onChange: (v: number) => void; label: string; shown: string }) {
+  return (
+    <>
+      <input type="range" min={min} max={max} value={value} onChange={(e) => onChange(Number(e.target.value))} aria-label={label} aria-valuetext={shown} className="h-11 w-24 shrink-0 accent-[var(--color-cta)]" />
+      <span className="w-10 shrink-0 text-center font-display text-sm text-cocoa">{shown}</span>
+    </>
+  );
+}
+const smoothWord = (s: number) => (s < 0.2 ? 'off' : s > 0.7 ? 'lots' : 'some');
+const nextSmooth = (s: number) => (s < 0.2 ? 0.5 : s > 0.7 ? 0 : 0.9);
+
 // ── what each tool shows ──
 
 export interface TrayProps {
@@ -225,6 +237,9 @@ export interface TrayProps {
   setFussy: (v: number) => void;
   brush: number;
   setBrush: (v: number) => void;
+  /** Eraser / bring back: how strongly a stroke rubs out (or back), and how much wobble is ironed out. */
+  eraser: { strength: number; smooth: number };
+  setEraser: (v: { strength: number; smooth: number }) => void;
   // frame + colour
   angle: number;
   onAngle: (visual: number, group?: boolean) => void;
@@ -322,6 +337,16 @@ export function StudioTray(p: TrayProps): ReactNode {
           <TLabel>brush</TLabel>
           <TDots values={[12, 24, 40, 70, 120]} value={p.brush} onChange={p.setBrush} label="brush size" px={(v) => v / 4.5} />
           <TSep />
+          <TLabel>strength</TLabel>
+          <TSlider min={10} max={100} value={Math.round(p.eraser.strength * 100)} onChange={(v) => p.setEraser({ ...p.eraser, strength: v / 100 })} label={p.tool === 'erase' ? 'how much it rubs out' : 'how much it brings back'} shown={`${Math.round(p.eraser.strength * 100)}%`} />
+          <TSep />
+          <TChip onClick={() => p.setEraser({ ...p.eraser, smooth: nextSmooth(p.eraser.smooth) })} label="smooth out wobbles — tap to change">
+            smoothing: {smoothWord(p.eraser.smooth)}
+          </TChip>
+          <TChip on={p.pen.stylusOnly} onClick={() => p.setPen({ ...p.pen, stylusOnly: !p.pen.stylusOnly })} label="stylus only — fingers move the picture, only the pen rubs out">
+            stylus only
+          </TChip>
+          <TSep />
           {p.tool === 'erase' ? jump('restore', 'bring back') : jump('erase', 'eraser')}
         </>,
       );
@@ -368,13 +393,13 @@ export function StudioTray(p: TrayProps): ReactNode {
           <TLabel>line</TLabel>
           <TDots values={[0.004, 0.008, 0.014, 0.024, 0.04]} value={p.pen.width} onChange={(width) => p.setPen({ ...p.pen, width })} label="line thickness" colour={p.pen.colour} px={(v) => v * 600} />
           <TSep />
+          <TLabel>opacity</TLabel>
+          <TSlider min={10} max={100} value={Math.round(p.pen.opacity * 100)} onChange={(v) => p.setPen({ ...p.pen, opacity: v / 100 })} label="line opacity" shown={`${Math.round(p.pen.opacity * 100)}%`} />
+          <TSep />
           <TTextures value={p.pen.texture} onChange={(texture) => p.setPen({ ...p.pen, texture })} />
           <TSep />
-          <TChip
-            onClick={() => p.setPen({ ...p.pen, smooth: p.pen.smooth < 0.2 ? 0.5 : p.pen.smooth > 0.7 ? 0 : 0.9 })}
-            label="smooth out wobbles — tap to change"
-          >
-            smoothing: {p.pen.smooth < 0.2 ? 'off' : p.pen.smooth > 0.7 ? 'lots' : 'some'}
+          <TChip onClick={() => p.setPen({ ...p.pen, smooth: nextSmooth(p.pen.smooth) })} label="smooth out wobbles — tap to change">
+            smoothing: {smoothWord(p.pen.smooth)}
           </TChip>
           <TChip on={p.pen.stylusOnly} onClick={() => p.setPen({ ...p.pen, stylusOnly: !p.pen.stylusOnly })} label="stylus only — fingers move the picture, only the pen draws">
             stylus only

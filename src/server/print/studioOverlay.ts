@@ -2,7 +2,7 @@ import { createElement as el } from 'react';
 import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import sharp, { type OverlayOptions } from 'sharp';
-import { SHAPE_PATHS, TEXT_LINE_HEIGHT, textureOf, type ShapeObject, type StickerObject, type StudioObject } from '@/lib/studio-objects';
+import { layerAlpha, SHAPE_PATHS, TEXT_LINE_HEIGHT, textureOf, type ShapeObject, type StickerObject, type StudioObject } from '@/lib/studio-objects';
 import { stickerSvg } from '@/lib/stickers';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { loadCardFontWoff } from './cardFonts';
@@ -28,6 +28,8 @@ export async function renderStudioObjects(
 
   const layers: OverlayOptions[] = [];
   for (const o of objects) {
+    const alpha = layerAlpha(o);
+    if (alpha <= 0) continue; // hidden: kept in the recipe, never printed
     let png: Buffer | null = null;
     let cx = 0, cy = 0;
     if (o.type === 'text') {
@@ -44,14 +46,22 @@ export async function renderStudioObjects(
       if (o.rotation) png = await rotate(png, o.rotation);
     } else {
       const r = await renderStroke(o, S, toPx);
-      if (r) layers.push(...(await clipAsync(await grain(r.png, r.left, r.top, o.texture), r.left, r.top, r.w, r.h, W, H)));
+      if (r) layers.push(...(await clipAsync(await fade(await grain(r.png, r.left, r.top, o.texture), alpha), r.left, r.top, r.w, r.h, W, H)));
       continue;
     }
     const m = await sharp(png).metadata();
     const left = Math.round(cx - m.width! / 2), top = Math.round(cy - m.height! / 2);
-    layers.push(...(await clipAsync(await grain(png, left, top, textureOf(o)), left, top, m.width!, m.height!, W, H)));
+    layers.push(...(await clipAsync(await fade(await grain(png, left, top, textureOf(o)), alpha), left, top, m.width!, m.height!, W, H)));
   }
   return sharp(design).ensureAlpha().composite(layers).png({ compressionLevel: 6 }).toBuffer();
+}
+
+/** Fade a whole layer to `alpha` (0–1) — as one layer, like the browser's globalAlpha. */
+export async function fade(png: Buffer, alpha: number): Promise<Buffer> {
+  if (alpha >= 1) return png;
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 3; i < data.length; i += 4) data[i] = Math.round(data[i]! * alpha);
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
 }
 
 async function rotate(png: Buffer, deg: number): Promise<Buffer> {

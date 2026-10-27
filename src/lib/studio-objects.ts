@@ -17,7 +17,15 @@ export type ShapeKind =
   // only placed by the festive touches (src/lib/studio-festive.ts) — not in the picker
   | 'snowflake' | 'tape' | 'frame';
 
-export interface TextObject {
+/** Every layer can be faded or hidden — numbers in the recipe, never baked in. */
+export interface LayerLook {
+  /** 0.05–1; absent = solid. */
+  opacity?: number;
+  /** Hidden layers are kept (and undoable) but neither shown nor printed. */
+  hidden?: boolean;
+}
+
+export interface TextObject extends LayerLook {
   id: string;
   type: 'text';
   text: string;
@@ -31,7 +39,7 @@ export interface TextObject {
   rotation: number;
   texture: TextureKind;
 }
-export interface ShapeObject {
+export interface ShapeObject extends LayerLook {
   id: string;
   type: 'shape';
   shape: ShapeKind;
@@ -47,7 +55,7 @@ export interface ShapeObject {
   rotation: number;
   texture: TextureKind;
 }
-export interface StrokeObject {
+export interface StrokeObject extends LayerLook {
   id: string;
   type: 'stroke';
   colour: string;
@@ -60,7 +68,7 @@ export interface StrokeObject {
   rotation?: number;
 }
 /** A multi-colour sticker from the manifest (src/lib/stickers) — drawn from its own SVG, never client art. */
-export interface StickerObject {
+export interface StickerObject extends LayerLook {
   id: string;
   type: 'sticker';
   sticker: StickerId;
@@ -116,6 +124,15 @@ const MAX_TOTAL_POINTS = 40000;
 const HEX = /^#[0-9a-f]{6}$/i;
 const num = (v: unknown, lo: number, hi: number, d: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
 const colour = (v: unknown, d = '#2b2118') => (typeof v === 'string' && HEX.test(v) ? v.toLowerCase() : d);
+/** A layer's opacity / hidden flag, kept only when it isn't the default. */
+const layerLook = (r: Record<string, unknown>): LayerLook => {
+  const out: LayerLook = {};
+  if (typeof r.opacity === 'number' && Number.isFinite(r.opacity) && r.opacity < 1) out.opacity = Math.round(Math.max(0.05, r.opacity) * 100) / 100;
+  if (r.hidden === true) out.hidden = true;
+  return out;
+};
+/** How solid a layer draws (0 when hidden). */
+export const layerAlpha = (o: LayerLook): number => (o.hidden ? 0 : (o.opacity ?? 1));
 const id = (v: unknown) => (typeof v === 'string' && /^[a-z0-9-]{1,40}$/i.test(v) ? v : Math.random().toString(36).slice(2, 10));
 
 /**
@@ -133,7 +150,7 @@ export function cleanObjects(raw: unknown): StudioObject[] {
       const text = String(r.text ?? '').replace(/\r/g, '').slice(0, MAX_TEXT_LENGTH);
       if (!text.trim()) continue;
       const font = CARD_FONTS.find((f) => f.token === r.font)?.token ?? 'caveat';
-      out.push({ id: id(r.id), type: 'text', text, font, colour: colour(r.colour), size: num(r.size, 0.01, 1, 0.08), x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture) });
+      out.push({ id: id(r.id), type: 'text', text, font, colour: colour(r.colour), size: num(r.size, 0.01, 1, 0.08), x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture), ...layerLook(r) });
     } else if (r.type === 'shape') {
       const shape = SHAPE_KINDS.includes(r.shape as ShapeKind) ? (r.shape as ShapeKind) : null;
       if (!shape) continue;
@@ -141,19 +158,19 @@ export function cleanObjects(raw: unknown): StudioObject[] {
       const legacy = r.strokeWidth === undefined ? (r.outline === true ? 0.05 : 0) : 0;
       out.push({
         id: id(r.id), type: 'shape', shape, fill: colour(r.fill, '#f6c445'), stroke: colour(r.stroke), strokeWidth: num(r.strokeWidth, 0, MAX_SHAPE_STROKE, legacy),
-        x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, MAX_SHAPE_SIZE, 0.2), h: num(r.h, 0.01, MAX_SHAPE_SIZE, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture),
+        x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), w: num(r.w, 0.01, MAX_SHAPE_SIZE, 0.2), h: num(r.h, 0.01, MAX_SHAPE_SIZE, 0.2), rotation: num(r.rotation, -360, 360, 0), texture: cleanTexture(r.texture), ...layerLook(r),
       });
     } else if (r.type === 'sticker') {
       // only stickers we drew ourselves: an unknown id is dropped, and no art ever comes from the client
       if (!isStickerId(r.sticker)) continue;
-      out.push({ id: id(r.id), type: 'sticker', sticker: r.sticker, x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), size: num(r.size, 0.02, MAX_STICKER_SIZE, 0.3), rotation: num(r.rotation, -360, 360, 0), flip: r.flip === true });
+      out.push({ id: id(r.id), type: 'sticker', sticker: r.sticker, x: num(r.x, -0.5, 1.5, 0.5), y: num(r.y, -0.5, 1.5, 0.5), size: num(r.size, 0.02, MAX_STICKER_SIZE, 0.3), rotation: num(r.rotation, -360, 360, 0), flip: r.flip === true, ...layerLook(r) });
     } else if (r.type === 'stroke') {
       if (!Array.isArray(r.points)) continue;
       const pts = (r.points as unknown[]).slice(0, MAX_STROKE_POINTS * 3).map((n, i) => (i % 3 === 2 ? num(n, 0, 1, 0.5) : num(n, -0.5, 1.5, 0)));
       const n = Math.floor(pts.length / 3) * 3;
       if (n < 3 || points + n / 3 > MAX_TOTAL_POINTS) continue;
       points += n / 3;
-      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n), texture: cleanTexture(r.texture), ...(typeof r.rotation === 'number' && Number.isFinite(r.rotation) && r.rotation % 360 !== 0 ? { rotation: num(r.rotation, -360, 360, 0) } : {}) });
+      out.push({ id: id(r.id), type: 'stroke', colour: colour(r.colour), width: num(r.width, 0.001, 0.3, 0.012), points: pts.slice(0, n), texture: cleanTexture(r.texture), ...(typeof r.rotation === 'number' && Number.isFinite(r.rotation) && r.rotation % 360 !== 0 ? { rotation: num(r.rotation, -360, 360, 0) } : {}), ...layerLook(r) });
     }
   }
   return out;

@@ -20,6 +20,8 @@ export interface PenStyle {
   width: number;
   /** 0–1: how much wobble is smoothed out. */
   smooth: number;
+  /** 0.1–1: how solid the line is (the whole line fades as one, so it never darkens where it crosses itself). */
+  opacity: number;
   stylusOnly: boolean;
   texture: TextureKind;
 }
@@ -87,6 +89,7 @@ export function AddedOptions(p: {
         <Section label="line">
           <SliderRow label="thickness" min={2} max={60} value={Math.round(p.pen.width * 1000)} onChange={(v) => p.setPen({ ...p.pen, width: v / 1000 })} ariaLabel="line thickness" display={<SizeDot px={p.pen.width * 600} colour={p.pen.colour} />} />
           <SliderRow label="smoothing" min={0} max={100} value={Math.round(p.pen.smooth * 100)} onChange={(v) => p.setPen({ ...p.pen, smooth: v / 100 })} ariaLabel="smooth out wobbles" display={p.pen.smooth < 0.2 ? 'off' : p.pen.smooth > 0.7 ? 'lots' : 'some'} />
+          <SliderRow label="opacity" min={10} max={100} value={Math.round(p.pen.opacity * 100)} onChange={(v) => p.setPen({ ...p.pen, opacity: v / 100 })} ariaLabel="line opacity" display={`${Math.round(p.pen.opacity * 100)}%`} />
         </Section>
         <TextureSection value={p.pen.texture} colour={p.pen.colour} onChange={(texture) => p.setPen({ ...p.pen, texture })} />
         <Section>
