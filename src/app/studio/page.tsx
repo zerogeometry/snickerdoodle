@@ -23,6 +23,9 @@ import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { setAssetVisibilityAction } from '@/app/actions/keep';
+import { studioInfoAction } from '@/app/actions/studio';
+import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { StudioTray } from '@/ui/studio/Tray';
 import { ToolGlyph } from '@/ui/studio/ToolGlyph';
@@ -154,6 +157,21 @@ function StudioEditor() {
   // a continuous turn (slider / dial / drag) works from where it started, so it never drifts
   const turnBase = useRef<{ geo: Geometry; objects: StudioObject[]; at: number } | null>(null);
   const scratch = !!upload?.scratch;
+  // who can see it (resolved on the server) — for the "this stays yours" pill
+  const [info, setInfo] = useState<KeepsakeInfo | null>(null);
+  const refreshInfo = useCallback(async (id: string) => {
+    const r = await studioInfoAction({ assetId: id });
+    if (r.ok) setInfo({ draft: r.draft, kept: r.kept, visibility: r.visibility, canManage: r.canManage, people: r.people });
+  }, []);
+  useEffect(() => {
+    if (assetId) void refreshInfo(assetId);
+  }, [assetId, refreshInfo]);
+  const changeVisibility = async (tier: Tier) => {
+    if (!assetId) return;
+    const r = await setAssetVisibilityAction(assetId, tier);
+    toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
+    await refreshInfo(assetId);
+  };
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1325,10 +1343,22 @@ function StudioEditor() {
                   {readiness.good ? '✓ ' : ''}
                   {readiness.label}
                 </span>
+                {ready ? (
+                  <span className="pointer-events-auto max-w-full">
+                    <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
+                  </span>
+                ) : null}
               </>
             )}
           </div>
-          {comparing ? <span className="absolute left-3 top-3 hidden rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper md:inline">your original</span> : null}
+          {/* bigger screens: who can see it, quietly top-left over the picture */}
+          {comparing ? (
+            <span className="absolute left-3 top-3 hidden rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper md:inline">your original</span>
+          ) : ready ? (
+            <div className="absolute left-3 top-3 hidden max-w-[60%] md:block">
+              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
+            </div>
+          ) : null}
           {busy ? (
             <div role="status" className="absolute inset-x-0 top-[72px] mx-auto w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] md:top-3">
               {busy}
