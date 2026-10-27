@@ -12,6 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
+import { MultiBuyNotice } from '@/ui/components/MultiBuy';
 import { ProductDetails } from '@/ui/components/ProductDetails';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
@@ -873,6 +874,8 @@ function CustomizeProduct() {
             <span className="text-xs font-semibold text-green-save">{deliveryLine(variant?.sku ?? product.key)}</span>
             <ChristmasPromise productKey={product.key} attrs={{ size, colour }} />
           </div>
+          {/* buy more, save more — THIS product's own tiers, from its costs (server-side) */}
+          <MultiBuyNotice tiers={variant?.multiBuyBps} productLabel={product.label} />
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
           {product.key === 'phoneCase' ? (

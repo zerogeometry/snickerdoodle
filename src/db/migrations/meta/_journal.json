@@ -337,6 +337,13 @@
       "when": 1793101233783,
       "tag": "0047_family_calendar",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793110917012,
+      "tag": "0048_multi_buy",
+      "breakpoints": true
     }
   ]
 }

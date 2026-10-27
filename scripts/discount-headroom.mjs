@@ -5,7 +5,9 @@
 //
 // Run: node --env-file=.env scripts/discount-headroom.mjs [--write-costs]
 //   --write-costs  also stores each variant's landed unit cost (product + baked-in delivery,
-//                  ex-VAT) in product_variants.unit_cost_pence — the promo margin guard reads it.
+//                  ex-VAT) in product_variants.unit_cost_pence — the promo margin guard reads it —
+//                  and its first-unit + "plus one" post (post_first_pence / post_extra_pence), which
+//                  the multi-buy tiers are derived from (src/pricing/multibuy.ts).
 //
 // Economics per unit (VAT-registered, prices are VAT-inclusive, free delivery baked in):
 //   ex-VAT revenue   R = P / 1.2
@@ -35,11 +37,22 @@ for (const file of readdirSync(DIR)) {
     const cost = toGbp(r['Product price'], r['Product currency']);
     if (!Number.isFinite(cost)) continue;
     const ship = toGbp(r['Shipping price'], r['Shipping currency']);
+    const extra = toGbp(r['Plus one shipping price'], r['Shipping currency']);
     const list = bySku.get(r['SKU']) ?? [];
-    list.push({ cost, ship: Number.isFinite(ship) ? ship : 0, method: (r['Shipping method'] || '').toLowerCase(), src: r['Source country'] });
+    list.push({ cost, ship: Number.isFinite(ship) ? ship : 0, extra: Number.isFinite(extra) ? extra : null, method: (r['Shipping method'] || '').toLowerCase(), src: r['Source country'] });
     bySku.set(r['SKU'], list);
   }
 }
+// SKUs the sheets don't carry yet — Prodigi SANDBOX quotes to GB, Standard: [cost, first post, plus-one post].
+//  - the christmas table packs (27 Oct 2026): uk9 → Royal Mail Tracked 48, £4.30 + £1.00 per extra item;
+//  - the DATED 2027 calendar (25 Oct, CHRISTMAS-range-and-postage.md): uk15, £4.35, two for £5.35.
+// (Still missing — so no multi-buy offer until added: phone cases, playing cards, height chart, jumpers, bandana.)
+const SANDBOX = {
+  'H-PLACE-1PK': [900, 430, 100], 'H-PLACE-2PK': [1650, 430, 100], 'H-PLACE-4PK': [3250, 430, 100], 'H-PLACE-6PK': [4850, 430, 100],
+  'H-COAST-1PK': [400, 430, 100], 'H-COAST-2PK': [550, 430, 100], 'H-COAST-4PK': [1000, 430, 100], 'H-COAST-6PK': [1500, 430, 100],
+  'CALENDAR-A5-L-DATED': [900, 435, 100], 'CALENDAR-A4-L-DATED': [1000, 435, 100],
+};
+for (const [sku, [cost, ship, extra]] of Object.entries(SANDBOX)) if (!bySku.has(sku)) bySku.set(sku, [{ cost, ship, extra, method: 'standard', src: 'GB' }]);
 /** Cheapest landed GB row for the SKU on the chosen shipping method (ties → GB source). */
 function landed(sku, method) {
   const rows = (bySku.get(sku) ?? []).filter((r) => r.method === method);
@@ -49,7 +62,7 @@ function landed(sku, method) {
 
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 const rows = await sql`
-  select p.key, p.label, p.visible_in_shop as shop, v.price_pence as price, v.sku as variant_sku, pvp.provider_sku as sku
+  select p.key, p.label, p.visible_in_shop as shop, v.price_pence as price, v.sku as variant_sku, v.attributes as attrs, pvp.provider_sku as sku
   from products p join product_variants v on v.product_id = p.id
   left join product_variant_providers pvp on pvp.variant_id = v.id
   where p.active and v.active and pvp.provider_sku is not null`;
@@ -58,7 +71,11 @@ if (process.argv.includes('--write-costs')) {
   for (const r of rows) {
     const l = landed(r.sku, SHIP_METHOD[r.key] ?? 'standard') ?? landed(r.sku, 'budget') ?? landed(r.sku, 'express');
     if (!l) continue;
-    await sql`update product_variants set unit_cost_pence = ${l.cost + l.ship} where sku = ${r.variant_sku}`;
+    // a card PACK is N of the single card's SKU in one parcel (flat card post): N × the card + one post
+    const n = r.key === 'cardPack' ? Number(/^pack of (\d+)$/.exec(r.attrs?.size ?? '')?.[1] ?? NaN) : 1;
+    if (!Number.isInteger(n) || n < 1) continue;
+    const extra = r.key === 'cardPack' ? n * (l.extra ?? 0) : l.extra;
+    await sql`update product_variants set unit_cost_pence = ${n * l.cost + l.ship}, post_first_pence = ${l.ship}, post_extra_pence = ${extra} where sku = ${r.variant_sku}`;
     written++;
   }
   console.error(`unit costs written for ${written}/${rows.length} variants`);

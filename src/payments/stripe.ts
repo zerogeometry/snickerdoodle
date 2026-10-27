@@ -39,6 +39,8 @@ export async function createCheckoutSession(args: {
   familySetSavingPence: number;
   /** Required for the same reason: the same-parcel saving (src/pricing/parcels.ts). */
   parcelSavingPence: number;
+  /** Required for the same reason: the multi-buy saving (src/pricing/multibuy.ts). */
+  multiBuySavingPence: number;
   /** Required for the same reason: a code's saving must reach Stripe or we over-charge. */
   promoSavingPence: number;
   /** The code's name on the receipt, when a code was used. */
@@ -68,9 +70,16 @@ export async function createCheckoutSession(args: {
   // Checkout Session allows a single discount) so Stripe's total always equals
   // our authoritative order total.
   const discounts: Stripe.Checkout.SessionCreateParams.Discount[] = [];
-  const savingPence = args.joinSavingPence + args.familySetSavingPence + args.parcelSavingPence + args.promoSavingPence;
+  const savingPence = args.joinSavingPence + args.familySetSavingPence + args.parcelSavingPence + args.multiBuySavingPence + args.promoSavingPence;
   if (savingPence > 0) {
-    const name = args.promoLabel && args.promoSavingPence > 0 ? `Code ${args.promoLabel}` : args.parcelSavingPence > 0 && args.joinSavingPence + args.familySetSavingPence === 0 ? 'Same-parcel saving' : 'Family saving';
+    const name =
+      args.promoLabel && args.promoSavingPence > 0
+        ? `Code ${args.promoLabel}`
+        : args.multiBuySavingPence > 0
+          ? 'Multi-buy saving'
+          : args.parcelSavingPence > 0 && args.joinSavingPence + args.familySetSavingPence === 0
+            ? 'Same-parcel saving'
+            : 'Family saving';
     const coupon = await stripe.coupons.create({ amount_off: savingPence, currency: 'gbp', duration: 'once', name });
     discounts.push({ coupon: coupon.id });
   }

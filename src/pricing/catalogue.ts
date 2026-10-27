@@ -86,7 +86,9 @@ export type CatalogueKey = keyof typeof CATALOGUE;
  * pass a DB-loaded one instead. Either way the CLIENT never supplies prices.
  */
 /** `unitCostPence` (server-only, landed ex-VAT cost) feeds the promo margin guard; absent ⇒ never discounted. */
-export type PricedCatalogue = Record<string, { pricePence: number; label: string; unitCostPence?: number | null }>;
+/** `postFirstPence` / `postExtraPence` (server-only, ex-VAT): its first-unit + "plus one" post — the multi-buy
+ * tiers are derived from these + the unit cost (src/pricing/multibuy.ts); absent ⇒ no multi-buy. */
+export type PricedCatalogue = Record<string, { pricePence: number; label: string; unitCostPence?: number | null; postFirstPence?: number | null; postExtraPence?: number | null }>;
 
 /** Narrowing guard — is this client-supplied string something we actually sell? */
 export function isCatalogueKey(key: string): key is CatalogueKey {
