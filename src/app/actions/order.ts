@@ -10,6 +10,7 @@ import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 import { CALENDAR_PAGE_COUNT } from '@/lib/calendar';
 import { normalizeBundle, type BundleSpec } from '@/lib/christmas-bundle';
+import { normalizeEve, type EveSpec } from '@/lib/christmas-eve';
 
 /** Never more cards than the biggest pack could hold, whatever the request says. */
 const MAX_PACK_CARDS = 20;
@@ -39,6 +40,8 @@ export async function placeOrderAction(input: {
     pages?: ({ assetId: string; transform: RawTransform; sourceObjectId?: string } | null)[];
     /** The CHRISTMAS BUNDLE: its drawings + extras. Normalised + counted (+ priced) server-side. */
     bundle?: unknown;
+    /** The CHRISTMAS EVE BUNDLE: its drawing(s) + mug colour. Normalised server-side. */
+    eve?: unknown;
   }[];
   gift?: boolean;
   subject?: string;
@@ -86,6 +89,7 @@ export async function placeOrderAction(input: {
       : {}),
     // Untrusted: WHICH drawings + two counts — capped at 12 each; placeOrder counts + prices them.
     ...(i.bundle !== undefined ? { bundle: normalizeBundle(i.bundle) } : {}),
+    ...(i.eve !== undefined ? { eve: normalizeEve(i.eve) } : {}),
   }));
 
   const account = await getCurrentAccount();
@@ -93,7 +97,11 @@ export async function placeOrderAction(input: {
     const x = b as BundleSpec | null | undefined;
     return x ? [x.table, ...x.ornaments, ...x.sacks].map((a) => a.assetId) : [];
   };
-  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean) || bundleArt(i.bundle).length > 0);
+  const eveArt = (b: unknown) => {
+    const x = b as EveSpec | null | undefined;
+    return x ? [x.drawing, ...Object.values(x.own)].filter((a): a is NonNullable<typeof a> => !!a).map((a) => a.assetId) : [];
+  };
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean) || bundleArt(i.bundle).length > 0 || eveArt(i.eve).length > 0);
   // Personalised orders require the controlling parent — a guest signs up first.
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
@@ -103,7 +111,7 @@ export async function placeOrderAction(input: {
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
-    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId), ...bundleArt(i.bundle)]).filter((x): x is string => !!x))];
+    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId), ...bundleArt(i.bundle), ...eveArt(i.eve)]).filter((x): x is string => !!x))];
     // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
     // keep it in their keepsake box, or have it erased as soon as the order ships.
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });

@@ -103,3 +103,22 @@ export function economicsOf(entry: { pricePence: number; unitCostPence?: number 
   if (typeof landed !== 'number' || typeof first !== 'number' || typeof extra !== 'number' || landed < first) return null;
   return { pricePence: entry.pricePence, productCostPence: landed - first, postFirstPence: first, postExtraPence: extra, parcelSavingPerExtraPence: grouped ? PARCEL_SAVING_PER_EXTRA_PENCE : 0 };
 }
+
+/**
+ * A BUNDLE's economics from its pieces' live costs: the pieces' product costs together, one parcel
+ * for them (the first piece's post + the others' "plus one"), and each extra bundle adding every
+ * piece's "plus one". Any piece unknown ⇒ null ⇒ no offer. Not in a parcel group (the bundle's price
+ * already counts its one parcel).
+ */
+export function composedEconomics(pricePence: number, pieces: ReadonlyArray<Parameters<typeof economicsOf>[0]>): UnitEconomics | null {
+  const parts = pieces.map((p) => economicsOf(p, false));
+  if (parts.length === 0 || parts.some((x) => !x)) return null;
+  const ps = parts as UnitEconomics[];
+  return {
+    pricePence,
+    productCostPence: ps.reduce((n, x) => n + x.productCostPence, 0),
+    postFirstPence: ps[0]!.postFirstPence + ps.slice(1).reduce((n, x) => n + x.postExtraPence, 0),
+    postExtraPence: ps.reduce((n, x) => n + x.postExtraPence, 0),
+    parcelSavingPerExtraPence: 0,
+  };
+}

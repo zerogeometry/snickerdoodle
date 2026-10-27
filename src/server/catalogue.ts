@@ -510,6 +510,17 @@ const DEFS: Record<string, ProductDef> = {
     specs: { 'the table': '4 placemats + 6 coasters, one drawing', ornaments: '+£15 each, a drawing each', sacks: '+£27 each, a drawing each', delivery: 'one tracked parcel' },
     variants: [{ pricePence: 9000, wMm: 0, hMm: 0 }],
   },
+  // The CHRISTMAS EVE BUNDLE (founder, 27 Oct): a sack + a ceramic ornament + a two-tone 11oz mug (any
+  // colour), all uk9 → ONE parcel. £62 (£74 separately). One drawing on all three, or one each. Not
+  // printed itself: the order splits it into the three pieces' own variants (src/lib/christmas-eve.ts).
+  // Its own multi-buy on the number of bundles, from the pieces' live costs. Builder:
+  // /customize/christmasEveBundle. TODO(founder): HIDDEN until it has a shop tile; link straight to it.
+  christmasEveBundle: {
+    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'a sack, an ornament and a mug — their christmas eve, made real', print: false,
+    description: 'Everything for christmas eve, with their drawing on it: a cotton sack to fill, a ceramic ornament for the tree and a two-tone mug for the cocoa. One drawing on all three, or a different one on each. Sent together in one tracked parcel.',
+    specs: { 'in the bundle': 'a christmas sack, a ceramic ornament, an 11oz two-tone mug', mug: 'any colour', delivery: 'one tracked parcel' },
+    variants: [{ pricePence: 6200, wMm: 0, hMm: 0 }],
+  },
   phoneCase: {
     category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
     description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",

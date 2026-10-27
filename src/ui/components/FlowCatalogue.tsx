@@ -28,6 +28,7 @@ import { defaultPlacementFor, groupOf, isLineOfSku, productQtyInBasket, resolveD
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
 import { isBundleKey } from '@/lib/christmas-bundle';
+import { isEveKey } from '@/lib/christmas-eve';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 function variantSub(v: CatalogueVariant): string | undefined {
@@ -196,7 +197,7 @@ export function FlowCatalogue({
     // A card pack needs its N drawings chosen — "+" opens the pack builder, never a blank pack. A
     // calendar likewise opens its builder (the drawing goes on the cover, ready to flip through).
     // The christmas family bundle too: its table drawing + a drawing per ornament / sack.
-    if (isCardPackKey(p.key) || isCalendarKey(p.key) || isBundleKey(p.key)) {
+    if (isCardPackKey(p.key) || isCalendarKey(p.key) || isBundleKey(p.key) || isEveKey(p.key)) {
       void customize(p);
       return;
     }

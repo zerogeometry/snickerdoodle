@@ -5,7 +5,8 @@ import { evaluatePromo, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCountsOf, bundlePricePence, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
-import { economicsOf, multiBuyTiers, tierFor } from './multibuy';
+import { composedEconomics, economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
+import { EVE_PIECES, isEveKey } from '@/lib/christmas-eve';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -77,6 +78,18 @@ export function clampQty(qty: number): number {
 /** Is this client-supplied key something the given catalogue sells? */
 export function inCatalogue(catalogue: PricedCatalogue, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(catalogue, key);
+}
+
+/**
+ * A priced line's unit economics for MULTI-BUY, from the server catalogue's live costs. The christmas
+ * eve bundle is its three pieces together (its own multi-buy, on the number of bundles).
+ */
+export function lineEconomics(catalogue: PricedCatalogue, key: string): UnitEconomics | null {
+  if (isEveKey(key)) {
+    const entry = catalogue[key];
+    return entry ? composedEconomics(entry.pricePence, EVE_PIECES.map((p) => catalogue[p])) : null;
+  }
+  return economicsOf(catalogue[key], parcelGroupOf(key) !== null);
 }
 
 /** Basis-points of an amount, rounded to the nearest penny. */
@@ -163,7 +176,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   for (const l of lines) if (!isBundleKey(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
   const multiBuyLines = lines.map((l) => {
     if (isBundleKey(l.productKey)) return { bps: 0, pence: 0 };
-    const tiers = multiBuyTiers(economicsOf(catalogue[l.productKey], parcelGroupOf(l.productKey) !== null));
+    const tiers = multiBuyTiers(lineEconomics(catalogue, l.productKey));
     const bps = tierFor(tiers, qtyOfProduct.get(productOf(l.productKey)) ?? 0);
     return { bps, pence: bpsOf(l.linePence, bps) };
   });
@@ -192,7 +205,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       lines.map((l) => {
         // The bundle is already the founder's set price — it never takes a code on top (cost
         // unknown ⇒ left out of the code; the rest of the basket still can).
-        if (isBundleKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
+        if (isBundleKey(l.productKey) || isEveKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
         const cost = catalogue[l.productKey]?.unitCostPence;
         return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
       }),

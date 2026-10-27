@@ -9,6 +9,7 @@ import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { fillCalendarPages, isCalendarKey } from '@/lib/calendar';
 import { BUNDLE_COMPONENT_SKUS, expandBundle, isBundleKey, normalizeBundle, pieceOfSku } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
+import { EVE_COMPONENT_SKUS, expandEve, isEveKey, normalizeEve } from '@/lib/christmas-eve';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -66,6 +67,9 @@ export interface PlaceLine {
   /** The CHRISTMAS BUNDLE only: its table drawing, a drawing per ornament / sack, and the extras
    * (untrusted — normalised + counted server-side; src/lib/christmas-bundle.ts). */
   bundle?: unknown;
+  /** The CHRISTMAS EVE BUNDLE only: its drawing(s) + mug colour (untrusted — normalised server-side;
+   * src/lib/christmas-eve.ts). qty = copies of this bundle. */
+  eve?: unknown;
 }
 
 export interface PlaceOrderResult {
@@ -120,7 +124,7 @@ export async function placeOrder(
   // The valid input lines align 1:1 (same order) with the priced lines.
   const valid = input.items.filter((l) => inCatalogue(catalogue, l.productKey) && clampQty(l.qty) > 0);
   // (a CHRISTMAS BUNDLE is made of its pieces' own variants — each pack / ornament / sack its own Prodigi item)
-  const keys = [...new Set([...valid.map((l) => l.productKey), ...(valid.some((l) => isBundleKey(l.productKey)) ? BUNDLE_COMPONENT_SKUS : [])])];
+  const keys = [...new Set([...valid.map((l) => l.productKey), ...(valid.some((l) => isBundleKey(l.productKey)) ? BUNDLE_COMPONENT_SKUS : []), ...(valid.some((l) => isEveKey(l.productKey)) ? EVE_COMPONENT_SKUS : [])])];
   // Resolve each line key (product key → default variant, or variant sku) → variant id.
   const variantByKey = await resolveVariantIdsByKey(db, keys);
 
@@ -242,6 +246,27 @@ export async function placeOrder(
   for (let i = 0; i < valid.length; i++) {
     const line = valid[i]!;
     const variantId = variantByKey.get(line.productKey);
+    if (isEveKey(line.productKey)) {
+      if (input.giftLink) throw new Error('a bundle can’t be bought through a gift link');
+      const b = normalizeEve(line.eve);
+      if (!b) throw new Error('a christmas eve bundle needs a drawing');
+      // The SERVER's priced line (price × copies), split into its three pieces to the penny.
+      const priced = q.lines[i]!;
+      const shelf = { sack: catalogue.sack?.pricePence ?? 0, ceramicOrnament: catalogue.ceramicOrnament?.pricePence ?? 0, mug: catalogue.mug?.pricePence ?? 0 };
+      const parts = expandEve(priced.unitPricePence, priced.qty, b, shelf);
+      const prepared: Array<{ art: PreparedArt; sku: string; variantId: string; qty: number; unitPricePence: number; linePence: number }> = [];
+      for (const part of parts) {
+        const pieceVariant = variantByKey.get(part.sku);
+        if (!pieceVariant) throw new Error(`christmas eve piece ${part.sku} isn’t in the catalogue`);
+        // the same gates as any print — authz, moderation, this piece's DPI at its default placement
+        const art = await prepareArtwork({ assetId: part.art.assetId, transform: defaultTransformFor(part.piece), sourceObjectId: part.art.sourceObjectId ?? undefined }, part.piece, pieceVariant);
+        if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
+        if (!art) throw new Error(`christmas eve piece ${part.sku} has no print template`);
+        prepared.push({ art, sku: part.sku, variantId: pieceVariant, qty: part.qty, unitPricePence: part.unitPricePence, linePence: part.linePence });
+      }
+      bundleByIndex.set(i, prepared); // inserted exactly like the family bundle's pieces
+      continue;
+    }
     if (isBundleKey(line.productKey)) {
       if (input.giftLink) throw new Error('a bundle can’t be bought through a gift link');
       const b = normalizeBundle(line.bundle);
