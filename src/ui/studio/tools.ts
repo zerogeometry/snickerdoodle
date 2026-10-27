@@ -1,5 +1,6 @@
 import {
   IconAdjustments,
+  IconSparkles,
   IconBackground,
   IconColorPicker,
   IconCrop,
@@ -18,7 +19,7 @@ import {
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'stickers' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'magic' | 'draw' | 'text' | 'shapes' | 'stickers' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -190,6 +191,16 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'A',
     info: 'Brighten a dull photo, deepen the colours, warm it up or cool it down — or try a look, like black & white or soft pastel, as much or as little as you like. Your original is never changed.',
+  },
+  {
+    id: 'magic',
+    group: 'colour',
+    hint: 'one tap to tidy the lines or brighten it up.',
+    label: 'magic edits',
+    icon: IconSparkles,
+    kind: 'mode',
+    key: 'M',
+    info: 'Tidy the lines smooths speckles and fuzzy, photographed edges and whitens the paper; brighten lifts a dim or dull photo. One tap each, done on our own computers — tap again to take it off. Your original is never changed.',
   },
   {
     id: 'compare',

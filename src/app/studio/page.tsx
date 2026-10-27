@@ -21,12 +21,14 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
-import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { autosaveStudioAction, magicPreviewAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
 import { deleteCreationAction, duplicateCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
 import { LookPanel } from '@/ui/studio/LookPanel';
+import { MagicPanel } from '@/ui/studio/MagicPanel';
+import { magicKey, type MagicEdits } from '@/lib/studio-magic';
 import { applyLook, IDENTITY_LOOK, lookIsIdentity, type StudioLook } from '@/lib/studio-look';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
@@ -45,6 +47,8 @@ import {
   IDENTITY,
   beginPaint,
   buildWork,
+  readRgb,
+  setWorkRgb,
   paintDab,
   type PaintStroke,
   flipGeometry,
@@ -75,12 +79,13 @@ interface Snapshot {
   look: StudioLook;
   drawingLayer: LayerLook;
   frame: FrameKind | null;
+  magic: MagicEdits | null;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'stickers', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
 const EDITING: ToolId[] = ['text', 'stickers', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
-const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'compare'];
+const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'magic', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
 /** The drawing itself, as a selectable layer (once unlocked). */
 const DRAWING = '__drawing';
@@ -116,6 +121,11 @@ export default function StudioPage() {
   const [drawingLayer, setDrawingLayer] = useState<LayerLook>({});
   // a frame round the whole design ("framed in gold")
   const [frame, setFrame] = useState<FrameKind | null>(null);
+  // one-tap magic edits on the drawing's pixels (self-hosted); previewed from the server's own result
+  const [magic, setMagic] = useState<MagicEdits | null>(null);
+  const origRgb = useRef<Uint8ClampedArray | null>(null);
+  const magicCache = useRef(new Map<string, Uint8ClampedArray>());
+  const [magicBusy, setMagicBusy] = useState(false);
   const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
@@ -243,6 +253,7 @@ export default function StudioPage() {
           if (st.look) setLook(st.look);
           if (st.drawing) setDrawingLayer(st.drawing);
           if (st.frame) setFrame(st.frame);
+          if (st.magic) setMagic(st.magic);
           if (st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
@@ -251,6 +262,7 @@ export default function StudioPage() {
       }
       if (!live) return;
       savedAlpha.current = work.alpha.slice();
+      origRgb.current = work.rgb;
       workRef.current = work;
       const pic = document.createElement('canvas');
       pic.width = work.w;
@@ -265,6 +277,40 @@ export default function StudioPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [upload?.dataUrl]);
+
+  // magic edits: the editing copy shows the server's own result (cached per combination), so the
+  // preview is the same edit the print gets; undo / reopen / start again all land here
+  useEffect(() => {
+    const work = workRef.current;
+    if (!ready || !work || !origRgb.current) return;
+    const key = magicKey(magic);
+    const show = (rgb: Uint8ClampedArray) => {
+      if (work.rgb === rgb) return;
+      setWorkRgb(work, rgb);
+      setTick((t) => t + 1);
+    };
+    if (!key) return show(origRgb.current);
+    const hit = magicCache.current.get(key);
+    if (hit) return show(hit);
+    if (!assetId) return;
+    let live = true;
+    setMagicBusy(true);
+    void magicPreviewAction({ assetId, magic, w: work.w, h: work.h })
+      .then(async (r) => {
+        if (!r.ok) throw new Error('preview');
+        const rgb = await readRgb(r.rgb, work.w, work.h);
+        magicCache.current.set(key, rgb);
+        if (live && magicKey(magicRef.current) === key) show(rgb);
+      })
+      .catch(() => toast('that bit of magic didn’t work — try again'))
+      .finally(() => setMagicBusy(false));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the edits themselves
+  }, [ready, assetId, magicKey(magic)]);
+  const magicRef = useRef(magic);
+  magicRef.current = magic;
 
   // canvas text needs the card fonts loaded first
   useEffect(() => {
@@ -461,7 +507,7 @@ export default function StudioPage() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLayer, frame });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLayer, frame, magic });
   const redoBeforePush = useRef<Snapshot[]>([]);
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
@@ -481,6 +527,7 @@ export default function StudioPage() {
     setLook(s.look);
     setDrawingLayer(s.drawingLayer);
     setFrame(s.frame);
+    setMagic(s.magic);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -920,6 +967,7 @@ export default function StudioPage() {
     setLook(IDENTITY_LOOK);
     setDrawingLayer({});
     setFrame(null);
+    setMagic(null);
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -937,7 +985,7 @@ export default function StudioPage() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, magic, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -967,7 +1015,7 @@ export default function StudioPage() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, frame, magic, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -991,7 +1039,7 @@ export default function StudioPage() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, look, drawingLayer, frame, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, drawingLayer, frame, magic, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -1104,7 +1152,7 @@ export default function StudioPage() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { s: 'stickers', a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
+      const map: Record<string, ToolId> = { m: 'magic', s: 'stickers', a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop' };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1243,6 +1291,17 @@ export default function StudioPage() {
       angle={visualAngle(geo)}
       onAngle={(v, group) => turnDesign(v, group)}
       background={geo.background}
+      magic={magic}
+      magicBusy={magicBusy}
+      onMagic={(id) => {
+        pushUndo();
+        setMagic((m) => {
+          const next = { ...(m ?? {}) } as MagicEdits;
+          if (next[id]) delete next[id];
+          else next[id] = true;
+          return next.tidy || next.brighten ? next : null;
+        });
+      }}
       look={look}
       onLook={(patch, group) => {
         // a slider drag is one undo step; a tap on a look is its own
@@ -1450,6 +1509,9 @@ function ToolOptions(p: {
   onAngle: (visual: number, group?: boolean) => void;
   look: StudioLook;
   onLook: (patch: Partial<StudioLook>, group?: boolean) => void;
+  magic: MagicEdits | null;
+  magicBusy: boolean;
+  onMagic: (id: keyof MagicEdits) => void;
 }) {
   const jump = (id: ToolId, label: string) => (
     <Button variant="secondary" size="sm" className="flex-1" onClick={() => p.onTool(id)}>
@@ -1549,6 +1611,8 @@ function ToolOptions(p: {
           </Section>
         </Stack>
       );
+    case 'magic':
+      return <MagicPanel magic={p.magic} busy={p.magicBusy} onToggle={p.onMagic} onRemoveBg={() => p.onTool('removeBg')} hadCutout={p.hadCutout} />;
     case 'adjust':
       return <LookPanel look={p.look} onChange={(patch) => p.onLook(patch, true)} onPick={(patch) => p.onLook(patch)} />;
     case 'rotate':

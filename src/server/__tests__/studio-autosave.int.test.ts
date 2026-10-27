@@ -127,6 +127,21 @@ describe.skipIf(!DB || !S3)('studio autosave', () => {
     expect((await studioStateForAsset(db, sam, a.assetId)).drawing).toEqual({ hidden: true });
   });
 
+  it('magic edits: switches in the recipe, made into the design (screened), reopened as left; the original untouched', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const before = await getObjectBytes(a.key);
+    let seen = 0;
+    const moderation: ModerationProviders = { hash: { isKnownIllegal: async () => false }, classifier: { classify: async () => (seen++, { flagged: false, labels: [] }) }, textReader: { read: async () => [] } };
+    const res = await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, magic: { tidy: true, brighten: true } }, { moderation });
+    expect(res.sourceObjectId).not.toBeNull();
+    expect(seen).toBe(1);
+    expect((await studioStateForAsset(db, sam, a.assetId)).magic).toEqual({ tidy: true, brighten: true });
+    expect(Buffer.compare(await getObjectBytes(a.key), before)).toBe(0);
+    await autosaveStudioDoc(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, magic: { tidy: true, junk: 1 } });
+    expect((await studioStateForAsset(db, sam, a.assetId)).magic).toEqual({ tidy: true });
+  });
+
   it('framed in gold: the frame prints round the cropped design and reopens; a sticker reopens as a sticker', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });

@@ -90,6 +90,37 @@ export function buildWork(img: HTMLImageElement): { work: Work; hadTransparency:
   return { work: { w, h, rgb, lab, alpha }, hadTransparency: transparent > w * h * 0.001 };
 }
 
+/** Swap the editing copy's colours (a magic edit's preview, or back to the original's). */
+export function setWorkRgb(work: Work, rgb: Uint8ClampedArray): void {
+  work.rgb = rgb;
+  const lab = new Float32Array(work.w * work.h * 3);
+  for (let k = 0; k < work.w * work.h; k++) {
+    const L = toLab(rgb[k * 3]!, rgb[k * 3 + 1]!, rgb[k * 3 + 2]!);
+    lab[k * 3] = L[0];
+    lab[k * 3 + 1] = L[1];
+    lab[k * 3 + 2] = L[2];
+  }
+  work.lab = lab;
+}
+
+/** An image (data URL) as w×h RGB, for setWorkRgb. */
+export async function readRgb(url: string, w: number, h: number): Promise<Uint8ClampedArray> {
+  const img = await loadImage(url);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext('2d', { willReadFrequently: true })!;
+  ctx.drawImage(img, 0, 0, w, h);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const rgb = new Uint8ClampedArray(w * h * 3);
+  for (let k = 0; k < w * h; k++) {
+    rgb[k * 3] = d[k * 4]!;
+    rgb[k * 3 + 1] = d[k * 4 + 1]!;
+    rgb[k * 3 + 2] = d[k * 4 + 2]!;
+  }
+  return rgb;
+}
+
 /** Read a greyscale mask (data URL) into the alpha array. */
 export async function readMask(maskUrl: string, alpha: Uint8ClampedArray, w: number, h: number): Promise<void> {
   const img = await loadImage(maskUrl);
