@@ -33,6 +33,13 @@ export interface AssetRef {
    * scope — and grants access to exactly this one asset. Null for every real asset.
    */
   ephemeralClaimId?: string | null;
+  /**
+   * Someone REPORTED this keepsake and a reviewer hasn't decided yet (D8; founder decision
+   * 2026-10-26). While held, only its uploader/controller can see it — every relative, whatever
+   * their circle or access, is denied until a reviewer clears it. Required, so every caller has to
+   * resolve it from the row: build refs with assetRefOf (src/server/assetRef.ts).
+   */
+  heldForReview: boolean;
 }
 
 export interface Membership {
@@ -134,6 +141,11 @@ export function canViewAsset(asset: AssetRef, viewer: ViewerContext): Decision {
   // STEP 3 — the uploader/controller always sees their own (non-ONLY_ME) asset.
   if (ownerOrController) {
     return allow('viewer is the uploader/controller');
+  }
+
+  // STEP 3b — reported and held for review: hidden from everyone but the uploader/controller.
+  if (asset.heldForReview) {
+    return deny('held for review after a report');
   }
 
   // STEP 4 — tier x circle (an active membership is guaranteed past step 1).

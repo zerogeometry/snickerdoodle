@@ -62,6 +62,7 @@ describe('canSetAssetVisibility (the asset controller, while an active member)',
     uploaderAccountId: 'acct-uploader',
     controllerAccountId: 'acct-controller',
     visibility: 'FAMILY',
+    heldForReview: false,
   };
   const activeIn = (accountId: string): ViewerContext => ({
     accountId,
@@ -92,6 +93,7 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
     uploaderAccountId: 'acct-uploader',
     controllerAccountId: 'acct-controller',
     visibility: 'FAMILY',
+    heldForReview: false,
   };
   const activeIn = (accountId: string): ViewerContext => ({ accountId, membership: mem({ accountId, familyId: 'fam-A' }) });
 

@@ -1,10 +1,10 @@
 import { and, eq } from 'drizzle-orm';
-import { canViewAsset, type AssetRef } from '@/authz';
+import { canViewAsset } from '@/authz';
 import { assets, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
 import { ensureHomeFamily } from './onboarding';
-import { getViewableAssetOrThrow, resolveAssetViewer, resolveViewerContext } from './assets';
+import { assetRefOf, getViewableAssetOrThrow, resolveAssetViewer, resolveViewerContext } from './assets';
 import { getCurrentAccount, getUploadClaims } from './session';
 import { loadPrintableVariants, type StudioVariant } from './studio-variants';
 
@@ -35,15 +35,7 @@ async function designOf(db: ReturnType<typeof getDb>, assetId: string, sourceObj
   return o ? { url: await presignDownload(o.key, 600), sourceObjectId: o.id } : null;
 }
 
-function refOf(row: typeof assets.$inferSelect): AssetRef {
-  return {
-    id: row.id,
-    familyId: row.familyId,
-    uploaderAccountId: row.uploaderAccountId,
-    controllerAccountId: row.controllerAccountId,
-    visibility: row.visibility,
-  };
-}
+const refOf = assetRefOf;
 
 /** Everything the positioning editor needs for the signed-in account — null for a guest.
  * `focusVariantId` scopes the editor to the ONE variant Customize sent us (see

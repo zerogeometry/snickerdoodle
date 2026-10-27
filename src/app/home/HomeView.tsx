@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCake, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
+import { IconCake, IconFlag, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -18,6 +18,9 @@ import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
 import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
+import { reportKeepsakeAction } from '@/app/actions/report';
+import { HOME_REPORT_REASONS } from '@/lib/reports';
+import { ReportModal } from '@/ui/modals/ReportModal';
 import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction, setMemberCalendarAction, setReminderConsentAction } from '@/app/actions/family';
 import { Chip } from '@/ui/primitives/Chip';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
@@ -65,6 +68,7 @@ function monthLabel(iso: string): string {
 export function HomeView({ data }: { data: HomeData }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
+  const [reporting, setReporting] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const nowForSeason = useNow();
@@ -190,10 +194,25 @@ export function HomeView({ data }: { data: HomeData }) {
       >
         {k.canManage ? (
           <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label="choose who can see this keepsake">
-            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={VIS_LABEL[k.visibility]} />
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={k.held ? 'being checked' : VIS_LABEL[k.visibility]} />
           </button>
+        ) : k.held ? (
+          // their own upload, already being checked — nothing more to report
+          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge="being checked" />
         ) : (
-          <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} />
+          <div className="relative">
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} />
+            <button
+              type="button"
+              onClick={() => setReporting(k)}
+              aria-label="something wrong with this keepsake? tell us"
+              className="absolute right-1 top-1 flex h-11 w-11 items-center justify-center rounded-full text-ink-soft hover:text-cinnamon focus-visible:outline-2"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-full border border-line bg-paper">
+                <Icon icon={IconFlag} size={14} />
+              </span>
+            </button>
+          </div>
         )}
       </div>
     );
@@ -586,6 +605,20 @@ export function HomeView({ data }: { data: HomeData }) {
         onSave={saveVisibility}
         onDelete={deleteActive}
         people={others}
+      />
+      <ReportModal
+        key={reporting?.id ?? 'none'}
+        open={!!reporting}
+        onClose={(sent) => {
+          setReporting(null);
+          if (sent) router.refresh(); // it's hidden from the family now — show the home as it is
+        }}
+        title="Something wrong with this keepsake?"
+        subtitle="Tell us what’s wrong — our team will take a look."
+        reasons={HOME_REPORT_REASONS}
+        footnote="Sending this hides it from the family straight away while we check it."
+        sentBody={(leftEmail) => `We’ve hidden it from the family while our team looks into it.${leftEmail ? ' We’ll reply by email.' : ''}`}
+        send={(f) => (reporting ? reportKeepsakeAction({ assetId: reporting.id, ...f }) : Promise.resolve({ ok: false }))}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <CreateGiftLinkModal

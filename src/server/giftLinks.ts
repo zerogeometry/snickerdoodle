@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
+import { assetRefOf } from './assetRef';
 import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { products, productVariants, savedDesigns } from '@/db/schema';
 import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
@@ -84,7 +85,7 @@ export async function createGiftLink(
   for (const a of rows) {
     if (a.familyId !== input.familyId) continue;
     if (!a.keptInHome) continue;
-    if (!canViewAsset({ id: a.id, familyId: a.familyId, uploaderAccountId: a.uploaderAccountId, controllerAccountId: a.controllerAccountId, visibility: a.visibility }, creator).allowed) {
+    if (!canViewAsset(assetRefOf(a), creator).allowed) {
       continue;
     }
     // A gift link is shared OUTSIDE the family (token, no membership) — only fully
@@ -110,7 +111,7 @@ export async function createGiftLink(
     const prices = await getCatalogue(db);
     for (const { d, a, v, p } of designs) {
       if (d.familyId !== input.familyId || a.familyId !== input.familyId || !a.keptInHome || a.moderationStatus !== 'CLEAR') continue;
-      if (!canViewAsset({ id: a.id, familyId: a.familyId, uploaderAccountId: a.uploaderAccountId, controllerAccountId: a.controllerAccountId, visibility: a.visibility }, creator).allowed) continue;
+      if (!canViewAsset(assetRefOf(a), creator).allowed) continue;
       if (!p.visibleInShop || !p.active || !v.active || NOT_GIFTABLE.has(p.key) || !prices[v.sku]) continue;
       const attrs = (v.attributes as Record<string, string>) ?? {};
       const detail = [attrs.size, attrs.colour].filter(Boolean).join(' · ');

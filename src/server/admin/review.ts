@@ -5,6 +5,7 @@ import { derivativeKey, getObjectBytes } from '@/storage';
 import { eraseAsset } from '../assets';
 import { eraseProfileImage } from '../profile';
 import type { DbHandle } from '../db';
+import { openReportLabels, storedReports } from '@/lib/reports';
 
 /**
  * The content-review queue (D8): what the automated checks FLAGGED, for a human to clear or
@@ -18,8 +19,8 @@ export interface ReviewItem {
   id: string;
   /** What flagged it (classifier labels, "drawn-words", "screening-not-configured"…). */
   labels: string[];
-  /** The upload itself, or something drawn/added in the Studio. */
-  source: 'upload' | 'studio design' | 'profile picture' | 'profile header' | 'family banner';
+  /** The upload itself, something drawn/added in the Studio, or a clean keepsake someone reported. */
+  source: 'upload' | 'studio design' | 'reported' | 'profile picture' | 'profile header' | 'family banner';
   flaggedAt: Date | null;
   /** The known-CSAM hash check never ran on it: it can only be removed — never looked at or cleared. */
   hashUnchecked: boolean;
@@ -52,7 +53,13 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
     ...flagged.map((r) => {
       const d = (r.detail ?? {}) as Detail;
       const fromDesign = d.design?.status === 'FLAGGED';
-      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at, hashUnchecked: hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail }) };
+      const reported = openReportLabels(r.detail);
+      // did the automated checks flag it too? (legacy rows with no split verdicts: only if no report explains it)
+      const automated = fromDesign || d.original?.status === 'FLAGGED' || (!d.original && !reported.length);
+      const hashUnchecked = hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail });
+      if (!automated) return { kind: 'keepsake' as const, id: r.id, labels: reported, source: 'reported' as const, flaggedAt: r.at, hashUnchecked };
+      const labels = [...new Set([...reported, ...((fromDesign ? d.design?.labels : d.original?.labels ?? d.labels) ?? [])])];
+      return { kind: 'keepsake' as const, id: r.id, labels, source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at, hashUnchecked };
     }),
     ...profiles.map((r) => ({
       kind: 'profile' as const,
@@ -97,7 +104,9 @@ export async function reviewImage(db: DbHandle, reviewer: Reviewer, kind: Review
 
 /**
  * The reviewer's decision. CLEAR → it may be printed/shown again (and the stored upload/design
- * verdicts say so, so a later re-screen of the other half can't quietly re-flag it). REMOVE → the
+ * verdicts say so, so a later re-screen of the other half can't quietly re-flag it); every open
+ * REPORT is marked resolved, which is what shows a reported keepsake to relatives again
+ * (src/lib/reports.ts isHeldForReview). REMOVE → the
  * real, cascading erase (bytes, rows, erasure ledger), as a takedown.
  */
 export async function decideReview(db: DbHandle, reviewer: Reviewer, kind: ReviewKind, id: string, decision: 'clear' | 'remove', now = new Date()): Promise<void> {
@@ -117,18 +126,19 @@ export async function decideReview(db: DbHandle, reviewer: Reviewer, kind: Revie
   if (!a) deny('not found');
   gate(reviewer, decision, a!);
   const d = (a!.moderationDetail ?? {}) as Detail;
-  await audit(db, reviewer, 'CONTENT_REVIEWED', 'asset', id, a!.familyId, { decision, labels: d.design?.labels ?? d.labels ?? [] });
+  await audit(db, reviewer, 'CONTENT_REVIEWED', 'asset', id, a!.familyId, { decision, labels: [...new Set([...openReportLabels(d), ...(d.design?.labels ?? d.labels ?? [])])] });
   if (decision === 'remove') {
     await eraseAsset(db, { id, familyId: a!.familyId }, { accountId: reviewer.accountId, actorType: 'ADMIN' }, { reason: 'content review — removed' });
     return;
   }
   const cleared = (v?: { status: string; labels?: string[] }) => (v ? { ...v, status: 'CLEAR' } : v);
+  const reports = storedReports(d).map((r) => (r.resolvedAt ? r : { ...r, resolvedAt: now.toISOString(), resolution: 'cleared' as const }));
   await db
     .update(assets)
     .set({
       moderationStatus: 'CLEAR',
       moderatedAt: now,
-      moderationDetail: { ...d, original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] }, design: cleared(d.design), review: { decision, by: reviewer.accountId, at: now.toISOString() } },
+      moderationDetail: { ...d, original: cleared(d.original) ?? { status: 'CLEAR', labels: d.labels ?? [] }, design: cleared(d.design), ...(reports.length ? { reports } : {}), review: { decision, by: reviewer.accountId, at: now.toISOString() } },
     })
     .where(eq(assets.id, id));
 }

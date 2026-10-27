@@ -15,6 +15,9 @@ import type { VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
 import { forgetAssetPreviews } from './print/previewCache';
+import { assetRefOf } from './assetRef';
+
+export { assetRefOf, type AssetRefFields } from './assetRef';
 
 /**
  * The server-data layer for assets. EVERY read of an asset leaves this module
@@ -24,18 +27,7 @@ import { forgetAssetPreviews } from './print/previewCache';
  * server action sits behind, and the place a signed-URL mint is gated.
  */
 
-type AssetRow = typeof assets.$inferSelect;
-
-function toAssetRef(row: AssetRow): AssetRef {
-  return {
-    id: row.id,
-    familyId: row.familyId,
-    uploaderAccountId: row.uploaderAccountId,
-    controllerAccountId: row.controllerAccountId,
-    visibility: row.visibility,
-    ephemeralClaimId: row.ephemeralClaimId,
-  };
-}
+const toAssetRef = assetRefOf;
 
 /** A denial that is indistinguishable from "not found" — never leak existence. */
 function denied(reason: string): AuthzError {

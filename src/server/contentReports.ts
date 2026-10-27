@@ -1,7 +1,9 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, ne } from 'drizzle-orm';
 import { assets, auditRecords, giftLinks } from '@/db/schema';
-import { REPORT_REASONS, REPORTED_LABEL } from '@/lib/reports';
+import type { ViewerContext } from '@/authz';
+import { HOME_REPORT_REASONS, isHeldForReview, REPORT_REASONS, REPORTED_FROM_HOME_LABEL, REPORTED_LABEL, type StoredReport } from '@/lib/reports';
 import { SUPPORT_EMAIL } from '@/lib/support';
+import { getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
 import { appUrl, sendMail } from './mail';
 
@@ -37,7 +39,7 @@ export async function reportGiftLink(
   let held = 0;
   if (ids.length) {
     const rows = await db.select({ id: assets.id, detail: assets.moderationDetail }).from(assets).where(and(inArray(assets.id, ids), eq(assets.moderationStatus, 'CLEAR')));
-    const report = { reason: reason.id, at: now.toISOString(), giftLinkId: link.id };
+    const report: StoredReport = { reason: reason.id, at: now.toISOString(), via: 'gift-link', giftLinkId: link.id };
     for (const r of rows) {
       const d = (r.detail ?? {}) as Detail;
       const [m] = await db
@@ -93,6 +95,99 @@ export async function reportGiftLink(
     });
   } catch (e) {
     console.error('report inbox not told', link.id, (e as Error).message);
+  }
+  return { ok: true };
+}
+
+/**
+ * Report a keepsake from the Keepsake Home (founder decision 2026-10-26). Any family member shown a
+ * keepsake they don't manage can say "something's wrong" — and the safe thing happens straight
+ * away: the keepsake is HELD (FLAGGED with an open report), which hides it from every relative
+ * (only its uploader/controller still sees it, marked "being checked"), keeps it from being printed
+ * or shared on a gift link, and puts it in the admin review queue. A reviewer's CLEAR lets it be
+ * seen again; REMOVE is the real cascading erase. The team is told by email — with no picture in
+ * it. Only the reason is kept on the keepsake; never the reporter, their note or their email.
+ *
+ * The gate is the view check (deny ≡ not found → AuthzError). A keepsake already held isn't held
+ * twice; CSAM-BLOCKED content is never touched.
+ */
+export async function reportKeepsakeFromHome(
+  db: DbHandle,
+  viewer: ViewerContext,
+  input: { assetId: string; reason: string; note?: string; email?: string },
+  now = new Date(),
+  env: Record<string, string | undefined> = process.env,
+): Promise<ReportResult> {
+  const reason = HOME_REPORT_REASONS.find((r) => r.id === input.reason);
+  const note = String(input.note ?? '').trim().slice(0, 1000);
+  const email = String(input.email ?? '').trim().toLowerCase();
+  if (!reason || typeof input.assetId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.assetId)) return { ok: false, reason: 'invalid' };
+  if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return { ok: false, reason: 'invalid' };
+
+  await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate (deny ≡ not found)
+  const [row] = await db.select().from(assets).where(eq(assets.id, input.assetId));
+  if (!row || row.moderationStatus === 'BLOCKED') return { ok: true }; // never touched, never redistributed
+
+  const d = (row.moderationDetail ?? {}) as Detail;
+  const alreadyHeld = isHeldForReview(row);
+  if (!alreadyHeld) {
+    const report: StoredReport = { reason: reason.id, at: now.toISOString(), via: 'home' };
+    // Not screened yet: it stays PENDING (held all the same) and the screening folds the report in
+    // when it lands (src/server/moderation) — a reviewer must never be able to CLEAR an unscreened
+    // picture past the hash check.
+    const pending = row.moderationStatus === 'PENDING';
+    await db
+      .update(assets)
+      .set({
+        moderationStatus: pending ? 'PENDING' : 'FLAGGED',
+        moderatedAt: pending ? row.moderatedAt : now,
+        moderationDetail: {
+          ...d,
+          // keep the screening's own verdict where review can see it (and whether the hash check ran)
+          ...(pending ? {} : { original: d.original ?? { status: row.moderationStatus, labels: d.labels ?? [] } }),
+          labels: [...new Set([REPORTED_FROM_HOME_LABEL, reason.label, ...(row.moderationStatus === 'CLEAR' ? [] : (d.labels ?? []))])],
+          reports: [...(Array.isArray(d.reports) ? d.reports : []), report],
+        },
+      })
+      .where(and(eq(assets.id, row.id), ne(assets.moderationStatus, 'BLOCKED')));
+  }
+
+  await db.insert(auditRecords).values({
+    familyId: row.familyId,
+    actorAccountId: viewer.accountId,
+    actorType: 'MEMBER',
+    event: 'CONTENT_FLAGGED',
+    targetType: 'asset',
+    targetId: row.id,
+    metadata: { via: 'home report', reason: reason.id, held: !alreadyHeld },
+  });
+
+  const inbox = (env.SUPPORT_INBOX ?? '').trim() || SUPPORT_EMAIL;
+  try {
+    await sendMail({
+      kind: 'content-report',
+      to: inbox,
+      ...(email ? { replyTo: email } : {}),
+      subject: `[report] a keepsake was reported from the keepsake home — ${reason.id}`,
+      text: [
+        'A family member reported a keepsake they were shown in their keepsake home.',
+        `Reason: ${reason.label}`,
+        note ? `Their note: ${note}` : null,
+        email ? `They’d like a reply at: ${email}` : 'They didn’t leave an email.',
+        '',
+        alreadyHeld
+          ? 'It was already held for review.'
+          : 'It’s now held: hidden from the rest of the family (only the parent who manages it still sees it), and it can’t be printed or shared.',
+        `Review it (two-step login): ${appUrl('/admin/review')}`,
+        `Keepsake id: ${row.id}`,
+        '',
+        'If anything matches the illegal-content runbook, follow it — don’t view or forward.',
+      ]
+        .filter((l) => l !== null)
+        .join('\n'),
+    });
+  } catch (e) {
+    console.error('report inbox not told', row.id, (e as Error).message);
   }
   return { ok: true };
 }
