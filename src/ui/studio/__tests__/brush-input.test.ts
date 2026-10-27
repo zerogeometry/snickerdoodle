@@ -1,6 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { beginPaint, paintDab, type Work } from '@/ui/studio/engine';
-import { isPalmTouch, PEN_GRACE_MS } from '@/ui/studio/input';
+import { isPalmTouch, multiTapAction, PEN_GRACE_MS, TAP_MS } from '@/ui/studio/input';
+
+describe('multi-finger taps (spec §19a): two = undo, three = redo', () => {
+  it('a quick, still two-finger tap undoes; three redoes', () => {
+    expect(multiTapAction({ fingers: 2, ms: 120, moved: false })).toBe('undo');
+    expect(multiTapAction({ fingers: 3, ms: 200, moved: false })).toBe('redo');
+  });
+  it('a pinch (fingers travelled), a long press or one finger does nothing', () => {
+    expect(multiTapAction({ fingers: 2, ms: 120, moved: true })).toBeNull();
+    expect(multiTapAction({ fingers: 2, ms: TAP_MS + 1, moved: false })).toBeNull();
+    expect(multiTapAction({ fingers: 1, ms: 50, moved: false })).toBeNull();
+    expect(multiTapAction({ fingers: 4, ms: 50, moved: false })).toBeNull();
+  });
+});
 
 const work = (w = 40, h = 40): Work => ({ w, h, rgb: new Uint8ClampedArray(w * h * 3), lab: new Float32Array(w * h * 3), alpha: new Uint8ClampedArray(w * h).fill(255) });
 

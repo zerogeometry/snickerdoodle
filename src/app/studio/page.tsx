@@ -45,7 +45,8 @@ import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
 import { flipObjects, layerAlpha, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type LayerLook, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
-import { isPalmTouch } from '@/ui/studio/input';
+import { isPalmTouch, multiTapAction } from '@/ui/studio/input';
+import { BrushHud } from '@/ui/studio/BrushHud';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { forgetMockupsFor } from '@/lib/mockupPrefetch';
@@ -502,9 +503,11 @@ function StudioEditor() {
 
   // ── history ──
   const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLook });
+  const redoBeforePush = useRef<Snapshot[]>([]);
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
+    redoBeforePush.current = redoStack.current;
     redoStack.current = [];
     setDirty(true);
     markPending();
@@ -542,7 +545,7 @@ function StudioEditor() {
 
   // ── pointer handling: tools, pinch-zoom, pan ──
   const pointers = useRef(new Map<number, { x: number; y: number; type: string }>());
-  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn' | 'spin'; pointerId?: number; paint?: PaintStroke; obj?: StudioObject; drawing?: boolean; place0?: Placement; spin0?: number; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
+  const gesture = useRef<{ kind: 'paint' | 'pan' | 'pinch' | 'crop' | 'stroke' | 'move' | 'scale' | 'turn' | 'spin'; t0?: number; pointerId?: number; paint?: PaintStroke; obj?: StudioObject; drawing?: boolean; place0?: Placement; spin0?: number; startDist?: number; startAngle?: number; smooth?: [number, number]; startSnap?: Snapshot; last?: [number, number]; z0?: number; pan0?: [number, number]; d0?: number; m0?: [number, number]; handle?: string; crop0?: Crop; g0?: [number, number] } | null>(null);
 
   const local = (e: React.PointerEvent) => {
     const r = canvasRef.current!.getBoundingClientRect();
@@ -562,6 +565,7 @@ function StudioEditor() {
   // palm rejection: while a pen is down (or was just lifted), touches on the canvas are a resting
   // hand, not a finger — and a big contact patch is a palm whatever the device
   const lastPenAt = useRef(0);
+  const taps = useRef<{ t0: number; max: number; moved: boolean; starts: Map<number, [number, number]> } | null>(null);
   const isPalm = (e: React.PointerEvent) =>
     isPalmTouch({ pointerType: e.pointerType, width: e.width, height: e.height, penDown: [...pointers.current.values()].some((p) => p.type === 'pen'), msSincePen: Date.now() - lastPenAt.current });
 
@@ -574,18 +578,50 @@ function StudioEditor() {
     e.currentTarget.setPointerCapture(e.pointerId);
     const [sx, sy] = local(e);
     pointers.current.set(e.pointerId, { x: sx, y: sy, type: e.pointerType });
+    // multi-finger taps: two = undo, three = redo (judged when the last finger lifts)
+    if (e.pointerType === 'touch') {
+      const tp = taps.current;
+      if (pointers.current.size === 1 || !tp) taps.current = { t0: Date.now(), max: 1, moved: false, starts: new Map([[e.pointerId, [sx, sy]]]) };
+      else {
+        tp.max = Math.max(tp.max, pointers.current.size);
+        tp.starts.set(e.pointerId, [sx, sy]);
+      }
+    } else taps.current = null;
 
+    // three fingers: nothing happens until they lift (a redo, if it was a tap)
+    if (pointers.current.size >= 3) {
+      gesture.current = null;
+      return;
+    }
     // two fingers → pinch / pan (cancel any half-done stroke)
     if (pointers.current.size === 2) {
-      if (gesture.current?.kind === 'stroke' && liveStroke.current) {
+      const g0 = gesture.current;
+      const cancel = () => {
+        undoStack.current.pop();
+        redoStack.current = redoBeforePush.current; // the half-gesture never happened
+        setTick((t) => t + 1);
+      };
+      if (g0?.kind === 'stroke' && liveStroke.current) {
         liveStroke.current = null; // a pinch started mid-line: drop the half-drawn stroke
-        undoStack.current.pop();
-        setTick((t) => t + 1);
+        cancel();
       }
-      if (gesture.current?.kind === 'paint' && gesture.current.startSnap) {
-        workRef.current.alpha.set(gesture.current.startSnap.alpha);
-        undoStack.current.pop();
-        setTick((t) => t + 1);
+      if (g0?.kind === 'paint' && g0.startSnap) {
+        workRef.current.alpha.set(g0.startSnap.alpha);
+        cancel();
+      }
+      // a second finger right after the first: that touch was the start of a pinch, not a move
+      if (g0 && (g0.kind === 'move' || g0.kind === 'scale' || g0.kind === 'turn' || g0.kind === 'crop') && Date.now() - (g0.t0 ?? 0) < 300) {
+        const s = undoStack.current.pop();
+        if (s) restore(s);
+        redoStack.current = redoBeforePush.current;
+      }
+      // …or the start of a two-finger tap / pinch, not a new text box (and never opens words for typing)
+      const pe = pendingEdit.current;
+      pendingEdit.current = null;
+      if (pe?.isNew) {
+        const s = undoStack.current.pop();
+        if (s) restore(s);
+        redoStack.current = redoBeforePush.current;
       }
       const [a, b] = [...pointers.current.values()];
       gesture.current = { kind: 'pinch', z0: view.zoom, pan0: [view.panX, view.panY], d0: Math.hypot(a!.x - b!.x, a!.y - b!.y), m0: [(a!.x + b!.x) / 2, (a!.y + b!.y) / 2] };
@@ -634,12 +670,12 @@ function StudioEditor() {
         const tn = pt(0, -b.h / 2 - pad - 28 / V.a);
         if (Math.hypot(rz.x - sx, rz.y - sy) < 24) {
           pushUndo();
-          gesture.current = { kind: 'scale', obj: sel ?? undefined, drawing, place0, startDist: Math.hypot(gx - b.cx, gy - b.cy) };
+          gesture.current = { t0: Date.now(), kind: 'scale', obj: sel ?? undefined, drawing, place0, startDist: Math.hypot(gx - b.cx, gy - b.cy) };
           return;
         }
         if (selB.turnable && Math.hypot(tn.x - sx, tn.y - sy) < 24) {
           pushUndo();
-          gesture.current = { kind: 'turn', obj: sel ?? undefined, drawing, place0, startAngle: Math.atan2(gy - b.cy, gx - b.cx) };
+          gesture.current = { t0: Date.now(), kind: 'turn', obj: sel ?? undefined, drawing, place0, startAngle: Math.atan2(gy - b.cy, gx - b.cx) };
           return;
         }
       }
@@ -648,7 +684,7 @@ function StudioEditor() {
       if (hit) {
         setSelectedId(hit.id);
         pushUndo();
-        gesture.current = { kind: 'move', obj: hit, g0: [gx, gy] };
+        gesture.current = { t0: Date.now(), kind: 'move', obj: hit, g0: [gx, gy] };
         // words: a TAP (no drag) opens them for typing, right there
         if (hit.type === 'text' && !wasEditing) pendingEdit.current = { id: hit.id, sx, sy, isNew: false };
         return;
@@ -657,7 +693,7 @@ function StudioEditor() {
       if (tool === 'select' && drawingUnlocked && !scratch && inBox(drawingBox(f), gx, gy)) {
         setSelectedId(DRAWING);
         pushUndo();
-        gesture.current = { kind: 'move', drawing: true, place0: geo.place ?? IDENTITY_PLACE, g0: [gx, gy] };
+        gesture.current = { t0: Date.now(), kind: 'move', drawing: true, place0: geo.place ?? IDENTITY_PLACE, g0: [gx, gy] };
         return;
       }
       if (tool === 'text' && !wasEditing) {
@@ -708,7 +744,7 @@ function StudioEditor() {
       const inside = gx >= c.x * gw && gx <= (c.x + c.w) * gw && gy >= c.y * gh && gy <= (c.y + c.h) * gh;
       if (hit || inside) {
         pushUndo();
-        gesture.current = { kind: 'crop', handle: hit ?? 'move', crop0: { ...c }, g0: [gx / gw, gy / gh] };
+        gesture.current = { t0: Date.now(), kind: 'crop', handle: hit ?? 'move', crop0: { ...c }, g0: [gx / gw, gy / gh] };
         return;
       }
     }
@@ -717,6 +753,12 @@ function StudioEditor() {
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const tp = taps.current;
+    const st = tp?.starts.get(e.pointerId);
+    if (tp && st && !tp.moved) {
+      const [mx, my] = local(e);
+      if (Math.hypot(mx - st[0], my - st[1]) > 12) tp.moved = true;
+    }
     const gst = gesture.current;
     if (!gst || !workRef.current || !pointers.current.has(e.pointerId)) return;
     if (e.pointerType === 'pen') lastPenAt.current = Date.now();
@@ -847,7 +889,14 @@ function StudioEditor() {
       setObjects((os) => [...os, { id: newId(), type: 'stroke', colour: pen.colour, width: pen.width, points, texture: pen.texture, ...(pen.opacity < 1 ? { opacity: pen.opacity } : {}) }]);
     }
     pointers.current.delete(e.pointerId);
-    if (pointers.current.size === 0) gesture.current = null;
+    if (pointers.current.size === 0) {
+      gesture.current = null;
+      const tp = taps.current;
+      taps.current = null;
+      const act = tp && e.type !== 'pointercancel' ? multiTapAction({ fingers: tp.max, ms: Date.now() - tp.t0, moved: tp.moved }) : null;
+      if (act === 'undo') undo();
+      if (act === 'redo') redo();
+    }
   };
 
   const onWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
@@ -1592,6 +1641,34 @@ function StudioEditor() {
             <div role="status" className="absolute inset-x-0 top-[72px] mx-auto w-fit rounded-pill border-2 border-cocoa bg-paper px-4 py-1.5 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] md:top-3">
               {busy}
             </div>
+          ) : null}
+          {/* phones: the brush's colour + size a thumb away, on the canvas (just above the tool's row) */}
+          {ready && tool === 'draw' ? (
+            <BrushHud
+              what="pen"
+              colour={pen.colour}
+              onColour={(colour) => setPen({ ...pen, colour })}
+              sizes={[
+                { value: 0.006, dot: 6, label: 'thin' },
+                { value: 0.012, dot: 11, label: 'medium' },
+                { value: 0.026, dot: 18, label: 'thick' },
+              ]}
+              size={pen.width}
+              onSize={(width) => setPen({ ...pen, width })}
+            />
+          ) : ready && (tool === 'erase' || tool === 'restore') ? (
+            <BrushHud
+              what={tool === 'erase' ? 'eraser' : 'bring back'}
+              colour={null}
+              onColour={() => undefined}
+              sizes={[
+                { value: 18, dot: 6, label: 'small' },
+                { value: 36, dot: 11, label: 'medium' },
+                { value: 80, dot: 18, label: 'big' },
+              ]}
+              size={brush}
+              onSize={setBrush}
+            />
           ) : null}
           {/* zoom: a slim column floating top-right over the picture */}
           <div className="absolute right-2.5 top-2.5 flex flex-col gap-1.5" role="group" aria-label="zoom">
