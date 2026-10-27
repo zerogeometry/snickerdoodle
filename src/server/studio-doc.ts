@@ -129,10 +129,39 @@ export async function applyLookToImage(input: Buffer, look: StudioLook | null, l
 
 /**
  * The self-hosted magic edits on the drawing's own pixels (alpha untouched): "tidy the lines" = a
- * median smoothing sized to the picture + paper cleaned toward white; "brighten" = the tones
- * stretched to the full range (1st–99th percentile) with a touch more colour. Deterministic sharp,
- * in-process — no third party sees the image.
+ * median smoothing sized to the picture + paper cleaned toward white; "brighten" = a LIFT-ONLY
+ * tone lift (see brightenPixels) with a touch more colour. Deterministic sharp, in-process — no
+ * third party sees the image.
  */
+/**
+ * "brighten", in place on raw RGB: the paper (the brightest common tone of the visible pixels,
+ * 97th percentile of luminance) is lifted to near-white by one gain ≥ 1, then the midtones get a
+ * gentle lift (gamma 0.9). Both steps only ever RAISE a value — a drawing never comes out darker
+ * (a contrast stretch would push its darkest 1% to black). Alpha decides what's "visible".
+ */
+export function brightenPixels(px: Buffer | Uint8Array, alpha: Buffer | Uint8Array): void {
+  const hist = new Uint32Array(256);
+  let total = 0;
+  for (let i = 0, k = 0; i + 2 < px.length; i += 3, k++) {
+    if (alpha[k] !== undefined && alpha[k]! <= 128) continue;
+    hist[Math.round(0.299 * px[i]! + 0.587 * px[i + 1]! + 0.114 * px[i + 2]!)]!++;
+    total++;
+  }
+  if (total === 0) return;
+  let seen = 0, paper = 255;
+  for (let v = 0; v < 256; v++) {
+    seen += hist[v]!;
+    if (seen >= total * 0.97) {
+      paper = v;
+      break;
+    }
+  }
+  const gain = Math.min(1.8, Math.max(1, 252 / Math.max(paper, 1)));
+  const lut = new Uint8Array(256);
+  for (let v = 0; v < 256; v++) lut[v] = Math.max(v, Math.min(255, Math.round(255 * Math.pow(Math.min(1, (v * gain) / 255), 0.9))));
+  for (let i = 0; i < px.length; i++) px[i] = lut[px[i]!]!;
+}
+
 export async function applyMagicToImage(input: Buffer, magic: MagicEdits | null): Promise<Buffer> {
   if (!magic) return input;
   const meta = await sharp(input).metadata();
@@ -140,7 +169,11 @@ export async function applyMagicToImage(input: Buffer, magic: MagicEdits | null)
   const alpha = await sharp(input).ensureAlpha().extractChannel(3).raw().toBuffer();
   let rgb = await sharp(input).removeAlpha().png().toBuffer();
   if (magic.tidy) rgb = await sharp(rgb).median(tidyWindow(Math.max(W, H))).png().toBuffer();
-  if (magic.brighten) rgb = await sharp(rgb).normalise({ lower: 1, upper: 99 }).modulate({ saturation: 1.08 }).png().toBuffer();
+  if (magic.brighten) {
+    const { data, info } = await sharp(rgb).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    brightenPixels(data, alpha);
+    rgb = await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).modulate({ saturation: 1.08 }).png().toBuffer();
+  }
   const px = await sharp(rgb).removeAlpha().raw().toBuffer();
   if (magic.tidy) {
     // the paper → white. Paper = the picture's own brightest common, near-neutral tone (so a dim
