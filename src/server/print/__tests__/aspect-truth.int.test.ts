@@ -120,9 +120,8 @@ describe.skipIf(!DB || !S3)('cover-fill keeps the source aspect (circle stays ro
     const meta = await sharp(buf).metadata();
     expect(meta.width).toBe(res.widthPx);
     expect(meta.height).toBe(res.heightPx);
-    // ...and it matches the 11×14 portrait canvas (279×356mm + 3mm bleed @300dpi)
-    expect(Math.abs(meta.width! - Math.round(((279 + 6) / 25.4) * 300))).toBeLessThanOrEqual(2);
-    expect(Math.abs(meta.height! - Math.round(((356 + 6) / 25.4) * 300))).toBeLessThanOrEqual(2);
+    // ...and it is exactly Prodigi's 11×14 portrait print area (printAreaSizes 3307×4192px, no bleed)
+    expect([meta.width, meta.height]).toEqual([3307, 4192]);
     // cleanup the big asset (cascades its derivatives)
     const objs = await db.select().from(storageObjects).where(eq(storageObjects.assetId, bigAsset.assetId));
     for (const o of objs) await deleteObject(o.key).catch(() => {});

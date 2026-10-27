@@ -1142,7 +1142,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <Icon icon={assess.decision === 'BLOCK' ? IconAlertTriangle : IconCircleCheck} size={15} />
               <span className="min-w-0 flex-1">
                 {assess.decision === 'OK'
-                  ? `print-ready · ${t.requiredDpi} dpi`
+                  ? `print-ready · ${assess.requiredDpi} dpi`
                   : assess.decision === 'UPSCALE'
                     ? assess.softUpClose
                       ? 'lovely from a step back, a little soft up close'

@@ -241,10 +241,10 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     expect(nearTo(px.at(px.w * 0.5, px.h * 0.5), DESIGN), 'the single face is the image').toBeLessThan(60);
   });
 
-  it('BLANKET landscape variant rotates the print file 90° back to Prodigi’s fixed PORTRAIT', async () => {
-    // Orientation is ours (like the frame/jigsaw): Prodigi's blanket print file is fixed PORTRAIT.
-    // A landscape variant designs on a SWAPPED canvas, then the fulfilment render rotates the
-    // finished file 90° back — so BOTH orientations ship a portrait file of identical dimensions.
+  it('BLANKET portrait variant rotates the print file 90° back to Prodigi’s fixed LANDSCAPE', async () => {
+    // Orientation is ours (like the frame/jigsaw): Prodigi's blanket print file is fixed LANDSCAPE
+    // (5905×3838px for the medium). A portrait variant designs on a SWAPPED canvas, then the
+    // fulfilment render rotates the finished file 90° back — so BOTH ship Prodigi's landscape file.
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [portrait] = await db.select().from(productVariants).where(eq(productVariants.sku, 'blanket'));
     const [landscape] = await db.select().from(productVariants).where(eq(productVariants.sku, 'blanket-medium-landscape'));
@@ -253,10 +253,8 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     keys.push(p.key);
     const l = await renderPrintFile(db, sam, { assetId, variantId: landscape!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
     keys.push(l.key);
-    expect(p.heightPx).toBeGreaterThan(p.widthPx); // native portrait file
-    expect(l.heightPx).toBeGreaterThan(l.widthPx); // landscape variant rotated 90° back → also portrait
-    expect(l.widthPx).toBe(p.widthPx); // identical Prodigi portrait canvas
-    expect(l.heightPx).toBe(p.heightPx);
+    expect(l).toMatchObject({ widthPx: 5905, heightPx: 3838 }); // native landscape file
+    expect(p).toMatchObject({ widthPx: 5905, heightPx: 3838 }); // portrait variant rotated 90° back → the same file
   });
 
   it('a PHONE CASE renders at Prodigi’s exact print-file pixels for that phone + grade (no trim, no rounding)', async () => {
@@ -292,7 +290,7 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     expect(at(Math.round(lay.bandPx / 2), 3600)[0]).toBeGreaterThan(240); // the band stays white paper
   });
 
-  it('a GREETINGS CARD renders the flat 4-panel spread (6236×2220), not a single face', async () => {
+  it('a GREETINGS CARD renders the flat 4-panel spread (6120×2160), not a single face', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [card] = await db
       .select({ id: productVariants.id })
@@ -304,11 +302,11 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     const res = await renderPrintFile(db, sam, { assetId, variantId: card!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, message: msg, cardSpan: 'full' });
     keys.push(res.key);
     // The card's own 4-panel artboard — NOT the single 5×7 face.
-    expect(res).toMatchObject({ widthPx: 6236, heightPx: 2220, renderedDpi: 300 });
+    expect(res).toMatchObject({ widthPx: 6120, heightPx: 2160, renderedDpi: 300 });
     const grant = await getStorageObjectGrant(db, res.printObjectId, sam);
     const meta = await sharp(Buffer.from(await (await fetch(grant.url)).arrayBuffer())).metadata();
-    expect(meta.width).toBe(6236);
-    expect(meta.height).toBe(2220);
+    expect(meta.width).toBe(6120);
+    expect(meta.height).toBe(2160);
 
     // Defence in depth: an abusive inside message is REJECTED at the PRINT boundary too, not just at
     // order time — the print renderer re-screens and refuses to lay it onto a keepsake.

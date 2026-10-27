@@ -151,7 +151,7 @@ export function assessPrintResolution(t: TemplateGeom, src: { width: number; hei
   if (!isPatternProduct(productKey)) return assessResolution(t, src, transform);
   const layout = patternLayout(canvasSizePx(t), t.requiredDpi, src, transform);
   return assessResolution(
-    { printWidthPx: layout.motifW, printHeightPx: layout.motifH, bleedMm: 0, requiredDpi: t.requiredDpi },
+    { printWidthPx: layout.motifW, printHeightPx: layout.motifH, bleedMm: 0, requiredDpi: t.requiredDpi, gateDpi: t.gateDpi },
     src,
     { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: transform.rotationDeg },
   );

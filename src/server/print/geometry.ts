@@ -17,7 +17,27 @@ export interface TemplateGeom {
   printWidthPx: number;
   printHeightPx: number;
   bleedMm: number;
+  /** The dpi the print FILE is made at (Prodigi's spec): px ÷ requiredDpi = the print's real inches. */
   requiredDpi: number;
+  /** The dpi the print's QUALITY is judged at, when it's lower than the file's: Prodigi asks for the
+   * big frames and the sack at 300 dpi, but they look right at 150 where they're seen (and were
+   * judged at 150 before their files went up to Prodigi's size), so the gate stays where it was.
+   * Absent ⇒ requiredDpi. Built from a template row by {@link templateGeom}. */
+  gateDpi?: number;
+}
+
+/** The dpi the resolution gate judges a print against (see {@link TemplateGeom.gateDpi}). */
+export const gateDpiOf = (t: TemplateGeom): number => Math.min(t.requiredDpi, t.gateDpi ?? t.requiredDpi);
+
+/**
+ * A print template row → the geometry every consumer shares. The row's `minSourceWidthPx` is the
+ * source width the print needs to be print-ready: normally the print's own width, but LESS when the
+ * file is made at a higher dpi than the print is judged at — that ratio is the gate dpi.
+ */
+export function templateGeom(t: { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number; minSourceWidthPx?: number | null }): TemplateGeom {
+  const g: TemplateGeom = { printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi };
+  if (t.minSourceWidthPx && t.minSourceWidthPx < t.printWidthPx) g.gateDpi = Math.round((t.requiredDpi * t.minSourceWidthPx) / t.printWidthPx);
+  return g;
 }
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -50,7 +70,7 @@ const ACUITY_K = 1050;
 export function minimumDpi(t: TemplateGeom): number {
   const wIn = t.printWidthPx / t.requiredDpi, hIn = t.printHeightPx / t.requiredDpi;
   const viewIn = Math.max(14, Math.hypot(wIn, hIn));
-  return Math.min(t.requiredDpi / MAX_UPSCALE, Math.max(MIN_FLOOR_DPI, Math.round(ACUITY_K / viewIn)));
+  return Math.min(gateDpiOf(t) / MAX_UPSCALE, Math.max(MIN_FLOOR_DPI, Math.round(ACUITY_K / viewIn)));
 }
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -157,6 +177,7 @@ export interface ResolutionAssessment {
   decision: 'OK' | 'UPSCALE' | 'BLOCK';
   tier: 0 | 1 | -1; // 0 = classical resample, 1 = ML super-resolution, -1 = block
   effectiveDpi: number;
+  /** The dpi the print is judged against — the gate dpi (gateDpiOf), not always the file's. */
   requiredDpi: number;
   upscaleFactor: number;
   /** The least the print can have where it's seen (minimumDpi) — below this it's BLOCKED. */
@@ -182,7 +203,7 @@ export function assessResolution(
   const rotated = transform.rotationDeg % 180 !== 0;
   const sw = rotated ? src.height : src.width;
   const effectiveDpi = Math.round((t.requiredDpi * sw) / rect.width);
-  const requiredDpi = t.requiredDpi;
+  const requiredDpi = gateDpiOf(t);
 
   const floor = minimumDpi(t);
   if (effectiveDpi >= requiredDpi) return { decision: 'OK', tier: 0, effectiveDpi, requiredDpi, upscaleFactor: 1, minimumDpi: floor, softUpClose: false };
@@ -205,7 +226,7 @@ export const GALLERY_FIT: Transform = { scale: 0, offsetX: 0, offsetY: 0, rotati
 /** The area the drawing fits into: the page less the margin all round (no bleed — the margin is white). */
 export function galleryArtGeom(t: TemplateGeom): TemplateGeom {
   const m = mmToPx(GALLERY_MARGIN_MM, t.requiredDpi);
-  return { printWidthPx: Math.max(1, t.printWidthPx - 2 * m), printHeightPx: Math.max(1, t.printHeightPx - 2 * m), bleedMm: 0, requiredDpi: t.requiredDpi };
+  return { printWidthPx: Math.max(1, t.printWidthPx - 2 * m), printHeightPx: Math.max(1, t.printHeightPx - 2 * m), bleedMm: 0, requiredDpi: t.requiredDpi, gateDpi: t.gateDpi };
 }
 /** Where the whole drawing sits on the PAGE (print-area px, the trimmed page — add the bleed for the file). */
 export function galleryRect(t: TemplateGeom, src: { width: number; height: number }): { x: number; y: number; width: number; height: number } {

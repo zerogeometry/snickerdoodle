@@ -127,12 +127,19 @@ describe('sizeDimsCm — physical size sub-label (the blanket buttons)', () => {
     variants: [bv('medium', 'portrait', 600, 1000), bv('medium', 'landscape', 1000, 600), bv('large', 'portrait', 1000, 1500)],
   });
   it('formats a size as min × max cm from the variant print mm', () => {
-    expect(sizeDimsCm(blanket, 'medium')).toBe('60 × 100 cm');
-    expect(sizeDimsCm(blanket, 'large')).toBe('100 × 150 cm');
+    const towel = product('teaTowel', { sizes: ['one size'], variants: [{ ...bv('one size', '', 695, 465), attributes: { size: 'one size' } }] });
+    expect(sizeDimsCm(towel, 'one size')).toBe('47 × 70 cm');
   });
   it('is orientation-agnostic — the swapped landscape canvas reads the same nominal size', () => {
-    const landscapeOnly = product('blanket', { sizes: ['medium'], variants: [bv('medium', 'landscape', 1000, 600)] });
+    const landscapeOnly = product('towel', { sizes: ['medium'], variants: [bv('medium', 'landscape', 1000, 600)] });
     expect(sizeDimsCm(landscapeOnly, 'medium')).toBe('60 × 100 cm');
+  });
+  it('the blanket reads as the size it’s sold as, not its print area (which runs past the blanket)', () => {
+    // Prodigi's print areas: 1000×650mm (medium, "60x100cm") and 1480×980mm (large, "100x150cm")
+    const exact = product('blanket', { sizes: ['medium', 'large'], variants: [bv('medium', 'portrait', 650, 1000), bv('large', 'landscape', 1480, 980)] });
+    expect(sizeDimsCm(exact, 'medium')).toBe('60 × 100 cm');
+    expect(sizeDimsCm(exact, 'large')).toBe('100 × 150 cm');
+    expect(sizeDimsCm(blanket, 'medium')).toBe('60 × 100 cm');
   });
   it('returns undefined when the size has no print mm', () => {
     const noMm = product('x', { sizes: ['one'], variants: [{ id: 'x1', sku: 'x', attributes: { size: 'one' }, pricePence: 100, isDefault: true, printWmm: null, printHmm: null }] });

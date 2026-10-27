@@ -1,6 +1,8 @@
 import { and, eq } from 'drizzle-orm';
-import { productVariantProviders, productVariants, products } from '@/db/schema';
+import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
 import type { DbHandle } from '../db';
+import { templateGeom, type TemplateGeom } from '../print/geometry';
+import { checkPrintSpec, printFileSize } from '../print/printFile';
 import { prodigiClient, type ProdigiClient, type ProdigiProduct } from './client';
 
 /**
@@ -10,7 +12,8 @@ import { prodigiClient, type ProdigiClient, type ProdigiProduct } from './client
  *  2. ENRICHES the product's technical `specs` from Prodigi's real attributes
  *     (the brand-voice blurb + description stay OURS — only specs come from Prodigi),
  *  3. SNAPSHOTS each variant's Prodigi data (dimensions, ships-to-GB, colours) into
- *     `providerConfig`, and reconciles our colours against Prodigi's colour axis.
+ *     `providerConfig`, and reconciles our colours against Prodigi's colour axis,
+ *  4. CHECKS the variant's print file is exactly Prodigi's print area for it (printSpecWarning).
  *
  * Metadata only — no image is ever sent. Idempotent; safe to re-run.
  */
@@ -44,6 +47,32 @@ export function specsFromProdigi(p: ProdigiProduct): Record<string, string> {
   return specs;
 }
 
+/**
+ * A variant's print file vs Prodigi's printAreaSizes for it (GB routes): a warning when its size or
+ * shape differs — we order with `fillPrintArea`, so Prodigi would rescale it, or crop the difference.
+ * The same check as the print-spec unit test (checkPrintSpec). null when it matches, or when Prodigi
+ * didn't say (no printAreaSizes).
+ */
+export function printSpecWarning(
+  row: { productKey: string; attributes: Record<string, string> | null; prodigiAttrs?: Record<string, string>; printTo?: string[]; template: TemplateGeom },
+  product: ProdigiProduct,
+): string | null {
+  const prodigi = (product.variants ?? [])
+    .filter((v) => v.shipsTo?.includes('GB'))
+    .map((v) => ({
+      attributes: v.attributes ?? {},
+      printAreaSizes: Object.fromEntries(Object.entries(v.printAreaSizes ?? {}).map(([k, s]) => [k, { w: s.horizontalResolution, h: s.verticalResolution }])),
+    }));
+  if (!prodigi.some((v) => Object.keys(v.printAreaSizes).length > 0)) return null;
+  return checkPrintSpec({
+    productKey: row.productKey,
+    prodigiAttrs: row.prodigiAttrs ?? null,
+    printTo: row.printTo ?? ['default'],
+    file: printFileSize(row.productKey, row.attributes, row.template),
+    prodigi,
+  });
+}
+
 export interface SyncEntry {
   internalSku: string;
   providerSku: string;
@@ -74,10 +103,12 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       productKey: products.key,
       productSpecs: products.specs,
       providerConfig: productVariantProviders.providerConfig,
+      template: printTemplates,
     })
     .from(productVariantProviders)
     .innerJoin(productVariants, eq(productVariants.id, productVariantProviders.variantId))
     .innerJoin(products, eq(products.id, productVariants.productId))
+    .leftJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
     .where(
       and(
         eq(productVariantProviders.provider, 'PRODIGI'),
@@ -137,6 +168,12 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
     const ourColour = ((r.attributes as Record<string, string> | null)?.colour ?? '').toLowerCase();
     if (ourColour && prodigiColours.length > 0 && !prodigiColours.map((c) => c.toLowerCase()).includes(ourColour)) {
       warnings.push(`colour "${ourColour}" not in Prodigi colours [${prodigiColours.join(', ')}] — needs a colour map`);
+    }
+
+    // The print file must be EXACTLY Prodigi's print area — anything else is rescaled or cropped.
+    if (r.template) {
+      const spec = printSpecWarning({ productKey: r.productKey, attributes: r.attributes as Record<string, string> | null, prodigiAttrs, printTo, template: templateGeom(r.template) }, product);
+      if (spec) warnings.push(spec);
     }
 
     await db

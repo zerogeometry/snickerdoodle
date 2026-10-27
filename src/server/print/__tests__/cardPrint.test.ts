@@ -37,7 +37,7 @@ describe('card 4-panel print assembly', () => {
   it('outputs the exact Prodigi artboard size', async () => {
     const out = await assembleCardPrintSpread({ design: await green(), transform: tf, span: 'front', message: null });
     const m = await sharp(out).metadata();
-    expect(`${m.width}x${m.height}`).toBe('6236x2220');
+    expect(`${m.width}x${m.height}`).toBe('6120x2160');
   });
 
   it('FRONT-ONLY: design on the outer-front panel; rear white; inside white when blank', async () => {
