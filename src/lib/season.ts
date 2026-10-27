@@ -196,3 +196,25 @@ export function formatShortDate(iso: string): string {
   const mo = dt.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }).toLowerCase();
   return `${wd} ${D} ${mo}`;
 }
+
+/**
+ * The honest deadline line for the evergreen /christmas pages — shown ALL YEAR, not just in season
+ * (families plan in October): the date most things must be ordered by (the uk9 parcel) and the
+ * earlier one for cards (uk7), for the coming Christmas.
+ *   upcoming → both dates (provisional until the makers confirm theirs)
+ *   missed   → the last date has passed: say so plainly (thank-you cards instead)
+ *   unknown  → no dates for that Christmas yet (we never guess one)
+ */
+export type ChristmasDeadlines =
+  | { state: 'upcoming'; year: number; mostThings: string; cards: string; provisional: boolean; cardsMissed: boolean }
+  | { state: 'missed'; year: number; mostThings: string }
+  | { state: 'unknown'; year: number };
+
+export function christmasDeadlines(now: Date): ChristmasDeadlines {
+  const year = christmasYear(now);
+  const table = CHRISTMAS_LAST_ORDER[year];
+  if (!table) return { state: 'unknown', year };
+  const mostThings = table.byRoute.uk9;
+  if (daysUntil(now, mostThings) < 0) return { state: 'missed', year, mostThings };
+  return { state: 'upcoming', year, mostThings, cards: table.byRoute.uk7, provisional: table.provisional, cardsMissed: daysUntil(now, table.byRoute.uk7) < 0 };
+}

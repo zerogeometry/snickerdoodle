@@ -602,6 +602,18 @@ export function definedPriceList(): Array<{ productKey: string; sku: string; isD
   });
 }
 
+/**
+ * The products as the DEFS describe them (no DB, no variants): our own words + specs + whether each
+ * is on show. Pure and read-only — for the public product pages, their structured data and the
+ * Merchant Center feed (src/server/shop), which pair it with {@link definedPriceList} for prices.
+ */
+export function definedProducts(): Array<{ key: string; category: string; label: string; blurb: string; description: string; specs: Record<string, string>; visibleInShop: boolean; paused: boolean }> {
+  return Object.entries(DEFS).map(([key, def]) => ({
+    key, category: def.category, label: def.label, blurb: def.blurb, description: def.description, specs: { ...def.specs },
+    visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
+  }));
+}
+
 /** Stable sku for a variant: the default keeps the legacy product key (back-compat). */
 function variantSku(productKey: string, v: VariantDef, isDefault: boolean): string {
   if (isDefault) return productKey;
