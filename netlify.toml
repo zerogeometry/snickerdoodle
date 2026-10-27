@@ -19,4 +19,5 @@
     "node_modules/@fontsource/*/files/*-latin-400-normal.woff",
     "src/server/print/assets/**",
     "public/examples/range/**",
+    "models/sr/**",
   ]
