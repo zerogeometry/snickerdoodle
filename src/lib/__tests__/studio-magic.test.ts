@@ -41,12 +41,14 @@ describe('magic edits — tidy the lines + brighten (self-hosted, deterministic)
     expect(await applyMagicToImage(b, null)).toBe(b);
   });
 
-  it('brighten stretches a dull photo to crisp whites and deep ink; alpha untouched', async () => {
+  it('brighten lifts a dull photo to crisp whites without darkening the ink; alpha untouched', async () => {
     const before = await raw(await dullDrawing());
     const after = await raw(await applyMagicToImage(await dullDrawing(), { brighten: true }));
     const at = (d: typeof before, x: number, y: number) => d.data[(y * 400 + x) * 4]!;
     expect(at(after, 50, 50)).toBeGreaterThan(at(before, 50, 50)); // paper whiter
-    expect(at(after, 200, 150)).toBeLessThan(at(before, 200, 150)); // ink deeper
+    expect(at(after, 50, 50)).toBeGreaterThan(240);
+    expect(at(after, 200, 150)).toBeGreaterThanOrEqual(at(before, 200, 150)); // lift-only: never darker
+    expect(at(after, 200, 150)).toBeLessThan(at(after, 50, 50) - 80); // …and the ink still reads as ink
     for (let i = 3; i < after.data.length; i += 4) expect(after.data[i]).toBe(before.data[i]);
   });
 
