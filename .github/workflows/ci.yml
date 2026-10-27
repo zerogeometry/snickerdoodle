@@ -1,0 +1,74 @@
+# Runs on every pull request (and on main / the build branch): typecheck, lint, migrations, and the
+# FULL test suite — including the *.int.test.ts suites, which skip themselves without a database +
+# object store. Postgres + MinIO here mirror docker-compose.yml (throwaway CI-only credentials, never
+# used anywhere real). The authz matrix and the integration suites are launch gates (CLAUDE.md).
+# (Ported from the overnight launch-gaps branch, 27 Oct; e2e + visual jobs to follow once those
+# suites are made CI-ready.)
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main, build/phase-0-trust-spine]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgres://snickerdoodle:localdev@localhost:5544/snickerdoodle
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: eu-west-2
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: snickerdoodle-originals
+      S3_FORCE_PATH_STYLE: 'true'
+      AUTH_SECRET: ci-only-throwaway-secret-not-used-anywhere-real
+      JOBS_SECRET: ci-only-throwaway-jobs-secret
+      APP_URL: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # MinIO needs a start command, which a service container can't take — run it directly. Its
+      # built-in KMS key is the same throwaway LOCAL key as docker-compose.yml.
+      - name: Start MinIO (private local object store)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Unit + integration tests
+        run: npm test

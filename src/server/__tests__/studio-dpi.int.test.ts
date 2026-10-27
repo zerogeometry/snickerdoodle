@@ -26,7 +26,7 @@ const tiny = () =>
     .png()
     .toBuffer();
 const shape = [{ id: 's', type: 'shape', shape: 'square', fill: '#d7352c', stroke: '#2b2118', strokeWidth: 0, texture: 'smooth', x: 0.75, y: 0.5, w: 0.3, h: 0.3, rotation: 0 }];
-const cover = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+const cover = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 as const };
 
 /**
  * REGRESSION (gap audit, 27 Oct): a design with stickers / words is stored enlarged (up to 4×) so they
