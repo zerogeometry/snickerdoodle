@@ -15,7 +15,7 @@
 import { CHRISTMAS_LAST_ORDER } from './season';
 
 /** "Monday 14 December" from the season's last-order table — the FAQ never types a date twice. */
-function longDate(iso: string): string {
+export function longDate(iso: string): string {
   const [Y, M, D] = iso.split('-').map(Number) as [number, number, number];
   return new Date(Date.UTC(Y, M - 1, D, 12)).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 }

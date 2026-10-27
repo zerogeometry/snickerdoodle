@@ -54,6 +54,19 @@ for (const vp of WIDTHS) {
       await shot(page, `${vp.name}-christmas-delivery-dates`, { mask: [page.locator('tbody')] });
     });
 
+    // C6/C7: the evergreen christmas hub, an intent page and a public product page. Dates move with the
+    // calendar, so the deadline lines + "arrives by christmas" pills are masked (not the design).
+    test('christmas hub, an intent page, a product page (C6/C7)', async ({ page }) => {
+      await quietCookies(page);
+      const dated = () => [page.getByText(/order by|arrives by christmas|too late for christmas|last order dates for christmas/)];
+      await page.goto('/christmas');
+      await shot(page, `${vp.name}-christmas-hub`, { mask: dated() });
+      await page.goto('/christmas/personalised-ornaments');
+      await shot(page, `${vp.name}-christmas-ornaments`, { mask: dated() });
+      await page.goto('/products/ceramic-christmas-ornament');
+      await shot(page, `${vp.name}-product-ornament`, { mask: dated() });
+    });
+
     test('the range, customize, studio, placement, checkout', async ({ page }) => {
       test.setTimeout(180_000);
       await quietCookies(page);
