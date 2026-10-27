@@ -10,7 +10,7 @@
 | 2 | **Children's Code** conformance assessment documented | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/CHILDRENS-CODE-assessment-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`) — needs DP review + sign-off |
 | 3 | **International transfers** reviewed ("not materially lower") | ☐ not started | Simon + DP professional | Depends on provider choices (D2–D4); still directional |
 | 4 | **Privacy notice + family data promise** pages live (placeholders filled) | ◐ in progress | Cowork drafts → Simon approves | UI pages exist in `src/app/(marketing)/trust`; **placeholders still need filling** from trust-spine `-2`/`-3` |
-| 5 | **ICO registration** / fee paid + **Article-28 DPAs** with all processors | ☐ not started | Simon | Per processor once chosen; none contracted yet. **D8 adds:** the AWS DPA must cover **Rekognition Content Moderation**; **IWF Image Intercept** onboarding/agreement |
+| 5 | **ICO registration** / fee paid + **Article-28 DPAs** with all processors | ☐ not started | Simon | Per processor once chosen; none contracted yet. **D8 adds:** the AWS DPA must cover **Rekognition Content Moderation**; **IWF Image Intercept** onboarding/agreement. Code is wired (2026-10-27); also set the **AWS AI-services opt-out** (no-training) for Rekognition — see `briefs/MODERATION-providers.md` |
 | 6 | **AI provider** confirms **no-retention, no-training** in contract | ☐ not started | Simon | Tied to D3; generative provider unchosen. (No third-party image egress until P3 — so not yet on the critical path) |
 
 **Decision D8 (content safety) adds two professional sign-offs — not formal gates, but launch-blocking for their areas:**
