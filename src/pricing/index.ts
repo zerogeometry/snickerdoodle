@@ -23,10 +23,12 @@ export {
   MIN_CHARGE_PENCE,
   clampQty,
   inCatalogue,
+  lineEconomics,
   recipientLineLabel,
   type PriceOpts,
   type PricedLine,
   type Quote,
   type RequestedLine,
 } from './engine';
+export { composedEconomics, economicsOf, hasMultiBuy, multiBuyTiers, MULTI_BUY, netAt, tierFor, type UnitEconomics } from './multibuy';
 export { parcelSaving, parcelGroupOf, PARCEL_SAVING_PER_EXTRA_PENCE, type ParcelGroup } from './parcels';

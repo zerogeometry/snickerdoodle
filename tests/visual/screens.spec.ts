@@ -88,6 +88,12 @@ for (const vp of WIDTHS) {
       await expect(page.getByRole('heading', { name: 'card pack' })).toBeVisible();
       await expect(page.getByText(/1 of \d+ chosen/)).toBeVisible();
       await shot(page, `${vp.name}-customize-cardpack`);
+      // the christmas family bundle builder: the drawing on the table, the flip-through, the add-ons
+      await push(page, '/customize/christmasBundle');
+      await expect(page.getByRole('heading', { name: 'christmas family bundle' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /add to basket · £90$/ })).toBeVisible();
+      await expect(page.getByText('the placemats · ×4')).toBeVisible();
+      await shot(page, `${vp.name}-customize-christmas-bundle`);
       await push(page, '/customize/mug');
       await expect(page.getByRole('button', { name: /edit placement/i })).toBeVisible();
 

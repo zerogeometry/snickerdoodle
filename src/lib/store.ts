@@ -5,6 +5,8 @@ import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
+import { isBundleKey, type BundleSpec } from '@/lib/christmas-bundle';
+import { isEveKey, type EveSpec } from '@/lib/christmas-eve';
 import { basketLineId } from '@/lib/basket-line';
 import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadSessionState } from '@/lib/uploadSession';
 
@@ -280,6 +282,12 @@ export type BasketItem = {
   /** DISPLAY ONLY (pack lines): the single-card variant the pack's fronts preview on, so the basket
    * can show the real first card. Never sent to the server. */
   previewVariantId?: string;
+  /** The CHRISTMAS BUNDLE line only: its table drawing, a drawing per ornament / sack, and the extras.
+   * Always qty 1; the server counts + prices it, and re-checks every drawing (src/lib/christmas-bundle.ts). */
+  bundle?: BundleSpec;
+  /** The CHRISTMAS EVE BUNDLE line only: its drawing (+ any piece's own) and the mug colour. qty =
+   * copies of this bundle; the server re-checks every drawing and splits it into its three pieces. */
+  eve?: EveSpec;
 };
 /** One card of a pack in the basket: which drawing, how it sits on the front (+ an optional cutout). */
 export type PackCardLine = { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
@@ -287,6 +295,12 @@ export type PackCardLine = { assetId: string; transform: PlacementTransform; sou
 export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.product);
 /** Is this basket line a calendar? (Its pages are edited in the calendar builder.) */
 export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(i.product);
+/** Is this basket line the Christmas family bundle? (Always ONE bundle; edited in its builder.) */
+export const isBundleLine = (i: Pick<BasketItem, 'product'>) => isBundleKey(i.product);
+/** Is this basket line a christmas eve bundle? (Edited in its builder; qty = copies.) */
+export const isEveLine = (i: Pick<BasketItem, 'product'>) => isEveKey(i.product);
+/** A line that is always exactly ONE (a card pack, the bundle): re-adding replaces it, qty stays 1. */
+export const isOneOffLine = (i: Pick<BasketItem, 'product'>) => isPackLine(i) || isBundleLine(i);
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
@@ -308,7 +322,7 @@ export const useBasket = create<BasketState>()(
         set((s) => {
           const existing = s.items.find((x) => x.id === item.id);
           // A card pack is always ONE pack: re-adding the same line replaces it, never makes it 2.
-          if (existing && isPackLine(item)) return { items: s.items.map((x) => (x.id === item.id ? { ...item, qty: 1 } : x)) };
+          if (existing && isOneOffLine(item)) return { items: s.items.map((x) => (x.id === item.id ? { ...item, qty: 1 } : x)) };
           if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
           return { items: [...s.items, { ...item, qty: 1 }] };
         }),
@@ -317,7 +331,7 @@ export const useBasket = create<BasketState>()(
           items:
             qty <= 0
               ? s.items.filter((x) => x.id !== id)
-              : s.items.map((x) => (x.id === id ? { ...x, qty: isPackLine(x) ? 1 : qty } : x)), // a pack stays at 1
+              : s.items.map((x) => (x.id === id ? { ...x, qty: isOneOffLine(x) ? 1 : qty } : x)), // a pack / the bundle stays at 1
         })),
       update: (id, patch, newId) =>
         set((s) => {
@@ -377,6 +391,8 @@ export function orderItemsFor(items: BasketItem[]) {
   return items.map((i) => {
     const productKey = i.sku ?? i.product;
     if (isPackLine(i)) return { productKey, qty: 1, ...(i.ground ? { ground: i.ground } : {}), cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
+    if (isBundleLine(i)) return { productKey, qty: 1, bundle: i.bundle ?? null };
+    if (isEveLine(i)) return { productKey, qty: i.qty, eve: i.eve ?? null };
     if (isCalendarLine(i) && i.pages?.length) return { productKey, qty: i.qty, pages: i.pages.map((p) => ({ assetId: p.assetId, transform: p.transform, ...(p.sourceObjectId ? { sourceObjectId: p.sourceObjectId } : {}) })) };
     return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });

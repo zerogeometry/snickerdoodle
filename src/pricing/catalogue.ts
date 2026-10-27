@@ -70,6 +70,13 @@ export const CATALOGUE = {
   christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
+  // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.
+  placemat: { pricePence: 6000, label: 'placemats' }, // a pack of 4 (founder, 27 Oct: £60)
+  coaster: { pricePence: 3200, label: 'coasters' }, // a pack of 6
+  // The CHRISTMAS FAMILY BUNDLE's BASE price — its add-ons are priced from the counts (src/lib/christmas-bundle.ts).
+  christmasBundle: { pricePence: 9000, label: 'christmas family bundle' },
+  // The CHRISTMAS EVE BUNDLE: a sack + a ceramic ornament + a mug, one parcel (src/lib/christmas-eve.ts).
+  christmasEveBundle: { pricePence: 6200, label: 'christmas eve bundle' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 
@@ -81,7 +88,9 @@ export type CatalogueKey = keyof typeof CATALOGUE;
  * pass a DB-loaded one instead. Either way the CLIENT never supplies prices.
  */
 /** `unitCostPence` (server-only, landed ex-VAT cost) feeds the promo margin guard; absent ⇒ never discounted. */
-export type PricedCatalogue = Record<string, { pricePence: number; label: string; unitCostPence?: number | null }>;
+/** `postFirstPence` / `postExtraPence` (server-only, ex-VAT): its first-unit + "plus one" post — the multi-buy
+ * tiers are derived from these + the unit cost (src/pricing/multibuy.ts); absent ⇒ no multi-buy. */
+export type PricedCatalogue = Record<string, { pricePence: number; label: string; unitCostPence?: number | null; postFirstPence?: number | null; postExtraPence?: number | null }>;
 
 /** Narrowing guard — is this client-supplied string something we actually sell? */
 export function isCatalogueKey(key: string): key is CatalogueKey {

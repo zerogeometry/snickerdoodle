@@ -12,6 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
+import { MultiBuyNotice } from '@/ui/components/MultiBuy';
 import { ProductDetails } from '@/ui/components/ProductDetails';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
@@ -31,6 +32,10 @@ import { CardPackBuilder } from '@/ui/components/CardPackBuilder';
 import { isCardPackKey } from '@/lib/card-packs';
 import { CalendarBuilder } from '@/ui/components/CalendarBuilder';
 import { isCalendarKey } from '@/lib/calendar';
+import { ChristmasBundleBuilder } from '@/ui/components/ChristmasBundleBuilder';
+import { isBundleKey } from '@/lib/christmas-bundle';
+import { ChristmasEveBuilder } from '@/ui/components/ChristmasEveBuilder';
+import { isEveKey } from '@/lib/christmas-eve';
 import { cachedCatalogue, loadCatalogueCached } from '@/lib/catalogueCache';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -67,6 +72,8 @@ export default function CustomizePage() {
   const params = useParams<{ productKey: string }>();
   if (isCardPackKey(params.productKey)) return <CardPackBuilder />;
   if (isCalendarKey(params.productKey)) return <CalendarBuilder />; // 13 pages: its own picker + flip-through
+  if (isBundleKey(params.productKey)) return <ChristmasBundleBuilder />; // the table + a drawing per ornament / sack
+  if (isEveKey(params.productKey)) return <ChristmasEveBuilder />; // a sack + an ornament + a mug, one drawing (or one each)
   return <CustomizeProduct />;
 }
 
@@ -870,6 +877,8 @@ function CustomizeProduct() {
             <span className="text-xs font-semibold text-green-save">{deliveryLine(variant?.sku ?? product.key)}</span>
             <ChristmasPromise productKey={product.key} attrs={{ size, colour }} />
           </div>
+          {/* buy more, save more — THIS product's own tiers, from its costs (server-side) */}
+          <MultiBuyNotice tiers={variant?.multiBuyBps} productLabel={product.label} />
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
           {product.key === 'phoneCase' ? (

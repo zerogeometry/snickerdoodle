@@ -45,7 +45,8 @@ export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku)
  */
 // + the calendar and the baubles (founder, 26 Oct): the drawing FILLS each page / the disc / the ball,
 // scaled without stretching (a little of the edges may crop).
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug', 'calendar', 'ceramicOrnament', 'christmasBauble']);
+// + the coaster (founder's bundle, 27 Oct): a small square the drawing fills; a placemat shows the whole drawing.
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug', 'calendar', 'ceramicOrnament', 'christmasBauble', 'coaster']);
 export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
 /**
  * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate): a quarter turn

@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, asc, eq, inArray, ne, notInArray, or, sql } from 'drizzle-orm';
 import { printTemplates, productVariantProviders, productVariants, products } from '@/db/schema';
-import { CATALOGUE, type PricedCatalogue } from '@/pricing';
+import { CATALOGUE, economicsOf, multiBuyTiers, parcelGroupOf, type PricedCatalogue } from '@/pricing';
 import { mmToPx, templateGeom, type TemplateGeom } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
@@ -11,6 +11,7 @@ import {
   ADULT_JUMPER_COLOURS, ADULT_JUMPER_PRINT_MM, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
+import { BUNDLE_ONLY_SKUS, isBundleKey } from '@/lib/christmas-bundle';
 
 export { mmToPx };
 
@@ -489,6 +490,62 @@ const DEFS: Record<string, ProductDef> = {
     // @300dpi, sandbox 27 Oct) but judged at 150dpi as it always was (gateDpi).
     variants: [{ size: 'one size', pricePence: 3500, ...exactPx({ w: 3779, h: 5905 }, 300), gateDpi: 150, prodigiSku: 'XMAS-SACK' }],
   },
+  // The CHRISTMAS TABLE (founder, 27 Oct — go-to-market C25): cork-backed placemats + coasters from uk9,
+  // the same parcel as the ornament + sack. A Prodigi pack has ONE print area ('default'): one drawing
+  // prints on every piece. On their own: placemats in a 4-pack (£60 — founder, 27 Oct), coasters in a 6-pack (£32). The
+  // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY to make up a bundle's extras — never
+  // priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts); their price here is
+  // the add-on price, for reference. Print areas: sandbox GET /v4.0/products, 27 Oct.
+  // TODO(founder samples): seeded HIDDEN — there's no Prodigi blank for either in .prodigi-assets, so
+  // the shop tile + mockup wait for the founder's sample photos; flip visibleInShop then.
+  placemat: {
+    category: 'FESTIVE', label: 'placemats', blurb: 'their masterpiece at every place', print: true,
+    description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
+    specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
+    variants: (
+      [
+        { size: 'pack of 4', pricePence: 6000, sku: 'H-PLACE-4PK' },
+        { size: 'pack of 1', pricePence: 1600, sku: 'H-PLACE-1PK' },
+        { size: 'pack of 2', pricePence: 3200, sku: 'H-PLACE-2PK' },
+        { size: 'pack of 6', pricePence: 9600, sku: 'H-PLACE-6PK' },
+      ] as const
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 3425, h: 2421 }, 300), prodigiSku: p.sku })),
+  },
+  coaster: {
+    category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true,
+    description: 'Six cork-backed coasters, each printed with the same drawing — for the mince pies and the cocoa, and long after.',
+    specs: { material: 'cork-backed', size: '10.6 cm square', pack: 'six coasters, one drawing', made: 'in the UK' },
+    variants: (
+      [
+        { size: 'pack of 6', pricePence: 3200, sku: 'H-COAST-6PK' },
+        { size: 'pack of 1', pricePence: 550, sku: 'H-COAST-1PK' },
+        { size: 'pack of 2', pricePence: 1100, sku: 'H-COAST-2PK' },
+        { size: 'pack of 4', pricePence: 2200, sku: 'H-COAST-4PK' },
+      ] as const
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku })),
+  },
+  // The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct — C25 + C26): the table set (4 placemats + 6 coasters,
+  // £90) + ornaments (£15) and sacks (£27) with a drawing each, extra placemats (£16) and coaster pairs
+  // (£11) — all uk9, ONE tracked parcel. Not printed itself: the order splits it into its pieces' own
+  // variants (src/lib/christmas-bundle.ts → orders.ts). Its builder lives at /customize/christmasBundle.
+  // TODO(founder samples): HIDDEN until the placemat/coaster photos give it a tile; link straight to it.
+  christmasBundle: {
+    category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false,
+    description: 'The Christmas table — four placemats and six coasters wearing their drawing — plus an ornament and a sack for everyone, each with its own drawing. Made in the UK and sent together in one tracked parcel.',
+    specs: { 'the table': '4 placemats + 6 coasters, one drawing', ornaments: '+£15 each, a drawing each', sacks: '+£27 each, a drawing each', delivery: 'one tracked parcel' },
+    variants: [{ pricePence: 9000, wMm: 0, hMm: 0 }],
+  },
+  // The CHRISTMAS EVE BUNDLE (founder, 27 Oct): a sack + a ceramic ornament + a two-tone 11oz mug (any
+  // colour), all uk9 → ONE parcel. £62 (£74 separately). One drawing on all three, or one each. Not
+  // printed itself: the order splits it into the three pieces' own variants (src/lib/christmas-eve.ts).
+  // Its own multi-buy on the number of bundles, from the pieces' live costs. Builder:
+  // /customize/christmasEveBundle. TODO(founder): HIDDEN until it has a shop tile; link straight to it.
+  christmasEveBundle: {
+    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'a sack, an ornament and a mug — their christmas eve, made real', print: false,
+    description: 'Everything for christmas eve, with their drawing on it: a cotton sack to fill, a ceramic ornament for the tree and a two-tone mug for the cocoa. One drawing on all three, or a different one on each. Sent together in one tracked parcel.',
+    specs: { 'in the bundle': 'a christmas sack, a ceramic ornament, an 11oz two-tone mug', mug: 'any colour', delivery: 'one tracked parcel' },
+    variants: [{ pricePence: 6200, wMm: 0, hMm: 0 }],
+  },
   phoneCase: {
     category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
     description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
@@ -697,16 +754,18 @@ export function definedPrintSpecs(): Array<{ productKey: string; sku: string; pr
  */
 export async function getCatalogue(db: DbHandle): Promise<PricedCatalogue> {
   const rows = await db
-    .select({ productKey: products.key, productActive: products.active, sku: productVariants.sku, label: productVariants.label, pricePence: productVariants.pricePence, unitCostPence: productVariants.unitCostPence, isDefault: productVariants.isDefault, variantActive: productVariants.active })
+    .select({ productKey: products.key, productActive: products.active, sku: productVariants.sku, label: productVariants.label, pricePence: productVariants.pricePence, unitCostPence: productVariants.unitCostPence, postFirstPence: productVariants.postFirstPence, postExtraPence: productVariants.postExtraPence, isDefault: productVariants.isDefault, variantActive: productVariants.active })
     .from(productVariants)
     .innerJoin(products, eq(products.id, productVariants.productId));
 
   const map: PricedCatalogue = {};
   for (const r of rows) {
     if (!r.productActive || !r.variantActive) continue;
-    map[r.sku] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
+    if (BUNDLE_ONLY_SKUS.has(r.sku)) continue; // a bundle's extra packs: never sold (or priced) on their own
+    const entry = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence, postFirstPence: r.postFirstPence, postExtraPence: r.postExtraPence };
+    map[r.sku] = entry;
     if (r.isDefault && !Object.prototype.hasOwnProperty.call(map, r.productKey)) {
-      map[r.productKey] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
+      map[r.productKey] = { ...entry };
     }
   }
   return Object.keys(map).length > 0 ? map : CATALOGUE;
@@ -727,6 +786,9 @@ export interface CatalogueVariant {
   /** The print template's pixel geometry — so the client runs the SAME DPI assessment
    * (assessResolution) the server's order-time gate does. null ⇒ not a printed product. */
   printGeom?: TemplateGeom | null;
+  /** Its multi-buy tiers for 2, 3, 4, 5+ (basis points), derived server-side from its live costs
+   * (src/pricing/multibuy.ts). All 0 ⇒ no offer. The costs themselves never leave the server. */
+  multiBuyBps?: number[];
 }
 export interface CatalogueProduct {
   key: string;
@@ -760,6 +822,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
     .select({
       key: products.key, label: products.label, blurb: products.blurb, description: products.description, specs: products.specs, category: products.category, sortOrder: products.sortOrder, popularRank: products.popularRank,
       vId: productVariants.id, vSku: productVariants.sku, vAttrs: productVariants.attributes, vPrice: productVariants.pricePence, vDefault: productVariants.isDefault, vSort: productVariants.sortOrder,
+      vCost: productVariants.unitCostPence, vPostFirst: productVariants.postFirstPence, vPostExtra: productVariants.postExtraPence,
       tWmm: printTemplates.printWidthMm, tHmm: printTemplates.printHeightMm,
       tWpx: printTemplates.printWidthPx, tHpx: printTemplates.printHeightPx, tBleed: printTemplates.bleedMm, tDpi: printTemplates.requiredDpi, tMinW: printTemplates.minSourceWidthPx,
     })
@@ -771,13 +834,14 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
 
   const byKey = new Map<string, CatalogueProduct>();
   for (const r of rows) {
+    if (BUNDLE_ONLY_SKUS.has(r.vSku)) continue; // a bundle's extra packs are never offered on their own
     let p = byKey.get(r.key);
     if (!p) {
       p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], orientations: [], grades: [], finishes: [], variants: [], popularRank: r.popularRank ?? null };
       byKey.set(r.key, p);
     }
     const attrs = (r.vAttrs as Record<string, string>) ?? {};
-    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null, printGeom: r.tWpx && r.tHpx && r.tDpi ? templateGeom({ printWidthPx: r.tWpx, printHeightPx: r.tHpx, bleedMm: r.tBleed ?? 0, requiredDpi: r.tDpi, minSourceWidthPx: r.tMinW }) : null });
+    p.variants.push({ id: r.vId, sku: r.vSku, attributes: attrs, pricePence: r.vPrice, isDefault: r.vDefault, printWmm: r.tWmm ?? null, printHmm: r.tHmm ?? null, printGeom: r.tWpx && r.tHpx && r.tDpi ? templateGeom({ printWidthPx: r.tWpx, printHeightPx: r.tHpx, bleedMm: r.tBleed ?? 0, requiredDpi: r.tDpi, minSourceWidthPx: r.tMinW }) : null, multiBuyBps: isBundleKey(r.key) ? [0, 0, 0, 0] : multiBuyTiers(economicsOf({ pricePence: r.vPrice, unitCostPence: r.vCost, postFirstPence: r.vPostFirst, postExtraPence: r.vPostExtra }, parcelGroupOf(r.vSku) !== null)) });
     p.fromPence = Math.min(p.fromPence, r.vPrice);
     if (attrs.size && !p.sizes.includes(attrs.size)) p.sizes.push(attrs.size);
     if (attrs.colour && !p.colours.includes(attrs.colour)) p.colours.push(attrs.colour);
