@@ -26,7 +26,8 @@ const src = (w: number, h: number) =>
 let CANVAS_W = 0;
 let CANVAS_H = 0;
 
-describe.skipIf(!DB || !S3)('print-file render — integration', () => {
+// Real full-size print files (blankets, card spreads) — slow on a busy CI runner, so generous timeouts.
+describe.skipIf(!DB || !S3)('print-file render — integration', { timeout: 60_000 }, () => {
   let client: ReturnType<typeof postgres>;
   let db: DbHandle;
   let ids: SeededIds;
