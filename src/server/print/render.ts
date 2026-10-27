@@ -1,6 +1,6 @@
 import './sharp-init';
 import { createHash } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
 import { printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
@@ -10,11 +10,14 @@ import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { assessResolution, clampTransform, computeLayerRect, type RawTransform } from './geometry';
+import { ensurePrintSharp, resolvePrintSource } from './upscale';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
 import { assembleCardPrintSpread, CARD_SPREAD } from './cardPrint';
 import { renderCardBackBadge } from './cardBranding';
+
+export type UpscaleMethod = 'none' | 'classical' | 'super-res';
 
 export interface RenderResult {
   printObjectId: string;
@@ -22,6 +25,8 @@ export interface RenderResult {
   renderedDpi: number;
   effectiveDpi: number;
   upscaled: boolean;
+  /** How the source was enlarged: not at all, the classical resample, or super-resolution. */
+  upscaleMethod: UpscaleMethod;
   widthPx: number;
   heightPx: number;
 }
@@ -31,8 +36,10 @@ export interface RenderResult {
  * Server-authoritative throughout: authz-gated, the transform is clamped here, the
  * geometry comes from the template, and the output is exactly the bleed canvas at
  * the product's DPI. The ORIGINAL is never mutated — the result is a write-once
- * DERIVATIVE. (Self-hosted: no third party sees the image. Real ML super-resolution
- * for large enlargements lands in P2; P1 uses classical resampling.)
+ * DERIVATIVE. Self-hosted: no third party sees the image. The upscale is tiered: up to
+ * 2× the classical resample; past that the print is made from the print-sharp
+ * (super-resolved) copy of the source, made here if it doesn't exist yet (./upscale.ts).
+ * The DPI gate always judges the SOURCE's real pixels, never the copy's.
  */
 export async function renderPrintFile(
   db: DbHandle,
@@ -41,7 +48,6 @@ export async function renderPrintFile(
     assetId: string;
     variantId: string;
     transform: RawTransform;
-    sourceObjectClass?: 'ORIGINAL' | 'DERIVATIVE';
     /** Render from a SPECIFIC stored object (e.g. a bg-removed cutout) — must belong to the asset. */
     sourceObjectId?: string;
     /** CUSHION back choice, honoured ONLY on a double-sided (DUAL) cushion variant: 'both' (or
@@ -60,15 +66,8 @@ export async function renderPrintFile(
   const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
   if (!tpl) throw new Error('no print template for this variant');
 
-  const [srcObj] = input.sourceObjectId
-    ? await db
-        .select()
-        .from(storageObjects)
-        .where(and(eq(storageObjects.id, input.sourceObjectId), eq(storageObjects.assetId, input.assetId)))
-    : await db
-        .select()
-        .from(storageObjects)
-        .where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, input.sourceObjectClass ?? 'ORIGINAL')));
+  // Only a real print source (original / cutout / design) — never a print file or an upscaled copy.
+  const srcObj = await resolvePrintSource(db, input.assetId, input.sourceObjectId);
   if (!srcObj) throw new Error('no source object to render from');
 
   const srcBuf = await getObjectBytes(srcObj.key);
@@ -82,6 +81,24 @@ export async function renderPrintFile(
   if (assess.decision === 'BLOCK') {
     throw new Error(`source too low-res for this product (would need ${assess.upscaleFactor.toFixed(1)}× upscale)`);
   }
+
+  // Tiered upscale. ≤2× → the classical resample below. More → print from the print-sharp copy
+  // (made now if a tap hasn't already). If super-resolution can't run, classical it is — the
+  // source already cleared the floor, so it still prints, just softer up close.
+  let printSrc = srcBuf;
+  let upscaleMethod: UpscaleMethod = assess.decision === 'UPSCALE' ? 'classical' : 'none';
+  if (assess.decision === 'UPSCALE' && assess.tier === 1) {
+    const copy = await ensurePrintSharp(db, input.assetId, srcObj, srcBuf).catch((e: unknown) => {
+      console.warn('[print] print-sharp copy failed; using the classical resample:', e instanceof Error ? e.message : e);
+      return null;
+    });
+    if (copy) {
+      printSrc = copy.buffer;
+      upscaleMethod = 'super-res';
+    }
+  }
+  const persist = (out: Buffer, w: number, h: number) =>
+    persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, upscaleMethod, w, h);
 
   // Orientation is OURS: a variant in the NON-native orientation designs on a SWAPPED
   // canvas, so the finished print file rotates 90° back to Prodigi's FIXED spec. Frames are
@@ -115,7 +132,7 @@ export async function renderPrintFile(
     const screen = screenCardMessage(input.message as Parameters<typeof screenCardMessage>[0]);
     if (!screen.ok) throw new Error(`the card ${screen.field} can’t be printed — please reword it`);
     out = await assembleCardPrintSpread({
-      design: srcBuf,
+      design: printSrc,
       transform,
       span: input.cardSpan === 'full' ? 'full' : 'front',
       message: screen.value,
@@ -123,15 +140,16 @@ export async function renderPrintFile(
     });
     outW = CARD_SPREAD.widthPx;
     outH = CARD_SPREAD.heightPx;
-    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+    return persist(out, outW, outH);
   }
 
+  // Placement comes from the SOURCE's dims; the print-sharp copy (same aspect) is just drawn into it.
   const rect = computeLayerRect(geom, src, transform);
   // rotate → scale to the drawn rect → INTERSECT with the canvas and place at its offset
   // on a white canvas. Handles both regimes: cover/zoom (layer ≥ canvas → crop, offset 0,
   // identical to the old extract) and contain/zoom-out (layer < canvas → whole image
   // placed centred with white margins — unprinted product surface).
-  const layer = await sharp(srcBuf).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill' }).toBuffer();
+  const layer = await sharp(printSrc).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill', kernel: 'lanczos3' }).toBuffer();
   const ix = Math.max(0, -rect.x);
   const iy = Math.max(0, -rect.y);
   const ox = Math.max(0, rect.x);
@@ -152,7 +170,7 @@ export async function renderPrintFile(
       .png()
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
-    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+    return persist(out, outW, outH);
   }
 
   // The child's image placed on ONE opaque white face — the single-sided print file, and the
@@ -186,7 +204,7 @@ export async function renderPrintFile(
     }
   }
 
-  return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+  return persist(out, outW, outH);
 }
 
 /** Write the finished print file as a deterministic write-once DERIVATIVE (idempotent re-render
@@ -199,7 +217,7 @@ async function persistPrintFile(
   out: Buffer,
   renderedDpi: number,
   effectiveDpi: number,
-  upscaled: boolean,
+  upscaleMethod: UpscaleMethod,
   widthPx: number,
   heightPx: number,
 ): Promise<RenderResult> {
@@ -225,5 +243,5 @@ async function persistPrintFile(
     printObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
   }
 
-  return { printObjectId, key, renderedDpi, effectiveDpi, upscaled, widthPx, heightPx };
+  return { printObjectId, key, renderedDpi, effectiveDpi, upscaled: upscaleMethod !== 'none', upscaleMethod, widthPx, heightPx };
 }

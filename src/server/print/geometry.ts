@@ -35,7 +35,16 @@ export const MAX_ZOOM = 4;
  * a small motif with margins — but never microscopic). The UI offers contain/2 at most. */
 export const MIN_SCALE = 0.1;
 export const MAX_UPSCALE = 4; // the most a HAND-HELD print (mug, card, small jigsaw) may be enlarged
-const TIER0_MAX = 2; // classical resample handles up to 2×; above that needs ML (tier 1)
+/** The tiered upscale's threshold: up to 2× the classical (Lanczos) resample is all a drawing
+ * needs — instant, the common case. Past it, CPU super-resolution (tier 1) makes the copy. */
+export const TIER0_MAX = 2;
+/** The super-resolution model's native enlargement; the print-sharp copy is made at this. */
+export const PRINT_SHARP_FACTOR = 4;
+
+/** Which upscale tier an enlargement factor needs: 0 = classical resample, 1 = super-resolution. */
+export function upscaleTierFor(factor: number): 0 | 1 {
+  return factor <= TIER0_MAX ? 0 : 1;
+}
 
 /**
  * The least real detail (dots per inch FROM THE SOURCE) a print can have and still look good
@@ -190,4 +199,25 @@ export function assessResolution(
   if (upscaleFactor <= TIER0_MAX) return { decision: 'UPSCALE', tier: 0, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: false };
   if (effectiveDpi >= floor) return { decision: 'UPSCALE', tier: 1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
   return { decision: 'BLOCK', tier: -1, effectiveDpi, requiredDpi, upscaleFactor, minimumDpi: floor, softUpClose: true };
+}
+
+/** The print-sharp copy the server made for this source (or the classical fallback). */
+export type PrintSharp = { method: 'super-res'; factor: number } | { method: 'classical' };
+
+/**
+ * What the print-readiness pill shows, from the DPI gate's verdict on the SOURCE's real pixels:
+ *  - ready          OK, or ≤2× (the instant classical resample makes it print-ready by itself)
+ *  - needs-upscale  >2× but above the floor: one tap makes the print-sharp copy
+ *  - ready-soft     made, but still a big stretch (or only the classical fallback ran): it prints,
+ *                   a little soft up close — said honestly
+ *  - blocked        below the floor; no upscale can invent the detail
+ */
+export type Readiness = 'ready' | 'needs-upscale' | 'ready-soft' | 'blocked';
+export function readinessState(a: ResolutionAssessment, sharp: PrintSharp | null): Readiness {
+  if (a.decision === 'OK') return 'ready';
+  if (a.decision === 'BLOCK') return 'blocked';
+  if (a.tier === 0) return 'ready';
+  if (!sharp) return 'needs-upscale';
+  if (sharp.method === 'classical') return 'ready-soft';
+  return a.upscaleFactor / sharp.factor <= TIER0_MAX ? 'ready' : 'ready-soft';
 }
