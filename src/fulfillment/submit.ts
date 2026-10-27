@@ -7,6 +7,7 @@ import { presignProviderIngest } from '@/storage';
 import type { DbHandle, Tx } from '@/server/db';
 import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
 import { startRetentionClockForOrder } from '@/server/retention';
+import { alertHandLines } from './handLines';
 import { sendOrderShipped } from '@/server/orderEmails';
 
 /**
@@ -284,6 +285,7 @@ async function submitOne(
     // is the founder's to fulfil by hand) and say so once, loudly.
     summary.skipped++;
     await db.update(orders).set({ nextSubmitAttemptAt: new Date(Date.now() + MANUAL_PARK_MS) }).where(eq(orders.id, order.id));
+    await alertHandLines(order, lines.map((l) => l.productKey), 'hand-only');
     return { ref: order.ref, status: 'skipped', note: 'no Prodigi-fulfillable lines — manual fulfilment' };
   }
 
@@ -473,6 +475,8 @@ async function submitOne(
       .set({ status: 'SUBMITTED' })
       .where(inArray(orderItemArtwork.id, fulfillable.map((l) => l.artworkId!)));
     summary.submitted++;
+    // anything the printer doesn't make (gift wrap) rode along — never drop it silently
+    await alertHandLines(order, lines.filter((l) => !fulfillable.includes(l)).map((l) => l.productKey), 'with-printed-items');
     const issueNote =
       result.outcome === 'createdwithissues'
         ? 'created with issues — watch the status sync'

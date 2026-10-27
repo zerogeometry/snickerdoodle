@@ -14,7 +14,7 @@
  */
 export type MailKind =
   | 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover' | 'email-change'
-  | 'support-ack' | 'support-request' | 'content-report' | 'order-confirmed' | 'order-shipped';
+  | 'support-ack' | 'support-request' | 'content-report' | 'order-confirmed' | 'order-shipped' | 'order-ops';
 
 export interface MailMessage {
   kind: MailKind;
