@@ -438,6 +438,8 @@ export const orders = pgTable(
     familySetSavingPence: integer('family_set_saving_pence').notNull().default(0),
     /** Same-parcel saving (src/pricing/parcels.ts, D24). */
     parcelSavingPence: integer('parcel_saving_pence').notNull().default(0),
+    /** Multi-buy saving: buy more of the same product, save more (src/pricing/multibuy.ts). */
+    multiBuySavingPence: integer('multi_buy_saving_pence').notNull().default(0),
     totalPence: integer('total_pence').notNull(),
     currency: text('currency').notNull().default('GBP'),
     isGift: boolean('is_gift').notNull().default(false),
@@ -625,6 +627,11 @@ export const productVariants = pgTable(
      * (from the Prodigi sheets via scripts/discount-headroom.mjs --write-costs). Drives the
      * promo margin guard. null ⇒ unknown ⇒ that line is never discounted. Never sent to clients. */
     unitCostPence: integer('unit_cost_pence'),
+    /** Its standard post, ex-VAT, from the same Prodigi sheets: the FIRST unit (already inside
+     * unitCostPence) and each EXTRA unit in the same parcel ("plus one"). They drive the multi-buy
+     * tiers (src/pricing/multibuy.ts). null ⇒ unknown ⇒ no multi-buy for it. Never sent to clients. */
+    postFirstPence: integer('post_first_pence'),
+    postExtraPence: integer('post_extra_pence'),
     currency: text('currency').notNull().default('GBP'),
     isDefault: boolean('is_default').notNull().default(false), // the variant a quick-add uses
     sortOrder: integer('sort_order').notNull().default(0),

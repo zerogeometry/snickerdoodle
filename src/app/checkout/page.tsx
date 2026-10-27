@@ -11,6 +11,7 @@ import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
 import { BundleThumb } from '@/ui/components/BundleThumb';
+import { MultiBuyChip } from '@/ui/components/MultiBuy';
 import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
@@ -131,12 +132,18 @@ export default function CheckoutPage() {
   const savingPence = quote?.joinSavingPence ?? 0;
   const setSavingPence = quote?.familySetSavingPence ?? 0;
   const parcelSavingPence = quote?.parcelSavingPence ?? 0;
+  const multiBuySavingPence = quote?.multiBuySavingPence ?? 0;
   const promoSavingPence = quote?.promoSavingPence ?? 0;
   const creditPence = quote?.creditPence ?? 0;
   const total = quote?.totalPence ?? (empty ? 0 : subtotalPence + DELIVERY_PENCE);
   // Each line's price from the SERVER quote (its lines align 1:1 with the basket when every line is
   // sellable); the client figure only fills in until the quote lands.
   const linePence = (i: number) => (quote && quote.lines.length === items.length ? quote.lines[i]!.linePence : items[i]!.pricePence * items[i]!.qty);
+  // The SERVER's multi-buy on this line (only when it's the saving the basket gets) — never worked out here.
+  const multiBuyOf = (i: number) => {
+    const l = quote && quote.lines.length === items.length ? quote.lines[i] : undefined;
+    return l?.multiBuyBps && l.multiBuySavingPence ? { bps: l.multiBuyBps, pence: l.multiBuySavingPence } : null;
+  };
 
   // Place a REAL order: the server re-prices and persists it. With Stripe
   // configured we redirect to Checkout; in local dev it's marked paid and we go
@@ -252,6 +259,13 @@ export default function CheckoutPage() {
           {/* D24: the postage we save by packing them together, handed back (src/pricing/parcels.ts) */}
           <dt>Same-parcel saving</dt>
           <dd>−{gbp(parcelSavingPence)}</dd>
+        </div>
+      ) : null}
+      {multiBuySavingPence > 0 ? (
+        <div className="flex justify-between text-green-save">
+          {/* buy more of the same, save more — each product's own tiers, from its costs (src/pricing/multibuy.ts) */}
+          <dt>Multi-buy saving</dt>
+          <dd>−{gbp(multiBuySavingPence)}</dd>
         </div>
       ) : null}
       {creditPence > 0 ? (
@@ -381,7 +395,16 @@ export default function CheckoutPage() {
                       )}
                     </div>
                     <div className="shrink-0 text-right">
-                      <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(linePence(idx))}</div>
+                      {!gift && multiBuyOf(idx) ? (
+                        // multi-buy: the line's price struck through, its new price, a small sticker — nothing else
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span className="text-[11px] text-ink-faint line-through">{gbp(linePence(idx))}</span>
+                          <span className="text-sm font-bold text-cocoa">{gbp(linePence(idx) - multiBuyOf(idx)!.pence)}</span>
+                          <MultiBuyChip bps={multiBuyOf(idx)!.bps} />
+                        </div>
+                      ) : (
+                        <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(linePence(idx))}</div>
+                      )}
                       <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-ink-faint hover:text-berry">remove</button>
                     </div>
                   </div>

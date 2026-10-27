@@ -4,7 +4,8 @@ import { formatPence } from './format';
 import { evaluatePromo, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCountsOf, bundlePricePence, isBundleKey } from '@/lib/christmas-bundle';
-import { parcelSaving } from './parcels';
+import { parcelGroupOf, parcelSaving } from './parcels';
+import { economicsOf, multiBuyTiers, tierFor } from './multibuy';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -21,8 +22,10 @@ export interface PricedLine {
   unitPricePence: number;
   qty: number;
   linePence: number;
+  /** Multi-buy on this line (only when it's the saving the basket gets): the tier + pence off. */
+  multiBuyBps?: number;
+  multiBuySavingPence?: number;
 }
-
 
 export interface Quote {
   lines: PricedLine[];
@@ -33,11 +36,14 @@ export interface Quote {
   familySetSavingPence: number;
   /** The same-parcel saving: £3 off each extra item that ships in the same Prodigi parcel (src/pricing/parcels.ts). */
   parcelSavingPence: number;
+  /** Multi-buy: buy more of the same product, save more (src/pricing/multibuy.ts). Per line on `lines`. */
+  multiBuySavingPence: number;
   totalPence: number;
   gift: boolean;
   joinSavingApplied: boolean;
   familySetApplied: boolean;
   parcelSavingApplied: boolean;
+  multiBuyApplied: boolean;
   /** Client-supplied keys we don't sell — dropped, never priced, surfaced for honesty. */
   rejectedKeys: string[];
   /** Pence a promo code took off the goods (0 if none / not used). */
@@ -148,17 +154,38 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence - joinSavingPence)
     : 0;
 
+  // Multi-buy: buy more of the SAME product (counted across lines — any drawing, any variant), save
+  // more. Each line's tier comes from ITS variant's live costs at the product's quantity
+  // (src/pricing/multibuy.ts). The family bundle never counts and is never discounted again.
+  // Resolved from the priced lines + the server catalogue alone — no client flag exists.
+  const productOf = (key: string) => key.split('-')[0]!;
+  const qtyOfProduct = new Map<string, number>();
+  for (const l of lines) if (!isBundleKey(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
+  const multiBuyLines = lines.map((l) => {
+    if (isBundleKey(l.productKey)) return { bps: 0, pence: 0 };
+    const tiers = multiBuyTiers(economicsOf(catalogue[l.productKey], parcelGroupOf(l.productKey) !== null));
+    const bps = tierFor(tiers, qtyOfProduct.get(productOf(l.productKey)) ?? 0);
+    return { bps, pence: bpsOf(l.linePence, bps) };
+  });
+  const multiBuyRaw = multiBuyLines.reduce((n, m) => n + m.pence, 0);
+  // Best single saving: multi-buy never stacks with the join / family-set savings — whichever is bigger.
+  const multiBuyWins = multiBuyRaw > joinSavingPence + familySetSavingPence;
+  const discountJoin = multiBuyWins ? 0 : joinSavingPence;
+  const discountSet = multiBuyWins ? 0 : familySetSavingPence;
+  const multiBuySavingPence = multiBuyWins ? Math.min(multiBuyRaw, subtotalPence) : 0;
+
   // Same-parcel saving: resolved from the priced lines alone (keys + quantities), like the family set.
-  // Clamped so the savings together never exceed the goods.
-  const parcelSavingPence = Math.max(0, Math.min(parcelSaving(lines).savingPence, subtotalPence - joinSavingPence - familySetSavingPence));
+  // It's postage, so it stacks with multi-buy. Clamped so the savings together never exceed the goods.
+  const parcelSavingPence = Math.max(0, Math.min(parcelSaving(lines).savingPence, subtotalPence - discountJoin - discountSet - multiBuySavingPence));
 
   // Promo code — best single saving, margin-guarded (src/pricing/promo.ts).
   let promoSavingPence = 0;
   let partnerCommissionPence = 0;
   let promo: Quote['promo'] = null;
-  let finalJoin = joinSavingPence;
-  let finalSet = familySetSavingPence;
+  let finalJoin = discountJoin;
+  let finalSet = discountSet;
   let finalParcel = parcelSavingPence;
+  let finalMultiBuy = multiBuySavingPence;
   if (opts.promo && lines.length > 0) {
     const outcome = evaluatePromo(
       opts.promo,
@@ -169,7 +196,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
         const cost = catalogue[l.productKey]?.unitCostPence;
         return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
       }),
-      joinSavingPence + familySetSavingPence + parcelSavingPence,
+      discountJoin + discountSet + multiBuySavingPence + parcelSavingPence,
     );
     if (outcome.applied) {
       promoSavingPence = outcome.discountPence;
@@ -178,6 +205,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
         finalJoin = 0;
         finalSet = 0;
         finalParcel = 0;
+        finalMultiBuy = 0; // a code never stacks with multi-buy either
       }
       promo = { code: opts.promo.code, applied: true, capped: outcome.capped };
     } else {
@@ -185,7 +213,13 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     }
   }
 
-  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - finalParcel - promoSavingPence + deliveryPence);
+  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - finalParcel - finalMultiBuy - promoSavingPence + deliveryPence);
+  if (finalMultiBuy > 0) {
+    lines.forEach((l, i) => {
+      const m = multiBuyLines[i]!;
+      if (m.pence > 0) Object.assign(l, { multiBuyBps: m.bps, multiBuySavingPence: m.pence });
+    });
+  }
   const creditPence = lines.length > 0 ? applicableCredit(beforeCredit, opts.creditAvailablePence ?? 0) : 0;
   const totalPence = beforeCredit - creditPence;
 
@@ -196,11 +230,13 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     joinSavingPence: finalJoin,
     familySetSavingPence: finalSet,
     parcelSavingPence: finalParcel,
+    multiBuySavingPence: finalMultiBuy,
     totalPence,
     gift,
     joinSavingApplied: joinSavingApplied && finalJoin > 0,
     familySetApplied: familySetApplied && finalSet > 0,
     parcelSavingApplied: finalParcel > 0,
+    multiBuyApplied: finalMultiBuy > 0,
     rejectedKeys,
     promoSavingPence,
     promo,
