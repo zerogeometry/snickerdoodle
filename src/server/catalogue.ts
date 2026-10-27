@@ -467,7 +467,7 @@ const DEFS: Record<string, ProductDef> = {
   },
   // The CHRISTMAS TABLE (founder, 27 Oct — go-to-market C25): cork-backed placemats + coasters from uk9,
   // the same parcel as the ornament + sack. A Prodigi pack has ONE print area ('default'): one drawing
-  // prints on every piece. On their own: placemats in a 4-pack (£59), coasters in a 6-pack (£32). The
+  // prints on every piece. On their own: placemats in a 4-pack (£60 — founder, 27 Oct), coasters in a 6-pack (£32). The
   // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY to make up a bundle's extras — never
   // priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts); their price here is
   // the add-on price, for reference. Print areas: sandbox GET /v4.0/products, 27 Oct.
@@ -479,7 +479,7 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
     variants: (
       [
-        { size: 'pack of 4', pricePence: 5900, sku: 'H-PLACE-4PK' },
+        { size: 'pack of 4', pricePence: 6000, sku: 'H-PLACE-4PK' },
         { size: 'pack of 1', pricePence: 1600, sku: 'H-PLACE-1PK' },
         { size: 'pack of 2', pricePence: 3200, sku: 'H-PLACE-2PK' },
         { size: 'pack of 6', pricePence: 9600, sku: 'H-PLACE-6PK' },

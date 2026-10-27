@@ -142,7 +142,7 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
   it('the bundle-only packs are seeded for fulfilment but never priced or shown on their own', async () => {
     const catalogue = await getCatalogue(db);
     for (const sku of BUNDLE_ONLY_SKUS) expect(catalogue[sku], sku).toBeUndefined();
-    expect(catalogue.placemat?.pricePence).toBe(5900);
+    expect(catalogue.placemat?.pricePence).toBe(6000);
     expect(catalogue.coaster?.pricePence).toBe(3200);
     expect(catalogue.christmasBundle?.pricePence).toBe(9000);
     const all = await loadCatalogue(db, { includeHidden: true });
