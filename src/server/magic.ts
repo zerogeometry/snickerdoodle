@@ -1,13 +1,16 @@
 import { createHash } from 'node:crypto';
 import { and, eq, gte } from 'drizzle-orm';
 import sharp from 'sharp';
-import { mlOperations, storageObjects } from '@/db/schema';
+import { mlOperations, printTemplates, products, productVariants, storageObjects } from '@/db/schema';
 import { runImageOp } from '@/ml/client';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import { cropToSheet } from '@/ml/sheetCrop';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
 import { getViewableAssetOrThrow } from './assets';
+import { clampTransform, PRINT_SHARP_FACTOR, readinessState, type PrintSharp, type RawTransform, type Readiness } from './print/geometry';
+import { assessPrintResolution } from './print/pattern-geometry';
+import { canMakePrintSharp, ensurePrintSharp, findPrintSharp, printSourceDims, resolvePrintSource } from './print/upscale';
 
 const PER_CREATION = Number(process.env.ML_BUDGET_PER_CREATION ?? 20);
 const PER_ACCOUNT_30D = Number(process.env.ML_BUDGET_PER_ACCOUNT ?? 500);
@@ -196,4 +199,75 @@ export async function applyCutoutMask(db: DbHandle, viewer: ViewerContext, asset
   }
   const png = await sharp(out, { raw: { width: W, height: H, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
   return storeCutout(db, assetId, png, createHash('sha256').update(png).digest('hex'));
+}
+
+export interface PrintSharpResult {
+  /** The pill's state for this placement, now. */
+  state: Readiness;
+  /** The copy made (or being made) for this source; null when none was needed. */
+  sharp: PrintSharp | null;
+  /** True while the super-resolution is still finishing in the background. */
+  pending: boolean;
+}
+
+/**
+ * "Upscale to print quality" — the one-tap fix for a placement that's more than 2× short but
+ * above the floor. Gated + budget-capped like every magic edit. The verdict is the server's
+ * (template + clamped transform + the SOURCE's real pixels); nothing about it is taken from the
+ * client; a repeat pattern is judged on one motif, a height chart on its art area, a calendar on
+ * its gallery page. Makes the print-sharp copy of the source (never touching the original) — in the
+ * background when `defer` is given, so the tap answers at once; every later render waits for
+ * or reuses that same job. Below the floor it's refused: no upscale can invent the detail.
+ */
+export async function upscaleForPrint(
+  db: DbHandle,
+  viewer: ViewerContext,
+  input: { assetId: string; variantId: string; transform: RawTransform; sourceObjectId?: string | null },
+  opts: { defer?: (job: () => Promise<void>) => void } = {},
+): Promise<PrintSharpResult> {
+  await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
+  const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, input.variantId));
+  if (!tpl) throw new Error('no print template for this variant');
+  const src = await resolvePrintSource(db, input.assetId, input.sourceObjectId);
+  if (!src) throw new Error('no source to upscale');
+
+  const buf = await getObjectBytes(src.key);
+  const meta = await sharp(buf).metadata();
+  const dims = { width: meta.width ?? 0, height: meta.height ?? 0 };
+  if (!dims.width || !dims.height) throw new Error('unreadable source image');
+  // judged on the REAL pixels (a Studio design's overlay enlarging never counts); `dims` is the file
+  const real = (await printSourceDims(db, input.assetId, src, buf)) ?? dims;
+  const [variant] = await db
+    .select({ key: products.key })
+    .from(productVariants)
+    .innerJoin(products, eq(productVariants.productId, products.id))
+    .where(eq(productVariants.id, input.variantId));
+  const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
+  // the SAME gate the positioner, the order and the render use (a repeat pattern: one motif)
+  const assess = assessPrintResolution(geom, real, clampTransform(input.transform), variant?.key);
+
+  // OK / ≤2× (classical, at render) / below the floor: nothing to make.
+  if (assess.decision !== 'UPSCALE' || assess.tier === 0) return { state: readinessState(assess, null), sharp: null, pending: false };
+
+  const made = await findPrintSharp(db, input.assetId, src);
+  const sr: PrintSharp = { method: 'super-res', factor: PRINT_SHARP_FACTOR };
+  if (made) return { state: readinessState(assess, sr), sharp: sr, pending: false };
+
+  // No model here, or a source big enough to have plenty of real detail: classical (honestly "soft").
+  if (!(await canMakePrintSharp(dims))) {
+    const classical: PrintSharp = { method: 'classical' };
+    return { state: readinessState(assess, classical), sharp: classical, pending: false };
+  }
+
+  await assertMlBudget(db, viewer.accountId, input.assetId);
+  await db.insert(mlOperations).values({ accountId: viewer.accountId, op: 'UPSCALE', assetId: input.assetId });
+  const job = async () => {
+    await ensurePrintSharp(db, input.assetId, src, buf);
+  };
+  if (opts.defer) {
+    opts.defer(() => job().catch((e: unknown) => console.warn('[magic] print-sharp failed (renders fall back to classical):', e instanceof Error ? e.message : e)));
+    return { state: readinessState(assess, sr), sharp: sr, pending: true };
+  }
+  await job();
+  return { state: readinessState(assess, sr), sharp: sr, pending: false };
 }

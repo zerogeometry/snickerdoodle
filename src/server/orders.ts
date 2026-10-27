@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
@@ -11,8 +11,7 @@ import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
-import { getObjectBytes } from '@/storage';
-import sharp from 'sharp';
+import { printSourceDims, resolvePrintSource } from '@/server/print/upscale';
 import type { DbHandle, Tx } from './db';
 import { resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
@@ -24,16 +23,11 @@ import { sendOrderConfirmed } from './orderEmails';
  * else the ORIGINAL) — read from the stored bytes' header, in-VPC. null if unreadable,
  * in which case the renderer's own gate still applies. */
 async function sourceDimensions(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<{ width: number; height: number } | null> {
-  const [obj] = sourceObjectId
-    ? await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, sourceObjectId))
-    : await db
-        .select({ key: storageObjects.key })
-        .from(storageObjects)
-        .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  const obj = await resolvePrintSource(db, assetId, sourceObjectId);
   if (!obj) return null;
   try {
-    const meta = await sharp(await getObjectBytes(obj.key)).metadata();
-    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+    // the REAL pixels: a Studio design enlarged for crisp stickers/words is judged as the drawing
+    return await printSourceDims(db, assetId, obj);
   } catch {
     return null;
   }
@@ -174,13 +168,11 @@ export async function placeOrder(
     if (!asset.controllerAccountId) throw new Error('keepsake has no controller');
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     if (!tpl) return null;
-    // validate the source object (a bg-removed cutout) belongs to THIS asset
+    // validate the source object (a cutout / trimmed sheet / Studio design) belongs to THIS asset and
+    // is a real print source — never a print file or an upscaled copy, whose pixel size overstates the detail
     let sourceObjectId: string | null = null;
     if (art.sourceObjectId) {
-      const [so] = await db
-        .select({ id: storageObjects.id })
-        .from(storageObjects)
-        .where(and(eq(storageObjects.id, art.sourceObjectId), eq(storageObjects.assetId, art.assetId)));
+      const so = await resolvePrintSource(db, art.assetId, art.sourceObjectId);
       if (so) sourceObjectId = so.id;
     }
     // Print-quality gate BEFORE any money moves: a placement that can't reach the
