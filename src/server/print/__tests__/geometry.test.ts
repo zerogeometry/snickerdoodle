@@ -9,6 +9,10 @@ import {
   MIN_SCALE,
   MIN_FLOOR_DPI,
   minimumDpi,
+  PRINT_SHARP_FACTOR,
+  readinessState,
+  TIER0_MAX,
+  upscaleTierFor,
   type TemplateGeom,
   type Transform,
 } from '@/server/print/geometry';
@@ -196,3 +200,55 @@ describe('minimumDpi — how much detail a print needs depends on how far away i
     expect(tiny.decision).toBe('BLOCK');
   });
 });
+
+describe('tiered upscale — tier selection by enlargement factor', () => {
+  it('up to 2× is the instant classical resample; past it, super-resolution', () => {
+    expect(TIER0_MAX).toBe(2);
+    expect(upscaleTierFor(1)).toBe(0);
+    expect(upscaleTierFor(1.6)).toBe(0);
+    expect(upscaleTierFor(2)).toBe(0);
+    expect(upscaleTierFor(2.01)).toBe(1);
+    expect(upscaleTierFor(7)).toBe(1);
+  });
+  it('the gate’s tier agrees with upscaleTierFor at the boundary', () => {
+    const t = sq(2000);
+    for (const w of [1001, 1000, 999, 700, 501]) {
+      const a = assessResolution(t, { width: w, height: w }, T());
+      if (a.decision === 'UPSCALE') expect(a.tier).toBe(upscaleTierFor(a.upscaleFactor));
+    }
+  });
+});
+
+describe('readinessState — what the print-readiness pill says', () => {
+  const t = sq(2000); // 2000px at 300dpi; floor 75dpi
+  const sr = { method: 'super-res' as const, factor: PRINT_SHARP_FACTOR };
+  const at = (w: number) => assessResolution(t, { width: w, height: w }, T());
+
+  it('enough pixels → ready', () => expect(readinessState(at(3000), null)).toBe('ready'));
+  it('≤ 2× short → ready by itself (classical, no tap needed)', () => expect(readinessState(at(1200), null)).toBe('ready'));
+  it('> 2× short but above the floor → needs the one-tap upscale (✗ until tapped)…', () => {
+    expect(at(600).tier).toBe(1);
+    expect(readinessState(at(600), null)).toBe('needs-upscale');
+  });
+  it('…and the print-sharp copy flips it to ready ✓', () => expect(readinessState(at(600), sr)).toBe('ready'));
+  it('only the classical fallback ran → prints, honestly “soft up close”', () => {
+    expect(readinessState(at(600), { method: 'classical' })).toBe('ready-soft');
+  });
+  it('a huge stretch even after ×4 → ready-soft, not a fake “crisp”', () => {
+    const huge = rect(60, 80, 300); // floor 24dpi, needs 300 → up to 12.5× is allowed
+    const a = assessResolution(huge, { width: 1800, height: 2400 }, T()); // 30dpi → 10×
+    expect(a).toMatchObject({ decision: 'UPSCALE', tier: 1 });
+    expect(readinessState(a, sr)).toBe('ready-soft'); // ×4, then 2.5× more classical
+    const b = assessResolution(huge, { width: 3000, height: 4000 }, T()); // 50dpi → 6×
+    expect(readinessState(b, sr)).toBe('ready'); // ×4, then 1.5×
+  });
+  it('below the floor → blocked, whatever upscale exists (it can’t invent detail)', () => {
+    expect(at(300).decision).toBe('BLOCK');
+    expect(readinessState(at(300), sr)).toBe('blocked');
+    expect(readinessState(at(300), { method: 'classical' })).toBe('blocked');
+  });
+});
+
+function rect(wIn: number, hIn: number, dpi: number): TemplateGeom {
+  return { printWidthPx: Math.round(wIn * dpi), printHeightPx: Math.round(hIn * dpi), bleedMm: 0, requiredDpi: dpi };
+}

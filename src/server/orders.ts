@@ -7,6 +7,7 @@ import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { assessResolution, clampTransform, type RawTransform } from '@/server/print/geometry';
+import { resolvePrintSource } from '@/server/print/upscale';
 import { getObjectBytes } from '@/storage';
 import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
@@ -166,13 +167,11 @@ export async function placeOrder(
     if (!asset.controllerAccountId) throw new Error('keepsake has no controller');
     const [tpl] = await db.select().from(printTemplates).where(eq(printTemplates.variantId, variantId));
     if (!tpl) continue;
-    // validate the source object (a bg-removed cutout) belongs to THIS asset
+    // validate the source object (a cutout / Studio design) belongs to THIS asset and is a real
+    // print source — never a print file or an upscaled copy, whose pixel size overstates the detail
     let sourceObjectId: string | null = null;
     if (art.sourceObjectId) {
-      const [so] = await db
-        .select({ id: storageObjects.id })
-        .from(storageObjects)
-        .where(and(eq(storageObjects.id, art.sourceObjectId), eq(storageObjects.assetId, art.assetId)));
+      const so = await resolvePrintSource(db, art.assetId, art.sourceObjectId);
       if (so) sourceObjectId = so.id;
     }
     // Print-quality gate BEFORE any money moves: a placement that can't reach the
