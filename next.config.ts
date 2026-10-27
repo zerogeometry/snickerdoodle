@@ -28,8 +28,14 @@ const SECURITY_HEADERS = [
 const STATIC_ASSET_CSP = "default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 
 /** The private app (anything a child's drawing can appear on) is never indexed — only the
- * marketing pages are. Belt and braces: these pages are behind sign-in or a token anyway. */
-const NOINDEX_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/customize', '/studio', '/start-creating', '/share-wish', '/admin', '/g', '/join', '/login', '/api'];
+ * marketing pages and the shop's front door (/start-creating + one product page per product) are.
+ * Belt and braces: these pages are behind sign-in or a token anyway. src/lib/seo.ts lists the same
+ * for robots.txt. */
+const NOINDEX_PATHS = ['/home', '/family', '/account', '/checkout', '/orders', '/studio', '/share-wish', '/admin', '/g', '/join', '/login', '/api', '/dev', '/offline', '/test-gate'];
+/** /customize itself, and anything under it that ISN'T exactly one plain product segment
+ * (`/customize/framedPrint` is indexable; `/customize/x/y`, `/customize/a.b` are not). A product
+ * that isn't on show says noindex from its own metadata (src/app/customize/[productKey]/layout.tsx). */
+const NOINDEX_SOURCES = ['/customize', '/customize/:rest((?![A-Za-z0-9-]+$).*)'];
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -44,6 +50,7 @@ const nextConfig: NextConfig = {
         { source: p, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
         { source: `${p}/:path*`, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] },
       ]),
+      ...NOINDEX_SOURCES.map((source) => ({ source, headers: [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] })),
     ];
   },
   // Allow an isolated build dir (e.g. e2e) so a production build can't clobber a
