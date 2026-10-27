@@ -3,7 +3,7 @@
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
-import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
+import { autosaveStudioDoc, cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
@@ -124,6 +124,33 @@ export async function saveStudioAction(input: {
   } catch (e) {
     if (e instanceof StudioTextError) return { ok: false, reason: 'text' };
     console.warn('[studio] save failed:', e instanceof Error ? e.message : e);
+    return { ok: false };
+  }
+}
+
+/** Autosave the Studio as the parent works: the recipe, plus the mask when it changed. Nothing is rendered. */
+export async function autosaveStudioAction(input: {
+  assetId: string;
+  mask: string | null;
+  geometry: StudioGeometry;
+  objects?: StudioObject[];
+  clearCutout?: boolean;
+}): Promise<{ ok: true } | { ok: false; reason?: 'text' }> {
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const db = getDb();
+  const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+  let mask: Buffer | null = null;
+  if (input.mask) {
+    const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(String(input.mask));
+    if (!m) return { ok: false };
+    mask = Buffer.from(m[1]!, 'base64');
+  }
+  try {
+    await autosaveStudioDoc(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, clearCutout: input.clearCutout === true });
+    return { ok: true };
+  } catch (e) {
+    if (e instanceof StudioTextError) return { ok: false, reason: 'text' };
     return { ok: false };
   }
 }

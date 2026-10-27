@@ -22,10 +22,11 @@ import { Modal } from '@/ui/primitives/Modal';
 import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
-import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
 import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
+import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { StudioTray } from '@/ui/studio/Tray';
 import { ToolGlyph } from '@/ui/studio/ToolGlyph';
@@ -65,6 +66,25 @@ import {
 } from '@/ui/studio/engine';
 
 const HISTORY_CAP = 25;
+/**
+ * This tab has an autosaved cut-out in progress for this drawing (sessionStorage, tab-only): a
+ * refresh mid-edit reopens WITH it — otherwise the Studio only uses a stored cut-out the drawing
+ * itself is using (the parent may have put the background back from the upload screen).
+ */
+const MASK_IN_PROGRESS = 'snickerdoodle.studio-mask';
+const maskInProgress = (assetId: string): boolean => {
+  try {
+    return window.sessionStorage.getItem(MASK_IN_PROGRESS) === assetId;
+  } catch {
+    return false;
+  }
+};
+const setMaskInProgress = (assetId: string | null) => {
+  try {
+    if (assetId) window.sessionStorage.setItem(MASK_IN_PROGRESS, assetId);
+    else window.sessionStorage.removeItem(MASK_IN_PROGRESS);
+  } catch {}
+};
 
 interface Snapshot {
   alpha: Uint8ClampedArray;
@@ -133,6 +153,15 @@ function StudioEditor() {
   const [confirmStart, setConfirmStart] = useState(false);
   const [, setHistoryTick] = useState(0);
   const lastBgPush = useRef(0);
+  // ── autosave: the recipe (and the mask, when it changed) goes to the server as they work ──
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const pendingRef = useRef(false); // changes the server hasn't got yet
+  const savedAlpha = useRef<Uint8ClampedArray | null>(null); // the mask the server has
+  const inflight = useRef<Promise<unknown> | null>(null);
+  const markPending = () => {
+    pendingRef.current = true;
+    setSaveState('pending');
+  };
   // ── added things (phase 2) ──
   const [objects, setObjects] = useState<StudioObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -176,9 +205,13 @@ function StudioEditor() {
   const deleteCreation = async () => {
     if (!assetId) return;
     setBusy('deleting…');
+    if (inflight.current) await inflight.current; // never let an autosave land after the delete
     const r = await deleteCreationAction({ assetId });
     setBusy(null);
     if (!r.ok) return toast('couldn’t delete that — try again');
+    pendingRef.current = false;
+    setSaveState('idle');
+    setMaskInProgress(null);
     setDirty(false);
     toast('deleted — gone for good');
     // (the back-gesture guard's extra history entry is replaced, so "back" never lands here again)
@@ -226,13 +259,14 @@ function StudioEditor() {
           setObjects(st.objects);
           // the stored cut-out only while the drawing is USING it (a parent can put the background back
           // from the upload screen — then the Studio opens on the untouched original)
-          if (st.mask && upload.cutout && !upload.cutout.trim) { // an EDIT in use — the table trim is just the drawing
+          if (st.mask && ((upload.cutout && !upload.cutout.trim) || maskInProgress(id))) { // an EDIT in use — the table trim is just the drawing
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
           }
         }
       }
       if (!live) return;
+      savedAlpha.current = work.alpha.slice();
       workRef.current = work;
       const pic = document.createElement('canvas');
       pic.width = work.w;
@@ -428,6 +462,7 @@ function StudioEditor() {
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
     redoStack.current = [];
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
   const restore = (s: Snapshot) => {
@@ -445,6 +480,7 @@ function StudioEditor() {
     redoStack.current.push(snapshot());
     restore(prev);
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
   const redo = () => {
@@ -453,6 +489,7 @@ function StudioEditor() {
     undoStack.current.push(snapshot());
     restore(next);
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
 
@@ -818,6 +855,7 @@ function StudioEditor() {
       if (m.ok && m.mask) {
         pushUndo();
         await readMask(m.mask, workRef.current.alpha, workRef.current.w, workRef.current.h);
+        savedAlpha.current = workRef.current.alpha.slice(); // the server made this cutout itself
         setHadCutout(true);
         setKeepWhite(keep);
         setTick((t) => t + 1);
@@ -878,9 +916,17 @@ function StudioEditor() {
     if (!id) return;
     setBusy('saving…');
     try {
+      if (inflight.current) await inflight.current;
+      pendingRef.current = false;
+      const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
       const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: !see });
-      if (!res.ok) return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
+      if (!res.ok) {
+        markPending();
+        return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
+      }
+      savedAlpha.current = alphaNow;
+      setSaveState('saved');
       // the design is re-saved in place (same id, new pixels): drop the old pictures of it
       const prev = useUpload.getState().upload?.cutout?.sourceObjectId;
       for (const id of new Set([prev, res.design?.sourceObjectId])) if (id) forgetMockupsFor(id);
@@ -899,6 +945,7 @@ function StudioEditor() {
   // `saved`: a design was just saved — the range opens at "your masterpiece, made real" on a
   // phone (with its loader right there) rather than back at the top.
   const backToRange = (saved = false) => {
+    setMaskInProgress(null); // left on purpose: the range's own cut-out choice decides from here
     // opened from the calendar / card-pack picker: back there (src/ui/components/usePickerEdits.ts)
     const to = studioReturnTo() ?? (saved ? '/start-creating?edited=1' : '/start-creating');
     if (guardRef.current) {
@@ -906,6 +953,57 @@ function StudioEditor() {
       router.replace(to);
     } else router.push(to);
   };
+
+  /** Send what's changed since the last save (recipe always; the mask only when it moved). */
+  const autosave = async (): Promise<boolean> => {
+    const work = workRef.current;
+    if (!work || !assetId) return !pendingRef.current;
+    if (inflight.current) await inflight.current;
+    if (!pendingRef.current) return true;
+    pendingRef.current = false; // anything changed from here on marks it again
+    setSaveState('saving');
+    const prev = savedAlpha.current;
+    const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
+    const alphaNow = maskMoved ? work.alpha.slice() : null;
+    const see = maskMoved && hasTransparency(work.alpha);
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    inflight.current = call;
+    const res = await call;
+    inflight.current = null;
+    if (res.ok) {
+      if (alphaNow) {
+        savedAlpha.current = alphaNow;
+        setMaskInProgress(see ? assetId : null);
+      }
+      setSaveState(pendingRef.current ? 'pending' : 'saved');
+      return true;
+    }
+    pendingRef.current = true;
+    setSaveState(res.reason === 'text' ? 'text' : 'error');
+    return false;
+  };
+  // a quiet pause after the last change (never mid-stroke) → autosave
+  useEffect(() => {
+    if (!ready || !assetId || saveState !== 'pending') return;
+    let t: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      if (pointers.current.size || busy) t = setTimeout(attempt, 800);
+      else void autosave();
+    };
+    t = setTimeout(attempt, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
+  }, [ready, assetId, saveState, geo, objects, tick, busy]);
+  // closing the tab with changes the server hasn't got yet → the browser asks first
+  useEffect(() => {
+    if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saveState]);
 
   // ── added-thing actions ──
   const updateSelected = (patch: Partial<StudioObject>, group = false) => {
@@ -979,7 +1077,13 @@ function StudioEditor() {
     setSelectedId(o.id);
     setTool('select');
   };
-  const onBack = () => (dirty ? setLeaving(true) : backToRange());
+  /** Back to the range: anything not yet autosaved goes first (if that fails, ask); then the
+   * design is made from the latest, since the range shows it. */
+  const onBack = async () => {
+    if (pendingRef.current && !(await autosave())) return setLeaving(true);
+    if (dirty) return save((saved) => backToRange(saved));
+    backToRange();
+  };
 
   // The phone's BACK GESTURE (iOS swipe, Android back) with unsaved edits: ask, exactly like the
   // "your range" button — instead of silently dropping the edits (a removed background lost on the
@@ -1264,7 +1368,7 @@ function StudioEditor() {
       {/* header: always a clear way back to the range */}
       <header className="pt-safe kraft z-20 flex min-h-[60px] items-center gap-2 border-b-2 border-cocoa/10 px-3 md:px-5">
         {/* narrow phones: just the arrow (the words come back from 400px) — the header never wraps */}
-        <button type="button" onClick={onBack} aria-label="back to your collection" className="press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-2.5 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] min-[400px]:px-3">
+        <button type="button" onClick={() => void onBack()} aria-label="back to your collection" className="press flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-2.5 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] min-[400px]:px-3">
           <Icon icon={IconArrowLeft} size={17} /> <span className="hidden whitespace-nowrap min-[400px]:inline">your collection</span>
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1273,6 +1377,8 @@ function StudioEditor() {
             {readiness.good ? '✓ ' : ''}
             {readiness.label}
           </span>
+          {/* autosave, quietly: saving… / saved (a failed save says so, with a retry) */}
+          {ready ? <SaveStatus state={saveState} onRetry={() => void autosave()} /> : null}
         </div>
         <button type="button" onClick={undo} disabled={!undoStack.current.length} aria-label="undo" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa disabled:opacity-40">
           <Icon icon={IconArrowBackUp} size={18} />
@@ -1400,7 +1506,12 @@ function StudioEditor() {
       </div>
 
       {/* leaving with unsaved changes */}
-      <Modal open={leaving} onClose={() => setLeaving(false)} title="save your changes?" subtitle="you’ve edited this drawing">
+      <Modal
+        open={leaving}
+        onClose={() => setLeaving(false)}
+        title="save your changes?"
+        subtitle={saveState === 'text' ? 'some of those words can’t be printed — change them and it saves' : saveState === 'error' ? 'we couldn’t save them just now' : 'you’ve edited this drawing'}
+      >
         <div className="flex flex-col gap-2">
           <Button size="lg" className="w-full" onClick={() => void save((saved) => backToRange(saved))}>
             save &amp; go back
