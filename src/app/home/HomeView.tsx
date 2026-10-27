@@ -189,7 +189,7 @@ export function HomeView({ data }: { data: HomeData }) {
       >
         {k.canManage ? (
           <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label="choose who can see this keepsake">
-            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={VIS_LABEL[k.visibility]} />
+            <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={k.imageUrl ?? undefined} badge={k.held ? 'being checked' : VIS_LABEL[k.visibility]} />
           </button>
         ) : (
           <div className="relative">

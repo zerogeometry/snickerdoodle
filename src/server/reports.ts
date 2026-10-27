@@ -1,9 +1,13 @@
 import { and, eq, ne } from 'drizzle-orm';
-import { assets, auditRecords, giftLinks } from '@/db/schema';
+import { accounts, assets, auditRecords, giftLinks } from '@/db/schema';
 import { canReportViaGiftLink, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
 import type { GiftItem } from './giftLinks';
+import { appUrl, sendMail } from './mail';
+import { openReport, type ReportVerdict } from './reportHold';
+
+export { openReport, type ReportVerdict };
 
 /**
  * One-tap REPORT / TAKEDOWN (D8, docs/05). Anyone shown a keepsake — a gift-link holder or a
@@ -25,26 +29,9 @@ export function isReportReason(x: unknown): x is ReportReason {
 }
 
 type Via = 'gift-link' | 'home';
-interface StoredReport {
-  reason: ReportReason;
-  via: Via;
-  at: string;
-}
-/** The report verdict kept in `assets.moderation_detail.report` beside `original` / `design`. */
-export interface ReportVerdict {
-  status: 'FLAGGED' | 'CLEAR';
-  labels: string[];
-  reports: StoredReport[];
-}
 
 /** Open reports kept per keepsake — enough for the reviewer; more adds nothing. */
 const MAX_OPEN_REPORTS = 20;
-
-/** Is there an unresolved report on this keepsake? (Read by the moderation re-screen.) */
-export function openReport(detail: unknown): ReportVerdict | null {
-  const r = (detail as { report?: ReportVerdict } | null)?.report;
-  return r && r.status === 'FLAGGED' ? r : null;
-}
 
 type AssetRow = typeof assets.$inferSelect;
 
@@ -73,6 +60,43 @@ async function recordReport(
     targetId: asset.id,
     metadata: { reason: input.reason, via: input.via },
   });
+  // Tell a reviewer once, when the keepsake first becomes held (not on every repeat report).
+  if (!open) await alertReviewers(db, input.reason);
+}
+
+const REASON_WORDS: Record<ReportReason, string> = {
+  worrying: 'something worrying',
+  'someone-elses': 'someone else’s picture or character',
+  'not-for-me': 'reached the wrong person',
+  other: 'something else',
+};
+
+/**
+ * Email the reviewers that something is waiting. Deliberately says nothing about the family,
+ * the child or the picture — just the reason and a link to the (two-step-login) review queue.
+ * Recipients: REVIEW_ALERT_EMAILS (comma-separated) if set, else every admin account.
+ * A failed alert never fails the report (the keepsake is already held); it's logged loudly.
+ */
+async function alertReviewers(db: DbHandle, reason: ReportReason, env: Record<string, string | undefined> = process.env): Promise<void> {
+  try {
+    const fromEnv = (env.REVIEW_ALERT_EMAILS ?? '').split(',').map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@'));
+    const to = fromEnv.length ? fromEnv : (await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.isAdmin, true))).map((a) => a.email);
+    for (const email of new Set(to)) {
+      await sendMail({
+        kind: 'review-alert',
+        to: email,
+        subject: 'a keepsake was reported — it’s paused for review',
+        text: [
+          `someone reported a keepsake (${REASON_WORDS[reason]}).`,
+          'it’s paused — no printing, no gift links, hidden from relatives — until you decide.',
+          '',
+          `open the review queue: ${appUrl('/admin/review')}`,
+        ].join('\n'),
+      });
+    }
+  } catch (e) {
+    console.error('[reports] FAILED to alert reviewers — check the review queue by hand', e instanceof Error ? e.message : e);
+  }
 }
 
 /**

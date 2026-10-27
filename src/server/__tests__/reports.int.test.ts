@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { and, eq } from 'drizzle-orm';
 import { randomBytes } from 'node:crypto';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -7,7 +7,7 @@ import * as schema from '@/db/schema';
 import { assets, auditRecords, giftLinks } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, type Reviewer } from '@/authz';
-import { resolveViewerContext } from '@/server/assets';
+import { listViewableAssets, resolveViewerContext } from '@/server/assets';
 import { getGiftLink } from '@/server/giftLinks';
 import { reportAsMember, reportViaGiftLink } from '@/server/reports';
 import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from '@/server/moderation';
@@ -148,5 +148,42 @@ describe.skipIf(!DB)('content reports — integration', () => {
     const a = await row(ids.assetExtended);
     expect((a.moderationDetail as { report: { reports: unknown[] } }).report.reports).toHaveLength(20);
     expect((await reportAudits(ids.assetExtended)).length - before).toBe(20);
+  });
+
+  it('while held it is hidden from relatives but still visible to its controller; clearing brings it back', async () => {
+    const jo = await resolveViewerContext(db, ids.joId, ids.hartleyId); // Family circle
+    const rosie = await resolveViewerContext(db, ids.rosieId, ids.hartleyId); // Extended circle
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId); // controller
+    const seen = async (v: typeof jo) => (await listViewableAssets(db, ids.hartleyId, v)).map((a) => a.id);
+    expect(await seen(rosie)).toContain(ids.assetExtended);
+
+    await reportAsMember(db, jo, ids.assetExtended, 'worrying');
+    expect(await seen(rosie)).not.toContain(ids.assetExtended);
+    expect(await seen(jo)).not.toContain(ids.assetExtended); // the reporter too
+    expect(await seen(sam)).toContain(ids.assetExtended);
+    await expect(reportAsMember(db, rosie, ids.assetExtended, 'other')).rejects.toBeInstanceOf(AuthzError); // can't see ⇒ can't touch
+
+    await decideReview(db, admin, 'keepsake', ids.assetExtended, 'clear');
+    expect(await seen(rosie)).toContain(ids.assetExtended);
+  });
+
+  it('a reviewer is emailed once when a keepsake first becomes held — with no family, child or picture details', async () => {
+    const prev = process.env.REVIEW_ALERT_EMAILS;
+    process.env.REVIEW_ALERT_EMAILS = 'reviewer@example.test';
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const token = await link([ids.assetFamily]);
+      await reportViaGiftLink(db, token, ids.assetFamily, 'someone-elses', null);
+      await reportViaGiftLink(db, token, ids.assetFamily, 'worrying', null); // already held: no second alert
+      const alerts = log.mock.calls.map((c) => String(c[0])).filter((m) => m.includes('[review-alert]'));
+      expect(alerts).toHaveLength(1);
+      expect(alerts[0]).toContain('reviewer@example.test');
+      expect(alerts[0]).toContain('/admin/review');
+      expect(alerts[0]).not.toMatch(/hartley|olivia|max|0499|[0-9a-f]{8}-[0-9a-f]{4}/i);
+    } finally {
+      log.mockRestore();
+      if (prev === undefined) delete process.env.REVIEW_ALERT_EMAILS;
+      else process.env.REVIEW_ALERT_EMAILS = prev;
+    }
   });
 });

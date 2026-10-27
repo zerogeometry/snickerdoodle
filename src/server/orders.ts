@@ -10,7 +10,7 @@ import { assessResolution, clampTransform, type RawTransform } from '@/server/pr
 import { getObjectBytes } from '@/storage';
 import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
-import { resolveViewerContext } from './assets';
+import { assetRefOf, resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
 import { notifyGiftListPurchase } from './giftListNotify';
 import { settlePaidOrderCredits } from './referrals';
@@ -154,7 +154,7 @@ export async function placeOrder(
     } else {
       const viewer = await resolveViewerContext(db, account!.id, asset.familyId);
       assertCanViewAsset(
-        { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
+        assetRefOf(asset),
         viewer,
       ); // ← the gate; throws on deny
       // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
