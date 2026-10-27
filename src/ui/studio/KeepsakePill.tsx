@@ -1,6 +1,6 @@
 'use client';
 
-import { IconLock, IconTrash } from '@tabler/icons-react';
+import { IconCopy, IconLock, IconTrash } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
@@ -28,12 +28,15 @@ export function KeepsakePill({
   image,
   onVisibility,
   onDelete,
+  onDuplicate,
 }: {
   info: KeepsakeInfo | null;
   image?: string;
   onVisibility: (tier: Tier) => Promise<void> | void;
   /** Delete this creation and its source (two taps). */
   onDelete: () => Promise<void> | void;
+  /** A copy to try something else on (kept keepsakes, controlling parent only). */
+  onDuplicate: () => Promise<void> | void;
 }) {
   const [open, setOpen] = useState(false);
   const who = !info ? null : info.draft ? 'just you' : TIER_LABEL[info.visibility];
@@ -68,6 +71,21 @@ export function KeepsakePill({
             setOpen(false);
             await onDelete();
           }}
+          extra={
+            <>
+              <button
+                type="button"
+                onClick={async () => {
+                  setOpen(false);
+                  await onDuplicate();
+                }}
+                className="inline-flex min-h-11 items-center gap-1.5 text-[13px] font-bold text-cocoa hover:underline"
+              >
+                <Icon icon={IconCopy} size={15} /> make a copy to try something else
+              </button>
+              <p className="text-[11px] leading-relaxed text-ink-soft">this one stays just as it is. the copy is its own keepsake — delete either any time.</p>
+            </>
+          }
         />
       ) : (
         <Modal open={open} onClose={() => setOpen(false)} title="this stays yours" subtitle={info?.draft ? 'only you can see it' : info ? `seen by ${who}` : undefined}>

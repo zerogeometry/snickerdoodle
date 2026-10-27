@@ -23,7 +23,7 @@ import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
-import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
+import { deleteCreationAction, duplicateCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
 import { LookPanel } from '@/ui/studio/LookPanel';
@@ -171,6 +171,21 @@ export default function StudioPage() {
     const r = await setAssetVisibilityAction(assetId, tier);
     toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
     await refreshInfo(assetId);
+  };
+  /** Branch a new edit: the server copies this keepsake (recipe + original); we carry on in the copy. */
+  const duplicate = async () => {
+    if (!assetId) return;
+    if (pendingRef.current && !(await autosave())) return toast('that didn’t save — try again');
+    setBusy('making a copy…');
+    const r = await duplicateCreationAction({ assetId });
+    setBusy(null);
+    if (!r.ok) return toast('couldn’t make a copy — try again');
+    setAssetId(r.assetId);
+    setLocalAssetId(r.assetId);
+    setCutout(null);
+    setDirty(true); // the copy's design is made on "done"
+    setSaveState('saved');
+    toast('a copy to play with — the first one’s kept just as it was');
   };
   const deleteCreation = async () => {
     if (!assetId) return;
@@ -1271,7 +1286,7 @@ export default function StudioPage() {
             <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span>
           ) : ready ? (
             <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-1.5 sm:max-w-[70%]">
-              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} />
+              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} onDuplicate={duplicate} />
               <SaveStatus state={saveState} onRetry={() => void autosave()} />
             </div>
           ) : null}
