@@ -131,6 +131,12 @@ const layerLook = (r: Record<string, unknown>): LayerLook => {
   if (r.hidden === true) out.hidden = true;
   return out;
 };
+/** The drawing's own layer look from the browser (cleaned); null = solid + shown. */
+export const cleanLayerLook = (raw: unknown): LayerLook | null => {
+  if (!raw || typeof raw !== 'object') return null;
+  const l = layerLook(raw as Record<string, unknown>);
+  return l.opacity === undefined && !l.hidden ? null : l;
+};
 /** How solid a layer draws (0 when hidden). */
 export const layerAlpha = (o: LayerLook): number => (o.hidden ? 0 : (o.opacity ?? 1));
 const id = (v: unknown) => (typeof v === 'string' && /^[a-z0-9-]{1,40}$/i.test(v) ? v : Math.random().toString(36).slice(2, 10));

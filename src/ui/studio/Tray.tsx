@@ -6,6 +6,8 @@ import {
   IconCheck,
   IconCircleCheck,
   IconCopy,
+  IconEye,
+  IconEyeOff,
   IconLock,
   IconLockOpen,
   IconMinus,
@@ -273,6 +275,8 @@ export interface TrayProps {
   onDuplicate: () => void;
   onForward: () => void;
   onBack: () => void;
+  /** Show / hide one added layer (kept either way, and undoable). */
+  onToggleHidden: (id: string) => void;
 }
 
 /** The rows for the active tool (one, or two for layers / an item being changed), or null. */
@@ -509,6 +513,10 @@ function ItemEditor(p: TrayProps & { o: StudioObject }) {
   const actions = (
     <>
       <TSep />
+      <TLabel>opacity</TLabel>
+      <TSlider min={5} max={100} value={Math.round((o.opacity ?? 1) * 100)} onChange={(v) => p.onUpdate({ opacity: v / 100 }, true)} label="layer opacity" shown={`${Math.round((o.opacity ?? 1) * 100)}%`} />
+      <TIcon icon={o.hidden ? IconEyeOff : IconEye} label={o.hidden ? `show ${layerName(o)}` : `hide ${layerName(o)}`} onClick={() => p.onToggleHidden(o.id)} />
+      <TSep />
       <TIcon icon={IconCopy} label="duplicate" onClick={p.onDuplicate} />
       <TIcon icon={IconStackPop} label="bring forward" onClick={p.onForward} />
       <TIcon icon={IconStackPush} label="send back" onClick={p.onBack} />
@@ -618,6 +626,11 @@ function LayersTray(p: TrayProps) {
       <TSep />
       <TTurn angle={d.angle} onAngle={d.onTurn} what="your drawing" />
       <TSep />
+      <TSep />
+      <TLabel>opacity</TLabel>
+      <TSlider min={5} max={100} value={Math.round(d.opacity * 100)} onChange={(v) => d.onOpacity(v / 100)} label={`${p.baseLabel} · opacity`} shown={`${Math.round(d.opacity * 100)}%`} />
+      <TIcon icon={d.hidden ? IconEyeOff : IconEye} label={d.hidden ? `show ${p.baseLabel}` : `hide ${p.baseLabel}`} onClick={d.onToggleHidden} />
+      <TSep />
       <TChip onClick={d.onReset}>
         <Icon icon={IconRestore} size={16} /> put it back
       </TChip>
@@ -637,7 +650,8 @@ function LayersTray(p: TrayProps) {
         {rows.map((o) => {
           const on = o.id === p.selected?.id;
           return (
-            <TChip key={o.id} on={on} onClick={() => p.onSelect(on ? null : o.id)} label={`layer: ${layerName(o)}`}>
+            <TChip key={o.id} on={on} onClick={() => p.onSelect(on ? null : o.id)} label={`layer: ${layerName(o)}${o.hidden ? ' (hidden)' : ''}`} className={o.hidden ? 'opacity-60' : undefined}>
+              {o.hidden ? <Icon icon={IconEyeOff} size={14} /> : null}
               {o.type === 'sticker' ? (
                 <img src={stickerDataUrl(o.sticker)} alt="" className="h-5 w-5" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
               ) : o.type === 'shape' ? (

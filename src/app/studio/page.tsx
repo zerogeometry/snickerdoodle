@@ -41,7 +41,7 @@ import { toggleFestive, type FestivePreset } from '@/lib/studio-festive';
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, onStickerLoad, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
-import { flipObjects, layerAlpha, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
+import { flipObjects, layerAlpha, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type LayerLook, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { isPalmTouch } from '@/ui/studio/input';
@@ -99,6 +99,7 @@ interface Snapshot {
   cut: boolean;
   keepWhite: boolean;
   look: StudioLook;
+  drawingLook: LayerLook;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
@@ -143,6 +144,8 @@ function StudioEditor() {
   const [geo, setGeo] = useState<Geometry>(IDENTITY);
   // colour & light + a preset look — numbers in the recipe, applied to the drawing's own pixels
   const [look, setLook] = useState<StudioLook>(IDENTITY_LOOK);
+  // the drawing's own layer: shown / hidden, and how solid
+  const [drawingLook, setDrawingLook] = useState<LayerLook>({});
   const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
@@ -269,6 +272,7 @@ function StudioEditor() {
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
           if (st.look) setLook(st.look);
+          if (st.drawing) setDrawingLook(st.drawing);
           // the stored cut-out only while the drawing is USING it (a parent can put the background back
           // from the upload screen — then the Studio opens on the untouched original)
           if (st.mask && ((upload.cutout && !upload.cutout.trim) || maskInProgress(id))) { // an EDIT in use — the table trim is just the drawing
@@ -395,6 +399,7 @@ function StudioEditor() {
     const G = geometryMatrix(work.w, work.h, g);
     ctx.transform(G.a, G.b, G.c, G.d, G.e, G.f);
     ctx.imageSmoothingQuality = 'high';
+    ctx.globalAlpha = comparing ? 1 : layerAlpha(drawingLook);
     ctx.drawImage(pic, 0, 0);
     ctx.restore();
 
@@ -463,7 +468,7 @@ function StudioEditor() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, editingId, look]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, editingId, look, drawingLook]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
   const drawingBox = (f: Frame, g: Geometry = geo): Box => {
@@ -479,7 +484,7 @@ function StudioEditor() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLook });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -495,6 +500,7 @@ function StudioEditor() {
     setHadCutout(s.cut);
     setKeepWhite(s.keepWhite);
     setLook(s.look);
+    setDrawingLook(s.drawingLook);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -948,6 +954,7 @@ function StudioEditor() {
     setHadCutout(false);
     setKeepWhite(false);
     setLook(IDENTITY_LOOK);
+    setDrawingLook({});
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -965,7 +972,7 @@ function StudioEditor() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -1011,7 +1018,7 @@ function StudioEditor() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -1038,7 +1045,7 @@ function StudioEditor() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, look, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, drawingLook, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -1280,7 +1287,23 @@ function StudioEditor() {
           lastEditPush.current = Date.now();
           setGeo((g) => ({ ...g, place: { ...(g.place ?? IDENTITY_PLACE), angle: normAngle(seen - visualAngle(g)) } }));
         },
+        // shown / hidden, and how solid — kept in the recipe, printed the same way
+        hidden: !!drawingLook.hidden,
+        opacity: drawingLook.opacity ?? 1,
+        onToggleHidden: () => {
+          pushUndo();
+          setDrawingLook((l) => ({ ...l, hidden: !l.hidden }));
+        },
+        onOpacity: (opacity) => {
+          if (Date.now() - lastEditPush.current > 800) pushUndo();
+          lastEditPush.current = Date.now();
+          setDrawingLook((l) => ({ ...l, opacity }));
+        },
       };
+  const onToggleHidden = (id: string) => {
+    pushUndo();
+    setObjects((os) => os.map((o) => (o.id === id ? { ...o, hidden: !o.hidden } : o)));
+  };
   const onFlip = (axis: 'h' | 'v') => {
     pushUndo();
     setGeo((g) => flipGeometry(g, axis));
@@ -1327,6 +1350,7 @@ function StudioEditor() {
       onDuplicate={duplicateSelected}
       onForward={() => reorder(1)}
       onBack={() => reorder(-1)}
+      onToggleHidden={onToggleHidden}
     />
   ) : (
     <ToolOptions
@@ -1410,6 +1434,7 @@ function StudioEditor() {
           onAddShape: addShape,
           onDelete: deleteSelected,
           onDuplicate: duplicateSelected,
+          onToggleHidden,
           onForward: () => reorder(1),
           onBack: () => reorder(-1),
         })

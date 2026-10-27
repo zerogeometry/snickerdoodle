@@ -110,4 +110,20 @@ describe.skipIf(!DB || !S3)('studio autosave', () => {
     expect(back.sourceObjectId).toBeNull();
     expect((await studioStateForAsset(db, sam, a.assetId)).look).toBeNull();
   });
+
+  it('the drawing’s own layer: faded or hidden in the design (on its background), reopened as left', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const at = async (x: number, y: number) => {
+      const { data, info } = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+      return [...data.subarray((y * info.width + x) * 4, (y * info.width + x) * 4 + 4)];
+    };
+    await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, drawing: { opacity: 0.5 } });
+    expect((await at(40, 50))[3]).toBe(128); // the blue square, half see-through
+    expect((await studioStateForAsset(db, sam, a.assetId)).drawing).toEqual({ opacity: 0.5 });
+
+    await saveStudio(db, sam, a.assetId, { mask: null, geometry: { ...IDENTITY_GEOMETRY, background: '#ffffff' }, drawing: { hidden: true } });
+    expect(await at(40, 50)).toEqual([255, 255, 255, 255]); // hidden: just the background prints
+    expect((await studioStateForAsset(db, sam, a.assetId)).drawing).toEqual({ hidden: true });
+  });
 });
