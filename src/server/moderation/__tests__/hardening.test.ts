@@ -28,6 +28,7 @@ describe('content-safety hardening', () => {
   it('production with no real screening FAILS CLOSED: held for review (never CLEAR, never rejected)', async () => {
     const writes: unknown[] = [];
     const db = {
+      select: () => ({ from: () => ({ where: async () => [] }) }), // no open report to carry over
       update: () => ({ set: (v: unknown) => ({ where: async () => void writes.push(v) }) }),
       insert: () => ({ values: async (v: unknown) => void writes.push(v) }),
     } as never;

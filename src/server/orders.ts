@@ -14,7 +14,7 @@ import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { getObjectBytes } from '@/storage';
 import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
-import { resolveViewerContext } from './assets';
+import { assetRefOf, resolveViewerContext } from './assets';
 import { getCatalogue, resolveVariantIdsByKey } from './catalogue';
 import { notifyGiftListPurchase } from './giftListNotify';
 import { settlePaidOrderCredits } from './referrals';
@@ -161,10 +161,7 @@ export async function placeOrder(
       if (!decision.allowed) throw new AuthzError(decision);
     } else {
       const viewer = await resolveViewerContext(db, account!.id, asset.familyId);
-      assertCanViewAsset(
-        { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
-        viewer,
-      ); // ← the gate; throws on deny
+      assertCanViewAsset(assetRefOf(asset), viewer); // ← the gate; throws on deny
       // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
       if (asset.moderationStatus !== 'CLEAR') {
         throw new Error('keepsake is not cleared for printing');

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
 import { HASH_UNCHECKED_LABEL } from '@/authz/review';
+import { openReportLabels, openReports } from '@/lib/reports';
 
 const sha256Hex = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -91,10 +92,16 @@ export async function moderateAndRecord(
   // silently CLEAR. Defends the gate against a future provider returning garbage.
   const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
   const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
+  // a (re-)screen never drops a viewer's report, and never lets the keepsake out while one is open
+  const { reports, held } = await storedReports(db, input.assetId);
 
   await db
     .update(assets)
-    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels, original: { status, labels } } })
+    .set({
+      moderationStatus: worse({ status, labels }, held).status,
+      moderatedAt: input.now ?? new Date(),
+      moderationDetail: { labels: [...new Set([...held.labels, ...labels])], original: { status, labels }, ...(reports ? { reports } : {}) },
+    })
     .where(eq(assets.id, input.assetId));
   if (status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -120,6 +127,20 @@ export async function moderateAndRecord(
 const RANK: Record<ModerationState | 'PENDING', number> = { CLEAR: 0, PENDING: 1, FLAGGED: 2, BLOCKED: 3 };
 type Stored = { status: ModerationState | 'PENDING'; labels: string[] };
 const worse = (a: Stored, b: Stored): Stored => (RANK[b.status] > RANK[a.status] ? b : a);
+
+/**
+ * A viewer's REPORT (src/server/contentReports.ts) lives beside the screening verdicts in
+ * `moderation_detail.reports`. Every write here carries it over untouched, and while a report is
+ * open the keepsake stays FLAGGED — hidden from relatives (src/lib/reports.ts isHeldForReview).
+ * Only a reviewer's CLEAR resolves it (src/server/admin/review.ts): a Studio re-save, a dropped
+ * design or a re-screen never can.
+ */
+async function storedReports(db: DbHandle, assetId: string): Promise<{ reports: unknown[] | null; held: Stored }> {
+  const [row] = await db.select({ detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
+  const all = (row?.detail as { reports?: unknown } | null)?.reports;
+  const open = openReports(row?.detail).length > 0;
+  return { reports: Array.isArray(all) ? all : null, held: open ? { status: 'FLAGGED', labels: openReportLabels(row?.detail) } : { status: 'CLEAR', labels: [] } };
+}
 
 async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {
   const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, assetId));
@@ -153,10 +174,15 @@ export async function moderateDesignAndRecord(
     design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
   }
   const original = await originalVerdict(db, input.assetId);
-  const combined = worse(original, design);
+  const { reports, held } = await storedReports(db, input.assetId);
+  const combined = worse(worse(original, design), held);
   await db
     .update(assets)
-    .set({ moderationStatus: combined.status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels: [...new Set([...original.labels, ...design.labels])], original, design } })
+    .set({
+      moderationStatus: combined.status,
+      moderatedAt: input.now ?? new Date(),
+      moderationDetail: { labels: [...new Set([...held.labels, ...original.labels, ...design.labels])], original, design, ...(reports ? { reports } : {}) },
+    })
     .where(eq(assets.id, input.assetId));
   if (design.status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -177,7 +203,11 @@ export async function clearDesignModeration(db: DbHandle, assetId: string): Prom
   const d = (row?.detail ?? {}) as { design?: Stored };
   if (!d.design) return;
   const original = await originalVerdict(db, assetId);
-  await db.update(assets).set({ moderationStatus: original.status, moderationDetail: { labels: original.labels, original } }).where(eq(assets.id, assetId));
+  const { reports, held } = await storedReports(db, assetId);
+  await db
+    .update(assets)
+    .set({ moderationStatus: worse(original, held).status, moderationDetail: { labels: [...new Set([...held.labels, ...original.labels])], original, ...(reports ? { reports } : {}) } })
+    .where(eq(assets.id, assetId));
 }
 
 export { defaultProviders, isModerationConfigured } from './providers';

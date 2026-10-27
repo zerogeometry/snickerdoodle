@@ -6,7 +6,7 @@ import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import type { DbHandle } from './db';
-import { resolveViewerContext } from './assets';
+import { assetRefOf, resolveViewerContext } from './assets';
 import { keepAndFileCreations } from './keepsakes';
 
 /** Products that can be saved/gifted as a design (a card needs its buyer's own inside message; a card
@@ -39,10 +39,7 @@ export async function saveDesign(
   const [asset] = await db.select().from(assets).where(eq(assets.id, input.assetId));
   if (!asset?.familyId || !asset.keptInHome) return { ok: false, reason: 'not-found' };
   const viewer = await resolveViewerContext(db, account.id, asset.familyId);
-  assertCanViewAsset(
-    { id: asset.id, familyId: asset.familyId, uploaderAccountId: asset.uploaderAccountId, controllerAccountId: asset.controllerAccountId, visibility: asset.visibility },
-    viewer,
-  );
+  assertCanViewAsset(assetRefOf(asset), viewer);
 
   const [variant] = await db
     .select({ sku: productVariants.sku, productKey: products.key, inShop: products.visibleInShop })
@@ -101,7 +98,7 @@ export async function listSavedDesigns(db: DbHandle, accountId: string, familyId
     .orderBy(desc(savedDesigns.createdAt));
   const out: SavedDesignView[] = [];
   for (const { d, a, v, p, key } of rows) {
-    const ref = { id: a.id, familyId: a.familyId, uploaderAccountId: a.uploaderAccountId, controllerAccountId: a.controllerAccountId, visibility: a.visibility };
+    const ref = assetRefOf(a);
     if (!canViewAsset(ref, viewer).allowed || a.moderationStatus === 'BLOCKED') continue;
     const attrs = (v.attributes as Record<string, string>) ?? {};
     const detail = [attrs.size, attrs.colour].filter(Boolean).join(' · ');
