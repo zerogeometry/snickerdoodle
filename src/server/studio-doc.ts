@@ -11,6 +11,7 @@ import { cleanLayerLook, cleanObjects, layerAlpha, objectText, type LayerLook, t
 import { renderStudioObjects } from './print/studioOverlay';
 import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
 import { applyLook, cleanLook, type StudioLook } from '@/lib/studio-look';
+import { cleanMagic, tidyWindow, type MagicEdits } from '@/lib/studio-magic';
 import { containsAbusiveText } from './textSafety';
 import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from './moderation';
 
@@ -126,8 +127,76 @@ export async function applyLookToImage(input: Buffer, look: StudioLook | null, l
   return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
 }
 
+/**
+ * The self-hosted magic edits on the drawing's own pixels (alpha untouched): "tidy the lines" = a
+ * median smoothing sized to the picture + paper cleaned toward white; "brighten" = the tones
+ * stretched to the full range (1st–99th percentile) with a touch more colour. Deterministic sharp,
+ * in-process — no third party sees the image.
+ */
+export async function applyMagicToImage(input: Buffer, magic: MagicEdits | null): Promise<Buffer> {
+  if (!magic) return input;
+  const meta = await sharp(input).metadata();
+  const W = meta.width!, H = meta.height!;
+  const alpha = await sharp(input).ensureAlpha().extractChannel(3).raw().toBuffer();
+  let rgb = await sharp(input).removeAlpha().png().toBuffer();
+  if (magic.tidy) rgb = await sharp(rgb).median(tidyWindow(Math.max(W, H))).png().toBuffer();
+  if (magic.brighten) rgb = await sharp(rgb).normalise({ lower: 1, upper: 99 }).modulate({ saturation: 1.08 }).png().toBuffer();
+  const px = await sharp(rgb).removeAlpha().raw().toBuffer();
+  if (magic.tidy) {
+    // the paper → white. Paper = the picture's own brightest common, near-neutral tone (so a dim
+    // photo's grey paper counts too); a soft ramp below it, so pale crayon survives, and nothing
+    // colourful is ever touched. A painting with no light paper is left alone.
+    const hist = new Uint32Array(256);
+    for (let i = 0, k = 0; i + 2 < px.length; i += 3, k++) if (alpha[k]! > 128) hist[Math.min(px[i]!, px[i + 1]!, px[i + 2]!)]!++;
+    let total = 0;
+    for (const n of hist) total += n;
+    let seen = 0, paper = 255;
+    for (let v = 0; v < 256; v++) {
+      seen += hist[v]!;
+      if (seen >= total * 0.9) {
+        paper = v;
+        break;
+      }
+    }
+    if (paper >= 170) {
+      const lo = paper - 32, hi = paper - 6;
+      for (let i = 0; i + 2 < px.length; i += 3) {
+        const m = Math.min(px[i]!, px[i + 1]!, px[i + 2]!);
+        if (m <= lo || Math.max(px[i]!, px[i + 1]!, px[i + 2]!) - m > 36) continue;
+        const t = Math.min(1, (m - lo) / (hi - lo));
+        const k = t * t * (3 - 2 * t);
+        for (let c = 0; c < 3; c++) px[i + c] = Math.round(px[i + c]! + (255 - px[i + c]!) * k);
+      }
+    }
+  }
+  return sharp(px, { raw: { width: W, height: H, channels: 3 } })
+    .joinChannel(alpha, { raw: { width: W, height: H, channels: 1 } })
+    .png({ compressionLevel: 6 })
+    .toBuffer();
+}
+
+/**
+ * The magic edits on the editing copy (w×h, the browser's own size), for the live preview — the
+ * same function as the print, run on the original's pixels at that size (alpha left to the browser).
+ */
+export async function magicPreviewForAsset(db: DbHandle, viewer: ViewerContext, assetId: string, magic: MagicEdits | null, w: number, h: number): Promise<Buffer> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const W = Math.round(Math.min(2000, Math.max(1, w))), H = Math.round(Math.min(2000, Math.max(1, h)));
+  const orig = await bytesOf(db, assetId, 'ORIGINAL');
+  if (!orig) throw new Error('no original');
+  const small = await sharp(orig).rotate().resize(W, H, { fit: 'fill' }).ensureAlpha().png().toBuffer();
+  const out = await applyMagicToImage(small, magic);
+  return sharp(out).removeAlpha().png().toBuffer();
+}
+
 /** The recipe as stored: geometry at the top level (older docs are just that), then the rest. */
-const docOf = (g: StudioGeometry, objects: StudioObject[], look: StudioLook | null, drawing: LayerLook | null) => ({ ...g, objects, ...(look ? { look } : {}), ...(drawing ? { drawing } : {}) });
+const docOf = (g: StudioGeometry, objects: StudioObject[], look: StudioLook | null, drawing: LayerLook | null, magic: MagicEdits | null = null) => ({
+  ...g,
+  objects,
+  ...(magic ? { magic } : {}),
+  ...(look ? { look } : {}),
+  ...(drawing ? { drawing } : {}),
+});
 
 async function bytesOf(db: DbHandle, assetId: string, which: 'ORIGINAL' | 'cutout'): Promise<Buffer | null> {
   if (which === 'ORIGINAL') {
@@ -144,14 +213,15 @@ export async function studioStateForAsset(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; drawing: LayerLook | null; mask: Buffer | null }> {
+): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; drawing: LayerLook | null; magic: MagicEdits | null; mask: Buffer | null }> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
   const geometry = row?.doc ? cleanGeometry(row.doc) : IDENTITY_GEOMETRY;
   const objects = row?.doc ? cleanObjects((row.doc as { objects?: unknown }).objects) : [];
   const look = row?.doc ? cleanLook((row.doc as { look?: unknown }).look) : null;
   const drawing = row?.doc ? cleanLayerLook((row.doc as { drawing?: unknown }).drawing) : null;
-  return { geometry, objects, look, drawing, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
+  const magic = row?.doc ? cleanMagic((row.doc as { magic?: unknown }).magic) : null;
+  return { geometry, objects, look, drawing, magic, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
 }
 
 /** Typed words that fail the abuse screen (user text is screened before it can print). */
@@ -177,7 +247,7 @@ export async function saveStudio(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; magic?: unknown; clearCutout?: boolean },
   deps: { moderation?: ModerationProviders } = {},
 ): Promise<StudioSaveResult> {
   const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
@@ -185,16 +255,17 @@ export async function saveStudio(
   const objects = cleanObjects(input.objects);
   const look = cleanLook(input.look);
   const drawing = cleanLayerLook(input.drawing);
+  const magic = cleanMagic(input.magic);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: docOf(g, objects, look, drawing) }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: docOf(g, objects, look, drawing, magic) }).where(eq(assets.id, assetId));
 
   const cut = input.clearCutout ? null : await bytesOf(db, assetId, 'cutout');
   const source = cut ?? (await bytesOf(db, assetId, 'ORIGINAL'));
   if (!source) throw new Error('no original to edit');
 
-  const plain = isIdentity(g) && objects.length === 0 && !look && !drawing;
+  const plain = isIdentity(g) && objects.length === 0 && !look && !drawing && !magic;
   if (!cut && plain) {
     await dropDerivative(db, assetId, 'design'); // back to the plain original — no stale design left behind
     await clearDesignModeration(db, assetId);
@@ -211,7 +282,8 @@ export async function saveStudio(
   }
 
   // originals: honour orientation first; then colour & light, on the drawing's own pixels
-  const base = await applyLookToImage(cut ?? (await sharp(source).rotate().png().toBuffer()), look, drawing);
+  // magic edits first (the drawing tidied / brightened), then colour & light — as previewed
+  const base = await applyLookToImage(await applyMagicToImage(cut ?? (await sharp(source).rotate().png().toBuffer()), magic), look, drawing);
   const baseMeta = await sharp(base).metadata();
   const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
   const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
@@ -255,11 +327,11 @@ export async function saveStudio(
   }
   // the real pixel size goes with THIS design's hash — a stale record can never vouch for new bytes
   const designPx: DesignPx = { ...real, sha256 };
-  await db.update(assets).set({ studioDoc: { ...docOf(g, objects, look, drawing), designPx } }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: { ...docOf(g, objects, look, drawing, magic), designPx } }).where(eq(assets.id, assetId));
   // Anything drawn or added is new content: screen it before it can reach a print order. A colour
   // change can bring out what was hard to see, so that's screened too (the more careful choice).
   // (Rotate / crop / background / removals only ever show less of the screened upload.)
-  if (objects.length || look) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
+  if (objects.length || look || magic) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
   else await clearDesignModeration(db, assetId);
   return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height, realPx: real };
 }
@@ -274,13 +346,14 @@ export async function autosaveStudioDoc(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; magic?: unknown; clearCutout?: boolean },
 ): Promise<void> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
   const look = cleanLook(input.look);
   const drawing = cleanLayerLook(input.drawing);
+  const magic = cleanMagic(input.magic);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   else if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
@@ -289,7 +362,7 @@ export async function autosaveStudioDoc(
   const designPx = (row?.doc as { designPx?: DesignPx } | null)?.designPx;
   await db
     .update(assets)
-    .set({ studioDoc: { ...docOf(g, objects, look, drawing), ...(designPx ? { designPx } : {}) } })
+    .set({ studioDoc: { ...docOf(g, objects, look, drawing, magic), ...(designPx ? { designPx } : {}) } })
     .where(eq(assets.id, assetId));
 }
 

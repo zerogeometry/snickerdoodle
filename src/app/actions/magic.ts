@@ -3,9 +3,10 @@
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
 import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
-import { autosaveStudioDoc, cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
+import { autosaveStudioDoc, cleanGeometry, magicPreviewForAsset, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { LayerLook, StudioObject } from '@/lib/studio-objects';
 import type { StudioLook } from '@/lib/studio-look';
+import { cleanMagic, type MagicEdits } from '@/lib/studio-magic';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { clientIp, LIMITS, rateLimit } from '@/server/rateLimit';
 
@@ -86,14 +87,14 @@ export async function saveCutoutMaskAction(input: { assetId: string; mask: strin
 }
 
 /** Reopen the Studio: the saved recipe + the current transparency mask (data URL, or null). */
-export async function studioStateAction(input: { assetId: string }): Promise<{ ok: true; geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; drawing: LayerLook | null; mask: string | null } | { ok: false }> {
+export async function studioStateAction(input: { assetId: string }): Promise<{ ok: true; geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; drawing: LayerLook | null; magic: MagicEdits | null; mask: string | null } | { ok: false }> {
   const account = await getCurrentAccount();
   const claims = await getUploadClaims();
   const db = getDb();
   const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
   try {
     const st = await studioStateForAsset(db, viewer, String(input.assetId));
-    return { ok: true, geometry: st.geometry, objects: st.objects, look: st.look, drawing: st.drawing, mask: st.mask ? `data:image/png;base64,${st.mask.toString('base64')}` : null };
+    return { ok: true, geometry: st.geometry, objects: st.objects, look: st.look, drawing: st.drawing, magic: st.magic, mask: st.mask ? `data:image/png;base64,${st.mask.toString('base64')}` : null };
   } catch {
     return { ok: false };
   }
@@ -107,6 +108,7 @@ export async function saveStudioAction(input: {
   objects?: StudioObject[];
   look?: StudioLook | null;
   drawing?: LayerLook | null;
+  magic?: MagicEdits | null;
   clearCutout?: boolean;
 }): Promise<{ ok: true; design: { url: string; sourceObjectId: string; px?: { width: number; height: number } } | null; aspect: number } | { ok: false; reason?: 'text' }> {
   const account = await getCurrentAccount();
@@ -120,7 +122,7 @@ export async function saveStudioAction(input: {
     mask = Buffer.from(m[1]!, 'base64');
   }
   try {
-    const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, look: input.look, drawing: input.drawing, clearCutout: input.clearCutout === true });
+    const res = await saveStudio(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, look: input.look, drawing: input.drawing, magic: input.magic, clearCutout: input.clearCutout === true });
     if (!res.sourceObjectId) return { ok: true, design: null, aspect: res.aspect };
     const grant = await getStorageObjectGrant(db, res.sourceObjectId, viewer, 600);
     return { ok: true, design: { url: grant.url, sourceObjectId: res.sourceObjectId, ...(res.realPx ? { px: res.realPx } : {}) }, aspect: res.aspect };
@@ -139,6 +141,7 @@ export async function autosaveStudioAction(input: {
   objects?: StudioObject[];
   look?: StudioLook | null;
   drawing?: LayerLook | null;
+  magic?: MagicEdits | null;
   clearCutout?: boolean;
 }): Promise<{ ok: true } | { ok: false; reason?: 'text' }> {
   const account = await getCurrentAccount();
@@ -152,10 +155,28 @@ export async function autosaveStudioAction(input: {
     mask = Buffer.from(m[1]!, 'base64');
   }
   try {
-    await autosaveStudioDoc(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, look: input.look, drawing: input.drawing, clearCutout: input.clearCutout === true });
+    await autosaveStudioDoc(db, viewer, String(input.assetId), { mask, geometry: cleanGeometry(input.geometry), objects: input.objects, look: input.look, drawing: input.drawing, magic: input.magic, clearCutout: input.clearCutout === true });
     return { ok: true };
   } catch (e) {
     if (e instanceof StudioTextError) return { ok: false, reason: 'text' };
+    return { ok: false };
+  }
+}
+
+/**
+ * The live preview of "tidy the lines" / "brighten": the same self-hosted edit the print runs,
+ * on the drawing at the editing copy's size. Gated like every magic edit, and rate-limited.
+ */
+export async function magicPreviewAction(input: { assetId: string; magic: MagicEdits | null; w: number; h: number }): Promise<{ ok: true; rgb: string } | { ok: false; reason?: 'too-many' }> {
+  const db = getDb();
+  if (!(await rateLimit(db, { ...LIMITS.magicEditsPerIp, caller: await clientIp() })).ok) return { ok: false, reason: 'too-many' };
+  const account = await getCurrentAccount();
+  const claims = await getUploadClaims();
+  const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+  try {
+    const png = await magicPreviewForAsset(db, viewer, String(input.assetId), cleanMagic(input.magic), Number(input.w), Number(input.h));
+    return { ok: true, rgb: `data:image/png;base64,${png.toString('base64')}` };
+  } catch {
     return { ok: false };
   }
 }

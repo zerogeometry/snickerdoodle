@@ -22,7 +22,9 @@ import { Modal } from '@/ui/primitives/Modal';
 import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
-import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { autosaveStudioAction, cutoutAlphaAction, magicPreviewAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { MagicPanel } from '@/ui/studio/MagicPanel';
+import { magicKey, type MagicEdits } from '@/lib/studio-magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
 import { deleteCreationAction, duplicateCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
@@ -64,6 +66,8 @@ import {
   maskToDataUrl,
   printReadiness,
   readMask,
+  readRgb,
+  setWorkRgb,
   removeColour,
   turnGeometry,
   rotatedSize,
@@ -102,12 +106,13 @@ interface Snapshot {
   keepWhite: boolean;
   look: StudioLook;
   drawingLook: LayerLook;
+  magic: MagicEdits | null;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
 const EDITING: ToolId[] = ['text', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
-const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'compare'];
+const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'magic', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
 /** The drawing itself, as a selectable layer (once unlocked). */
 const DRAWING = '__drawing';
@@ -149,6 +154,11 @@ function StudioEditor() {
   // the drawing's own layer: shown / hidden, and how solid
   const [drawingLook, setDrawingLook] = useState<LayerLook>({});
   const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
+  // one-tap magic edits on the drawing's pixels (self-hosted); previewed from the server's own result
+  const [magic, setMagic] = useState<MagicEdits | null>(null);
+  const origRgb = useRef<Uint8ClampedArray | null>(null);
+  const magicCache = useRef(new Map<string, Uint8ClampedArray>());
+  const [magicBusy, setMagicBusy] = useState(false);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
   const [fussy, setFussy] = useState(28);
@@ -290,6 +300,7 @@ function StudioEditor() {
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
           if (st.look) setLook(st.look);
+          if (st.magic) setMagic(st.magic);
           if (st.drawing) setDrawingLook(st.drawing);
           // the stored cut-out only while the drawing is USING it (a parent can put the background back
           // from the upload screen — then the Studio opens on the untouched original)
@@ -301,6 +312,7 @@ function StudioEditor() {
       }
       if (!live) return;
       savedAlpha.current = work.alpha.slice();
+      origRgb.current = work.rgb;
       workRef.current = work;
       const pic = document.createElement('canvas');
       pic.width = work.w;
@@ -320,6 +332,49 @@ function StudioEditor() {
   useEffect(() => {
     void Promise.all(CARD_FONTS.map((f) => document.fonts.load(`40px ${f.css}`).catch(() => null))).then(() => setTick((t) => t + 1));
   }, []);
+
+  // magic edits: the editing copy shows the server's own result (cached per combination), so the
+  // preview is the same edit the print gets; undo / reopen / start again all land here
+  const magicRef = useRef(magic);
+  magicRef.current = magic;
+  useEffect(() => {
+    const work = workRef.current;
+    if (!ready || !work || !origRgb.current) return;
+    const key = magicKey(magic);
+    const show = (rgb: Uint8ClampedArray) => {
+      if (work.rgb === rgb) return;
+      setWorkRgb(work, rgb);
+      setTick((t) => t + 1);
+    };
+    if (!key) return show(origRgb.current);
+    const hit = magicCache.current.get(key);
+    if (hit) return show(hit);
+    if (!assetId) return;
+    let live = true;
+    setMagicBusy(true);
+    void magicPreviewAction({ assetId, magic, w: work.w, h: work.h })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(r.reason ?? 'preview');
+        const rgb = await readRgb(r.rgb, work.w, work.h);
+        magicCache.current.set(key, rgb);
+        if (live && magicKey(magicRef.current) === key) show(rgb);
+      })
+      .catch((e: unknown) => toast(e instanceof Error && e.message === 'too-many' ? TOO_MANY_COPY : 'that bit of magic didn’t work — try again'))
+      .finally(() => setMagicBusy(false));
+    return () => {
+      live = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the edits themselves
+  }, [ready, assetId, magicKey(magic)]);
+  const onMagic = (id: keyof MagicEdits) => {
+    pushUndo();
+    setMagic((m) => {
+      const next = { ...(m ?? {}) } as MagicEdits;
+      if (next[id]) delete next[id];
+      else next[id] = true;
+      return next.tidy || next.brighten ? next : null;
+    });
+  };
 
   // ── stage size ──
   useEffect(() => {
@@ -502,7 +557,7 @@ function StudioEditor() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLook });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLook, magic });
   const redoBeforePush = useRef<Snapshot[]>([]);
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
@@ -521,6 +576,7 @@ function StudioEditor() {
     setKeepWhite(s.keepWhite);
     setLook(s.look);
     setDrawingLook(s.drawingLook);
+    setMagic(s.magic);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -1021,6 +1077,7 @@ function StudioEditor() {
     setKeepWhite(false);
     setLook(IDENTITY_LOOK);
     setDrawingLook({});
+    setMagic(null);
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -1038,7 +1095,7 @@ function StudioEditor() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, magic, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -1084,7 +1141,7 @@ function StudioEditor() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLook) < 1 ? drawingLook : null, magic, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -1111,7 +1168,7 @@ function StudioEditor() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, look, drawingLook, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, drawingLook, magic, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -1258,7 +1315,7 @@ function StudioEditor() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', s: 'stickers', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
+      const map: Record<string, ToolId> = { m: 'magic', a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', s: 'stickers', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1447,6 +1504,9 @@ function StudioEditor() {
       background={geo.background}
       setBackground={setBackground}
       look={look}
+      magic={magic}
+      magicBusy={magicBusy}
+      onMagic={onMagic}
       onLook={onLook}
     />
   );
@@ -1481,6 +1541,9 @@ function StudioEditor() {
           setBackground,
           look,
           onLook,
+          magic,
+          magicBusy,
+          onMagic,
           pen,
           setPen,
           textStyle,
@@ -1751,6 +1814,9 @@ function ToolOptions(p: {
   angle: number;
   onAngle: (visual: number, group?: boolean) => void;
   look: StudioLook;
+  magic: MagicEdits | null;
+  magicBusy: boolean;
+  onMagic: (id: keyof MagicEdits) => void;
   onLook: (patch: Partial<StudioLook>, group?: boolean) => void;
 }) {
   const jump = (id: ToolId, label: string) => (
@@ -1851,6 +1917,8 @@ function ToolOptions(p: {
           </Section>
         </Stack>
       );
+    case 'magic':
+      return <MagicPanel magic={p.magic} busy={p.magicBusy} onToggle={p.onMagic} onRemoveBg={() => p.onTool('removeBg')} hadCutout={p.hadCutout} />;
     case 'adjust':
       return <LookPanel look={p.look} onChange={(patch) => p.onLook(patch, true)} onPick={(patch) => p.onLook(patch)} />;
     case 'rotate':

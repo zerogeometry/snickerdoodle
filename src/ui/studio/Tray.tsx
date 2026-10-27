@@ -16,6 +16,7 @@ import {
   IconRestore,
   IconRotate,
   IconRotateClockwise,
+  IconSparkles,
   IconStackPop,
   IconStackPush,
   IconTrash,
@@ -28,6 +29,7 @@ import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { IDENTITY_LOOK, LOOKS, lookIsIdentity, type StudioLook } from '@/lib/studio-look';
+import { MAGIC_EDITS, type MagicEdits } from '@/lib/studio-magic';
 import { Icon } from '@/ui/primitives/Icon';
 import { layerName, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from './AddedOptions';
 import { STANDARD_COLOURS } from './ColourPicker';
@@ -252,6 +254,10 @@ export interface TrayProps {
   setBackground: (bg: string | null) => void;
   look: StudioLook;
   onLook: (patch: Partial<StudioLook>, group?: boolean) => void;
+  /** One-tap magic edits (tidy the lines · brighten), switches in the recipe. */
+  magic: MagicEdits | null;
+  magicBusy: boolean;
+  onMagic: (id: keyof MagicEdits) => void;
   // added things
   pen: PenStyle;
   setPen: (s: PenStyle) => void;
@@ -363,6 +369,22 @@ export function StudioTray(p: TrayProps): ReactNode {
           </TChip>
           <TSep />
           <TSwatches value={p.background} onChange={(hex) => p.setBackground(hex)} label="background colour" />
+        </>,
+      );
+    case 'magic':
+      return row(
+        <>
+          {MAGIC_EDITS.map((m) => (
+            <TChip key={m.id} on={!!p.magic?.[m.id]} disabled={p.magicBusy} onClick={() => p.onMagic(m.id)} label={`${m.label} — ${m.note}`}>
+              <Icon icon={p.magic?.[m.id] ? IconCircleCheck : IconSparkles} size={16} /> {m.label}
+            </TChip>
+          ))}
+          {!p.hadCutout ? (
+            <>
+              <TSep />
+              {jump('removeBg', 'remove background')}
+            </>
+          ) : null}
         </>,
       );
     case 'adjust':
