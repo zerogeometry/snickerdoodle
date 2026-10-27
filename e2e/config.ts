@@ -58,5 +58,9 @@ export const webServer: PlaywrightTestConfig['webServer'] = {
   reuseExistingServer: true,
   timeout: 300_000,
   // Magic links + invite emails point at the server under test.
-  env: { APP_URL: BASE_URL },
+  // RATE_LIMIT_SCALE: many journeys from one address (127.0.0.1) mustn't trip the per-IP limits
+  // (it only loosens by a factor — src/server/rateLimit.ts — never switches them off).
+  // MAIL_PROVIDER=console: production refuses to run without a real mail provider (D7); the e2e
+  // server prints its emails to its own log instead.
+  env: { APP_URL: BASE_URL, RATE_LIMIT_SCALE: '100', MAIL_PROVIDER: 'console' },
 };

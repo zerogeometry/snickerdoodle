@@ -14,14 +14,16 @@
  *
  * Idempotent. Never run against a deployed database: it refuses anything that isn't local.
  */
-import { and, count, eq, isNull } from 'drizzle-orm';
+import { HeadObjectCommand } from '@aws-sdk/client-s3';
+import { and, count, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { mockupViews, printTemplates, products, productVariants } from '@/db/schema';
+import { mockupViews, printTemplates, products, productVariants, templateAssets } from '@/db/schema';
 import { seedCatalogue } from '@/server/catalogue';
 import { setMockupTemplate, setMockupView, type MaterialClass } from '@/server/print/templates';
+import { ensureBucket, getS3 } from '@/storage';
 
 const url = process.env.DATABASE_URL;
 if (!url) throw new Error('e2e seed: DATABASE_URL is not set');
@@ -78,28 +80,49 @@ async function main() {
       console.log(`e2e seed: catalogue seeded (${s.products} products, ${s.variants} variants)`);
     }
 
-    const missing = await db
-      .select({ variantId: printTemplates.variantId, w: printTemplates.printWidthPx, h: printTemplates.printHeightPx, key: products.key })
+    await ensureBucket();
+    const { client: s3, bucket } = getS3();
+    const stored = async (key: string | null) => {
+      if (!key) return false;
+      try {
+        await s3.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const templates = await db
+      .select({ variantId: printTemplates.variantId, w: printTemplates.printWidthPx, h: printTemplates.printHeightPx, key: products.key, blankKey: templateAssets.key })
       .from(printTemplates)
       .innerJoin(productVariants, eq(productVariants.id, printTemplates.variantId))
       .innerJoin(products, eq(products.id, productVariants.productId))
-      .where(and(isNull(printTemplates.blankObjectId), eq(products.active, true), eq(productVariants.active, true)));
+      .leftJoin(templateAssets, eq(templateAssets.id, printTemplates.blankObjectId))
+      .where(and(eq(products.active, true), eq(productVariants.active, true)));
 
-    for (const m of missing) {
+    let drawn = 0;
+    let lost = 0;
+    for (const m of templates) {
+      if (await stored(m.blankKey)) continue;
+      if (m.blankKey) lost++;
       const { blank, quad } = await syntheticBlank(m.w, m.h);
       await setMockupTemplate(db, { variantId: m.variantId, blank, contentType: 'image/png', printQuad: quad, materialClass: MATERIAL[m.key] ?? 'PAPER' });
+      drawn++;
     }
-    if (missing.length) console.log(`e2e seed: drew ${missing.length} synthetic mockup templates`);
+    if (lost) console.warn(`e2e seed: ${lost} mockup templates had lost their blank from storage — redrawn synthetic`);
+    if (drawn) console.log(`e2e seed: drew ${drawn} synthetic mockup templates`);
 
     // The range shows the mug by its centred wrap (an alternate view) — draw that too where absent.
     const mugs = await db
-      .select({ variantId: printTemplates.variantId, w: printTemplates.printWidthPx, h: printTemplates.printHeightPx, view: mockupViews.view })
+      .select({ variantId: printTemplates.variantId, w: printTemplates.printWidthPx, h: printTemplates.printHeightPx, view: mockupViews.view, blankKey: templateAssets.key })
       .from(printTemplates)
       .innerJoin(productVariants, eq(productVariants.id, printTemplates.variantId))
       .innerJoin(products, eq(products.id, productVariants.productId))
       .leftJoin(mockupViews, and(eq(mockupViews.variantId, printTemplates.variantId), eq(mockupViews.view, 'centre')))
+      .leftJoin(templateAssets, eq(templateAssets.id, mockupViews.blankObjectId))
       .where(eq(products.key, 'mug'));
-    const noCentre = mugs.filter((m) => m.view === null);
+    const noCentre = [];
+    for (const m of mugs) if (!(await stored(m.blankKey))) noCentre.push(m);
     for (const m of noCentre) {
       const { blank, quad } = await syntheticBlank(m.w, m.h);
       await setMockupView(db, { variantId: m.variantId, view: 'centre', blank, contentType: 'image/png', printQuad: quad, printWidthPx: m.w, printHeightPx: m.h, materialClass: 'CERAMIC' });
