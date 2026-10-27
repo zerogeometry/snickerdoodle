@@ -3,6 +3,7 @@ import {
   canBuyFromGiftList,
   canContributeCreations,
   canDeleteAsset,
+  canDiscardDraft,
   canManageFamily,
   canSetAssetVisibility,
   type AssetRef,
@@ -112,4 +113,23 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
     expect(canDeleteAsset(asset, { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', familyId: 'fam-B' }) })).toBe(false));
   it('anonymous cannot delete', () =>
     expect(canDeleteAsset(asset, { accountId: null, membership: null })).toBe(false));
+});
+
+describe('canDiscardDraft (only the holder of a draft’s upload claim)', () => {
+  const draft: AssetRef = { id: 'd1', familyId: null, uploaderAccountId: null, controllerAccountId: null, visibility: 'FAMILY', ephemeralClaimId: 'claim-1' };
+  const kept: AssetRef = { id: 'a1', familyId: 'fam-A', uploaderAccountId: 'acct-c', controllerAccountId: 'acct-c', visibility: 'FAMILY', ephemeralClaimId: null };
+
+  it('the claim holder can discard their own draft', () =>
+    expect(canDiscardDraft(draft, { accountId: null, membership: null, uploadClaim: 'claim-1' })).toBe(true));
+  it('a signed-in claim holder can too', () =>
+    expect(canDiscardDraft(draft, { accountId: 'acct-x', membership: null, uploadClaim: 'claim-1' })).toBe(true));
+  it('a different claim cannot', () =>
+    expect(canDiscardDraft(draft, { accountId: null, membership: null, uploadClaim: 'claim-2' })).toBe(false));
+  it('no claim cannot (anonymous)', () => expect(canDiscardDraft(draft, { accountId: null, membership: null })).toBe(false));
+  it('a family member without the claim cannot', () =>
+    expect(canDiscardDraft(draft, { accountId: 'acct-m', membership: mem({ accountId: 'acct-m' }) })).toBe(false));
+  it('a kept (family) asset is never discardable as a draft — even by its controller holding an old claim', () =>
+    expect(canDiscardDraft(kept, { accountId: 'acct-c', membership: mem({ accountId: 'acct-c' }), uploadClaim: 'claim-1' })).toBe(false));
+  it('an asset with no claim recorded at all cannot', () =>
+    expect(canDiscardDraft({ ...kept, ephemeralClaimId: undefined }, { accountId: null, membership: null, uploadClaim: 'claim-1' })).toBe(false));
 });

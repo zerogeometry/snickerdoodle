@@ -23,7 +23,7 @@ import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
-import { studioInfoAction } from '@/app/actions/studio';
+import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
@@ -85,6 +85,7 @@ export default function StudioPage() {
   const setAssetId = useUpload((s) => s.setAssetId);
   const setCutout = useUpload((s) => s.setCutout);
   const setAspect = useUpload((s) => s.setAspect);
+  const resetUpload = useUpload((s) => s.resetUpload);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,6 +143,17 @@ export default function StudioPage() {
     const r = await setAssetVisibilityAction(assetId, tier);
     toast(r.ok ? `now seen by ${TIER_LABEL[tier]}` : 'couldn’t change that — try again');
     await refreshInfo(assetId);
+  };
+  const deleteCreation = async () => {
+    if (!assetId) return;
+    setBusy('deleting…');
+    const r = await deleteCreationAction({ assetId });
+    setBusy(null);
+    if (!r.ok) return toast('couldn’t delete that — try again');
+    setDirty(false);
+    resetUpload();
+    toast('deleted — gone for good');
+    router.push('/start-creating');
   };
 
   const transparent = useMemo(() => (workRef.current ? hasTransparency(workRef.current.alpha) : false), [tick, ready]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1066,7 +1078,7 @@ export default function StudioPage() {
             <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span>
           ) : ready ? (
             <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] sm:max-w-[60%]">
-              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} />
+              <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} />
             </div>
           ) : null}
           {busy ? (

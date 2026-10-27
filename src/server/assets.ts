@@ -262,7 +262,7 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
 export async function eraseAsset(
   db: DbHandle,
   row: { id: string; familyId: string | null },
-  actor: { accountId: string | null; actorType: 'MEMBER' | 'SYSTEM' | 'ADMIN' },
+  actor: { accountId: string | null; actorType: 'MEMBER' | 'GUEST' | 'SYSTEM' | 'ADMIN' },
   metadata?: Record<string, unknown>,
   opts: { skipLedger?: boolean } = {},
 ): Promise<void> {

@@ -17,6 +17,7 @@ export {
   type GiftLinkGrant,
   canContributeCreations,
   canDeleteAsset,
+  canDiscardDraft,
   canManageFamily,
   canSetAssetVisibility,
 } from './actions';
