@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'cookies',
   description: 'How Snickerdoodle uses cookies — non-essential ones are off by default.',
-};
+  path: '/trust/cookies',
+});
 
 export default function CookiesPage() {
   return (

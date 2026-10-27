@@ -1,12 +1,14 @@
 import { IconClockHour4 } from '@tabler/icons-react';
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import { Icon } from '@/ui/primitives/Icon';
 import { ComplaintForm } from './ComplaintForm';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'make a data-protection complaint',
   description: 'Raise a data-protection complaint directly with Snickerdoodle. We acknowledge within 30 days.',
-};
+  path: '/trust/data-complaint',
+});
 
 // The DUAA s.164A complaints channel: submissions go to the rights-request intake
 // (src/server/rights.ts) — recorded with a due date and acknowledged by email on receipt.

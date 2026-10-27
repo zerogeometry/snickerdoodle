@@ -55,6 +55,7 @@ export function isGateExempt(pathname: string): boolean {
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/manifest.webmanifest' ||
+    pathname === '/sw.js' ||
     // static brand files only — never an API route that happens to end in .png
     (!pathname.startsWith('/api/') && /\.(png|jpe?g|webp|svg|ico|woff2?)$/.test(pathname))
   );

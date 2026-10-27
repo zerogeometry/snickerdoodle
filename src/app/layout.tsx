@@ -16,14 +16,32 @@ import './globals.css';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
+import { ServiceWorkerRegister } from '@/ui/components/ServiceWorkerRegister';
+import { OG_IMAGE, SITE_NAME, siteUrl } from '@/lib/seo';
+
+const DESCRIPTION =
+  "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.";
 
 export const metadata: Metadata = {
+  // canonical + share URLs resolve against the configured origin (APP_URL), never a hard-coded host
+  metadataBase: siteUrl(),
+  applicationName: SITE_NAME,
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
-  description:
-    "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+  description: DESCRIPTION,
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
-  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32' }, { url: '/brand/favicon-192.png', sizes: '192x192' }], apple: '/brand/favicon-180.png' },
+  formatDetection: { telephone: false, email: false, address: false },
+  icons: {
+    icon: [
+      { url: '/brand/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/brand/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/brand/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/brand/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
+  // Share cards for any page that doesn't set its own (public pages do, via publicMetadata()).
+  openGraph: { type: 'website', siteName: SITE_NAME, locale: 'en_GB', title: 'snickerdoodle — keep the magic', description: DESCRIPTION, images: [OG_IMAGE] },
+  twitter: { card: 'summary_large_image', title: 'snickerdoodle — keep the magic', description: DESCRIPTION, images: [OG_IMAGE.url] },
 };
 
 export const viewport: Viewport = {
@@ -46,6 +64,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         {children}
         <Toaster />
         <CookieBanner />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

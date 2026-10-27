@@ -24,6 +24,8 @@ export const LIMITS = {
   checkout: { max: 30, windowMs: 60 * 60_000 },
   /** reports sent by one visitor */
   report: { max: 20, windowMs: 60 * 60_000 },
+  /** founding-families sign-ups from one visitor (the per-inbox re-send throttle is in the service) */
+  waitlist: { max: 5, windowMs: 10 * 60_000 },
   /** emails a member can make us send (invites, gift requests, email change, wishes) */
   'send-email': { max: 40, windowMs: 24 * 60 * 60_000 },
 } as const satisfies Record<string, { max: number; windowMs: number }>;

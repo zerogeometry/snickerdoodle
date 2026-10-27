@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
+import { publicMetadata } from '@/lib/seo';
 import Link from 'next/link';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Prose } from '@/ui/components/Prose';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = publicMetadata({
   title: 'how we look after your family’s data',
   description: 'The plain-English promise of how Snickerdoodle looks after your family’s drawings, photos and data.',
-};
+  path: '/trust/family-promise',
+});
 
 export default function FamilyPromisePage() {
   return (
