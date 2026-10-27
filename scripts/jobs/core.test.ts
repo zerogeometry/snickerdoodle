@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { JOBS, SCHEDULED, checkBaseUrl, logLine, nextRunAt, onCalendar, parseArgs, runJob, summarise, timerUnit } from './core.mjs';
+import { runOnTestSite } from '../../netlify/test-site-jobs.mjs';
 
 const at = (iso: string) => new Date(iso);
 
@@ -202,8 +203,49 @@ describe('runJob', () => {
     expect(r.reason).not.toContain(secret);
   });
 
+  it('takes a shorter timeout and no retries when asked (the Netlify functions)', async () => {
+    let calls = 0;
+    const fetchImpl = (async (_u: string, init?: RequestInit) => {
+      calls++;
+      return new Promise<Response>((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)));
+    }) as unknown as typeof fetch;
+    const r = await runJob({ name: 'retention', base, secret, fetchImpl, timeoutMs: 20, retries: 0 });
+    expect(r).toMatchObject({ outcome: 'failed', attempts: 1 });
+    expect(r.reason).toMatch(/no answer within/);
+    expect(calls).toBe(1);
+  });
+
   it('refuses to run without a secret', async () => {
     const r = await runJob({ name: 'retention', base, secret: '', fetchImpl: reply(200, {}) as unknown as typeof fetch });
     expect(r).toMatchObject({ outcome: 'failed', reason: 'JOBS_SECRET is not set' });
+  });
+});
+
+describe('the Netlify test-site scheduler', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does nothing at all unless SITE_MODE=test', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    const res = await runOnTestSite(['retention'], { APP_URL: 'https://snickerdoodle.co.uk', JOBS_SECRET: 'x' });
+    expect(await res.text()).toBe('not the test site');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('runs the named jobs against the test site and reports failures', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', async (u: string) => {
+      urls.push(u);
+      return u.endsWith('/retention') ? new Response('{"purged":0}', { status: 200 }) : new Response('nope', { status: 500 });
+    });
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const res = await runOnTestSite(['retention', 'popularity'], { SITE_MODE: 'test', APP_URL: 'https://test.example.app', JOBS_SECRET: 'x' });
+    expect(urls.sort()).toEqual(['https://test.example.app/api/jobs/popularity', 'https://test.example.app/api/jobs/retention']);
+    expect(res.status).toBe(500);
   });
 });

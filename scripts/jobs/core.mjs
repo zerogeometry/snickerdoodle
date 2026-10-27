@@ -255,13 +255,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /**
  * POST one job. Never throws. Retries only when the request never reached a working app
  * (connection refused, 502/503/504) — never after a timeout, so a slow job isn't doubled up.
+ * `timeoutMs` / `retries` override the job's own (the Netlify functions get ~30s in all).
  * @param {{ name: string, base: string, secret: string, since?: string, fetchImpl?: typeof fetch,
- *   retryDelayMs?: number, now?: () => number, log?: (line: Record<string, unknown>) => void }} opts
+ *   timeoutMs?: number, retries?: number, retryDelayMs?: number, now?: () => number,
+ *   log?: (line: Record<string, unknown>) => void }} opts
  */
 export async function runJob(opts) {
   const { name, base, secret, since, fetchImpl = fetch, retryDelayMs = 30_000, now = Date.now, log = () => {} } = opts;
   const job = JOBS[name];
   if (!job) return { outcome: 'failed', status: null, reason: `unknown job "${name}"`, body: null };
+  const timeoutMs = opts.timeoutMs ?? job.timeoutMs;
+  const retries = opts.retries ?? job.retries;
   if (!secret) return { outcome: 'failed', status: null, reason: 'JOBS_SECRET is not set', body: null };
   if (job.needsSince && !since) return { outcome: 'failed', status: null, reason: `${name} needs --since <ISO time the backup was taken>`, body: null };
   const url = `${base}${job.path}${since ? `?since=${encodeURIComponent(since)}` : ''}`;
@@ -274,7 +278,7 @@ export async function runJob(opts) {
       const res = await fetchImpl(url, {
         method: 'POST',
         headers: { authorization: `Bearer ${secret}`, 'user-agent': 'snickerdoodle-jobs' },
-        signal: AbortSignal.timeout(job.timeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       const text = await res.text();
       let body = null;
@@ -295,11 +299,11 @@ export async function runJob(opts) {
     } catch (e) {
       const err = /** @type {Error & { cause?: { code?: string } }} */ (e);
       const timedOut = err.name === 'TimeoutError' || err.name === 'AbortError';
-      const reason = timedOut ? `no answer within ${Math.round(job.timeoutMs / 1000)}s` : redact(`${err.message}${err.cause?.code ? ` (${err.cause.code})` : ''}`, secret);
+      const reason = timedOut ? `no answer within ${Math.round(timeoutMs / 1000)}s` : redact(`${err.message}${err.cause?.code ? ` (${err.cause.code})` : ''}`, secret);
       result = { outcome: 'failed', status: null, reason, body: null, retryable: !timedOut };
     }
     const { retryable, ...rest } = result;
-    if (rest.outcome === 'failed' && retryable && attempt <= job.retries) {
+    if (rest.outcome === 'failed' && retryable && attempt <= retries) {
       log({ level: 'warn', job: name, event: 'retry', attempt, reason: rest.reason });
       await sleep(retryDelayMs);
       continue;
