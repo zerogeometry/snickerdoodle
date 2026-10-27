@@ -1,0 +1,15 @@
+# Nightly database dump: pg_dump, encrypted to the backup key, into private S3 (gone after 13 days).
+[Unit]
+Description=Snickerdoodle database backup
+After=postgresql.service network-online.target
+Wants=network-online.target
+OnFailure=snickerdoodle-alert@backup.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/sd-backup
+TimeoutStartSec=1h
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=yes
+PrivateTmp=yes

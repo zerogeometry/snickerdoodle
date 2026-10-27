@@ -1,0 +1,48 @@
+# The web app: `next start` on 127.0.0.1:3000, behind Caddy. Installed by deploy.sh.
+[Unit]
+Description=Snickerdoodle web app
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+StartLimitIntervalSec=300
+StartLimitBurst=5
+OnFailure=snickerdoodle-alert@app.service
+
+[Service]
+User=snickerdoodle
+Group=snickerdoodle
+WorkingDirectory=/opt/snickerdoodle/current
+EnvironmentFile=/etc/snickerdoodle/app.env
+EnvironmentFile=/etc/snickerdoodle/db.env
+Environment=NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=768
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3000
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+# Postgres shares the box: keep the app from starving it.
+MemoryHigh=1100M
+MemoryMax=1300M
+
+# Hardening: the code is root-owned and read-only to the app; only Next's cache is writable.
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/snickerdoodle/releases
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

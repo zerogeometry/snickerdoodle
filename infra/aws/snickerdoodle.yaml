@@ -1,0 +1,397 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Snickerdoodle launch home (decision D18), London only: the private picture bucket, the backups
+  bucket, two customer-managed KMS keys (originals / everything else) and the app's IAM user.
+  Nothing here is public. Create it in CloudFormation in eu-west-2 (see infra/README.md).
+
+Parameters:
+  SiteDomain:
+    Type: String
+    Default: snickerdoodle.co.uk
+    Description: The site's domain. Only this origin may read signed picture links from a page (CORS).
+    AllowedPattern: '^[a-z0-9.-]+$'
+  SesFromDomain:
+    Type: String
+    Default: ''
+    Description: Leave blank unless email is sent with Amazon SES (decision D7). If set, the app may send from this verified domain only.
+
+Rules:
+  LondonOnly:
+    Assertions:
+      - Assert: !Equals [!Ref 'AWS::Region', eu-west-2]
+        AssertDescription: Children's pictures stay in the UK. Create this stack in eu-west-2 (London).
+
+Conditions:
+  UseSes: !Not [!Equals [!Ref SesFromDomain, '']]
+
+Resources:
+  # ── who the app is ────────────────────────────────────────────────────────────────────────
+  # Lightsail boxes can't take an IAM role, so the app uses this user's access key (made by
+  # hand in the IAM console, stored only on the box). Its permissions are in AppPolicy below.
+  AppUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: snickerdoodle-app
+      Tags:
+        - { Key: project, Value: snickerdoodle }
+
+  # ── keys ──────────────────────────────────────────────────────────────────────────────────
+  # The account can MANAGE both keys but only the app can USE them, and only through S3 in
+  # London. So no other login — the console included — can open a child's original.
+  OriginalsKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Snickerdoodle - children's original uploads only
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountManagesTheKeyButCannotUseIt
+            Effect: Allow
+            Principal: { AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root' }
+            Action:
+              - kms:Create*
+              - kms:Describe*
+              - kms:Enable*
+              - kms:List*
+              - kms:Put*
+              - kms:Update*
+              - kms:Revoke*
+              - kms:Disable*
+              - kms:Get*
+              - kms:Delete*
+              - kms:TagResource
+              - kms:UntagResource
+              - kms:ScheduleKeyDeletion
+              - kms:CancelKeyDeletion
+              - kms:RotateKeyOnDemand
+            Resource: '*'
+          - Sid: AppUsesTheKeyThroughS3InLondon
+            Effect: Allow
+            Principal: { AWS: !GetAtt AppUser.Arn }
+            Action: [kms:Encrypt, kms:Decrypt, kms:GenerateDataKey, kms:DescribeKey]
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:ViaService: s3.eu-west-2.amazonaws.com
+                kms:CallerAccount: !Ref 'AWS::AccountId'
+      Tags:
+        - { Key: project, Value: snickerdoodle }
+
+  OriginalsKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/snickerdoodle-originals
+      TargetKeyId: !Ref OriginalsKey
+
+  GeneralKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: Snickerdoodle - everything else (renders, print files, ledger, database backups)
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountManagesTheKeyButCannotUseIt
+            Effect: Allow
+            Principal: { AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root' }
+            Action:
+              - kms:Create*
+              - kms:Describe*
+              - kms:Enable*
+              - kms:List*
+              - kms:Put*
+              - kms:Update*
+              - kms:Revoke*
+              - kms:Disable*
+              - kms:Get*
+              - kms:Delete*
+              - kms:TagResource
+              - kms:UntagResource
+              - kms:ScheduleKeyDeletion
+              - kms:CancelKeyDeletion
+              - kms:RotateKeyOnDemand
+            Resource: '*'
+          - Sid: AppUsesTheKeyThroughS3InLondon
+            Effect: Allow
+            Principal: { AWS: !GetAtt AppUser.Arn }
+            Action: [kms:Encrypt, kms:Decrypt, kms:GenerateDataKey, kms:DescribeKey]
+            Resource: '*'
+            Condition:
+              StringEquals:
+                kms:ViaService: s3.eu-west-2.amazonaws.com
+                kms:CallerAccount: !Ref 'AWS::AccountId'
+      Tags:
+        - { Key: project, Value: snickerdoodle }
+
+  GeneralKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: alias/snickerdoodle-general
+      TargetKeyId: !Ref GeneralKey
+
+  # ── the private picture bucket ────────────────────────────────────────────────────────────
+  PrivateBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'snickerdoodle-private-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt GeneralKey.Arn
+            BucketKeyEnabled: true
+      # Same rules as infra/s3-lifecycle.json — keep the two in step.
+      LifecycleConfiguration:
+        Rules:
+          - Id: deleted-files-gone-within-7-days
+            Status: Enabled
+            Prefix: ''
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 7
+            ExpiredObjectDeleteMarker: true
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+          - Id: erasure-ledger-30-days
+            Status: Enabled
+            Prefix: erasure-ledger/
+            ExpirationInDays: 30
+      # The 3D previews read a signed picture link into WebGL, which needs CORS. Still private:
+      # a request without a valid signature is refused whatever the origin.
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins: [!Sub 'https://${SiteDomain}']
+            AllowedMethods: [GET, HEAD]
+            AllowedHeaders: ['*']
+            MaxAge: 3000
+      Tags:
+        - { Key: project, Value: snickerdoodle }
+
+  PrivateBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PrivateBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyWithoutTLS
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt PrivateBucket.Arn, !Sub '${PrivateBucket.Arn}/*']
+            Condition:
+              Bool: { 'aws:SecureTransport': 'false' }
+          - Sid: DenyOldTLS
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt PrivateBucket.Arn, !Sub '${PrivateBucket.Arn}/*']
+            Condition:
+              NumericLessThan: { 's3:TlsVersion': '1.2' }
+          # Uploads may not ask for weaker encryption than our KMS keys (no-header uploads get
+          # the bucket default, which is the general KMS key).
+          - Sid: DenyNonKmsEncryption
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${PrivateBucket.Arn}/*'
+            Condition:
+              'Null': { 's3:x-amz-server-side-encryption': 'false' }
+              StringNotEquals: { 's3:x-amz-server-side-encryption': 'aws:kms' }
+          - Sid: DenyCustomerProvidedKeys
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${PrivateBucket.Arn}/*'
+            Condition:
+              'Null': { 's3:x-amz-server-side-encryption-customer-algorithm': 'false' }
+          # An original must name its key (the app sends the originals key) — it can never
+          # quietly fall back to the general one.
+          - Sid: OriginalsMustNameTheirKey
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${PrivateBucket.Arn}/*/original'
+            Condition:
+              'Null': { 's3:x-amz-server-side-encryption-aws-kms-key-id': 'true' }
+
+  # ── database backups (nightly encrypted dumps; no pictures in them) ───────────────────────
+  # Not versioned, so the 13-day expiry is the whole story: a deletion is out of the backups
+  # within 14 days (privacy notice §8). The app key can add and read dumps, never delete them.
+  BackupsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'snickerdoodle-backups-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: aws:kms
+              KMSMasterKeyID: !GetAtt GeneralKey.Arn
+            BucketKeyEnabled: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: db-dumps-13-days
+            Status: Enabled
+            Prefix: db/
+            ExpirationInDays: 13
+          - Id: tidy-unfinished-uploads
+            Status: Enabled
+            Prefix: ''
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      Tags:
+        - { Key: project, Value: snickerdoodle }
+
+  BackupsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref BackupsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyWithoutTLS
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt BackupsBucket.Arn, !Sub '${BackupsBucket.Arn}/*']
+            Condition:
+              Bool: { 'aws:SecureTransport': 'false' }
+          - Sid: DenyNonKmsEncryption
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${BackupsBucket.Arn}/*'
+            Condition:
+              'Null': { 's3:x-amz-server-side-encryption': 'false' }
+              StringNotEquals: { 's3:x-amz-server-side-encryption': 'aws:kms' }
+
+  # ── what the app may do ───────────────────────────────────────────────────────────────────
+  AppPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: snickerdoodle-app
+      Description: The Snickerdoodle app - its own bucket, its backups, moderation and its settings. London only.
+      Users: [!Ref AppUser]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PicturesBucketObjects
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+            Resource: !Sub '${PrivateBucket.Arn}/*'
+          - Sid: PicturesBucketList
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt PrivateBucket.Arn
+          - Sid: BackupsAddAndRead
+            Effect: Allow
+            Action: [s3:PutObject, s3:GetObject]
+            Resource: !Sub '${BackupsBucket.Arn}/db/*'
+          - Sid: BackupsList
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource: !GetAtt BackupsBucket.Arn
+          # Content safety (D8). Send the image bytes, not an S3 reference.
+          - Sid: Moderation
+            Effect: Allow
+            Action: [rekognition:DetectModerationLabels, rekognition:DetectText]
+            Resource: '*'
+          - Sid: ReadOwnSettings
+            Effect: Allow
+            Action: [ssm:GetParametersByPath, ssm:GetParameters, ssm:GetParameter]
+            Resource:
+              - !Sub 'arn:aws:ssm:eu-west-2:${AWS::AccountId}:parameter/snickerdoodle/prod'
+              - !Sub 'arn:aws:ssm:eu-west-2:${AWS::AccountId}:parameter/snickerdoodle/prod/*'
+          - !If
+            - UseSes
+            - Sid: SendEmailFromOurDomainOnly
+              Effect: Allow
+              Action: [ses:SendEmail, ses:SendRawEmail]
+              Resource: !Sub 'arn:aws:ses:eu-west-2:${AWS::AccountId}:identity/${SesFromDomain}'
+            - !Ref 'AWS::NoValue'
+          - Sid: LondonOnly
+            Effect: Deny
+            Action: '*'
+            Resource: '*'
+            Condition:
+              StringNotEquals: { 'aws:RequestedRegion': eu-west-2 }
+
+  # ── the settings these resources decide (plain, not secret) ───────────────────────────────
+  # infra/lightsail/fetch-secrets.sh copies everything under /snickerdoodle/prod/app/ into the
+  # app's settings file. The secret ones are added by infra/aws/put-secrets.sh.
+  ParamBucket:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/app/S3_BUCKET
+      Type: String
+      Value: !Ref PrivateBucket
+  ParamRegion:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/app/S3_REGION
+      Type: String
+      Value: eu-west-2
+  # The app's setting is called *_ALIAS; it takes the key ARN, which S3 accepts as well.
+  ParamGeneralKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/app/S3_KMS_KEY_ALIAS
+      Type: String
+      Value: !GetAtt GeneralKey.Arn
+  ParamOriginalsKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/app/S3_KMS_KEY_ALIAS_ORIGINALS
+      Type: String
+      Value: !GetAtt OriginalsKey.Arn
+  ParamBackupBucket:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/box/BACKUP_BUCKET
+      Type: String
+      Value: !Ref BackupsBucket
+  ParamBackupKey:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /snickerdoodle/prod/box/BACKUP_KMS_KEY_ARN
+      Type: String
+      Value: !GetAtt GeneralKey.Arn
+
+Outputs:
+  PrivateBucketName:
+    Value: !Ref PrivateBucket
+  BackupsBucketName:
+    Value: !Ref BackupsBucket
+  OriginalsKeyArn:
+    Value: !GetAtt OriginalsKey.Arn
+  GeneralKeyArn:
+    Value: !GetAtt GeneralKey.Arn
+  AppUserName:
+    Value: !Ref AppUser
+    Description: Make ONE access key for this user (IAM console), paste it into the box, then forget it.

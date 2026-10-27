@@ -1,0 +1,46 @@
+# Caddy: the front door. Gets and renews the HTTPS certificate by itself, forwards to the app
+# on 127.0.0.1:3000 (never reachable from outside), and adds the security headers.
+# SITE_DOMAIN and ACME_EMAIL come from /etc/snickerdoodle/caddy.env (fetch-secrets.sh).
+# No access log on purpose: URLs carry gift-link tokens, and we don't need visitors' IPs.
+{
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2
+	}
+}
+
+(security_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=(self), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		-Server
+		-X-Powered-By
+		defer
+	}
+}
+
+{$SITE_DOMAIN} {
+	import security_headers
+	encode zstd gzip
+
+	# Jobs are called on the box itself (sd-job / the timers) — never from the internet.
+	# Dev-only routes stay shut too.
+	@internal path /api/jobs /api/jobs/* /api/dev /api/dev/*
+	respond @internal 404
+
+	# Drawings and photos up to 20 MB (the app's own limit), plus form overhead.
+	request_body {
+		max_size 25MB
+	}
+
+	reverse_proxy 127.0.0.1:3000
+}
+
+www.{$SITE_DOMAIN} {
+	import security_headers
+	redir https://{$SITE_DOMAIN}{uri} permanent
+}
