@@ -115,6 +115,8 @@ export const LIMITS = {
   mfaPerAccount: { bucket: 'mfa:account', limit: 5, windowSec: 900, failClosed: true },
   complaintPerIp: { bucket: 'complaint:ip', limit: 5, windowSec: 3600 },
   supportPerIp: { bucket: 'support:ip', limit: 6, windowSec: 3600 },
+  // the news-list sign-up (each inbox is also throttled to one confirmation email per 10 minutes)
+  waitlistPerIp: { bucket: 'waitlist:ip', limit: 10, windowSec: 3600 },
   reportPerIp: { bucket: 'report:ip', limit: 10, windowSec: 3600 },
   reportPerAccount: { bucket: 'report:account', limit: 10, windowSec: 3600 },
   invitesPerAccount: { bucket: 'invite:account', limit: 20, windowSec: 3600 },

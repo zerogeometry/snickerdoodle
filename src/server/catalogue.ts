@@ -590,6 +590,17 @@ function variantAttributes(v: VariantDef): Record<string, string> {
   return a;
 }
 
+/**
+ * The products ON SHOW (visible in the shop and not paused), straight from the definitions — no DB,
+ * so the sitemap and each product page's search metadata can't drift from the storefront. Order as
+ * defined. A hidden or paused product is never listed (and its page says noindex).
+ */
+export function shopFrontProducts(): { key: string; label: string; blurb: string; description: string }[] {
+  return Object.entries(DEFS)
+    .filter(([, def]) => def.visibleInShop && !def.paused)
+    .map(([key, def]) => ({ key, label: def.label, blurb: def.blurb, description: def.description }));
+}
+
 export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));

@@ -171,10 +171,27 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - End commit messages with: Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 
 ## How to run
-- dev: (added with the Next.js app shell) · test: `npm test` (watch: `npm run test:watch`)
-- typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (added later) ·
-  visual diff: `npm run test:visual` (added later) · db: `npm run db:*` (added later) ·
-  jobs: `npm run jobs` (added later) · lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
+- local stack: `docker compose up -d` (Postgres on 5544 + MinIO with a throwaway KMS key) →
+  `npm run db:migrate` · dev: `npm run dev` · build/start: `npm run build` / `npm start`
+  (`NEXT_DIST_DIR` gives a build its own dir, e.g. `.next-e2e`).
+- test: `npm test` (watch: `npm run test:watch`) — the `*.int.test.ts` suites skip themselves
+  without `DATABASE_URL` + `S3_ENDPOINT`; bucket-enforcement tests skip only where the store
+  doesn't verify presigned URLs (moto) and run against MinIO/S3. typecheck: `npm run typecheck`
+  · lint: `npm run lint` (ESLint, Next rules) · db: `npm run db:generate|db:migrate|db:push`.
+- e2e: `npm run test:e2e` (playwright.config.ts — builds + starts a production server on :3100,
+  or reuses one; locally the system Edge, in CI Playwright's Chromium). CI (or `E2E_SEED=1`)
+  seeds the catalogue + synthetic mockup templates first (e2e/seed.ts, local DBs only).
+- visual: `npm run test:visual` (tests/visual — 390px phone + laptop, baselines in
+  tests/visual/__screenshots__/<platform>; `-- --update-snapshots` re-records).
+- CI: `.github/workflows/ci.yml` — typecheck, lint, migrate, the full suite on Postgres + MinIO;
+  e2e; visual (non-blocking until its Linux baselines are re-recorded on the runner).
+- jobs: the `/api/jobs/*` routes (Bearer `JOBS_SECRET`). On the AWS London box (D18) the
+  `scheduler` service runs them from `infra/aws-london/scheduler/crontab` (UTC); by hand there:
+  `sudo infra/aws-london/bin/job.sh <job>`. Go-live kit + runbook: `infra/aws-london/README.md`,
+  `project-office/ops/AWS-LONDON-RUNBOOK.md`. The password-locked TEST SITE is Netlify
+  (`netlify.toml`, `scripts/test-site/`).
+- icons: `node scripts/make-icons.mjs [hi-res-logo]` regenerates the PWA/apple icons ·
+  news list: `node scripts/waitlist-export.mjs` (confirmed, still-consented emails as CSV).
 
 ## STOP AND ASK
 If a task seems to require breaking ANY non-negotiable — or trusting the client for visibility/

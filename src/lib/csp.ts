@@ -21,8 +21,11 @@
  *                     attributes in server HTML, and the AR viewer styles its element inline.
  *                     A nonce can't cover attributes, and adding one would switch
  *                     'unsafe-inline' off. Scripts stay strict; this only allows CSS.
+ *  - worker-src 'self'  ONE worker: our own service worker, /sw.js (public/sw.js — it caches only
+ *                     build assets, brand files and the offline page; never a page, an API
+ *                     response or a child's picture). No blob:/data: workers, nothing off-site.
  * Not allowed at all: any third-party script (Stripe Checkout is a full-page redirect — no
- * Stripe.js, no Stripe frame), frames, plugins, workers, <base>, off-site forms, being framed.
+ * Stripe.js, no Stripe frame), frames, plugins, other workers, <base>, off-site forms, being framed.
  *
  * WebAssembly is refused too (no 'wasm-unsafe-eval'). The AR viewer's model-viewer bundles three's
  * meshopt mesh decoder and compiles it on import; that compile is refused and logs one error, but
@@ -71,7 +74,7 @@ export function buildCsp({ nonce, mode, storageOrigins }: CspInput): string {
     'connect-src': ["'self'", 'data:', 'blob:', ...storage, ...(dev ? DEV_RELAXATIONS.connect : [])],
     'manifest-src': ["'self'"],
     'frame-src': ["'none'"],
-    'worker-src': ["'none'"],
+    'worker-src': ["'self'"],
     'object-src': ["'none'"],
     'base-uri': ["'none'"],
     'form-action': ["'self'"],
