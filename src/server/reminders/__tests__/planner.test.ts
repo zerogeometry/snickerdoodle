@@ -1,50 +1,58 @@
 import { describe, expect, it } from 'vitest';
-import { CAP_DAYS, planReminders, type PlannerChild, type PlannerRecipient } from '../planner';
+import { CAP_DAYS, planDigests, type Candidate, type PriorSend } from '../planner';
 
 const NOW = new Date('2026-10-12T09:00:00Z');
-const mia: PlannerChild = { id: 'c-mia', familyId: 'fam-A', firstName: 'Mia', birthday: '2021-10-28' }; // in 16 days
-const leo: PlannerChild = { id: 'c-leo', familyId: 'fam-A', firstName: 'Leo', birthday: '2019-10-30' }; // in 18 days
-const parent: PlannerRecipient = { accountId: 'acct-1', email: 'p@example.test', familyId: 'fam-A', remindersConsent: true };
+const c = (over: Partial<Candidate> = {}): Candidate => ({ accountId: 'acct-1', email: 'p@example.test', key: 'child:mia', year: 2026, date: '2026-11-11', title: 'Mia turns 5', note: null, ...over });
+const yes = new Map([['acct-1', true]]);
+const plan = (candidates: Candidate[], opts: { consent?: Map<string, boolean>; sent?: PriorSend[]; now?: Date } = {}) =>
+  planDigests({ candidates, consent: opts.consent ?? yes, sent: opts.sent ?? [], now: opts.now ?? NOW });
 
-describe('planReminders', () => {
-  it('sends one gentle reminder in the window, for the soonest birthday', () => {
-    const out = planReminders({ children: [mia, leo], recipients: [parent], sent: [], now: NOW });
+describe('occasion reminders — a month before AND two weeks before', () => {
+  it('a month out: the 30-day nudge', () => {
+    const out = plan([c({ date: '2026-11-11' })]); // in 30 days
     expect(out).toHaveLength(1);
-    expect(out[0]).toMatchObject({ childId: 'c-mia', firstName: 'Mia', turns: 5, inDays: 16, occasionDate: '2026-10-28' });
+    expect(out[0]!.lines).toEqual([expect.objectContaining({ key: 'child:mia', offset: 30, inDays: 30 })]);
   });
 
+  it('two weeks out: the 14-day nudge', () => {
+    expect(plan([c({ date: '2026-10-26' })])[0]!.lines[0]).toMatchObject({ offset: 14, inDays: 14 });
+  });
+
+  it('a little late (the job missed a day) still goes, inside the window', () => {
+    expect(plan([c({ date: '2026-10-24' })])[0]!.lines[0]).toMatchObject({ offset: 14, inDays: 12 });
+  });
+
+  it('outside both windows: nothing (no third nudge, nothing months ahead)', () => {
+    for (const date of ['2026-12-31', '2026-11-01', '2026-10-15']) expect(plan([c({ date })])).toEqual([]);
+  });
+
+  it('each nudge once per occasion per year', () => {
+    const sent: PriorSend[] = [{ accountId: 'acct-1', occasionKey: 'child:mia', occasionYear: 2026, offsetDays: 30, sentAt: new Date('2026-10-01T09:00:00Z') }];
+    expect(plan([c({ date: '2026-11-10' })], { sent })).toEqual([]); // the month nudge already went
+    expect(plan([c({ date: '2026-10-26' })], { sent })[0]!.lines[0]!.offset).toBe(14); // the two-week one still comes
+  });
+});
+
+describe('gentle and lawful', () => {
   it('PECR: no consent → nothing, ever', () => {
-    expect(planReminders({ children: [mia], recipients: [{ ...parent, remindersConsent: false }], sent: [], now: NOW })).toEqual([]);
+    expect(plan([c()], { consent: new Map([['acct-1', false]]) })).toEqual([]);
+    expect(plan([c()], { consent: new Map() })).toEqual([]);
   });
 
-  it('one reminder per child per year', () => {
-    const sent = [{ accountId: 'acct-1', childId: 'c-mia', occasionYear: 2026, sentAt: new Date('2026-10-01T09:00:00Z') }];
-    const out = planReminders({ children: [mia], recipients: [parent], sent, now: NOW });
-    expect(out).toEqual([]);
+  it('everything due goes in ONE email, soonest first', () => {
+    const out = plan([c({ key: 'fest:fam:diwali', title: 'Diwali', date: '2026-11-08' }), c({ key: 'occ:anniv', title: 'Granny & grandad’s 40th', date: '2026-10-26' })]);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.lines.map((l) => l.title)).toEqual(['Granny & grandad’s 40th', 'Diwali']);
   });
 
-  it(`frequency cap: nothing within ${CAP_DAYS} days of the last reminder, even for another child`, () => {
-    const sent = [{ accountId: 'acct-1', childId: 'c-mia', occasionYear: 2026, sentAt: new Date('2026-10-10T09:00:00Z') }];
-    expect(planReminders({ children: [mia, leo], recipients: [parent], sent, now: NOW })).toEqual([]);
+  it(`at most one email every ${CAP_DAYS} days — what's due waits (its window is wider)`, () => {
+    const sent: PriorSend[] = [{ accountId: 'acct-1', occasionKey: 'occ:x', occasionYear: 2026, offsetDays: 14, sentAt: new Date('2026-10-11T09:00:00Z') }];
+    expect(plan([c({ date: '2026-11-11' })], { sent })).toEqual([]);
+    expect(plan([c({ date: '2026-11-11' })], { sent, now: new Date('2026-10-14T09:00:00Z') })[0]!.lines[0]!.offset).toBe(30);
   });
 
-  it('after the cap window, the next child can be reminded', () => {
-    const sent = [{ accountId: 'acct-1', childId: 'c-mia', occasionYear: 2026, sentAt: new Date('2026-10-01T09:00:00Z') }];
-    const out = planReminders({ children: [mia, leo], recipients: [parent], sent, now: NOW });
-    expect(out.map((o) => o.childId)).toEqual(['c-leo']);
-  });
-
-  it('outside the window (too far or too close) → nothing', () => {
-    const far = { ...mia, birthday: '2021-12-25' };
-    const close = { ...mia, birthday: '2021-10-15' };
-    expect(planReminders({ children: [far, close], recipients: [parent], sent: [], now: NOW })).toEqual([]);
-  });
-
-  it("never crosses families: another family's child is not this recipient's occasion", () => {
-    expect(planReminders({ children: [{ ...mia, familyId: 'fam-B' }], recipients: [parent], sent: [], now: NOW })).toEqual([]);
-  });
-
-  it('ignores malformed birthdays rather than guessing', () => {
-    expect(planReminders({ children: [{ ...mia, birthday: '28/10/2021' }], recipients: [parent], sent: [], now: NOW })).toEqual([]);
+  it('each recipient only hears their own candidates (who-sees-what is decided upstream)', () => {
+    const out = plan([c(), c({ accountId: 'acct-2', email: 'g@example.test' })], { consent: new Map([['acct-1', true], ['acct-2', true]]) });
+    expect(out.map((d) => d.email).sort()).toEqual(['g@example.test', 'p@example.test']);
   });
 });

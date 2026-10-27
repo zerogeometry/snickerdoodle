@@ -44,6 +44,10 @@ export const relationship = pgEnum('relationship', [
   'OTHER',
 ]);
 export const membershipStatus = pgEnum('membership_status', ['ACTIVE', 'REMOVED', 'LEFT']);
+/** What an occasion is (the family calendar — founder, 27 Oct). */
+export const occasionKind = pgEnum('occasion_kind', ['BIRTHDAY', 'ANNIVERSARY', 'MILESTONE', 'OTHER']);
+/** A date that follows a LUNAR calendar — kept on the same lunar day each year (src/lib/occasions). */
+export const lunarCalendar = pgEnum('lunar_calendar', ['CHINESE', 'KOREAN']);
 export const assetKind = pgEnum('asset_kind', ['DRAWING', 'PHOTO']);
 // Content-safety state (decision D8). PENDING until the automated gate runs;
 // CLEAR may be ordered/printed; FLAGGED waits in the review queue (never
@@ -146,6 +150,10 @@ export const families = pgTable('families', {
   ownerAccountId: uuid('owner_account_id')
     .notNull()
     .references(() => accounts.id),
+  /** "The days we celebrate": the festival groups this family marks (src/lib/occasions/festivals.ts).
+   * Private to the family; a calendar preference only — never used for marketing or segmentation
+   * (it can reveal religion / ethnicity: special-category data, DPIA). */
+  celebrate: jsonb('celebrate').$type<string[]>().notNull().default(sql`'["everyday","christmas"]'::jsonb`),
   createdAt,
 });
 
@@ -218,6 +226,8 @@ export const children = pgTable('children', {
     .references(() => families.id),
   firstName: text('first_name').notNull(), // no surname collected (minimisation)
   birthday: date('birthday'),
+  /** The birthday is kept on the LUNAR calendar (the same lunar day as the day they were born). */
+  birthdayLunar: lunarCalendar('birthday_lunar'),
   avatarAssetId: uuid('avatar_asset_id').references((): AnyPgColumn => assets.id),
   controllerAccountId: uuid('controller_account_id')
     .notNull()
@@ -858,13 +868,49 @@ export const reminderSends = pgTable(
     accountId: uuid('account_id')
       .notNull()
       .references(() => accounts.id, { onDelete: 'cascade' }),
-    childId: uuid('child_id')
-      .notNull()
-      .references(() => children.id, { onDelete: 'cascade' }),
+    childId: uuid('child_id').references(() => children.id, { onDelete: 'cascade' }),
+    /** WHICH occasion: `child:<id>` · `occ:<id>` · `fest:<familyId>:<festival>` (src/lib/occasions). */
+    occasionKey: text('occasion_key').notNull(),
     occasionYear: integer('occasion_year').notNull(),
+    /** which nudge: 30 = a month before, 14 = two weeks before (founder, 27 Oct) */
+    offsetDays: integer('offset_days').notNull().default(14),
     sentAt: timestamp('sent_at', { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [uniqueIndex('reminder_once_per_occasion').on(t.accountId, t.childId, t.occasionYear), index('reminder_account_idx').on(t.accountId, t.sentAt)],
+  (t) => [uniqueIndex('reminder_once_per_occasion_nudge').on(t.accountId, t.occasionKey, t.occasionYear, t.offsetDays), index('reminder_account_idx').on(t.accountId, t.sentAt)],
+);
+
+// ── occasions — the family calendar's own dates (founder, 27 Oct): birthdays, anniversaries and
+// anything else, for someone on Snickerdoodle or not ("granny and grandad's anniversary"). Shown to
+// the family's members with the calendar switched on, at the circle it's shared with (FAMILY by
+// default; EXTENDED widens it). Name + date only — never a picture. Erased with the family.
+export const occasions = pgTable(
+  'occasions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    kind: occasionKind('kind').notNull(),
+    /** the Gregorian date it happened / happens (year optional unless it follows a lunar calendar) */
+    month: integer('month').notNull(),
+    day: integer('day').notNull(),
+    year: integer('year'),
+    lunar: lunarCalendar('lunar'),
+    /** who it's for, when they're in the family (both optional) */
+    childId: uuid('child_id').references(() => children.id, { onDelete: 'cascade' }),
+    memberAccountId: uuid('member_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    shareCircle: circle('share_circle').notNull().default('FAMILY'),
+    createdByAccountId: uuid('created_by_account_id')
+      .notNull()
+      .references(() => accounts.id),
+    createdAt,
+  },
+  (t) => [
+    index('occasions_family_idx').on(t.familyId),
+    check('occasion_date_ok', sql`${t.month} BETWEEN 1 AND 12 AND ${t.day} BETWEEN 1 AND 31`),
+    check('occasion_lunar_needs_year', sql`${t.lunar} IS NULL OR ${t.year} IS NOT NULL`),
+  ],
 );
 
 // ── promo_codes — discount + partner codes (D15). Priced ONLY server-side (src/pricing/promo.ts):

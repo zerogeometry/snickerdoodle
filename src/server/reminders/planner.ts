@@ -1,103 +1,75 @@
 /**
- * The occasion-reminder planner — PURE (no I/O), so the rules that keep reminders gentle
- * and lawful are unit-tested:
- *  - CONSENT: only a recipient whose latest REMINDERS/EMAIL consent is GRANTED is ever sent
- *    anything (PECR; consent is the basis for reminders, never bundled into the upload).
- *  - NO PROFILING: the only input is a birthday the parent typed in. Nothing is inferred.
- *  - ONE PER OCCASION: a child's birthday triggers at most one reminder per recipient per year.
- *  - FREQUENCY CAP: at most one reminder per recipient per CAP_DAYS, however many children.
- *  - TIMING: sent in a window ahead of the day (enough time to make + deliver something).
+ * The occasion-reminder planner — PURE (no I/O), so the rules that keep reminders gentle and lawful
+ * are unit-tested:
+ *  - CONSENT: only a recipient whose latest REMINDERS/EMAIL consent is GRANTED is ever sent anything
+ *    (PECR; consent is the basis for reminders, never bundled into anything else).
+ *  - WHO: a recipient only ever hears about an occasion they may SEE (decided upstream by the
+ *    calendar rules, src/authz/occasions — the candidates arrive already filtered).
+ *  - NO PROFILING: the only inputs are dates the family typed in or chose to celebrate.
+ *  - TWO NUDGES per occasion (founder, 27 Oct): about a month before, and about two weeks before —
+ *    each at most once per recipient per occasion per year.
+ *  - ONE EMAIL per recipient per run: everything due goes in one gentle digest, and never more than
+ *    one email every CAP_DAYS (anything due waits — its window is wider than the cap).
  */
-export const REMIND_DAYS_BEFORE_MAX = 21;
-export const REMIND_DAYS_BEFORE_MIN = 10;
-export const CAP_DAYS = 7;
+export const NUDGES = [30, 14] as const;
+/** a nudge may go out from `offset` days before down to `offset - WINDOW` days before */
+export const WINDOW = 4;
+export const CAP_DAYS = 2;
 
-export interface PlannerChild {
-  id: string;
-  familyId: string;
-  firstName: string;
-  /** YYYY-MM-DD */
-  birthday: string;
-}
-
-export interface PlannerRecipient {
+export interface Candidate {
   accountId: string;
   email: string;
-  familyId: string;
-  remindersConsent: boolean;
+  /** which occasion (`child:<id>`, `occ:<id>`, `fest:<family>:<festival>`, `ms:<child>:<tag>`) */
+  key: string;
+  year: number;
+  date: string; // YYYY-MM-DD
+  title: string;
+  note: string | null;
 }
-
 export interface PriorSend {
   accountId: string;
-  childId: string;
+  occasionKey: string;
   occasionYear: number;
+  offsetDays: number;
   sentAt: Date;
 }
-
-export interface PlannedReminder {
+export interface DigestLine {
+  key: string;
+  year: number;
+  offset: number;
+  title: string;
+  note: string | null;
+  date: string;
+  inDays: number;
+}
+export interface Digest {
   accountId: string;
   email: string;
-  childId: string;
-  firstName: string;
-  turns: number;
-  occasionYear: number;
-  occasionDate: string; // YYYY-MM-DD
-  inDays: number;
+  lines: DigestLine[];
 }
 
 const DAY = 86_400_000;
+const dayOf = (s: string) => Date.UTC(Number(s.slice(0, 4)), Number(s.slice(5, 7)) - 1, Number(s.slice(8, 10)));
 
-function nextOccurrence(birthday: string, now: Date): { date: Date; year: number; turns: number } | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthday);
-  if (!m) return null;
-  const [by, bm, bd] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  let year = now.getUTCFullYear();
-  let at = Date.UTC(year, bm - 1, bd);
-  if (at < today) at = Date.UTC(++year, bm - 1, bd);
-  return { date: new Date(at), year, turns: year - by };
-}
+export function planDigests(input: { candidates: Candidate[]; consent: Map<string, boolean>; sent: PriorSend[]; now: Date }): Digest[] {
+  const today = Date.UTC(input.now.getUTCFullYear(), input.now.getUTCMonth(), input.now.getUTCDate());
+  const lastSent = new Map<string, number>();
+  for (const s of input.sent) lastSent.set(s.accountId, Math.max(lastSent.get(s.accountId) ?? 0, s.sentAt.getTime()));
+  const done = new Set(input.sent.map((s) => `${s.accountId}|${s.occasionKey}|${s.occasionYear}|${s.offsetDays}`));
 
-export function planReminders(input: {
-  children: PlannerChild[];
-  recipients: PlannerRecipient[];
-  sent: PriorSend[];
-  now: Date;
-}): PlannedReminder[] {
-  const { now } = input;
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const out: PlannedReminder[] = [];
-  const lastSentAt = new Map<string, number>();
-  for (const s of input.sent) lastSentAt.set(s.accountId, Math.max(lastSentAt.get(s.accountId) ?? 0, s.sentAt.getTime()));
-
-  for (const r of input.recipients) {
-    if (!r.remindersConsent) continue; // PECR: no consent, nothing — ever
-    const last = lastSentAt.get(r.accountId);
-    if (last !== undefined && now.getTime() - last < CAP_DAYS * DAY) continue; // frequency cap
-
-    // Soonest qualifying birthday in this recipient's family wins this run.
-    const candidates = input.children
-      .filter((c) => c.familyId === r.familyId)
-      .map((c) => ({ c, occ: nextOccurrence(c.birthday, now) }))
-      .filter((x): x is { c: PlannerChild; occ: NonNullable<ReturnType<typeof nextOccurrence>> } => x.occ !== null && x.occ.turns > 0)
-      .map((x) => ({ ...x, inDays: Math.round((x.occ.date.getTime() - today) / DAY) }))
-      .filter((x) => x.inDays >= REMIND_DAYS_BEFORE_MIN && x.inDays <= REMIND_DAYS_BEFORE_MAX)
-      .filter((x) => !input.sent.some((s) => s.accountId === r.accountId && s.childId === x.c.id && s.occasionYear === x.occ.year))
-      .sort((a, b) => a.inDays - b.inDays);
-
-    const pick = candidates[0];
-    if (!pick) continue;
-    out.push({
-      accountId: r.accountId,
-      email: r.email,
-      childId: pick.c.id,
-      firstName: pick.c.firstName,
-      turns: pick.occ.turns,
-      occasionYear: pick.occ.year,
-      occasionDate: pick.occ.date.toISOString().slice(0, 10),
-      inDays: pick.inDays,
-    });
-    lastSentAt.set(r.accountId, now.getTime()); // the cap also binds within one run
+  const byAccount = new Map<string, Digest>();
+  for (const c of input.candidates) {
+    if (input.consent.get(c.accountId) !== true) continue; // PECR: no consent, nothing — ever
+    const last = lastSent.get(c.accountId);
+    if (last !== undefined && input.now.getTime() - last < CAP_DAYS * DAY) continue; // gentle: one email every few days at most
+    const inDays = Math.round((dayOf(c.date) - today) / DAY);
+    // the nudge whose window we're in (the 14-day one wins if somehow both are)
+    const offset = [...NUDGES].reverse().find((o) => inDays <= o && inDays >= o - WINDOW);
+    if (offset === undefined) continue;
+    if (done.has(`${c.accountId}|${c.key}|${c.year}|${offset}`)) continue;
+    const d = byAccount.get(c.accountId) ?? { accountId: c.accountId, email: c.email, lines: [] };
+    if (!d.lines.some((l) => l.key === c.key && l.year === c.year)) d.lines.push({ key: c.key, year: c.year, offset, title: c.title, note: c.note, date: c.date, inDays });
+    byAccount.set(c.accountId, d);
   }
-  return out;
+  return [...byAccount.values()].map((d) => ({ ...d, lines: d.lines.sort((a, b) => a.inDays - b.inDays) }));
 }

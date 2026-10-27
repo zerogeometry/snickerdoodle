@@ -57,7 +57,7 @@ export type AddChildResult =
 export async function addChild(
   db: DbHandle,
   owner: ViewerContext,
-  input: { familyId: string; firstName: string; birthday?: string | null },
+  input: { familyId: string; firstName: string; birthday?: string | null; birthdayLunar?: 'CHINESE' | 'KOREAN' | null },
 ): Promise<AddChildResult> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== input.familyId) {
     return { ok: false, reason: 'not-owner' };
@@ -71,7 +71,8 @@ export async function addChild(
 
   const child = await resolveChildSubject(db, input.familyId, owner.accountId, screened.value);
   if (!child) return { ok: false, reason: 'invalid' };
-  if (birthday) await db.update(children).set({ birthday }).where(eq(children.id, child.id));
+  const birthdayLunar = birthday && (input.birthdayLunar === 'CHINESE' || input.birthdayLunar === 'KOREAN') ? input.birthdayLunar : null;
+  if (birthday) await db.update(children).set({ birthday, birthdayLunar }).where(eq(children.id, child.id));
   await db.insert(auditRecords).values({
     familyId: input.familyId,
     actorAccountId: owner.accountId,
@@ -107,11 +108,11 @@ export type UpdateChildResult = { ok: true } | { ok: false; reason: 'not-owner' 
 export async function updateChild(
   db: DbHandle,
   owner: ViewerContext,
-  input: { familyId: string; childId: string; firstName?: string; birthday?: string | null },
+  input: { familyId: string; childId: string; firstName?: string; birthday?: string | null; birthdayLunar?: 'CHINESE' | 'KOREAN' | null },
 ): Promise<UpdateChildResult> {
   const child = await ownedChild(db, owner, input.familyId, input.childId);
   if (!child) return { ok: false, reason: 'not-owner' };
-  const patch: { firstName?: string; birthday?: string | null } = {};
+  const patch: { firstName?: string; birthday?: string | null; birthdayLunar?: 'CHINESE' | 'KOREAN' | null } = {};
   if (input.firstName !== undefined) {
     const screened = screenChildFirstName(input.firstName);
     if (!screened.ok) return { ok: false, reason: screened.reason === 'surname' ? 'surname' : 'invalid' };
@@ -128,6 +129,8 @@ export async function updateChild(
     if (b === false) return { ok: false, reason: 'birthday' };
     patch.birthday = b;
   }
+  // the birthday kept on the lunar day they were born (founder, 27 Oct) — null = the Gregorian date
+  if (input.birthdayLunar !== undefined) patch.birthdayLunar = input.birthdayLunar === 'CHINESE' || input.birthdayLunar === 'KOREAN' ? input.birthdayLunar : null;
   if (Object.keys(patch).length === 0) return { ok: true };
   await db.update(children).set(patch).where(eq(children.id, child.id));
   await db.insert(auditRecords).values({

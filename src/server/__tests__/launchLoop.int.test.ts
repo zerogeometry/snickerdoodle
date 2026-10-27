@@ -430,9 +430,9 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   });
 
   // ── G10: reminders — consent-gated, once per occasion ─────────────────────
-  it('reminders: nothing without consent; with consent exactly one per occasion, never twice', async () => {
+  it('reminders: nothing without consent; with consent exactly one per occasion nudge, never twice', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const soon = new Date(Date.now() + 15 * 86_400_000);
+    const soon = new Date(Date.now() + 14 * 86_400_000); // the two-weeks-before nudge
     const bday = `2020-${String(soon.getUTCMonth() + 1).padStart(2, '0')}-${String(soon.getUTCDate()).padStart(2, '0')}`;
     await addChild(db, sam, { familyId: ids.hartleyId, firstName: 'Nell', birthday: bday });
     const [nell] = await db.select().from(children).where(and(eq(children.familyId, ids.hartleyId), eq(children.firstName, 'Nell')));

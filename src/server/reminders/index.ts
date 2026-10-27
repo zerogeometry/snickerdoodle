@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNotNull, or } from 'drizzle-orm';
-import { accounts, auditRecords, children, consentRecords, memberships, reminderSends } from '@/db/schema';
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import { auditRecords, consentRecords, reminderSends } from '@/db/schema';
 import { appUrl, sendMail } from '@/server/mail';
 import type { DbHandle } from '@/server/db';
-import { planReminders, type PlannerRecipient } from './planner';
+import { NUDGES, planDigests } from './planner';
+import { reminderCandidates } from '../occasions';
 
 /** The account's CURRENT reminders-by-email consent: the latest consent_record wins. */
 export async function hasReminderConsent(db: DbHandle, accountId: string): Promise<boolean> {
@@ -36,65 +37,56 @@ export async function setReminderConsent(db: DbHandle, accountId: string, grante
 }
 
 /**
- * One reminder run (daily cron → POST /api/jobs/reminders). Recipients are the parent who
- * entered the birthday AND relatives the parent shared the family calendar with — each only
- * with their OWN reminders consent; consent + caps are decided by the pure planner.
- * The send is recorded BEFORE the email goes out (unique per occasion), so a crash or an
+ * One reminder run (daily cron → POST /api/jobs/reminders). For every family calendar: each member who
+ * sees it (the owner, or someone the owner shared it with) hears about the occasions their circle may
+ * see — a little one's birthday, the family's own occasions, the festivals it celebrates — about a month
+ * before and about two weeks before, each with their OWN reminders consent (the pure planner decides
+ * consent, timing, once-only and the gentle cap). One digest email per person per run. Each nudge is
+ * recorded BEFORE the email goes out (unique per occasion per year per nudge), so a crash or an
  * overlapping run can never double-send.
  */
 export async function runReminders(db: DbHandle, now = new Date()): Promise<{ planned: number; sent: number }> {
-  const kids = await db
-    .select({ id: children.id, familyId: children.familyId, firstName: children.firstName, birthday: children.birthday })
-    .from(children)
-    .where(isNotNull(children.birthday));
-  if (kids.length === 0) return { planned: 0, sent: 0 };
+  const today = now.toISOString().slice(0, 10);
+  const candidates = await reminderCandidates(db, today, NUDGES[0] + 1);
+  if (candidates.length === 0) return { planned: 0, sent: 0 };
 
-  const familyIds = [...new Set(kids.map((k) => k.familyId))];
-  const owners = await db
-    .select({ accountId: memberships.accountId, familyId: memberships.familyId, email: accounts.email })
-    .from(memberships)
-    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
-    .where(
-      and(
-        inArray(memberships.familyId, familyIds),
-        eq(memberships.status, 'ACTIVE'),
-        or(eq(memberships.isOwner, true), eq(memberships.seesOccasions, true)),
-      ),
-    );
-
-  const recipients: PlannerRecipient[] = [];
-  for (const o of owners) recipients.push({ ...o, remindersConsent: await hasReminderConsent(db, o.accountId) });
-
+  const accountIds = [...new Set(candidates.map((c) => c.accountId))];
+  const consent = new Map<string, boolean>();
+  for (const id of accountIds) consent.set(id, await hasReminderConsent(db, id));
   const sent = await db
-    .select({ accountId: reminderSends.accountId, childId: reminderSends.childId, occasionYear: reminderSends.occasionYear, sentAt: reminderSends.sentAt })
+    .select({ accountId: reminderSends.accountId, occasionKey: reminderSends.occasionKey, occasionYear: reminderSends.occasionYear, offsetDays: reminderSends.offsetDays, sentAt: reminderSends.sentAt })
     .from(reminderSends)
-    .where(inArray(reminderSends.accountId, recipients.map((r) => r.accountId).concat(['00000000-0000-0000-0000-000000000000'])));
+    .where(inArray(reminderSends.accountId, accountIds));
 
-  const plan = planReminders({
-    children: kids.map((k) => ({ ...k, birthday: String(k.birthday).slice(0, 10) })),
-    recipients,
-    sent,
-    now,
-  });
-
+  const digests = planDigests({ candidates, consent, sent, now });
   let delivered = 0;
-  for (const p of plan) {
-    const [claimed] = await db
-      .insert(reminderSends)
-      .values({ accountId: p.accountId, childId: p.childId, occasionYear: p.occasionYear, sentAt: now })
-      .onConflictDoNothing()
-      .returning({ id: reminderSends.id });
-    if (!claimed) continue; // another run already took this occasion
+  for (const d of digests) {
+    // claim each nudge first; only the ones this run won go in the email
+    const lines = [];
+    for (const l of d.lines) {
+      const childId = l.key.startsWith('child:') ? l.key.slice(6) : null;
+      const [claimed] = await db
+        .insert(reminderSends)
+        .values({ accountId: d.accountId, occasionKey: l.key, occasionYear: l.year, offsetDays: l.offset, childId, sentAt: now })
+        .onConflictDoNothing()
+        .returning({ id: reminderSends.id });
+      if (claimed) lines.push(l);
+    }
+    if (!lines.length) continue;
+    const when = (n: number) => (n >= 25 ? 'in about a month' : n >= 12 ? 'in two weeks' : `in ${n} days`);
+    const first = lines[0]!;
     await sendMail({
       kind: 'reminder',
-      to: p.email,
-      subject: `${p.firstName} turns ${p.turns} soon ✦`,
+      to: d.email,
+      subject: `coming up: ${first.title}${lines.length > 1 ? ` and ${lines.length - 1} more` : ''} ✦`,
       text:
-        `${p.firstName} turns ${p.turns} in ${p.inDays} days — plenty of time to turn a drawing into something they'll keep.\n\n` +
-        `Make something: ${appUrl('/start-creating')}\n\n` +
-        `Don't want birthday nudges? Turn them off in one tap: ${appUrl('/home')}`,
+        `A gentle heads-up from your family calendar:\n\n` +
+        lines.map((l) => `• ${l.title}${l.note ? ` (${l.note})` : ''} — ${when(l.inDays)}, ${new Date(`${l.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`).join('\n') +
+        `\n\nPlenty of time to turn a drawing into something they'll keep: ${appUrl('/start-creating')}\n\n` +
+        `See the whole calendar: ${appUrl('/family')}\n` +
+        `Don't want these nudges? Turn them off in one tap: ${appUrl('/family')}`,
     });
     delivered++;
   }
-  return { planned: plan.length, sent: delivered };
+  return { planned: digests.length, sent: delivered };
 }

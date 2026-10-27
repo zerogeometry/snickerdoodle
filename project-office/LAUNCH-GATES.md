@@ -6,7 +6,7 @@
 
 | # | Gate | Status | Owner | Blocker / next step |
 |---|---|---|---|---|
-| 1 | **DPIA** completed & signed off | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/DPIA-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`) — needs DP review + sign-off |
+| 1 | **DPIA** completed & signed off | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/DPIA-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`; + `DPIA-addendum-family-calendar.md` for the family calendar / "days we celebrate" — Art 9, and its privacy-notice wording `PRIVACY-NOTICE-family-calendar-draft.md` to publish) — needs DP review + sign-off |
 | 2 | **Children's Code** conformance assessment documented | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/CHILDRENS-CODE-assessment-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`) — needs DP review + sign-off |
 | 3 | **International transfers** reviewed ("not materially lower") | ☐ not started | Simon + DP professional | Depends on provider choices (D2–D4); still directional |
 | 4 | **Privacy notice + family data promise** pages live (placeholders filled) | ◐ in progress | Cowork drafts → Simon approves | UI pages exist in `src/app/(marketing)/trust`; **placeholders still need filling** from trust-spine `-2`/`-3` |
