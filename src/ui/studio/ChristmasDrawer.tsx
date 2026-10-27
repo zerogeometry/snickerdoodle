@@ -2,7 +2,7 @@
 
 import { IconFrame, IconSnowflake, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { STICKERS, stickerDataUrl, type StickerId } from '@/lib/stickers';
+import { stickerDataUrl, stickersIn, type StickerId } from '@/lib/stickers';
 import { presetIsOn, type FestivePreset } from '@/lib/studio-festive';
 import type { StudioObject } from '@/lib/studio-objects';
 import { Button } from '@/ui/primitives/Button';
@@ -48,7 +48,7 @@ function DrawerBody({ objects, onSticker, onToggle, onClose, compact }: DrawerPr
     <>
       <h3 className="text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">stickers</h3>
       <ul className={`mt-1.5 grid gap-2 ${compact ? 'grid-cols-3' : 'grid-cols-4'}`} aria-label="christmas stickers">
-        {STICKERS.map((s, i) => (
+        {stickersIn('christmas').map((s, i) => (
           <li key={s.id}>
             <button
               type="button"

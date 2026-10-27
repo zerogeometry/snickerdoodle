@@ -13,12 +13,13 @@ import {
   IconPencil,
   IconStack2,
   IconShape,
+  IconSticker,
   IconChristmasTree,
   IconTypography,
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'christmas' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'stickers' | 'christmas' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -125,6 +126,16 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'H',
     info: 'Add a heart, star, sun, cloud and more. Then drag to move it and use the corner to resize.',
+  },
+  {
+    id: 'stickers',
+    group: 'add',
+    hint: 'tap a sticker to add it — or frame the whole thing in gold.',
+    label: 'stickers',
+    icon: IconSticker,
+    kind: 'mode',
+    key: 'S',
+    info: 'Hearts, suns, rainbows, crowns and more — chunky little stickers to pop on. Drag one to move it, use the corner to resize, turn or flip it. Or frame the whole design in gold. Each is its own layer; your drawing underneath is never changed.',
   },
   {
     // Christmas season only (src/lib/season.ts) — hidden the rest of the year

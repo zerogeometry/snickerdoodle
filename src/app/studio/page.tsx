@@ -35,6 +35,7 @@ import { ToolGlyph } from '@/ui/studio/ToolGlyph';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
 import { ChristmasPanel, ChristmasSheet } from '@/ui/studio/ChristmasDrawer';
+import { StickersPanel, StickersSheet } from '@/ui/studio/StickerDrawer';
 import type { StickerId } from '@/lib/stickers';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { toggleFestive, type FestivePreset } from '@/lib/studio-festive';
@@ -1192,7 +1193,7 @@ function StudioEditor() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
+      const map: Record<string, ToolId> = { a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', s: 'stickers', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1328,6 +1329,8 @@ function StudioEditor() {
 
   const toolOptions = tool === 'christmas' ? (
     <ChristmasPanel objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} />
+  ) : tool === 'stickers' ? (
+    <StickersPanel objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} />
   ) : tool && ADDING.includes(tool) ? (
     <AddedOptions
       tool={tool}
@@ -1386,8 +1389,8 @@ function StudioEditor() {
   const def = tool ? toolById(tool) : null;
   // PHONES: the same options as one slim frosted row over the picture (no pane, no "where to start")
   const tray =
-    // (the christmas drawer is its own bottom sheet on a phone, not a row over the picture)
-    tool && tool !== 'christmas' && def?.kind === 'mode'
+    // (the sticker drawers are their own bottom sheets on a phone, not a row over the picture)
+    tool && tool !== 'christmas' && tool !== 'stickers' && def?.kind === 'mode'
       ? StudioTray({
           tool,
           onTool,
@@ -1488,6 +1491,7 @@ function StudioEditor() {
           trayKey={tool ?? undefined}
         />
         {tool === 'christmas' ? <ChristmasSheet objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} /> : null}
+        {tool === 'stickers' ? <StickersSheet objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} /> : null}
 
         {/* stage */}
         <div ref={stageRef} className="relative order-first min-h-0 flex-1 overflow-hidden bg-paper-2 md:order-none">

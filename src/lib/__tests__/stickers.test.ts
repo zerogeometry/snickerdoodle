@@ -2,7 +2,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { CHRISTMAS_STICKER_SVG } from '@/lib/stickers/christmas-art';
-import { isStickerId, STICKER_IDS, STICKERS, stickerSvg } from '@/lib/stickers';
+import { EVERYDAY_IDS } from '@/lib/stickers/everyday-art';
+import { isStickerId, STICKER_IDS, STICKERS, stickersIn, stickerSvg } from '@/lib/stickers';
 import { cleanObjects, MAX_OBJECTS, MAX_STICKER_SIZE, rotateObjects, type StickerObject } from '@/lib/studio-objects';
 import { CARD_FONTS, normalizeCardFont, pickerFonts } from '@/lib/card-fonts';
 
@@ -11,10 +12,13 @@ const DIR = path.resolve(__dirname, '../../ui/studio/stickers/christmas');
 describe('the Christmas sticker family: manifest ↔ art', () => {
   it('twelve stickers, one SVG file each, and the art module is exactly those files', () => {
     const files = readdirSync(DIR).filter((f) => f.endsWith('.svg')).map((f) => f.replace(/\.svg$/, '')).sort();
-    expect(STICKERS).toHaveLength(12);
-    expect([...STICKER_IDS].sort()).toEqual(files);
+    const christmas = stickersIn('christmas').map((s) => s.id);
+    expect(christmas).toHaveLength(12);
+    expect([...christmas].sort()).toEqual(files);
     expect(Object.keys(CHRISTMAS_STICKER_SVG).sort()).toEqual(files);
-    for (const id of STICKER_IDS) expect(stickerSvg(id)).toBe(readFileSync(path.join(DIR, `${id}.svg`), 'utf8').trim());
+    for (const id of christmas) expect(stickerSvg(id)).toBe(readFileSync(path.join(DIR, `${id}.svg`), 'utf8').trim());
+    // the manifest is the christmas family + the everyday doodles, nothing else
+    expect([...STICKER_IDS].sort()).toEqual([...christmas, ...EVERYDAY_IDS].sort());
   });
 
   it('each is a self-contained square SVG: no scripts, no external links, ids prefixed so they never collide', () => {
