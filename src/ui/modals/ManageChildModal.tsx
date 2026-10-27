@@ -8,11 +8,13 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { toast } from '@/lib/store';
 import { deleteChildAction, updateChildAction } from '@/app/actions/family';
+import { LunarChoice, type LunarValue } from '@/ui/components/LunarChoice';
 
 export interface ManagedChild {
   id: string;
   firstName: string;
   birthdayISO: string | null;
+  birthdayLunar?: 'CHINESE' | 'KOREAN' | null;
 }
 
 const REASON: Record<string, string> = {
@@ -32,11 +34,13 @@ export function ManageChildModal({ child, onClose }: { child: ManagedChild | nul
   const [pending, startTransition] = useTransition();
   const [name, setName] = useState('');
   const [birthday, setBirthday] = useState('');
+  const [lunar, setLunar] = useState<LunarValue>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState(false);
   useEffect(() => {
     setName(child?.firstName ?? '');
     setBirthday(child?.birthdayISO?.slice(0, 10) ?? '');
+    setLunar(child?.birthdayLunar ?? null);
     setError(null);
     setConfirm(false);
   }, [child]);
@@ -48,6 +52,7 @@ export function ManageChildModal({ child, onClose }: { child: ManagedChild | nul
       const res = await updateChildAction(child.id, {
         ...(name.trim() !== child.firstName ? { firstName: name.trim() } : {}),
         ...(birthday !== (child.birthdayISO?.slice(0, 10) ?? '') ? { birthday: birthday || null } : {}),
+        ...(lunar !== (child.birthdayLunar ?? null) ? { birthdayLunar: lunar } : {}),
       });
       if (!res.ok) return setError(REASON[res.reason ?? 'invalid'] ?? REASON.invalid!);
       toast('saved ✓');
@@ -111,6 +116,7 @@ export function ManageChildModal({ child, onClose }: { child: ManagedChild | nul
           className="min-h-11 w-full rounded-lg border border-line bg-paper px-3 text-[13px] text-cocoa"
         />
       </label>
+      {birthday ? <LunarChoice value={lunar} onChange={setLunar} /> : null}
       {error ? (
         <p id="manage-child-error" role="alert" className="mt-1.5 border-l-2 border-berry pl-2 text-xs font-semibold text-cocoa">
           {error}

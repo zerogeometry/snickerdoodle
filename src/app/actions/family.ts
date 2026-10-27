@@ -11,10 +11,13 @@ import { revokeGiftLink } from '@/server/giftLinks';
 import { revalidatePath } from 'next/cache';
 import type { AccessLevel, Circle } from '@/domain/types';
 import { setMemberSeesOccasions } from '@/server/invites';
-import { listActiveFamilies } from '@/server/onboarding';
+import { ensureHomeFamily, listActiveFamilies } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { containsAbusiveText } from '@/server/textSafety';
 import { setReminderConsent } from '@/server/reminders';
+import { addOccasion, deleteOccasion, setCelebrate, updateOccasion, type OccasionInput, type OccasionResult } from '@/server/occasions';
+import { resendInvite } from '@/server/members';
+import { appUrl, sendMail } from '@/server/mail';
 
 /** The family the owner is managing: their OWNED family (only owners add children / rename). */
 async function ownedFamily(accountId: string) {
@@ -25,7 +28,7 @@ async function ownedFamily(accountId: string) {
 }
 
 /** Add one of the parent's little ones (first name only; birthday optional). */
-export async function addChildAction(input: { firstName: string; birthday?: string | null }): Promise<{
+export async function addChildAction(input: { firstName: string; birthday?: string | null; birthdayLunar?: 'CHINESE' | 'KOREAN' | null }): Promise<{
   ok: boolean;
   needsAuth?: boolean;
   reason?: 'not-owner' | 'surname' | 'invalid' | 'birthday';
@@ -35,7 +38,7 @@ export async function addChildAction(input: { firstName: string; birthday?: stri
   if (!account) return { ok: false, needsAuth: true };
   const ctx = await ownedFamily(account.id);
   if (!ctx) return { ok: false, reason: 'not-owner' };
-  const res = await addChild(ctx.db, ctx.viewer, { familyId: ctx.familyId, firstName: String(input.firstName ?? ''), birthday: input.birthday ?? null });
+  const res = await addChild(ctx.db, ctx.viewer, { familyId: ctx.familyId, firstName: String(input.firstName ?? ''), birthday: input.birthday ?? null, birthdayLunar: input.birthdayLunar ?? null });
   return res.ok ? { ok: true, firstName: res.child.firstName } : { ok: false, reason: res.reason };
 }
 
@@ -124,7 +127,7 @@ export async function revokeInviteAction(inviteId: string): Promise<{ ok: boolea
 /** Correct a little one's first name / birthday (null clears the birthday). */
 export async function updateChildAction(
   childId: string,
-  change: { firstName?: string; birthday?: string | null },
+  change: { firstName?: string; birthday?: string | null; birthdayLunar?: 'CHINESE' | 'KOREAN' | null },
 ): Promise<{ ok: boolean; reason?: 'not-owner' | 'surname' | 'invalid' | 'birthday' | 'taken' }> {
   return asOwner(
     (ctx) =>
@@ -133,6 +136,7 @@ export async function updateChildAction(
         childId: String(childId),
         firstName: change?.firstName === undefined ? undefined : String(change.firstName),
         birthday: change?.birthday === undefined ? undefined : change.birthday ? String(change.birthday) : null,
+        birthdayLunar: change?.birthdayLunar === undefined ? undefined : change.birthdayLunar,
       }),
     { ok: false, reason: 'not-owner' as const },
   );
@@ -160,4 +164,56 @@ export async function leaveFamilyAction(familyId: string): Promise<{ ok: boolean
   const res = await leaveFamily(db, viewer, { familyId: String(familyId) });
   revalidatePath('/home');
   return res;
+}
+
+// ── the family calendar (founder, 27 Oct) ─────────────────────────────────────────────────────
+
+/** Add an occasion to the signed-in parent's family calendar (owner or a contributor). */
+export async function addOccasionAction(input: OccasionInput): Promise<OccasionResult> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, reason: 'not-allowed' };
+  const db = getDb();
+  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  return addOccasion(db, account.id, familyId, input);
+}
+
+/** Change an occasion (its owner, or whoever added it). */
+export async function updateOccasionAction(occasionId: string, input: OccasionInput): Promise<OccasionResult> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, reason: 'not-allowed' };
+  return updateOccasion(getDb(), account.id, String(occasionId), input);
+}
+
+/** Remove an occasion (its owner, or whoever added it). */
+export async function deleteOccasionAction(occasionId: string): Promise<{ ok: boolean }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false };
+  return { ok: await deleteOccasion(getDb(), account.id, String(occasionId)) };
+}
+
+/** The days we celebrate (owner only). */
+export async function setCelebrateAction(groups: string[]): Promise<{ ok: boolean }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false };
+  const db = getDb();
+  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  return { ok: await setCelebrate(db, account.id, familyId, groups) };
+}
+
+/** Send a pending invite again — a fresh link and a fresh fortnight (the old link stops working). */
+export async function resendInviteAction(inviteId: string): Promise<{ ok: boolean }> {
+  return asOwner(async (ctx) => {
+    const res = await resendInvite(ctx.db, ctx.viewer, { familyId: ctx.familyId, inviteId: String(inviteId) });
+    if (!res.ok) return { ok: false };
+    await sendMail({
+      kind: 'family-invite',
+      to: res.email,
+      subject: 'a little reminder: you’re invited to a family keepsake box',
+      text:
+        `You've been invited to join a family's private keepsake box on snickerdoodle.\n\n` +
+        `Tap to join (it's just for you, and lasts 14 days):\n${appUrl(`/join/${res.token}`)}\n\n` +
+        `Nothing is ever public — only the family you join can see what's inside.`,
+    });
+    return { ok: true };
+  }, { ok: false });
 }

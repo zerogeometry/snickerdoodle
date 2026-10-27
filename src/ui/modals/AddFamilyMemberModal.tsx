@@ -8,7 +8,7 @@ import {
   IconUserPlus,
   IconUsers,
 } from '@tabler/icons-react';
-import { useRef, useState, useTransition, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, useTransition, type ChangeEvent } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
@@ -19,8 +19,9 @@ import { createInviteAction } from '@/app/actions/invite';
 import { addChildAction } from '@/app/actions/family';
 import { useRouter } from 'next/navigation';
 import type { AccessLevel, Relationship } from '@/domain/types';
+import { LunarChoice, type LunarValue } from '@/ui/components/LunarChoice';
 
-type Rel = 'Child' | 'Parent' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
+export type Rel = 'Child' | 'Parent' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
 
 const RELS: { label: Rel; circle: 'Family' | 'Extended' | 'subject'; enum: Relationship }[] = [
   { label: 'Child', circle: 'subject', enum: 'CHILD' },
@@ -37,12 +38,17 @@ function relOf(rel: Rel) {
   return RELS.find((r) => r.label === rel)!;
 }
 
-export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [rel, setRel] = useState<Rel>('Grandparent');
+export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent' }: { open: boolean; onClose: () => void; /** where it opens (the pinboard row tapped) */ initialRel?: Rel }) {
+  const [rel, setRel] = useState<Rel>(initialRel);
+  // opened from a different row of the pinboard: start on that kind of person
+  useEffect(() => {
+    if (open) setRel(initialRel);
+  }, [open, initialRel]);
   const [invite, setInvite] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
+  const [lunar, setLunar] = useState<LunarValue>(null);
   const [access, setAccess] = useState('view_buy');
   // The family calendar is the point of inviting family — pre-ticked, visible, changeable later.
   const [shareCalendar, setShareCalendar] = useState(true);
@@ -84,7 +90,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
     if (isChild) {
       // A child is a keepsake SUBJECT, not an invitee: no email, no account, first name only.
       startTransition(async () => {
-        const res = await addChildAction({ firstName: trimmed, birthday: birthday || null });
+        const res = await addChildAction({ firstName: trimmed, birthday: birthday || null, birthdayLunar: birthday ? lunar : null });
         if (res.needsAuth) return toast('log in to add your little one');
         if (!res.ok) {
           setError(
@@ -240,6 +246,7 @@ export function AddFamilyMemberModal({ open, onClose }: { open: boolean; onClose
             className="flex-1 bg-transparent text-[13px] text-cocoa outline-none"
           />
         </div>
+        {isChild && birthday ? <LunarChoice value={lunar} onChange={setLunar} /> : null}
       </div>
 
       {/* Invite (hidden for a child — a subject, not an invitee) */}
