@@ -172,8 +172,10 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 
 ## How to run
 - dev: (added with the Next.js app shell) · test: `npm test` (watch: `npm run test:watch`)
-- typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (added later) ·
-  visual diff: `npm run test:visual` (added later) · db: `npm run db:*` (added later) ·
+- typecheck: `npm run typecheck` · e2e: `npm run test:e2e` (desktop + 390px phone projects; builds
+  and starts the app itself, seeds the catalogue + synthetic mockup templates) · visual diff:
+  `npm run test:visual` (`:update` re-records, `:pairs` renders the /mockups side-by-sides; see
+  tests/visual/MOCKUP-DIFF.md) · db: `npm run db:*` ·
   lint: `npm run lint` (ESLint, Next rules; also runs inside `next build`)
 - jobs: `npm run jobs` runs the /api/jobs/* schedule against APP_URL (or JOBS_BASE_URL) with
   JOBS_SECRET; `npm run jobs -- --once <job>` runs one (exit 1 on failure); `-- --list` shows
