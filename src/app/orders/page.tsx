@@ -44,7 +44,7 @@ export default async function OrdersPage() {
             <p className="mt-1 max-w-xs text-sm text-ink-soft">
               When you order something lovely, you&apos;ll be able to track it here.
             </p>
-            <Button href="/catalogue" size="lg" className="mt-5">
+            <Button href="/start-creating" size="lg" className="mt-5">
               see the range →
             </Button>
           </div>
@@ -99,7 +99,7 @@ export default async function OrdersPage() {
                 </div>
               </div>
             ))}
-            <Link href="/catalogue" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-cinnamon">
+            <Link href="/start-creating" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-cinnamon">
               keep creating <Icon icon={IconArrowRight} size={15} />
             </Link>
           </div>

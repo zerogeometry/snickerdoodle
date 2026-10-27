@@ -60,7 +60,7 @@ export function AppDesktopNav({ active }: { active: string }) {
   return (
     <>
       <header className="pt-safe kraft sticky top-0 z-30 flex items-center justify-between px-4 py-2 md:hidden">
-        <Link href="/home" aria-label="snickerdoodle home" className="flex items-center gap-2">
+        <Link href="/" aria-label="snickerdoodle — the homepage" className="flex items-center gap-2">
           <Logo height={38} />
         </Link>
         <div className="flex items-center gap-2">
@@ -70,7 +70,7 @@ export function AppDesktopNav({ active }: { active: string }) {
       </header>
 
       <header className="hidden items-center justify-between border-b-2 border-cocoa/10 px-6 py-3 md:flex">
-        <Link href="/home" aria-label="snickerdoodle home" className="flex items-center gap-2.5">
+        <Link href="/" aria-label="snickerdoodle — the homepage" className="flex items-center gap-2.5">
           <Logo height={44} />
         </Link>
         <nav className="flex items-center gap-1.5 text-sm">

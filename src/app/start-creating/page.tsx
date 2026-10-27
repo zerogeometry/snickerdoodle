@@ -25,6 +25,7 @@ import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
+import { StartFromKeepsake } from '@/ui/components/StartFromKeepsake';
 
 const TOO_MANY = 'that’s a lot of pictures for now — try again in a little while';
 
@@ -308,6 +309,8 @@ export default function StartCreatingPage() {
               to make your bits, then it&apos;s gone unless you keep it.
             </p>
           </div>
+          {/* signed in: the keepsake box, to make one real again (nothing for a guest / an empty box) */}
+          <StartFromKeepsake />
         </main>
       ) : (
         // ── Made-real state — fits one viewport; only the range + basket scroll ──

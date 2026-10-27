@@ -8,14 +8,14 @@ import type { Tab } from './BottomTabBar';
  */
 export const APP_TABS: Tab[] = [
   { label: 'Home', href: '/home', icon: IconHome },
-  { label: 'Create', href: '/catalogue', icon: IconWand },
+  { label: 'Create', href: '/start-creating', icon: IconWand },
   { label: 'Family', href: '/family', icon: IconUsers },
   { label: 'Orders', href: '/orders', icon: IconPackage },
 ];
 
 export const APP_NAV = [
   { label: 'Home', href: '/home' },
-  { label: 'Create', href: '/catalogue' },
+  { label: 'Create', href: '/start-creating' },
   { label: 'Family', href: '/family' },
   { label: 'Orders', href: '/orders' },
 ] as const;
