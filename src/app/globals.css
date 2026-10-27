@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* project-office holds founder paperwork (incl. saved third-party web pages) — never app source */
+@source not '../../project-office';
 
 /*
  * Brand tokens — the SCRAPBOOK direction (decision D12, 2026-10-12): kraft paper, tape,

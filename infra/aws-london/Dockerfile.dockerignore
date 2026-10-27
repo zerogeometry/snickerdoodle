@@ -31,6 +31,7 @@ blob-report
 coverage
 
 # not needed to build or run
+project-office
 .git
 .github
 .claude
