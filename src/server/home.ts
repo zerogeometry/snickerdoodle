@@ -7,7 +7,6 @@ import type { Circle, VisibilityTier } from '@/domain/types';
 import { listActiveFamilies, resolveHomeFamily, type FamilyChoice } from './onboarding';
 import { resolveViewerContext } from './assets';
 import { getCurrentAccount } from './session';
-import { hasReminderConsent } from './reminders';
 import { listGiftListsForOwner, type OwnerGiftList } from './giftLinks';
 import { listSavedDesigns, type SavedDesignView } from './savedDesigns';
 import { familyBannerFor, profileImagesFor } from './profile';
@@ -68,8 +67,6 @@ export interface HomeData {
   members: HomeMember[];
   /** The family banner (members only, via the authz-gated image route). */
   bannerUrl: string | null;
-  /** The viewer's current birthday-reminder email consent (PECR). */
-  remindersOn: boolean;
   /** The viewer's "+ Keepsake" saved designs in this family. */
   savedDesigns: SavedDesignView[];
   /** The owner's gift lists with what's been bought + by whom (owner only; [] otherwise). */
@@ -180,7 +177,6 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     isOwner,
     giftLists: isOwner ? await listGiftListsForOwner(db, viewer, familyId) : [],
     savedDesigns: await listSavedDesigns(db, account.id, familyId),
-    remindersOn: await hasReminderConsent(db, account.id),
     families: familyChoices,
     members,
     bannerUrl: await familyBannerFor(db, account.id, familyId),

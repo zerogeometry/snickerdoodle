@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCake, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
+import { IconArrowRight, IconCake, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -18,12 +18,10 @@ import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
 import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
-import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction, setMemberCalendarAction, setReminderConsentAction } from '@/app/actions/family';
-import { Chip } from '@/ui/primitives/Chip';
+import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction } from '@/app/actions/family';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
 import { gbp } from '@/lib/store';
 import { exampleBySlug } from '@/lib/examples';
-import { Toggle } from '@/ui/primitives/Toggle';
 import type { HomeData, HomeKeepsake } from '@/server/home';
 import type { VisibilityTier } from '@/domain/types';
 import { isChristmasSeason } from '@/lib/season';
@@ -98,27 +96,10 @@ export function HomeView({ data }: { data: HomeData }) {
   const greetingName = data.account.name ?? data.account.email.split('@')[0];
   const others = data.members.filter((m) => !m.isYou).map((m) => ({ initial: m.initial, circle: m.circle }));
   const comingUp = nextBirthday(data.children);
-  const [remindersOn, setRemindersOn] = useState(data.remindersOn);
-  const toggleReminders = async (on: boolean) => {
-    setRemindersOn(on);
-    const res = await setReminderConsentAction(on);
-    if (!res.ok) {
-      setRemindersOn(!on);
-      return toast('couldn’t change that — try again');
-    }
-    toast(on ? 'we’ll send a gentle nudge before birthdays' : 'birthday nudges are off');
-  };
-  const relatives = data.members.filter((m) => !m.isOwner);
   const removeDesign = async (id: string) => {
     const res = await deleteSavedDesignAction(id);
     toast(res.ok ? 'removed from saved' : 'couldn’t remove that');
     if (res.ok) router.refresh();
-  };
-  const toggleCalendar = async (accountId: string, name: string, on: boolean) => {
-    const res = await setMemberCalendarAction(accountId, on);
-    if (!res.ok) return toast('couldn’t change that — try again');
-    toast(on ? `${name} can see the family calendar` : `${name} no longer sees birthdays`);
-    router.refresh();
   };
   // Switching a gift request off asks once first (it stops working for everyone holding the link).
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
@@ -326,32 +307,9 @@ export function HomeView({ data }: { data: HomeData }) {
                     </li>
                   ))}
                 </ul>
-                {data.isOwner && relatives.length > 0 && data.children.some((c) => c.birthday) ? (
-                  <div className="mt-3">
-                    <p className="text-[11px] text-ink-soft">family calendar shared with — tap to change</p>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-label="who sees the family calendar">
-                      {relatives.map((m) => (
-                        <Chip
-                          key={m.accountId}
-                          active={m.seesOccasions}
-                          aria-pressed={m.seesOccasions}
-                          onClick={() => toggleCalendar(m.accountId, m.name, !m.seesOccasions)}
-                        >
-                          {m.name}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {data.children.some((c) => c.birthday) ? (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-paper-2 px-3 py-2.5">
-                    <span className="text-xs text-cocoa">
-                      <b>birthday nudges by email</b>
-                      <span className="block text-[11px] text-ink-soft">one gentle note a few weeks before — never more than one a week</span>
-                    </span>
-                    <Toggle on={remindersOn} onChange={toggleReminders} label="birthday nudges by email" />
-                  </div>
-                ) : null}
+                <Link href="/family" className="mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-cinnamon">
+                  the family calendar, reminders and who sees what <Icon icon={IconArrowRight} size={13} />
+                </Link>
               </div>
             ) : null}
           </section>
@@ -370,6 +328,9 @@ export function HomeView({ data }: { data: HomeData }) {
                   <Icon icon={IconWand} size={16} /> make something
                 </Button>
               </div>
+              <Link href="/family" className="mt-2 inline-flex min-h-11 items-center gap-1 text-xs font-bold text-cinnamon">
+                see the whole family calendar <Icon icon={IconArrowRight} size={13} />
+              </Link>
             </section>
           ) : null}
 
