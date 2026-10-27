@@ -24,7 +24,7 @@ export function MultiBuyChip({ bps }: { bps: number }) {
  * never hover) opening that product's tiers in a small card (a bottom sheet on phones).
  * Renders nothing when every tier is 0 (no offer).
  */
-export function MultiBuyNotice({ tiers, productLabel }: { tiers: readonly number[] | null | undefined; productLabel: string }) {
+export function MultiBuyNotice({ tiers, productLabel, subtitle }: { tiers: readonly number[] | null | undefined; productLabel: string; subtitle?: string }) {
   const [open, setOpen] = useState(false);
   if (!tiers?.some((t) => t > 0)) return null;
   const rows: Array<[string, string]> = [['1', 'full price'], ...tiers.map((t, i): [string, string] => [i === tiers.length - 1 ? `${i + 2}+` : String(i + 2), t > 0 ? `${pct(t)} off` : 'full price'])];
@@ -42,7 +42,7 @@ export function MultiBuyNotice({ tiers, productLabel }: { tiers: readonly number
           <Icon icon={IconInfoCircle} size={16} />
         </button>
       </p>
-      <Modal open={open} onClose={() => setOpen(false)} size="sm" title="buy more, save more" subtitle={`more than one ${productLabel}? any drawings, any sizes`}>
+      <Modal open={open} onClose={() => setOpen(false)} size="sm" title="buy more, save more" subtitle={subtitle ?? `more than one ${productLabel}? any drawings, any sizes`}>
         <table className="w-full text-sm text-cocoa">
           <caption className="sr-only">the multi-buy saving for {productLabel}, by how many you get</caption>
           <thead>

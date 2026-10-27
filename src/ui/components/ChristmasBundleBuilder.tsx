@@ -10,6 +10,7 @@ import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
 import { ChristmasPromise } from './ChristmasPromise';
 import { MockupPreview } from './MockupPreview';
+import type { ProductKey } from './ProductArt';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
 import { forgetResumeVisit, isResumeVisit, usePickerEdits } from './usePickerEdits';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
@@ -53,7 +54,8 @@ type Draft = { table: BundleArt | null; ornaments: BundleArt[]; sacks: BundleArt
 const EMPTY: Draft = { table: null, ornaments: [], sacks: [], extraPlacemats: 0, extraCoasters: 0 };
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-const placeOf = (piece: BundlePiece) => clampTransform(defaultTransformFor(piece));
+/** A piece's placement: its product's default (the order gate + the print file use the same). */
+export const placeOf = (piece: string) => clampTransform(defaultTransformFor(piece));
 
 function readDraft(): Draft | null {
   try {
@@ -83,7 +85,7 @@ function writeDraft(d: Draft | null) {
 const slotName = (slot: number) => (slot < ORN ? 'the table' : slot < SACK ? `ornament ${slot - ORN + 1}` : `sack ${slot - SACK + 1}`);
 
 /** One piece in the flip-through. */
-type Shown = { piece: BundlePiece; art: BundleArt; name: string; count: number; slot: number };
+export type Shown<P extends string = BundlePiece> = { piece: P; art: BundleArt; name: string; count: number; slot: number };
 
 export function ChristmasBundleBuilder() {
   const router = useRouter();
@@ -454,7 +456,7 @@ export function ChristmasBundleBuilder() {
 
 // ── pieces ─────────────────────────────────────────────────────────────────────────────────────
 
-function Shell({ children }: { children: React.ReactNode }) {
+export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
@@ -466,7 +468,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Step({ n, title, note, children }: { n: number; title: string; note: string; children: React.ReactNode }) {
+export function Step({ n, title, note, children }: { n: number; title: string; note: string; children: React.ReactNode }) {
   return (
     <section className="mt-6" aria-labelledby={`bundle-step-${n}`}>
       <h2 id={`bundle-step-${n}`} className="flex items-baseline gap-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
@@ -479,7 +481,7 @@ function Step({ n, title, note, children }: { n: number; title: string; note: st
   );
 }
 
-function Polaroid({ url, i, label, onClick, blocked }: { url: string | null; i: number; label: string; onClick: () => void; blocked?: boolean }) {
+export function Polaroid({ url, i, label, onClick, blocked }: { url: string | null; i: number; label: string; onClick: () => void; blocked?: boolean }) {
   return (
     <div
       className="polaroid tape relative w-24 shrink-0 !p-1.5"
@@ -493,7 +495,7 @@ function Polaroid({ url, i, label, onClick, blocked }: { url: string | null; i: 
   );
 }
 
-function AddTile({ label, sub, onClick, wide, disabled }: { label: string; sub?: string; onClick: () => void; wide?: boolean; disabled?: boolean }) {
+export function AddTile({ label, sub, onClick, wide, disabled }: { label: string; sub?: string; onClick: () => void; wide?: boolean; disabled?: boolean }) {
   return (
     <button
       type="button"
@@ -584,7 +586,7 @@ function Stepper({ label, sub, value, step, onChange }: { label: string; sub: st
   );
 }
 
-function Row({ label, pence }: { label: string; pence: number }) {
+export function Row({ label, pence }: { label: string; pence: number }) {
   return (
     <li className="flex justify-between gap-3">
       <span>{label}</span>
@@ -597,15 +599,17 @@ function Row({ label, pence }: { label: string; pence: number }) {
  * The FLIP-THROUGH: the placemats, the coasters, then every ornament and sack — one at a time, with
  * the print-quality badge the order-time gate would give it. ← / → or a swipe turns it.
  */
-function BundleFlip({
-  shown, view, onView, render, badge, onEmpty,
+export function BundleFlip<S extends Shown<string>>({
+  shown, view, onView, render, badge, onEmpty, emptyLabel = 'pick a drawing for the table to see it here',
 }: {
-  shown: Shown[];
+  shown: S[];
   view: number;
   onView: (i: number) => void;
-  render: (s: Shown) => React.ReactNode;
-  badge: (s: Shown) => { text: string | null; block: boolean; soft: boolean };
+  render: (s: S) => React.ReactNode;
+  badge: (s: S) => { text: string | null; block: boolean; soft: boolean };
   onEmpty: () => void;
+  /** What the empty state says (nothing picked yet). */
+  emptyLabel?: string;
 }) {
   const swipe = useRef<number | null>(null);
   const go = (i: number) => onView(Math.max(0, Math.min(shown.length - 1, i)));
@@ -618,7 +622,7 @@ function BundleFlip({
         className="press mx-auto flex aspect-[3425/2421] w-full max-w-md flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-cocoa/30 bg-paper/60 text-sm font-bold text-ink-soft hover:border-cocoa"
       >
         <Icon icon={IconPlus} size={22} className="text-cinnamon" />
-        pick a drawing for the table to see it here
+        {emptyLabel}
       </button>
     );
   }
@@ -673,7 +677,7 @@ function BundleFlip({
 }
 
 /** The shape of each piece's sketch (placemats + coasters have no product photo yet). */
-const SKETCH: Record<BundlePiece, string> = {
+const SKETCH: Record<string, string> = {
   placemat: 'rounded-[4%]',
   coaster: 'rounded-[9%]',
   ceramicOrnament: 'rounded-full',
@@ -687,14 +691,23 @@ const SKETCH: Record<BundlePiece, string> = {
  * TODO(founder samples): swap the placemat + coaster sketches for mockups once the sample photos are in
  * (scripts/compose-founder-layers.mjs → seedMockups.ts), as the sack's were.
  */
-function PiecePreview({ s, imageUrl, src, variantId }: { s: Shown; imageUrl: string | null; src: { width: number; height: number } | null; variantId: string | null }) {
-  const geom = BUNDLE_PIECE_GEOM[s.piece];
+export function PiecePreview({
+  s, imageUrl, src, variantId, geom = BUNDLE_PIECE_GEOM[s.piece as BundlePiece],
+}: {
+  s: Shown<string>;
+  imageUrl: string | null;
+  src: { width: number; height: number } | null;
+  /** The piece's variant, when it has a real product mockup (the ornament, the sack, the mug). */
+  variantId: string | null;
+  /** Its print area (default: the family bundle's table of geometry). */
+  geom?: { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number };
+}) {
   const place = placeOf(s.piece);
-  if (variantId && (s.piece === 'ceramicOrnament' || s.piece === 'sack')) {
+  if (variantId && s.piece !== 'placemat' && s.piece !== 'coaster') {
     return (
       <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-[10px] bg-paper-2">
         <MockupPreview
-          productKey={s.piece}
+          productKey={s.piece as ProductKey}
           assetId={s.art.assetId}
           variantId={variantId}
           transform={place}
@@ -711,7 +724,7 @@ function PiecePreview({ s, imageUrl, src, variantId }: { s: Shown; imageUrl: str
   const box = s.piece === 'sack' ? 'max-w-[60%]' : s.piece === 'placemat' ? 'max-w-full' : 'max-w-[70%]';
   return (
     <div className={`mx-auto ${box}`}>
-      <div className={`relative w-full overflow-hidden border-[6px] border-line bg-white ${SKETCH[s.piece]}`} style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}>
+      <div className={`relative w-full overflow-hidden border-[6px] border-line bg-white ${SKETCH[s.piece] ?? 'rounded-[4%]'}`} style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}>
         {imageUrl && rect ? (
           <img
             src={imageUrl}

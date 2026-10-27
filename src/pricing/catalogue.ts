@@ -75,6 +75,8 @@ export const CATALOGUE = {
   coaster: { pricePence: 3200, label: 'coasters' }, // a pack of 6
   // The CHRISTMAS FAMILY BUNDLE's BASE price — its add-ons are priced from the counts (src/lib/christmas-bundle.ts).
   christmasBundle: { pricePence: 9000, label: 'christmas family bundle' },
+  // The CHRISTMAS EVE BUNDLE: a sack + a ceramic ornament + a mug, one parcel (src/lib/christmas-eve.ts).
+  christmasEveBundle: { pricePence: 6200, label: 'christmas eve bundle' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

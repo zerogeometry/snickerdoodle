@@ -4,14 +4,16 @@ import { defaultTransformFor } from '@/lib/catalogue-view';
 import type { BasketItem } from '@/lib/store';
 
 /**
- * A christmas-family-bundle basket line's thumbnail: its first ornament (or, with none, the table
+ * A christmas bundle basket line's thumbnail (the family bundle or the christmas eve bundle): its first ornament (or, with none, the table
  * drawing) on the REAL ceramic ornament, with a little sticker counting the pieces — falls back to the
  * bundle motif. Decorative: the line's own text names it (the sticker only where there's room for it).
  */
 export function BundleThumb({ item, px }: { item: BasketItem; px: number }) {
   const b = item.bundle;
-  const art = b?.ornaments[0] ?? b?.table ?? null;
-  const pieces = b ? 4 + b.extraPlacemats + 6 + b.extraCoasters + b.ornaments.length + b.sacks.length : 0;
+  const eve = item.eve;
+  // the family bundle: its first ornament (else the table drawing); the christmas eve bundle: its ornament
+  const art = b ? (b.ornaments[0] ?? b.table) : eve ? (eve.own.ceramicOrnament ?? eve.drawing) : null;
+  const pieces = b ? 4 + b.extraPlacemats + 6 + b.extraCoasters + b.ornaments.length + b.sacks.length : eve ? 3 * item.qty : 0;
   return (
     <div className="relative h-full w-full" aria-hidden>
       {art && item.previewVariantId ? (

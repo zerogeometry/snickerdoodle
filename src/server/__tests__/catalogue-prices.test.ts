@@ -5,6 +5,7 @@ import { packSizeOf } from '@/lib/card-packs';
 import {
   BUNDLE_BASE_PENCE, BUNDLE_COMPONENT_SKUS, BUNDLE_KEY, BUNDLE_ONLY_SKUS, BUNDLE_PIECE_GEOM, COASTER_PACKS, ORNAMENT_SKU, PLACEMAT_PACKS, SACK_SKU, pieceOfSku,
 } from '@/lib/christmas-bundle';
+import { EVE_COMPONENT_SKUS, EVE_KEY, EVE_PRICE_PENCE, MUG_COLOURS, mugSkuFor } from '@/lib/christmas-eve';
 
 // The founder-agreed shop prices (2026-10-21: "adjust all prices to the nearest £0.50", plus the
 // heart cushion +£2, 30-piece jigsaw +£1 and greetings card +50p). Server-authoritative: this is
@@ -215,5 +216,21 @@ describe('christmas family bundle — catalogue entries', () => {
 
   it('the bundle-only packs are never priceable on their own (the static list doesn’t carry them)', () => {
     for (const sku of BUNDLE_ONLY_SKUS) expect(Object.prototype.hasOwnProperty.call(CATALOGUE, sku), sku).toBe(false);
+  });
+});
+
+// The CHRISTMAS EVE BUNDLE (founder, 27 Oct): £62 a bundle, £74 separately (sack £35 + ornament £21 + mug £18).
+describe('christmas eve bundle — catalogue entries', () => {
+  const row = (sku: string) => list.find((x) => x.sku === sku);
+  it('is seeded at £62, not printed itself, held back until it has a tile', () => {
+    expect(row(EVE_KEY)).toMatchObject({ pricePence: EVE_PRICE_PENCE, prodigiSku: null, visibleInShop: false, paused: false });
+    expect(CATALOGUE.christmasEveBundle.pricePence).toBe(EVE_PRICE_PENCE);
+  });
+  it('separately it’s £74', () => {
+    expect(['sack', 'ceramicOrnament', 'mug'].reduce((n, s) => n + row(s)!.pricePence, 0)).toBe(7400);
+  });
+  it('every mug colour is a seeded two-tone 11oz variant; every piece has its Prodigi SKU', () => {
+    for (const c of MUG_COLOURS) expect(row(mugSkuFor(c)), c).toMatchObject({ attributes: { size: '11oz', colour: c } });
+    for (const sku of EVE_COMPONENT_SKUS) expect(row(sku)?.prodigiSku, sku).toBeTruthy();
   });
 });

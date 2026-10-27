@@ -12,7 +12,7 @@ import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
 import { BundleThumb } from '@/ui/components/BundleThumb';
 import { MultiBuyChip } from '@/ui/components/MultiBuy';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isEveLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -347,7 +347,7 @@ export default function CheckoutPage() {
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {isPackLine(item) ? (
                         <CardPackThumb item={item} px={56} />
-                      ) : isBundleLine(item) ? (
+                      ) : isBundleLine(item) || isEveLine(item) ? (
                         <BundleThumb item={item} px={56} />
                       ) : item.artwork && item.variantId ? (
                         <MockupPreview
@@ -388,7 +388,7 @@ export default function CheckoutPage() {
                             <Icon icon={IconPlus} size={12} />
                           </button>
                         </div>
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) || isEveLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
                           customize
                         </button>
                       </div>
