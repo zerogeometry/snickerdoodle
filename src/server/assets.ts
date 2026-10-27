@@ -155,6 +155,12 @@ export async function getViewableAssetOrThrow(
   viewer: ViewerContext,
 ): Promise<AssetRef> {
   const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
+  return assertViewableRow(row, viewer);
+}
+
+/** The view gate on an asset row already in hand — the ONE place getViewableAssetOrThrow and the
+ * signed-URL grant below decide "may this viewer see it". */
+function assertViewableRow(row: typeof assets.$inferSelect | undefined, viewer: ViewerContext): AssetRef {
   if (!row) throw denied('not found');
   const ref = toAssetRef(row);
   assertCanViewAsset(ref, viewer); // ← the gate
@@ -200,10 +206,15 @@ export async function getStorageObjectGrant(
   viewer: ViewerContext,
   ttlSeconds = 120,
 ): Promise<{ url: string }> {
-  const [object] = await db.select().from(storageObjects).where(eq(storageObjects.id, storageObjectId));
-  if (!object) throw denied('not found');
-  await getViewableAssetOrThrow(db, object.assetId, viewer); // ← the gate, via the owning asset
-  return { url: await presignDownload(object.key, ttlSeconds) };
+  // the object and its owning asset in ONE round trip (a tile's link is minted on every preview)
+  const [hit] = await db
+    .select({ key: storageObjects.key, asset: assets })
+    .from(storageObjects)
+    .innerJoin(assets, eq(assets.id, storageObjects.assetId))
+    .where(eq(storageObjects.id, storageObjectId));
+  if (!hit) throw denied('not found');
+  assertViewableRow(hit.asset, viewer); // ← the gate, via the owning asset
+  return { url: await presignDownload(hit.key, ttlSeconds) };
 }
 
 /**
