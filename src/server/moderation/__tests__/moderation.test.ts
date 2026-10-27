@@ -40,3 +40,33 @@ describe('content-safety decision (D8)', () => {
     expect((await moderateImage(input, both)).status).toBe('BLOCKED');
   });
 });
+
+describe('fail-safe: a broken provider sends the picture to review (D8)', () => {
+  type C = { flagged: boolean; labels: string[] };
+  const ok = { async classify(): Promise<C> { return { flagged: false, labels: [] }; } };
+  const noMatch = { async isKnownIllegal() { return false; } };
+
+  it('hash check errors → FLAGGED, never CLEAR and never BLOCKED', async () => {
+    const hash = { async isKnownIllegal(): Promise<boolean> { throw new Error('list missing'); } };
+    expect(await moderateImage(input, { hash, classifier: ok })).toEqual({ status: 'FLAGGED', labels: ['hash-check-unavailable'] });
+  });
+
+  it('only a real `true` is a match — an odd answer is review', async () => {
+    const hash = { async isKnownIllegal() { return 'yes' as unknown as boolean; } };
+    expect(await moderateImage(input, { hash, classifier: ok })).toEqual({ status: 'FLAGGED', labels: ['hash-check-unavailable'] });
+  });
+
+  it('classifier errors or odd answers → FLAGGED', async () => {
+    const throws = { async classify(): Promise<C> { throw new Error('down'); } };
+    const odd = { async classify() { return {} as C; } };
+    for (const classifier of [throws, odd]) {
+      expect(await moderateImage(input, { hash: noMatch, classifier })).toEqual({ status: 'FLAGGED', labels: ['screening-unavailable'] });
+    }
+  });
+
+  it('both broken → FLAGGED with both reasons', async () => {
+    const hash = { async isKnownIllegal(): Promise<boolean> { throw new Error('x'); } };
+    const classifier = { async classify(): Promise<C> { throw new Error('y'); } };
+    expect(await moderateImage(input, { hash, classifier })).toEqual({ status: 'FLAGGED', labels: ['hash-check-unavailable', 'screening-unavailable'] });
+  });
+});
