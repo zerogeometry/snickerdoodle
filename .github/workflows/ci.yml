@@ -8,6 +8,12 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      update_visual_baselines:
+        description: 'Re-record the visual baselines on the CI runner (download the artifact, review, commit)'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -67,3 +73,136 @@ jobs:
         run: npm run db:migrate
       - name: Unit + integration tests
         run: npm test
+
+  # The real user journeys (docs/03) on a desktop AND a ~390px phone, against a production build
+  # with the same Postgres + MinIO (its built-in KMS key, so originals are really encrypted).
+  # e2e/global-setup.ts seeds the catalogue and draws synthetic mockup templates (the photoreal
+  # blanks are not in git). The HTML report + traces/screenshots upload when anything fails.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: 'true'
+      DATABASE_URL: postgres://snickerdoodle:localdev@localhost:5544/snickerdoodle
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: eu-west-2
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: snickerdoodle-originals
+      S3_FORCE_PATH_STYLE: 'true'
+      AUTH_SECRET: ci-only-throwaway-secret-not-used-anywhere-real
+      JOBS_SECRET: ci-only-throwaway-jobs-secret
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Start MinIO (private local object store, with its local KMS key)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: npm run db:migrate
+      # playwright.config.ts's webServer builds (.next-e2e) and starts the app on :3100
+      - name: e2e journeys (desktop + mobile)
+        run: npm run test:e2e
+      - name: Upload the e2e report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
+
+  # Visual regression at 390px + 1280px against tests/visual/__screenshots__ (Linux Chromium).
+  # The committed baselines were recorded in a Linux container on a newer Chromium build than
+  # this runner's, so until they're re-recorded HERE this job REPORTS (diffs uploaded) without
+  # blocking: run the workflow manually with "update visual baselines", download the
+  # `visual-baselines` artifact, review + commit it, then drop `continue-on-error`.
+  visual:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: snickerdoodle
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: snickerdoodle
+        ports: ['5544:5432']
+        options: >-
+          --health-cmd "pg_isready -U snickerdoodle -d snickerdoodle"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+    env:
+      CI: 'true'
+      DATABASE_URL: postgres://snickerdoodle:localdev@localhost:5544/snickerdoodle
+      S3_ENDPOINT: http://localhost:9000
+      S3_REGION: eu-west-2
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      S3_BUCKET: snickerdoodle-originals
+      S3_FORCE_PATH_STYLE: 'true'
+      AUTH_SECRET: ci-only-throwaway-secret-not-used-anywhere-real
+      JOBS_SECRET: ci-only-throwaway-jobs-secret
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Start MinIO (private local object store, with its local KMS key)
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            -e MINIO_KMS_SECRET_KEY='snickerdoodle-local:1LxBT5XnX65c/9F+OfmEcv7gXmhomiUQOKtpIlwgLTM=' \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do curl -sf http://localhost:9000/minio/health/live && exit 0; sleep 1; done
+          docker logs minio; exit 1
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Apply migrations
+        run: npm run db:migrate
+      - name: Visual regression (390 + 1280)
+        if: ${{ !inputs.update_visual_baselines }}
+        run: npm run test:visual
+      - name: Re-record the visual baselines on this runner
+        if: ${{ inputs.update_visual_baselines }}
+        run: npm run test:visual:update
+      - name: Upload the re-recorded baselines
+        if: ${{ inputs.update_visual_baselines }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: tests/visual/__screenshots__/
+      - name: Upload the visual diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-diffs
+          path: |
+            playwright-report-visual/
+            test-results/
+          retention-days: 14
