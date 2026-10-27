@@ -34,7 +34,7 @@ import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/
 import { boxOf, drawObject, drawStroke, drawTextured, hits, inBox, moveObject, scaleObject, turnObject, type Box, type Frame } from '@/ui/studio/objects-canvas';
 import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS } from '@/lib/card-fonts';
-import { flipObjects, layerAlpha, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
+import { flipObjects, layerAlpha, type LayerLook, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
 import { toolById, type ToolId } from '@/ui/studio/tools';
 import { isPalmTouch } from '@/ui/studio/input';
@@ -71,6 +71,7 @@ interface Snapshot {
   cut: boolean;
   keepWhite: boolean;
   look: StudioLook;
+  drawingLayer: LayerLook;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
@@ -108,6 +109,8 @@ export default function StudioPage() {
   const [geo, setGeo] = useState<Geometry>(IDENTITY);
   // colour & light + a preset look — numbers in the recipe, applied to the drawing's own pixels
   const [look, setLook] = useState<StudioLook>(IDENTITY_LOOK);
+  // the drawing's own layer: shown / hidden, and how solid
+  const [drawingLayer, setDrawingLayer] = useState<LayerLook>({});
   const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
@@ -218,6 +221,7 @@ export default function StudioPage() {
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
           if (st.look) setLook(st.look);
+          if (st.drawing) setDrawingLayer(st.drawing);
           if (st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
@@ -341,6 +345,7 @@ export default function StudioPage() {
     const G = geometryMatrix(work.w, work.h, g);
     ctx.transform(G.a, G.b, G.c, G.d, G.e, G.f);
     ctx.imageSmoothingQuality = 'high';
+    ctx.globalAlpha = comparing ? 1 : layerAlpha(drawingLayer);
     ctx.drawImage(pic, 0, 0);
     ctx.restore();
 
@@ -408,7 +413,7 @@ export default function StudioPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, look]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, look, drawingLayer]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
   const drawingBox = (f: Frame, g: Geometry = geo): Box => {
@@ -424,7 +429,7 @@ export default function StudioPage() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look, drawingLayer });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -440,6 +445,7 @@ export default function StudioPage() {
     setHadCutout(s.cut);
     setKeepWhite(s.keepWhite);
     setLook(s.look);
+    setDrawingLayer(s.drawingLayer);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -839,6 +845,7 @@ export default function StudioPage() {
     setHadCutout(false);
     setKeepWhite(false);
     setLook(IDENTITY_LOOK);
+    setDrawingLayer({});
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -856,7 +863,7 @@ export default function StudioPage() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -886,7 +893,7 @@ export default function StudioPage() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, drawing: layerAlpha(drawingLayer) < 1 ? drawingLayer : null, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -910,7 +917,7 @@ export default function StudioPage() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, look, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, drawingLayer, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -1080,6 +1087,17 @@ export default function StudioPage() {
               },
               // its tilt AS SEEN: the design's own turn plus the drawing's
               angle: normAngle(visualAngle(geo) + (geo.place?.angle ?? 0)),
+              hidden: !!drawingLayer.hidden,
+              opacity: drawingLayer.opacity ?? 1,
+              onToggleHidden: () => {
+                pushUndo();
+                setDrawingLayer((l) => ({ ...l, hidden: !l.hidden }));
+              },
+              onOpacity: (opacity) => {
+                if (Date.now() - lastEditPush.current > 800) pushUndo();
+                lastEditPush.current = Date.now();
+                setDrawingLayer((l) => ({ ...l, opacity }));
+              },
               onTurn: (seen, group) => {
                 if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
                 lastEditPush.current = Date.now();
@@ -1095,6 +1113,10 @@ export default function StudioPage() {
       onDuplicate={duplicateSelected}
       onForward={() => reorder(1)}
       onBack={() => reorder(-1)}
+      onToggleHidden={(id) => {
+        pushUndo();
+        setObjects((os) => os.map((o) => (o.id === id ? { ...o, hidden: !o.hidden } : o)));
+      }}
     />
   ) : (
     <ToolOptions

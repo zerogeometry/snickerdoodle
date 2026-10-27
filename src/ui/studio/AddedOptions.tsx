@@ -1,6 +1,6 @@
 'use client';
 
-import { IconCopy, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
+import { IconCopy, IconEye, IconEyeOff, IconLock, IconLockOpen, IconPencil, IconRestore, IconStackPop, IconStackPush, IconTrash, IconTypography } from '@tabler/icons-react';
 import { useEffect, useRef, useState } from 'react';
 import { CARD_FONTS, cardFontCss, type CardFontToken } from '@/lib/card-fonts';
 import { SHAPE_KINDS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
@@ -40,6 +40,11 @@ export interface DrawingLayer {
   /** Its tilt as seen, and turning it there. */
   angle: number;
   onTurn: (deg: number, group?: boolean) => void;
+  /** Show / hide it, and how solid it is (0.05–1). */
+  hidden: boolean;
+  opacity: number;
+  onToggleHidden: () => void;
+  onOpacity: (opacity: number) => void;
 }
 export interface ShapeStyle {
   fill: string;
@@ -74,6 +79,8 @@ export function AddedOptions(p: {
   onDuplicate: () => void;
   onForward: () => void;
   onBack: () => void;
+  /** Show / hide one added layer. */
+  onToggleHidden: (id: string) => void;
 }) {
   const { tool, selected } = p;
 
@@ -122,6 +129,7 @@ export function AddedOptions(p: {
             <ColourPicker value={o.colour} onChange={(colour) => p.onUpdate({ colour }, true)} label="text colour" />
           </Section>
           <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+          <OpacitySection value={o.opacity ?? 1} onChange={(opacity) => p.onUpdate({ opacity }, true)} />
           <AngleControl angle={o.rotation} onAngle={p.onTurn} what="the words" />
         </Stack>
       );
@@ -131,6 +139,7 @@ export function AddedOptions(p: {
         <Stack>
           <Section>{actions}</Section>
           <ShapeStyleControls style={{ fill: o.fill, stroke: o.stroke, strokeWidth: o.strokeWidth, texture: o.texture }} onChange={(patch, group) => p.onUpdate(patch as Partial<StudioObject>, group)} />
+          <OpacitySection value={o.opacity ?? 1} onChange={(opacity) => p.onUpdate({ opacity }, true)} />
           <AngleControl angle={o.rotation} onAngle={p.onTurn} what={`the ${o.shape}`} />
         </Stack>
       );
@@ -145,6 +154,7 @@ export function AddedOptions(p: {
           <SliderRow label="thickness" min={2} max={60} value={Math.round(o.width * 1000)} onChange={(v) => p.onUpdate({ width: v / 1000 } as Partial<StudioObject>, true)} ariaLabel="line thickness" display={<SizeDot px={o.width * 600} colour={o.colour} />} />
         </Section>
         <TextureSection value={o.texture} colour={o.colour} onChange={(texture) => p.onUpdate({ texture })} />
+        <OpacitySection value={o.opacity ?? 1} onChange={(opacity) => p.onUpdate({ opacity }, true)} />
         <AngleControl angle={o.rotation ?? 0} onAngle={p.onTurn} what="the pen line" />
       </Stack>
     );
@@ -155,7 +165,8 @@ export function AddedOptions(p: {
     return (
       <Stack>
         <Section label="layers · top first">
-          <LayersList objects={p.objects} selectedId={d?.selected ? '__drawing' : selected?.id ?? null} baseLabel={p.baseLabel} drawing={d} onSelect={p.onSelect} />
+          <LayersList objects={p.objects} selectedId={d?.selected ? '__drawing' : selected?.id ?? null} baseLabel={p.baseLabel} drawing={d} onSelect={p.onSelect} onToggleHidden={p.onToggleHidden} />
+          {d ? <OpacitySection value={d.opacity} onChange={d.onOpacity} label={`${p.baseLabel} · opacity`} /> : null}
           {!selected && !d?.selected ? <p className="text-xs text-ink-soft">{p.objects.length ? 'tap a layer — here or on the picture — to move it, size it or change it.' : 'nothing added yet — try add text, draw or shapes.'}</p> : null}
         </Section>
         {d?.selected ? (
@@ -279,6 +290,13 @@ function ShapeStyleControls({ style, onChange }: { style: ShapeStyle; onChange: 
   );
 }
 
+/** How solid a layer is — the whole layer fades as one. */
+const OpacitySection = (p: { value: number; onChange: (v: number) => void; label?: string }) => (
+  <Section label={p.label ?? 'opacity'}>
+    <SliderRow label="opacity" min={5} max={100} value={Math.round(p.value * 100)} onChange={(v) => p.onChange(v / 100)} ariaLabel={p.label ?? 'layer opacity'} display={`${Math.round(p.value * 100)}%`} />
+  </Section>
+);
+
 const TextureSection = (p: { value: TextureKind; colour: string; onChange: (t: TextureKind) => void }) => (
   <Section label="texture">
     <TextureChips {...p} />
@@ -295,12 +313,14 @@ function LayersList({
   baseLabel,
   drawing,
   onSelect,
+  onToggleHidden,
 }: {
   objects: StudioObject[];
   selectedId: string | null;
   baseLabel: string;
   drawing: DrawingLayer | null;
   onSelect: (id: string | null) => void;
+  onToggleHidden: (id: string) => void;
 }) {
   const rows = [...objects].reverse();
   return (
@@ -309,12 +329,12 @@ function LayersList({
         {rows.map((o) => {
           const on = o.id === selectedId;
           return (
-            <li key={o.id}>
+            <li key={o.id} className="flex items-center gap-1.5">
               <button
                 type="button"
                 aria-pressed={on}
                 onClick={() => onSelect(on ? null : o.id)}
-                className={`flex min-h-11 w-full items-center gap-2 rounded-xl border-2 px-2.5 text-left text-xs font-bold ${on ? 'border-cocoa bg-honey-band text-cocoa' : 'border-cocoa/15 bg-paper text-cocoa hover:border-cocoa/50'}`}
+                className={`flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl border-2 px-2.5 text-left text-xs font-bold ${on ? 'border-cocoa bg-honey-band text-cocoa' : 'border-cocoa/15 bg-paper text-cocoa hover:border-cocoa/50'} ${o.hidden ? 'opacity-60' : ''}`}
               >
                 <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cocoa/20 bg-paper-2">
                   {o.type === 'shape' ? (
@@ -329,7 +349,9 @@ function LayersList({
                 </span>
                 <span className="min-w-0 flex-1 truncate">{layerName(o)}</span>
                 {o.texture !== 'smooth' ? <span className="shrink-0 text-[11px] font-normal text-ink-faint">{o.texture}</span> : null}
+                {o.opacity !== undefined && o.opacity < 1 ? <span className="shrink-0 text-[11px] font-normal text-ink-faint">{Math.round(o.opacity * 100)}%</span> : null}
               </button>
+              <EyeButton hidden={!!o.hidden} name={layerName(o)} onClick={() => onToggleHidden(o.id)} />
             </li>
           );
         })}
@@ -354,6 +376,7 @@ function LayersList({
               <span className="min-w-0 flex-1 truncate">{baseLabel}</span>
             </span>
           )}
+          {drawing ? <EyeButton hidden={drawing.hidden} name={baseLabel} onClick={drawing.onToggleHidden} /> : null}
           {drawing ? (
             <button
               type="button"
@@ -369,6 +392,21 @@ function LayersList({
         </li>
       </ul>
     </div>
+  );
+}
+
+/** Show / hide a layer — kept either way, and undoable. */
+function EyeButton({ hidden, name, onClick }: { hidden: boolean; name: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={hidden}
+      aria-label={hidden ? `show ${name}` : `hide ${name}`}
+      className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper text-cocoa hover:border-cocoa"
+    >
+      <Icon icon={hidden ? IconEyeOff : IconEye} size={16} />
+    </button>
   );
 }
 

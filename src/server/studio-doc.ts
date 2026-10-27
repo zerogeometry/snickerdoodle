@@ -7,7 +7,7 @@ import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject 
 import { getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
 import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
-import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
+import { cleanLayerLook, cleanObjects, layerAlpha, objectText, type LayerLook, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
 import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
 import { applyLook, cleanLook, type StudioLook } from '@/lib/studio-look';
@@ -102,15 +102,18 @@ async function placeInFrame(drawing: Buffer, W: number, H: number, p: Placement)
 
 /** Colour & light + a preset look, on the drawing's own pixels (alpha untouched) — the server half of
  * src/lib/studio-look.ts, the same function the browser previews with. */
-export async function applyLookToImage(input: Buffer, look: StudioLook | null): Promise<Buffer> {
-  if (!look) return input;
+export async function applyLookToImage(input: Buffer, look: StudioLook | null, layer: LayerLook | null = null): Promise<Buffer> {
+  const alpha = layer ? layerAlpha(layer) : 1;
+  if (!look && alpha >= 1) return input;
   const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   applyLook(data, 4, look);
+  // the drawing layer faded / hidden (like the browser's globalAlpha on it)
+  if (alpha < 1) for (let i = 3; i < data.length; i += 4) data[i] = Math.round(data[i]! * alpha);
   return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
 }
 
 /** The recipe as stored: geometry at the top level (older docs are just that), then the rest. */
-const docOf = (g: StudioGeometry, objects: StudioObject[], look: StudioLook | null) => ({ ...g, objects, ...(look ? { look } : {}) });
+const docOf = (g: StudioGeometry, objects: StudioObject[], look: StudioLook | null, drawing: LayerLook | null) => ({ ...g, objects, ...(look ? { look } : {}), ...(drawing ? { drawing } : {}) });
 
 async function bytesOf(db: DbHandle, assetId: string, which: 'ORIGINAL' | 'cutout'): Promise<Buffer | null> {
   if (which === 'ORIGINAL') {
@@ -127,13 +130,14 @@ export async function studioStateForAsset(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; mask: Buffer | null }> {
+): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; drawing: LayerLook | null; mask: Buffer | null }> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
   const geometry = row?.doc ? cleanGeometry(row.doc) : IDENTITY_GEOMETRY;
   const objects = row?.doc ? cleanObjects((row.doc as { objects?: unknown }).objects) : [];
   const look = row?.doc ? cleanLook((row.doc as { look?: unknown }).look) : null;
-  return { geometry, objects, look, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
+  const drawing = row?.doc ? cleanLayerLook((row.doc as { drawing?: unknown }).drawing) : null;
+  return { geometry, objects, look, drawing, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
 }
 
 /** Typed words that fail the abuse screen (user text is screened before it can print). */
@@ -157,23 +161,24 @@ export async function saveStudio(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; clearCutout?: boolean },
   deps: { moderation?: ModerationProviders } = {},
 ): Promise<StudioSaveResult> {
   const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
   const look = cleanLook(input.look);
+  const drawing = cleanLayerLook(input.drawing);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: docOf(g, objects, look) }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: docOf(g, objects, look, drawing) }).where(eq(assets.id, assetId));
 
   const cut = input.clearCutout ? null : await bytesOf(db, assetId, 'cutout');
   const source = cut ?? (await bytesOf(db, assetId, 'ORIGINAL'));
   if (!source) throw new Error('no original to edit');
 
-  const plain = isIdentity(g) && objects.length === 0 && !look;
+  const plain = isIdentity(g) && objects.length === 0 && !look && !drawing;
   if (!cut && plain) {
     await dropDerivative(db, assetId, 'design'); // back to the plain original — no stale design left behind
     await clearDesignModeration(db, assetId);
@@ -190,7 +195,7 @@ export async function saveStudio(
   }
 
   // originals: honour orientation first; then colour & light, on the drawing's own pixels
-  const base = await applyLookToImage(cut ?? (await sharp(source).rotate().png().toBuffer()), look);
+  const base = await applyLookToImage(cut ?? (await sharp(source).rotate().png().toBuffer()), look, drawing);
   const baseMeta = await sharp(base).metadata();
   const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
   const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
@@ -247,16 +252,17 @@ export async function autosaveStudioDoc(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; drawing?: unknown; clearCutout?: boolean },
 ): Promise<void> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
   const look = cleanLook(input.look);
+  const drawing = cleanLayerLook(input.drawing);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   else if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: docOf(g, objects, look) }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: docOf(g, objects, look, drawing) }).where(eq(assets.id, assetId));
 }
 
 /** Remove a derivative for real: bytes first (confirmed), then the row. */
