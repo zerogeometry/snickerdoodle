@@ -153,7 +153,10 @@ describe('proxy — sends the policy and hands the nonce to Next', () => {
     // NextResponse.next({ request: { headers } }) carries the overridden request headers like this
     expect(res.headers.get('x-middleware-request-x-nonce')).toBe(nonce);
     expect(res.headers.get('x-middleware-request-content-security-policy')).toBe(csp);
-    expect(res.headers.get('x-robots-tag')).toBeNull(); // the real site's marketing pages stay indexable
+    // noindex by default: a family page (the collection) is kept out of search…
+    expect(res.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    // …while the real site's public marketing pages stay indexable
+    expect((await run('/how-it-works')).headers.get('x-robots-tag')).toBeNull();
   });
 
   it('a new nonce per request', async () => {
@@ -175,5 +178,42 @@ describe('proxy — sends the policy and hands the nonce to Next', () => {
     expect(gate.headers.get('x-middleware-next')).toBe('1');
     expect(gate.headers.get('x-robots-tag')).toBe('noindex, nofollow');
     expect(gate.headers.get('x-middleware-request-x-nonce')).toBeTruthy();
+  });
+});
+
+describe('proxy — a dead gift link answers 410 Gone (CLAUDE.md: deleted source → 410)', () => {
+  afterEach(() => {
+    vi.doUnmock('@/app/g/[token]/status');
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function run(path: string, status: 200 | 404 | 410, init?: { method?: string; headers?: Record<string, string> }) {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.resetModules();
+    const lookups: string[] = [];
+    vi.doMock('@/app/g/[token]/status', async (orig) => ({
+      ...(await orig<typeof import('@/app/g/[token]/status')>()),
+      giftLinkHttpStatus: async (token: string) => (lookups.push(token), status),
+    }));
+    const { proxy } = await import('@/proxy');
+    const res = await proxy(new NextRequest(new URL(path, 'http://localhost:3100'), init));
+    return { res, lookups };
+  }
+
+  it('a deleted / revoked / expired link: 410, still noindex; an unknown token: 404; a live one: 200', async () => {
+    const gone = await run('/g/abcDEF_123-xyz', 410);
+    expect(gone.res.status).toBe(410);
+    expect(gone.lookups).toEqual(['abcDEF_123-xyz']);
+    expect(gone.res.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+    expect((await run('/g/abcDEF_123-xyz', 404)).res.status).toBe(404);
+    expect((await run('/g/abcDEF_123-xyz', 200)).res.status).toBe(200);
+  });
+
+  it('only the page load gets it — the page’s own refreshes / actions and other paths are never looked up', async () => {
+    expect((await run('/g/abcDEF_123-xyz', 410, { headers: { rsc: '1' } })).lookups).toEqual([]);
+    expect((await run('/g/abcDEF_123-xyz', 410, { method: 'POST' })).lookups).toEqual([]);
+    expect((await run('/g/abcDEF_123-xyz/more', 410)).lookups).toEqual([]);
+    expect((await run('/home', 410)).lookups).toEqual([]);
   });
 });

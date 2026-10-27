@@ -40,3 +40,16 @@ export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: 'w
  */
 export const AI_SEARCH_CRAWLERS = ['OAI-SearchBot', 'ChatGPT-User', 'PerplexityBot', 'Perplexity-User', 'Claude-SearchBot', 'Claude-User', 'Applebot', 'Bingbot', 'Googlebot', 'DuckAssistBot'];
 export const AI_TRAINING_CRAWLERS = ['GPTBot', 'ClaudeBot', 'Google-Extended', 'Applebot-Extended', 'CCBot', 'meta-externalagent'];
+
+/**
+ * NOINDEX BY DEFAULT (gap audit, 27 Oct): search engines may index ONLY the public pages above —
+ * every other page (anything a family uses, and any page added later and not listed here) gets
+ * `X-Robots-Tag: noindex, nofollow` from the proxy (src/proxy.ts). One list for the sitemap and
+ * the header, so the two can never disagree.
+ */
+export const NOINDEX = 'noindex, nofollow';
+const INDEXABLE = new Set(PUBLIC_PAGES.map((p) => p.path));
+export function isIndexablePath(pathname: string): boolean {
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname;
+  return INDEXABLE.has(path);
+}
