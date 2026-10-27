@@ -27,6 +27,8 @@ import { setAssetVisibilityAction } from '@/app/actions/keep';
 import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
 import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
+import { LookPanel } from '@/ui/studio/LookPanel';
+import { applyLook, IDENTITY_LOOK, lookIsIdentity, type StudioLook } from '@/lib/studio-look';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { StudioTray } from '@/ui/studio/Tray';
 import { ToolGlyph } from '@/ui/studio/ToolGlyph';
@@ -93,12 +95,13 @@ interface Snapshot {
   /** "background removed" travels with history, so undoing it lets you remove it again. */
   cut: boolean;
   keepWhite: boolean;
+  look: StudioLook;
 }
 const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
 /** Tools where tapping something you've added picks it up to move / change. */
 const EDITING: ToolId[] = ['text', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
-const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'compare'];
+const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'adjust', 'compare'];
 const newId = () => Math.random().toString(36).slice(2, 10);
 /** The drawing itself, as a selectable layer (once unlocked). */
 const DRAWING = '__drawing';
@@ -135,6 +138,9 @@ function StudioEditor() {
   const [ready, setReady] = useState(false);
   const [assetId, setLocalAssetId] = useState<string | null>(upload?.assetId ?? null);
   const [geo, setGeo] = useState<Geometry>(IDENTITY);
+  // colour & light + a preset look — numbers in the recipe, applied to the drawing's own pixels
+  const [look, setLook] = useState<StudioLook>(IDENTITY_LOOK);
+  const lookCache = useRef<{ look: StudioLook; src: Uint8ClampedArray; out: Uint8ClampedArray } | null>(null);
   const [tool, setTool] = useState<ToolId | null>(null);
   const [everywhere, setEverywhere] = useState(true);
   const [fussy, setFussy] = useState(28);
@@ -257,6 +263,7 @@ function StudioEditor() {
           // a fresh blank canvas starts on white paper (switch to see-through in background)
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
+          if (st.look) setLook(st.look);
           // the stored cut-out only while the drawing is USING it (a parent can put the background back
           // from the upload screen — then the Studio opens on the untouched original)
           if (st.mask && ((upload.cutout && !upload.cutout.trim) || maskInProgress(id))) { // an EDIT in use — the table trim is just the drawing
@@ -303,14 +310,25 @@ function StudioEditor() {
     const ctx = pic.getContext('2d')!;
     const img = ctx.createImageData(work.w, work.h);
     const a = comparing && sourceAlpha.current ? sourceAlpha.current : work.alpha;
+    // the look, worked out once per change (the same function the print render uses)
+    let rgb = work.rgb;
+    if (!comparing && !lookIsIdentity(look)) {
+      const c = lookCache.current;
+      if (!c || c.look !== look || c.src !== work.rgb) {
+        const out = work.rgb.slice();
+        applyLook(out, 3, look);
+        lookCache.current = { look, src: work.rgb, out };
+      }
+      rgb = lookCache.current!.out;
+    }
     for (let k = 0; k < work.w * work.h; k++) {
-      img.data[k * 4] = work.rgb[k * 3]!;
-      img.data[k * 4 + 1] = work.rgb[k * 3 + 1]!;
-      img.data[k * 4 + 2] = work.rgb[k * 3 + 2]!;
+      img.data[k * 4] = rgb[k * 3]!;
+      img.data[k * 4 + 1] = rgb[k * 3 + 1]!;
+      img.data[k * 4 + 2] = rgb[k * 3 + 2]!;
       img.data[k * 4 + 3] = a[k]!;
     }
     ctx.putImageData(img, 0, 0);
-  }, [tick, comparing, ready]);
+  }, [tick, comparing, ready, look]);
 
   // ── view maths ──
   const shownGeo = comparing ? IDENTITY : geo;
@@ -440,7 +458,7 @@ function StudioEditor() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- selectedBox is a plain helper over objects/selectedId/geo, all listed
-  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, editingId]);
+  }, [tick, stageSize, view, geo, shownGeo, transparent, comparing, cropping, viewMatrix, ready, objects, selectedId, tool, pen, drawingUnlocked, editingId, look]);
 
   /** The drawing's outline in the frame: its own rectangle, turned with the design and its placement. */
   const drawingBox = (f: Frame, g: Geometry = geo): Box => {
@@ -456,7 +474,7 @@ function StudioEditor() {
   };
 
   // ── history ──
-  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite });
+  const snapshot = (): Snapshot => ({ alpha: workRef.current!.alpha.slice(), geo, objects, cut: hadCutout, keepWhite, look });
   const pushUndo = (s: Snapshot = snapshot()) => {
     undoStack.current.push(s);
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
@@ -471,6 +489,7 @@ function StudioEditor() {
     setObjects(s.objects);
     setHadCutout(s.cut);
     setKeepWhite(s.keepWhite);
+    setLook(s.look);
     if (selectedId && !s.objects.some((o) => o.id === selectedId)) setSelectedId(null);
     setTick((t) => t + 1);
   };
@@ -903,6 +922,7 @@ function StudioEditor() {
     setSelectedId(null);
     setHadCutout(false);
     setKeepWhite(false);
+    setLook(IDENTITY_LOOK);
     setTick((t) => t + 1);
     setConfirmStart(false);
     fit();
@@ -920,7 +940,7 @@ function StudioEditor() {
       pendingRef.current = false;
       const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
-      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: !see });
+      const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: !see });
       if (!res.ok) {
         markPending();
         return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
@@ -966,7 +986,7 @@ function StudioEditor() {
     const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
     const alphaNow = maskMoved ? work.alpha.slice() : null;
     const see = maskMoved && hasTransparency(work.alpha);
-    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, look: lookIsIdentity(look) ? null : look, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
     inflight.current = call;
     const res = await call;
     inflight.current = null;
@@ -993,7 +1013,7 @@ function StudioEditor() {
     t = setTimeout(attempt, 2500);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
-  }, [ready, assetId, saveState, geo, objects, tick, busy]);
+  }, [ready, assetId, saveState, geo, objects, look, tick, busy]);
   // closing the tab with changes the server hasn't got yet → the browser asks first
   useEffect(() => {
     if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
@@ -1140,7 +1160,7 @@ function StudioEditor() {
         e.preventDefault();
         return setComparing(true);
       }
-      const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
+      const map: Record<string, ToolId> = { a: 'adjust', g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
       const id = map[e.key.toLowerCase()];
       if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
@@ -1251,6 +1271,12 @@ function StudioEditor() {
     lastBgPush.current = Date.now();
     setGeo((g) => ({ ...g, background: bg }));
   };
+  const onLook = (patch: Partial<StudioLook>, group = false) => {
+    // a slider drag is one undo step; a tap on a look is its own
+    if (!group || Date.now() - lastEditPush.current > 800) pushUndo();
+    lastEditPush.current = Date.now();
+    setLook((l) => ({ ...l, ...patch }));
+  };
 
   const toolOptions = tool === 'christmas' ? (
     <ChristmasPanel objects={objects} onSticker={addSticker} onToggle={onFestive} onClose={() => setTool(null)} />
@@ -1299,6 +1325,8 @@ function StudioEditor() {
       onAngle={(v, group) => turnDesign(v, group)}
       background={geo.background}
       setBackground={setBackground}
+      look={look}
+      onLook={onLook}
     />
   );
   // every tool's panel: what it's for in a line, then its options (actions show nothing extra)
@@ -1328,6 +1356,8 @@ function StudioEditor() {
           onDoneCrop: () => setTool(null),
           background: geo.background,
           setBackground,
+          look,
+          onLook,
           pen,
           setPen,
           textStyle,
@@ -1563,6 +1593,8 @@ function ToolOptions(p: {
   onTool: (id: ToolId) => void;
   angle: number;
   onAngle: (visual: number, group?: boolean) => void;
+  look: StudioLook;
+  onLook: (patch: Partial<StudioLook>, group?: boolean) => void;
 }) {
   const jump = (id: ToolId, label: string) => (
     <Button variant="secondary" size="sm" className="flex-1" onClick={() => p.onTool(id)}>
@@ -1649,6 +1681,8 @@ function ToolOptions(p: {
           </Section>
         </Stack>
       );
+    case 'adjust':
+      return <LookPanel look={p.look} onChange={(patch) => p.onLook(patch, true)} onPick={(patch) => p.onLook(patch)} />;
     case 'rotate':
       return (
         <Stack>

@@ -25,6 +25,7 @@ import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_STICKER_
 import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
+import { IDENTITY_LOOK, LOOKS, lookIsIdentity, type StudioLook } from '@/lib/studio-look';
 import { Icon } from '@/ui/primitives/Icon';
 import { layerName, type DrawingLayer, type PenStyle, type ShapeStyle, type TextStyle } from './AddedOptions';
 import { STANDARD_COLOURS } from './ColourPicker';
@@ -232,6 +233,8 @@ export interface TrayProps {
   onDoneCrop: () => void;
   background: string | null;
   setBackground: (bg: string | null) => void;
+  look: StudioLook;
+  onLook: (patch: Partial<StudioLook>, group?: boolean) => void;
   // added things
   pen: PenStyle;
   setPen: (s: PenStyle) => void;
@@ -333,6 +336,8 @@ export function StudioTray(p: TrayProps): ReactNode {
           <TSwatches value={p.background} onChange={(hex) => p.setBackground(hex)} label="background colour" />
         </>,
       );
+    case 'adjust':
+      return <AdjustTray look={p.look} onLook={p.onLook} />;
     case 'rotate':
       return row(<TTurn angle={p.angle} onAngle={p.onAngle} what="the design" />);
     case 'flip':
@@ -408,6 +413,58 @@ export function StudioTray(p: TrayProps): ReactNode {
     default:
       return null;
   }
+}
+
+const signed = (v: number) => (v > 0 ? `+${v}` : String(v));
+const LIGHT: { key: 'brightness' | 'contrast' | 'saturation' | 'warmth'; label: string; aria: string }[] = [
+  { key: 'brightness', label: 'brightness', aria: 'brightness' },
+  { key: 'contrast', label: 'contrast', aria: 'contrast' },
+  { key: 'saturation', label: 'colour', aria: 'colour strength' },
+  { key: 'warmth', label: 'warmth', aria: 'warmth — cooler to warmer' },
+];
+
+/** Adjust on a phone: the looks in one row; light & colour (one slider at a time) in the other. */
+function AdjustTray({ look, onLook }: { look: StudioLook; onLook: (patch: Partial<StudioLook>, group?: boolean) => void }) {
+  const [which, setWhich] = useState<(typeof LIGHT)[number]['key'] | 'amount'>('brightness');
+  const k = which === 'amount' && !look.filter ? 'brightness' : which;
+  const cur = LIGHT.find((l) => l.key === k);
+  return (
+    <div className="flex flex-col gap-1.5">
+      <TrayRow label="light & colour">
+        {/* the slider for the one picked comes first, so it's in reach without a scroll */}
+        <TLabel>{cur ? cur.label : 'how much'}</TLabel>
+        {cur ? (
+          <input type="range" min={-100} max={100} value={look[cur.key]} onChange={(e) => onLook({ [cur.key]: Number(e.target.value) }, true)} aria-label={cur.aria} aria-valuetext={signed(look[cur.key])} className="h-11 w-32 shrink-0 accent-[var(--color-cta)]" />
+        ) : (
+          <input type="range" min={0} max={100} value={look.intensity} onChange={(e) => onLook({ intensity: Number(e.target.value) }, true)} aria-label="how much of the look" aria-valuetext={`${look.intensity}%`} className="h-11 w-32 shrink-0 accent-[var(--color-cta)]" />
+        )}
+        <span className="w-10 shrink-0 text-center font-display text-sm text-cocoa">{cur ? signed(look[cur.key]) : `${look.intensity}%`}</span>
+        <TSep />
+        {LIGHT.map((l) => (
+          <TChip key={l.key} on={k === l.key} onClick={() => setWhich(l.key)} label={`${l.aria}: ${signed(look[l.key])}`}>
+            {l.label}
+          </TChip>
+        ))}
+        {look.filter ? (
+          <TChip on={k === 'amount'} onClick={() => setWhich('amount')} label={`how much of the look: ${look.intensity}%`}>
+            how much
+          </TChip>
+        ) : null}
+        <TIcon icon={IconRestore} label="back to how it was" onClick={() => onLook(IDENTITY_LOOK)} disabled={lookIsIdentity(look)} />
+      </TrayRow>
+      <TrayRow label="looks">
+        <TLabel>look</TLabel>
+        <TChip on={!look.filter} onClick={() => onLook({ filter: null })}>
+          none
+        </TChip>
+        {LOOKS.map((l) => (
+          <TChip key={l.id} on={look.filter === l.id} onClick={() => onLook({ filter: l.id, intensity: look.filter === l.id ? look.intensity : 100 })}>
+            {l.label}
+          </TChip>
+        ))}
+      </TrayRow>
+    </div>
+  );
 }
 
 /** Changing one added thing: its own look, its turn, then duplicate / forward / back / delete. */
