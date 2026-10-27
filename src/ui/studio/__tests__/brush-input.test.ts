@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { beginPaint, paintDab, type Work } from '@/ui/studio/engine';
-import { isPalmTouch, multiTapAction, PEN_GRACE_MS, TAP_MS } from '@/ui/studio/input';
+import { isPalmTouch, multiTapAction, TAP_MS } from '@/ui/studio/input';
 
 describe('multi-finger taps (spec §19a): two = undo, three = redo', () => {
   it('a quick, still two-finger tap undoes; three redoes', () => {
@@ -48,11 +48,10 @@ describe('eraser strength — a see-through brush that never builds up within on
 });
 
 describe('palm rejection (spec §19a)', () => {
-  const finger = { pointerType: 'touch', width: 20, height: 20, penDown: false, msSincePen: 1e9 };
+  const finger = { pointerType: 'touch', width: 20, height: 20, penDown: false };
   it('a fingertip with no pen about is a finger', () => expect(isPalmTouch(finger)).toBe(false));
   it('a touch while the pen is down is the resting hand', () => expect(isPalmTouch({ ...finger, penDown: true })).toBe(true));
-  it('a touch just after the pen lifts is still the hand', () => expect(isPalmTouch({ ...finger, msSincePen: PEN_GRACE_MS - 1 })).toBe(true));
-  it('…but a while later, fingers work again', () => expect(isPalmTouch({ ...finger, msSincePen: PEN_GRACE_MS + 1 })).toBe(false));
+  it('once the pen lifts, a finger works again straight away', () => expect(isPalmTouch({ ...finger, penDown: false })).toBe(false));
   it('a palm-sized contact patch is a palm, pen or no pen', () => expect(isPalmTouch({ ...finger, width: 90 })).toBe(true));
   it('devices that don’t report a size aren’t penalised', () => expect(isPalmTouch({ ...finger, width: undefined, height: undefined })).toBe(false));
   it('a pen or a mouse is never rejected', () => {

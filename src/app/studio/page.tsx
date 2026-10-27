@@ -569,16 +569,14 @@ export default function StudioPage() {
     return [p.x, p.y];
   };
 
-  // palm rejection: while a pen is down (or was just lifted), touches on the canvas are a resting
-  // hand, not a finger — and a big contact patch is a palm whatever the device
-  const lastPenAt = useRef(0);
+  // palm rejection: while a pen is down, touches on the canvas are the resting hand, not a
+  // finger — and a big contact patch is a palm whatever the device
   const taps = useRef<{ t0: number; max: number; moved: boolean; starts: Map<number, [number, number]> } | null>(null);
   const isPalm = (e: React.PointerEvent) =>
-    isPalmTouch({ pointerType: e.pointerType, width: e.width, height: e.height, penDown: [...pointers.current.values()].some((p) => p.type === 'pen'), msSincePen: Date.now() - lastPenAt.current });
+    isPalmTouch({ pointerType: e.pointerType, width: e.width, height: e.height, penDown: [...pointers.current.values()].some((p) => p.type === 'pen') });
 
   const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!workRef.current || busy) return;
-    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
     if (isPalm(e)) return; // never tracked, so it can't draw, pan or end a stroke
     e.currentTarget.setPointerCapture(e.pointerId);
     const [sx, sy] = local(e);
@@ -751,7 +749,6 @@ export default function StudioPage() {
     }
     const gst = gesture.current;
     if (!gst || !workRef.current || !pointers.current.has(e.pointerId)) return;
-    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
     // a line belongs to the pointer that started it
     if ((gst.kind === 'stroke' || gst.kind === 'paint') && gst.pointerId !== undefined && gst.pointerId !== e.pointerId) return;
     const [sx, sy] = local(e);
@@ -865,7 +862,6 @@ export default function StudioPage() {
 
   const onPointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!pointers.current.has(e.pointerId)) return; // a rejected palm lifting off
-    if (e.pointerType === 'pen') lastPenAt.current = Date.now();
     const gst = gesture.current;
     if (gst?.kind === 'stroke' && liveStroke.current && (gst.pointerId === undefined || gst.pointerId === e.pointerId)) {
       const points = liveStroke.current;
@@ -1355,13 +1351,18 @@ export default function StudioPage() {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        <StudioToolbar
-          active={tool}
-          disabled={disabled}
-          onTool={onTool}
-          onHold={(id, down) => id === 'compare' && setComparing(down)}
-          hidden={scratch ? IMAGE_ONLY : []}
-        />
+        {/* the tools appear once the drawing is ready to edit (nothing can be tapped too early) */}
+        {ready ? (
+          <StudioToolbar
+            active={tool}
+            disabled={disabled}
+            onTool={onTool}
+            onHold={(id, down) => id === 'compare' && setComparing(down)}
+            hidden={scratch ? IMAGE_ONLY : []}
+          />
+        ) : (
+          <ToolbarSkeleton />
+        )}
 
         {/* stage */}
         <div ref={stageRef} className="relative order-first min-h-0 flex-1 overflow-hidden bg-paper-2 md:order-none">
@@ -1441,8 +1442,8 @@ export default function StudioPage() {
         </div>
 
         {/* options: a strip above the toolbar on phones, a side panel on bigger screens */}
-        <div className="order-first max-h-[38vh] overflow-y-auto overscroll-contain border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{options}</div>
-        <aside aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{options}</aside>
+        <div className="order-first max-h-[38vh] overflow-y-auto overscroll-contain border-t-2 border-cocoa/10 bg-paper px-3 py-2.5 md:hidden">{ready ? options : <OptionsSkeleton />}</div>
+        <aside aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{ready ? options : <OptionsSkeleton />}</aside>
       </div>
 
       {/* leaving with unsaved changes */}
@@ -1663,6 +1664,30 @@ function ToolOptions(p: {
     default:
       return null;
   }
+}
+
+/** While the drawing gets ready: the toolbar's shape, quietly (a skeleton, never a spinner wall). */
+function ToolbarSkeleton() {
+  const pips = Array.from({ length: 7 }, (_, i) => <span key={i} className="h-12 w-12 shrink-0 animate-pulse rounded-[14px] bg-paper-2" />);
+  return (
+    <>
+      <div aria-hidden className="pb-safe flex gap-1.5 overflow-hidden border-t-2 border-cocoa/10 bg-paper px-2 pb-2 pt-2 md:hidden">{pips}</div>
+      <div aria-hidden className="hidden w-[68px] shrink-0 flex-col items-center gap-1.5 border-r-2 border-cocoa/10 bg-paper p-2 md:flex">{pips}</div>
+    </>
+  );
+}
+function OptionsSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-3">
+      <span className="h-5 w-32 animate-pulse rounded-pill bg-paper-2" />
+      <span className="h-3 w-48 animate-pulse rounded-pill bg-paper-2" />
+      <div className="grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className="h-[72px] animate-pulse rounded-[14px] bg-paper-2" />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /** No tool picked: the likeliest first steps, one tap away. */
