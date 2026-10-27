@@ -38,7 +38,11 @@ export type ProductKey =
   // christmas jumpers (D24)
   | 'kidsJumper'
   | 'christmasJumper'
-  | 'playingCards';
+  | 'playingCards'
+  // the christmas table + the family bundle (founder, 27 Oct)
+  | 'placemat'
+  | 'coaster'
+  | 'christmasBundle';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -214,6 +218,27 @@ const ART: Record<ProductKey, ReactNode> = {
         strokeLinejoin="round"
       />
       <House transform="translate(35,44) scale(0.64)" />
+    </>
+  ),
+  placemat: (
+    <>
+      <rect x="10" y="24" width="76" height="52" rx="6" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="4" />
+      <House transform="translate(33,33) scale(0.85)" />
+    </>
+  ),
+  coaster: (
+    <>
+      <rect x="26" y="26" width="44" height="44" rx="7" fill="var(--color-paper)" stroke="var(--color-leaf)" strokeWidth="4" />
+      <House transform="translate(36,36) scale(0.66)" />
+    </>
+  ),
+  christmasBundle: (
+    <>
+      <rect x="8" y="46" width="58" height="38" rx="5" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="3.5" />
+      <House transform="translate(23,52) scale(0.66)" />
+      <path d="M70 14 q0 -6 5 -6" fill="none" stroke="var(--color-tomato)" strokeWidth="2.2" strokeLinecap="round" />
+      <circle cx="72" cy="34" r="17" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="3.5" />
+      <House transform="translate(63,26) scale(0.48)" />
     </>
   ),
   calendar: (

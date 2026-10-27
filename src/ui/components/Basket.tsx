@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 import { CardPackThumb } from './CardPackThumb';
+import { BundleThumb } from './BundleThumb';
 import { MockupPreview } from './MockupPreview';
 import { ProductArt, type ProductKey } from './ProductArt';
-import { gbp, isPackLine, useBasket, type BasketItem } from '@/lib/store';
+import { gbp, isBundleLine, isPackLine, useBasket, type BasketItem } from '@/lib/store';
 
 /**
  * The slim vertical basket down the right of the Start-Creating catalogue — a clear
@@ -23,11 +24,13 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
   const router = useRouter();
   // A card pack is always ONE pack (qty fixed): it shows its card count + a remove, not − / +.
   const pack = isPackLine(item);
+  // The christmas bundle is ONE bundle too: its pieces are edited in its builder.
+  const bundle = isBundleLine(item);
   const [infoOpen, setInfoOpen] = useState(false);
   // A personalised line renders its ACTUAL creation; an add-on with no artwork falls
   // back to the stylised motif.
   const personalised = Boolean(item.artwork && item.variantId);
-  const label = pack ? `${item.name} · ${item.cards?.length ?? 0} cards` : item.sub ? `${item.name}, ${item.sub}` : item.name;
+  const label = pack ? `${item.name} · ${item.cards?.length ?? 0} cards` : bundle ? `${item.name} · ${item.sub ?? ''}` : item.sub ? `${item.name}, ${item.sub}` : item.name;
   // Editing re-opens Customize for THIS line (carries its variant + placement) and swaps
   // the CTA to "update basket".
   const edit = () => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`);
@@ -36,6 +39,8 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
       <div className="relative aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
         {pack ? (
           <CardPackThumb item={item} px={150} />
+        ) : bundle ? (
+          <BundleThumb item={item} px={150} />
         ) : personalised ? (
           <MockupPreview
             productKey={item.product}
@@ -76,9 +81,9 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
           {item.sub ? <span className="text-[10px] leading-tight text-paper">{item.sub}</span> : null}
         </div>
       </div>
-      {pack ? (
+      {pack || bundle ? (
         <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
-          <span className="flex flex-1 items-center justify-center text-[11px] font-bold text-cocoa">{item.cards?.length ?? 0} cards</span>
+          <span className="flex flex-1 items-center justify-center text-[11px] font-bold text-cocoa">{bundle ? 'one bundle' : `${item.cards?.length ?? 0} cards`}</span>
           <button
             type="button"
             aria-label={`remove ${label}`}

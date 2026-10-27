@@ -3,12 +3,16 @@ import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joi
 import { formatPence } from './format';
 import { evaluatePromo, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
+import { bundleCountsOf, bundlePricePence, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelSaving } from './parcels';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
   productKey: string;
   qty: number;
+  /** The CHRISTMAS BUNDLE only: its drawings + extras (untrusted — normalised and COUNTED here, so
+   * the price comes from what will be made, never from a figure the client sends). */
+  bundle?: unknown;
 }
 
 export interface PricedLine {
@@ -108,10 +112,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     }
     // A card PACK line is always ONE pack — its N cards ride with it (src/lib/card-packs.ts), so a
     // client asking for "qty 3" of a pack can't get three packs' worth of cards for one pack's price.
-    const qty = isCardPackKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
+    // The CHRISTMAS BUNDLE likewise: one bundle, its pieces counted from what it carries.
+    const qty = isCardPackKey(r.productKey) || isBundleKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
     if (qty <= 0) continue;
     const entry = catalogue[r.productKey]!;
-    const unit = entry.pricePence; // SERVER price — request price (if any) ignored
+    // SERVER price — request price (if any) ignored. A bundle = its base + each add-on at its set price.
+    const unit = isBundleKey(r.productKey) ? bundlePricePence(bundleCountsOf(r.bundle), entry.pricePence) : entry.pricePence;
     lines.push({
       productKey: r.productKey,
       label: entry.label,
@@ -157,6 +163,9 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     const outcome = evaluatePromo(
       opts.promo,
       lines.map((l) => {
+        // The bundle is already the founder's set price — it never takes a code on top (cost
+        // unknown ⇒ left out of the code; the rest of the basket still can).
+        if (isBundleKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
         const cost = catalogue[l.productKey]?.unitCostPence;
         return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
       }),

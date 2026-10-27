@@ -17,7 +17,8 @@ import { getCurrentAccount } from '@/server/session';
  * charged the catalogue total.
  */
 export interface QuoteRequest {
-  items: { productKey: string; qty: number }[];
+  /** `bundle`: the CHRISTMAS BUNDLE's drawings + extras — COUNTED server-side, never a price. */
+  items: { productKey: string; qty: number; bundle?: unknown }[];
   gift?: boolean;
   /** What the customer typed — resolved + priced server-side; its value is never trusted. */
   promoCode?: string;
@@ -33,6 +34,7 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const items: RequestedLine[] = (req.items ?? []).map((i) => ({
     productKey: String(i.productKey),
     qty: Number(i.qty),
+    ...(i.bundle !== undefined ? { bundle: i.bundle } : {}),
   }));
   const joinProvenance = await resolveJoinProvenance();
   const db = getDb();

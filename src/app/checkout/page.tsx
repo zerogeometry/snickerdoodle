@@ -10,7 +10,8 @@ import { Toggle } from '@/ui/primitives/Toggle';
 import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { BundleThumb } from '@/ui/components/BundleThumb';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -98,7 +99,8 @@ export default function CheckoutPage() {
       setQuote(null);
       return;
     }
-    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty })), gift, promoCode }).then((q) => {
+    // (the christmas bundle sends its drawings + extras: the server counts + prices them)
+    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(isBundleLine(i) ? { bundle: i.bundle } : {}) })), gift, promoCode }).then((q) => {
       if (live) setQuote(q);
     });
     return () => {
@@ -331,6 +333,8 @@ export default function CheckoutPage() {
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {isPackLine(item) ? (
                         <CardPackThumb item={item} px={56} />
+                      ) : isBundleLine(item) ? (
+                        <BundleThumb item={item} px={56} />
                       ) : item.artwork && item.variantId ? (
                         <MockupPreview
                           productKey={item.product}
@@ -351,11 +355,11 @@ export default function CheckoutPage() {
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
                       {item.sub ? <div className="break-words text-[11px] text-ink-faint">{item.sub}</div> : null}
-                      {isPackLine(item) ? (
-                        // A card pack is always one pack — no quantity; its cards are edited in the builder.
+                      {isPackLine(item) || isBundleLine(item) ? (
+                        // A card pack / the bundle is always ONE — no quantity; its pieces are edited in the builder.
                         <div className="mt-1.5 flex items-center gap-2">
                           <button type="button" onClick={() => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`)} className="relative rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:border-honey">
-                            edit cards
+                            {isBundleLine(item) ? 'edit bundle' : 'edit cards'}
                           </button>
                         </div>
                       ) : (

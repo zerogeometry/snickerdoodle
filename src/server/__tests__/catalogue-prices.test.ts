@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { CATALOGUE } from '@/pricing';
 import { definedPriceList, PATTERN_PRODUCT_KEYS } from '../catalogue';
 import { packSizeOf } from '@/lib/card-packs';
+import {
+  BUNDLE_BASE_PENCE, BUNDLE_COMPONENT_SKUS, BUNDLE_KEY, BUNDLE_ONLY_SKUS, BUNDLE_PIECE_GEOM, COASTER_PACKS, ORNAMENT_SKU, PLACEMAT_PACKS, SACK_SKU, pieceOfSku,
+} from '@/lib/christmas-bundle';
 
 // The founder-agreed shop prices (2026-10-21: "adjust all prices to the nearest £0.50", plus the
 // heart cushion +£2, 30-piece jigsaw +£1 and greetings card +50p). Server-authoritative: this is
@@ -163,5 +166,54 @@ describe('greetings-card multipacks', () => {
       expect(r.prodigiSku).toBe('CLASSIC-GRE-FEDR-7X5-BLA');
       expect(r.px).toEqual(single.px);
     }
+  });
+});
+
+// The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct — go-to-market C25 + C26). Prices + Prodigi SKUs + print
+// areas (sandbox GET /v4.0/products, 27 Oct) pinned against src/lib/christmas-bundle.ts, so the builder's
+// DPI check, the order's split and the seeded templates can never disagree.
+describe('christmas family bundle — catalogue entries', () => {
+  const row = (sku: string) => {
+    const r = list.find((x) => x.sku === sku);
+    if (!r) throw new Error(`no variant ${sku}`);
+    return r;
+  };
+
+  it('the bundle is seeded at its £90 base, not printed itself, held back until it has a tile', () => {
+    const b = row(BUNDLE_KEY);
+    expect(b.pricePence).toBe(BUNDLE_BASE_PENCE);
+    expect(b.prodigiSku).toBeNull();
+    expect(b.visibleInShop).toBe(false);
+    expect(b.paused).toBe(false); // priceable + orderable (hidden ≠ paused)
+    expect(CATALOGUE.christmasBundle.pricePence).toBe(BUNDLE_BASE_PENCE);
+  });
+
+  it('placemats (4-pack £59) and coasters (6-pack £32) are seeded as standalone products', () => {
+    expect(row('placemat')).toMatchObject({ isDefault: true, pricePence: 5900, prodigiSku: 'H-PLACE-4PK' });
+    expect(row('coaster')).toMatchObject({ isDefault: true, pricePence: 3200, prodigiSku: 'H-COAST-6PK' });
+  });
+
+  it('every pack the bundle expands into is seeded with its own Prodigi SKU', () => {
+    for (const p of [...PLACEMAT_PACKS, ...COASTER_PACKS]) expect(row(p.sku).prodigiSku, p.sku).toBe(p.prodigiSku);
+    expect(row(ORNAMENT_SKU).prodigiSku).toBe('XMAS-PORC-BAUB');
+    expect(row(SACK_SKU).prodigiSku).toBe('XMAS-SACK');
+  });
+
+  it('each piece’s seeded print template is the geometry the builder + the order gate use', () => {
+    for (const sku of BUNDLE_COMPONENT_SKUS) {
+      const r = row(sku);
+      const g = BUNDLE_PIECE_GEOM[pieceOfSku(sku)!];
+      expect({ w: r.px!.w, h: r.px!.h, dpi: r.dpi, bleed: r.bleedMm }, sku).toEqual({ w: g.printWidthPx, h: g.printHeightPx, dpi: g.requiredDpi, bleed: g.bleedMm });
+    }
+    // Prodigi's exact areas: placemat 3425×2421, coaster 1251×1251, ornament 885×885 (no bleed)
+    expect(row('placemat').px).toEqual({ w: 3425, h: 2421 });
+    expect(row('coaster').px).toEqual({ w: 1251, h: 1251 });
+    expect(row('ceramicOrnament')).toMatchObject({ px: { w: 885, h: 885 }, bleedMm: 0 });
+    // the sack: Prodigi's 3779×5905 px panel (320×500 mm) at 150 dpi on fabric — the same aspect
+    expect(Math.abs(row('sack').px!.w / row('sack').px!.h - 3779 / 5905)).toBeLessThan(0.001);
+  });
+
+  it('the bundle-only packs are never priceable on their own (the static list doesn’t carry them)', () => {
+    for (const sku of BUNDLE_ONLY_SKUS) expect(Object.prototype.hasOwnProperty.call(CATALOGUE, sku), sku).toBe(false);
   });
 });

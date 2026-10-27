@@ -11,6 +11,7 @@ import {
   ADULT_JUMPER_COLOURS, ADULT_JUMPER_PRINT_MM, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
+import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 
 export { mmToPx };
 
@@ -444,8 +445,9 @@ const DEFS: Record<string, ProductDef> = {
     category: 'FESTIVE', label: 'ceramic christmas ornament', blurb: "this year's ornament — one for every christmas they're little", print: true, visibleInShop: true,
     description: "Their drawing on a glossy ceramic ornament for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. A flat 7.5 cm disc on a gold string.",
     specs: { size: '7.5 cm disc', finish: 'flat, gloss ceramic, printed on one side', string: 'gold', made: 'in the UK' },
-    // 82×82mm = Prodigi's official template canvas (968×968px @300dpi) for the 3″ face.
-    variants: [{ size: '7.5 cm', pricePence: 2100, wMm: 82, hMm: 82, dpi: 300, prodigiSku: 'XMAS-PORC-BAUB' }],
+    // Prodigi's EXACT print area (sandbox GET /v4.0/products, 27 Oct): 885×885 px, no bleed. (It was
+    // 82 mm + 3 mm bleed from their template canvas — a 1038 px file Prodigi shrank to fit, bleed and all.)
+    variants: [{ size: '7.5 cm', pricePence: 2100, ...exactPx({ w: 885, h: 885 }, 300), prodigiSku: 'XMAS-PORC-BAUB' }],
   },
   // The plastic BALL (XMAS-PLAS-BAUB): printed on BOTH sides, shatterproof, from uk5 → Royal Mail RM24
   // (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
@@ -462,6 +464,51 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'cotton', size: '19×30″' },
     // 320×500mm = Prodigi's official print panel (3780×5907px @300dpi), NOT the whole sack.
     variants: [{ size: 'one size', pricePence: 3500, wMm: 320, hMm: 500, dpi: 150, prodigiSku: 'XMAS-SACK' }],
+  },
+  // The CHRISTMAS TABLE (founder, 27 Oct — go-to-market C25): cork-backed placemats + coasters from uk9,
+  // the same parcel as the ornament + sack. A Prodigi pack has ONE print area ('default'): one drawing
+  // prints on every piece. On their own: placemats in a 4-pack (£59), coasters in a 6-pack (£32). The
+  // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY to make up a bundle's extras — never
+  // priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts); their price here is
+  // the add-on price, for reference. Print areas: sandbox GET /v4.0/products, 27 Oct.
+  // TODO(founder samples): seeded HIDDEN — there's no Prodigi blank for either in .prodigi-assets, so
+  // the shop tile + mockup wait for the founder's sample photos; flip visibleInShop then.
+  placemat: {
+    category: 'FESTIVE', label: 'placemats', blurb: 'their masterpiece at every place', print: true,
+    description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
+    specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
+    variants: (
+      [
+        { size: 'pack of 4', pricePence: 5900, sku: 'H-PLACE-4PK' },
+        { size: 'pack of 1', pricePence: 1600, sku: 'H-PLACE-1PK' },
+        { size: 'pack of 2', pricePence: 3200, sku: 'H-PLACE-2PK' },
+        { size: 'pack of 6', pricePence: 9600, sku: 'H-PLACE-6PK' },
+      ] as const
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 3425, h: 2421 }, 300), prodigiSku: p.sku })),
+  },
+  coaster: {
+    category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true,
+    description: 'Six cork-backed coasters, each printed with the same drawing — for the mince pies and the cocoa, and long after.',
+    specs: { material: 'cork-backed', size: '10.6 cm square', pack: 'six coasters, one drawing', made: 'in the UK' },
+    variants: (
+      [
+        { size: 'pack of 6', pricePence: 3200, sku: 'H-COAST-6PK' },
+        { size: 'pack of 1', pricePence: 550, sku: 'H-COAST-1PK' },
+        { size: 'pack of 2', pricePence: 1100, sku: 'H-COAST-2PK' },
+        { size: 'pack of 4', pricePence: 2200, sku: 'H-COAST-4PK' },
+      ] as const
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku })),
+  },
+  // The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct — C25 + C26): the table set (4 placemats + 6 coasters,
+  // £90) + ornaments (£15) and sacks (£27) with a drawing each, extra placemats (£16) and coaster pairs
+  // (£11) — all uk9, ONE tracked parcel. Not printed itself: the order splits it into its pieces' own
+  // variants (src/lib/christmas-bundle.ts → orders.ts). Its builder lives at /customize/christmasBundle.
+  // TODO(founder samples): HIDDEN until the placemat/coaster photos give it a tile; link straight to it.
+  christmasBundle: {
+    category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false,
+    description: 'The Christmas table — four placemats and six coasters wearing their drawing — plus an ornament and a sack for everyone, each with its own drawing. Made in the UK and sent together in one tracked parcel.',
+    specs: { 'the table': '4 placemats + 6 coasters, one drawing', ornaments: '+£15 each, a drawing each', sacks: '+£27 each, a drawing each', delivery: 'one tracked parcel' },
+    variants: [{ pricePence: 9000, wMm: 0, hMm: 0 }],
   },
   phoneCase: {
     category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
@@ -590,7 +637,7 @@ function variantAttributes(v: VariantDef): Record<string, string> {
   return a;
 }
 
-export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null }> {
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; dpi: number; bleedMm: number }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     return def.variants.map((v, i) => ({
@@ -598,6 +645,7 @@ export function definedPriceList(): Array<{ productKey: string; sku: string; isD
       pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
       visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
       px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
+      dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
     }));
   });
 }
@@ -626,6 +674,7 @@ export async function getCatalogue(db: DbHandle): Promise<PricedCatalogue> {
   const map: PricedCatalogue = {};
   for (const r of rows) {
     if (!r.productActive || !r.variantActive) continue;
+    if (BUNDLE_ONLY_SKUS.has(r.sku)) continue; // a bundle's extra packs: never sold (or priced) on their own
     map[r.sku] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
     if (r.isDefault && !Object.prototype.hasOwnProperty.call(map, r.productKey)) {
       map[r.productKey] = { pricePence: r.pricePence, label: r.label, unitCostPence: r.unitCostPence };
@@ -693,6 +742,7 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
 
   const byKey = new Map<string, CatalogueProduct>();
   for (const r of rows) {
+    if (BUNDLE_ONLY_SKUS.has(r.vSku)) continue; // a bundle's extra packs are never offered on their own
     let p = byKey.get(r.key);
     if (!p) {
       p = { key: r.key, label: r.label, blurb: r.blurb, description: r.description, specs: (r.specs as Record<string, string>) ?? {}, category: r.category, fromPence: r.vPrice, sizes: [], colours: [], orientations: [], grades: [], finishes: [], variants: [], popularRank: r.popularRank ?? null };

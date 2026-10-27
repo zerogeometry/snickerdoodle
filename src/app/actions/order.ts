@@ -9,6 +9,7 @@ import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 import { CALENDAR_PAGE_COUNT } from '@/lib/calendar';
+import { normalizeBundle, type BundleSpec } from '@/lib/christmas-bundle';
 
 /** Never more cards than the biggest pack could hold, whatever the request says. */
 const MAX_PACK_CARDS = 20;
@@ -36,6 +37,8 @@ export async function placeOrderAction(input: {
     ground?: string;
     /** A CALENDAR line: its pages (cover + months; null = not chosen). Re-filled + checked server-side. */
     pages?: ({ assetId: string; transform: RawTransform; sourceObjectId?: string } | null)[];
+    /** The CHRISTMAS BUNDLE: its drawings + extras. Normalised + counted (+ priced) server-side. */
+    bundle?: unknown;
   }[];
   gift?: boolean;
   subject?: string;
@@ -81,10 +84,16 @@ export async function placeOrderAction(input: {
           ),
         }
       : {}),
+    // Untrusted: WHICH drawings + two counts — capped at 12 each; placeOrder counts + prices them.
+    ...(i.bundle !== undefined ? { bundle: normalizeBundle(i.bundle) } : {}),
   }));
 
   const account = await getCurrentAccount();
-  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean));
+  const bundleArt = (b: unknown) => {
+    const x = b as BundleSpec | null | undefined;
+    return x ? [x.table, ...x.ornaments, ...x.sacks].map((a) => a.assetId) : [];
+  };
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean) || bundleArt(i.bundle).length > 0);
   // Personalised orders require the controlling parent — a guest signs up first.
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
@@ -94,7 +103,7 @@ export async function placeOrderAction(input: {
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
-    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId)]).filter((x): x is string => !!x))];
+    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId), ...bundleArt(i.bundle)]).filter((x): x is string => !!x))];
     // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
     // keep it in their keepsake box, or have it erased as soon as the order ships.
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });
