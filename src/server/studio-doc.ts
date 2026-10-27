@@ -219,6 +219,27 @@ export async function saveStudio(
   return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height };
 }
 
+/**
+ * AUTOSAVE (Studio spec §16): keep the parent's work as they go, cheaply — the recipe (geometry +
+ * added things), and the transparency mask when it changed. Nothing is rendered or screened here
+ * (that's saveStudio, on "done"): the products are still made from the last saved design, and
+ * the original is never touched. Reopening the Studio picks up exactly where they left off.
+ */
+export async function autosaveStudioDoc(
+  db: DbHandle,
+  viewer: ViewerContext,
+  assetId: string,
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
+): Promise<void> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const g = cleanGeometry(input.geometry);
+  const objects = cleanObjects(input.objects);
+  if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
+  if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
+  else if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
+  await db.update(assets).set({ studioDoc: { ...g, objects } }).where(eq(assets.id, assetId));
+}
+
 /** Remove a derivative for real: bytes first (confirmed), then the row. */
 async function dropDerivative(db: DbHandle, assetId: string, kind: 'cutout' | 'design'): Promise<void> {
   const key = derivativeKey(assetId, kind);

@@ -21,10 +21,11 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { toast, useUpload } from '@/lib/store';
 import { startGuestUpload } from '@/app/actions/guestUpload';
-import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
+import { autosaveStudioAction, cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
 import { setAssetVisibilityAction } from '@/app/actions/keep';
 import { deleteCreationAction, studioInfoAction } from '@/app/actions/studio';
 import { KeepsakePill, TIER_LABEL, type KeepsakeInfo, type Tier } from '@/ui/studio/KeepsakePill';
+import { SaveStatus, type SaveState } from '@/ui/studio/SaveStatus';
 import { StudioToolbar } from '@/ui/studio/StudioToolbar';
 import { ColourPicker } from '@/ui/studio/ColourPicker';
 import { AddedOptions, type PenStyle, type ShapeStyle, type TextStyle } from '@/ui/studio/AddedOptions';
@@ -115,6 +116,15 @@ export default function StudioPage() {
   const [confirmStart, setConfirmStart] = useState(false);
   const [, setHistoryTick] = useState(0);
   const lastBgPush = useRef(0);
+  // ── autosave: the recipe (and the mask, when it changed) goes to the server as they work ──
+  const [saveState, setSaveState] = useState<SaveState>('idle');
+  const pendingRef = useRef(false); // changes the server hasn't got yet
+  const savedAlpha = useRef<Uint8ClampedArray | null>(null); // the mask the server has
+  const inflight = useRef<Promise<unknown> | null>(null);
+  const markPending = () => {
+    pendingRef.current = true;
+    setSaveState('pending');
+  };
   // ── added things (phase 2) ──
   const [objects, setObjects] = useState<StudioObject[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -150,6 +160,8 @@ export default function StudioPage() {
     const r = await deleteCreationAction({ assetId });
     setBusy(null);
     if (!r.ok) return toast('couldn’t delete that — try again');
+    pendingRef.current = false;
+    setSaveState('idle');
     setDirty(false);
     resetUpload();
     toast('deleted — gone for good');
@@ -201,6 +213,7 @@ export default function StudioPage() {
         }
       }
       if (!live) return;
+      savedAlpha.current = work.alpha.slice();
       workRef.current = work;
       const pic = document.createElement('canvas');
       pic.width = work.w;
@@ -394,6 +407,7 @@ export default function StudioPage() {
     if (undoStack.current.length > HISTORY_CAP) undoStack.current.shift();
     redoStack.current = [];
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
   const restore = (s: Snapshot) => {
@@ -411,6 +425,7 @@ export default function StudioPage() {
     redoStack.current.push(snapshot());
     restore(prev);
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
   const redo = () => {
@@ -419,6 +434,7 @@ export default function StudioPage() {
     undoStack.current.push(snapshot());
     restore(next);
     setDirty(true);
+    markPending();
     setHistoryTick((t) => t + 1);
   };
 
@@ -731,6 +747,7 @@ export default function StudioPage() {
       if (m.ok && m.mask) {
         pushUndo();
         await readMask(m.mask, workRef.current.alpha, workRef.current.w, workRef.current.h);
+        savedAlpha.current = workRef.current.alpha.slice(); // the server made this cutout itself
         setHadCutout(true);
         setKeepWhite(keep);
         setTick((t) => t + 1);
@@ -790,9 +807,17 @@ export default function StudioPage() {
     if (!id) return;
     setBusy('saving…');
     try {
+      if (inflight.current) await inflight.current;
+      pendingRef.current = false;
+      const alphaNow = work.alpha.slice();
       const see = hasTransparency(work.alpha);
       const res = await saveStudioAction({ assetId: id, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: !see });
-      if (!res.ok) return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
+      if (!res.ok) {
+        markPending();
+        return toast(res.reason === 'text' ? 'some of those words can’t be printed — please change them' : 'that didn’t save — try again');
+      }
+      savedAlpha.current = alphaNow;
+      setSaveState('saved');
       setCutout(res.design);
       setAspect(res.aspect);
       setDirty(false);
@@ -803,6 +828,54 @@ export default function StudioPage() {
     }
   };
   const backToRange = () => router.push('/start-creating');
+
+  /** Send what's changed since the last save (recipe always; the mask only when it moved). */
+  const autosave = async (): Promise<boolean> => {
+    const work = workRef.current;
+    if (!work || !assetId) return !pendingRef.current;
+    if (inflight.current) await inflight.current;
+    if (!pendingRef.current) return true;
+    pendingRef.current = false; // anything changed from here on marks it again
+    setSaveState('saving');
+    const prev = savedAlpha.current;
+    const maskMoved = !prev || prev.length !== work.alpha.length || prev.some((a, k) => a !== work.alpha[k]);
+    const alphaNow = maskMoved ? work.alpha.slice() : null;
+    const see = maskMoved && hasTransparency(work.alpha);
+    const call = autosaveStudioAction({ assetId, mask: see ? maskToDataUrl(work) : null, geometry: geo, objects, clearCutout: maskMoved && !see }).catch(() => ({ ok: false as const, reason: undefined }));
+    inflight.current = call;
+    const res = await call;
+    inflight.current = null;
+    if (res.ok) {
+      if (alphaNow) savedAlpha.current = alphaNow;
+      setSaveState(pendingRef.current ? 'pending' : 'saved');
+      return true;
+    }
+    pendingRef.current = true;
+    setSaveState(res.reason === 'text' ? 'text' : 'error');
+    return false;
+  };
+  // a quiet pause after the last change (never mid-stroke) → autosave
+  useEffect(() => {
+    if (!ready || !assetId || saveState !== 'pending') return;
+    let t: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      if (pointers.current.size || busy) t = setTimeout(attempt, 800);
+      else void autosave();
+    };
+    t = setTimeout(attempt, 2500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autosave reads the latest geo/objects; re-armed on every change
+  }, [ready, assetId, saveState, geo, objects, tick, busy]);
+  // closing the tab with changes the server hasn't got yet → the browser asks first
+  useEffect(() => {
+    if (saveState !== 'pending' && saveState !== 'saving' && saveState !== 'error' && saveState !== 'text') return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saveState]);
 
   // ── added-thing actions ──
   const updateSelected = (patch: Partial<StudioObject>, group = false) => {
@@ -854,7 +927,12 @@ export default function StudioPage() {
     setSelectedId(o.id);
     setTool('select');
   };
-  const onBack = () => (dirty ? setLeaving(true) : backToRange());
+  /** Back to the range: anything not yet autosaved goes first; if that fails, ask. */
+  const onBack = async () => {
+    if (pendingRef.current && !(await autosave())) return setLeaving(true);
+    if (dirty) return save(backToRange); // the range shows the design, so make it from the latest
+    backToRange();
+  };
 
   // ── keyboard (desktop) ──
   useEffect(() => {
@@ -1025,7 +1103,7 @@ export default function StudioPage() {
     <div className="fixed inset-0 flex flex-col bg-oat">
       {/* header: always a clear way back to the range */}
       <header className="pt-safe kraft z-20 flex min-h-[60px] items-center gap-2 border-b-2 border-cocoa/10 px-3 md:px-5">
-        <button type="button" onClick={onBack} className="press flex min-h-11 items-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-3 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
+        <button type="button" onClick={() => void onBack()} className="press flex min-h-11 items-center gap-1.5 rounded-[14px] border-2 border-cocoa bg-paper px-3 text-sm font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
           <Icon icon={IconArrowLeft} size={17} /> your range
         </button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -1077,8 +1155,9 @@ export default function StudioPage() {
           {comparing ? (
             <span className="absolute left-3 top-3 rounded-pill bg-cocoa px-3 py-1 text-xs font-extrabold text-paper">your original</span>
           ) : ready ? (
-            <div className="absolute left-3 top-3 max-w-[calc(100%-1.5rem)] sm:max-w-[60%]">
+            <div className="absolute left-3 top-3 flex max-w-[calc(100%-1.5rem)] flex-wrap items-center gap-x-1.5 sm:max-w-[70%]">
               <KeepsakePill info={info} image={upload.dataUrl} onVisibility={changeVisibility} onDelete={deleteCreation} />
+              <SaveStatus state={saveState} onRetry={() => void autosave()} />
             </div>
           ) : null}
           {busy ? (
@@ -1109,13 +1188,18 @@ export default function StudioPage() {
       </div>
 
       {/* leaving with unsaved changes */}
-      <Modal open={leaving} onClose={() => setLeaving(false)} title="save your changes?" subtitle="you’ve edited this drawing">
+      <Modal
+        open={leaving}
+        onClose={() => setLeaving(false)}
+        title="your latest changes aren’t saved yet"
+        subtitle={saveState === 'text' ? 'some of those words can’t be printed — change them and it saves' : 'we couldn’t save them just now'}
+      >
         <div className="flex flex-col gap-2">
           <Button size="lg" className="w-full" onClick={() => void save(backToRange)}>
-            save &amp; go back
+            try again &amp; go back
           </Button>
           <Button variant="secondary" size="lg" className="w-full" onClick={backToRange}>
-            leave without saving
+            leave without them
           </Button>
           <Button variant="ghost" size="md" className="w-full" onClick={() => setLeaving(false)}>
             keep editing
