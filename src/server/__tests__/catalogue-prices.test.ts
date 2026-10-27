@@ -188,8 +188,8 @@ describe('christmas family bundle — catalogue entries', () => {
     expect(CATALOGUE.christmasBundle.pricePence).toBe(BUNDLE_BASE_PENCE);
   });
 
-  it('placemats (4-pack £59) and coasters (6-pack £32) are seeded as standalone products', () => {
-    expect(row('placemat')).toMatchObject({ isDefault: true, pricePence: 5900, prodigiSku: 'H-PLACE-4PK' });
+  it('placemats (4-pack £60) and coasters (6-pack £32) are seeded as standalone products', () => {
+    expect(row('placemat')).toMatchObject({ isDefault: true, pricePence: 6000, prodigiSku: 'H-PLACE-4PK' });
     expect(row('coaster')).toMatchObject({ isDefault: true, pricePence: 3200, prodigiSku: 'H-COAST-6PK' });
   });
 

@@ -71,7 +71,7 @@ export const CATALOGUE = {
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
   // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.
-  placemat: { pricePence: 5900, label: 'placemats' }, // a pack of 4
+  placemat: { pricePence: 6000, label: 'placemats' }, // a pack of 4 (founder, 27 Oct: £60)
   coaster: { pricePence: 3200, label: 'coasters' }, // a pack of 6
   // The CHRISTMAS FAMILY BUNDLE's BASE price — its add-ons are priced from the counts (src/lib/christmas-bundle.ts).
   christmasBundle: { pricePence: 9000, label: 'christmas family bundle' },

@@ -6,7 +6,7 @@ import { priceBasket, quote, type PricedCatalogue, type PromoRule } from '@/pric
 const CAT: PricedCatalogue = {
   christmasBundle: { pricePence: 9000, label: 'christmas family bundle', unitCostPence: 5000 },
   mug: { pricePence: 1800, label: 'mug', unitCostPence: 930 },
-  placemat: { pricePence: 5900, label: 'placemats', unitCostPence: 3700 },
+  placemat: { pricePence: 6000, label: 'placemats', unitCostPence: 3700 },
   coaster: { pricePence: 3200, label: 'coasters', unitCostPence: 1950 },
 };
 const A = { assetId: 'a' };
@@ -63,7 +63,7 @@ describe('pricing — the christmas family bundle', () => {
 
   it('standalone placemats + coasters ship in the uk9 homeware parcel (£3 off the second)', () => {
     const q = priceBasket([{ productKey: 'placemat', qty: 1 }, { productKey: 'coaster', qty: 1 }], { catalogue: CAT });
-    expect(q.subtotalPence).toBe(5900 + 3200);
+    expect(q.subtotalPence).toBe(6000 + 3200);
     expect(q.parcelSavingPence).toBe(300);
   });
 

@@ -179,7 +179,7 @@ export interface BundleOrderLine {
   linePence: number;
 }
 
-/** The base price, shared between the table's two packs (placemats : coasters = 58 : 32, as on their own). */
+/** The base price, shared between the table's two packs (placemats : coasters = 58 : 32 — an internal split; the bundle's £90 is its own price). */
 const COASTER_BASE_SHARE = 32 / 90;
 
 const designKey = (a: BundleArt) => `${a.assetId}|${a.sourceObjectId ?? ''}`;
