@@ -9,8 +9,10 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { autosaveStudioDoc, IDENTITY_GEOMETRY, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
-import { getObjectBytes } from '@/storage';
+import { autosaveStudioDoc, IDENTITY_GEOMETRY, saveStudio, StudioTextError, studioStateForAsset } from '@/server/studio-doc';
+import { applyLook, IDENTITY_LOOK } from '@/lib/studio-look';
+import { derivativeKey, getObjectBytes } from '@/storage';
+import type { ModerationProviders } from '@/server/moderation';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -81,5 +83,31 @@ describe.skipIf(!DB || !S3)('studio autosave', () => {
 
     const blake = await resolveViewerContext(db, ids.blakeId, ids.hartleyId);
     await expect(autosaveStudioDoc(db, blake, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY })).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('a look is a recipe number: it reopens, renders into the design exactly as previewed, and the design is screened', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await drawing(), keptInHome: true });
+    const before = await getObjectBytes(a.key);
+    const look = { ...IDENTITY_LOOK, brightness: 30, warmth: 40, filter: 'pastel' as const, intensity: 60 };
+    let seen = 0;
+    const moderation: ModerationProviders = { hash: { isKnownIllegal: async () => false }, classifier: { classify: async () => (seen++, { flagged: false, labels: [] }) }, textReader: { read: async () => [] } };
+    const res = await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, look }, { moderation });
+    expect(res.sourceObjectId).not.toBeNull();
+    expect(seen).toBe(1);
+    expect((await studioStateForAsset(db, sam, a.assetId)).look).toEqual(look);
+
+    const design = await sharp(await getObjectBytes(derivativeKey(a.assetId, 'design'))).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    const orig = await sharp(before).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+    expect([design.info.width, design.info.height]).toEqual([orig.info.width, orig.info.height]);
+    const expected = new Uint8ClampedArray(orig.data);
+    applyLook(expected, 4, look);
+    expect(Buffer.compare(design.data, Buffer.from(expected))).toBe(0); // the browser's numbers, pixel for pixel
+    expect(Buffer.compare(await getObjectBytes(a.key), before)).toBe(0); // original untouched
+
+    // back to how it was → the plain original again, nothing stale left
+    const back = await saveStudio(db, sam, a.assetId, { mask: null, geometry: IDENTITY_GEOMETRY, look: IDENTITY_LOOK }, { moderation });
+    expect(back.sourceObjectId).toBeNull();
+    expect((await studioStateForAsset(db, sam, a.assetId)).look).toBeNull();
   });
 });

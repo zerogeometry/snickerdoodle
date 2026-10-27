@@ -10,6 +10,7 @@ import { applyCutoutMask, cutoutAlphaForAsset } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
 import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
+import { applyLook, cleanLook, type StudioLook } from '@/lib/studio-look';
 import { containsAbusiveText } from './textSafety';
 import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from './moderation';
 
@@ -99,6 +100,18 @@ async function placeInFrame(drawing: Buffer, W: number, H: number, p: Placement)
   return frame.composite([{ input: part, left: x0, top: y0 }]).png().toBuffer();
 }
 
+/** Colour & light + a preset look, on the drawing's own pixels (alpha untouched) — the server half of
+ * src/lib/studio-look.ts, the same function the browser previews with. */
+export async function applyLookToImage(input: Buffer, look: StudioLook | null): Promise<Buffer> {
+  if (!look) return input;
+  const { data, info } = await sharp(input).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  applyLook(data, 4, look);
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png({ compressionLevel: 6 }).toBuffer();
+}
+
+/** The recipe as stored: geometry at the top level (older docs are just that), then the rest. */
+const docOf = (g: StudioGeometry, objects: StudioObject[], look: StudioLook | null) => ({ ...g, objects, ...(look ? { look } : {}) });
+
 async function bytesOf(db: DbHandle, assetId: string, which: 'ORIGINAL' | 'cutout'): Promise<Buffer | null> {
   if (which === 'ORIGINAL') {
     const [o] = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
@@ -114,12 +127,13 @@ export async function studioStateForAsset(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; mask: Buffer | null }> {
+): Promise<{ geometry: StudioGeometry; objects: StudioObject[]; look: StudioLook | null; mask: Buffer | null }> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const [row] = await db.select({ doc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
   const geometry = row?.doc ? cleanGeometry(row.doc) : IDENTITY_GEOMETRY;
   const objects = row?.doc ? cleanObjects((row.doc as { objects?: unknown }).objects) : [];
-  return { geometry, objects, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
+  const look = row?.doc ? cleanLook((row.doc as { look?: unknown }).look) : null;
+  return { geometry, objects, look, mask: await cutoutAlphaForAsset(db, viewer, assetId) };
 }
 
 /** Typed words that fail the abuse screen (user text is screened before it can print). */
@@ -143,28 +157,30 @@ export async function saveStudio(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; clearCutout?: boolean },
   deps: { moderation?: ModerationProviders } = {},
 ): Promise<StudioSaveResult> {
   const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
+  const look = cleanLook(input.look);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: { ...g, objects } }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: docOf(g, objects, look) }).where(eq(assets.id, assetId));
 
   const cut = input.clearCutout ? null : await bytesOf(db, assetId, 'cutout');
   const source = cut ?? (await bytesOf(db, assetId, 'ORIGINAL'));
   if (!source) throw new Error('no original to edit');
 
-  if (!cut && isIdentity(g) && objects.length === 0) {
+  const plain = isIdentity(g) && objects.length === 0 && !look;
+  if (!cut && plain) {
     await dropDerivative(db, assetId, 'design'); // back to the plain original — no stale design left behind
     await clearDesignModeration(db, assetId);
     const meta = await sharp(source).rotate().metadata();
     return { sourceObjectId: null, objectKey: null, aspect: (meta.width ?? 1) / (meta.height ?? 1) };
   }
-  if (cut && isIdentity(g) && objects.length === 0) {
+  if (cut && plain) {
     await dropDerivative(db, assetId, 'design'); // the cutout IS the design now
     await clearDesignModeration(db, assetId);
     const key = derivativeKey(assetId, 'cutout');
@@ -173,7 +189,8 @@ export async function saveStudio(
     return { sourceObjectId: o!.id, objectKey: key, aspect: (meta.width ?? 1) / (meta.height ?? 1) };
   }
 
-  const base = cut ?? (await sharp(source).rotate().png().toBuffer()); // originals: honour orientation first
+  // originals: honour orientation first; then colour & light, on the drawing's own pixels
+  const base = await applyLookToImage(cut ?? (await sharp(source).rotate().png().toBuffer()), look);
   const baseMeta = await sharp(base).metadata();
   const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
   const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
@@ -212,9 +229,10 @@ export async function saveStudio(
       .returning();
     objectId = row!.id;
   }
-  // Anything drawn or added is new content: screen it before it can reach a print order.
+  // Anything drawn or added is new content: screen it before it can reach a print order. A colour
+  // change can bring out what was hard to see, so that's screened too (the more careful choice).
   // (Rotate / crop / background / removals only ever show less of the screened upload.)
-  if (objects.length) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
+  if (objects.length || look) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
   else await clearDesignModeration(db, assetId);
   return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height };
 }
@@ -229,15 +247,16 @@ export async function autosaveStudioDoc(
   db: DbHandle,
   viewer: ViewerContext,
   assetId: string,
-  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
+  input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; look?: unknown; clearCutout?: boolean },
 ): Promise<void> {
   await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
+  const look = cleanLook(input.look);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');
   if (input.mask) await applyCutoutMask(db, viewer, assetId, input.mask);
   else if (input.clearCutout) await dropDerivative(db, assetId, 'cutout');
-  await db.update(assets).set({ studioDoc: { ...g, objects } }).where(eq(assets.id, assetId));
+  await db.update(assets).set({ studioDoc: docOf(g, objects, look) }).where(eq(assets.id, assetId));
 }
 
 /** Remove a derivative for real: bytes first (confirmed), then the row. */

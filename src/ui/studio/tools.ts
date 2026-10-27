@@ -1,4 +1,5 @@
 import {
+  IconAdjustments,
   IconBackground,
   IconColorPicker,
   IconCrop,
@@ -16,7 +17,7 @@ import {
   type Icon as TablerIcon,
 } from '@tabler/icons-react';
 
-export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
+export type ToolId = 'removeBg' | 'removeColour' | 'erase' | 'restore' | 'background' | 'adjust' | 'draw' | 'text' | 'shapes' | 'select' | 'rotate' | 'flip' | 'crop' | 'compare' | 'startAgain';
 
 export type ToolGroup = 'cut' | 'add' | 'frame' | 'colour' | 'check';
 /** Toolbar groups, in order of how often parents reach for them. */
@@ -168,6 +169,16 @@ export const TOOLS: ToolDef[] = [
     kind: 'mode',
     key: 'K',
     info: 'Fill the see-through parts with a colour, so it prints on that colour. Leave it see-through to let the product’s own colour show — on a card or print, see-through is white paper.',
+  },
+  {
+    id: 'adjust',
+    group: 'colour',
+    hint: 'brighter, bolder, warmer — or try a look.',
+    label: 'adjust',
+    icon: IconAdjustments,
+    kind: 'mode',
+    key: 'A',
+    info: 'Brighten a dull photo, deepen the colours, warm it up or cool it down — or try a look, like black & white or soft pastel, as much or as little as you like. Your original is never changed.',
   },
   {
     id: 'compare',
