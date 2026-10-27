@@ -37,7 +37,7 @@ main() {
   apt-get update -qq
   apt-get install -y -qq ca-certificates curl gnupg jq git age \
     postgresql-16 postgresql-client-16 nodejs caddy \
-    ufw fail2ban unattended-upgrades >/dev/null
+    ufw fail2ban python3-systemd unattended-upgrades >/dev/null
   node -e 'process.exit(Number(process.versions.node.split(".")[0]) === 22 ? 0 : 1)' || die "expected Node 22, got $(node -v)"
   # The AWS CLI is published by AWS as a snap and updates itself.
   command -v aws >/dev/null || snap install aws-cli --classic >/dev/null
@@ -74,7 +74,13 @@ KbdInteractiveAuthentication no
 PermitRootLogin no
 EOF
   sshd -t && systemctl try-reload-or-restart ssh
-  systemctl enable --now fail2ban >/dev/null
+  cat >/etc/fail2ban/jail.d/snickerdoodle.conf <<'EOF'
+[sshd]
+enabled = true
+backend = systemd
+EOF
+  systemctl enable fail2ban >/dev/null
+  systemctl restart fail2ban
 
   step "app user and folders"
   id snickerdoodle >/dev/null 2>&1 ||

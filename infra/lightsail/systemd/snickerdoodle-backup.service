@@ -7,6 +7,8 @@ OnFailure=snickerdoodle-alert@backup.service
 
 [Service]
 Type=oneshot
+# the AWS command line is a snap
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin
 ExecStart=/usr/local/sbin/sd-backup
 TimeoutStartSec=1h
 Nice=10
