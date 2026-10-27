@@ -41,7 +41,9 @@ export const gbp = formatPence;
 // product is made from it. "undo" brings the whole photo back.
 // `key` = this drawing's identity (stays put when the trim swaps the picture in).
 export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean } | null;
-export type Cutout = { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean };
+/** `px` = a Studio design's REAL pixel size (it may be stored enlarged for crisp stickers / words) —
+ * what the print-quality badge judges, like the server's gate (src/server/print/sourceDims.ts). */
+export type Cutout = { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean; px?: { width: number; height: number } };
 /** What to SHOW for the drawing: an edit's picture, or the drawing itself (a trim IS the drawing — and its
  * own copy never expires, unlike the edit's short-lived link). */
 export const shownSrc = (u: Upload): string | null => (u ? (u.cutout && !u.cutout.trim ? u.cutout.url : u.dataUrl) : null);

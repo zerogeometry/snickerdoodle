@@ -9,6 +9,7 @@ import type { DbHandle } from './db';
 import { applyCutoutMask, cutoutAlphaForAsset, workingBytes } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
 import { renderStudioObjects } from './print/studioOverlay';
+import { DESIGN_MAX_ENLARGE, type DesignPx } from './print/sourceDims';
 import { cleanPlace, normAngle, placeIsIdentity, rotatedSize, type Placement } from '@/lib/studio-geometry';
 import { containsAbusiveText } from './textSafety';
 import { clearDesignModeration, moderateDesignAndRecord, type ModerationProviders } from './moderation';
@@ -131,6 +132,8 @@ export interface StudioSaveResult {
   objectKey: string | null;
   /** The design's width/height, for auto-orienting product tiles. */
   aspect: number;
+  /** A design's REAL pixel size (what print quality is judged on) — absent for the original / a cutout. */
+  realPx?: { width: number; height: number };
 }
 
 /**
@@ -178,10 +181,14 @@ export async function saveStudio(
   const [gwF, ghF] = rotatedSize(baseMeta.width!, baseMeta.height!, g.rotate);
   const GW = Math.max(1, Math.round(gwF)), GH = Math.max(1, Math.round(ghF));
   let designed = await applyGeometry(base, g);
+  // the drawing's own detail across the design (a drawing scaled up in its frame spreads it thinner) —
+  // what print quality is judged on (src/server/print/sourceDims.ts), never the enlarged file below
+  const spread = Math.max(1, g.place?.scale ?? 1);
+  const real = { width: Math.max(1, Math.round(designed.width / spread)), height: Math.max(1, Math.round(designed.height / spread)) };
   // Added things: draw them at a resolution that stays crisp in print.
   let k = 1;
   if (objects.length) {
-    k = Math.min(4, Math.max(1, OVERLAY_EDGE / Math.max(designed.width, designed.height)));
+    k = Math.min(DESIGN_MAX_ENLARGE, Math.max(1, OVERLAY_EDGE / Math.max(designed.width, designed.height)));
     if (k > 1) {
       const w = Math.round(designed.width * k), h = Math.round(designed.height * k);
       designed = { buffer: await sharp(designed.buffer).resize(w, h, { kernel: 'lanczos3' }).png().toBuffer(), width: w, height: h };
@@ -212,11 +219,14 @@ export async function saveStudio(
       .returning();
     objectId = row!.id;
   }
+  // the real pixel size goes with THIS design's hash — a stale record can never vouch for new bytes
+  const designPx: DesignPx = { ...real, sha256 };
+  await db.update(assets).set({ studioDoc: { ...g, objects, designPx } }).where(eq(assets.id, assetId));
   // Anything drawn or added is new content: screen it before it can reach a print order.
   // (Rotate / crop / background / removals only ever show less of the screened upload.)
   if (objects.length) await moderateDesignAndRecord(db, { assetId, familyId: ref.familyId, buffer: designed.buffer }, deps.moderation);
   else await clearDesignModeration(db, assetId);
-  return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height };
+  return { sourceObjectId: objectId, objectKey: key, aspect: designed.width / designed.height, realPx: { width: real.width, height: real.height } };
 }
 
 /** Remove a derivative for real: bytes first (confirmed), then the row. */

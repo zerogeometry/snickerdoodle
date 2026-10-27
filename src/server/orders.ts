@@ -12,6 +12,7 @@ import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } fro
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { getObjectBytes } from '@/storage';
+import { printSourceDims } from '@/server/print/sourceDims';
 import sharp from 'sharp';
 import type { DbHandle, Tx } from './db';
 import { resolveViewerContext } from './assets';
@@ -25,15 +26,16 @@ import { sendOrderConfirmed } from './orderEmails';
  * in which case the renderer's own gate still applies. */
 async function sourceDimensions(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<{ width: number; height: number } | null> {
   const [obj] = sourceObjectId
-    ? await db.select({ key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.id, sourceObjectId))
+    ? await db.select({ key: storageObjects.key, sha256: storageObjects.sha256 }).from(storageObjects).where(eq(storageObjects.id, sourceObjectId))
     : await db
-        .select({ key: storageObjects.key })
+        .select({ key: storageObjects.key, sha256: storageObjects.sha256 })
         .from(storageObjects)
         .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!obj) return null;
   try {
     const meta = await sharp(await getObjectBytes(obj.key)).metadata();
-    return meta.width && meta.height ? { width: meta.width, height: meta.height } : null;
+    // the REAL pixels: a Studio design enlarged for crisp stickers / words is judged as the drawing
+    return meta.width && meta.height ? await printSourceDims(db, assetId, obj, { width: meta.width, height: meta.height }) : null;
   } catch {
     return null;
   }

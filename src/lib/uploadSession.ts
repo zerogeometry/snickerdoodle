@@ -15,7 +15,7 @@ export type SessionUpload = {
   name: string;
   assetId?: string;
   key?: string;
-  cutout?: { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean };
+  cutout?: { url: string; sourceObjectId: string; oneTap?: boolean; trim?: boolean; px?: { width: number; height: number } };
   trim?: { url: string; sourceObjectId: string };
   aspect?: number;
   kept?: boolean;
@@ -35,6 +35,8 @@ export function toSessionUpload(u: (SessionUpload & Record<string, unknown>) | n
     out.cutout = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
     if (u.cutout.oneTap === true) out.cutout.oneTap = true;
     if (u.cutout.trim === true) out.cutout.trim = true;
+    const px = u.cutout.px;
+    if (px && Number.isFinite(px.width) && Number.isFinite(px.height) && px.width > 0 && px.height > 0) out.cutout.px = { width: Math.round(px.width), height: Math.round(px.height) };
   }
   if (u.trim && typeof u.trim.url === 'string' && typeof u.trim.sourceObjectId === 'string') out.trim = { url: u.trim.url, sourceObjectId: u.trim.sourceObjectId };
   if (typeof u.key === 'string') out.key = u.key.slice(0, 80);

@@ -20,8 +20,8 @@ import { toSessionUpload } from '@/lib/uploadSession';
  * reached by briefly opening the chosen keepsake as "the drawing" (setting aside the one in progress,
  * put back on return) — every Studio tool works unchanged.
  */
-export type DrawingEdit = { url: string; sourceObjectId: string };
-type Drawingish = { assetId: string; imageUrl: string | null; sourceObjectId?: string };
+export type DrawingEdit = { url: string; sourceObjectId: string; /** a Studio design's real pixel size (src/server/print/sourceDims.ts) */ px?: { width: number; height: number } };
+type Drawingish = { assetId: string; imageUrl: string | null; sourceObjectId?: string; px?: { width: number; height: number } };
 /** the drawing in progress, set aside without its picture */
 type Stashed = Omit<NonNullable<Upload>, 'dataUrl'>;
 
@@ -139,7 +139,7 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
     const back = isResumeVisit();
     if (back && u?.assetId === detour.assetId) {
       if (u.cutout && !u.cutout.trim) {
-        const design = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId };
+        const design: DrawingEdit = { url: u.cutout.url, sourceObjectId: u.cutout.sourceObjectId, ...(u.cutout.px ? { px: u.cutout.px } : {}) };
         setEdits((e) => ({ ...e, [detour!.assetId]: design }));
       } else {
         // saved back to the plain drawing: no edit of it here any more
@@ -169,7 +169,7 @@ export function usePickerEdits(opts: { returnTo: string; onUploaded: () => void;
   /** The drawings as they'll print here: an edit made in this builder replaces the picture + source. */
   // (its small grid copy is of the drawing BEFORE the edit — so an edited one shows the edit itself)
   const apply = useCallback(
-    <D extends Drawingish>(list: D[]): D[] => list.map((d) => (edits[d.assetId] ? { ...d, imageUrl: edits[d.assetId]!.url, sourceObjectId: edits[d.assetId]!.sourceObjectId, thumbUrl: null } : d)),
+    <D extends Drawingish>(list: D[]): D[] => list.map((d) => (edits[d.assetId] ? { ...d, imageUrl: edits[d.assetId]!.url, sourceObjectId: edits[d.assetId]!.sourceObjectId, thumbUrl: null, px: edits[d.assetId]!.px } : d)),
     [edits],
   );
 

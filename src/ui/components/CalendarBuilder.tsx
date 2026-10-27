@@ -199,6 +199,12 @@ export function CalendarBuilder() {
       const key = `${c.assetId}:${c.sourceObjectId ?? ''}`;
       if (!d?.imageUrl || key in dims || started.has(key)) continue;
       started.add(key);
+      // a Studio design is judged on its drawing's real pixels, like the server's gate
+      if (d.px) {
+        const px = d.px;
+        setDims((m) => ({ ...m, [key]: { width: px.width, height: px.height } }));
+        continue;
+      }
       setDims((m) => ({ ...m, [key]: null }));
       const img = new window.Image();
       img.onload = () => setDims((m) => ({ ...m, [key]: img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null }));

@@ -41,7 +41,7 @@ import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type Pla
  */
 
 /** A drawing that can go on a card. */
-export type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean; /** a small copy for tiles (the picker grid, the fan) */ thumbUrl?: string | null };
+export type Drawing = { assetId: string; imageUrl: string | null; sourceObjectId?: string; label: string; printable: boolean; /** a Studio design's real pixel size */ px?: { width: number; height: number }; /** a small copy for tiles (the picker grid, the fan) */ thumbUrl?: string | null };
 type Slot = PackCardLine | null;
 export type PickerState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; signedIn: boolean; keepsakes: PickerKeepsake[]; at: number };
 
@@ -205,6 +205,12 @@ export function CardPackBuilder() {
       const key = `${c.assetId}:${c.sourceObjectId ?? ''}`;
       if (!d?.imageUrl || key in dims || started.has(key)) continue;
       started.add(key);
+      // a Studio design is judged on its drawing's real pixels, like the server's gate
+      if (d.px) {
+        const px = d.px;
+        setDims((m) => ({ ...m, [key]: { width: px.width, height: px.height } }));
+        continue;
+      }
       setDims((m) => ({ ...m, [key]: null }));
       const img = new window.Image();
       img.onload = () => setDims((m) => ({ ...m, [key]: img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null }));

@@ -16,6 +16,7 @@ import { renderRepeatPattern } from './pattern';
 import { renderHeightChartFace } from './heightChart';
 import { isHeightChart } from './height-chart-geometry';
 import { assessPrintResolution } from './pattern-geometry';
+import { printSourceDims } from './sourceDims';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
@@ -85,6 +86,9 @@ export async function renderPrintFile(
   const meta = await sharp(srcBuf).metadata();
   const src = { width: meta.width ?? 0, height: meta.height ?? 0 };
   if (!src.width || !src.height) throw new Error('unreadable source image');
+  // print quality is judged on the drawing's REAL pixels (a Studio design's enlarging never counts);
+  // the layout below keeps using the file's own size (the same shape)
+  const judged = await printSourceDims(db, input.assetId, srcObj, src);
 
   const transform = clampTransform(input.transform);
   const geom = { printWidthPx: tpl.printWidthPx, printHeightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi };
@@ -101,7 +105,7 @@ export async function renderPrintFile(
   // 5 m roll needs no bigger a photo than a pair of socks.
   if (variantRow?.key && isPatternProduct(variantRow.key)) {
     const canvas = canvasSizePx(geom);
-    const motifAssess = assessPrintResolution(geom, src, transform, variantRow.key);
+    const motifAssess = assessPrintResolution(geom, judged, transform, variantRow.key);
     if (motifAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${motifAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
@@ -122,7 +126,7 @@ export async function renderPrintFile(
   // (Prodigi prints no markings). Placement and resolution are judged on the art area beside the
   // ruler — the same answer the positioner, the mockup and the order gate use.
   if (variantRow?.key && isHeightChart(variantRow.key)) {
-    const chartAssess = assessPrintResolution(geom, src, transform, variantRow.key);
+    const chartAssess = assessPrintResolution(geom, judged, transform, variantRow.key);
     if (chartAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${chartAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
@@ -133,7 +137,7 @@ export async function renderPrintFile(
 
   // THE CALENDAR: a gallery page — the whole drawing fitted inside a 1 cm white margin (founder, 26 Oct).
   if (variantRow?.key && isGalleryProduct(variantRow.key)) {
-    const galleryAssess = assessResolution(galleryArtGeom(geom), src, GALLERY_FIT);
+    const galleryAssess = assessResolution(galleryArtGeom(geom), judged, GALLERY_FIT);
     if (galleryAssess.decision === 'BLOCK') {
       throw new Error(`source too low-res for this product (would need ${galleryAssess.upscaleFactor.toFixed(1)}× upscale)`);
     }
@@ -149,7 +153,7 @@ export async function renderPrintFile(
     return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
   }
 
-  const assess = assessResolution(geom, src, transform);
+  const assess = assessResolution(geom, judged, transform);
   if (assess.decision === 'BLOCK') {
     throw new Error(`source too low-res for this product (would need ${assess.upscaleFactor.toFixed(1)}× upscale)`);
   }

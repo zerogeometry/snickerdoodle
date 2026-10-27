@@ -332,12 +332,16 @@ function CustomizeProduct() {
   const printSrc = shownSrc(upload);
   const [srcSize, setSrcSize] = useState<{ width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false); // "+ Keepsake" in flight (declared before any early return)
+  // a Studio design is judged on its drawing's REAL pixels, like the server's gate (it may be stored
+  // enlarged for crisp stickers / words)
+  const realPx = upload?.cutout && printSrc === upload.cutout.url ? upload.cutout.px : undefined;
   useEffect(() => {
     if (!printSrc) return setSrcSize(null);
+    if (realPx) return setSrcSize({ width: realPx.width, height: realPx.height });
     const img = new window.Image();
     img.onload = () => setSrcSize(img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null);
     img.src = printSrc;
-  }, [printSrc]);
+  }, [printSrc, realPx?.width, realPx?.height]); // eslint-disable-line react-hooks/exhaustive-deps -- realPx travels with the design url
 
   if (products && !product) {
     return (
