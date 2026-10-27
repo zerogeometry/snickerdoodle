@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
   // renderer, reached via src/server/print/render.ts → the print-preview server action); sharp
   // likewise. Without this, webpack tries to parse the .node binary and the route 500s.
   serverExternalPackages: ['@resvg/resvg-js', 'sharp'],
+  // The service worker must never be served stale (a fix to it has to reach phones at once).
+  async headers() {
+    return [{ source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] }];
+  },
   // noindex: set by src/middleware.ts for every path outside the public list in
   // src/lib/indexing.ts (marketing/trust/shop front stay indexable).
   experimental: {

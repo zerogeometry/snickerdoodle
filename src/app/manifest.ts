@@ -2,11 +2,13 @@ import type { MetadataRoute } from 'next';
 
 /**
  * Installable-app manifest (PWA): opens full-screen like a native app, kraft-coloured chrome.
- * Icons: the founder's smiley-face favicon — only a 100px source exists today; a ≥1024px original
- * is needed for crisp 192/512 install icons (flagged).
+ * Icons come from `node scripts/make-icons.mjs` — today derived from the 1440px lockup (the face is
+ * only ~480px there). Regenerate them with the founder's hi-res logo (SVG or ≥1024px) when it
+ * arrives: `node scripts/make-icons.mjs <logo.svg>` (flagged, D12).
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
+    id: '/',
     name: 'snickerdoodle — keep the magic',
     short_name: 'snickerdoodle',
     description: "Turn your little one's drawings into keepsakes, kept in your family's private home.",
@@ -14,8 +16,15 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
+    lang: 'en-GB',
+    categories: ['lifestyle', 'shopping', 'photo'],
     background_color: '#EBDDC6',
     theme_color: '#EBDDC6',
-    icons: [{ src: '/brand/favicon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' }],
+    icons: [
+      { src: '/brand/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/brand/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/brand/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+      { src: '/brand/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
   };
 }
