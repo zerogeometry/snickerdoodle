@@ -180,11 +180,11 @@ describe('christmas family bundle — catalogue entries', () => {
     return r;
   };
 
-  it('the bundle is seeded at its £90 base, not printed itself, held back until it has a tile', () => {
+  it('the bundle is seeded at its £90 base, not printed itself, on show (founder, 28 Oct)', () => {
     const b = row(BUNDLE_KEY);
     expect(b.pricePence).toBe(BUNDLE_BASE_PENCE);
     expect(b.prodigiSku).toBeNull();
-    expect(b.visibleInShop).toBe(false);
+    expect(b.visibleInShop).toBe(true); // on show (founder, 28 Oct)
     expect(b.paused).toBe(false); // priceable + orderable (hidden ≠ paused)
     expect(CATALOGUE.christmasBundle.pricePence).toBe(BUNDLE_BASE_PENCE);
   });
@@ -222,8 +222,8 @@ describe('christmas family bundle — catalogue entries', () => {
 // The CHRISTMAS EVE BUNDLE (founder, 27 Oct): £62 a bundle, £74 separately (sack £35 + ornament £21 + mug £18).
 describe('christmas eve bundle — catalogue entries', () => {
   const row = (sku: string) => list.find((x) => x.sku === sku);
-  it('is seeded at £62, not printed itself, held back until it has a tile', () => {
-    expect(row(EVE_KEY)).toMatchObject({ pricePence: EVE_PRICE_PENCE, prodigiSku: null, visibleInShop: false, paused: false });
+  it('is seeded at £62, not printed itself, on show (founder, 28 Oct)', () => {
+    expect(row(EVE_KEY)).toMatchObject({ pricePence: EVE_PRICE_PENCE, prodigiSku: null, visibleInShop: true, paused: false });
     expect(CATALOGUE.christmasEveBundle.pricePence).toBe(EVE_PRICE_PENCE);
   });
   it('separately it’s £74', () => {

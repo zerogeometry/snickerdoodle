@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
 import { FAQ_UPDATED } from '@/lib/faq';
-import { CHRISTMAS_PAGES_UPDATED, CHRISTMAS_PATHS } from '@/lib/christmas-pages';
 import { PRODUCT_PATHS } from '@/lib/shop-products';
 import { isTestSite } from '@/lib/siteMode';
 import { PUBLIC_PAGES, siteOrigin } from '@/lib/seo';
@@ -20,6 +19,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     url: `${origin}${p.path === '/' ? '' : p.path}`,
     changeFrequency: p.changeFrequency,
     priority: p.priority,
-    ...(p.path === '/faq' ? { lastModified: FAQ_UPDATED } : CHRISTMAS_PATHS.includes(p.path) && p.path !== '/christmas/delivery-dates' ? { lastModified: CHRISTMAS_PAGES_UPDATED } : {}),
+    ...(p.path === '/faq' ? { lastModified: FAQ_UPDATED } : {}),
   }));
 }

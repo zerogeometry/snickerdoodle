@@ -59,6 +59,10 @@ export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   ceramicOrnament: 'Ceramic christmas ornament',
   christmasBauble: 'Christmas bauble (plastic ball)',
   sack: 'Christmas sack',
+  placemat: 'Placemats (set of 4)',
+  coaster: 'Coasters (set of 6)',
+  christmasBundle: 'Christmas family bundle (from £90)',
+  christmasEveBundle: 'Christmas Eve bundle (sack, ornament and mug)',
   kidsJumper: 'Kids’ organic jumper',
   christmasJumper: 'Christmas jumper (adult)',
 };

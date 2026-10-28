@@ -22,6 +22,8 @@ export const EXPECTED_POPULARITY = [
   'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
   // the dated 2027 wall calendar (D23, Christmas 2026 → mid-January)
   'calendar',
+  // the Christmas bundles + the table set (founder, 27–28 Oct)
+  'christmasBundle', 'christmasEveBundle', 'placemat', 'coaster',
 ];
 
 export const POPULARITY_WINDOW_DAYS = 90;

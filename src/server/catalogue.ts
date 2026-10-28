@@ -496,10 +496,10 @@ const DEFS: Record<string, ProductDef> = {
   // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY to make up a bundle's extras — never
   // priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts); their price here is
   // the add-on price, for reference. Print areas: sandbox GET /v4.0/products, 27 Oct.
-  // TODO(founder samples): seeded HIDDEN — there's no Prodigi blank for either in .prodigi-assets, so
-  // the shop tile + mockup wait for the founder's sample photos; flip visibleInShop then.
+  // ON SHOW (founder, 28 Oct). TODO(founder samples): no Prodigi blank for either in .prodigi-assets yet,
+  // so they show the plain tile until the founder's sample photos give them a mockup.
   placemat: {
-    category: 'FESTIVE', label: 'placemats', blurb: 'their masterpiece at every place', print: true,
+    category: 'FESTIVE', label: 'placemats', blurb: 'their masterpiece at every place', print: true, visibleInShop: true,
     description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
     specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
     variants: (
@@ -512,7 +512,7 @@ const DEFS: Record<string, ProductDef> = {
     ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 3425, h: 2421 }, 300), prodigiSku: p.sku })),
   },
   coaster: {
-    category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true,
+    category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
     description: 'Six cork-backed coasters, each printed with the same drawing — for the mince pies and the cocoa, and long after.',
     specs: { material: 'cork-backed', size: '10.6 cm square', pack: 'six coasters, one drawing', made: 'in the UK' },
     variants: (
@@ -528,9 +528,9 @@ const DEFS: Record<string, ProductDef> = {
   // £90) + ornaments (£15) and sacks (£27) with a drawing each, extra placemats (£16) and coaster pairs
   // (£11) — all uk9, ONE tracked parcel. Not printed itself: the order splits it into its pieces' own
   // variants (src/lib/christmas-bundle.ts → orders.ts). Its builder lives at /customize/christmasBundle.
-  // TODO(founder samples): HIDDEN until the placemat/coaster photos give it a tile; link straight to it.
+  // ON SHOW (founder, 28 Oct).
   christmasBundle: {
-    category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false,
+    category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false, visibleInShop: true,
     description: 'The Christmas table — four placemats and six coasters wearing their drawing — plus an ornament and a sack for everyone, each with its own drawing. Made in the UK and sent together in one tracked parcel.',
     specs: { 'the table': '4 placemats + 6 coasters, one drawing', ornaments: '+£15 each, a drawing each', sacks: '+£27 each, a drawing each', delivery: 'one tracked parcel' },
     variants: [{ pricePence: 9000, wMm: 0, hMm: 0 }],
@@ -539,9 +539,9 @@ const DEFS: Record<string, ProductDef> = {
   // colour), all uk9 → ONE parcel. £62 (£74 separately). One drawing on all three, or one each. Not
   // printed itself: the order splits it into the three pieces' own variants (src/lib/christmas-eve.ts).
   // Its own multi-buy on the number of bundles, from the pieces' live costs. Builder:
-  // /customize/christmasEveBundle. TODO(founder): HIDDEN until it has a shop tile; link straight to it.
+  // /customize/christmasEveBundle. ON SHOW (founder, 28 Oct).
   christmasEveBundle: {
-    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'a sack, an ornament and a mug — their christmas eve, made real', print: false,
+    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'a sack, an ornament and a mug — their christmas eve, made real', print: false, visibleInShop: true,
     description: 'Everything for christmas eve, with their drawing on it: a cotton sack to fill, a ceramic ornament for the tree and a two-tone mug for the cocoa. One drawing on all three, or a different one on each. Sent together in one tracked parcel.',
     specs: { 'in the bundle': 'a christmas sack, a ceramic ornament, an 11oz two-tone mug', mug: 'any colour', delivery: 'one tracked parcel' },
     variants: [{ pricePence: 6200, wMm: 0, hMm: 0 }],
