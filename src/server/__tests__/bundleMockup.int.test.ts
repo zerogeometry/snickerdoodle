@@ -35,7 +35,8 @@ describe.skipIf(!URL || !LAYERS)('christmas family bundle pictures — integrati
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-    expect(await seedBundleLayouts(db)).toBe(2 + 2 + 2 + (1 + 1 + 2) + (1 + 1 + 4) + (1 + 1 + 8)); // print areas over the four layouts
+    // print areas: the bundle's four layouts + the placemat tile (1) + the coaster tile (2)
+    expect(await seedBundleLayouts(db)).toBe(2 + 2 + 2 + (1 + 1 + 2) + (1 + 1 + 4) + (1 + 1 + 8) + 1 + 2);
   }, 120_000);
   afterAll(async () => {
     if (assetIds.length) await db.delete(assets).where(inArray(assets.id, assetIds));
@@ -73,6 +74,27 @@ describe.skipIf(!URL || !LAYERS)('christmas family bundle pictures — integrati
     await expect(renderBundlePreview(db, { accountId: ids.samId, uploadClaims: [] }, { layout: 'x2', placemat: { assetId: mine }, coaster: null, ornaments: [{ assetId: ids.assetBloomFamily }, { assetId: mine }] })).rejects.toBeInstanceOf(BundlePreviewDenied);
     await expect(renderBundlePreview(db, { accountId: ids.samId, uploadClaims: [] }, { layout: 'x2', placemat: { assetId: mine }, coaster: { assetId: ids.assetBloomFamily }, ornaments: [] })).rejects.toBeInstanceOf(BundlePreviewDenied);
     await expect(renderBundlePreview(db, { accountId: null, uploadClaims: [] }, { layout: 'x2', placemat: { assetId: mine }, coaster: null, ornaments: [] })).rejects.toBeInstanceOf(BundlePreviewDenied);
+  });
+
+  it('the standalone placemat + coaster tiles: the drawing at the shopper’s placement, cached per placement; the placemat’s back is never a mockup', async () => {
+    const mine = await drawing([200, 120, 60]);
+    const all = await loadCatalogue(db, { includeHidden: true });
+    const viewer = await resolveAssetViewer(db, mine, ids.samId, []);
+    for (const key of ['placemat', 'coaster']) {
+      const p = all.find((x) => x.key === key)!;
+      // every pack shows the founder's one picture: rendered once (512 px thumb), then a cache hit
+      const tiles: Awaited<ReturnType<typeof composeMockup>>[] = [];
+      for (const v of p.variants) tiles.push(await composeMockup(db, viewer, { assetId: mine, variantId: v.id, transform: { scale: 1 }, size: 'thumb' }));
+      expect(tiles[0], key).toMatchObject({ format: 'webp', widthPx: 512, cached: false });
+      expect(tiles.slice(1).every((t) => t.cached && t.key === tiles[0]!.key), key).toBe(true);
+      const v = p.variants.find((x) => x.isDefault)!;
+      const a = await composeMockup(db, viewer, { assetId: mine, variantId: v.id, transform: { scale: 1 }, size: 'zoom' });
+      const b = await composeMockup(db, viewer, { assetId: mine, variantId: v.id, transform: { scale: 0 }, size: 'zoom' });
+      expect(a.key).not.toBe(b.key); // a different placement is a different picture
+      expect(a.widthPx).toBe(1024);
+    }
+    const placemat = all.find((x) => x.key === 'placemat')!.variants.find((x) => x.isDefault)!;
+    await expect(composeMockup(db, viewer, { assetId: mine, variantId: placemat.id, transform: {}, view: 'back' })).rejects.toThrow(/photo/);
   });
 
   it('the catalogue tile: the one drawing on every piece, behind the authz gate, cached as that drawing’s derivative', async () => {

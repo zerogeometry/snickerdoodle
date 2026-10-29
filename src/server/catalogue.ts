@@ -511,18 +511,21 @@ const DEFS: Record<string, ProductDef> = {
       ] as const
     ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 3425, h: 2421 }, 300), prodigiSku: p.sku })),
   },
+  // Coasters on their own start at TWO (founder, 29 Oct): packs of 2 / 4 / 6 at £18 / £26 / £34 — priced so
+  // each still clears 10% net with a 10% creator code + 5% commission (pinned by a test). The 6-pack stays
+  // the default (it keeps the product key as its sku); the single coaster is bundle-only, never sold.
   coaster: {
     category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
-    description: 'Six cork-backed coasters, each printed with the same drawing — for the mince pies and the cocoa, and long after.',
-    specs: { material: 'cork-backed', size: '10.6 cm square', pack: 'six coasters, one drawing', made: 'in the UK' },
+    description: 'Cork-backed coasters, each printed with the same drawing — in packs of 2, 4 or 6. For the mince pies and the cocoa, and long after.',
+    specs: { material: 'cork-backed', size: '10.6 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
     variants: (
       [
-        { size: 'pack of 6', pricePence: 3200, sku: 'H-COAST-6PK' },
+        { size: 'pack of 2', pricePence: 1800, sku: 'H-COAST-2PK' },
+        { size: 'pack of 4', pricePence: 2600, sku: 'H-COAST-4PK' },
+        { size: 'pack of 6', pricePence: 3400, sku: 'H-COAST-6PK', default: true },
         { size: 'pack of 1', pricePence: 550, sku: 'H-COAST-1PK' },
-        { size: 'pack of 2', pricePence: 1100, sku: 'H-COAST-2PK' },
-        { size: 'pack of 4', pricePence: 2200, sku: 'H-COAST-4PK' },
       ] as const
-    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku })),
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku, ...('default' in p ? { default: true } : {}) })),
   },
   // The CHRISTMAS FAMILY BUNDLE (founder, 29 Oct — three simple sizes, no add-ons): N placemats + N
   // coasters + N ceramic ornaments, all uk9, ONE tracked parcel — a set for 2 (£78), 4 (£145) or 8

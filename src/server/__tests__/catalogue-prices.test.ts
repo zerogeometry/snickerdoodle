@@ -191,9 +191,29 @@ describe('christmas family bundle — catalogue entries', () => {
     expect(CATALOGUE.christmasBundle.pricePence).toBe(7800);
   });
 
-  it('placemats (4-pack £60) and coasters (6-pack £32) are seeded as standalone products', () => {
+  it('placemats (4-pack £60) and coasters (2 / 4 / 6-packs £18 / £26 / £34) are seeded as standalone products', () => {
     expect(row('placemat')).toMatchObject({ isDefault: true, pricePence: 6000, prodigiSku: 'H-PLACE-4PK' });
-    expect(row('coaster')).toMatchObject({ isDefault: true, pricePence: 3200, prodigiSku: 'H-COAST-6PK' });
+    // coasters start at TWO (founder, 29 Oct); the 6-pack keeps the product key; the single isn't sold
+    const coasters = list.filter((r) => r.productKey === 'coaster' && !BUNDLE_ONLY_SKUS.has(r.sku)).map((r) => [r.sku, r.prodigiSku, r.pricePence, r.isDefault]);
+    expect(coasters).toEqual([
+      ['coaster-packof2', 'H-COAST-2PK', 1800, false],
+      ['coaster-packof4', 'H-COAST-4PK', 2600, false],
+      ['coaster', 'H-COAST-6PK', 3400, true],
+    ]);
+    expect(BUNDLE_ONLY_SKUS.has('coaster-packof1')).toBe(true);
+  });
+
+  it('every coaster pack still clears 10% net with a 10% creator code + 5% commission (the margin-guard floor)', () => {
+    // Prodigi product cost ex-VAT, before post (scripts/discount-headroom.mjs); uk9 post £4.30
+    const COST: Record<string, number> = { 'coaster-packof2': 550, 'coaster-packof4': 1000, coaster: 1500 };
+    for (const [sku, product] of Object.entries(COST)) {
+      const price = row(sku).pricePence;
+      const paid = price * 0.9; // the 10% code
+      const revenue = paid / 1.2;
+      const fulfil = product + 430;
+      const net = revenue - fulfil - (0.015 * paid + 20) - 0.03 * fulfil - 0.05 * revenue /* commission */ - 55;
+      expect(net / revenue, sku).toBeGreaterThanOrEqual(0.1);
+    }
   });
 
   it('every item the bundle expands into is seeded with its own Prodigi SKU', () => {

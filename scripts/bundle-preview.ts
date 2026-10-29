@@ -1,13 +1,13 @@
-// Preview + TIME the Christmas family bundle's pictures on THIS machine, before seeding: builds each
+// Preview + TIME the Christmas family bundle's pictures (and the standalone placemat + coaster tiles) on THIS machine, before seeding: builds each
 // layout from the founder's layers (.prodigi-assets/blanks/layered/christmasBundle) exactly as the seed
 // does, renders brand-safe test drawings into it with the shop's own renderer, writes WebPs to look at
 // and prints how long a render takes. No database, no storage, no child's image — test art only.
 //
 //   npx tsx --conditions=react-server scripts/bundle-preview.ts <drawing.png> [more drawings…] [--out dir] [--runs 20]
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { BUNDLE_LAYOUTS, buildBundleLayout, decodeBundleLayout, decodeDrawing, encodeBundle, renderBundleLayers, type DecodedDrawing } from '@/server/print/bundleMockup';
-import { BUNDLE_BACKDROP, bundleLayoutDir } from '@/server/print/seedMockups';
+import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, decodeBundleLayout, decodeDrawing, encodeBundle, renderBundleLayers, type BuiltBundleLayout, type DecodedDrawing } from '@/server/print/bundleMockup';
+import { BUNDLE_BACKDROP, bundleLayoutDir, TILE_LAYERS } from '@/server/print/seedMockups';
 
 const args = process.argv.slice(2);
 const flag = (name: string, d: string) => {
@@ -28,14 +28,18 @@ async function main() {
   const drawings: DecodedDrawing[] = [];
   for (const f of args) drawings.push(await decodeDrawing(await sharp(readFileSync(f)).resize(1200, 1200, { fit: 'inside', withoutEnlargement: true }).png().toBuffer()));
 
-  for (const name of BUNDLE_LAYOUTS) {
-    const dir = bundleLayoutDir(name);
-    if (!dir) {
+  // the bundle's four pictures, then the standalone placemat + coaster tiles
+  const jobs: Array<{ name: string; build: () => Promise<BuiltBundleLayout> }> = [
+    ...BUNDLE_LAYOUTS.map((name) => ({ name, build: async () => buildBundleLayout(bundleLayoutDir(name) ?? '', BUNDLE_BACKDROP) })),
+    ...Object.entries(TILE_LAYERS).map(([name, layers]) => ({ name: `${name}-tile`, build: async () => buildLayout(layers, [1024, 1024], BUNDLE_BACKDROP) })),
+  ];
+  for (const { name, build } of jobs) {
+    if ((BUNDLE_LAYOUTS as readonly string[]).includes(name) ? !bundleLayoutDir(name as never) : !TILE_LAYERS[name.replace('-tile', '') as 'placemat'].every((l) => existsSync(l.file))) {
       console.log(`${name}: no layers staged`);
       continue;
     }
     let t = process.hrtime.bigint();
-    const built = await buildBundleLayout(dir, BUNDLE_BACKDROP);
+    const built = await build();
     const buildMs = ms(t);
     for (const edge of [1024, 512]) {
       t = process.hrtime.bigint();

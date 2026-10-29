@@ -257,63 +257,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
  * The full client→quote path: resolves the join context from server-resolved
  * provenance (never from the client), then prices. The server action calls this.
  */
-/** "add one more and save" (founder, 29 Oct): a basket line where ONE more of the same would reach a
- * better multi-buy tier. `bps` is the tier the whole product would then get. */
-export interface MultiBuyNudge {
-  /** the priced line it belongs to (quote.lines) */
-  lineIndex: number;
-  /** how many of the product there would be with one more */
-  nextQty: number;
-  bps: number;
-}
-
-/**
- * The checkout's "add 1 more — both 15% off" lines, worked out by the SAME engine that charges: for
- * each product with an offer, its last line is re-priced with one more, and a nudge is shown only when
- * that basket really would get a better multi-buy than this one does (so never when a code, the join
- * saving or the family set would win instead — they don't stack). Never on a bundle or a card pack
- * (always one), never on a gift (prices hidden). At most one per product. Pure.
- */
-export function multiBuyNudges(requested: readonly RequestedLine[], opts: PriceOpts = {}): MultiBuyNudge[] {
-  if (opts.gift) return [];
-  const catalogue: PricedCatalogue = opts.catalogue ?? CATALOGUE;
-  // exactly the lines priceBasket keeps, so indices line up with its quote.lines
-  const kept = requested.filter((r) => inCatalogue(catalogue, r.productKey) && clampQty(r.qty) > 0);
-  const base = priceBasket(kept, opts);
-  const bpsAt = (q: Quote, i: number) => (q.multiBuyApplied ? (q.lines[i]?.multiBuyBps ?? 0) : 0);
-  const lastOf = new Map<string, number>();
-  kept.forEach((r, i) => {
-    if (isBundleKey(r.productKey) || isCardPackKey(r.productKey)) return;
-    lastOf.set(productOfKey(r.productKey), i);
-  });
-  const out: MultiBuyNudge[] = [];
-  for (const [product, i] of lastOf) {
-    const qty = clampQty(kept[i]!.qty);
-    if (qty >= MAX_QTY) continue;
-    const trial = priceBasket(kept.map((r, j) => (j === i ? { ...r, qty: qty + 1 } : r)), opts);
-    const bps = bpsAt(trial, i);
-    if (bps <= bpsAt(base, i)) continue;
-    const nextQty = trial.lines.reduce((n, l) => n + (!isBundleKey(l.productKey) && productOfKey(l.productKey) === product ? l.qty : 0), 0);
-    out.push({ lineIndex: i, nextQty, bps });
-  }
-  return out.sort((a, b) => a.lineIndex - b.lineIndex);
-}
-
 export function quote(
   requested: readonly RequestedLine[],
   opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
 ): Quote {
   const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
   return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
-}
-
-/** {@link multiBuyNudges} for exactly the basket {@link quote} prices (the same server-resolved options). */
-export function quoteNudges(
-  requested: readonly RequestedLine[],
-  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
-): MultiBuyNudge[] {
-  const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
-  return multiBuyNudges(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
 }
 
 /**

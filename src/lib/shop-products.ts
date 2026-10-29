@@ -141,7 +141,7 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
   },
   coaster: {
-    slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (set of 6)',
+    slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (packs of 2, 4 or 6)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
   },
   christmasBundle: {

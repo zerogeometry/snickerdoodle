@@ -173,7 +173,7 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
     const catalogue = await getCatalogue(db);
     for (const sku of BUNDLE_ONLY_SKUS) expect(catalogue[sku], sku).toBeUndefined();
     expect(catalogue.placemat?.pricePence).toBe(6000);
-    expect(catalogue.coaster?.pricePence).toBe(3200);
+    expect([catalogue['coaster-packof2']?.pricePence, catalogue['coaster-packof4']?.pricePence, catalogue.coaster?.pricePence]).toEqual([1800, 2600, 3400]); // coasters from 2 (founder, 29 Oct)
     expect([catalogue.christmasBundle?.pricePence, catalogue['christmasBundle-for4']?.pricePence, catalogue['christmasBundle-for8']?.pricePence]).toEqual([7800, 14500, 27900]);
     const all = await loadCatalogue(db, { includeHidden: true });
     const skus = all.flatMap((p) => p.variants.map((v) => v.sku));

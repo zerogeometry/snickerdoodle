@@ -35,7 +35,9 @@ const BY_PRODUCT: Record<string, ParcelGroup> = {
   petBandana: 'uk9-home',
   placemat: 'uk9-home', // H-PLACE-*PK (founder, 27 Oct)
   coaster: 'uk9-home', // H-COAST-*PK
-  // (the christmasBundle is deliberately NOT grouped: its price already counts its own parcel.)
+  // The christmas family bundle's pieces are all uk9 homeware (founder, 29 Oct): ONE item of the group, so a
+  // sack / mug / tea towel added to it rides in the same parcel and takes £3 off. On its own it saves nothing.
+  christmasBundle: 'uk9-home',
   apron: 'uk3-textile',
   cushion: 'uk3-textile',
   blanket: 'uk3-textile',

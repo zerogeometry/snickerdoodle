@@ -4,7 +4,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { BUNDLE_PIECE_GEOM, type BundlePiece, type BundleSize } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { clampTransform, computeLayerRect } from './geometry';
+import { clampTransform, computeLayerRect, type Transform } from './geometry';
 
 /**
  * The CHRISTMAS FAMILY BUNDLE's pictures (founder, 29 Oct), composed from the founder's own PSD layers
@@ -128,6 +128,25 @@ const alphaOf = (rgba: Uint8Array): Uint8Array => {
   return a;
 };
 
+/**
+ * A SHAPE layer's mask: its alpha when it has real transparency; else (a grey shape on an opaque white
+ * ground — how some print maps are exported) the shape is read from how far each pixel is from white,
+ * scaled so the grey itself is fully on — the antialiased edge stays soft. Exported for its test.
+ */
+export function shapeMaskOf(rgba: Uint8Array): Uint8Array {
+  const n = rgba.length / 4;
+  let clear = 0;
+  for (let i = 0; i < n; i++) if (rgba[i * 4 + 3]! < 250) clear++;
+  if (clear > n * 0.01) return alphaOf(rgba);
+  const lum = (i: number) => 0.299 * rgba[i * 4]! + 0.587 * rgba[i * 4 + 1]! + 0.114 * rgba[i * 4 + 2]!;
+  let dark = 255;
+  for (let i = 0; i < n; i++) dark = Math.min(dark, lum(i));
+  const span = Math.max(1, 255 - dark);
+  const a = new Uint8Array(n);
+  for (let i = 0; i < n; i++) a[i] = Math.max(0, Math.min(255, Math.round(((255 - lum(i)) / span) * 255)));
+  return a;
+}
+
 /** A piece's soft contact shadow as an alpha plane (0–1). */
 async function shadowOf(alpha: Uint8Array, W: number, H: number): Promise<Float32Array> {
   const dx = Math.round(SHADOW.dxFrac * W), dy = Math.round(SHADOW.dyFrac * H);
@@ -154,9 +173,17 @@ async function shadowOf(alpha: Uint8Array, W: number, H: number): Promise<Float3
  */
 export async function buildBundleLayout(dir: string, backdropFile: string): Promise<BuiltBundleLayout> {
   const manifest = JSON.parse(readFileSync(path.join(dir, 'manifest.json'), 'utf8')) as { canvas: [number, number]; layers: ManifestLayer[] };
-  const [W, H] = manifest.canvas;
+  const layers = [...manifest.layers].sort((a, b) => a.order - b.order).map((l) => ({ file: path.join(dir, l.file), role: l.role }));
+  return buildLayout(layers, manifest.canvas, backdropFile);
+}
+
+/**
+ * The same, from a plain list of layers (bottom → top) — e.g. the standalone placemat's one print map,
+ * the coasters' back + front (the front's shadow falls on the back one).
+ */
+export async function buildLayout(layers: ReadonlyArray<{ file: string; role: ManifestLayer['role'] }>, canvas: [number, number], backdropFile: string): Promise<BuiltBundleLayout> {
+  const [W, H] = canvas;
   const N = W * H;
-  const layers = [...manifest.layers].sort((a, b) => a.order - b.order);
 
   // the stack, bottom → top: fixed layers carry a colour; print areas a slot for a drawing
   type Fixed = { kind: 'fixed'; rgb: Uint8Array | [number, number, number]; a: Float32Array | Uint8Array; aScale: number };
@@ -171,8 +198,9 @@ export async function buildBundleLayout(dir: string, backdropFile: string): Prom
   const quads: Array<{ role: RegionRole; index: number; quad: [number, number][] }> = [];
   for (let i = 0; i < layers.length; i++) {
     const l = layers[i]!;
-    const rgba = await rgbaOf(path.join(dir, l.file), W, H);
-    const a = alphaOf(rgba);
+    const rgba = await rgbaOf(l.file, W, H);
+    const isShape = l.role === 'placemat' || l.role === 'coaster' || l.role === 'ornament-print';
+    const a = isShape ? shapeMaskOf(rgba) : alphaOf(rgba);
     if (l.role === 'placemat' || l.role === 'coaster' || l.role === 'ornament-print') {
       const role: RegionRole = l.role === 'ornament-print' ? 'ornament' : l.role;
       // an ornament's shadow is its whole disc: the print face and its edge together
@@ -180,7 +208,7 @@ export async function buildBundleLayout(dir: string, backdropFile: string): Prom
       if (role === 'ornament') {
         const edge = layers.slice(i + 1).find((x) => x.role === 'ornament-edge');
         if (edge) {
-          const ea = alphaOf(await rgbaOf(path.join(dir, edge.file), W, H));
+          const ea = alphaOf(await rgbaOf(edge.file, W, H));
           silhouette = a.map((v, j) => Math.max(v, ea[j]!));
         }
       }
@@ -291,11 +319,12 @@ export async function decodeDrawing(buf: Buffer): Promise<DecodedDrawing> {
   return { data, width: info.width, height: info.height };
 }
 
-/** The drawing laid on a piece's print canvas exactly as its print file (white, the piece's default
- * placement), at `w × h` px, turned `deg` — RGBA. */
-async function pieceArt(d: DecodedDrawing, piece: BundlePiece, w: number, h: number, deg: number): Promise<{ data: Buffer; width: number; height: number }> {
+/** The drawing laid on a piece's print canvas exactly as its print file (white, at `placement` — the
+ * piece's default unless the shopper placed it), at `w × h` px, turned `deg` — RGBA. */
+async function pieceArt(d: DecodedDrawing, piece: BundlePiece, w: number, h: number, deg: number, placement?: Transform): Promise<{ data: Buffer; width: number; height: number }> {
   const geom = BUNDLE_PIECE_GEOM[piece];
-  const r = computeLayerRect(geom, { width: d.width, height: d.height }, clampTransform(defaultTransformFor(piece)));
+  const t = placement ?? clampTransform(defaultTransformFor(piece));
+  const r = computeLayerRect(geom, { width: d.width, height: d.height }, t);
   const s = w / geom.printWidthPx;
   const rw = Math.max(1, Math.round(r.width * s)), rh = Math.max(1, Math.round(r.height * s));
   const rx = Math.round(r.x * s), ry = Math.round(r.y * s);
@@ -304,6 +333,7 @@ async function pieceArt(d: DecodedDrawing, piece: BundlePiece, w: number, h: num
   let canvas = sharp({ create: { width: w, height: h, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } });
   if (ix1 > ix0 && iy1 > iy0) {
     const part = await sharp(d.data, { raw: { width: d.width, height: d.height, channels: 4 } })
+      .rotate(t.rotationDeg)
       .resize(rw, rh, { fit: 'fill' })
       .extract({ left: ix0 - rx, top: iy0 - ry, width: ix1 - ix0, height: iy1 - iy0 })
       .raw()
@@ -327,7 +357,12 @@ async function pieceArt(d: DecodedDrawing, piece: BundlePiece, w: number, h: num
  * Render a layout: each print area gets `drawingFor(role, index)`'s drawing, laid into its oriented
  * rectangle and added in under its weight. Returns RGB pixels (encode with encodeBundle).
  */
-export async function renderBundleLayers(layout: DecodedBundleLayout, drawingFor: (role: RegionRole, index: number) => DecodedDrawing | null): Promise<{ data: Buffer; width: number; height: number }> {
+export async function renderBundleLayers(
+  layout: DecodedBundleLayout,
+  drawingFor: (role: RegionRole, index: number) => DecodedDrawing | null,
+  /** the shopper's own placement (a standalone placemat / coaster); absent ⇒ each piece's default */
+  placement?: Transform,
+): Promise<{ data: Buffer; width: number; height: number }> {
   const { W, H } = layout;
   const out = Buffer.from(layout.base); // a copy — the base is cached
   const acc = new Float32Array(W * H * 3);
@@ -345,7 +380,7 @@ export async function renderBundleLayers(layout: DecodedBundleLayout, drawingFor
       // the same drawing at the same size + angle (a row of ornaments) is laid out once
       const id = `${r.role}|${w}x${h}@${deg}|${drawingKey(d)}`;
       let p = made.get(id);
-      if (!p) made.set(id, (p = pieceArt(d, ROLE_PIECE[r.role], w, h, deg)));
+      if (!p) made.set(id, (p = pieceArt(d, ROLE_PIECE[r.role], w, h, deg, placement)));
       const art = await p;
       const ox = Math.round(cx - art.width / 2), oy = Math.round(cy - art.height / 2);
       const { box, weight } = r;

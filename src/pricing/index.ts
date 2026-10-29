@@ -19,8 +19,6 @@ export { evaluatePromo, normalisePromoCode, PROMO_ECONOMICS, type PromoRule, typ
 export {
   priceBasket,
   quote,
-  quoteNudges,
-  multiBuyNudges,
   productOfKey,
   applicableCredit,
   MIN_CHARGE_PENCE,
@@ -28,7 +26,6 @@ export {
   inCatalogue,
   lineEconomics,
   recipientLineLabel,
-  type MultiBuyNudge,
   type PriceOpts,
   type PricedLine,
   type Quote,

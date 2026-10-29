@@ -155,11 +155,11 @@ async function putAsset(db: DbHandle, kind: 'BLANK' | 'MASK' | 'LIGHTING', key: 
 }
 
 /**
- * Author (or re-author) one of the CHRISTMAS FAMILY BUNDLE's flattened layouts (bundleMockup.ts):
- * ONE base picture shared by the layout, and per print area a mockup_views row — view
- * `bundle-<layout>-<role>-<index>` — whose mask is the area's WEIGHT and whose printQuad is its oriented
- * rectangle at the piece's print aspect. Display-only, like every mockup view. Bumps the layout's
- * version (cached pictures re-render) and drops any area the layout no longer has.
+ * Author (or re-author) one FLATTENED LAYOUT (bundleMockup.ts — the family bundle's pictures, the
+ * standalone placemat + coaster tiles): ONE base picture shared by the layout, and per print area a
+ * mockup_views row — view `layout-<layout>-<role>-<index>` — whose mask is the area's WEIGHT and whose
+ * printQuad is its oriented rectangle at the piece's print aspect. Display-only, like every mockup
+ * view. Bumps the layout's version (cached pictures re-render) and drops any area it no longer has.
  */
 export async function setBundleLayout(
   db: DbHandle,
@@ -170,10 +170,10 @@ export async function setBundleLayout(
     regions: Array<{ role: string; index: number; quad: [number, number][]; weight: Buffer; printWidthPx: number; printHeightPx: number; materialClass: MaterialClass }>;
   },
 ): Promise<{ templateVersion: number }> {
-  const prefix = `bundle-${input.layout}-`;
+  const prefix = `layout-${input.layout}-`;
   const existing = (await db.select({ id: mockupViews.id, view: mockupViews.view, v: mockupViews.templateVersion }).from(mockupViews).where(eq(mockupViews.variantId, input.variantId))).filter((r) => r.view.startsWith(prefix));
   const templateVersion = Math.max(0, ...existing.map((r) => r.v)) + 1;
-  const dir = `templates/${input.variantId}/bundle-${input.layout}/v${templateVersion}`;
+  const dir = `templates/${input.variantId}/layout-${input.layout}/v${templateVersion}`;
   const blankObjectId = await putAsset(db, 'BLANK', `${dir}/base.png`, input.base, 'image/png');
   const views = new Set<string>();
   for (const r of input.regions) {

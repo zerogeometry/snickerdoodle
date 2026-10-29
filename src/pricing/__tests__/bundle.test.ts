@@ -43,14 +43,25 @@ describe('pricing — the christmas family bundle', () => {
     expect(only.promoSavingPence).toBe(0);
     expect(only.promo).toMatchObject({ applied: false, reason: 'nothing-eligible' });
     expect(only.totalPence).toBe(14500);
-    const mixed = quote([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }, { productKey: 'mug', qty: 1 }], { catalogue: CAT, promo: rule() });
-    expect(mixed.promoSavingPence).toBe(180); // 10% of the mug only
+    // (a framed print: another lab, so no same-parcel saving competes with the code)
+    const mixed = quote([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }, { productKey: 'framedPrint', qty: 1 }], { catalogue: { ...CAT, framedPrint: { pricePence: 6500, label: 'framed print', unitCostPence: 3785 } }, promo: rule() });
+    expect(mixed.promoSavingPence).toBe(650); // 10% of the frame only
   });
 
-  it('earns no same-parcel saving and no multi-buy (its price already counts its parcel)', () => {
-    const q = priceBasket([{ productKey: 'christmasBundle', qty: 1, bundle: bundle() }, { productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }], { catalogue: CAT });
+  it('on its own: no same-parcel saving (its price counts its parcel) and never multi-buy', () => {
+    const q = priceBasket([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }], { catalogue: CAT });
     expect(q.parcelSavingPence).toBe(0);
     expect(q.multiBuySavingPence).toBe(0);
+  });
+
+  it('counts as uk9 homeware: a christmas sack added to it rides in the same parcel — £3 off the sack', () => {
+    const cat = { ...CAT, sack: { pricePence: 3500, label: 'christmas sack' } };
+    const q = priceBasket([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }, { productKey: 'sack', qty: 1 }], { catalogue: cat });
+    expect(q.parcelSavingPence).toBe(300);
+    expect(q.totalPence).toBe(14500 + 3500 - 300);
+    // a card (another lab) saves nothing
+    const c = priceBasket([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }, { productKey: 'card', qty: 1 }], { catalogue: { ...cat, card: { pricePence: 550, label: 'card' } } });
+    expect(c.parcelSavingPence).toBe(0);
   });
 
   it('the retired christmas eve bundle can’t be priced', () => {

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { buildBundleLayout, coverQuadAt, decodeBundleLayout, decodeDrawing, minAreaTilt, renderBundleLayers, SHADOW, type DecodedDrawing } from '../bundleMockup';
+import { buildBundleLayout, coverQuadAt, decodeBundleLayout, decodeDrawing, minAreaTilt, renderBundleLayers, shapeMaskOf, SHADOW, type DecodedDrawing } from '../bundleMockup';
 
 // The christmas family bundle's FAST compositor (bundleMockup.ts), on a small synthetic, brand-safe
 // layout: a placemat, a coaster and two overlapping ornaments (print face + edge ring + string). The
@@ -121,5 +121,16 @@ describe('the bundle compositor — pre-flattened, exact', () => {
     const w = Math.hypot((q[1]![0] - q[0]![0]) * W, (q[1]![1] - q[0]![1]) * H), h = Math.hypot((q[3]![0] - q[0]![0]) * W, (q[3]![1] - q[0]![1]) * H);
     expect(w / h).toBeCloseTo(2, 3);
     expect(h).toBeGreaterThanOrEqual(80);
+  });
+
+  it('a print map’s mask: its alpha when it has transparency; else the GREY shape on WHITE, edge kept soft', () => {
+    const px = (r: number, a = 255) => [r, r, r, a];
+    // grey-on-white (no transparency): white → 0, the grey → 255, a half-way edge pixel → ~128
+    const opaque = Uint8Array.from([...px(255), ...px(128), ...px(192), ...px(255)]);
+    const m = shapeMaskOf(opaque);
+    expect([m[0], m[1], m[3]]).toEqual([0, 255, 0]);
+    expect(Math.abs(m[2]! - 128)).toBeLessThanOrEqual(2);
+    // real transparency → the alpha itself
+    expect([...shapeMaskOf(Uint8Array.from([...px(0, 0), ...px(128, 255), ...px(128, 90), ...px(0, 0)]))]).toEqual([0, 255, 90, 0]);
   });
 });

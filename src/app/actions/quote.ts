@@ -1,8 +1,11 @@
 'use server';
 
-import { quote, quoteNudges, type MultiBuyNudge, type Quote, type RequestedLine } from '@/pricing';
+import { lineEconomics, multiBuyTiers, quote, type Quote, type RequestedLine } from '@/pricing';
+import { isBundleKey } from '@/lib/christmas-bundle';
+import { isCardPackKey } from '@/lib/card-packs';
+import { pickAddOns, type AddOn } from '@/server/addOns';
 import { getDb } from '@/db/client';
-import { getCatalogue } from '@/server/catalogue';
+import { getCatalogue, loadCatalogue } from '@/server/catalogue';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { resolvePromo } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
@@ -28,9 +31,12 @@ export interface QuoteRequest {
 export type ClientQuote = Omit<Quote, 'partnerCommissionPence'> & {
   /** A code that couldn't be used at all (unknown / expired / used up / not started). */
   promoError?: 'unknown' | 'not-started' | 'expired' | 'used-up' | 'own-code' | 'first-order-only';
-  /** "add one more and save": where ONE more of the same would reach a better multi-buy tier — worked
-   * out by the server's own engine on the very basket it just priced (src/pricing/engine.ts). */
-  nudges: MultiBuyNudge[];
+  /** Per priced line: its product's multi-buy tiers for 2, 3, 4, 5+ (basis points), from the SERVER's
+   * live costs (src/pricing/multibuy.ts) — the basket's quantity dropdown labels its options with
+   * them. All 0 = no offer. (The saving itself is only ever what the quote charges.) */
+  lineTiers: number[][];
+  /** Up to three things that go with the basket, not in it, with their real same-parcel saving (src/server/addOns.ts). */
+  addOns: AddOn[];
 };
 
 export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
@@ -50,8 +56,9 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const opts = { gift: req.gift ?? false, joinProvenance, catalogue, promo: resolved?.ok ? resolved.rule : null, creditAvailablePence };
   const { partnerCommissionPence: _hidden, ...q } = quote(items, opts);
   void _hidden;
-  const nudges = quoteNudges(items, opts);
-  return resolved && !resolved.ok ? { ...q, nudges, promoError: resolved.reason } : { ...q, nudges };
+  const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) || isCardPackKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
+  const addOns = q.lines.length ? pickAddOns(await loadCatalogue(db), items, opts) : [];
+  return resolved && !resolved.ok ? { ...q, lineTiers, addOns, promoError: resolved.reason } : { ...q, lineTiers, addOns };
 }
 
 /** The real, server-resolved join provenance (a joined member within their

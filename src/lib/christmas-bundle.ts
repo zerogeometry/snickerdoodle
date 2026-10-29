@@ -78,10 +78,10 @@ export function bundleCostPence(n: BundleSize): number {
   return product + BUNDLE_POST.firstPence + (bundleItems(n) - 1) * BUNDLE_POST.extraPence;
 }
 
-/** Pack variants that exist ONLY to fulfil a bundle — never priced or shown on their own. (The
- * placemat 4-pack and the coaster 6-pack are the standalone products; the 1/6 placemat and 1-coaster
- * packs are seeded too but no bundle uses them any more.) */
-export const BUNDLE_ONLY_SKUS: ReadonlySet<string> = new Set(['placemat-packof1', 'placemat-packof2', 'placemat-packof6', 'coaster-packof1', 'coaster-packof2', 'coaster-packof4']);
+/** Pack variants that exist ONLY to fulfil a bundle — never priced or shown on their own. (The placemat
+ * 4-pack and the coaster 2/4/6-packs are sold on their own — founder, 29 Oct; the 1/6 placemat and the
+ * single coaster are seeded too but no bundle uses them.) */
+export const BUNDLE_ONLY_SKUS: ReadonlySet<string> = new Set(['placemat-packof1', 'placemat-packof2', 'placemat-packof6', 'coaster-packof1']);
 /** Every variant sku a bundle can expand into. */
 export const BUNDLE_COMPONENT_SKUS: readonly string[] = [PLACEMAT_2PK.sku, PLACEMAT_4PK.sku, COASTER_2PK.sku, COASTER_4PK.sku, ORNAMENT.sku];
 

@@ -53,9 +53,9 @@ describe('christmas family bundle — the three sizes', () => {
     }
   });
 
-  it('the bundle-only packs are never sold alone; the standalone 4-pack / 6-pack are', () => {
-    for (const s of ['placemat-packof2', 'coaster-packof2', 'coaster-packof4']) expect(BUNDLE_ONLY_SKUS.has(s)).toBe(true);
-    for (const s of ['placemat', 'coaster', 'ceramicOrnament']) expect(BUNDLE_ONLY_SKUS.has(s)).toBe(false);
+  it('the bundle-only packs are never sold alone; the placemat 4-pack and the coaster 2/4/6-packs are', () => {
+    for (const s of ['placemat-packof2', 'placemat-packof1', 'coaster-packof1']) expect(BUNDLE_ONLY_SKUS.has(s)).toBe(true);
+    for (const s of ['placemat', 'coaster', 'coaster-packof2', 'coaster-packof4', 'ceramicOrnament']) expect(BUNDLE_ONLY_SKUS.has(s)).toBe(false);
     expect([...BUNDLE_COMPONENT_SKUS].sort()).toEqual(['ceramicOrnament', 'coaster-packof2', 'coaster-packof4', 'placemat', 'placemat-packof2']);
   });
 });
