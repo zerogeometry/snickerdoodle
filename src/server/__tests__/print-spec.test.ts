@@ -45,7 +45,7 @@ describe('print files match Prodigi’s print areas', () => {
     expect(wrong).toEqual([]);
   });
 
-  it('…and the same shape, within 0.5%, on every non-garment product (a garment is checked at half size, same shape)', () => {
+  it('…and the same shape, within 0.5%, on every product (garments included — full size since 29 Oct)', () => {
     for (const s of specs.filter((x) => !KNOWN[x.productKey])) {
       const file = printFileSize(s.productKey, s.attributes, s.template);
       const area = (prodigi[s.prodigiSku]?.variants ?? []).find((v) => v.printAreaSizes[s.printTo[0]!])?.printAreaSizes[s.printTo[0]!];
@@ -84,14 +84,20 @@ describe('print files match Prodigi’s print areas', () => {
   });
 });
 
-describe('the DPI gate doesn’t get stricter now the big frames and the sack are made at Prodigi’s 300dpi', () => {
+describe('the DPI gate doesn’t get stricter now the big frames, the sack and the garments are made at Prodigi’s 300dpi', () => {
   // The templates they had before (150dpi, a 3mm bleed) — what a shopper's drawing was judged against.
   const before = (wMm: number, hMm: number): TemplateGeom => ({ printWidthPx: mmToPx(wMm, 150), printHeightPx: mmToPx(hMm, 150), bleedMm: 3, requiredDpi: 150 });
+  // garments had no trim (bleed 0) at 150dpi — the half-size file the founder retired on 29 Oct
+  const garmentBefore = (wMm: number, hMm: number): TemplateGeom => ({ printWidthPx: mmToPx(wMm, 150), printHeightPx: mmToPx(hMm, 150), bleedMm: 0, requiredDpi: 150 });
   const cases: Array<{ name: string; key: string; match: (a: Record<string, string>) => boolean; old: TemplateGeom }> = [
     { name: '18×24″ frame', key: 'framedPrint', match: (a) => a.size === '18×24″' && a.orientation === 'portrait' && a.colour === 'gold', old: before(457, 610) },
     { name: '18×24″ frame, landscape', key: 'framedPrint', match: (a) => a.size === '18×24″' && a.orientation === 'landscape' && a.colour === 'gold', old: before(610, 457) },
     { name: '24×32″ frame', key: 'framedPrint', match: (a) => a.size === '24×32″' && a.orientation === 'portrait' && a.colour === 'gold', old: before(610, 813) },
     { name: 'christmas sack', key: 'sack', match: () => true, old: before(320, 500) },
+    { name: 'kids tee', key: 'kidsTee', match: (a) => a.colour === 'white', old: garmentBefore(260, 260) },
+    { name: 'adult tee', key: 'adultTee', match: (a) => a.colour === 'white', old: garmentBefore(396, 498) },
+    { name: 'kids jumper', key: 'kidsJumper', match: () => true, old: garmentBefore(260, 260) },
+    { name: 'christmas jumper', key: 'christmasJumper', match: () => true, old: garmentBefore(390, 490) },
   ];
   const rank = { OK: 0, UPSCALE: 1, BLOCK: 3 } as const;
   const severity = (a: ReturnType<typeof assessResolution>) => rank[a.decision] + (a.decision === 'UPSCALE' && a.softUpClose ? 1 : 0);

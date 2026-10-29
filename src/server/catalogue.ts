@@ -6,9 +6,9 @@ import { mmToPx, templateGeom, type TemplateGeom } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
 import {
-  ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_PRINT_MM, ADULT_TEE_SIZES, HOODIE_PRINT_MM, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
-  KIDS_TEE_COLOURS, KIDS_TEE_PRINT_MM, KIDS_TEE_SIZES, type GarmentColour,
-  ADULT_JUMPER_COLOURS, ADULT_JUMPER_PRINT_MM, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
+  ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_SIZES, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
+  KIDS_TEE_COLOURS, KIDS_TEE_SIZES, type GarmentColour,
+  ADULT_JUMPER_COLOURS, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 import { BUNDLE_ONLY_SKUS, isBundleKey } from '@/lib/christmas-bundle';
@@ -166,12 +166,13 @@ function mugVariants(): VariantDef[] {
 
 // Kids tee: Stanley/Stella Mini Creator 2.0 — size AND colour are Prodigi attributes of ONE SKU.
 // Every colour Prodigi offers (src/lib/garments.ts); white is the cheaper tier (£8 cost vs £9).
-// Print canvas 260×260mm: Prodigi's printAreaSizes = 3070×3070px (@300dpi), IDENTICAL for every
-// size — re-verified via GET /v4.0/products/TEE-SS-STTK909, 2026-10-15 (GB lab uk9).
+// Print file = Prodigi's printAreaSizes 3070×3070px (@300dpi, 260×260mm), IDENTICAL for every size —
+// re-verified via GET /v4.0/products/TEE-SS-STTK909, 2026-10-15 (GB lab uk9). Made at 300dpi, judged at
+// 150dpi as before (gateDpi) — founder, 29 Oct: send Prodigi its full resolution.
 function kidsTeeVariants(): VariantDef[] {
   return KIDS_TEE_SIZES.flatMap((size) =>
     KIDS_TEE_COLOURS.map((c) => ({
-      size, colour: c.name, pricePence: c.name === 'white' ? 2500 : 2700, wMm: KIDS_TEE_PRINT_MM.w, hMm: KIDS_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
+      size, colour: c.name, pricePence: c.name === 'white' ? 2500 : 2700, ...exactPx({ w: 3070, h: 3070 }, 300), gateDpi: 150,
       prodigiSku: 'TEE-SS-STTK909', prodigiAttrs: { size, color: c.attr }, printTo: ['front'],
     })),
   );
@@ -186,7 +187,7 @@ function kidsTeeVariants(): VariantDef[] {
 function adultTeeVariants(): VariantDef[] {
   return ADULT_TEE_SIZES.flatMap((s) =>
     ADULT_TEE_COLOURS.map((c) => ({
-      size: s, colour: c.name, pricePence: 3200, wMm: ADULT_TEE_PRINT_MM.w, hMm: ADULT_TEE_PRINT_MM.h, dpi: 150, bleedMm: 0,
+      size: s, colour: c.name, pricePence: 3200, ...exactPx({ w: 4677, h: 5881 }, 300), gateDpi: 150,
       prodigiSku: 'TEE-SS-STTM559', prodigiAttrs: { size: s.toLowerCase(), color: c.attr }, printTo: ['front'],
       ...(s === 'M' && c.name === 'white' ? { default: true } : {}), // sizes display XS→2XL; M is the sane default
     })),
@@ -207,7 +208,7 @@ function adultTeeVariants(): VariantDef[] {
 function babyVariants(): VariantDef[] {
   return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
     size, colour: 'white', pricePence: 2200,
-    wMm: size === '18-24 months' ? 127 : 180, hMm: size === '18-24 months' ? 170 : 180, dpi: 150, bleedMm: 0,
+    ...exactPx(size === '18-24 months' ? { w: 1500, h: 2010 } : { w: 2130, h: 2130 }, 300), gateDpi: 150,
     prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' }, printTo: ['front'],
   }));
 }
@@ -274,12 +275,12 @@ function turned({ wMm, hMm, dpi, px, bleedMm, gateDpi }: Canvas, turn: boolean):
   };
 }
 
-// Hoodies: like the tees, size + colour are Prodigi attributes of ONE SKU, the print is
-// the front, and the file renders at 150dpi (Prodigi scales it onto the platen, as for the tees).
-function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColour[]; printMm: { w: number; h: number }; pricePence: number; defaultSize?: string; attrSize?: (s: string) => string }): VariantDef[] {
+// Hoodies: like the tees, size + colour are Prodigi attributes of ONE SKU, the print is the front, and
+// the file is Prodigi's exact print area at 300dpi, judged at 150dpi as before (gateDpi) — founder, 29 Oct.
+function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColour[]; printPx: { w: number; h: number }; pricePence: number; defaultSize?: string; attrSize?: (s: string) => string }): VariantDef[] {
   return o.sizes.flatMap((size) =>
     o.colours.map((c, ci) => ({
-      size, colour: c.name, pricePence: o.pricePence, wMm: o.printMm.w, hMm: o.printMm.h, dpi: 150, bleedMm: 0,
+      size, colour: c.name, pricePence: o.pricePence, ...exactPx(o.printPx, 300), gateDpi: 150,
       prodigiSku: o.sku, prodigiAttrs: { size: o.attrSize ? o.attrSize(size) : size, color: c.attr }, printTo: ['front'],
       ...(o.defaultSize === size && ci === 0 ? { default: true } : {}),
     })),
@@ -577,7 +578,7 @@ const DEFS: Record<string, ProductDef> = {
     category: 'APPAREL', label: 'kids hoodie', blurb: 'their masterpiece, snuggled up', print: true,
     description: 'A cosy organic-cotton hoodie with their own drawing on the front — the winter sibling of the kids tee.',
     specs: { material: '100% organic cotton', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
-    variants: garmentVariants({ sku: 'HOOD-SS-STSK911', sizes: KIDS_HOODIE_SIZES, colours: KIDS_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4300 }),
+    variants: garmentVariants({ sku: 'HOOD-SS-STSK911', sizes: KIDS_HOODIE_SIZES, colours: KIDS_HOODIE_COLOURS, printPx: { w: 3070, h: 3070 }, pricePence: 4300 }),
   },
   adultHoodie: {
     category: 'APPAREL', label: 'adult hoodie', blurb: 'matching hoodies for the whole fan club', print: true,
@@ -587,7 +588,7 @@ const DEFS: Record<string, ProductDef> = {
     // (printAreaSizes 3070×3070, 4724×4724 and 3307×4606px — src/server/__tests__/fixtures/
     // prodigi-print-areas.json) but every variant is designed to 3070². Pick per-variant areas (or the
     // one Prodigi confirms for uk9) before un-hiding; the catalogue sync and print-spec test flag it.
-    variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
+    variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printPx: { w: 3070, h: 3070 }, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   wrappingPaper: {
     category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
@@ -615,14 +616,14 @@ const DEFS: Record<string, ProductDef> = {
     description: "A cosy organic-cotton sweatshirt with their own drawing on the front — in Christmas green, or every day in white, grey, navy or black.",
     specs: { material: '100% organic cotton (Stanley/Stella)', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
     // £19 + £4.30 (uk9, Tracked 48)
-    variants: garmentVariants({ sku: 'SWEAT-SS-STSK913', sizes: KIDS_JUMPER_SIZES, colours: KIDS_JUMPER_COLOURS, printMm: HOODIE_PRINT_MM, pricePence: 3800, defaultSize: '5-6 years' }),
+    variants: garmentVariants({ sku: 'SWEAT-SS-STSK913', sizes: KIDS_JUMPER_SIZES, colours: KIDS_JUMPER_COLOURS, printPx: { w: 3070, h: 3070 }, pricePence: 3800, defaultSize: '5-6 years' }),
   },
   christmasJumper: {
     category: 'APPAREL', label: 'christmas jumper', blurb: 'matching jumpers for the grown-ups', print: true,
     description: "A soft crew-neck sweatshirt in fire red or bottle green with your little one's drawing on the front — the family Christmas jumper, designed by the smallest person in the house.",
     specs: { material: '80% cotton, 20% polyester (AWDis)', fit: 'unisex, S–2XL', print: 'up to 39 × 49 cm on the front', care: 'wash at 30°, inside out', made: 'in the UK' },
     // £15 + up to £4.30 (uk2 1st Class OR uk9 Tracked 48 — Prodigi's pick per colour/size)
-    variants: garmentVariants({ sku: 'GLOBAL-SWEAT-AWD-JH030', sizes: ADULT_JUMPER_SIZES, colours: ADULT_JUMPER_COLOURS, printMm: ADULT_JUMPER_PRINT_MM, pricePence: 3200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
+    variants: garmentVariants({ sku: 'GLOBAL-SWEAT-AWD-JH030', sizes: ADULT_JUMPER_SIZES, colours: ADULT_JUMPER_COLOURS, printPx: { w: 4606, h: 5787 }, pricePence: 3200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   petBandana: {
     category: 'APPAREL', label: 'pet bandana', blurb: 'the dog, wearing their drawing of the dog', print: true,

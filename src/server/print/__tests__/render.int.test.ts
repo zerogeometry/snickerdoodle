@@ -342,8 +342,8 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
       const assetId = await ingest(await cutout());
       const res = await renderPrintFile(db, sam, { assetId, variantId: await variant('kidsTee-34years-frenchnavy'), transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
       keys.push(res.key);
-      // no trim on a garment: the file IS Prodigi's 3070×3070 front print area, at half scale (150dpi)
-      expect([res.widthPx, res.heightPx]).toEqual([1535, 1535]);
+      // no trim on a garment: the file IS Prodigi's 3070×3070 front print area, at full size (300dpi, 29 Oct)
+      expect([res.widthPx, res.heightPx]).toEqual([3070, 3070]);
       const a = await alphaAt(res.key);
       expect(a(0.02, 0.5)).toBe(0); // no paper, no rectangle
       expect(a(0.5, 0.5)).toBe(255); // the art

@@ -1,5 +1,4 @@
 import { DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
-import { isGarmentKey } from '@/lib/garments';
 import { CARD_SPREAD } from './cardPrint';
 import { canvasSizePx, type TemplateGeom } from './geometry';
 
@@ -36,8 +35,8 @@ export const ASPECT_TOLERANCE = 0.005;
  * sentence saying how it differs. The variant's order-time attributes pick Prodigi's variant(s); its
  * first `printTo` area is the one compared (every area a product fills shares one file).
  *
- * A DTG garment's file is made at 150dpi — HALF Prodigi's 300dpi px, the same shape (Prodigi scales
- * it onto the platen; founder's call), so for those the file must be half Prodigi's px (±1 for rounding).
+ * Every product — DTG garments included (founder, 29 Oct: no more half-size 150dpi garment files) — must
+ * send exactly Prodigi's px. A garment is still JUDGED at 150dpi (its template's gateDpi).
  */
 export function checkPrintSpec(spec: {
   productKey: string;
@@ -57,15 +56,13 @@ export function checkPrintSpec(spec: {
   if (sizes.length === 0) return `Prodigi has no "${area}" print area for ${JSON.stringify(spec.prodigiAttrs ?? {})}`;
   if (sizes.length > 1) return `Prodigi's "${area}" print area differs between its routes for this variant (${sizes.map((s) => `${s.w}×${s.h}`).join(', ')}); ours is ${ours}`;
   const theirs = sizes[0]!;
-  const half = isGarmentKey(spec.productKey);
-  const target = half ? { w: theirs.w / 2, h: theirs.h / 2 } : theirs;
-  const slack = half ? 1 : 0;
+  const target = theirs;
   const aspectOff = spec.file.w / spec.file.h / (theirs.w / theirs.h) - 1;
   if (Math.abs(aspectOff) > ASPECT_TOLERANCE) {
     return `print file ${ours} is a different shape from Prodigi's "${area}" ${theirs.w}×${theirs.h} (${(aspectOff * 100).toFixed(1)}%) — Prodigi will crop it`;
   }
-  if (Math.abs(spec.file.w - target.w) > slack || Math.abs(spec.file.h - target.h) > slack) {
-    return `print file ${ours} isn't Prodigi's "${area}" ${theirs.w}×${theirs.h}${half ? ' at half size (a 150dpi garment file)' : ''} — Prodigi will rescale it`;
+  if (spec.file.w !== target.w || spec.file.h !== target.h) {
+    return `print file ${ours} isn't Prodigi's "${area}" ${theirs.w}×${theirs.h} — Prodigi will rescale it`;
   }
   return null;
 }
