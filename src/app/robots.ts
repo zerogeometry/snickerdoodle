@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { isTestSite } from '@/lib/siteMode';
+import { isPasswordLocked } from '@/lib/siteMode';
 import { AI_SEARCH_CRAWLERS, AI_TRAINING_CRAWLERS, PRIVATE_PATHS, siteOrigin } from '@/lib/seo';
 
 /**
@@ -11,7 +11,7 @@ import { AI_SEARCH_CRAWLERS, AI_TRAINING_CRAWLERS, PRIVATE_PATHS, siteOrigin } f
 export const dynamic = 'force-dynamic';
 
 export default function robots(): MetadataRoute.Robots {
-  if (isTestSite()) return { rules: [{ userAgent: '*', disallow: '/' }] };
+  if (isPasswordLocked()) return { rules: [{ userAgent: '*', disallow: '/' }] };
   const open = { allow: '/', disallow: PRIVATE_PATHS };
   return {
     rules: [

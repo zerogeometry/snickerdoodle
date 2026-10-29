@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
 import { FAQ_UPDATED } from '@/lib/faq';
 import { PRODUCT_PATHS } from '@/lib/shop-products';
-import { isTestSite } from '@/lib/siteMode';
+import { isPasswordLocked } from '@/lib/siteMode';
 import { PUBLIC_PAGES, siteOrigin } from '@/lib/seo';
 import { shopListings } from '@/server/shop/listing';
 
@@ -11,7 +11,7 @@ import { shopListings } from '@/server/shop/listing';
 export const dynamic = 'force-dynamic';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  if (isTestSite()) return [];
+  if (isPasswordLocked()) return [];
   const origin = siteOrigin();
   // a product page is listed only while its product is on show (a hidden one answers 404)
   const onShow = new Set(shopListings().map((l) => l.path));

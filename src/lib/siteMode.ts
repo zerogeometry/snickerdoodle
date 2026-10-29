@@ -10,12 +10,43 @@
  *
  * What it can NEVER do (refused at boot — {@link testSiteProblems}): take real money (live Stripe
  * key), print for real (POD_MODE=LIVE), or open the children's-pictures-to-the-printer gate (LG3).
+ * PRIVATE LIVE mode (founder, 29 Oct 2026): `SITE_MODE=private`, the founder's end-to-end test. The
+ * site keeps the password and is never indexed, exactly like the test site, but it is otherwise the
+ * REAL shop: live Stripe, real printing (POD_MODE=LIVE) and the LG3 gate are ALLOWED, our own KMS
+ * keys are REQUIRED (no storage relaxation), and the season preview date is REFUSED (a real order
+ * must see real dates). Every launch gate in the code still applies on its own: the POD egress gate
+ * (LG3 + the processor register), the content-safety gate (IWF + moderation) and the margin guard.
+ * Only the people holding the password can reach it.
+ *
+ * Any other SITE_MODE value refuses to start: a typo must never quietly turn the lock off.
  * Edge-safe: no Node imports, so the proxy (src/proxy.ts) can use it.
  */
 type Env = Record<string, string | undefined>;
 
 export function isTestSite(env: Env = process.env): boolean {
   return env.SITE_MODE === 'test';
+}
+
+/** PRIVATE LIVE: the real shop behind the shared password (see above). */
+export function isPrivateLive(env: Env = process.env): boolean {
+  return env.SITE_MODE === 'private';
+}
+
+/** Behind the shared password and never indexed: the test site OR the private live site. */
+export function isPasswordLocked(env: Env = process.env): boolean {
+  return isTestSite(env) || isPrivateLive(env);
+}
+
+const KNOWN_MODES = new Set(['test', 'private']);
+
+/** Everything that would make a private live site unsafe. Empty = safe to run. */
+export function privateLiveProblems(env: Env = process.env): string[] {
+  if (!isPrivateLive(env)) return [];
+  const problems: string[] = [];
+  if (!env.TEST_SITE_PASSWORD || env.TEST_SITE_PASSWORD.length < 10) problems.push('TEST_SITE_PASSWORD must be set (10+ characters) — the private site is password-locked');
+  if (!env.AUTH_SECRET) problems.push('AUTH_SECRET must be set');
+  if (env.SEASON_PREVIEW_DATE || env.NEXT_PUBLIC_SEASON_PREVIEW_DATE) problems.push('SEASON_PREVIEW_DATE is set — a private live site takes real orders, so it must see the real date');
+  return problems;
 }
 
 /** Everything that would make a "test" site not a test site. Empty = safe to run. */
@@ -33,8 +64,13 @@ export function testSiteProblems(env: Env = process.env): string[] {
 }
 
 export function assertTestSiteSafe(env: Env = process.env): void {
+  if (env.SITE_MODE && !KNOWN_MODES.has(env.SITE_MODE)) {
+    throw new Error(`refusing to start: SITE_MODE="${env.SITE_MODE}" is not "test" or "private" — a typo must never turn the password lock off (unset it for the public site)`);
+  }
   const problems = testSiteProblems(env);
   if (problems.length) throw new Error(`refusing to start the test site: ${problems.join('; ')}`);
+  const priv = privateLiveProblems(env);
+  if (priv.length) throw new Error(`refusing to start the private live site: ${priv.join('; ')}`);
 }
 
 // ── the password lock ─────────────────────────────────────────────────────────────────────

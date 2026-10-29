@@ -1,4 +1,4 @@
-import { isTestSite } from '@/lib/siteMode';
+import { isPasswordLocked } from '@/lib/siteMode';
 import { siteOrigin } from '@/lib/seo';
 import { buildMerchantFeed } from '@/server/shop/merchantFeed';
 
@@ -10,7 +10,7 @@ import { buildMerchantFeed } from '@/server/shop/merchantFeed';
 export const dynamic = 'force-dynamic';
 
 export function GET(): Response {
-  if (isTestSite()) return new Response('not found', { status: 404, headers: { 'X-Robots-Tag': 'noindex, nofollow' } });
+  if (isPasswordLocked()) return new Response('not found', { status: 404, headers: { 'X-Robots-Tag': 'noindex, nofollow' } });
   return new Response(buildMerchantFeed(siteOrigin()), {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',

@@ -358,6 +358,38 @@ Stripe dashboard → Developers → Webhooks → add `https://snickerdoodle.co.u
 From anywhere: `infra/aws-london/bin/smoke.sh https://snickerdoodle.co.uk` (Git Bash on Windows).
 On the box (adds the mockup-render check): `sudo /opt/snickerdoodle/kit/bin/smoke.sh`.
 
+### 4.9 🔑 Private live mode: the founder's real end-to-end order, still behind the password
+
+`SITE_MODE=private` keeps the password lock and noindex but runs the REAL shop (src/lib/siteMode.ts).
+It's **switched off until all four are true**, in this order:
+
+1. ☐ **IWF Image Intercept is connected** and `MODERATION_PROVIDER=real` is set (until then every upload
+   is held, so nothing can be printed anyway).
+2. ☐ **The DP professional's LG3 sign-off** is in hand (only then create `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF=true`),
+   and Prodigi's DPA is recorded in the sub-processor register.
+3. ☐ The three live keys are in your password manager: Stripe secret key (Snickerdoodle account in the
+   Launch Mode Ltd organisation), its webhook signing secret (endpoint `https://snickerdoodle.co.uk/api/webhooks/stripe`,
+   event `checkout.session.completed`), and the Prodigi LIVE API key; and Prodigi has a payment card.
+4. ☐ `TEST_SITE_PASSWORD` stays as it is.
+
+Then, in SSM (console: Systems Manager → Parameter Store → `/snickerdoodle/prod/…`, or `put`/`sput` as in §3.6):
+
+| Parameter | Value |
+|---|---|
+| `SITE_MODE` | `private` |
+| `STRIPE_SECRET_KEY` (SecureString) | the live `sk_live_…` / `rk_live_…` key |
+| `STRIPE_WEBHOOK_SECRET` (SecureString) | the live `whsec_…` |
+| `PRODIGI_API_KEY` (SecureString) | the Prodigi LIVE key |
+| `PRODIGI_BASE_URL` | `https://api.prodigi.com/v4.0` |
+| `POD_MODE` | `LIVE` |
+
+→ `sudo /opt/snickerdoodle/kit/bin/deploy.sh --restart`. The banner changes to "private preview — orders
+here are real". Place ONE order to your own address, watch it through Stripe → Prodigi → your door.
+
+**Back to safe:** set `SITE_MODE` to `test`, put the `sk_test_` key and the sandbox Prodigi key/URL back,
+`POD_MODE=SANDBOX`, delete the LG3 parameter, `deploy.sh --restart` (test mode refuses to start otherwise).
+**Going public** later = delete `SITE_MODE` and `TEST_SITE_PASSWORD` (launch day, gates all green).
+
 ## 5. Every day
 
 ### 5.1 Routine deploy
