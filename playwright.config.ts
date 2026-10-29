@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+// E2E_PORT: run several e2e servers side by side (one per test worktree + database) — default 3100.
+const PORT = Number(process.env.E2E_PORT ?? 3100);
+const BASE = `http://localhost:${PORT}`;
+
 /**
  * e2e config (task #37). Tests the real user journeys against a running app + the dev
  * Postgres/MinIO. Reuses an already-running dev server on :3000 when present, else starts
@@ -12,7 +16,7 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   reporter: [['list']],
   use: {
-    baseURL: 'http://localhost:3100',
+    baseURL: BASE,
     trace: 'on-first-retry',
     actionTimeout: 15_000,
     navigationTimeout: 45_000,
@@ -28,8 +32,8 @@ export default defineConfig({
     command:
       // …and its own address (sign-in links come back to :3100, not a dev server's :3000) and the console mailer
       // (production refuses to start without a mail provider; the complaint form insists its acknowledgement is sent).
-      'cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local APP_URL=http://localhost:3100 AUTH_URL=http://localhost:3100 MAIL_PROVIDER=console npm run start -- -p 3100',
-    url: 'http://localhost:3100',
+      `cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local APP_URL=${BASE} AUTH_URL=${BASE} MAIL_PROVIDER=console npm run start -- -p ${PORT}`,
+    url: BASE,
     reuseExistingServer: true,
     timeout: 300_000,
   },
