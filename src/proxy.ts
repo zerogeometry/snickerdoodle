@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { TEST_GATE_COOKIE, gateCookieValid, isGateExempt, isTestSite } from '@/lib/siteMode';
+import { TEST_GATE_COOKIE, gateCookieValid, isGateExempt, isPasswordLocked } from '@/lib/siteMode';
 import { buildCsp, cspMode, newNonce, storageOrigins } from '@/lib/csp';
 import { isIndexablePath, NOINDEX } from '@/lib/seo';
 
@@ -9,8 +9,8 @@ import { isIndexablePath, NOINDEX } from '@/lib/seo';
  *     The policy also goes on the REQUEST, with `x-nonce`: Next.js reads the nonce from there and
  *     puts it on its own <script> tags. (Pages render per request — see the root layout — so the
  *     nonce is never baked into a cached page.)
- *  2. on the TEST SITE only (`SITE_MODE=test`): sits behind the shared password and is never
- *     indexed.
+ *  2. on the TEST SITE (`SITE_MODE=test`) and the PRIVATE LIVE site (`SITE_MODE=private`): sits behind
+ *     the shared password and is never indexed.
  *  3. on the real site: NOINDEX BY DEFAULT — only the public pages (src/lib/seo.ts) may be indexed.
  *  4. a gift link (/g/<token>) that's dead answers 410 Gone (unknown → 404), still with its friendly
  *     card (src/app/g/[token]/status.ts — CLAUDE.md: "deleted source → 410").
@@ -18,7 +18,7 @@ import { isIndexablePath, NOINDEX } from '@/lib/seo';
 export async function proxy(req: NextRequest) {
   const nonce = newNonce();
   const csp = buildCsp({ nonce, mode: cspMode(), storageOrigins: storageOrigins() });
-  const testSite = isTestSite();
+  const testSite = isPasswordLocked(); // the test site or the private live site
 
   const { pathname, search } = req.nextUrl;
   if (testSite && !isGateExempt(pathname) && !(await gateCookieValid(req.cookies.get(TEST_GATE_COOKIE)?.value))) {

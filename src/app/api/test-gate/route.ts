@@ -1,11 +1,11 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { TEST_GATE_COOKIE, TEST_GATE_DAYS, gateToken, isTestSite, sameSitePath, sameString } from '@/lib/siteMode';
+import { TEST_GATE_COOKIE, TEST_GATE_DAYS, gateToken, isPasswordLocked, sameSitePath, sameString } from '@/lib/siteMode';
 import { getDb } from '@/db/client';
 import { ipFromHeaders, LIMITS, rateLimit } from '@/server/rateLimit';
 
 /** The test site's password check (a plain form post — works before any JS loads). */
 export async function POST(req: NextRequest) {
-  if (!isTestSite()) return new NextResponse('not found', { status: 404 });
+  if (!isPasswordLocked()) return new NextResponse('not found', { status: 404 });
   const form = await req.formData();
   const given = String(form.get('password') ?? '');
   const next = sameSitePath(String(form.get('next') ?? '/'), req.url);
