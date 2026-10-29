@@ -4,7 +4,7 @@ import { printTemplates, productVariantProviders, productVariants, products } fr
 import { CATALOGUE, economicsOf, multiBuyTiers, parcelGroupOf, type PricedCatalogue } from '@/pricing';
 import { mmToPx, templateGeom, type TemplateGeom } from './print/geometry';
 import type { DbHandle } from './db';
-import { EXPECTED_POPULARITY, recomputePopularity } from './popularity';
+import { EXPECTED_POPULARITY, pinFirst, recomputePopularity } from './popularity';
 import {
   ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_SIZES, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
   KIDS_TEE_COLOURS, KIDS_TEE_SIZES, type GarmentColour,
@@ -850,7 +850,9 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
     if (attrs.grade && !p.grades.includes(attrs.grade)) p.grades.push(attrs.grade);
     if (attrs.finish && !p.finishes.includes(attrs.finish)) p.finishes.push(attrs.finish);
   }
-  return [...byKey.values()];
+  // the pinned lead (the Christmas family bundle — founder, 29 Oct) heads EVERY listing, the standalone
+  // /catalogue grid included, not only the popularity-ranked shelf
+  return pinFirst([...byKey.keys()]).map((k) => byKey.get(k)!);
 }
 
 /**

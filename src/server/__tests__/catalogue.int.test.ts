@@ -88,7 +88,8 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
     // + the calendar (PR #15) and the bauble + sack (D24), on show for Christmas
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    // the Christmas family bundle is pinned to the top of every listing (founder, 29 Oct)
+    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
