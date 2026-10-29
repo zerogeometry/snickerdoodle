@@ -285,6 +285,39 @@ body {
   }
 }
 
+/* "buy more & save" (founder, 29 Oct): a slow, soft honey highlight that breathes behind the words —
+   opacity only, the text itself never changes colour (cinnamon passes on both oat and honey-band).
+   Off under reduced motion. */
+.save-glow {
+  position: relative;
+  isolation: isolate;
+}
+.save-glow::before {
+  content: '';
+  position: absolute;
+  inset: -1px -6px;
+  z-index: -1;
+  border-radius: 999px;
+  background: var(--color-honey-band);
+  opacity: 0;
+  animation: save-glow 4.5s ease-in-out infinite;
+}
+@keyframes save-glow {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .save-glow::before {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* CTA wobble — a quick attention nudge roughly every 3s, still the rest of the time. */
 @keyframes cta-wobble {
   0%,

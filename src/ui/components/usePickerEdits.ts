@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { keepUploadAction } from '@/app/actions/keep';
 import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
-import { removeBackgroundAction } from '@/app/actions/magic';
+import { putBackgroundBackAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { normalizeUpload, toast, useUpload, type Upload } from '@/lib/store';
 import { toSessionUpload } from '@/lib/uploadSession';
@@ -57,7 +57,9 @@ export function isResumeVisit(): boolean {
     return false;
   }
 }
-/** Drop ?resume=1 once used, so a reload / a later "back" to this entry starts fresh. */
+/** Drop ?resume=1 once used, so a reload / a later "back" to this entry starts fresh. Call it from an
+ * effect declared AFTER usePickerEdits — its "back from the Studio" check reads the same flag (founder,
+ * 29 Oct: the bundle builder cleared it first, so the Studio's edit never came back). */
 export function forgetResumeVisit(): void {
   try {
     const url = new URL(window.location.href);
@@ -76,6 +78,10 @@ export function usePickerEdits(opts: {
   sheet?: PickerSheet | null;
   /** a new keepsake was made from an edit — choose it */
   onCopied?: (assetId: string) => void;
+  /** PER-PIECE edits (the family bundle — founder, 29 Oct): the drawing in progress is kept first and its
+   * edits made on a COPY, so editing one piece never changes the others showing the same drawing. A guest
+   * (nothing can be kept) still edits it in place. */
+  forkLoose?: boolean;
 }) {
   const router = useRouter();
   // (the per-builder edits this replaced lived in the tab: clear what an earlier version left behind)
@@ -112,6 +118,7 @@ export function usePickerEdits(opts: {
     if (detour.copyOf && !saved) void discardCopyAction({ assetId: detour.assetId }).then(() => opts.onUploaded());
     const chosen = detour.copyOf && !saved ? detour.copyOf : detour.assetId;
     // (a detour abandoned some other way: just put the drawing in progress back, below)
+    // (a builder must tidy ?resume=1 away only AFTER this has run — see forgetResumeVisit)
     if (isResumeVisit() && detour.sheet) setResume({ assetId: chosen, sheet: detour.sheet });
     try {
       // (only when one WAS set aside — editing the drawing in progress itself sets nothing aside)
@@ -141,6 +148,15 @@ export function usePickerEdits(opts: {
     const u = useUpload.getState().upload;
     return !!u && u.assetId === d.assetId && !u.kept;
   };
+  /** forkLoose: keep the drawing in progress (signed in) so its edit becomes a copy. True when it now is one. */
+  const keptForEdit = async (d: Drawingish): Promise<boolean> => {
+    if (!opts.forkLoose || !isLooseDrawing(d)) return false;
+    const r = await keepUploadAction(d.assetId).catch(() => ({ ok: false }));
+    if (!r.ok) return false;
+    useUpload.setState((s) => (s.upload?.assetId === d.assetId ? { upload: { ...s.upload, kept: true } } : {}));
+    opts.onUploaded();
+    return true;
+  };
   /** The drawing in progress (not a keepsake yet) with its background lifted — "put it back" undoes it. */
   const hasLiftedBackground = (d: Drawingish) => {
     const u = useUpload.getState().upload;
@@ -151,9 +167,13 @@ export function usePickerEdits(opts: {
     if (busy[d.assetId]) return;
     setBusy((b) => ({ ...b, [d.assetId]: 'lifting…' }));
     try {
+      await keptForEdit(d);
       if (isLooseDrawing(d)) {
         // the drawing in progress: its own cutout, and back again
         if (hasLiftedBackground(d)) {
+          // the lifted copy is deleted, not just hidden — it can't come back in a later edit or copy
+          const lifted = useUpload.getState().upload?.cutout?.sourceObjectId;
+          if (lifted) void putBackgroundBackAction({ assetId: d.assetId, sourceObjectId: lifted });
           useUpload.getState().setCutout(null);
           return void toast('background back — just as it was');
         }
@@ -178,6 +198,7 @@ export function usePickerEdits(opts: {
 
   const editInStudio = async (d: Drawingish) => {
     if (busy[d.assetId]) return;
+    await keptForEdit(d);
     const current = useUpload.getState().upload;
     // the drawing in progress, not a keepsake yet: the Studio as usual, back here afterwards
     if (isLooseDrawing(d)) {

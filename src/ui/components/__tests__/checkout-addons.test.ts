@@ -39,14 +39,13 @@ describe('checkout add-ons', () => {
     expect(shown[0]!.transform).toEqual(line.artwork!.transform);
   });
 
-  it('the “+” is a real labelled 44px button: shown on touch screens + keyboard focus, fades in on hover', () => {
+  it('the “+” is a real labelled 44px button, ALWAYS visible (no hover reveal at all)', () => {
     const html = renderToStaticMarkup(createElement(CheckoutAddOns, { addOns: [SACK], items: [BUNDLE_LINE], gift: false }));
     expect(html).toContain('aria-label="add a christmas sack with your drawing"');
     expect(html).toMatch(/<button type="button"/);
     expect(html).toContain('h-11 w-11'); // 44px
-    expect(html).toContain('[@media(hover:none)]:opacity-100'); // always visible on touch
-    expect(html).toContain('group-focus-within:opacity-100'); // and on keyboard focus
-    expect(html).toContain('group-hover:opacity-100');
+    const plus = html.match(/<button[^>]*data-addon-plus[^>]*>/)?.[0] ?? html.match(/<button[^>]*aria-label="add a christmas sack[^>]*>/)![0];
+    expect(plus).not.toMatch(/opacity-0|group-hover|hover:none/);
   });
 
   it('only a REAL saving is claimed — a card from another lab says nothing about savings', () => {
@@ -63,8 +62,10 @@ describe('checkout add-ons', () => {
 describe('the multi-buy quantity dropdown', () => {
   it('its options come from the server’s tiers: the quantity, and the discount it earns', () => {
     const o = qtyOptions([1500, 1500, 1500, 1500]);
-    expect(o.slice(0, 5).map((x) => `${x.label} · ${x.note}`)).toEqual(['1 · full price', '2 · 15% off', '3 · 15% off', '4 · 15% off', '5 · 15% off']);
-    expect(qtyOptions([1000, 1500, 1500, 1500]).map((x) => x.note).slice(0, 3)).toEqual(['full price', '10% off', '15% off']);
+    expect(o.slice(0, 5).map((x) => [x.label, x.note ?? null])).toEqual([['1', null], ['2', '15% off'], ['3', '15% off'], ['4', '15% off'], ['5', '15% off']]);
+    expect(qtyOptions([1000, 1500, 1500, 1500]).map((x) => x.note ?? null).slice(0, 3)).toEqual([null, '10% off', '15% off']);
+    // no "full price" anywhere (founder, 29 Oct)
+    expect(JSON.stringify(qtyOptions([1500, 1500, 1500, 1500]))).not.toContain('full price');
   });
   it('counts the same product already on other lines', () => {
     expect(qtyOptions([1000, 1500, 1500, 1500], 1)[0]!.note).toBe('10% off'); // 1 here + 1 elsewhere = 2

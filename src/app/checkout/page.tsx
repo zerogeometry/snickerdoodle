@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowLeft, IconGift, IconHeart, IconLock, IconMinus, IconPlus, IconShieldCheck } from '@tabler/icons-react';
+import { IconArrowLeft, IconGift, IconHeart, IconLock, IconPencil, IconShieldCheck, IconTrash } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -274,7 +274,7 @@ export default function CheckoutPage() {
       {multiBuySavingPence > 0 ? (
         <div className="flex justify-between text-green-save">
           {/* buy more of the same, save more — each product's own tiers, from its costs (src/pricing/multibuy.ts) */}
-          <dt>Multi-buy saving</dt>
+          <dt>Buy more &amp; save</dt>
           <dd>−{gbp(multiBuySavingPence)}</dd>
         </div>
       ) : null}
@@ -350,9 +350,18 @@ export default function CheckoutPage() {
                 </p>
               ) : null}
               <div className="mt-3 space-y-2.5">
-                {items.map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-line bg-paper p-3">
-                    <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-oat">
+                {items.map((item, idx) => {
+                  const oneOff = isPackLine(item) || isBundleLine(item);
+                  const editHref = `/customize/${item.product}${oneOff || isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`;
+                  const editLabel = isBundleLine(item) ? `edit your ${item.name}` : isPackLine(item) ? `edit the cards in your ${item.name}` : `customize your ${item.name}`;
+                  return (
+                  // (founder, 29 Oct) desktop: thumbnail · title + subtitle · buy more & save + quantity · prices · remove / edit;
+                  // a phone stacks the same things in the same order
+                  <div
+                    key={item.id}
+                    className="grid items-center gap-x-3 gap-y-2 rounded-2xl border border-line bg-paper p-3 [grid-template-areas:'thumb_title_actions'_'thumb_qty_price'] [grid-template-columns:3.5rem_minmax(0,1fr)_auto] md:[grid-template-areas:'thumb_title_qty_price_actions'] md:[grid-template-columns:3.5rem_minmax(0,1fr)_auto_minmax(4.5rem,auto)_auto]"
+                  >
+                    <div className="relative h-14 w-14 overflow-hidden rounded-xl bg-oat [grid-area:thumb] self-start md:self-center">
                       {/* The ACTUAL creation — this drawing, on this variant, at its saved
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {isPackLine(item) ? (
@@ -376,42 +385,21 @@ export default function CheckoutPage() {
                         </div>
                       )}
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-bold text-cocoa">{item.name}</div>
+                    {/* (b) title + subtitle */}
+                    <div className="min-w-0 [grid-area:title]">
+                      <div className="break-words text-sm font-bold text-cocoa">{item.name}</div>
                       {item.sub ? <div className="break-words text-[11px] text-ink-faint">{item.sub}</div> : null}
-                      {isPackLine(item) || isBundleLine(item) ? (
-                        // A card pack / the bundle is always ONE — no quantity; its pieces are edited in the builder.
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <button type="button" onClick={() => router.push(`/customize/${item.product}?edit=${encodeURIComponent(item.id)}`)} className="relative rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa before:absolute before:-inset-x-1 before:-inset-y-3 before:content-[''] hover:border-honey">
-                            {isBundleLine(item) ? 'edit bundle' : 'edit cards'}
-                          </button>
-                        </div>
-                      ) : (
-                      <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                        {/* wraps to a second line on a narrow phone rather than pushing the price off screen */}
-                        {tiersOf(idx) && hasMultiBuy(tiersOf(idx)!) ? (
-                          // buy more, save more: the same dropdown as the product page — each option's discount from the server's tiers
-                          <MultiBuyQty compact tiers={tiersOf(idx)} value={Math.min(item.qty, 10)} others={othersOf(idx)} onChange={(q) => setQty(item.id, q)} productLabel={item.name} />
-                        ) : (
-                        <div className="flex items-center rounded-full border border-line bg-white">
-                          <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-ink-soft">
-                            <Icon icon={IconMinus} size={12} />
-                          </button>
-                          <span className="min-w-4 text-center text-xs font-bold text-cocoa">{item.qty}</span>
-                          <button type="button" aria-label="one more" onClick={() => setQty(item.id, item.qty + 1)} className="px-2 py-0.5 text-cinnamon">
-                            <Icon icon={IconPlus} size={12} />
-                          </button>
-                        </div>
-                        )}
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
-                          customize
-                        </button>
-                      </div>
+                    </div>
+                    {/* (c) buy more & save + the quantity (a card pack / the bundle is always ONE — no quantity) */}
+                    <div className="min-w-0 [grid-area:qty]">
+                      {oneOff ? null : (
+                        // the same dropdown as the product page — each option's discount from the SERVER's tiers; no offer → just the quantity
+                        <MultiBuyQty compact tiers={tiersOf(idx) && hasMultiBuy(tiersOf(idx)!) ? tiersOf(idx) : null} value={Math.min(item.qty, 10)} others={othersOf(idx)} onChange={(q) => setQty(item.id, q)} productLabel={item.name} />
                       )}
                     </div>
-                    <div className="shrink-0 text-right">
+                    {/* (d) the price — struck through + the new one + "−X%" when buy more & save applies */}
+                    <div className="text-right [grid-area:price]">
                       {!gift && multiBuyOf(idx) ? (
-                        // multi-buy: the line's price struck through, its new price, a small sticker — nothing else
                         <div className="flex flex-col items-end gap-0.5">
                           <span className="text-[11px] text-ink-faint line-through">{gbp(linePence(idx))}</span>
                           <span className="text-sm font-bold text-cocoa">{gbp(linePence(idx) - multiBuyOf(idx)!.pence)}</span>
@@ -420,10 +408,19 @@ export default function CheckoutPage() {
                       ) : (
                         <div className="text-sm font-bold text-cocoa">{gift ? 'gift' : gbp(linePence(idx))}</div>
                       )}
-                      <button type="button" onClick={() => remove(item.id)} className="text-[11px] text-ink-faint hover:text-berry">remove</button>
+                    </div>
+                    {/* (e) remove, and edit beneath — labelled 44px icon buttons */}
+                    <div className="flex flex-col items-center [grid-area:actions] self-start md:self-center">
+                      <button type="button" onClick={() => remove(item.id)} aria-label={`remove ${item.name} from your basket`} className="press flex h-11 w-11 items-center justify-center rounded-full text-ink-soft hover:text-berry focus-visible:outline-2">
+                        <Icon icon={IconTrash} size={18} />
+                      </button>
+                      <button type="button" onClick={() => router.push(editHref)} aria-label={editLabel} className="press flex h-11 w-11 items-center justify-center rounded-full text-ink-soft hover:text-cocoa focus-visible:outline-2">
+                        <Icon icon={IconPencil} size={18} />
+                      </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
 
               {/* Goes nicely with it — made with their drawing, the server's real saving (src/server/addOns.ts) */}

@@ -1,5 +1,6 @@
 'use client';
 
+import { fromLabel } from '@/lib/pack-labels';
 import { IconMinus, IconPlus, IconZoomScan } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
@@ -158,7 +159,7 @@ export function ProductTile({
         {/* phones: the name and the price each get their own line; from sm, one row */}
         <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-1">
           <span className="min-w-0 truncate text-base font-extrabold text-cocoa sm:text-sm">{p.label}</span>
-          <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-soft sm:text-xs">from {gbp(p.fromPence)}</span>
+          <span className="shrink-0 whitespace-nowrap text-sm font-semibold text-ink-soft sm:text-xs">{fromLabel(p, gbp)}</span>
         </div>
         {/* Controls stack on a narrow tile (so each meets the 44px tap target without
             overflowing) and sit on one row once the TILE itself is wide enough. Uses a

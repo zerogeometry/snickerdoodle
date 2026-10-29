@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconCircleCheck, IconPlus, IconRefresh, IconShoppingBag } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCircleCheck, IconPencil, IconPlus, IconRefresh, IconShoppingBag } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -22,6 +22,7 @@ import {
   type BundleArt, type BundlePiece, type BundleSize, type BundleSpec,
 } from '@/lib/christmas-bundle';
 import { christmasBundleLine, newBundleLineId } from '@/lib/christmas-bundle-line';
+import { EMPTY_DRAFT, resetSlot, setSlot, slotView, specOf, withLooks, type Draft, type Slot, type SlotView } from '@/lib/bundle-draft';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, shownSrc, toast, useBasket, useUpload } from '@/lib/store';
 
@@ -51,8 +52,7 @@ const ORN = 100;
 const MAX = 8;
 
 /** null = "the placemats' drawing" (the coasters, each ornament). */
-type Draft = { size: BundleSize; placemat: BundleArt | null; coaster: BundleArt | null; ornaments: Array<BundleArt | null> };
-const EMPTY: Draft = { size: 2, placemat: null, coaster: null, ornaments: [] };
+const EMPTY = EMPTY_DRAFT;
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 /** A piece's placement: its product's default (the order gate + the print file use the same). */
@@ -83,11 +83,8 @@ function writeDraft(d: Draft | null) {
 }
 
 const slotName = (slot: number) => (slot === PLACEMATS ? 'the placemats' : slot === COASTERS ? 'the coasters' : `ornament ${slot - ORN + 1}`);
-/** The spec the server will make from a draft (null until the placemats have a drawing). */
-function specOf(d: Draft): BundleSpec | null {
-  if (!d.placemat) return null;
-  return { placemat: d.placemat, coaster: d.coaster, ornaments: Array.from({ length: d.size }, (_, i) => d.ornaments[i] ?? d.placemat!) };
-}
+/** The picker's slot number → the draft's slot. */
+const slotOf = (slot: number): Slot => (slot === PLACEMATS ? 'placemat' : slot === COASTERS ? 'coaster' : { ornament: slot - ORN });
 
 export function ChristmasBundleBuilder() {
   const router = useRouter();
@@ -137,8 +134,7 @@ export function ChristmasBundleBuilder() {
       setD({ size, placemat: b.placemat, coaster: b.coaster ?? null, ornaments: b.ornaments.map((a) => (a.assetId === b.placemat.assetId && (a.sourceObjectId ?? null) === (b.placemat.sourceObjectId ?? null) ? null : a)) });
       return;
     }
-    const resuming = isResumeVisit();
-    forgetResumeVisit();
+    const resuming = isResumeVisit(); // (tidied away below, after the picker workshop has read it too)
     if (!resuming) writeDraft(null);
     const draft = resuming ? readDraft() : null;
     if (draft) {
@@ -170,29 +166,35 @@ export function ChristmasBundleBuilder() {
     }
     return list;
   }, [upload, picker]);
-  const tools = usePickerEdits({ returnTo: `${NEXT}?resume=1`, onUploaded: loadPicker, sheet, onCopied: setChosen });
+  const tools = usePickerEdits({ returnTo: `${NEXT}?resume=1`, onUploaded: loadPicker, sheet, onCopied: setChosen, forkLoose: true });
   const { resume, clearResume } = tools;
+  // only now (after usePickerEdits' own "back from the Studio" check) tidy ?resume=1 out of the address
+  useEffect(() => forgetResumeVisit(), []);
+  // Back from the Studio (founder, 29 Oct: "edits don't come back"): the edited drawing goes straight into
+  // the piece it was opened for — that piece only (a keepsake's edit is a copy of its own) — no second tap.
   useEffect(() => {
     if (!resume) return;
     clearResume();
-    setSheet(resume.sheet);
-    setChosen(resume.assetId);
+    const slot = resume.sheet?.slot;
+    if (typeof slot === 'number') {
+      setD((old) => setSlot(old, slotOf(slot), { assetId: resume.assetId }));
+      setSheet(null);
+      toast(`${slotName(slot)} updated ✓`);
+    } else {
+      setSheet(resume.sheet);
+      setChosen(resume.assetId);
+    }
   }, [resume, clearResume]);
   const applyEdits = tools.apply;
   const drawings = useMemo(() => applyEdits(drawingsRaw), [applyEdits, drawingsRaw]);
-  // a drawing edited here (remove background, the Studio) → every piece already showing it shows the edit
+  // a drawing's edit (remove background, the Studio) reaches the pieces holding THAT drawing — and a
+  // drawing not in the list right now (the keepsake box reloading) is left exactly as it is: it used to
+  // be stripped of its look, which emptied the thumbnails (founder, 29 Oct)
   useEffect(() => {
-    const fix = (a: BundleArt | null): BundleArt | null => {
-      if (!a) return a;
-      const sid = drawings.find((x) => x.assetId === a.assetId)?.sourceObjectId;
-      if ((sid ?? null) === (a.sourceObjectId ?? null)) return a;
-      return sid ? { assetId: a.assetId, sourceObjectId: sid } : { assetId: a.assetId };
-    };
-    setD((old) => {
-      const next = { ...old, placemat: fix(old.placemat), coaster: fix(old.coaster), ornaments: old.ornaments.map(fix) };
-      const same = next.placemat === old.placemat && next.coaster === old.coaster && next.ornaments.every((a, i) => a === old.ornaments[i]);
-      return same ? old : next;
-    });
+    setD((old) => withLooks(old, (id) => {
+      const x = drawings.find((y) => y.assetId === id);
+      return x ? x.sourceObjectId : false;
+    }));
   }, [drawings]);
   const drawingFor = useCallback((assetId: string) => drawings.find((x) => x.assetId === assetId) ?? null, [drawings]);
 
@@ -250,14 +252,7 @@ export function ChristmasBundleBuilder() {
     if (!x) return;
     const a: BundleArt = { assetId: x.assetId, ...(x.sourceObjectId ? { sourceObjectId: x.sourceObjectId } : {}) };
     const { slot } = sheet;
-    setD((old) => {
-      if (slot === PLACEMATS) return { ...old, placemat: a };
-      if (slot === COASTERS) return { ...old, coaster: a };
-      const list = [...old.ornaments];
-      while (list.length <= slot - ORN) list.push(null);
-      list[slot - ORN] = a;
-      return { ...old, ornaments: list };
-    });
+    setD((d0) => setSlot(d0, slotOf(slot), a));
     setSheet(null);
     toast(`${slotName(slot)} ✓`);
   };
@@ -291,9 +286,11 @@ export function ChristmasBundleBuilder() {
   };
 
   const sheetDrawing = chosen ? drawingFor(chosen) : null;
-  const tile = (a: BundleArt | null) => {
-    const x = a ? drawingFor(a.assetId) : null;
-    return x?.thumbUrl ?? x?.imageUrl ?? null;
+  /** a slot's thumbnail: the drawing's picture in THIS look (its cutout / design), small where there's a small copy */
+  const pictureOf = (a: BundleArt) => {
+    const x = drawingFor(a.assetId);
+    if (!x || (x.sourceObjectId ?? null) !== (a.sourceObjectId ?? null)) return null; // a look not loaded yet → a skeleton, never a stale picture
+    return x.thumbUrl ?? x.imageUrl ?? null;
   };
 
   return (
@@ -344,50 +341,35 @@ export function ChristmasBundleBuilder() {
             </div>
           </Step>
 
-          {/* 2 · the table */}
-          <Step n={2} title="the table" note={`one drawing on all ${d.size} placemats — and on the coasters too, unless you pick another`}>
-            <div className="flex flex-wrap gap-x-5 gap-y-4">
-              <Piece
-                label="placemats"
-                url={tile(d.placemat)}
-                i={0}
-                note={d.placemat ? drawingFor(d.placemat.assetId)?.label ?? 'a drawing' : 'pick a drawing'}
-                aria={d.placemat ? `the placemats' drawing — swap it` : 'pick a drawing for the placemats'}
-                onClick={() => openSheet(PLACEMATS)}
-                blocked={!!d.placemat && assess('placemat', d.placemat)?.decision === 'BLOCK'}
-              />
-              <Piece
-                label="coasters"
-                url={tile(d.coaster ?? d.placemat)}
-                i={1}
-                note={d.coaster ? drawingFor(d.coaster.assetId)?.label ?? 'a drawing' : 'same as the placemats'}
-                aria={d.coaster ? `the coasters' drawing — swap it` : 'the coasters wear the placemats’ drawing — pick a different one'}
-                onClick={() => openSheet(COASTERS)}
-                blocked={!!(d.coaster ?? d.placemat) && assess('coaster', (d.coaster ?? d.placemat)!)?.decision === 'BLOCK'}
-                reset={d.coaster ? { label: 'use the placemats’ drawing on the coasters', onClick: () => setD((x) => ({ ...x, coaster: null })) } : undefined}
-              />
-            </div>
+          {/* 2–4 · each piece's design (founder, 29 Oct): the placemats one for all, the coasters one for all,
+              the ornaments one each — every one customisable (the picker's remove background / the Studio) */}
+          <Step n={2} title="customize your placemats" note={`one design on all ${d.size} placemats`}>
+            <Piece view={slotView(d, 'placemat', pictureOf)} label="placemats" i={0}
+              note={d.placemat ? drawingFor(d.placemat.assetId)?.label ?? 'your design' : 'pick a design'}
+              aria={d.placemat ? 'edit the placemats’ design' : 'pick a design for the placemats'}
+              onClick={() => openSheet(PLACEMATS)}
+              blocked={!!d.placemat && assess('placemat', d.placemat)?.decision === 'BLOCK'} />
           </Step>
-
-          {/* 3 · the ornaments */}
-          <Step n={3} title="the ornaments" note="one each — the placemats’ drawing until you pick its own">
+          <Step n={3} title="customize your coasters" note={`one design on all ${d.size} coasters`}>
+            <Piece view={slotView(d, 'coaster', pictureOf)} label="coasters" i={1}
+              note={d.coaster ? drawingFor(d.coaster.assetId)?.label ?? 'your design' : 'same as the placemats'}
+              aria={d.coaster ? 'edit the coasters’ design' : 'the coasters wear the placemats’ design — edit or pick another'}
+              onClick={() => openSheet(COASTERS)}
+              blocked={!!(d.coaster ?? d.placemat) && assess('coaster', (d.coaster ?? d.placemat)!)?.decision === 'BLOCK'}
+              reset={d.coaster ? { label: 'use the placemats’ design on the coasters', onClick: () => setD((x) => resetSlot(x, 'coaster')) } : undefined} />
+          </Step>
+          <Step n={4} title="customize your ornaments" note="a unique design for each">
             <ol className="flex flex-wrap gap-x-4 gap-y-4" aria-label="the ornaments">
               {Array.from({ length: d.size }, (_, i) => {
-                const own = d.ornaments[i] ?? null;
-                const a = own ?? d.placemat;
+                const v = slotView(d, { ornament: i }, pictureOf);
                 return (
                   <li key={i}>
-                    <Piece
-                      label={`ornament ${i + 1}`}
-                      url={tile(a)}
-                      i={i + 2}
-                      note={own ? 'its own drawing' : 'the placemats’'}
-                      aria={own ? `ornament ${i + 1}'s drawing — swap it` : `ornament ${i + 1} wears the placemats’ drawing — pick its own`}
+                    <Piece view={v} label={`ornament ${i + 1}`} i={i + 2} round
+                      note={v.own ? 'its own design' : 'the placemats’ for now'}
+                      aria={v.own ? `edit ornament ${i + 1}’s design` : `ornament ${i + 1} wears the placemats’ design — edit or pick its own`}
                       onClick={() => openSheet(ORN + i)}
-                      blocked={!!a && assess('ceramicOrnament', a)?.decision === 'BLOCK'}
-                      round
-                      reset={own ? { label: `ornament ${i + 1}: use the placemats’ drawing`, onClick: () => setD((x) => ({ ...x, ornaments: x.ornaments.map((o, j) => (j === i ? null : o)) })) } : undefined}
-                    />
+                      blocked={!!v.art && assess('ceramicOrnament', v.art)?.decision === 'BLOCK'}
+                      reset={v.own ? { label: `ornament ${i + 1}: use the placemats’ design`, onClick: () => setD((x) => resetSlot(x, { ornament: i })) } : undefined} />
                   </li>
                 );
               })}
@@ -455,9 +437,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
 export function Step({ n, title, note, children }: { n: number; title: string; note: string; children: React.ReactNode }) {
   return (
     <section className="mt-6" aria-labelledby={`bundle-step-${n}`}>
-      <h2 id={`bundle-step-${n}`} className="flex items-baseline gap-2 text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-[12px] text-cocoa">{n}</span>
-        {title}
+      <h2 id={`bundle-step-${n}`} className="font-display text-lg font-extrabold lowercase leading-tight text-cocoa">
+        <span className="text-cinnamon">{n}.</span> {title}
       </h2>
       <p className="mt-1 text-xs text-ink-soft">{note}</p>
       <div className="mt-3 space-y-4">{children}</div>
@@ -465,12 +446,16 @@ export function Step({ n, title, note, children }: { n: number; title: string; n
   );
 }
 
-/** One piece's drawing: a taped polaroid (tap to pick / swap), its name, and an optional "back to the placemats'" link. */
+/**
+ * One piece's design: a taped polaroid (tap to edit / swap), its name, and an optional "back to the
+ * placemats'" link. An "edit" label shows on hover (with a gentle lift) — and ALWAYS on touch screens and
+ * on keyboard focus, so it's never a hover-only control; no lift under prefers-reduced-motion.
+ */
 function Piece({
-  label, url, i, note, aria, onClick, blocked, round, reset,
+  view, label, i, note, aria, onClick, blocked, round, reset,
 }: {
+  view: SlotView;
   label: string;
-  url: string | null;
   i: number;
   note: string;
   aria: string;
@@ -482,11 +467,22 @@ function Piece({
   return (
     <div className="w-24">
       <div
-        className="polaroid tape relative w-24 shrink-0 !p-1.5"
+        className="polaroid tape group relative w-24 shrink-0 !p-1.5"
         style={{ ['--tilt' as string]: i % 2 ? '1.2deg' : '-1.4deg', ['--tape' as string]: TAPES[i % TAPES.length], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
       >
         <div className={`relative aspect-square w-full overflow-hidden bg-white ${round ? 'rounded-full' : ''} ${blocked ? 'ring-2 ring-cinnamon' : ''}`}>
-          {url ? <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-cinnamon"><Icon icon={IconPlus} size={18} /></span>}
+          {view.state === 'ready' ? (
+            <img src={view.url!} alt="" loading="lazy" className="h-full w-full object-cover transition-transform duration-200 ease-out group-hover:scale-[1.06] group-focus-within:scale-[1.06] motion-reduce:transition-none motion-reduce:group-hover:scale-100 motion-reduce:group-focus-within:scale-100" />
+          ) : view.state === 'loading' ? (
+            <span className="block h-full w-full bg-line motion-safe:animate-pulse" aria-hidden />
+          ) : (
+            <span className="flex h-full items-center justify-center text-cinnamon"><Icon icon={IconPlus} size={18} /></span>
+          )}
+          {view.state !== 'empty' ? (
+            <span data-edit-label aria-hidden className="pointer-events-none absolute inset-x-0 bottom-1 mx-auto flex w-max items-center gap-0.5 rounded-full border border-cocoa bg-paper/95 px-1.5 text-[10px] font-extrabold lowercase text-cocoa opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100">
+              <Icon icon={IconPencil} size={10} /> edit
+            </span>
+          ) : null}
           <button type="button" onClick={onClick} aria-label={aria} className="absolute inset-0 focus-visible:outline-2" />
         </div>
       </div>
@@ -532,7 +528,13 @@ function BundlePicture({ sku, spec, size, onEmpty }: { sku: string; spec: Bundle
           setState('idle');
         })
         .catch(() => {
-          if (!stale) setState('error');
+          if (stale) return;
+          // never leave an OLDER set on show as if it were this one (founder, 29 Oct)
+          setUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return null;
+          });
+          setState('error');
         });
     }, 120);
     return () => {

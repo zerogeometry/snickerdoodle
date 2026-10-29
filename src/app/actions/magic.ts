@@ -2,7 +2,7 @@
 
 import { getDb } from '@/db/client';
 import { getStorageObjectGrant, resolveAssetViewer } from '@/server/assets';
-import { applyCutoutMask, cutoutAlphaForAsset, removeBackgroundForAsset } from '@/server/magic';
+import { applyCutoutMask, cutoutAlphaForAsset, putBackgroundBack, removeBackgroundForAsset } from '@/server/magic';
 import { cleanGeometry, saveStudio, studioStateForAsset, StudioTextError, type StudioGeometry } from '@/server/studio-doc';
 import type { StudioObject } from '@/lib/studio-objects';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
@@ -35,6 +35,20 @@ export async function removeBackgroundAction(input: {
     if (msg.includes('budget')) return { ok: false, reason: 'budget' };
     if (msg.includes('no-clean-background')) return { ok: false, reason: 'nochange' };
     return { ok: false, needsAuth: account === null && viewer.uploadClaim == null };
+  }
+}
+
+/** "put the background back" on the drawing in progress: its lifted copy is deleted (src/server/magic.ts). */
+export async function putBackgroundBackAction(input: { assetId: string; sourceObjectId: string }): Promise<{ ok: boolean }> {
+  try {
+    const account = await getCurrentAccount();
+    const claims = await getUploadClaims();
+    const db = getDb();
+    const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, claims);
+    await putBackgroundBack(db, viewer, String(input.assetId), String(input.sourceObjectId));
+    return { ok: true };
+  } catch {
+    return { ok: false };
   }
 }
 
