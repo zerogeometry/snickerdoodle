@@ -42,11 +42,14 @@ export async function copyKeepsake(db: DbHandle, viewer: ViewerContext, sourceId
   });
 
   // carry the look over: the derivatives byte-for-byte (so a design's real-size record still matches
-  // its hash), the Studio recipe, and the same visibility
+  // its hash), the Studio recipe, and the same visibility. A cut-out is carried ONLY when the keepsake's
+  // look can use it (it has a Studio recipe) — a stale one (a background later put back) never rides
+  // into the copy, where it could become the copy's look (founder, 29 Oct: an old background came back).
+  const carried = CARRIED.filter((k) => k !== 'cutout' || !!src.studioDoc);
   const derived = await db
     .select()
     .from(storageObjects)
-    .where(inArray(storageObjects.key, CARRIED.map((k) => derivativeKey(sourceId, k))));
+    .where(inArray(storageObjects.key, carried.map((k) => derivativeKey(sourceId, k))));
   const { bucket } = getS3();
   for (const d of derived) {
     const kind = CARRIED.find((k) => d.key === derivativeKey(sourceId, k))!;

@@ -1,5 +1,6 @@
 'use client';
 
+import { packLine } from '@/lib/pack-labels';
 import { IconAlertTriangle, IconHeartPlus, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
@@ -885,6 +886,8 @@ function CustomizeProduct() {
         <div className="flex flex-col">
           <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">{product.label}</h1>
           {product.blurb ? <p className="mt-1 text-sm text-ink-soft">{product.blurb}</p> : null}
+          {/* a pack says how many the price buys (founder, 29 Oct) */}
+          {packLine(product.label, variant?.attributes) ? <p className="mt-1 text-sm font-bold text-cocoa">{packLine(product.label, variant?.attributes)}</p> : null}
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa">
               {gbp(variant?.pricePence ?? product.fromPence)}
@@ -892,7 +895,7 @@ function CustomizeProduct() {
             <span className="text-xs font-semibold text-green-save">{deliveryLine(variant?.sku ?? product.key)}</span>
             <ChristmasPromise productKey={product.key} attrs={{ size, colour }} />
           </div>
-          {/* buy more, save more + how many — THIS product's own tiers, from its costs (server-side) */}
+          {/* buy more & save + how many — THIS product's own tiers, from its costs (server-side) */}
           <MultiBuyQty tiers={variant?.multiBuyBps} value={qty} onChange={setQty} productLabel={product.label} />
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}

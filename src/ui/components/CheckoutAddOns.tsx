@@ -18,8 +18,7 @@ import type { AddOn } from '@/server/addOns';
  * claimed at all. "+" adds that product with that drawing at its default placement, and the basket
  * re-quotes. Small and warm: no countdowns, nothing pre-ticked.
  *
- * The "+" fades in on hover with a mouse, but is ALWAYS shown on touch screens (hover: none) and on
- * keyboard focus — never a hover-only control (CLAUDE.md). A real, labelled, 44 px button.
+ * The "+" is ALWAYS shown (founder, 29 Oct — so it's clear these are on offer). A real, labelled, 44 px button.
  */
 
 /** What "+" puts in the basket for an add-on made with `art` — the same placement its picture shows. */
@@ -70,7 +69,7 @@ export function CheckoutAddOns({ addOns, items, gift }: { addOns: readonly AddOn
                     toast(`${a.label} added ✓`);
                   }}
                   aria-label={`add a ${a.label} with your drawing`}
-                  className="press absolute bottom-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa opacity-0 shadow-[0_2px_0_var(--color-cocoa)] transition-opacity duration-150 focus-visible:opacity-100 focus-visible:outline-2 group-hover:opacity-100 group-focus-within:opacity-100 motion-reduce:transition-none [@media(hover:none)]:opacity-100"
+                  className="press absolute bottom-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa shadow-[0_2px_0_var(--color-cocoa)] focus-visible:outline-2"
                   data-addon-plus
                 >
                   <Icon icon={IconPlus} size={18} />

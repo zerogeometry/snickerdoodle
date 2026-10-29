@@ -10,6 +10,8 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { copyKeepsake, copyWithoutBackground, discardUnusedCopy, keepsakeLooks } from '@/server/keepsakeCopy';
+import { putBackgroundBack, removeBackgroundForAsset } from '@/server/magic';
+import { BundlePreviewDenied, renderBundlePreview } from '@/server/print/bundleCompose';
 import { IDENTITY_GEOMETRY, saveStudio } from '@/server/studio-doc';
 import { deleteObject, derivativeKey, getObjectBytes } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -97,6 +99,46 @@ describe.skipIf(!DB || !S3)('keepsake copies for edits', () => {
     expect((await sharp(await getObjectBytes(look.key)).metadata()).hasAlpha).toBe(true);
     expect(await objectsOf(src)).toHaveLength(before.length);
     expect((await objectsOf(src)).some((o) => o.key === derivativeKey(src, 'cutout'))).toBe(false);
+  });
+
+  // ── founder, 29 Oct: "remove background showed an OLD background" — a privacy check first ──
+  it('a stale cut-out (a background later put back) never rides into a copy, where it could become its look', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const src = await keepsake(); // no Studio recipe: its look is the drawing itself
+    await removeBackgroundForAsset(db, sam, src, { keepEnclosedPaper: true }); // a cut-out made… and never used
+    expect((await objectsOf(src)).some((o) => o.key === derivativeKey(src, 'cutout'))).toBe(true);
+    const { assetId } = await copyKeepsake(db, sam, src);
+    made.push(assetId);
+    expect((await objectsOf(assetId)).some((o) => o.key === derivativeKey(assetId, 'cutout'))).toBe(false);
+    const [c] = await db.select().from(assets).where(eq(assets.id, assetId));
+    expect((await keepsakeLooks(db, [{ id: assetId, studioDoc: c!.studioDoc }])).get(assetId)!.kind).not.toBe('cutout');
+  });
+
+  it('"put the background back" on the drawing in progress DELETES its cut-out — only its own, only when it IS the cut-out', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const loose = await keepsake({ keptInHome: false }); // a drawing in progress, not a keepsake yet
+    const cut = await removeBackgroundForAsset(db, sam, loose, { keepEnclosedPaper: true });
+    // a different object id (a design, or another asset's) deletes nothing
+    expect(await putBackgroundBack(db, sam, loose, '00000000-0000-0000-0000-000000000000')).toBe(false);
+    expect((await objectsOf(loose)).some((o) => o.id === cut.objectId)).toBe(true);
+    // a stranger is refused by the gate
+    const mallory = await resolveViewerContext(db, ids.malloryId, ids.hartleyId);
+    await expect(putBackgroundBack(db, mallory, loose, cut.objectId)).rejects.toBeInstanceOf(AuthzError);
+    // its own cut-out: gone, storage row and all
+    expect(await putBackgroundBack(db, sam, loose, cut.objectId)).toBe(true);
+    expect((await objectsOf(loose)).some((o) => o.key === derivativeKey(loose, 'cutout'))).toBe(false);
+    // a keepsake's cut-out is never deleted this way (its edits are copies of their own)
+    const kept = await keepsake();
+    const kcut = await removeBackgroundForAsset(db, sam, kept, { keepEnclosedPaper: true });
+    expect(await putBackgroundBack(db, sam, kept, kcut.objectId)).toBe(false);
+  });
+
+  it('the bundle picture never reads another asset’s object — even one the viewer could see on its own', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [a, b] = [await keepsake(), await keepsake()];
+    const bcut = await removeBackgroundForAsset(db, sam, b, { keepEnclosedPaper: true });
+    // asset a + asset b's cut-out id → refused before any byte is read
+    await expect(renderBundlePreview(db, { accountId: ids.samId, uploadClaims: [] }, { layout: 'x2', placemat: { assetId: a, sourceObjectId: bcut.objectId }, coaster: null, ornaments: [] })).rejects.toBeInstanceOf(BundlePreviewDenied);
   });
 
   it('a keepsake never saved in the Studio shows its drawing', async () => {

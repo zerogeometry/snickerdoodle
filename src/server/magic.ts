@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { and, eq, gte } from 'drizzle-orm';
 import sharp from 'sharp';
-import { mlOperations, storageObjects } from '@/db/schema';
+import { assets, mlOperations, storageObjects } from '@/db/schema';
 import { runImageOp } from '@/ml/client';
-import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import { cropToSheet } from '@/ml/sheetCrop';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
@@ -62,6 +62,25 @@ export async function removeBackgroundForAsset(
   const { objectId, key } = await storeCutout(db, assetId, res.buffer, res.sha256);
   await db.insert(mlOperations).values({ accountId: viewer.accountId, op: 'BG_REMOVE', assetId });
   return { objectId, key };
+}
+
+/**
+ * "Put the background back" on the drawing IN PROGRESS (founder, 29 Oct — an old cut-out came back in a
+ * later edit): the lifted copy is DELETED, not just hidden in the browser, so it can't resurface in a
+ * later edit or a keepsake copy. Only for a drawing that isn't a keepsake yet (a keepsake's edits are
+ * copies of their own), and only when `sourceObjectId` IS its cut-out (a Studio design stays a saved
+ * edit). Same gate as lifting it. Returns whether anything was deleted.
+ */
+export async function putBackgroundBack(db: DbHandle, viewer: ViewerContext, assetId: string, sourceObjectId: string): Promise<boolean> {
+  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const [a] = await db.select({ kept: assets.keptInHome }).from(assets).where(eq(assets.id, assetId));
+  if (!a || a.kept) return false;
+  const key = derivativeKey(assetId, 'cutout');
+  const [cut] = await db.select({ id: storageObjects.id }).from(storageObjects).where(and(eq(storageObjects.key, key), eq(storageObjects.assetId, assetId)));
+  if (!cut || cut.id !== sourceObjectId) return false;
+  await deleteObjectConfirmed(key);
+  await db.delete(storageObjects).where(eq(storageObjects.id, cut.id));
+  return true;
 }
 
 /** Store (or overwrite) an asset's CUTOUT derivative and return its storage object. */
