@@ -34,8 +34,6 @@ import { CalendarBuilder } from '@/ui/components/CalendarBuilder';
 import { isCalendarKey } from '@/lib/calendar';
 import { ChristmasBundleBuilder } from '@/ui/components/ChristmasBundleBuilder';
 import { isBundleKey } from '@/lib/christmas-bundle';
-import { ChristmasEveBuilder } from '@/ui/components/ChristmasEveBuilder';
-import { isEveKey } from '@/lib/christmas-eve';
 import { cachedCatalogue, loadCatalogueCached } from '@/lib/catalogueCache';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -73,7 +71,6 @@ export default function CustomizePage() {
   if (isCardPackKey(params.productKey)) return <CardPackBuilder />;
   if (isCalendarKey(params.productKey)) return <CalendarBuilder />; // 13 pages: its own picker + flip-through
   if (isBundleKey(params.productKey)) return <ChristmasBundleBuilder />; // the table + a drawing per ornament / sack
-  if (isEveKey(params.productKey)) return <ChristmasEveBuilder />; // a sack + an ornament + a mug, one drawing (or one each)
   return <CustomizeProduct />;
 }
 

@@ -1,21 +1,19 @@
 /**
- * The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct 2026 — go-to-market jobs C25 + C26): a Christmas
- * table set plus the family's ornaments and sacks, every piece from Prodigi's uk9 lab so the lot
- * ships as ONE Royal Mail Tracked 48 parcel.
+ * The CHRISTMAS FAMILY BUNDLE (founder, 29 Oct 2026 — three simple sizes, no add-ons): N placemats +
+ * N coasters + N ceramic ornaments, every piece from Prodigi's uk9 lab, so the lot ships as ONE Royal
+ * Mail Tracked 48 parcel.
  *
- *  - the base set, £90: 4 placemats (H-PLACE-4PK) + 6 coasters (H-COAST-6PK), the TABLE DRAWING on
- *    every piece (a Prodigi pack has one print area, so one drawing prints on all of it);
- *  - add-ons at set prices, each capped at 12: a ceramic ornament (+£15) or a christmas sack (+£27)
- *    with its OWN drawing each; an extra placemat (+£16) or a pair of extra coasters (+£11) with the
- *    table drawing.
- * No names are printed on anything, and there's no family-member step: just counts, and a drawing
- * per ornament / sack.
+ *   a set for 2 — £78 · a set for 4 — £145 · a set for 8 — £279   (≈ 20% net after every cost)
  *
- * In the basket the bundle is ONE line (qty 1) carrying its drawings + counts. The SERVER prices it
- * from the counts it resolves itself (never a client price), and at order time splits it into one
- * order line per Prodigi item — placemat + coaster packs (biggest packs first: a pack is ONE item for
- * Prodigi postage), one per distinct ornament / sack design — whose prices add up to the bundle's to
- * the penny. Client-safe: no I/O.
+ * The drawings: ONE for all the placemats; ONE for all the coasters (the placemats' unless the shopper
+ * picks another); ONE per ornament (the placemats' until they pick its own). A Prodigi pack has one
+ * print area, so one drawing prints on every piece of it. No names, no extras, no add-ons.
+ *
+ * The size is the basket line's VARIANT sku (christmasBundle / christmasBundle-for4 /
+ * christmasBundle-for8); the SERVER prices it from its catalogue (never a client figure) and at order
+ * time splits it into one order line per Prodigi item — the placemat + coaster packs and one per
+ * distinct ornament design — at shares of the price (weighted by what each piece costs us) that add
+ * up to it to the penny. Client-safe: no I/O.
  */
 
 export const BUNDLE_KEY = 'christmasBundle';
@@ -23,62 +21,79 @@ export const BUNDLE_KEY = 'christmasBundle';
 /** Is this basket-line key the bundle (the product key or one of its variant skus)? */
 export const isBundleKey = (key: string | null | undefined): boolean => !!key && (key === BUNDLE_KEY || key.startsWith(`${BUNDLE_KEY}-`));
 
-/** The base set: what £90 buys. */
-export const BUNDLE_BASE = { placemats: 4, coasters: 6 } as const;
-/** The base set's price (the seeded catalogue price of the bundle — pinned equal by a test). */
-export const BUNDLE_BASE_PENCE = 9000;
-/** The add-ons' set prices (founder, 27 Oct). Extra coasters come in PAIRS: £11 a pair. */
-export const BUNDLE_ADDON_PENCE = { ornament: 1500, sack: 2700, placemat: 1600, coasterPair: 1100 } as const;
-/** The most of any one add-on: 12 ornaments, 12 sacks, 12 extra placemats, 12 extra coasters (6 pairs). */
-export const BUNDLE_MAX_EACH = 12;
-/** Extra coasters are added two at a time. */
-export const COASTER_STEP = 2;
+/** How many of each piece: a set for 2, 4 or 8. */
+export type BundleSize = 2 | 4 | 8;
+
+/** The three sizes — their variant sku (the set for 2 is the default, so it keeps the product key)
+ * and price. Pinned equal to the seeded catalogue by a test. */
+export const BUNDLE_SIZES: ReadonlyArray<{ n: BundleSize; size: string; sku: string; pricePence: number }> = [
+  { n: 2, size: 'for 2', sku: BUNDLE_KEY, pricePence: 7800 },
+  { n: 4, size: 'for 4', sku: `${BUNDLE_KEY}-for4`, pricePence: 14500 },
+  { n: 8, size: 'for 8', sku: `${BUNDLE_KEY}-for8`, pricePence: 27900 },
+];
+
+/** The size a bundle key stands for (null: not a bundle key we sell). */
+export function bundleSizeOf(key: string | null | undefined): BundleSize | null {
+  return BUNDLE_SIZES.find((s) => s.sku === key)?.n ?? null;
+}
+/** The variant sku of a size. */
+export const bundleSkuFor = (n: BundleSize): string => BUNDLE_SIZES.find((s) => s.n === n)!.sku;
 
 /** The product keys of the pieces (each seeded in src/server/catalogue.ts with its Prodigi SKU). */
-export type BundlePiece = 'placemat' | 'coaster' | 'ceramicOrnament' | 'sack';
+export type BundlePiece = 'placemat' | 'coaster' | 'ceramicOrnament';
 
-/** One Prodigi pack: how many pieces, our variant sku, Prodigi's SKU. Biggest first. */
+/** One Prodigi item of a bundle: our variant sku (it carries the Prodigi SKU + print template). */
 export interface BundlePack {
-  size: number;
   sku: string;
   prodigiSku: string;
+  /** pieces in the pack */
+  pieces: number;
+  /** what Prodigi charges us for it, ex-VAT, before post (sandbox quote 27 Oct) */
+  costPence: number;
 }
-/** Placemats: Prodigi makes 1/2/4/6-packs (H-PLACE-*PK). The 4-pack is our standalone product. */
-export const PLACEMAT_PACKS: readonly BundlePack[] = [
-  { size: 6, sku: 'placemat-packof6', prodigiSku: 'H-PLACE-6PK' },
-  { size: 4, sku: 'placemat', prodigiSku: 'H-PLACE-4PK' },
-  { size: 2, sku: 'placemat-packof2', prodigiSku: 'H-PLACE-2PK' },
-  { size: 1, sku: 'placemat-packof1', prodigiSku: 'H-PLACE-1PK' },
-];
-/** Coasters: 1/2/4/6-packs (H-COAST-*PK). The 6-pack is our standalone product. */
-export const COASTER_PACKS: readonly BundlePack[] = [
-  { size: 6, sku: 'coaster', prodigiSku: 'H-COAST-6PK' },
-  { size: 4, sku: 'coaster-packof4', prodigiSku: 'H-COAST-4PK' },
-  { size: 2, sku: 'coaster-packof2', prodigiSku: 'H-COAST-2PK' },
-  { size: 1, sku: 'coaster-packof1', prodigiSku: 'H-COAST-1PK' },
-];
-/** The ornament + sack are the very same items as on their own (their default variant). */
-export const ORNAMENT_SKU = 'ceramicOrnament';
-export const SACK_SKU = 'sack';
+export const PLACEMAT_2PK: BundlePack = { sku: 'placemat-packof2', prodigiSku: 'H-PLACE-2PK', pieces: 2, costPence: 1650 };
+export const PLACEMAT_4PK: BundlePack = { sku: 'placemat', prodigiSku: 'H-PLACE-4PK', pieces: 4, costPence: 3250 };
+export const COASTER_2PK: BundlePack = { sku: 'coaster-packof2', prodigiSku: 'H-COAST-2PK', pieces: 2, costPence: 550 };
+export const COASTER_4PK: BundlePack = { sku: 'coaster-packof4', prodigiSku: 'H-COAST-4PK', pieces: 4, costPence: 1000 };
+/** The ornament is the very same item as on its own (its default variant). */
+export const ORNAMENT: BundlePack = { sku: 'ceramicOrnament', prodigiSku: 'XMAS-PORC-BAUB', pieces: 1, costPence: 800 };
 
-/** Pack variants that exist ONLY to fulfil a bundle — never priced or shown on their own. */
-export const BUNDLE_ONLY_SKUS: ReadonlySet<string> = new Set(
-  [...PLACEMAT_PACKS, ...COASTER_PACKS].map((p) => p.sku).filter((s) => s !== 'placemat' && s !== 'coaster'),
-);
+/** The packs that make each size's table (founder, 29 Oct): a set for 8 is two 4-packs of each. */
+export const TABLE_PACKS: Record<BundleSize, { placemat: { pack: BundlePack; qty: number }; coaster: { pack: BundlePack; qty: number } }> = {
+  2: { placemat: { pack: PLACEMAT_2PK, qty: 1 }, coaster: { pack: COASTER_2PK, qty: 1 } },
+  4: { placemat: { pack: PLACEMAT_4PK, qty: 1 }, coaster: { pack: COASTER_4PK, qty: 1 } },
+  8: { placemat: { pack: PLACEMAT_4PK, qty: 2 }, coaster: { pack: COASTER_4PK, qty: 2 } },
+};
+
+/** Prodigi uk9 post: the first item £4.30, each extra item in the parcel +£1 (a pack is one item). */
+export const BUNDLE_POST = { firstPence: 430, extraPence: 100 } as const;
+
+/** How many Prodigi items (postage units) a size is: its packs + one per ornament. */
+export const bundleItems = (n: BundleSize): number => TABLE_PACKS[n].placemat.qty + TABLE_PACKS[n].coaster.qty + n;
+
+/** What a size costs us, ex-VAT, post included — £45.30 / £83.80 / £164.30 (pinned by a test). */
+export function bundleCostPence(n: BundleSize): number {
+  const t = TABLE_PACKS[n];
+  const product = t.placemat.pack.costPence * t.placemat.qty + t.coaster.pack.costPence * t.coaster.qty + ORNAMENT.costPence * n;
+  return product + BUNDLE_POST.firstPence + (bundleItems(n) - 1) * BUNDLE_POST.extraPence;
+}
+
+/** Pack variants that exist ONLY to fulfil a bundle — never priced or shown on their own. (The
+ * placemat 4-pack and the coaster 6-pack are the standalone products; the 1/6 placemat and 1-coaster
+ * packs are seeded too but no bundle uses them any more.) */
+export const BUNDLE_ONLY_SKUS: ReadonlySet<string> = new Set(['placemat-packof1', 'placemat-packof2', 'placemat-packof6', 'coaster-packof1', 'coaster-packof2', 'coaster-packof4']);
 /** Every variant sku a bundle can expand into. */
-export const BUNDLE_COMPONENT_SKUS: readonly string[] = [...PLACEMAT_PACKS, ...COASTER_PACKS].map((p) => p.sku).concat(ORNAMENT_SKU, SACK_SKU);
+export const BUNDLE_COMPONENT_SKUS: readonly string[] = [PLACEMAT_2PK.sku, PLACEMAT_4PK.sku, COASTER_2PK.sku, COASTER_4PK.sku, ORNAMENT.sku];
 
 /**
  * Each piece's print area (Prodigi sandbox GET /v4.0/products, 27 Oct) — the SAME geometry the
  * seeded print templates hold (pinned by a test), so the builder's print-quality check is the
- * order-time gate's. The sack's template is Prodigi's exact 3779×5905 px panel at 300 dpi, bleed 0
- * (print-spec fix, C4), exactly as the sack on its own.
+ * order-time gate's.
  */
 export const BUNDLE_PIECE_GEOM: Record<BundlePiece, { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number }> = {
   placemat: { printWidthPx: 3425, printHeightPx: 2421, bleedMm: 0, requiredDpi: 300 },
   coaster: { printWidthPx: 1251, printHeightPx: 1251, bleedMm: 0, requiredDpi: 300 },
   ceramicOrnament: { printWidthPx: 885, printHeightPx: 885, bleedMm: 0, requiredDpi: 300 },
-  sack: { printWidthPx: 3779, printHeightPx: 5905, bleedMm: 0, requiredDpi: 300 },
 };
 
 /** A drawing for one piece: which keepsake, and (optionally) its bg-removed cutout. */
@@ -86,19 +101,14 @@ export interface BundleArt {
   assetId: string;
   sourceObjectId?: string | null;
 }
-/** What the shopper chose. Counts are implied by the slots + the two steppers. */
+/** What the shopper chose. */
 export interface BundleSpec {
-  table: BundleArt;
+  /** on every placemat */
+  placemat: BundleArt;
+  /** on every coaster — null: the placemats' drawing */
+  coaster: BundleArt | null;
+  /** one per ornament — exactly the size's count */
   ornaments: BundleArt[];
-  sacks: BundleArt[];
-  extraPlacemats: number;
-  extraCoasters: number;
-}
-export interface BundleCounts {
-  ornaments: number;
-  sacks: number;
-  extraPlacemats: number;
-  extraCoasters: number;
 }
 
 const art = (x: unknown): BundleArt | null => {
@@ -107,71 +117,28 @@ const art = (x: unknown): BundleArt | null => {
   if (typeof assetId !== 'string' || assetId.length === 0 || assetId.length > 64) return null;
   return typeof sourceObjectId === 'string' && sourceObjectId.length > 0 && sourceObjectId.length <= 64 ? { assetId, sourceObjectId } : { assetId };
 };
-const count = (x: unknown, step = 1): number => {
-  const n = typeof x === 'number' && Number.isFinite(x) ? Math.floor(x) : 0;
-  const capped = Math.min(BUNDLE_MAX_EACH, Math.max(0, n));
-  return capped - (capped % step);
-};
 
 /**
- * Untrusted input → a bundle the server will make, or null (no table drawing = no bundle). Junk slots
- * are dropped, each list is cut at 12, the extras are whole numbers in 0–12 (coasters in pairs).
+ * Untrusted input → the bundle of size `n` the server will make, or null (no placemat drawing = no
+ * bundle). Junk ornament slots are dropped and the list is cut at `n`; an ornament left without a
+ * drawing wears the placemats' (the builder's default, shown in its preview).
  */
-export function normalizeBundle(raw: unknown): BundleSpec | null {
+export function normalizeBundle(raw: unknown, n: BundleSize): BundleSpec | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
-  const table = art(r.table);
-  if (!table) return null;
-  const list = (x: unknown) => (Array.isArray(x) ? x.slice(0, 64).map(art).filter((a): a is BundleArt => a !== null).slice(0, BUNDLE_MAX_EACH) : []);
-  return { table, ornaments: list(r.ornaments), sacks: list(r.sacks), extraPlacemats: count(r.extraPlacemats), extraCoasters: count(r.extraCoasters, COASTER_STEP) };
+  const placemat = art(r.placemat);
+  if (!placemat) return null;
+  const given = Array.isArray(r.ornaments) ? r.ornaments.slice(0, 64).map(art).filter((a): a is BundleArt => a !== null).slice(0, n) : [];
+  const ornaments = [...given, ...Array.from({ length: n - given.length }, () => ({ ...placemat }))];
+  return { placemat, coaster: art(r.coaster), ornaments };
 }
 
-export const bundleCounts = (b: BundleSpec): BundleCounts => ({ ornaments: b.ornaments.length, sacks: b.sacks.length, extraPlacemats: b.extraPlacemats, extraCoasters: b.extraCoasters });
-/** The counts of a bundle line that may not be valid (no table drawing) — the add-ons alone. */
-export const bundleCountsOf = (raw: unknown): BundleCounts => {
-  const b = normalizeBundle(raw);
-  return b ? bundleCounts(b) : { ornaments: 0, sacks: 0, extraPlacemats: 0, extraCoasters: 0 };
-};
+/** The coasters' drawing. */
+export const coasterArt = (b: BundleSpec): BundleArt => b.coaster ?? b.placemat;
 
-/** The bundle's price: the base set + each add-on at its set price. */
-export function bundlePricePence(c: BundleCounts, basePence: number = BUNDLE_BASE_PENCE): number {
-  return (
-    basePence +
-    c.ornaments * BUNDLE_ADDON_PENCE.ornament +
-    c.sacks * BUNDLE_ADDON_PENCE.sack +
-    c.extraPlacemats * BUNDLE_ADDON_PENCE.placemat +
-    (c.extraCoasters / COASTER_STEP) * BUNDLE_ADDON_PENCE.coasterPair
-  );
-}
-
-/** How many placemats + coasters go on the table. */
-export const tablePieces = (c: Pick<BundleCounts, 'extraPlacemats' | 'extraCoasters'>) => ({
-  placemats: BUNDLE_BASE.placemats + c.extraPlacemats,
-  coasters: BUNDLE_BASE.coasters + c.extraCoasters,
-});
-
-/**
- * The Prodigi packs that make exactly `n` pieces — the biggest packs first, so the fewest items (a
- * pack is ONE item for Prodigi postage). Every count resolves, because there's a 1-pack.
- */
-export function packsFor(n: number, packs: readonly BundlePack[]): BundlePack[] {
-  if (!Number.isInteger(n) || n < 1) throw new Error(`can’t make ${n} pieces`);
-  const out: BundlePack[] = [];
-  let left = n;
-  for (const p of packs) {
-    while (left >= p.size) {
-      out.push(p);
-      left -= p.size;
-    }
-  }
-  if (left !== 0) throw new Error(`no pack makes ${n} pieces`);
-  return out;
-}
-
-/** One order line of an expanded bundle: one Prodigi item (a pack, or an ornament / sack design × qty). */
+/** One order line of an expanded bundle: one Prodigi item × qty. */
 export interface BundleOrderLine {
   piece: BundlePiece;
-  /** our variant sku (src/server/catalogue.ts) — it carries the Prodigi SKU + print template */
   sku: string;
   art: BundleArt;
   qty: number;
@@ -179,60 +146,45 @@ export interface BundleOrderLine {
   linePence: number;
 }
 
-/** The base price, shared between the table's two packs (placemats : coasters = 58 : 32 — an internal split; the bundle's £90 is its own price). */
-const COASTER_BASE_SHARE = 32 / 90;
-
 const designKey = (a: BundleArt) => `${a.assetId}|${a.sourceObjectId ?? ''}`;
 
-/** Spread `pence` across packs in proportion to their pieces — whole pennies, adding up exactly. */
-function spread(pence: number, packs: BundlePack[], piece: BundlePiece, table: BundleArt): BundleOrderLine[] {
-  const total = packs.reduce((n, p) => n + p.size, 0);
-  const shares = packs.map((p) => Math.floor((pence * p.size) / total));
-  shares[0]! += pence - shares.reduce((n, s) => n + s, 0);
-  return packs.map((p, i) => ({ piece, sku: p.sku, art: table, qty: 1, unitPricePence: shares[i]!, linePence: shares[i]! }));
-}
-
-/** One line per distinct design, each at the add-on's price. */
-function perDesign(list: BundleArt[], piece: BundlePiece, sku: string, unit: number): BundleOrderLine[] {
-  const groups = new Map<string, { art: BundleArt; qty: number }>();
-  for (const a of list) {
-    const g = groups.get(designKey(a));
-    if (g) g.qty++;
-    else groups.set(designKey(a), { art: a, qty: 1 });
-  }
-  return [...groups.values()].map((g) => ({ piece, sku, art: g.art, qty: g.qty, unitPricePence: unit, linePence: unit * g.qty }));
-}
-
 /**
- * Split a bundle into order lines. `pricePence` is the SERVER's priced line; it must be exactly this
- * bundle's price (else the composition and the charge disagree — refused). The lines add up to it to
- * the penny: each ornament / sack at its add-on price, the rest (the base + the table extras) spread
- * over the placemat + coaster packs.
+ * Split a bundle of size `n` into its order lines. `pricePence` is the SERVER's priced line. Each
+ * physical item gets a share of it weighted by what it costs us (whole pennies; the odd pennies go to
+ * the first items), and items alike — the same pack or ornament, the same drawing, the same share —
+ * become one line. The lines add up to `pricePence` exactly.
  */
-export function expandBundle(pricePence: number, b: BundleSpec, basePence: number = BUNDLE_BASE_PENCE): BundleOrderLine[] {
-  const c = bundleCounts(b);
-  if (!Number.isInteger(pricePence) || pricePence !== bundlePricePence(c, basePence)) throw new Error('bundle price doesn’t match its pieces');
-  const { placemats, coasters } = tablePieces(c);
-  const coasterBase = Math.round(basePence * COASTER_BASE_SHARE);
-  const placematPence = basePence - coasterBase + c.extraPlacemats * BUNDLE_ADDON_PENCE.placemat;
-  const coasterPence = coasterBase + (c.extraCoasters / COASTER_STEP) * BUNDLE_ADDON_PENCE.coasterPair;
-  return [
-    ...spread(placematPence, packsFor(placemats, PLACEMAT_PACKS), 'placemat', b.table),
-    ...spread(coasterPence, packsFor(coasters, COASTER_PACKS), 'coaster', b.table),
-    ...perDesign(b.ornaments, 'ceramicOrnament', ORNAMENT_SKU, BUNDLE_ADDON_PENCE.ornament),
-    ...perDesign(b.sacks, 'sack', SACK_SKU, BUNDLE_ADDON_PENCE.sack),
+export function expandBundle(pricePence: number, b: BundleSpec, n: BundleSize): BundleOrderLine[] {
+  if (!Number.isInteger(pricePence) || pricePence <= 0) throw new Error('not a bundle price');
+  if (b.ornaments.length !== n) throw new Error('a bundle needs a drawing for every ornament');
+  const t = TABLE_PACKS[n];
+  const items: Array<{ piece: BundlePiece; pack: BundlePack; art: BundleArt }> = [
+    ...Array.from({ length: t.placemat.qty }, () => ({ piece: 'placemat' as const, pack: t.placemat.pack, art: b.placemat })),
+    ...Array.from({ length: t.coaster.qty }, () => ({ piece: 'coaster' as const, pack: t.coaster.pack, art: coasterArt(b) })),
+    ...b.ornaments.map((a) => ({ piece: 'ceramicOrnament' as const, pack: ORNAMENT, art: a })),
   ];
+  const total = items.reduce((s, x) => s + x.pack.costPence, 0);
+  const shares = items.map((x) => Math.floor((pricePence * x.pack.costPence) / total));
+  let left = pricePence - shares.reduce((s, x) => s + x, 0);
+  for (let i = 0; left > 0; i = (i + 1) % shares.length, left--) shares[i]!++;
+  const lines = new Map<string, BundleOrderLine>();
+  items.forEach((x, i) => {
+    const unit = shares[i]!;
+    const k = `${x.pack.sku}|${designKey(x.art)}|${unit}`;
+    const l = lines.get(k);
+    if (l) {
+      l.qty++;
+      l.linePence += unit;
+    } else lines.set(k, { piece: x.piece, sku: x.pack.sku, art: x.art, qty: 1, unitPricePence: unit, linePence: unit });
+  });
+  return [...lines.values()];
 }
 
-/** The piece a component sku belongs to ('placemat-packof6' → 'placemat'). */
+/** The piece a component sku belongs to ('placemat-packof2' → 'placemat'). */
 export const pieceOfSku = (sku: string): BundlePiece | null => {
   const k = sku.split('-')[0];
-  return k === 'placemat' || k === 'coaster' || k === 'ceramicOrnament' || k === 'sack' ? k : null;
+  return k === 'placemat' || k === 'coaster' || k === 'ceramicOrnament' ? k : null;
 };
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-/** "4 placemats · 6 coasters · 4 ornaments · 2 sacks" — for the basket + the builder. */
-export function bundleSummary(c: BundleCounts): string {
-  const { placemats, coasters } = tablePieces(c);
-  return [plural(placemats, 'placemat'), plural(coasters, 'coaster'), c.ornaments ? plural(c.ornaments, 'ornament') : null, c.sacks ? plural(c.sacks, 'sack') : null].filter(Boolean).join(' · ');
-}
+/** "4 placemats · 4 coasters · 4 ornaments" — for the basket + the builder. */
+export const bundleSummary = (n: BundleSize): string => `${n} placemats · ${n} coasters · ${n} ornaments`;

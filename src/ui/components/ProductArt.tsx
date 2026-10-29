@@ -42,8 +42,7 @@ export type ProductKey =
   // the christmas table + the family bundle (founder, 27 Oct)
   | 'placemat'
   | 'coaster'
-  | 'christmasBundle'
-  | 'christmasEveBundle';
+  | 'christmasBundle';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -240,16 +239,6 @@ const ART: Record<ProductKey, ReactNode> = {
       <path d="M70 14 q0 -6 5 -6" fill="none" stroke="var(--color-tomato)" strokeWidth="2.2" strokeLinecap="round" />
       <circle cx="72" cy="34" r="17" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="3.5" />
       <House transform="translate(63,26) scale(0.48)" />
-    </>
-  ),
-  christmasEveBundle: (
-    <>
-      <path d="M14 34 h34 v46 h-34 z" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3.5" strokeLinejoin="round" />
-      <path d="M14 34 q17 -8 34 0" fill="none" stroke="var(--color-tomato)" strokeWidth="2.4" />
-      <House transform="translate(20,48) scale(0.6)" />
-      <rect x="56" y="52" width="26" height="28" rx="4" fill="var(--color-paper)" stroke="var(--color-cobalt)" strokeWidth="3.5" />
-      <path d="M82 58 q9 0 9 8 q0 8 -9 8" fill="none" stroke="var(--color-cobalt)" strokeWidth="3" />
-      <circle cx="70" cy="28" r="11" fill="var(--color-paper)" stroke="var(--color-berry)" strokeWidth="3" />
     </>
   ),
   calendar: (

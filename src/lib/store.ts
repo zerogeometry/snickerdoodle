@@ -6,7 +6,6 @@ import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
 import { isBundleKey, type BundleSpec } from '@/lib/christmas-bundle';
-import { isEveKey, type EveSpec } from '@/lib/christmas-eve';
 import { basketLineId } from '@/lib/basket-line';
 import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadSessionState } from '@/lib/uploadSession';
 
@@ -282,12 +281,10 @@ export type BasketItem = {
   /** DISPLAY ONLY (pack lines): the single-card variant the pack's fronts preview on, so the basket
    * can show the real first card. Never sent to the server. */
   previewVariantId?: string;
-  /** The CHRISTMAS BUNDLE line only: its table drawing, a drawing per ornament / sack, and the extras.
-   * Always qty 1; the server counts + prices it, and re-checks every drawing (src/lib/christmas-bundle.ts). */
+  /** The CHRISTMAS BUNDLE line only: its placemat drawing, its coaster drawing (null = the placemats')
+   * and one per ornament; its SIZE is its sku. Always qty 1; the server prices the size and re-checks
+   * every drawing (src/lib/christmas-bundle.ts). */
   bundle?: BundleSpec;
-  /** The CHRISTMAS EVE BUNDLE line only: its drawing (+ any piece's own) and the mug colour. qty =
-   * copies of this bundle; the server re-checks every drawing and splits it into its three pieces. */
-  eve?: EveSpec;
 };
 /** One card of a pack in the basket: which drawing, how it sits on the front (+ an optional cutout). */
 export type PackCardLine = { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
@@ -297,8 +294,6 @@ export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.pr
 export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(i.product);
 /** Is this basket line the Christmas family bundle? (Always ONE bundle; edited in its builder.) */
 export const isBundleLine = (i: Pick<BasketItem, 'product'>) => isBundleKey(i.product);
-/** Is this basket line a christmas eve bundle? (Edited in its builder; qty = copies.) */
-export const isEveLine = (i: Pick<BasketItem, 'product'>) => isEveKey(i.product);
 /** A line that is always exactly ONE (a card pack, the bundle): re-adding replaces it, qty stays 1. */
 export const isOneOffLine = (i: Pick<BasketItem, 'product'>) => isPackLine(i) || isBundleLine(i);
 type BasketState = {
@@ -361,12 +356,19 @@ export const useBasket = create<BasketState>()(
       name: 'sd_basket',
       storage: createJSONStorage(() => sessionStorage),
       partialize: (s) => ({ items: s.items }),
-      // v1: a line is per drawing too (src/lib/basket-line.ts) — re-key a basket saved before that
-      version: 1,
-      migrate: (persisted) => ({ items: rekeyLines((persisted as { items?: BasketItem[] } | null)?.items ?? []) }),
+      // v1: a line is per drawing too (src/lib/basket-line.ts) — re-key a basket saved before that.
+      // v2 (29 Oct): the christmas eve bundle is retired and the family bundle became three sizes —
+      // a line of either made before then is dropped (it can't be priced or made any more).
+      version: 2,
+      migrate: (persisted) => ({ items: dropRetiredLines(rekeyLines((persisted as { items?: BasketItem[] } | null)?.items ?? [])) }),
     },
   ),
 );
+/** Drop basket lines for things no longer made: the christmas eve bundle, and a family bundle saved
+ * before the sizes (no placemat drawing). */
+export function dropRetiredLines(items: BasketItem[]): BasketItem[] {
+  return items.filter((i) => !i.product.startsWith('christmasEveBundle') && !(isBundleLine(i) && !(i.bundle && typeof i.bundle === 'object' && 'placemat' in i.bundle)));
+}
 /** Re-key catalogue lines (`cat-…`) to their per-design id, folding any that turn out identical. */
 export function rekeyLines(items: BasketItem[]): BasketItem[] {
   const out: BasketItem[] = [];
@@ -392,7 +394,6 @@ export function orderItemsFor(items: BasketItem[]) {
     const productKey = i.sku ?? i.product;
     if (isPackLine(i)) return { productKey, qty: 1, ...(i.ground ? { ground: i.ground } : {}), cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
     if (isBundleLine(i)) return { productKey, qty: 1, bundle: i.bundle ?? null };
-    if (isEveLine(i)) return { productKey, qty: i.qty, eve: i.eve ?? null };
     if (isCalendarLine(i) && i.pages?.length) return { productKey, qty: i.qty, pages: i.pages.map((p) => ({ assetId: p.assetId, transform: p.transform, ...(p.sourceObjectId ? { sourceObjectId: p.sourceObjectId } : {}) })) };
     return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });

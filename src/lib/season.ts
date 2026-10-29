@@ -59,8 +59,9 @@ export function christmasYear(now: Date): number {
   return m === 1 ? y - 1 : y;
 }
 
-/** While the season is on, these lead the range, in this order (then everything else as usual). */
-export const CHRISTMAS_FEATURED = ['ceramicOrnament', 'christmasBauble', 'cardPack', 'wrappingPaper', 'calendar', 'sack', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
+/** While the season is on, these lead the range, in this order (then everything else as usual). The
+ * family bundle first (founder, 29 Oct). */
+export const CHRISTMAS_FEATURED = ['christmasBundle', 'ceramicOrnament', 'christmasBauble', 'cardPack', 'wrappingPaper', 'calendar', 'sack', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
 
 /**
  * The expected-popularity list with the Christmas products moved to the front while the season is on.
@@ -110,7 +111,7 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
 /** product key → route (variant overrides in {@link routeOf}). Verified by sandbox quotes 2026-10-25. */
 const ROUTE_BY_PRODUCT: Record<string, Route> = {
   ceramicOrnament: 'uk9', sack: 'uk9', mug: 'uk9', teaTowel: 'uk9', petBandana: 'uk9', socks: 'uk9',
-  placemat: 'uk9', coaster: 'uk9', christmasBundle: 'uk9', christmasEveBundle: 'uk9', // the christmas table + the family bundle: all uk9, one parcel
+  placemat: 'uk9', coaster: 'uk9', christmasBundle: 'uk9', // the christmas table + the family bundle: all uk9, one parcel
   kidsTee: 'uk9', adultTee: 'uk9', kidsHoodie: 'uk9', adultHoodie: 'uk9', kidsJumper: 'uk9',
   apron: 'uk3', cushion: 'uk3', blanket: 'uk3',
   card: 'uk7', cardPack: 'uk7',

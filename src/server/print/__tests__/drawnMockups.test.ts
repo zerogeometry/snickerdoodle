@@ -48,7 +48,7 @@ describe('shop art', () => {
     // (the .tsx compiles with the classic JSX runtime under vitest — give it React)
     (globalThis as { React?: unknown }).React = await import('react');
     const { hasProductArt } = await import('@/ui/components/ProductArt');
-    const keys = [...new Set(definedPriceList().map((v) => v.productKey))];
+    const keys = [...new Set(definedPriceList().filter((v) => !v.paused || v.productKey === 'giftWrap').map((v) => v.productKey))]; // a retired (paused) product shows nowhere
     expect(keys.filter((k) => !hasProductArt(k))).toEqual([]);
   });
 });

@@ -73,10 +73,8 @@ export const CATALOGUE = {
   // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.
   placemat: { pricePence: 6000, label: 'placemats' }, // a pack of 4 (founder, 27 Oct: £60)
   coaster: { pricePence: 3200, label: 'coasters' }, // a pack of 6
-  // The CHRISTMAS FAMILY BUNDLE's BASE price — its add-ons are priced from the counts (src/lib/christmas-bundle.ts).
-  christmasBundle: { pricePence: 9000, label: 'christmas family bundle' },
-  // The CHRISTMAS EVE BUNDLE: a sack + a ceramic ornament + a mug, one parcel (src/lib/christmas-eve.ts).
-  christmasEveBundle: { pricePence: 6200, label: 'christmas eve bundle' },
+  // The CHRISTMAS FAMILY BUNDLE: a set for 2 (a set for 4 £145, for 8 £279 — DB per variant; src/lib/christmas-bundle.ts).
+  christmasBundle: { pricePence: 7800, label: 'christmas family bundle' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

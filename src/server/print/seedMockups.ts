@@ -5,7 +5,9 @@ import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
-import { setMockupTemplate, setMockupView } from './templates';
+import { setBundleLayout, setMockupTemplate, setMockupView } from './templates';
+import { BUNDLE_LAYOUTS, buildBundleLayout, ROLE_PIECE, type BundleLayoutName } from './bundleMockup';
+import { BUNDLE_KEY, BUNDLE_PIECE_GEOM } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
@@ -117,6 +119,39 @@ function hoodiePhoto(): GarmentPhoto | null {
 // present. The layer order composited here is the founder's spec: background → shadow →
 // paper → [the child's print, clipped to the aperture at render time] → frame.
 const LAYERED = path.join(ROOT, 'layered');
+
+/** The CHRISTMAS FAMILY BUNDLE's layouts — the founder's PSD layers (29 Oct), one folder per picture
+ * (thumb = the catalogue tile; x2/x4/x8 = the builder's picture of each size) — and the backdrop our
+ * other tiles stand on (the ceramic ornament's), so the bundle matches them. */
+export const BUNDLE_BACKDROP = path.join(LAYERED, 'bauble', 'ceramic', 'background.png');
+export function bundleLayoutDir(name: BundleLayoutName): string | null {
+  const dir = path.join(LAYERED, 'christmasBundle', name);
+  return existsSync(path.join(dir, 'manifest.json')) && existsSync(BUNDLE_BACKDROP) ? dir : null;
+}
+
+/** Flatten + store every staged bundle layout (src/server/print/bundleMockup.ts) on the bundle's
+ * default variant, as display-only mockup views. Returns how many print areas were stored. */
+export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+  const [v] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, BUNDLE_KEY));
+  if (!v) return 0;
+  let n = 0;
+  for (const name of BUNDLE_LAYOUTS) {
+    const dir = bundleLayoutDir(name);
+    if (!dir) continue;
+    const built = await buildBundleLayout(dir, BUNDLE_BACKDROP);
+    await setBundleLayout(db, {
+      variantId: v.id,
+      layout: name,
+      base: built.base,
+      regions: built.regions.map((r) => {
+        const g = BUNDLE_PIECE_GEOM[ROLE_PIECE[r.role]];
+        return { ...r, printWidthPx: g.printWidthPx, printHeightPx: g.printHeightPx, materialClass: r.role === 'ornament' ? ('GLOSS' as const) : ('PAPER' as const) };
+      }),
+    });
+    n += built.regions.length;
+  }
+  return n;
+}
 function layeredFrameDir(colour: string): string | null {
   const dir = path.join(LAYERED, 'framedPrint', colour.replace(/\s+/g, '-'));
   const has = (f: string) => existsSync(path.join(dir, f));
@@ -1535,6 +1570,9 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
       }
     }
   }
+
+  // The christmas family bundle's pictures (it isn't printed itself, so it has no print template).
+  authoredViews += await seedBundleLayouts(db);
 
   return { authored, authoredViews, skippedProducts: [...new Set(skipped)], registration };
 }

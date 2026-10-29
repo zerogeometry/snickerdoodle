@@ -1,6 +1,6 @@
 'use client';
 
-import { IconInfoCircle } from '@tabler/icons-react';
+import { IconInfoCircle, IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 import { StickerChip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
@@ -17,6 +17,33 @@ const pct = (bps: number) => `${Math.round(bps / 100)}%`;
 /** The compact sticker on a basket line: "multi-buy −10%". */
 export function MultiBuyChip({ bps }: { bps: number }) {
   return <StickerChip>multi-buy −{pct(bps)}</StickerChip>;
+}
+
+/** "add 1 more — both 15% off" / "add 1 more — all 3 10% off". */
+export const nudgeText = (nextQty: number, bps: number) => `add 1 more — ${nextQty === 2 ? 'both' : `all ${nextQty}`} ${pct(bps)} off`;
+
+/**
+ * "add one more and save" (founder, 29 Oct): ONE small line under a checkout line whose product would
+ * reach a better multi-buy tier with one more. The figures are the SERVER's (quoteBasket's nudges —
+ * the engine that charges, re-run with one more), never worked out here. One tap adds another of the
+ * same design. Small and warm: no countdown, nothing pre-ticked; the caller renders nothing when
+ * there's no better tier. A real button — keyboard-operable, labelled, a 44px tap target.
+ */
+export function MultiBuyNudgeLine({ nextQty, bps, productLabel, onAdd }: { nextQty: number; bps: number; productLabel: string; onAdd: () => void }) {
+  const text = nudgeText(nextQty, bps);
+  return (
+    <button
+      type="button"
+      onClick={onAdd}
+      aria-label={`add one more ${productLabel} — ${nextQty === 2 ? 'both' : `all ${nextQty}`} ${pct(bps)} off`}
+      className="press -ml-1 inline-flex min-h-11 items-center gap-1.5 rounded-full px-1 text-left text-[12px] font-bold lowercase text-green-save hover:text-cocoa focus-visible:outline-2"
+    >
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-current bg-paper" aria-hidden>
+        <Icon icon={IconPlus} size={12} />
+      </span>
+      {text}
+    </button>
+  );
 }
 
 /**

@@ -17,6 +17,8 @@ import { firmAlpha } from './apparel';
 import { perspectiveWarp } from './perspective';
 import { cylinderWarp } from './cylinder';
 import { ByteLru, designCache, faceCache } from './previewCache';
+import { bundleTileKey, composeBundleTile } from './bundleCompose';
+import { isBundleKey } from '@/lib/christmas-bundle';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -121,10 +123,10 @@ export type ComposeMemo = Map<string, Promise<Buffer>>;
 /** Thumbs (400px out) work at ≤ 800px — 3.5× fewer pixels than the 1500px zoom tier, no visible loss. */
 const THUMB_WORK_EDGE = 800;
 /** …and draw from a copy of the design no bigger than this (a 4500px original is ~10× the pixels). */
-const THUMB_DESIGN_EDGE = 1200;
+export const THUMB_DESIGN_EDGE = 1200;
 
 /** The design's bytes — shrunk for a thumb, memoised per request when a memo is given. */
-async function designBytes(key: string, edge: number | null, memo?: ComposeMemo, shared?: { assetId: string; tag: string }): Promise<Buffer> {
+export async function designBytes(key: string, edge: number | null, memo?: ComposeMemo, shared?: { assetId: string; tag: string }): Promise<Buffer> {
   const id = `${key}@${edge ?? 'full'}`;
   const hit = memo?.get(id);
   if (hit) return hit;
@@ -147,7 +149,7 @@ async function designBytes(key: string, edge: number | null, memo?: ComposeMemo,
 // and a colour flip of the same product redo none of that.
 const templateBytesCache = new ByteLru<Buffer>(160 * 1024 * 1024, (b) => b.byteLength);
 const templateRawCache = new ByteLru<Raw>(192 * 1024 * 1024, (r) => r.data.byteLength);
-function templateBytes(key: string): Promise<Buffer> {
+export function templateBytes(key: string): Promise<Buffer> {
   return templateBytesCache.get(key, () => getObjectBytes(key));
 }
 /** A template-derived raw layer — cached under the layer's stable id when it has one (the shop's
@@ -298,7 +300,7 @@ export class NoMockupTemplateError extends Error {
 // so a burst can't fan out unbounded scRGB (4× memory) pipelines on a small box.
 let active = 0;
 const waiters: Array<() => void> = [];
-async function withLimit<T>(fn: () => Promise<T>): Promise<T> {
+export async function withLimit<T>(fn: () => Promise<T>): Promise<T> {
   if (active >= MAX_CONCURRENT) await new Promise<void>((resolve) => waiters.push(resolve));
   active++;
   try {
@@ -435,8 +437,26 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       ? db.select().from(storageObjects).where(and(eq(storageObjects.id, input.sourceObjectId), eq(storageObjects.assetId, input.assetId)))
       : db.select().from(storageObjects).where(and(eq(storageObjects.assetId, input.assetId), eq(storageObjects.objectClass, 'ORIGINAL'))),
   ]);
-  if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
   if (!srcObj) throw new NoMockupTemplateError('no source object for the design');
+  // The CHRISTMAS FAMILY BUNDLE isn't printed itself (no print template): its tile is the founder's
+  // flattened layout with this one drawing on every piece (bundleCompose.ts) — authz already passed.
+  if (isBundleKey(prod?.key)) {
+    const size: MockupSize = input.size ?? 'thumb';
+    const key = await bundleTileKey(db, input.assetId, srcObj, size);
+    if (!key) throw new NoMockupTemplateError('the bundle has no layout yet');
+    const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
+    if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: 'FLAT', cached: true };
+    const pending = inFlight.get(key);
+    if (pending) return pending;
+    const p = withLimit(() => composeBundleTile(db, { assetId: input.assetId, key, srcObj, size, memo: input.memo }));
+    inFlight.set(key, p);
+    try {
+      return await p;
+    } finally {
+      inFlight.delete(key);
+    }
+  }
+  if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
   const face: Face | undefined = !input.fill && (!input.view || PRIMARY_VIEWS.has(input.view))
     ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : isGalleryProduct(prod?.key) ? 'gallery' : undefined
     : undefined;
@@ -669,21 +689,26 @@ async function renderAndPersist(
     out.buffer = flopped;
   }
 
-  // Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading
-  // delete already cover it; private bucket; EXIF stripped by re-encode. The unique
-  // index on key makes onConflictDoNothing a genuine arbiter, so a concurrent racer that
-  // slipped past the cache check + dedup can't duplicate the row.
-  const sha256 = createHash('sha256').update(out.buffer).digest('hex');
+  const mockupObjectId = await persistDerivative(db, args.assetId, args.key, out.buffer);
+  return { mockupObjectId, key: args.key, format: 'webp', tier: out.tier, cached: false, widthPx: out.width, heightPx: out.height };
+}
+
+/**
+ * Write-once DERIVATIVE under the asset (mirrors render.ts): retention + cascading delete already
+ * cover it; private bucket; EXIF stripped by re-encode. The unique index on key makes
+ * onConflictDoNothing a genuine arbiter, so a concurrent racer that slipped past the cache check +
+ * dedup can't duplicate the row. Returns the storage object's id.
+ */
+export async function persistDerivative(db: DbHandle, assetId: string, key: string, webp: Buffer): Promise<string> {
+  const sha256 = createHash('sha256').update(webp).digest('hex');
   const { bucket } = getS3();
-  await putObject(args.key, out.buffer, 'image/webp');
+  await putObject(key, webp, 'image/webp');
   const [row] = await db
     .insert(storageObjects)
-    .values({ assetId: args.assetId, objectClass: 'DERIVATIVE', bucket, key: args.key, contentType: 'image/webp', byteSize: out.buffer.byteLength, sha256, exifStripped: true, writeOnce: true })
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/webp', byteSize: webp.byteLength, sha256, exifStripped: true, writeOnce: true })
     .onConflictDoNothing({ target: storageObjects.key })
     .returning();
-  const mockupObjectId = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, args.key)))[0]!.id;
-
-  return { mockupObjectId, key: args.key, format: 'webp', tier: out.tier, cached: false, widthPx: out.width, heightPx: out.height };
+  return row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
 }
 
 /**

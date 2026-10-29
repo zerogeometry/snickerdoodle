@@ -3,17 +3,16 @@ import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joi
 import { formatPence } from './format';
 import { evaluatePromo, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
-import { bundleCountsOf, bundlePricePence, isBundleKey } from '@/lib/christmas-bundle';
+import { isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
-import { composedEconomics, economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
-import { EVE_PIECES, isEveKey } from '@/lib/christmas-eve';
+import { economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
   productKey: string;
   qty: number;
-  /** The CHRISTMAS BUNDLE only: its drawings + extras (untrusted — normalised and COUNTED here, so
-   * the price comes from what will be made, never from a figure the client sends). */
+  /** The CHRISTMAS BUNDLE only: its drawings (untrusted; the price comes from its size's variant —
+   * the key — never from anything here. The order normalises + checks them: src/server/orders.ts). */
   bundle?: unknown;
 }
 
@@ -80,17 +79,13 @@ export function inCatalogue(catalogue: PricedCatalogue, key: string): boolean {
   return Object.prototype.hasOwnProperty.call(catalogue, key);
 }
 
-/**
- * A priced line's unit economics for MULTI-BUY, from the server catalogue's live costs. The christmas
- * eve bundle is its three pieces together (its own multi-buy, on the number of bundles).
- */
+/** A priced line's unit economics for MULTI-BUY, from the server catalogue's live costs. */
 export function lineEconomics(catalogue: PricedCatalogue, key: string): UnitEconomics | null {
-  if (isEveKey(key)) {
-    const entry = catalogue[key];
-    return entry ? composedEconomics(entry.pricePence, EVE_PIECES.map((p) => catalogue[p])) : null;
-  }
   return economicsOf(catalogue[key], parcelGroupOf(key) !== null);
 }
+
+/** The product a line key belongs to (multi-buy counts a product across its lines and variants). */
+export const productOfKey = (key: string): string => key.split('-')[0]!;
 
 /** Basis-points of an amount, rounded to the nearest penny. */
 function bpsOf(amountPence: number, bps: number): number {
@@ -131,12 +126,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     }
     // A card PACK line is always ONE pack — its N cards ride with it (src/lib/card-packs.ts), so a
     // client asking for "qty 3" of a pack can't get three packs' worth of cards for one pack's price.
-    // The CHRISTMAS BUNDLE likewise: one bundle, its pieces counted from what it carries.
+    // The CHRISTMAS BUNDLE likewise: one bundle per line (its size is its variant).
     const qty = isCardPackKey(r.productKey) || isBundleKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
     if (qty <= 0) continue;
     const entry = catalogue[r.productKey]!;
-    // SERVER price — request price (if any) ignored. A bundle = its base + each add-on at its set price.
-    const unit = isBundleKey(r.productKey) ? bundlePricePence(bundleCountsOf(r.bundle), entry.pricePence) : entry.pricePence;
+    // SERVER price — request price (if any) ignored.
+    const unit = entry.pricePence;
     lines.push({
       productKey: r.productKey,
       label: entry.label,
@@ -171,7 +166,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   // more. Each line's tier comes from ITS variant's live costs at the product's quantity
   // (src/pricing/multibuy.ts). The family bundle never counts and is never discounted again.
   // Resolved from the priced lines + the server catalogue alone — no client flag exists.
-  const productOf = (key: string) => key.split('-')[0]!;
+  const productOf = productOfKey;
   const qtyOfProduct = new Map<string, number>();
   for (const l of lines) if (!isBundleKey(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
   const multiBuyLines = lines.map((l) => {
@@ -205,7 +200,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       lines.map((l) => {
         // The bundle is already the founder's set price — it never takes a code on top (cost
         // unknown ⇒ left out of the code; the rest of the basket still can).
-        if (isBundleKey(l.productKey) || isEveKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
+        if (isBundleKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
         const cost = catalogue[l.productKey]?.unitCostPence;
         return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
       }),
@@ -262,12 +257,63 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
  * The full client→quote path: resolves the join context from server-resolved
  * provenance (never from the client), then prices. The server action calls this.
  */
+/** "add one more and save" (founder, 29 Oct): a basket line where ONE more of the same would reach a
+ * better multi-buy tier. `bps` is the tier the whole product would then get. */
+export interface MultiBuyNudge {
+  /** the priced line it belongs to (quote.lines) */
+  lineIndex: number;
+  /** how many of the product there would be with one more */
+  nextQty: number;
+  bps: number;
+}
+
+/**
+ * The checkout's "add 1 more — both 15% off" lines, worked out by the SAME engine that charges: for
+ * each product with an offer, its last line is re-priced with one more, and a nudge is shown only when
+ * that basket really would get a better multi-buy than this one does (so never when a code, the join
+ * saving or the family set would win instead — they don't stack). Never on a bundle or a card pack
+ * (always one), never on a gift (prices hidden). At most one per product. Pure.
+ */
+export function multiBuyNudges(requested: readonly RequestedLine[], opts: PriceOpts = {}): MultiBuyNudge[] {
+  if (opts.gift) return [];
+  const catalogue: PricedCatalogue = opts.catalogue ?? CATALOGUE;
+  // exactly the lines priceBasket keeps, so indices line up with its quote.lines
+  const kept = requested.filter((r) => inCatalogue(catalogue, r.productKey) && clampQty(r.qty) > 0);
+  const base = priceBasket(kept, opts);
+  const bpsAt = (q: Quote, i: number) => (q.multiBuyApplied ? (q.lines[i]?.multiBuyBps ?? 0) : 0);
+  const lastOf = new Map<string, number>();
+  kept.forEach((r, i) => {
+    if (isBundleKey(r.productKey) || isCardPackKey(r.productKey)) return;
+    lastOf.set(productOfKey(r.productKey), i);
+  });
+  const out: MultiBuyNudge[] = [];
+  for (const [product, i] of lastOf) {
+    const qty = clampQty(kept[i]!.qty);
+    if (qty >= MAX_QTY) continue;
+    const trial = priceBasket(kept.map((r, j) => (j === i ? { ...r, qty: qty + 1 } : r)), opts);
+    const bps = bpsAt(trial, i);
+    if (bps <= bpsAt(base, i)) continue;
+    const nextQty = trial.lines.reduce((n, l) => n + (!isBundleKey(l.productKey) && productOfKey(l.productKey) === product ? l.qty : 0), 0);
+    out.push({ lineIndex: i, nextQty, bps });
+  }
+  return out.sort((a, b) => a.lineIndex - b.lineIndex);
+}
+
 export function quote(
   requested: readonly RequestedLine[],
   opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
 ): Quote {
   const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
   return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
+}
+
+/** {@link multiBuyNudges} for exactly the basket {@link quote} prices (the same server-resolved options). */
+export function quoteNudges(
+  requested: readonly RequestedLine[],
+  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
+): MultiBuyNudge[] {
+  const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
+  return multiBuyNudges(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
 }
 
 /**

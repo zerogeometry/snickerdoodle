@@ -11,7 +11,7 @@ import {
   ADULT_JUMPER_COLOURS, ADULT_JUMPER_PRINT_MM, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
-import { BUNDLE_ONLY_SKUS, isBundleKey } from '@/lib/christmas-bundle';
+import { BUNDLE_ONLY_SKUS, BUNDLE_SIZES, isBundleKey } from '@/lib/christmas-bundle';
 
 export { mmToPx };
 
@@ -493,9 +493,9 @@ const DEFS: Record<string, ProductDef> = {
   // The CHRISTMAS TABLE (founder, 27 Oct — go-to-market C25): cork-backed placemats + coasters from uk9,
   // the same parcel as the ornament + sack. A Prodigi pack has ONE print area ('default'): one drawing
   // prints on every piece. On their own: placemats in a 4-pack (£60 — founder, 27 Oct), coasters in a 6-pack (£32). The
-  // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY to make up a bundle's extras — never
-  // priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts); their price here is
-  // the add-on price, for reference. Print areas: sandbox GET /v4.0/products, 27 Oct.
+  // other packs (1/2/6 placemats, 1/2/4 coasters) exist ONLY for the family bundle (it uses the 2-packs
+  // and the 4-packs) — never priced or shown on their own (BUNDLE_ONLY_SKUS, src/lib/christmas-bundle.ts);
+  // their price here is for reference only. Print areas: sandbox GET /v4.0/products, 27 Oct.
   // ON SHOW (founder, 28 Oct). TODO(founder samples): no Prodigi blank for either in .prodigi-assets yet,
   // so they show the plain tile until the founder's sample photos give them a mockup.
   placemat: {
@@ -524,26 +524,23 @@ const DEFS: Record<string, ProductDef> = {
       ] as const
     ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku })),
   },
-  // The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct — C25 + C26): the table set (4 placemats + 6 coasters,
-  // £90) + ornaments (£15) and sacks (£27) with a drawing each, extra placemats (£16) and coaster pairs
-  // (£11) — all uk9, ONE tracked parcel. Not printed itself: the order splits it into its pieces' own
-  // variants (src/lib/christmas-bundle.ts → orders.ts). Its builder lives at /customize/christmasBundle.
-  // ON SHOW (founder, 28 Oct).
+  // The CHRISTMAS FAMILY BUNDLE (founder, 29 Oct — three simple sizes, no add-ons): N placemats + N
+  // coasters + N ceramic ornaments, all uk9, ONE tracked parcel — a set for 2 (£78), 4 (£145) or 8
+  // (£279), ≈ 20% net after every cost. Not printed itself: the order splits it into its pieces' own
+  // variants (src/lib/christmas-bundle.ts → orders.ts). Builder: /customize/christmasBundle.
   christmasBundle: {
     category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false, visibleInShop: true,
-    description: 'The Christmas table — four placemats and six coasters wearing their drawing — plus an ornament and a sack for everyone, each with its own drawing. Made in the UK and sent together in one tracked parcel.',
-    specs: { 'the table': '4 placemats + 6 coasters, one drawing', ornaments: '+£15 each, a drawing each', sacks: '+£27 each, a drawing each', delivery: 'one tracked parcel' },
-    variants: [{ pricePence: 9000, wMm: 0, hMm: 0 }],
+    description: 'Their drawings on the Christmas table and on the tree: placemats and coasters wearing a drawing, and a ceramic ornament for everyone with its own. A set for 2, 4 or 8 — made in the UK and sent together in one tracked parcel.',
+    specs: { 'in the set': 'placemats, coasters and ceramic ornaments — 2, 4 or 8 of each', drawings: 'one on the placemats, one on the coasters, one on each ornament', delivery: 'one tracked parcel' },
+    variants: BUNDLE_SIZES.map((s) => ({ size: s.size, pricePence: s.pricePence, wMm: 0, hMm: 0 })),
   },
-  // The CHRISTMAS EVE BUNDLE (founder, 27 Oct): a sack + a ceramic ornament + a two-tone 11oz mug (any
-  // colour), all uk9 → ONE parcel. £62 (£74 separately). One drawing on all three, or one each. Not
-  // printed itself: the order splits it into the three pieces' own variants (src/lib/christmas-eve.ts).
-  // Its own multi-buy on the number of bundles, from the pieces' live costs. Builder:
-  // /customize/christmasEveBundle. ON SHOW (founder, 28 Oct).
+  // The CHRISTMAS EVE BUNDLE — RETIRED (founder, 29 Oct: "drop it for simplicity"). Kept as a PAUSED
+  // row so the seed takes it off sale everywhere (inactive ⇒ never priced, never orderable, not in the
+  // shop); its builder and expansion are gone.
   christmasEveBundle: {
-    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'a sack, an ornament and a mug — their christmas eve, made real', print: false, visibleInShop: true,
-    description: 'Everything for christmas eve, with their drawing on it: a cotton sack to fill, a ceramic ornament for the tree and a two-tone mug for the cocoa. One drawing on all three, or a different one on each. Sent together in one tracked parcel.',
-    specs: { 'in the bundle': 'a christmas sack, a ceramic ornament, an 11oz two-tone mug', mug: 'any colour', delivery: 'one tracked parcel' },
+    category: 'FESTIVE', label: 'christmas eve bundle', blurb: 'retired', print: false, visibleInShop: false, paused: true,
+    description: 'No longer sold.',
+    specs: {},
     variants: [{ pricePence: 6200, wMm: 0, hMm: 0 }],
   },
   phoneCase: {

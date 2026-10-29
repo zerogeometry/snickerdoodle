@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EXPECTED_POPULARITY, PRIOR_STRENGTH, priorScores, rankByPopularity } from '@/server/popularity';
+import { EXPECTED_POPULARITY, pinFirst, PRIOR_STRENGTH, priorScores, rankByPopularity } from '@/server/popularity';
+import { seasonalExpected } from '@/lib/season';
 
 describe('popularity — expected order first, real sales take over', () => {
   it('with no sales, the range is in the expected order', () => {
@@ -15,7 +16,7 @@ describe('popularity — expected order first, real sales take over', () => {
   it('a handful of sales nudges, it doesn’t upend', () => {
     const order = rankByPopularity(new Map([['blanket', 2]]));
     expect(order.indexOf('blanket')).toBeLessThan(EXPECTED_POPULARITY.indexOf('blanket'));
-    expect(order[0]).toBe('framedPrint');
+    expect(order[0]).toBe('christmasBundle'); // the family bundle leads (founder, 29 Oct)
   });
 
   it('once real sales outweigh the head start, they decide', () => {
@@ -25,5 +26,14 @@ describe('popularity — expected order first, real sales take over', () => {
 
   it('sales of products outside the list never put them in the range', () => {
     expect(rankByPopularity(new Map([['bauble', 500]]))).not.toContain('bauble');
+  });
+
+  it('the christmas family bundle is pinned first — whatever sells, in season or out (founder, 29 Oct)', () => {
+    const selling = rankByPopularity(new Map([['mug', 400], ['blanket', 300]]));
+    expect(selling[0]).toBe('mug');
+    expect(pinFirst(selling)[0]).toBe('christmasBundle');
+    expect(pinFirst(seasonalExpected(selling, new Date('2026-11-20T12:00:00Z')))[0]).toBe('christmasBundle');
+    expect(pinFirst(selling)).toHaveLength(selling.length);
+    expect(pinFirst(['mug', 'card'])).toEqual(['mug', 'card']); // not in the range → nothing to pin
   });
 });

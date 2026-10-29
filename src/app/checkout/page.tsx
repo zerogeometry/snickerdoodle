@@ -11,8 +11,8 @@ import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
 import { BundleThumb } from '@/ui/components/BundleThumb';
-import { MultiBuyChip } from '@/ui/components/MultiBuy';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isEveLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { MultiBuyChip, MultiBuyNudgeLine } from '@/ui/components/MultiBuy';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -140,6 +140,8 @@ export default function CheckoutPage() {
   // sellable); the client figure only fills in until the quote lands.
   const linePence = (i: number) => (quote && quote.lines.length === items.length ? quote.lines[i]!.linePence : items[i]!.pricePence * items[i]!.qty);
   // The SERVER's multi-buy on this line (only when it's the saving the basket gets) — never worked out here.
+  // "add one more and save": the server's own nudge for this line (quoteBasket re-ran its engine with one more)
+  const nudgeOf = (i: number) => (!gift && quote && quote.lines.length === items.length ? (quote.nudges ?? []).find((n) => n.lineIndex === i) ?? null : null);
   const multiBuyOf = (i: number) => {
     const l = quote && quote.lines.length === items.length ? quote.lines[i] : undefined;
     return l?.multiBuyBps && l.multiBuySavingPence ? { bps: l.multiBuyBps, pence: l.multiBuySavingPence } : null;
@@ -347,7 +349,7 @@ export default function CheckoutPage() {
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {isPackLine(item) ? (
                         <CardPackThumb item={item} px={56} />
-                      ) : isBundleLine(item) || isEveLine(item) ? (
+                      ) : isBundleLine(item) ? (
                         <BundleThumb item={item} px={56} />
                       ) : item.artwork && item.variantId ? (
                         <MockupPreview
@@ -388,11 +390,14 @@ export default function CheckoutPage() {
                             <Icon icon={IconPlus} size={12} />
                           </button>
                         </div>
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) || isEveLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
                           customize
                         </button>
                       </div>
                       )}
+                      {nudgeOf(idx) ? (
+                        <MultiBuyNudgeLine nextQty={nudgeOf(idx)!.nextQty} bps={nudgeOf(idx)!.bps} productLabel={item.name} onAdd={() => setQty(item.id, item.qty + 1)} />
+                      ) : null}
                     </div>
                     <div className="shrink-0 text-right">
                       {!gift && multiBuyOf(idx) ? (

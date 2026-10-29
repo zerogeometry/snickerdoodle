@@ -1,6 +1,6 @@
 'use server';
 
-import { quote, type Quote, type RequestedLine } from '@/pricing';
+import { quote, quoteNudges, type MultiBuyNudge, type Quote, type RequestedLine } from '@/pricing';
 import { getDb } from '@/db/client';
 import { getCatalogue } from '@/server/catalogue';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
@@ -17,7 +17,7 @@ import { getCurrentAccount } from '@/server/session';
  * charged the catalogue total.
  */
 export interface QuoteRequest {
-  /** `bundle`: the CHRISTMAS BUNDLE's drawings + extras — COUNTED server-side, never a price. */
+  /** `bundle`: the CHRISTMAS BUNDLE's drawings — its price is its size's variant (the key), never a figure. */
   items: { productKey: string; qty: number; bundle?: unknown }[];
   gift?: boolean;
   /** What the customer typed — resolved + priced server-side; its value is never trusted. */
@@ -28,6 +28,9 @@ export interface QuoteRequest {
 export type ClientQuote = Omit<Quote, 'partnerCommissionPence'> & {
   /** A code that couldn't be used at all (unknown / expired / used up / not started). */
   promoError?: 'unknown' | 'not-started' | 'expired' | 'used-up' | 'own-code' | 'first-order-only';
+  /** "add one more and save": where ONE more of the same would reach a better multi-buy tier — worked
+   * out by the server's own engine on the very basket it just priced (src/pricing/engine.ts). */
+  nudges: MultiBuyNudge[];
 };
 
 export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
@@ -44,15 +47,11 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
     ? await resolvePromo(db, req.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
     : null;
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
-  const { partnerCommissionPence: _hidden, ...q } = quote(items, {
-    gift: req.gift ?? false,
-    joinProvenance,
-    catalogue,
-    promo: resolved?.ok ? resolved.rule : null,
-    creditAvailablePence,
-  });
+  const opts = { gift: req.gift ?? false, joinProvenance, catalogue, promo: resolved?.ok ? resolved.rule : null, creditAvailablePence };
+  const { partnerCommissionPence: _hidden, ...q } = quote(items, opts);
   void _hidden;
-  return resolved && !resolved.ok ? { ...q, promoError: resolved.reason } : q;
+  const nudges = quoteNudges(items, opts);
+  return resolved && !resolved.ok ? { ...q, nudges, promoError: resolved.reason } : { ...q, nudges };
 }
 
 /** The real, server-resolved join provenance (a joined member within their
