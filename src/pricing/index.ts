@@ -19,6 +19,7 @@ export { evaluatePromo, normalisePromoCode, PROMO_ECONOMICS, type PromoRule, typ
 export {
   priceBasket,
   quote,
+  productOfKey,
   applicableCredit,
   MIN_CHARGE_PENCE,
   clampQty,

@@ -1,6 +1,6 @@
 'use client';
 
-import { IconAlertTriangle, IconChevronLeft, IconChevronRight, IconCircleCheck, IconMinus, IconPlus, IconShoppingBag, IconX } from '@tabler/icons-react';
+import { IconAlertTriangle, IconCircleCheck, IconPlus, IconRefresh, IconShoppingBag } from '@tabler/icons-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -9,34 +9,32 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { FlowHeader } from './FlowHeader';
 import { ChristmasPromise } from './ChristmasPromise';
-import { MockupPreview } from './MockupPreview';
-import type { ProductKey } from './ProductArt';
 import { PickerBody, type Drawing, type PickerState } from './CardPackBuilder';
 import { forgetResumeVisit, isResumeVisit, usePickerEdits } from './usePickerEdits';
 import { loadCatalogueAction } from '@/app/actions/catalogue';
 import { checkBundleAction } from '@/app/actions/bundle';
 import { keepsakePickerAction } from '@/app/actions/keepsakePicker';
 import type { CatalogueProduct } from '@/server/catalogue';
-import { canvasSizePx, clampTransform, computeLayerRect, type ResolutionAssessment } from '@/server/print/geometry';
+import { clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import {
-  BUNDLE_ADDON_PENCE, BUNDLE_BASE, BUNDLE_BASE_PENCE, BUNDLE_KEY, BUNDLE_MAX_EACH, BUNDLE_PIECE_GEOM, COASTER_STEP,
-  bundlePricePence, bundleSummary, tablePieces, type BundleArt, type BundlePiece, type BundleSpec,
+  BUNDLE_KEY, BUNDLE_PIECE_GEOM, BUNDLE_SIZES, bundleSizeOf, bundleSkuFor, bundleSummary,
+  type BundleArt, type BundlePiece, type BundleSize, type BundleSpec,
 } from '@/lib/christmas-bundle';
 import { christmasBundleLine, newBundleLineId } from '@/lib/christmas-bundle-line';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, shownSrc, toast, useBasket, useUpload } from '@/lib/store';
 
 /**
- * The CHRISTMAS FAMILY BUNDLE builder (founder, 27 Oct — go-to-market C25 + C26):
- *  (1) the table drawing — on all 4 placemats + 6 coasters;
- *  (2) ornaments + sacks, each with its own drawing (from the keepsake box, or uploaded through the
- *      same picker workshop as the card packs + calendar: auto trim + straighten, remove background,
- *      edit in the Studio);
- *  (3) extra placemats (+1) and coasters (+2);
- *  (4) a flip-through of every piece with its print-quality check — the order-time gate's maths;
- *  (5) add to basket: ONE line, every drawing authz-checked server-side and priced by the server.
- * No names, no family-member step — just counts and a drawing per ornament / sack.
+ * The CHRISTMAS FAMILY BUNDLE builder (founder, 29 Oct — three sizes, no add-ons):
+ *  (1) how many: a set for 2, 4 or 8 (that many placemats, coasters and ornaments);
+ *  (2) the table: ONE drawing on every placemat; the coasters wear it too unless another is picked;
+ *  (3) the ornaments: one drawing each — the placemats' until the shopper picks its own;
+ *  (4) the picture of exactly that set, composed server-side from the founder's layers with these
+ *      drawings (/api/mockup/bundle), and each drawing's print-quality check (the order gate's maths);
+ *  (5) add to basket: ONE line, every drawing authz-checked server-side, priced by the server.
+ * New drawings come in through the same picker workshop as the card packs + calendar (auto trim +
+ * straighten, remove background, edit in the Studio) and the normal ingest (hash-check + moderation).
  *
  * Not in /mockups — extends the Scrapbook language of the calendar + card-pack builders (taped
  * polaroids, ink chips, the kraft thumb-zone dock, the bottom-sheet picker).
@@ -44,30 +42,32 @@ import { gbp, shownSrc, toast, useBasket, useUpload } from '@/lib/store';
 
 const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)'];
 const PICKER_TTL_MS = 8 * 60_000; // signed URLs live 10 min — refresh the list before they lapse
-const DRAFT_KEY = 'sd_bundle_draft'; // per tab: picks survive a trip to the Studio
+const DRAFT_KEY = 'sd_bundle_draft_v2'; // per tab: picks survive a trip to the Studio
 const NEXT = `/customize/${BUNDLE_KEY}`;
-/** The picker's slot numbers: 0 = the table, 100+i = ornament i, 200+i = sack i. */
+/** The picker's slot numbers: 0 = the placemats, 1 = the coasters, 100+i = ornament i. */
+const PLACEMATS = 0;
+const COASTERS = 1;
 const ORN = 100;
-const SACK = 200;
+const MAX = 8;
 
-type Draft = { table: BundleArt | null; ornaments: BundleArt[]; sacks: BundleArt[]; extraPlacemats: number; extraCoasters: number };
-const EMPTY: Draft = { table: null, ornaments: [], sacks: [], extraPlacemats: 0, extraCoasters: 0 };
+/** null = "the placemats' drawing" (the coasters, each ornament). */
+type Draft = { size: BundleSize; placemat: BundleArt | null; coaster: BundleArt | null; ornaments: Array<BundleArt | null> };
+const EMPTY: Draft = { size: 2, placemat: null, coaster: null, ornaments: [] };
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 /** A piece's placement: its product's default (the order gate + the print file use the same). */
 export const placeOf = (piece: string) => clampTransform(defaultTransformFor(piece));
+const isArt = (a: unknown): a is BundleArt => !!a && typeof a === 'object' && typeof (a as BundleArt).assetId === 'string';
 
 function readDraft(): Draft | null {
   try {
     const d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) ?? 'null') as Partial<Draft> | null;
     if (!d || typeof d !== 'object') return null;
-    const ok = (a: unknown): a is BundleArt => !!a && typeof a === 'object' && typeof (a as BundleArt).assetId === 'string';
     return {
-      table: ok(d.table) ? d.table : null,
-      ornaments: (Array.isArray(d.ornaments) ? d.ornaments : []).filter(ok).slice(0, BUNDLE_MAX_EACH),
-      sacks: (Array.isArray(d.sacks) ? d.sacks : []).filter(ok).slice(0, BUNDLE_MAX_EACH),
-      extraPlacemats: Number(d.extraPlacemats) || 0,
-      extraCoasters: Number(d.extraCoasters) || 0,
+      size: BUNDLE_SIZES.some((s) => s.n === d.size) ? (d.size as BundleSize) : 2,
+      placemat: isArt(d.placemat) ? d.placemat : null,
+      coaster: isArt(d.coaster) ? d.coaster : null,
+      ornaments: (Array.isArray(d.ornaments) ? d.ornaments : []).slice(0, MAX).map((a) => (isArt(a) ? a : null)),
     };
   } catch {
     return null;
@@ -82,10 +82,12 @@ function writeDraft(d: Draft | null) {
   }
 }
 
-const slotName = (slot: number) => (slot < ORN ? 'the table' : slot < SACK ? `ornament ${slot - ORN + 1}` : `sack ${slot - SACK + 1}`);
-
-/** One piece in the flip-through. */
-export type Shown<P extends string = BundlePiece> = { piece: P; art: BundleArt; name: string; count: number; slot: number };
+const slotName = (slot: number) => (slot === PLACEMATS ? 'the placemats' : slot === COASTERS ? 'the coasters' : `ornament ${slot - ORN + 1}`);
+/** The spec the server will make from a draft (null until the placemats have a drawing). */
+function specOf(d: Draft): BundleSpec | null {
+  if (!d.placemat) return null;
+  return { placemat: d.placemat, coaster: d.coaster, ornaments: Array.from({ length: d.size }, (_, i) => d.ornaments[i] ?? d.placemat!) };
+}
 
 export function ChristmasBundleBuilder() {
   const router = useRouter();
@@ -100,14 +102,13 @@ export function ChristmasBundleBuilder() {
   const [sheet, setSheet] = useState<{ slot: number; advance: boolean } | null>(null);
   const [chosen, setChosen] = useState<string | null>(null);
   const [dims, setDims] = useState<Record<string, { width: number; height: number } | null>>({});
-  const [view, setView] = useState(0); // the piece on show in the flip-through
   const [adding, setAdding] = useState(false);
 
-  // ── load: the shop catalogue (for the ornament + sack mockups) and the keepsake box ─────────
+  // ── load: the shop catalogue (prices + the ornament's variant for the basket thumb) and the keepsake box
   useEffect(() => {
     loadCatalogueAction()
       .then(setProducts)
-      .catch(() => setProducts([])); // the builder still works — the pieces show as sketches
+      .catch(() => setProducts([])); // the builder still works on the seeded prices
   }, []);
   const loadPicker = useCallback(() => {
     setPicker({ status: 'loading' });
@@ -116,21 +117,24 @@ export function ChristmasBundleBuilder() {
       .catch(() => setPicker({ status: 'error' }));
   }, []);
   useEffect(loadPicker, [loadPicker]);
-  const variantOf = (key: string) => products?.find((p) => p.key === key)?.variants.find((v) => v.isDefault)?.id ?? null;
-  const ornamentVariant = variantOf('ceramicOrnament');
-  const sackVariant = variantOf('sack');
+  const ornamentVariant = products?.find((p) => p.key === 'ceramicOrnament')?.variants.find((v) => v.isDefault)?.id ?? null;
+  // the SERVER catalogue's price per size (the seeded figures stand in until it lands)
+  const priceOf = (n: BundleSize) => products?.find((p) => p.key === BUNDLE_KEY)?.variants.find((v) => v.sku === bundleSkuFor(n))?.pricePence ?? BUNDLE_SIZES.find((s) => s.n === n)!.pricePence;
 
   // Seed once: a basket line (?edit=<id>) reopens exactly that bundle; else this tab's draft (only on
-  // the way back from the Studio); else the drawing in progress goes on the table.
+  // the way back from the Studio); else the drawing in progress goes on the table. ?size=4 picks a size.
   const seededRef = useRef(false);
   useEffect(() => {
     if (seededRef.current) return;
     seededRef.current = true;
-    const id = new URLSearchParams(window.location.search).get('edit');
+    const q = new URLSearchParams(window.location.search);
+    const id = q.get('edit');
     const line = id ? useBasket.getState().items.find((i) => i.id === id && i.bundle) : null;
-    if (line?.bundle) {
+    if (line?.bundle && isArt(line.bundle.placemat)) {
+      const b = line.bundle;
+      const size = bundleSizeOf(line.sku) ?? 2;
       setEdit(line.id);
-      setD({ ...line.bundle, ornaments: [...line.bundle.ornaments], sacks: [...line.bundle.sacks] });
+      setD({ size, placemat: b.placemat, coaster: b.coaster ?? null, ornaments: b.ornaments.map((a) => (a.assetId === b.placemat.assetId && (a.sourceObjectId ?? null) === (b.placemat.sourceObjectId ?? null) ? null : a)) });
       return;
     }
     const resuming = isResumeVisit();
@@ -141,13 +145,15 @@ export function ChristmasBundleBuilder() {
       setD(draft);
       return;
     }
+    const asked = Number(q.get('size'));
+    const size: BundleSize = asked === 4 || asked === 8 ? asked : 2;
     const u = useUpload.getState().upload;
-    if (u?.assetId) setD((x) => ({ ...x, table: { assetId: u.assetId!, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) } }));
+    setD({ ...EMPTY, size, placemat: u?.assetId ? { assetId: u.assetId, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) } : null });
   }, []);
   // Keep this tab's draft (not while editing a basket line — that line IS the saved state).
   useEffect(() => {
     if (!seededRef.current || edit) return;
-    writeDraft(d.table || d.ornaments.length || d.sacks.length ? d : null);
+    writeDraft(d.placemat || d.coaster || d.ornaments.some(Boolean) ? d : null);
   }, [d, edit]);
 
   // Every drawing on offer: the one in progress first, then the keepsake box. One entry per drawing.
@@ -183,33 +189,31 @@ export function ChristmasBundleBuilder() {
       return sid ? { assetId: a.assetId, sourceObjectId: sid } : { assetId: a.assetId };
     };
     setD((old) => {
-      const next = { ...old, table: fix(old.table), ornaments: old.ornaments.map((a) => fix(a)!), sacks: old.sacks.map((a) => fix(a)!) };
-      const same = next.table === old.table && next.ornaments.every((a, i) => a === old.ornaments[i]) && next.sacks.every((a, i) => a === old.sacks[i]);
+      const next = { ...old, placemat: fix(old.placemat), coaster: fix(old.coaster), ornaments: old.ornaments.map(fix) };
+      const same = next.placemat === old.placemat && next.coaster === old.coaster && next.ornaments.every((a, i) => a === old.ornaments[i]);
       return same ? old : next;
     });
   }, [drawings]);
   const drawingFor = useCallback((assetId: string) => drawings.find((x) => x.assetId === assetId) ?? null, [drawings]);
 
   // ── what's being made ─────────────────────────────────────────────────────────────────────
-  const { placemats, coasters } = tablePieces(d);
-  const shown: Shown[] = useMemo(() => {
-    const out: Shown[] = [];
-    if (d.table) {
-      out.push({ piece: 'placemat', art: d.table, name: 'the placemats', count: placemats, slot: 0 });
-      out.push({ piece: 'coaster', art: d.table, name: 'the coasters', count: coasters, slot: 0 });
-    }
-    d.ornaments.forEach((a, i) => out.push({ piece: 'ceramicOrnament', art: a, name: `ornament ${i + 1}`, count: 1, slot: ORN + i }));
-    d.sacks.forEach((a, i) => out.push({ piece: 'sack', art: a, name: `sack ${i + 1}`, count: 1, slot: SACK + i }));
+  const spec = useMemo(() => specOf(d), [d]);
+  const price = priceOf(d.size);
+  // every (piece, drawing) pair once — for the print-quality check
+  const pieces = useMemo(() => {
+    if (!spec) return [];
+    const out: Array<{ piece: BundlePiece; art: BundleArt; name: string }> = [
+      { piece: 'placemat', art: spec.placemat, name: 'the placemats' },
+      { piece: 'coaster', art: spec.coaster ?? spec.placemat, name: 'the coasters' },
+    ];
+    spec.ornaments.forEach((a, i) => out.push({ piece: 'ceramicOrnament', art: a, name: `ornament ${i + 1}` }));
     return out;
-  }, [d, placemats, coasters]);
-  useEffect(() => {
-    if (view > 0 && view >= shown.length) setView(Math.max(0, shown.length - 1));
-  }, [view, shown.length]);
+  }, [spec]);
 
   // The pixel size of each drawing — fed to the SAME assessment the order-time gate runs, per piece.
   useEffect(() => {
     const started = new Set<string>();
-    for (const s of shown) {
+    for (const s of pieces) {
       const x = drawingFor(s.art.assetId);
       const key = `${s.art.assetId}:${s.art.sourceObjectId ?? ''}`;
       if (!x?.imageUrl || key in dims || started.has(key)) continue;
@@ -224,20 +228,19 @@ export function ChristmasBundleBuilder() {
       img.onload = () => setDims((m) => ({ ...m, [key]: img.naturalWidth && img.naturalHeight ? { width: img.naturalWidth, height: img.naturalHeight } : null }));
       img.src = x.imageUrl;
     }
-  }, [shown, drawingFor, dims]);
-  const dimsOf = useCallback((a: BundleArt) => dims[`${a.assetId}:${a.sourceObjectId ?? ''}`] ?? null, [dims]);
-  const assess = (s: Pick<Shown, 'piece' | 'art'>): ResolutionAssessment | null => {
-    const src = dimsOf(s.art);
-    return src ? assessPrintResolution(BUNDLE_PIECE_GEOM[s.piece], src, placeOf(s.piece), s.piece) : null;
+  }, [pieces, drawingFor, dims]);
+  const assess = (piece: BundlePiece, a: BundleArt): ResolutionAssessment | null => {
+    const src = dims[`${a.assetId}:${a.sourceObjectId ?? ''}`] ?? null;
+    return src ? assessPrintResolution(BUNDLE_PIECE_GEOM[piece], src, placeOf(piece), piece) : null;
   };
-  const blocked = shown.find((s) => assess(s)?.decision === 'BLOCK') ?? null;
-
-  const price = bundlePricePence({ ornaments: d.ornaments.length, sacks: d.sacks.length, extraPlacemats: d.extraPlacemats, extraCoasters: d.extraCoasters });
+  const blocked = pieces.find((s) => assess(s.piece, s.art)?.decision === 'BLOCK') ?? null;
+  const soft = !blocked && pieces.some((s) => assess(s.piece, s.art)?.softUpClose);
+  const checked = pieces.length > 0 && pieces.every((s) => assess(s.piece, s.art));
 
   // ── picking ────────────────────────────────────────────────────────────────────────────────
   const openSheet = (slot: number) => {
     if (picker.status === 'ready' && Date.now() - picker.at > PICKER_TTL_MS) loadPicker();
-    const cur = slot === 0 ? d.table : slot < SACK ? d.ornaments[slot - ORN] : d.sacks[slot - SACK];
+    const cur = slot === PLACEMATS ? d.placemat : slot === COASTERS ? (d.coaster ?? d.placemat) : (d.ornaments[slot - ORN] ?? d.placemat);
     setChosen(cur?.assetId ?? null);
     setSheet({ slot, advance: !cur });
   };
@@ -248,36 +251,30 @@ export function ChristmasBundleBuilder() {
     const a: BundleArt = { assetId: x.assetId, ...(x.sourceObjectId ? { sourceObjectId: x.sourceObjectId } : {}) };
     const { slot } = sheet;
     setD((old) => {
-      if (slot === 0) return { ...old, table: a };
-      const key = slot < SACK ? 'ornaments' : 'sacks';
-      const i = slot - (slot < SACK ? ORN : SACK);
-      const list = [...old[key]];
-      if (i < list.length) list[i] = a;
-      else if (list.length < BUNDLE_MAX_EACH) list.push(a);
-      return { ...old, [key]: list };
+      if (slot === PLACEMATS) return { ...old, placemat: a };
+      if (slot === COASTERS) return { ...old, coaster: a };
+      const list = [...old.ornaments];
+      while (list.length <= slot - ORN) list.push(null);
+      list[slot - ORN] = a;
+      return { ...old, ornaments: list };
     });
-    // show the piece just filled in the flip-through
-    const at = slot === 0 ? 0 : (d.table ? 2 : 0) + (slot < SACK ? slot - ORN : d.ornaments.length + (slot - SACK));
-    setView(at);
     setSheet(null);
     toast(`${slotName(slot)} ✓`);
   };
-  const removeAt = (key: 'ornaments' | 'sacks', i: number) => setD((old) => ({ ...old, [key]: old[key].filter((_, j) => j !== i) }));
 
   // ── basket ─────────────────────────────────────────────────────────────────────────────────
-  const ready = !!d.table;
   const addToBasket = async () => {
-    if (!d.table || blocked || adding) return;
-    const spec: BundleSpec = { table: d.table, ornaments: d.ornaments, sacks: d.sacks, extraPlacemats: d.extraPlacemats, extraCoasters: d.extraCoasters };
+    if (!spec || blocked || adding) return;
     setAdding(true);
     try {
-      // every drawing is checked server-side (may this buyer use it?) and the server prices it
-      const res = await checkBundleAction(spec);
+      // every drawing is checked server-side (may this buyer use it?) and the server prices the size
+      const sku = bundleSkuFor(d.size);
+      const res = await checkBundleAction(sku, spec);
       if (!res.ok) {
         toast(res.reason === 'not-allowed' ? 'one of those drawings isn’t yours to use — swap it for another' : 'we couldn’t add it just now — please try again');
         return;
       }
-      const line = christmasBundleLine({ id: edit ?? newBundleLineId(), bundle: spec, pricePence: res.pricePence, previewVariantId: ornamentVariant ?? undefined });
+      const line = christmasBundleLine({ id: edit ?? newBundleLineId(), size: d.size, bundle: spec, pricePence: res.pricePence, previewVariantId: ornamentVariant ?? undefined });
       if (edit) {
         const { id, ...fields } = line;
         update(edit, fields, id);
@@ -294,41 +291,29 @@ export function ChristmasBundleBuilder() {
   };
 
   const sheetDrawing = chosen ? drawingFor(chosen) : null;
-  const tile = (a: BundleArt) => {
-    const x = drawingFor(a.assetId);
+  const tile = (a: BundleArt | null) => {
+    const x = a ? drawingFor(a.assetId) : null;
     return x?.thumbUrl ?? x?.imageUrl ?? null;
   };
-  const badgeOf = (q: ResolutionAssessment | null) => (!q ? null : q.decision === 'BLOCK' ? 'too small to print' : q.softUpClose ? 'a little soft up close' : 'print-ready');
 
   return (
     <Shell>
-      <div className="grid gap-7 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start lg:gap-12">
-        {/* Left: flip through every piece, with its print-quality check */}
+      <div className="grid gap-7 md:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] md:items-start lg:gap-12">
+        {/* Left: the picture of exactly this set, with these drawings */}
         <div className="min-w-0 md:sticky md:top-20">
-          <BundleFlip
-            shown={shown}
-            view={view}
-            onView={setView}
-            render={(s) => (
-              <PiecePreview
-                s={s}
-                imageUrl={drawingFor(s.art.assetId)?.imageUrl ?? null}
-                src={dimsOf(s.art)}
-                variantId={s.piece === 'ceramicOrnament' ? ornamentVariant : s.piece === 'sack' ? sackVariant : null}
-              />
-            )}
-            badge={(s) => {
-              const q = assess(s);
-              return { text: badgeOf(q), block: q?.decision === 'BLOCK', soft: !!q?.softUpClose };
-            }}
-            onEmpty={() => openSheet(0)}
-          />
+          <BundlePicture sku={bundleSkuFor(d.size)} spec={spec} size={d.size} onEmpty={() => openSheet(PLACEMATS)} />
+          {spec ? (
+            <p role="status" className={`mt-2 flex items-center justify-center gap-1 text-[12px] font-extrabold ${blocked ? 'text-cinnamon' : soft ? 'text-ink-soft' : 'text-green-save'}`}>
+              {checked || blocked ? <Icon icon={blocked ? IconAlertTriangle : IconCircleCheck} size={14} /> : null}
+              {blocked ? `the drawing on ${blocked.name} is too small to print well — tap it to swap it` : !checked ? 'checking the print quality…' : soft ? 'print-ready — a little soft up close' : 'every piece is print-ready'}
+            </p>
+          ) : null}
         </div>
 
         {/* Right: title → the three steps → what it adds up to → add to basket (bottom-right) */}
         <div className="flex flex-col">
           <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">christmas family bundle</h1>
-          <p className="mt-1 text-sm text-ink-soft">the whole family’s christmas in one parcel — their drawings on the table, on the tree and under it.</p>
+          <p className="mt-1 text-sm text-ink-soft">their drawings on the christmas table and on the tree — placemats, coasters and an ornament for everyone, in one parcel.</p>
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa" aria-live="polite">
               {gbp(price)}
@@ -337,96 +322,95 @@ export function ChristmasBundleBuilder() {
             <ChristmasPromise productKey={BUNDLE_KEY} />
           </div>
 
-          {/* 1 · the table */}
-          <Step n={1} title="the table" note={`one drawing on all ${BUNDLE_BASE.placemats} placemats + ${BUNDLE_BASE.coasters} coasters · ${gbp(BUNDLE_BASE_PENCE)}`}>
-            {d.table ? (
-              <div className="flex items-center gap-3">
-                <Polaroid url={tile(d.table)} i={0} label={`the table drawing: ${drawingFor(d.table.assetId)?.label ?? 'a drawing'} — swap it`} onClick={() => openSheet(0)} />
-                <Button variant="secondary" size="md" onClick={() => openSheet(0)}>
-                  swap the table drawing
-                </Button>
-              </div>
-            ) : (
-              <AddTile label="pick the table drawing" sub="from your keepsake box, or upload one" onClick={() => openSheet(0)} wide />
-            )}
+          {/* 1 · how many */}
+          <Step n={1} title="how many?" note="a placemat, a coaster and an ornament for each of you">
+            <div role="radiogroup" aria-label="how many of each" className="grid grid-cols-3 gap-2">
+              {BUNDLE_SIZES.map((s) => {
+                const on = s.n === d.size;
+                return (
+                  <button
+                    key={s.n}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => setD((x) => ({ ...x, size: s.n }))}
+                    className={`press flex min-h-11 flex-col items-center justify-center rounded-[12px] border-2 px-2 py-2 text-cocoa focus-visible:outline-2 ${on ? 'border-cocoa bg-honey shadow-[0_2px_0_var(--color-cocoa)]' : 'border-cocoa/25 bg-paper hover:border-cocoa'}`}
+                  >
+                    <span className="text-sm font-extrabold lowercase">a set for {s.n}</span>
+                    <span className="text-xs font-bold">{gbp(priceOf(s.n))}</span>
+                  </button>
+                );
+              })}
+            </div>
           </Step>
 
-          {/* 2 · ornaments + sacks, a drawing each */}
-          <Step n={2} title="ornaments & sacks" note="one for everyone — each with its own drawing">
-            <SlotRow
-              label="ceramic ornaments"
-              each={BUNDLE_ADDON_PENCE.ornament}
-              list={d.ornaments}
-              tile={tile}
-              nameOf={(i) => `ornament ${i + 1}`}
-              assess={(a) => badgeOf(assess({ piece: 'ceramicOrnament', art: a }))}
-              blockedOf={(a) => assess({ piece: 'ceramicOrnament', art: a })?.decision === 'BLOCK'}
-              onOpen={(i) => openSheet(ORN + i)}
-              onRemove={(i) => removeAt('ornaments', i)}
-              addLabel="add an ornament"
-            />
-            <SlotRow
-              label="christmas sacks"
-              each={BUNDLE_ADDON_PENCE.sack}
-              list={d.sacks}
-              tile={tile}
-              nameOf={(i) => `sack ${i + 1}`}
-              assess={(a) => badgeOf(assess({ piece: 'sack', art: a }))}
-              blockedOf={(a) => assess({ piece: 'sack', art: a })?.decision === 'BLOCK'}
-              onOpen={(i) => openSheet(SACK + i)}
-              onRemove={(i) => removeAt('sacks', i)}
-              addLabel="add a sack"
-            />
+          {/* 2 · the table */}
+          <Step n={2} title="the table" note={`one drawing on all ${d.size} placemats — and on the coasters too, unless you pick another`}>
+            <div className="flex flex-wrap gap-x-5 gap-y-4">
+              <Piece
+                label="placemats"
+                url={tile(d.placemat)}
+                i={0}
+                note={d.placemat ? drawingFor(d.placemat.assetId)?.label ?? 'a drawing' : 'pick a drawing'}
+                aria={d.placemat ? `the placemats' drawing — swap it` : 'pick a drawing for the placemats'}
+                onClick={() => openSheet(PLACEMATS)}
+                blocked={!!d.placemat && assess('placemat', d.placemat)?.decision === 'BLOCK'}
+              />
+              <Piece
+                label="coasters"
+                url={tile(d.coaster ?? d.placemat)}
+                i={1}
+                note={d.coaster ? drawingFor(d.coaster.assetId)?.label ?? 'a drawing' : 'same as the placemats'}
+                aria={d.coaster ? `the coasters' drawing — swap it` : 'the coasters wear the placemats’ drawing — pick a different one'}
+                onClick={() => openSheet(COASTERS)}
+                blocked={!!(d.coaster ?? d.placemat) && assess('coaster', (d.coaster ?? d.placemat)!)?.decision === 'BLOCK'}
+                reset={d.coaster ? { label: 'use the placemats’ drawing on the coasters', onClick: () => setD((x) => ({ ...x, coaster: null })) } : undefined}
+              />
+            </div>
           </Step>
 
-          {/* 3 · more for the table */}
-          <Step n={3} title="more for the table" note="the table drawing again — for a bigger table">
-            <Stepper
-              label="extra placemats"
-              sub={`+${gbp(BUNDLE_ADDON_PENCE.placemat)} each`}
-              value={d.extraPlacemats}
-              step={1}
-              onChange={(v) => setD((x) => ({ ...x, extraPlacemats: v }))}
-            />
-            <Stepper
-              label="extra coasters"
-              sub={`+${gbp(BUNDLE_ADDON_PENCE.coasterPair)} a pair`}
-              value={d.extraCoasters}
-              step={COASTER_STEP}
-              onChange={(v) => setD((x) => ({ ...x, extraCoasters: v }))}
-            />
+          {/* 3 · the ornaments */}
+          <Step n={3} title="the ornaments" note="one each — the placemats’ drawing until you pick its own">
+            <ol className="flex flex-wrap gap-x-4 gap-y-4" aria-label="the ornaments">
+              {Array.from({ length: d.size }, (_, i) => {
+                const own = d.ornaments[i] ?? null;
+                const a = own ?? d.placemat;
+                return (
+                  <li key={i}>
+                    <Piece
+                      label={`ornament ${i + 1}`}
+                      url={tile(a)}
+                      i={i + 2}
+                      note={own ? 'its own drawing' : 'the placemats’'}
+                      aria={own ? `ornament ${i + 1}'s drawing — swap it` : `ornament ${i + 1} wears the placemats’ drawing — pick its own`}
+                      onClick={() => openSheet(ORN + i)}
+                      blocked={!!a && assess('ceramicOrnament', a)?.decision === 'BLOCK'}
+                      round
+                      reset={own ? { label: `ornament ${i + 1}: use the placemats’ drawing`, onClick: () => setD((x) => ({ ...x, ornaments: x.ornaments.map((o, j) => (j === i ? null : o)) })) } : undefined}
+                    />
+                  </li>
+                );
+              })}
+            </ol>
           </Step>
 
-          {/* What it adds up to — every line, no surprises */}
+          {/* What it adds up to — no surprises */}
           <section aria-label="what’s in your bundle" className="mt-6 rounded-[16px] border-2 border-cocoa/15 bg-paper p-4">
-            <ul className="space-y-1.5 text-sm text-cocoa">
-              <Row label={`the table · ${BUNDLE_BASE.placemats} placemats + ${BUNDLE_BASE.coasters} coasters`} pence={BUNDLE_BASE_PENCE} />
-              {d.ornaments.length ? <Row label={`${d.ornaments.length} ornament${d.ornaments.length === 1 ? '' : 's'} × ${gbp(BUNDLE_ADDON_PENCE.ornament)}`} pence={d.ornaments.length * BUNDLE_ADDON_PENCE.ornament} /> : null}
-              {d.sacks.length ? <Row label={`${d.sacks.length} sack${d.sacks.length === 1 ? '' : 's'} × ${gbp(BUNDLE_ADDON_PENCE.sack)}`} pence={d.sacks.length * BUNDLE_ADDON_PENCE.sack} /> : null}
-              {d.extraPlacemats ? <Row label={`${d.extraPlacemats} more placemat${d.extraPlacemats === 1 ? '' : 's'}`} pence={d.extraPlacemats * BUNDLE_ADDON_PENCE.placemat} /> : null}
-              {d.extraCoasters ? <Row label={`${d.extraCoasters} more coasters`} pence={(d.extraCoasters / COASTER_STEP) * BUNDLE_ADDON_PENCE.coasterPair} /> : null}
-            </ul>
-            <p className="mt-2 flex justify-between border-t-2 border-dashed border-cocoa/15 pt-2 text-sm font-extrabold text-cocoa">
-              <span>{bundleSummary({ ornaments: d.ornaments.length, sacks: d.sacks.length, extraPlacemats: d.extraPlacemats, extraCoasters: d.extraCoasters })}</span>
+            <p className="flex justify-between gap-3 text-sm font-extrabold text-cocoa">
+              <span>a set for {d.size} · {bundleSummary(d.size)}</span>
               <span>{gbp(price)}</span>
             </p>
             <CaveatNote className="mt-2 text-lg">no names, just their drawings — they’re only little once ✶</CaveatNote>
           </section>
 
           <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-6 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none md:flex md:flex-col md:items-end">
-            {blocked ? (
-              <p role="status" className="mb-2 flex items-start gap-1.5 text-[12px] font-semibold text-cocoa">
-                <Icon icon={IconAlertTriangle} size={15} className="mt-px shrink-0 text-cinnamon" />
-                the drawing on {blocked.name} is too small to print well — tap it to swap it for another.
-              </p>
-            ) : null}
-            {ready ? (
+            {spec ? (
               <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={() => void addToBasket()} disabled={!!blocked || adding}>
                 <Icon icon={IconShoppingBag} size={16} /> {adding ? 'checking your drawings…' : edit ? 'update basket' : 'add to basket'} · {gbp(price)}
               </Button>
             ) : (
-              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={() => openSheet(0)}>
-                <Icon icon={IconPlus} size={16} /> pick the table drawing
+              <Button size="lg" className="w-full whitespace-nowrap md:w-auto md:!px-8" onClick={() => openSheet(PLACEMATS)}>
+                <Icon icon={IconPlus} size={16} /> pick a drawing for the table
               </Button>
             )}
           </div>
@@ -443,7 +427,7 @@ export function ChristmasBundleBuilder() {
         footer={
           drawings.length > 0 ? (
             <Button size="md" className="w-full" onClick={putIt} disabled={!sheetDrawing?.printable}>
-              {sheet && sheet.slot === 0 ? 'put it on the table' : `use it for ${sheet ? slotName(sheet.slot) : 'this one'}`}
+              {sheet ? `use it for ${slotName(sheet.slot)}` : 'use this one'}
             </Button>
           ) : null
         }
@@ -481,271 +465,117 @@ export function Step({ n, title, note, children }: { n: number; title: string; n
   );
 }
 
-export function Polaroid({ url, i, label, onClick, blocked }: { url: string | null; i: number; label: string; onClick: () => void; blocked?: boolean }) {
-  return (
-    <div
-      className="polaroid tape relative w-24 shrink-0 !p-1.5"
-      style={{ ['--tilt' as string]: i % 2 ? '1.2deg' : '-1.4deg', ['--tape' as string]: TAPES[i % TAPES.length], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
-    >
-      <div className={`relative aspect-square w-full overflow-hidden bg-white ${blocked ? 'ring-2 ring-cinnamon' : ''}`}>
-        {url ? <img src={url} alt="" loading="lazy" className="h-full w-full object-contain" /> : <span className="flex h-full items-center justify-center text-[10px] font-bold text-ink-faint">a drawing</span>}
-        <button type="button" onClick={onClick} aria-label={label} className="absolute inset-0 focus-visible:outline-2" />
-      </div>
-    </div>
-  );
-}
-
-export function AddTile({ label, sub, onClick, wide, disabled }: { label: string; sub?: string; onClick: () => void; wide?: boolean; disabled?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`press flex min-h-11 flex-col items-center justify-center gap-1 rounded-[12px] border-2 border-dashed border-cocoa/30 bg-paper/60 px-3 py-3 text-cinnamon hover:border-cocoa disabled:opacity-40 ${wide ? 'w-full' : 'aspect-square w-24'}`}
-    >
-      <Icon icon={IconPlus} size={18} />
-      <span className="text-[12px] font-extrabold lowercase leading-tight">{label}</span>
-      {sub ? <span className="text-[11px] font-semibold text-ink-soft">{sub}</span> : null}
-    </button>
-  );
-}
-
-function SlotRow({
-  label, each, list, tile, nameOf, assess, blockedOf, onOpen, onRemove, addLabel,
+/** One piece's drawing: a taped polaroid (tap to pick / swap), its name, and an optional "back to the placemats'" link. */
+function Piece({
+  label, url, i, note, aria, onClick, blocked, round, reset,
 }: {
   label: string;
-  each: number;
-  list: BundleArt[];
-  tile: (a: BundleArt) => string | null;
-  nameOf: (i: number) => string;
-  assess: (a: BundleArt) => string | null;
-  blockedOf: (a: BundleArt) => boolean;
-  onOpen: (i: number) => void;
-  onRemove: (i: number) => void;
-  addLabel: string;
+  url: string | null;
+  i: number;
+  note: string;
+  aria: string;
+  onClick: () => void;
+  blocked?: boolean;
+  round?: boolean;
+  reset?: { label: string; onClick: () => void };
 }) {
-  const full = list.length >= BUNDLE_MAX_EACH;
   return (
-    <div>
-      <p className="flex items-baseline justify-between text-sm font-extrabold lowercase text-cocoa">
-        <span>{label}</span>
-        <span className="text-xs font-bold text-ink-soft" aria-live="polite">
-          {list.length} · +{gbp(each)} each
-        </span>
-      </p>
-      <ol className="mt-2 flex flex-wrap gap-x-3 gap-y-4" aria-label={label}>
-        {list.map((a, i) => {
-          const badge = assess(a);
-          const bad = blockedOf(a);
-          return (
-            <li key={i} className="relative">
-              <Polaroid url={tile(a)} i={i + 1} blocked={bad} label={`${nameOf(i)}${badge ? `, ${badge}` : ''} — swap its drawing`} onClick={() => onOpen(i)} />
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                aria-label={`remove ${nameOf(i)}`}
-                className="press absolute -right-2 -top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa before:absolute before:-inset-[9px] before:content-[''] hover:text-cinnamon"
-              >
-                <Icon icon={IconX} size={13} />
-              </button>
-              <p className={`mt-1 flex items-center gap-1 text-[10px] font-extrabold leading-tight ${bad ? 'text-cinnamon' : 'text-green-save'}`} aria-hidden>
-                {badge ? <Icon icon={bad ? IconAlertTriangle : IconCircleCheck} size={12} /> : null}
-                {badge ?? nameOf(i)}
-              </p>
-            </li>
-          );
-        })}
-        <li>
-          <AddTile label={full ? `that’s ${BUNDLE_MAX_EACH} — the most` : addLabel} sub={full ? undefined : `+${gbp(each)}`} onClick={() => onOpen(list.length)} disabled={full} />
-        </li>
-      </ol>
-    </div>
-  );
-}
-
-function Stepper({ label, sub, value, step, onChange }: { label: string; sub: string; value: number; step: number; onChange: (v: number) => void }) {
-  const set = (v: number) => onChange(Math.max(0, Math.min(BUNDLE_MAX_EACH, v)));
-  return (
-    <div className="flex items-center justify-between gap-3" role="group" aria-label={label}>
-      <div>
-        <p className="text-sm font-extrabold lowercase text-cocoa">{label}</p>
-        <p className="text-xs text-ink-soft">{sub}</p>
+    <div className="w-24">
+      <div
+        className="polaroid tape relative w-24 shrink-0 !p-1.5"
+        style={{ ['--tilt' as string]: i % 2 ? '1.2deg' : '-1.4deg', ['--tape' as string]: TAPES[i % TAPES.length], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
+      >
+        <div className={`relative aspect-square w-full overflow-hidden bg-white ${round ? 'rounded-full' : ''} ${blocked ? 'ring-2 ring-cinnamon' : ''}`}>
+          {url ? <img src={url} alt="" loading="lazy" className="h-full w-full object-cover" /> : <span className="flex h-full items-center justify-center text-cinnamon"><Icon icon={IconPlus} size={18} /></span>}
+          <button type="button" onClick={onClick} aria-label={aria} className="absolute inset-0 focus-visible:outline-2" />
+        </div>
       </div>
-      <div className="flex items-center rounded-pill border-2 border-cocoa bg-paper shadow-[0_2px_0_var(--color-cocoa)]">
-        <button type="button" onClick={() => set(value - step)} disabled={value <= 0} aria-label={`${step === 1 ? 'one' : step} fewer ${label}`} className="press flex h-11 w-11 items-center justify-center text-cocoa disabled:opacity-35">
-          <Icon icon={IconMinus} size={16} />
+      <p className="mt-1.5 text-[12px] font-extrabold lowercase leading-tight text-cocoa">{label}</p>
+      <p className={`text-[11px] font-semibold leading-tight ${blocked ? 'text-cinnamon' : 'text-ink-soft'}`}>{blocked ? 'too small to print' : note}</p>
+      {reset ? (
+        <button type="button" onClick={reset.onClick} aria-label={reset.label} className="relative mt-0.5 text-[11px] font-bold text-cinnamon underline decoration-dotted before:absolute before:-inset-x-1 before:-inset-y-3 before:content-['']">
+          undo
         </button>
-        <span className="min-w-8 text-center font-display text-lg text-cocoa" aria-live="polite" aria-label={`${value} ${label}`}>
-          {value}
-        </span>
-        <button type="button" onClick={() => set(value + step)} disabled={value + step > BUNDLE_MAX_EACH} aria-label={`${step === 1 ? 'one' : step} more ${label}`} className="press flex h-11 w-11 items-center justify-center text-cinnamon disabled:opacity-35">
-          <Icon icon={IconPlus} size={16} />
-        </button>
-      </div>
+      ) : null}
     </div>
-  );
-}
-
-export function Row({ label, pence }: { label: string; pence: number }) {
-  return (
-    <li className="flex justify-between gap-3">
-      <span>{label}</span>
-      <span className="font-bold">{gbp(pence)}</span>
-    </li>
   );
 }
 
 /**
- * The FLIP-THROUGH: the placemats, the coasters, then every ornament and sack — one at a time, with
- * the print-quality badge the order-time gate would give it. ← / → or a swipe turns it.
+ * The picture of exactly this set: the founder's layout for the size with these drawings, composed
+ * server-side (/api/mockup/bundle — every drawing authz-checked there). The last picture stays up
+ * while a new one is made; a calm skeleton before the first; a quiet retry if it fails.
  */
-export function BundleFlip<S extends Shown<string>>({
-  shown, view, onView, render, badge, onEmpty, emptyLabel = 'pick a drawing for the table to see it here',
-}: {
-  shown: S[];
-  view: number;
-  onView: (i: number) => void;
-  render: (s: S) => React.ReactNode;
-  badge: (s: S) => { text: string | null; block: boolean; soft: boolean };
-  onEmpty: () => void;
-  /** What the empty state says (nothing picked yet). */
-  emptyLabel?: string;
-}) {
-  const swipe = useRef<number | null>(null);
-  const go = (i: number) => onView(Math.max(0, Math.min(shown.length - 1, i)));
-  const s = shown[view] ?? null;
-  if (!s) {
+function BundlePicture({ sku, spec, size, onEmpty }: { sku: string; spec: BundleSpec | null; size: BundleSize; onEmpty: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [state, setState] = useState<'idle' | 'loading' | 'error'>('idle');
+  const [attempt, setAttempt] = useState(0);
+  const body = spec ? JSON.stringify({ sku, bundle: spec }) : null;
+  useEffect(() => {
+    if (!body) return;
+    // a newer picture supersedes this one: its answer is dropped. (Not aborted — a request cut off
+    // mid-render only makes the server log a broken pipe; the short pause keeps the spares rare.)
+    let stale = false;
+    setState('loading');
+    // a short pause: a run of quick picks makes one picture, not five
+    const t = window.setTimeout(() => {
+      fetch('/api/mockup/bundle', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+        .then(async (r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          const blob = await r.blob();
+          if (stale) return;
+          const next = URL.createObjectURL(blob);
+          setUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return next;
+          });
+          setState('idle');
+        })
+        .catch(() => {
+          if (!stale) setState('error');
+        });
+    }, 120);
+    return () => {
+      stale = true;
+      window.clearTimeout(t);
+    };
+  }, [body, attempt]);
+  useEffect(() => () => {
+    setUrl((old) => {
+      if (old) URL.revokeObjectURL(old);
+      return null;
+    });
+  }, []);
+
+  if (!spec) {
     return (
       <button
         type="button"
         onClick={onEmpty}
-        className="press mx-auto flex aspect-[3425/2421] w-full max-w-md flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-cocoa/30 bg-paper/60 text-sm font-bold text-ink-soft hover:border-cocoa"
+        className="press mx-auto flex aspect-square w-full max-w-xl flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-dashed border-cocoa/30 bg-paper/60 text-sm font-bold text-ink-soft hover:border-cocoa"
       >
         <Icon icon={IconPlus} size={22} className="text-cinnamon" />
-        {emptyLabel}
+        pick a drawing for the table to see your set here
       </button>
     );
   }
-  const b = badge(s);
   return (
-    <section aria-label="flip through your bundle" aria-roledescription="carousel" className="select-none">
-      <div
-        className="relative mx-auto max-w-md touch-pan-y"
-        tabIndex={0}
-        aria-label={`${s.name}, ${view + 1} of ${shown.length} — use the arrow keys to flip through`}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowRight') go(view + 1);
-          else if (e.key === 'ArrowLeft') go(view - 1);
-          else return;
-          e.preventDefault();
-        }}
-        onPointerDown={(e) => {
-          swipe.current = e.clientX;
-        }}
-        onPointerUp={(e) => {
-          if (swipe.current === null) return;
-          const dx = e.clientX - swipe.current;
-          swipe.current = null;
-          if (Math.abs(dx) > 40) go(view + (dx < 0 ? 1 : -1));
-        }}
-      >
-        <div key={view} className="pop-in polaroid !p-3" style={{ ['--tilt' as string]: view % 2 ? '0.6deg' : '-0.6deg', ['--pop-rot' as string]: '0deg' }}>
-          {render(s)}
-          <p className={`mt-2 flex items-center justify-center gap-1 text-[12px] font-extrabold ${b.block ? 'text-cinnamon' : b.soft ? 'text-ink-soft' : 'text-green-save'}`}>
-            {b.text ? <Icon icon={b.block ? IconAlertTriangle : IconCircleCheck} size={14} /> : null}
-            {b.text ?? 'checking the print quality…'}
-          </p>
-        </div>
+    <div className="polaroid relative mx-auto w-full max-w-xl !p-2.5" style={{ ['--tilt' as string]: '-0.5deg' }}>
+      <div className="relative aspect-square w-full overflow-hidden rounded-[6px] bg-paper-2">
+        {url ? (
+          <img src={url} alt={`your set for ${size}: ${size} placemats, ${size} coasters and ${size} ornaments with your drawings`} className={`h-full w-full object-cover transition-opacity duration-150 ${state === 'loading' ? 'opacity-80' : ''}`} />
+        ) : state !== 'error' ? (
+          <div className="h-full w-full animate-pulse bg-paper-2" aria-label="drawing your set…" role="img" />
+        ) : null}
+        {state === 'error' ? (
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-paper/90 p-2 text-[12px] font-bold text-cocoa" role="status">
+            we couldn’t draw the picture just now — your set is fine
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className="press inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-cinnamon">
+              <Icon icon={IconRefresh} size={14} /> try again
+            </button>
+          </div>
+        ) : null}
       </div>
-      <div className="mt-3 flex items-center justify-center gap-3">
-        <button type="button" onClick={() => go(view - 1)} disabled={view === 0} aria-label="previous piece" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa shadow-[0_2px_0_var(--color-cocoa)] disabled:opacity-40">
-          <Icon icon={IconChevronLeft} size={18} />
-        </button>
-        <p className="min-w-36 text-center text-sm font-extrabold lowercase text-cocoa" aria-live="polite">
-          {s.name}
-          {s.count > 1 ? ` · ×${s.count}` : ''}
-          <span className="block text-[11px] font-bold text-ink-faint">
-            {view + 1} of {shown.length}
-          </span>
-        </p>
-        <button type="button" onClick={() => go(view + 1)} disabled={view >= shown.length - 1} aria-label="next piece" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa shadow-[0_2px_0_var(--color-cocoa)] disabled:opacity-40">
-          <Icon icon={IconChevronRight} size={18} />
-        </button>
-      </div>
-    </section>
-  );
-}
-
-/** The shape of each piece's sketch (placemats + coasters have no product photo yet). */
-const SKETCH: Record<string, string> = {
-  placemat: 'rounded-[4%]',
-  coaster: 'rounded-[9%]',
-  ceramicOrnament: 'rounded-full',
-  sack: 'rounded-[3%]',
-};
-
-/**
- * One piece as it prints. The ornament + sack show their real product mockup; the placemats + coasters
- * a clean SKETCH — the print area, cork-edged, with the drawing laid out by the SAME geometry the print
- * file uses (computeLayerRect at the piece's default placement).
- * TODO(founder samples): swap the placemat + coaster sketches for mockups once the sample photos are in
- * (scripts/compose-founder-layers.mjs → seedMockups.ts), as the sack's were.
- */
-export function PiecePreview({
-  s, imageUrl, src, variantId, geom = BUNDLE_PIECE_GEOM[s.piece as BundlePiece],
-}: {
-  s: Shown<string>;
-  imageUrl: string | null;
-  src: { width: number; height: number } | null;
-  /** The piece's variant, when it has a real product mockup (the ornament, the sack, the mug). */
-  variantId: string | null;
-  /** Its print area (default: the family bundle's table of geometry). */
-  geom?: { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number };
-}) {
-  const place = placeOf(s.piece);
-  if (variantId && s.piece !== 'placemat' && s.piece !== 'coaster') {
-    return (
-      <div className="relative mx-auto aspect-square w-full max-w-sm overflow-hidden rounded-[10px] bg-paper-2">
-        <MockupPreview
-          productKey={s.piece as ProductKey}
-          assetId={s.art.assetId}
-          variantId={variantId}
-          transform={place}
-          sourceObjectId={s.art.sourceObjectId ?? null}
-          size="zoom"
-          px={384}
-          instant={imageUrl && src ? { src: imageUrl, aspect: src.width / src.height } : null}
-        />
-      </div>
-    );
-  }
-  const canvas = canvasSizePx(geom);
-  const rect = src ? computeLayerRect(geom, src, place) : null;
-  const box = s.piece === 'sack' ? 'max-w-[60%]' : s.piece === 'placemat' ? 'max-w-full' : 'max-w-[70%]';
-  return (
-    <div className={`mx-auto ${box}`}>
-      <div className={`relative w-full overflow-hidden border-[6px] border-line bg-white ${SKETCH[s.piece] ?? 'rounded-[4%]'}`} style={{ aspectRatio: `${canvas.width} / ${canvas.height}` }}>
-        {imageUrl && rect ? (
-          <img
-            src={imageUrl}
-            alt={`your drawing on ${s.name}`}
-            className="absolute max-w-none"
-            style={{
-              left: `${(rect.x / canvas.width) * 100}%`,
-              top: `${(rect.y / canvas.height) * 100}%`,
-              width: `${(rect.width / canvas.width) * 100}%`,
-              height: `${(rect.height / canvas.height) * 100}%`,
-            }}
-          />
-        ) : imageUrl ? (
-          <img src={imageUrl} alt={`your drawing on ${s.name}`} className={`h-full w-full ${place.scale ? 'object-cover' : 'object-contain'}`} />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-paper-2 text-xs font-bold text-ink-faint">your drawing</div>
-        )}
-      </div>
-      {s.piece === 'placemat' || s.piece === 'coaster' ? (
-        <p className="mt-1.5 text-center text-[11px] font-semibold text-ink-faint">a sketch of {s.piece === 'placemat' ? 'a placemat' : 'a coaster'} — photos of the real thing soon</p>
-      ) : null}
     </div>
   );
 }

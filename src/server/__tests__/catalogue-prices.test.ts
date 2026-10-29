@@ -3,9 +3,8 @@ import { CATALOGUE } from '@/pricing';
 import { definedPriceList, PATTERN_PRODUCT_KEYS } from '../catalogue';
 import { packSizeOf } from '@/lib/card-packs';
 import {
-  BUNDLE_BASE_PENCE, BUNDLE_COMPONENT_SKUS, BUNDLE_KEY, BUNDLE_ONLY_SKUS, BUNDLE_PIECE_GEOM, COASTER_PACKS, ORNAMENT_SKU, PLACEMAT_PACKS, SACK_SKU, pieceOfSku,
+  BUNDLE_COMPONENT_SKUS, BUNDLE_KEY, BUNDLE_ONLY_SKUS, BUNDLE_PIECE_GEOM, BUNDLE_SIZES, COASTER_2PK, COASTER_4PK, ORNAMENT, PLACEMAT_2PK, PLACEMAT_4PK, pieceOfSku,
 } from '@/lib/christmas-bundle';
-import { EVE_COMPONENT_SKUS, EVE_KEY, EVE_PRICE_PENCE, MUG_COLOURS, mugSkuFor } from '@/lib/christmas-eve';
 
 // The founder-agreed shop prices (2026-10-21: "adjust all prices to the nearest £0.50", plus the
 // heart cushion +£2, 30-piece jigsaw +£1 and greetings card +50p). Server-authoritative: this is
@@ -170,7 +169,7 @@ describe('greetings-card multipacks', () => {
   });
 });
 
-// The CHRISTMAS FAMILY BUNDLE (founder, 27 Oct — go-to-market C25 + C26). Prices + Prodigi SKUs + print
+// The CHRISTMAS FAMILY BUNDLE (founder, 29 Oct — three sizes, no add-ons). Prices + Prodigi SKUs + print
 // areas (sandbox GET /v4.0/products, 27 Oct) pinned against src/lib/christmas-bundle.ts, so the builder's
 // DPI check, the order's split and the seeded templates can never disagree.
 describe('christmas family bundle — catalogue entries', () => {
@@ -180,24 +179,45 @@ describe('christmas family bundle — catalogue entries', () => {
     return r;
   };
 
-  it('the bundle is seeded at its £90 base, not printed itself, on show (founder, 28 Oct)', () => {
-    const b = row(BUNDLE_KEY);
-    expect(b.pricePence).toBe(BUNDLE_BASE_PENCE);
-    expect(b.prodigiSku).toBeNull();
-    expect(b.visibleInShop).toBe(true); // on show (founder, 28 Oct)
-    expect(b.paused).toBe(false); // priceable + orderable (hidden ≠ paused)
-    expect(CATALOGUE.christmasBundle.pricePence).toBe(BUNDLE_BASE_PENCE);
+  it('the three sizes are seeded at £78 / £145 / £279, not printed themselves, on show — and nothing else', () => {
+    const rows = list.filter((r) => r.productKey === BUNDLE_KEY);
+    expect(rows.map((r) => [r.sku, r.pricePence, r.isDefault, r.attributes.size])).toEqual([
+      ['christmasBundle', 7800, true, 'for 2'],
+      ['christmasBundle-for4', 14500, false, 'for 4'],
+      ['christmasBundle-for8', 27900, false, 'for 8'],
+    ]);
+    expect(rows.map((r) => r.sku)).toEqual(BUNDLE_SIZES.map((s) => s.sku));
+    for (const r of rows) expect(r).toMatchObject({ prodigiSku: null, visibleInShop: true, paused: false });
+    expect(CATALOGUE.christmasBundle.pricePence).toBe(7800);
   });
 
-  it('placemats (4-pack £60) and coasters (6-pack £32) are seeded as standalone products', () => {
+  it('placemats (4-pack £60) and coasters (2 / 4 / 6-packs £18 / £26 / £34) are seeded as standalone products', () => {
     expect(row('placemat')).toMatchObject({ isDefault: true, pricePence: 6000, prodigiSku: 'H-PLACE-4PK' });
-    expect(row('coaster')).toMatchObject({ isDefault: true, pricePence: 3200, prodigiSku: 'H-COAST-6PK' });
+    // coasters start at TWO (founder, 29 Oct); the 6-pack keeps the product key; the single isn't sold
+    const coasters = list.filter((r) => r.productKey === 'coaster' && !BUNDLE_ONLY_SKUS.has(r.sku)).map((r) => [r.sku, r.prodigiSku, r.pricePence, r.isDefault]);
+    expect(coasters).toEqual([
+      ['coaster-packof2', 'H-COAST-2PK', 1800, false],
+      ['coaster-packof4', 'H-COAST-4PK', 2600, false],
+      ['coaster', 'H-COAST-6PK', 3400, true],
+    ]);
+    expect(BUNDLE_ONLY_SKUS.has('coaster-packof1')).toBe(true);
   });
 
-  it('every pack the bundle expands into is seeded with its own Prodigi SKU', () => {
-    for (const p of [...PLACEMAT_PACKS, ...COASTER_PACKS]) expect(row(p.sku).prodigiSku, p.sku).toBe(p.prodigiSku);
-    expect(row(ORNAMENT_SKU).prodigiSku).toBe('XMAS-PORC-BAUB');
-    expect(row(SACK_SKU).prodigiSku).toBe('XMAS-SACK');
+  it('every coaster pack still clears 10% net with a 10% creator code + 5% commission (the margin-guard floor)', () => {
+    // Prodigi product cost ex-VAT, before post (scripts/discount-headroom.mjs); uk9 post £4.30
+    const COST: Record<string, number> = { 'coaster-packof2': 550, 'coaster-packof4': 1000, coaster: 1500 };
+    for (const [sku, product] of Object.entries(COST)) {
+      const price = row(sku).pricePence;
+      const paid = price * 0.9; // the 10% code
+      const revenue = paid / 1.2;
+      const fulfil = product + 430;
+      const net = revenue - fulfil - (0.015 * paid + 20) - 0.03 * fulfil - 0.05 * revenue /* commission */ - 55;
+      expect(net / revenue, sku).toBeGreaterThanOrEqual(0.1);
+    }
+  });
+
+  it('every item the bundle expands into is seeded with its own Prodigi SKU', () => {
+    for (const p of [PLACEMAT_2PK, PLACEMAT_4PK, COASTER_2PK, COASTER_4PK, ORNAMENT]) expect(row(p.sku).prodigiSku, p.sku).toBe(p.prodigiSku);
   });
 
   it('each piece’s seeded print template is the geometry the builder + the order gate use', () => {
@@ -210,8 +230,6 @@ describe('christmas family bundle — catalogue entries', () => {
     expect(row('placemat').px).toEqual({ w: 3425, h: 2421 });
     expect(row('coaster').px).toEqual({ w: 1251, h: 1251 });
     expect(row('ceramicOrnament')).toMatchObject({ px: { w: 885, h: 885 }, bleedMm: 0 });
-    // the sack: Prodigi's 3779×5905 px panel (320×500 mm) at 150 dpi on fabric — the same aspect
-    expect(Math.abs(row('sack').px!.w / row('sack').px!.h - 3779 / 5905)).toBeLessThan(0.001);
   });
 
   it('the bundle-only packs are never priceable on their own (the static list doesn’t carry them)', () => {
@@ -219,18 +237,10 @@ describe('christmas family bundle — catalogue entries', () => {
   });
 });
 
-// The CHRISTMAS EVE BUNDLE (founder, 27 Oct): £62 a bundle, £74 separately (sack £35 + ornament £21 + mug £18).
-describe('christmas eve bundle — catalogue entries', () => {
-  const row = (sku: string) => list.find((x) => x.sku === sku);
-  it('is seeded at £62, not printed itself, on show (founder, 28 Oct)', () => {
-    expect(row(EVE_KEY)).toMatchObject({ pricePence: EVE_PRICE_PENCE, prodigiSku: null, visibleInShop: true, paused: false });
-    expect(CATALOGUE.christmasEveBundle.pricePence).toBe(EVE_PRICE_PENCE);
-  });
-  it('separately it’s £74', () => {
-    expect(['sack', 'ceramicOrnament', 'mug'].reduce((n, s) => n + row(s)!.pricePence, 0)).toBe(7400);
-  });
-  it('every mug colour is a seeded two-tone 11oz variant; every piece has its Prodigi SKU', () => {
-    for (const c of MUG_COLOURS) expect(row(mugSkuFor(c)), c).toMatchObject({ attributes: { size: '11oz', colour: c } });
-    for (const sku of EVE_COMPONENT_SKUS) expect(row(sku)?.prodigiSku, sku).toBeTruthy();
+// The CHRISTMAS EVE BUNDLE — retired (founder, 29 Oct: "drop it for simplicity").
+describe('christmas eve bundle — retired', () => {
+  it('is PAUSED and off the shop: the seed deactivates it, so it can never be priced or ordered', () => {
+    expect(list.find((x) => x.sku === 'christmasEveBundle')).toMatchObject({ paused: true, visibleInShop: false });
+    expect(Object.prototype.hasOwnProperty.call(CATALOGUE, 'christmasEveBundle')).toBe(false);
   });
 });

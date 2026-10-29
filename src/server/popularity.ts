@@ -17,14 +17,21 @@ import { seasonalExpected, seasonClock } from '@/lib/season';
  * catalogue. Hidden products may sit in the list — the shop still only shows visibleInShop ones.
  */
 export const EXPECTED_POPULARITY = [
+  // the christmas family bundle leads the shop (founder, 29 Oct: "the bundle appears at the top of the catalogue")
+  'christmasBundle',
   'framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
   // the range expansion (D21) joins the same range — one collection, shown together (founder, 2026-10-21)
   'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
   // the dated 2027 wall calendar (D23, Christmas 2026 → mid-January)
   'calendar',
-  // the Christmas bundles + the table set (founder, 27–28 Oct)
-  'christmasBundle', 'christmasEveBundle', 'placemat', 'coaster',
+  // the Christmas table set (founder, 27–28 Oct)
+  'placemat', 'coaster',
 ];
+
+/** Always first, whatever sells (founder, 29 Oct: the family bundle "appears at the top of the catalogue"). */
+export const PINNED_FIRST: readonly string[] = ['christmasBundle'];
+/** The order with the pinned products moved to the front (in their pinned order). */
+export const pinFirst = (order: readonly string[], pinned: readonly string[] = PINNED_FIRST): string[] => [...pinned.filter((k) => order.includes(k)), ...order.filter((k) => !pinned.includes(k))];
 
 export const POPULARITY_WINDOW_DAYS = 90;
 /** How many sales the expected order is "worth" in total — real sales take over beyond this. */
@@ -64,7 +71,8 @@ export async function recomputePopularity(db: DbHandle, now = new Date()): Promi
   const sold = await unitsSold(db, now);
   // Christmas (D24): while the season is on, the festive range leads in a fixed order, the rest
   // follows by popularity; outside it this is just the popularity order (src/lib/season.ts).
-  const order = seasonalExpected(rankByPopularity(sold), seasonClock(now));
+  // The family bundle is pinned to the very top either way (PINNED_FIRST).
+  const order = pinFirst(seasonalExpected(rankByPopularity(sold), seasonClock(now)));
   for (const [i, key] of order.entries()) {
     await db.update(products).set({ popularRank: i + 1 }).where(sql`${products.key} = ${key}`);
   }

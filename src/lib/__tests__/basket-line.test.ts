@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { basketLineId, designSig } from '@/lib/basket-line';
 import { isLineOfSku, lineIdFor, lineIdForSku, productQtyInBasket } from '@/lib/catalogue-view';
-import { rekeyLines, useBasket, type BasketItem } from '@/lib/store';
+import { dropRetiredLines, rekeyLines, useBasket, type BasketItem } from '@/lib/store';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 /**
@@ -93,5 +93,18 @@ describe('rekeyLines — a basket saved before lines were per drawing', () => {
     const out = rekeyLines([{ ...a, id: 'cat-cushion-heart' }, { ...a, qty: 2 }]);
     expect(out).toHaveLength(1);
     expect(out[0]!.qty).toBe(3);
+  });
+});
+
+describe('dropRetiredLines — a basket saved before 29 Oct (the christmas eve bundle retired, the family bundle sized)', () => {
+  it('drops christmas eve bundle lines and old-shape family bundles; keeps sized bundles and everything else', () => {
+    const line = (o: Partial<BasketItem>): BasketItem => ({ id: 'x', name: 'x', product: 'mug' as BasketItem['product'], pricePence: 1, qty: 1, ...o });
+    const out = dropRetiredLines([
+      line({ id: 'eve', product: 'christmasEveBundle' as BasketItem['product'] }),
+      line({ id: 'old', product: 'christmasBundle' as BasketItem['product'], bundle: { table: { assetId: 'a' } } as unknown as BasketItem['bundle'] }),
+      line({ id: 'new', product: 'christmasBundle' as BasketItem['product'], sku: 'christmasBundle-for4', bundle: { placemat: { assetId: 'a' }, coaster: null, ornaments: [] } }),
+      line({ id: 'mug' }),
+    ]);
+    expect(out.map((i) => i.id)).toEqual(['new', 'mug']);
   });
 });

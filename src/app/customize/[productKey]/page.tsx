@@ -12,7 +12,7 @@ import { type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
-import { MultiBuyNotice } from '@/ui/components/MultiBuy';
+import { MultiBuyQty } from '@/ui/components/MultiBuy';
 import { ProductDetails } from '@/ui/components/ProductDetails';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload, useUploadHydrated, type CardMessage } from '@/lib/store';
@@ -34,8 +34,6 @@ import { CalendarBuilder } from '@/ui/components/CalendarBuilder';
 import { isCalendarKey } from '@/lib/calendar';
 import { ChristmasBundleBuilder } from '@/ui/components/ChristmasBundleBuilder';
 import { isBundleKey } from '@/lib/christmas-bundle';
-import { ChristmasEveBuilder } from '@/ui/components/ChristmasEveBuilder';
-import { isEveKey } from '@/lib/christmas-eve';
 import { cachedCatalogue, loadCatalogueCached } from '@/lib/catalogueCache';
 import { saveDesignAction } from '@/app/actions/designs';
 import { has3D } from '@/ui/three/spinnable';
@@ -73,7 +71,6 @@ export default function CustomizePage() {
   if (isCardPackKey(params.productKey)) return <CardPackBuilder />;
   if (isCalendarKey(params.productKey)) return <CalendarBuilder />; // 13 pages: its own picker + flip-through
   if (isBundleKey(params.productKey)) return <ChristmasBundleBuilder />; // the table + a drawing per ornament / sack
-  if (isEveKey(params.productKey)) return <ChristmasEveBuilder />; // a sack + an ornament + a mug, one drawing (or one each)
   return <CustomizeProduct />;
 }
 
@@ -92,6 +89,9 @@ function CustomizeProduct() {
   const uploadReady = useUploadHydrated();
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
+  const setLineQty = useBasket((s) => s.setQty);
+  // how many to add (founder, 29 Oct: the multi-buy dropdown sets it; an edited line keeps its own)
+  const [qty, setQty] = useState(1);
   const placements = usePlacements((s) => s.placements);
 
   // Edit mode: arrived from a basket line (?edit=<lineId>) to change that exact creation.
@@ -177,6 +177,7 @@ function CustomizeProduct() {
     const lv = line && product.variants.find((v) => v.id === line.variantId);
     if (!line || !lv) return;
     setEdit({ id: line.id, assetId: line.artwork?.assetId, sourceObjectId: line.artwork?.sourceObjectId });
+    setQty(line.qty);
     // Returning from the positioner (resume=1): the selection + placement stores already
     // hold the user's IN-PROGRESS edits (the new placement, a toggled orientation) — re-seeding
     // from the still-unchanged basket line would clobber them. Only seed on FIRST entry from
@@ -533,11 +534,16 @@ function CustomizeProduct() {
     if (edit) {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
-      update(edit.id, fields, basketLineId(variant.sku, fields));
+      const id = basketLineId(variant.sku, fields);
+      update(edit.id, fields, id);
+      setLineQty(id, qty);
       toast('basket updated ✓');
     } else {
-      add({ id: basketLineId(variant.sku, fields), ...fields }); // a different drawing / colour / back = its own line
-      toast('added to basket ✓');
+      const id = basketLineId(variant.sku, fields);
+      const before = useBasket.getState().items.find((i) => i.id === id)?.qty ?? 0;
+      add({ id, ...fields }); // a different drawing / colour / back = its own line
+      setLineQty(id, before + qty); // the dropdown's quantity (multi-buy is the server's, at checkout)
+      toast(qty > 1 ? `${qty} added to basket ✓` : 'added to basket ✓');
     }
     router.push('/start-creating');
   };
@@ -550,6 +556,8 @@ function CustomizeProduct() {
   // zooming shows what you're looking at (not always the single view). For a card: 'outside' → the
   // flat spread ('outside-front'/'outside-full'); 'single'/'inside' → the primary card mockup. A
   // full-width closed card shows only its FRONT panel of the double-wide design (spanHalf='front').
+  // the placemat's back: the founder's photo of the cork underside, as authored (no drawing on it)
+  const photoBack = showBack ? PHOTO_BACK[product.key] ?? null : null;
   const activeMockupView =
     product.key === 'card'
       ? cardView === 'outside'
@@ -573,6 +581,7 @@ function CustomizeProduct() {
       {/* Big close-up: near-fullscreen on mobile, large on desktop. */}
       <Modal open={zoomOpen} onClose={() => setZoomOpen(false)} size="xl" fill title={product.label} subtitle={gbp(variant?.pricePence ?? product.fromPence)}>
         <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-oat p-3">
+          {photoBack ? <StillPhoto product={product.key} view="back" alt={photoBack} px={720} /> : (
           <MockupPreview
             productKey={product.key as ProductKey}
             assetId={activeAssetId}
@@ -587,6 +596,7 @@ function CustomizeProduct() {
             px={720}
             loader
           />
+          )}
         </div>
       </Modal>
       <div className="grid gap-7 md:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] md:items-start lg:gap-12">
@@ -638,6 +648,9 @@ function CustomizeProduct() {
               <CardInsidePreview message={cardMessage} />
             ) : (
               <>
+                {photoBack ? (
+                  <StillPhoto product={product.key} view="back" alt={photoBack} px={360} />
+                ) : (
                 <MockupPreview
                   productKey={product.key as ProductKey}
                   assetId={activeAssetId}
@@ -652,6 +665,7 @@ function CustomizeProduct() {
                   px={360}
                   loader
                 />
+                )}
                 <button
                   type="button"
                   onClick={() => setZoomOpen(true)}
@@ -689,7 +703,7 @@ function CustomizeProduct() {
           ) : null}
           {/* Cushion "turn it around" — flip the preview between the image side and the back
               (the chosen colour, or the plain white reverse for heart/round). */}
-          {product.key === 'cushion' || FLIP_BACK_KEYS.has(product.key) ? (
+          {product.key === 'cushion' || FLIP_BACK_KEYS.has(product.key) || PHOTO_BACK[product.key] ? (
             <div className="mt-2 flex items-center justify-center gap-1.5" role="group" aria-label="turn it around">
               {([['the front', false], ['the back', true]] as const).map(([label, b]) => (
                 <button
@@ -697,6 +711,7 @@ function CustomizeProduct() {
                   type="button"
                   onClick={() => setShowBack(b)}
                   aria-pressed={showBack === b}
+                  aria-label={`show ${label}`}
                   className={`${OPT_SM} ${showBack === b ? OPT_ON : OPT_OFF}`}
                 >
                   {label}
@@ -877,8 +892,8 @@ function CustomizeProduct() {
             <span className="text-xs font-semibold text-green-save">{deliveryLine(variant?.sku ?? product.key)}</span>
             <ChristmasPromise productKey={product.key} attrs={{ size, colour }} />
           </div>
-          {/* buy more, save more — THIS product's own tiers, from its costs (server-side) */}
-          <MultiBuyNotice tiers={variant?.multiBuyBps} productLabel={product.label} />
+          {/* buy more, save more + how many — THIS product's own tiers, from its costs (server-side) */}
+          <MultiBuyQty tiers={variant?.multiBuyBps} value={qty} onChange={setQty} productLabel={product.label} />
 
           {/* Phone cases: the "size" is the phone — a type-to-search picker, then grade + finish. */}
           {product.key === 'phoneCase' ? (
@@ -1307,6 +1322,24 @@ function Picker({
           );
         })}
       </div>
+    </div>
+  );
+}
+
+/** Products whose "the back" is a PHOTO shown as authored (founder, 29 Oct) → its description. */
+const PHOTO_BACK: Record<string, string> = { placemat: 'the back of the placemat: natural cork, no print' };
+
+/** A product photo as authored (/api/mockup/still) — a calm skeleton until it lands. */
+function StillPhoto({ product, view, alt, px }: { product: string; view: string; alt: string; px: number }) {
+  const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
+  return (
+    <div className="relative flex w-full items-center justify-center" style={{ maxWidth: px }}>
+      {state === 'loading' ? <div className="absolute inset-0 rounded-lg bg-line motion-safe:animate-pulse" aria-hidden /> : null}
+      {state === 'error' ? (
+        <p role="status" className="py-16 text-center text-xs font-bold text-ink-soft">the back photo isn’t here yet</p>
+      ) : (
+        <img src={`/api/mockup/still?product=${encodeURIComponent(product)}&view=${encodeURIComponent(view)}`} alt={alt} onLoad={() => setState('ready')} onError={() => setState('error')} className={`aspect-square w-full rounded-lg object-contain ${state === 'ready' ? '' : 'opacity-0'}`} />
+      )}
     </div>
   );
 }

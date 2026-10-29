@@ -42,7 +42,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
 
   it('seeds products → variants → print templates → provider mapping from the static catalogue', async () => {
     const res = await seedCatalogue(db);
-    expect(res.products).toBe(Object.keys(CATALOGUE).length);
+    expect(res.products).toBe(Object.keys(CATALOGUE).length + 1); // + the retired christmas eve bundle, seeded PAUSED (never priced)
 
     // a printable product has a template; an add-on (gift wrap) does not
     const [framed] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
@@ -88,7 +88,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
     // + the calendar (PR #15) and the bauble + sack (D24), on show for Christmas
-    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'christmasEveBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    expect(shop.map((p) => p.key)).toEqual(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -101,7 +101,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.babyBodysuit!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'christmasEveBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));

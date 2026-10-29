@@ -8,7 +8,7 @@ import { CardPackThumb } from './CardPackThumb';
 import { BundleThumb } from './BundleThumb';
 import { MockupPreview } from './MockupPreview';
 import { ProductArt, type ProductKey } from './ProductArt';
-import { gbp, isBundleLine, isEveLine, isPackLine, useBasket, type BasketItem } from '@/lib/store';
+import { gbp, isBundleLine, isPackLine, useBasket, type BasketItem } from '@/lib/store';
 
 /**
  * The slim vertical basket down the right of the Start-Creating catalogue — a clear
@@ -39,7 +39,7 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
       <div className="relative aspect-square w-full overflow-hidden rounded-[10px] bg-paper-2">
         {pack ? (
           <CardPackThumb item={item} px={150} />
-        ) : bundle || isEveLine(item) ? (
+        ) : bundle ? (
           <BundleThumb item={item} px={150} />
         ) : personalised ? (
           <MockupPreview

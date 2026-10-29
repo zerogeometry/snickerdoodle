@@ -5,7 +5,9 @@ import sharp from 'sharp';
 import { eq } from 'drizzle-orm';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
-import { setMockupTemplate, setMockupView } from './templates';
+import { setBundleLayout, setMockupTemplate, setMockupView } from './templates';
+import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, ROLE_PIECE, type BundleLayoutName } from './bundleMockup';
+import { BUNDLE_KEY, BUNDLE_PIECE_GEOM } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
@@ -117,6 +119,65 @@ function hoodiePhoto(): GarmentPhoto | null {
 // present. The layer order composited here is the founder's spec: background → shadow →
 // paper → [the child's print, clipped to the aperture at render time] → frame.
 const LAYERED = path.join(ROOT, 'layered');
+
+/** The CHRISTMAS FAMILY BUNDLE's layouts — the founder's PSD layers (29 Oct), one folder per picture
+ * (thumb = the catalogue tile; x2/x4/x8 = the builder's picture of each size) — and the backdrop our
+ * other tiles stand on (the ceramic ornament's), so the bundle matches them. */
+export const BUNDLE_BACKDROP = path.join(LAYERED, 'bauble', 'ceramic', 'background.png');
+export function bundleLayoutDir(name: BundleLayoutName): string | null {
+  const dir = path.join(LAYERED, 'christmasBundle', name);
+  return existsSync(path.join(dir, 'manifest.json')) && existsSync(BUNDLE_BACKDROP) ? dir : null;
+}
+
+/** The standalone PLACEMAT + COASTER tiles (founder's print maps, 29 Oct): one placemat straight on;
+ * two coasters at an angle, the back one first, then the front (its shadow falls on the back one). */
+export const TILE_LAYERS: Record<'placemat' | 'coaster', Array<{ file: string; role: 'placemat' | 'coaster' }>> = {
+  placemat: [{ file: path.join(LAYERED, 'placemat', 'printmap.png'), role: 'placemat' }],
+  coaster: [
+    { file: path.join(LAYERED, 'coaster', 'printmap-1-back.png'), role: 'coaster' },
+    { file: path.join(LAYERED, 'coaster', 'printmap-2-front.png'), role: 'coaster' },
+  ],
+};
+/** The placemat's REAR VIEW — the founder's photo of the cork underside, shown as authored (no art). */
+export const PLACEMAT_BACK = path.join(LAYERED, 'placemat', 'back.webp');
+
+/** Flatten + store a layout (src/server/print/bundleMockup.ts) on the variant `sku`, as display-only views. */
+async function storeLayout(db: DbHandle, sku: string, layout: string, built: Awaited<ReturnType<typeof buildBundleLayout>>): Promise<number> {
+  const [v] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, sku));
+  if (!v) return 0;
+  await setBundleLayout(db, {
+    variantId: v.id,
+    layout,
+    base: built.base,
+    regions: built.regions.map((r) => {
+      const g = BUNDLE_PIECE_GEOM[ROLE_PIECE[r.role]];
+      return { ...r, printWidthPx: g.printWidthPx, printHeightPx: g.printHeightPx, materialClass: r.role === 'ornament' ? ('GLOSS' as const) : ('PAPER' as const) };
+    }),
+  });
+  return built.regions.length;
+}
+
+/** Every staged flattened layout: the family bundle's four pictures, the placemat + coaster tiles, and
+ * the placemat's back photo. Returns how many print areas were stored. */
+export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+  let n = 0;
+  for (const name of BUNDLE_LAYOUTS) {
+    const dir = bundleLayoutDir(name);
+    if (dir) n += await storeLayout(db, BUNDLE_KEY, name, await buildBundleLayout(dir, BUNDLE_BACKDROP));
+  }
+  for (const [sku, layers] of Object.entries(TILE_LAYERS)) {
+    if (!existsSync(BUNDLE_BACKDROP) || !layers.every((l) => existsSync(l.file))) continue;
+    const m = await sharp(layers[0]!.file).metadata();
+    n += await storeLayout(db, sku, 'tile', await buildLayout(layers, [m.width!, m.height!], BUNDLE_BACKDROP));
+  }
+  if (existsSync(PLACEMAT_BACK)) {
+    const [v] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, 'placemat'));
+    const buf = readFileSync(PLACEMAT_BACK);
+    const m = await sharp(buf).metadata();
+    if (v) await setMockupView(db, { variantId: v.id, view: 'back', blank: buf, contentType: 'image/webp', printQuad: [[0, 0], [1, 0], [1, 1], [0, 1]], printWidthPx: m.width!, printHeightPx: m.height!, materialClass: 'PAPER' });
+  }
+  return n;
+}
 function layeredFrameDir(colour: string): string | null {
   const dir = path.join(LAYERED, 'framedPrint', colour.replace(/\s+/g, '-'));
   const has = (f: string) => existsSync(path.join(dir, f));
@@ -1535,6 +1596,9 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
       }
     }
   }
+
+  // The christmas family bundle's pictures (it isn't printed itself, so it has no print template).
+  authoredViews += await seedBundleLayouts(db);
 
   return { authored, authoredViews, skippedProducts: [...new Set(skipped)], registration };
 }

@@ -133,7 +133,7 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.holiday, productType: 'Christmas > Sacks',
     image: xmas('sack', 1000, 778, 'A natural cotton Christmas sack printed with a child’s crayon reindeer, by a fireplace'),
   },
-  // The Christmas table set + bundles (founder, 27–28 Oct). No photos yet (samples on order), so the
+  // The Christmas table set + the family bundle (founder, 27–29 Oct). No photos yet (samples on order), so the
   // feed leaves them out until they have one. Category: the seasonal-decorations node already checked
   // above, until a precise placemat/coaster taxonomy id is verified against the en-GB list.
   placemat: {
@@ -141,15 +141,11 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
   },
   coaster: {
-    slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (set of 6)',
+    slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (packs of 2, 4 or 6)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
   },
   christmasBundle: {
-    slug: 'christmas-family-bundle', name: 'christmas family bundle', title: 'Christmas family bundle: placemats, coasters, ornaments and sacks with your children’s drawings',
-    googleCategory: CAT.holiday, productType: 'Christmas > Bundles',
-  },
-  christmasEveBundle: {
-    slug: 'christmas-eve-bundle', name: 'christmas eve bundle', title: 'Christmas Eve bundle: a sack, an ornament and a mug with your child’s drawing',
+    slug: 'christmas-family-bundle', name: 'christmas family bundle', title: 'Christmas family bundle: placemats, coasters and ornaments with your children’s drawings',
     googleCategory: CAT.holiday, productType: 'Christmas > Bundles',
   },
   phoneCase: {

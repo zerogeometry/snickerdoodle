@@ -11,8 +11,11 @@ import { ProductArt, type ProductKey } from '@/ui/components/ProductArt';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { CardPackThumb } from '@/ui/components/CardPackThumb';
 import { BundleThumb } from '@/ui/components/BundleThumb';
-import { MultiBuyChip } from '@/ui/components/MultiBuy';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isEveLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { MultiBuyChip, MultiBuyQty } from '@/ui/components/MultiBuy';
+import { CheckoutAddOns } from '@/ui/components/CheckoutAddOns';
+import { productOfKey } from '@/pricing';
+import { hasMultiBuy } from '@/pricing/multibuy';
+import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
@@ -140,6 +143,13 @@ export default function CheckoutPage() {
   // sellable); the client figure only fills in until the quote lands.
   const linePence = (i: number) => (quote && quote.lines.length === items.length ? quote.lines[i]!.linePence : items[i]!.pricePence * items[i]!.qty);
   // The SERVER's multi-buy on this line (only when it's the saving the basket gets) — never worked out here.
+  // the line's product's multi-buy tiers — the SERVER's (quoteBasket), aligned with the lines
+  const tiersOf = (i: number) => (quote && quote.lines.length === items.length ? (quote.lineTiers?.[i] ?? null) : null);
+  // how many of the same product sit on the OTHER lines (multi-buy counts the product across lines)
+  const othersOf = (i: number) => {
+    const p = productOfKey(items[i]!.sku ?? items[i]!.product);
+    return items.reduce((n, x, j) => n + (j !== i && !isBundleLine(x) && productOfKey(x.sku ?? x.product) === p ? x.qty : 0), 0);
+  };
   const multiBuyOf = (i: number) => {
     const l = quote && quote.lines.length === items.length ? quote.lines[i] : undefined;
     return l?.multiBuyBps && l.multiBuySavingPence ? { bps: l.multiBuyBps, pence: l.multiBuySavingPence } : null;
@@ -347,7 +357,7 @@ export default function CheckoutPage() {
                           placement — so checkout shows every unique instance exactly as it prints. */}
                       {isPackLine(item) ? (
                         <CardPackThumb item={item} px={56} />
-                      ) : isBundleLine(item) || isEveLine(item) ? (
+                      ) : isBundleLine(item) ? (
                         <BundleThumb item={item} px={56} />
                       ) : item.artwork && item.variantId ? (
                         <MockupPreview
@@ -379,6 +389,10 @@ export default function CheckoutPage() {
                       ) : (
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5">
                         {/* wraps to a second line on a narrow phone rather than pushing the price off screen */}
+                        {tiersOf(idx) && hasMultiBuy(tiersOf(idx)!) ? (
+                          // buy more, save more: the same dropdown as the product page — each option's discount from the server's tiers
+                          <MultiBuyQty compact tiers={tiersOf(idx)} value={Math.min(item.qty, 10)} others={othersOf(idx)} onChange={(q) => setQty(item.id, q)} productLabel={item.name} />
+                        ) : (
                         <div className="flex items-center rounded-full border border-line bg-white">
                           <button type="button" aria-label="one fewer" onClick={() => setQty(item.id, item.qty - 1)} className="px-2 py-0.5 text-ink-soft">
                             <Icon icon={IconMinus} size={12} />
@@ -388,7 +402,8 @@ export default function CheckoutPage() {
                             <Icon icon={IconPlus} size={12} />
                           </button>
                         </div>
-                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) || isEveLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
+                        )}
+                        <button type="button" onClick={() => router.push(`/customize/${item.product}${isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`)} className="rounded-full border border-line bg-white px-2.5 py-0.5 text-[11px] font-bold text-cocoa hover:border-honey">
                           customize
                         </button>
                       </div>
@@ -410,6 +425,9 @@ export default function CheckoutPage() {
                   </div>
                 ))}
               </div>
+
+              {/* Goes nicely with it — made with their drawing, the server's real saving (src/server/addOns.ts) */}
+              {quote?.addOns?.length ? <CheckoutAddOns addOns={quote.addOns} items={items} gift={gift} /> : null}
 
               {/* Gift fork */}
               <div className="mt-3 rounded-2xl border border-dashed border-tomato bg-paper-2 p-3.5">

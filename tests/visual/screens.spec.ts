@@ -84,11 +84,12 @@ for (const vp of WIDTHS) {
       await expect(page.getByRole('heading', { name: 'card pack' })).toBeVisible();
       await expect(page.getByText(/1 of \d+ chosen/)).toBeVisible();
       await shot(page, `${vp.name}-customize-cardpack`);
-      // the christmas family bundle builder: the drawing on the table, the flip-through, the add-ons
-      await push(page, '/customize/christmasBundle');
+      // the christmas family bundle builder: three sizes, the drawing on the table, a picture of the set
+      await push(page, '/customize/christmasBundle?size=4');
       await expect(page.getByRole('heading', { name: 'christmas family bundle' })).toBeVisible();
-      await expect(page.getByRole('button', { name: /add to basket · £90$/ })).toBeVisible();
-      await expect(page.getByText('the placemats · ×4')).toBeVisible();
+      await expect(page.getByRole('radio', { name: /a set for 4/ })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByRole('button', { name: /add to basket · £145$/ })).toBeVisible();
+      await expect(page.getByRole('img', { name: /your set for 4/ })).toBeVisible({ timeout: 30_000 });
       await shot(page, `${vp.name}-customize-christmas-bundle`);
       await push(page, '/customize/mug');
       await expect(page.getByRole('button', { name: /edit placement/i })).toBeVisible();

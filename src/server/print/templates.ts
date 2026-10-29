@@ -154,6 +154,40 @@ async function putAsset(db: DbHandle, kind: 'BLANK' | 'MASK' | 'LIGHTING', key: 
   return ta!.id;
 }
 
+/**
+ * Author (or re-author) one FLATTENED LAYOUT (bundleMockup.ts — the family bundle's pictures, the
+ * standalone placemat + coaster tiles): ONE base picture shared by the layout, and per print area a
+ * mockup_views row — view `layout-<layout>-<role>-<index>` — whose mask is the area's WEIGHT and whose
+ * printQuad is its oriented rectangle at the piece's print aspect. Display-only, like every mockup
+ * view. Bumps the layout's version (cached pictures re-render) and drops any area it no longer has.
+ */
+export async function setBundleLayout(
+  db: DbHandle,
+  input: {
+    variantId: string;
+    layout: string;
+    base: Buffer;
+    regions: Array<{ role: string; index: number; quad: [number, number][]; weight: Buffer; printWidthPx: number; printHeightPx: number; materialClass: MaterialClass }>;
+  },
+): Promise<{ templateVersion: number }> {
+  const prefix = `layout-${input.layout}-`;
+  const existing = (await db.select({ id: mockupViews.id, view: mockupViews.view, v: mockupViews.templateVersion }).from(mockupViews).where(eq(mockupViews.variantId, input.variantId))).filter((r) => r.view.startsWith(prefix));
+  const templateVersion = Math.max(0, ...existing.map((r) => r.v)) + 1;
+  const dir = `templates/${input.variantId}/layout-${input.layout}/v${templateVersion}`;
+  const blankObjectId = await putAsset(db, 'BLANK', `${dir}/base.png`, input.base, 'image/png');
+  const views = new Set<string>();
+  for (const r of input.regions) {
+    assertQuadFitsBlank(r.quad, { warped: true });
+    const view = `${prefix}${r.role}-${r.index}`;
+    views.add(view);
+    const maskObjectId = await putAsset(db, 'MASK', `${dir}/${r.role}-${r.index}.png`, r.weight, 'image/png');
+    const row = { variantId: input.variantId, view, templateVersion, materialClass: r.materialClass, blankObjectId, printQuad: r.quad, maskObjectId, overlayObjectId: null, printWidthPx: r.printWidthPx, printHeightPx: r.printHeightPx, mapResolutionPx: 1024 };
+    await db.insert(mockupViews).values(row).onConflictDoUpdate({ target: [mockupViews.variantId, mockupViews.view], set: row });
+  }
+  for (const r of existing) if (!views.has(r.view)) await db.delete(mockupViews).where(eq(mockupViews.id, r.id));
+  return { templateVersion };
+}
+
 export interface SetMockupViewInput {
   variantId: string;
   /** The alternate view name, e.g. 'tin'. */
