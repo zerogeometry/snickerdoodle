@@ -1,0 +1,149 @@
+{
+  "failures": [],
+  "bars": {
+    "/home": {
+      "position": "fixed",
+      "bottomGap": 0,
+      "top": 768,
+      "tabs": [
+        {
+          "text": "Home",
+          "h": 64,
+          "w": 90.5,
+          "current": "page"
+        },
+        {
+          "text": "Create",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Family",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Orders",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        }
+      ]
+    },
+    "/home scroll": {
+      "mainBottom": 748,
+      "navTop": 768,
+      "pb": "0px"
+    },
+    "/family": {
+      "position": "fixed",
+      "bottomGap": 0,
+      "top": 768,
+      "tabs": [
+        {
+          "text": "Home",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Create",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Family",
+          "h": 64,
+          "w": 90.5,
+          "current": "page"
+        },
+        {
+          "text": "Orders",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        }
+      ]
+    },
+    "/family scroll": {
+      "mainBottom": 747.75,
+      "navTop": 768,
+      "pb": "0px"
+    },
+    "/orders": {
+      "position": "fixed",
+      "bottomGap": 0,
+      "top": 768,
+      "tabs": [
+        {
+          "text": "Home",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Create",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Family",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Orders",
+          "h": 64,
+          "w": 90.5,
+          "current": "page"
+        }
+      ]
+    },
+    "/orders scroll": {
+      "mainBottom": 748,
+      "navTop": 768,
+      "pb": "24px"
+    },
+    "/account": {
+      "position": "fixed",
+      "bottomGap": 0,
+      "top": 768,
+      "tabs": [
+        {
+          "text": "Home",
+          "h": 64,
+          "w": 90.5,
+          "current": "page"
+        },
+        {
+          "text": "Create",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Family",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        },
+        {
+          "text": "Orders",
+          "h": 64,
+          "w": 90.5,
+          "current": null
+        }
+      ]
+    },
+    "/account scroll": {
+      "mainBottom": 748.375,
+      "navTop": 768,
+      "pb": "24px"
+    }
+  }
+}

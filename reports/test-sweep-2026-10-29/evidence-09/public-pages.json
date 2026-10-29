@@ -1,0 +1,314 @@
+{
+  "report": {
+    "/": {
+      "title": "snickerdoodle — keep the magic",
+      "description": "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+      "h1": [
+        "Keep the magic."
+      ],
+      "imgs": 96
+    },
+    "/how-it-works": {
+      "title": "how it works · snickerdoodle",
+      "description": "Upload a drawing, see it made real on lovely things, and keep the magic in your family's private keepsake home.",
+      "h1": [
+        "How snickerdoodle works"
+      ],
+      "imgs": 2
+    },
+    "/our-story": {
+      "title": "our story · snickerdoodle",
+      "description": "Why we built snickerdoodle — to keep the magic of childhood drawings, and frame the wonky bits in gold.",
+      "h1": [
+        "They're only little once"
+      ],
+      "imgs": 3
+    },
+    "/gifts": {
+      "title": "gifts · snickerdoodle",
+      "description": "Share a ready-to-buy link so family can treat your little one — guest checkout in a tap, or join the family for 5% off.",
+      "h1": [
+        "Gifts the whole family can give"
+      ],
+      "imgs": 13
+    },
+    "/faq": {
+      "title": "FAQs — turning children’s drawings into keepsakes · snickerdoodle",
+      "description": "Answers about Snickerdoodle: what you can make from your child’s drawing, prices, free UK delivery, print quality, gifts for grandparents, and how we keep your child’s artwork private.",
+      "h1": [
+        "Snickerdoodle questions, answered"
+      ],
+      "imgs": 1
+    },
+    "/help": {
+      "title": "help & contact · snickerdoodle",
+      "description": "Get help with Snickerdoodle: search our answers on orders, delivery, the studio, gifts and privacy — or send our team a message and a real person will reply.",
+      "h1": [
+        "How can we help?"
+      ],
+      "imgs": 1
+    },
+    "/christmas/delivery-dates": {
+      "title": "Christmas last order dates · snickerdoodle",
+      "description": "The last day to order Snickerdoodle keepsakes for Christmas delivery in the UK — baubles, cards, wrapping paper, calendars, clothing and more.",
+      "h1": [
+        "Christmas last order dates"
+      ],
+      "imgs": 1
+    },
+    "/trust/privacy": {
+      "title": "privacy notice · snickerdoodle",
+      "description": "How Snickerdoodle (Launch Mode Ltd) collects, uses and looks after your personal information.",
+      "h1": [
+        "Privacy Notice"
+      ],
+      "imgs": 1
+    },
+    "/trust/cookies": {
+      "title": "cookies · snickerdoodle",
+      "description": "How Snickerdoodle uses cookies — non-essential ones are off by default.",
+      "h1": [
+        "Cookies"
+      ],
+      "imgs": 1
+    },
+    "/trust/terms": {
+      "title": "terms of service · snickerdoodle",
+      "description": "The terms for using Snickerdoodle — including how we process the drawings you upload.",
+      "h1": [
+        "Terms of Service"
+      ],
+      "imgs": 1
+    },
+    "/trust/family-promise": {
+      "title": "how we look after your family’s data · snickerdoodle",
+      "description": "The plain-English promise of how Snickerdoodle looks after your family’s drawings, photos and data.",
+      "h1": [
+        "Looking after your family's magic"
+      ],
+      "imgs": 1
+    },
+    "/trust/data-complaint": {
+      "title": "make a data-protection complaint · snickerdoodle",
+      "description": "Raise a data-protection complaint directly with Snickerdoodle. We acknowledge within 30 days.",
+      "h1": [
+        "Make a data-protection complaint"
+      ],
+      "imgs": 1
+    },
+    "/products/framed-print": {
+      "title": "Framed print of your child’s drawing · snickerdoodle",
+      "description": "A gallery-quality print of the original in a hand-finished frame, ready to hang — every wonky bit treasured. Eight frames to suit any wall (gold is our signature). From £65, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Framed print of your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/mug": {
+      "title": "Personalised mug with your child’s drawing · snickerdoodle",
+      "description": "Their masterpiece wrapped around a sturdy two-tone mug — for the grown-up who'll treasure every sip. From £18, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised mug with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/cushion": {
+      "title": "Personalised cushion with your child’s drawing · snickerdoodle",
+      "description": "A plump cushion with their artwork on it — heart, round or square, a keepsake you can actually hug. From £22, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised cushion with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/kids-t-shirt": {
+      "title": "Kids’ organic T-shirt with their own drawing · snickerdoodle",
+      "description": "A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again. From £25, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Kids’ organic T-shirt with their own drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/adult-t-shirt": {
+      "title": "Adult organic T-shirt with your child’s drawing · snickerdoodle",
+      "description": "The grown-up version of the kids tee — the same organic cotton, sized up, with your little one's artwork on the front. A relaxed unisex fit for mums, dads and anyone in their fan club. From £32, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Adult organic T-shirt with your child’s drawing"
+      ],
+      "imgs": 1
+    },
+    "/products/jigsaw": {
+      "title": "Jigsaw puzzle made from your child’s drawing · snickerdoodle",
+      "description": "Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece. From £26, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Jigsaw puzzle made from your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/fleece-blanket": {
+      "title": "Personalised fleece blanket with your child’s drawing · snickerdoodle",
+      "description": "A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow. From £60, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised fleece blanket with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/greetings-card": {
+      "title": "Greetings card with your child’s drawing on the front · snickerdoodle",
+      "description": "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself. From £5.50, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Greetings card with your child’s drawing on the front"
+      ],
+      "imgs": 2
+    },
+    "/products/card-pack": {
+      "title": "Christmas cards from your child’s drawings — packs of 5 or 10 · snickerdoodle",
+      "description": "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come. From £12, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Christmas cards from your child’s drawings — packs of 5 or 10"
+      ],
+      "imgs": 2
+    },
+    "/products/wall-calendar": {
+      "title": "2027 wall calendar with your child’s drawings · snickerdoodle",
+      "description": "A 2027 wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month, and one on the cover. From £22, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "2027 wall calendar with your child’s drawings"
+      ],
+      "imgs": 1
+    },
+    "/products/ceramic-christmas-ornament": {
+      "title": "Personalised ceramic Christmas ornament from your child’s drawing · snickerdoodle",
+      "description": "Their drawing on a glossy ceramic ornament for the tree — make a new one every Christmas and watch the tree fill up with a timeline of their drawings. A flat 7.5 cm disc on a gold string. From £21, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised ceramic Christmas ornament from your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/christmas-bauble": {
+      "title": "Personalised shatterproof Christmas bauble from your child’s drawing · snickerdoodle",
+      "description": "Their drawing on a shatterproof bauble for the tree, printed on both sides — so it looks lovely from every angle and won't break if little hands drop it. From £19, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised shatterproof Christmas bauble from your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/christmas-sack": {
+      "title": "Personalised Christmas sack with your child’s drawing · snickerdoodle",
+      "description": "A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after. From £35, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised Christmas sack with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/placemats": {
+      "title": "Personalised placemats with your child’s drawing (set of 4) · snickerdoodle",
+      "description": "A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after. From £16, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised placemats with your child’s drawing (set of 4)"
+      ],
+      "imgs": 1
+    },
+    "/products/coasters": {
+      "title": "Personalised coasters with your child’s drawing (packs of 2, 4 or 6) · snickerdoodle",
+      "description": "Cork-backed coasters, each printed with the same drawing — in packs of 2, 4 or 6. For the mince pies and the cocoa, and long after. From £5.50, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Personalised coasters with your child’s drawing (packs of 2, 4 or 6)"
+      ],
+      "imgs": 1
+    },
+    "/products/christmas-family-bundle": {
+      "title": "Christmas family bundle: placemats, coasters and ornaments with your children’s drawings · snickerdoodle",
+      "description": "Their drawings on the Christmas table and on the tree: placemats and coasters wearing a drawing, and a ceramic ornament for everyone with its own. A set for 2, 4 or 8 — made in the UK and sent together in one tracked parcel. From £78, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Christmas family bundle: placemats, coasters and ornaments with your children’s drawings"
+      ],
+      "imgs": 1
+    },
+    "/products/phone-case": {
+      "title": "Phone case with your child’s drawing · snickerdoodle",
+      "description": "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte. From £25, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Phone case with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/socks": {
+      "title": "Socks printed with your child’s drawing · snickerdoodle",
+      "description": "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10). From £20, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Socks printed with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/height-chart": {
+      "title": "Canvas height chart with your child’s drawing · snickerdoodle",
+      "description": "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once. From £31, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Canvas height chart with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/wrapping-paper": {
+      "title": "Wrapping paper made from your child’s drawing · snickerdoodle",
+      "description": "Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres, in white or brown kraft (on kraft the colours come out a little earthier, and the paper shows through where the drawing is white). From £23, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Wrapping paper made from your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/tea-towel": {
+      "title": "Tea towel printed with your child’s drawing · snickerdoodle",
+      "description": "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours. From £27, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Tea towel printed with your child’s drawing"
+      ],
+      "imgs": 2
+    },
+    "/products/playing-cards": {
+      "title": "Playing cards with your child’s drawing on the back · snickerdoodle",
+      "description": "A full 54-card deck with their drawing on the back of every card, in a white presentation box — for family card nights. From £24, made to order in the UK, with free UK delivery.",
+      "h1": [
+        "Playing cards with your child’s drawing on the back"
+      ],
+      "imgs": 2
+    }
+  },
+  "checked": {
+    "/": 200,
+    "/how-it-works": 200,
+    "/gifts": 200,
+    "/our-story": 200,
+    "/login": 200,
+    "/start-creating": 200,
+    "/faq": 200,
+    "/help": 200,
+    "/trust/family-promise": 200,
+    "/trust/privacy": 200,
+    "/trust/cookies": 200,
+    "/trust/data-complaint": 200,
+    "/christmas/delivery-dates": 200,
+    "/trust/terms": 200,
+    "/start-creating?for=framedPrint": 200,
+    "/start-creating?for=mug": 200,
+    "/start-creating?for=cushion": 200,
+    "/start-creating?for=kidsTee": 200,
+    "/start-creating?for=adultTee": 200,
+    "/start-creating?for=jigsaw": 200,
+    "/start-creating?for=blanket": 200,
+    "/start-creating?for=card": 200,
+    "/start-creating?for=cardPack": 200,
+    "/start-creating?for=calendar": 200,
+    "/start-creating?for=ceramicOrnament": 200,
+    "/start-creating?for=christmasBauble": 200,
+    "/start-creating?for=sack": 200,
+    "/start-creating?for=placemat": 200,
+    "/start-creating?for=coaster": 200,
+    "/start-creating?for=christmasBundle": 200,
+    "/start-creating?for=phoneCase": 200,
+    "/start-creating?for=socks": 200,
+    "/start-creating?for=heightChart": 200,
+    "/start-creating?for=wrappingPaper": 200,
+    "/start-creating?for=teaTowel": 200,
+    "/start-creating?for=playingCards": 200
+  }
+}
