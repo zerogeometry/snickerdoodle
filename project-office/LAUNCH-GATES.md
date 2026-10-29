@@ -1,16 +1,16 @@
 # Launch Gates — Snickerdoodle
 
-> Maintained by Cowork. The six hard blockers from `docs/05`. **None may be ticked without a qualified data-protection professional's sign-off where noted.** Cowork drafts; it does not approve.
+> Maintained by Cowork. The six hard blockers from `docs/05`. Gates 1–3 originally required a qualified data-protection professional's sign-off; **on 29 Oct 2026 the founder chose to sign them off himself as controller** (recorded per gate below). Cowork drafts; it does not approve.
 
 > **Status note (2026-06-26, Cowork).** The build now has *supporting scaffolding* for several gates — trust-page UI (LG4), a cookie banner with non-essential off by default (PECR), and schema for audit/DSAR/no-training attestation. **None of the gates themselves are met:** they require DP-professional sign-off and signed contracts, and no live children's data is processed yet. Scaffolding ≠ gate closed.
 
 | # | Gate | Status | Owner | Blocker / next step |
 |---|---|---|---|---|
-| 1 | **DPIA** completed & signed off | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/DPIA-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`; + `DPIA-addendum-family-calendar.md` for the family calendar / "days we celebrate" — Art 9, and its privacy-notice wording `PRIVACY-NOTICE-family-calendar-draft.md` to publish) — needs DP review + sign-off |
-| 2 | **Children's Code** conformance assessment documented | ◐ in progress (draft ready for DP review) | Simon + DP professional | Draft: `project-office/compliance/CHILDRENS-CODE-assessment-draft.md` (+ `OPEN-QUESTIONS-for-DP-professional.md`) — needs DP review + sign-off |
-| 3 | **International transfers** reviewed ("not materially lower") | ☐ not started | Simon + DP professional | Depends on provider choices (D2–D4); still directional |
+| 1 | **DPIA** completed & signed off | ☑ signed off 29 Oct 2026 — **by the founder as controller** (Launch Mode Ltd), not by an external DP professional (founder's decision) | Simon | `project-office/compliance/DPIA-draft.md` (+ family-calendar addendum). Record any later professional review here. |
+| 2 | **Children's Code** conformance assessment documented | ☑ signed off 29 Oct 2026 — **by the founder as controller** | Simon | `project-office/compliance/CHILDRENS-CODE-assessment-draft.md` |
+| 3 | **International transfers** reviewed ("not materially lower") | ☑ signed off 29 Oct 2026 — **by the founder as controller** | Simon | Resend (US: UK Addendum to SCCs + DPF UK Extension), Stripe (DPF + UK IDTA), AWS (eu-west-2, DPA via Service Terms). **Prodigi: written confirmation that UK orders stay in UK labs is still awaited** (C1 email, 29 Oct) — revisit if their answer differs. The `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF` setting is created only when private live mode is switched on (runbook §4.9). |
 | 4 | **Privacy notice + family data promise** pages live (placeholders filled) | ◐ in progress | Cowork drafts → Simon approves | UI pages exist in `src/app/(marketing)/trust`; **placeholders still need filling** from trust-spine `-2`/`-3` |
-| 5 | **ICO registration** / fee paid + **Article-28 DPAs** with all processors | ☐ not started | Simon | Per processor once chosen; none contracted yet. **D8 adds:** the AWS DPA must cover **Rekognition Content Moderation**; **IWF Image Intercept** onboarding/agreement |
+| 5 | **ICO registration** / fee paid + **Article-28 DPAs** with all processors | ◐ ICO fee paid (Launch Mode Ltd); DPAs: AWS ✅, Stripe ✅, Resend ✅ (executed copy on file), Prodigi ✅ by its terms (written answers awaited), **IWF pending** (form submitted 29 Oct) | Simon | Evidence: `project-office/compliance/PROCESSORS.md` (files kept in `Documents/snickerdoodle/compliance/`). Prodigi must also be recorded in the in-app sub-processor register before private live mode. |
 | 6 | **AI provider** confirms **no-retention, no-training** in contract | ☐ not started | Simon | Tied to D3; generative provider unchosen. (No third-party image egress until P3 — so not yet on the critical path) |
 
 **Decision D8 (content safety) adds two professional sign-offs — not formal gates, but launch-blocking for their areas:**

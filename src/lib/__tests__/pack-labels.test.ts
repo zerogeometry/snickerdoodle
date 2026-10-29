@@ -3,7 +3,7 @@ import { fromLabel, packCountOf, packLine } from '@/lib/pack-labels';
 
 // founder, 29 Oct: "from £60" read as ONE placemat — a pack says how many the price buys.
 const gbp = (p: number) => `£${p / 100}`;
-const v = (pricePence: number, size?: string) => ({ pricePence, attributes: size ? { size } : {} });
+const v = (pricePence: number, size?: string): { pricePence: number; attributes: Record<string, string> } => ({ pricePence, attributes: size ? { size } : {} });
 
 describe('pack labels', () => {
   it('catalogue tile: "from £60 for 4" / "from £18 for 2"; a non-pack product is unchanged', () => {
