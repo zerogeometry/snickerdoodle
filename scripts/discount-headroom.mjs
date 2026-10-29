@@ -23,7 +23,7 @@ const DIR = '.prodigi-assets/pricing';
 const FX = { GBP: 1, EUR: 0.87, USD: 0.8 };
 const VAT = 0.2, STRIPE_PCT = 0.015, STRIPE_FIXED = 20;
 // Shipping tier baked into each product (founder decisions in PRICING.md): jigsaw = Express (tracked).
-const SHIP_METHOD = { jigsaw: 'express' };
+const SHIP_METHOD = { jigsaw: 'express', phoneCase: 'express' }; // a basket with a phone case ships Express
 
 function parseLine(line) { const o = []; let c = '', q = false; for (let i = 0; i < line.length; i++) { const ch = line[i]; if (ch === '"') { if (q && line[i + 1] === '"') { c += '"'; i++; } else q = !q; } else if (ch === ',' && !q) { o.push(c); c = ''; } else c += ch; } o.push(c); return o; }
 function parseCsv(t) { const L = t.split(/\r?\n/).filter((l) => l.trim()); const h = parseLine(L[0]).map((x) => x.trim()); return L.slice(1).map((l) => { const cs = parseLine(l); const r = {}; h.forEach((x, i) => (r[x] = (cs[i] ?? '').trim())); return r; }); }
@@ -46,15 +46,30 @@ for (const file of readdirSync(DIR)) {
 // SKUs the sheets don't carry yet — Prodigi SANDBOX quotes to GB, Standard: [cost, first post, plus-one post].
 //  - the christmas table packs (27 Oct 2026): uk9 → Royal Mail Tracked 48, £4.30 + £1.00 per extra item;
 //  - the DATED 2027 calendar (25 Oct, CHRISTMAS-range-and-postage.md): uk15, £4.35, two for £5.35.
-// (Still missing — so no multi-buy offer until added: phone cases, playing cards, height chart, jumpers, bandana.)
+//  - playing cards, kraft wrap rolls, height charts (29 Oct 2026, 1 copy + 2 copies quoted for the plus-one);
+//    a height chart always ships in its own parcel, so its plus-one is a full second post.
+// (Still missing — so no multi-buy offer or code discount until added: hidden jumpers, bandana.)
 const SANDBOX = {
   'H-PLACE-1PK': [900, 430, 100], 'H-PLACE-2PK': [1650, 430, 100], 'H-PLACE-4PK': [3250, 430, 100], 'H-PLACE-6PK': [4850, 430, 100],
   'H-COAST-1PK': [400, 430, 100], 'H-COAST-2PK': [550, 430, 100], 'H-COAST-4PK': [1000, 430, 100], 'H-COAST-6PK': [1500, 430, 100],
   'CALENDAR-A5-L-DATED': [900, 435, 100], 'CALENDAR-A4-L-DATED': [1000, 435, 100],
+  'PLAY-CARD': [800, 645, 25],
+  'WRAP-KFT-ROL-70X200': [800, 570, 100], 'WRAP-KFT-ROL-70X300': [1100, 570, 100], 'WRAP-KFT-ROL-70X500': [1700, 570, 100],
+  'POSTER-HANGER-20-CAN-ROL-SC-8X48': [1200, 675, 675], 'POSTER-HANGER-20-CAN-ROL-SC-8X60': [1400, 675, 675],
+  'POSTER-HANGER-30-CAN-ROL-SC-12X48': [1400, 675, 675], 'POSTER-HANGER-30-CAN-ROL-SC-12X60': [1500, 675, 675],
 };
 for (const [sku, [cost, ship, extra]] of Object.entries(SANDBOX)) if (!bySku.has(sku)) bySku.set(sku, [{ cost, ship, extra, method: 'standard', src: 'GB' }]);
+// Phone cases (29 Oct 2026, all 152 GB case SKUs quoted, 0 exceptions): a basket with a case ships EXPRESS
+// (resolveShippingMethod in src/fulfillment/submit.ts), lab uk6 → £5.95, +£0.50 per extra case.
+// Snap £9.50, tough (…-TCB-CS-…) £11.50 — the same for every phone model.
+const PHONE_CASE = /^GLOBAL-TECH-[A-Z0-9]+-(TCB-)?CS-[GM]$/;
+function phoneCaseRow(sku) {
+  const m = PHONE_CASE.exec(sku);
+  return m ? { cost: m[1] ? 1150 : 950, ship: 595, extra: 50, method: 'express', src: 'GB' } : null;
+}
 /** Cheapest landed GB row for the SKU on the chosen shipping method (ties → GB source). */
 function landed(sku, method) {
+  if (!bySku.has(sku)) { const c = phoneCaseRow(sku); if (c) bySku.set(sku, [c]); }
   const rows = (bySku.get(sku) ?? []).filter((r) => r.method === method);
   if (!rows.length) return null;
   return rows.reduce((best, r) => (r.cost + r.ship < best.cost + best.ship ? r : best));
