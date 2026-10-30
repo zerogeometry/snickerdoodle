@@ -9,7 +9,8 @@ import { assets, orderItems, orders, promoCodes, storageObjects, webhookEvents }
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { placeOrder } from '@/server/orders';
 import { resolvePromo } from '@/server/promos';
-import { getCatalogue } from '@/server/catalogue';
+import { getCatalogue, seedCatalogue } from '@/server/catalogue';
+import { ensureTestCosts } from '@/test/costFixture';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { reportKeepsake } from '@/server/contentReports';
@@ -53,8 +54,10 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     client = postgres(URL!, { prepare: false });
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
+    await seedCatalogue(db); // never rely on another suite having seeded the live catalogue
+    await ensureTestCosts(db); // CI / a fresh DB has no Prodigi costs: a synthetic fixture (src/test/costFixture.ts)
     catalogue = await getCatalogue(db);
-  });
+  }, 120_000);
   afterAll(async () => {
     if (STRIPE_KEY) process.env.STRIPE_SECRET_KEY = STRIPE_KEY;
     if (orderIds.length) {

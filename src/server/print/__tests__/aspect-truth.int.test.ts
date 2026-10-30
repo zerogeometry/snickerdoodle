@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { productVariants, storageObjects } from '@/db/schema';
+import { printTemplates, productVariants, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { getStorageObjectGrant, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
@@ -56,9 +56,12 @@ describe.skipIf(!DB || !S3)('cover-fill keeps the source aspect (circle stays ro
     await client.end();
   });
 
-  it('the framed print renders the circle round to within 2%', async () => {
+  it('the framed print renders the circle round to within 2%', async (ctx) => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [v] = await db.select().from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
+    // the framed print's mockup is authored from the founder's layered photos (gitignored, so never in CI)
+    const [t] = v ? await db.select({ blank: printTemplates.blankObjectId, quad: printTemplates.printQuad }).from(printTemplates).where(eq(printTemplates.variantId, v.id)) : [];
+    if (!t?.blank || !t.quad) ctx.skip('no framed-print mockup template in this database (seedMockups needs the founder layers)');
     const res = await composeMockup(db, sam, { assetId, variantId: v!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, size: 'zoom' });
     const grant = await getStorageObjectGrant(db, res.mockupObjectId, sam, 600);
     const buf = Buffer.from(await (await fetch(grant.url)).arrayBuffer());

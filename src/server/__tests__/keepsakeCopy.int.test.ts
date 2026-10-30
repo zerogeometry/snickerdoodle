@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, like } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { assets, mlOperations, storageObjects } from '@/db/schema';
+import { assets, mlOperations, mockupViews, productVariants, storageObjects } from '@/db/schema';
+import { BUNDLE_KEY } from '@/lib/christmas-bundle';
 import { AuthzError } from '@/authz';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { resolveViewerContext } from '@/server/assets';
@@ -133,7 +134,15 @@ describe.skipIf(!DB || !S3)('keepsake copies for edits', () => {
     expect(await putBackgroundBack(db, sam, kept, kcut.objectId)).toBe(false);
   });
 
-  it('the bundle picture never reads another asset’s object — even one the viewer could see on its own', async () => {
+  it('the bundle picture never reads another asset’s object — even one the viewer could see on its own', async (ctx) => {
+    // the bundle's layout is authored from the founder's layered photos (gitignored, so never in CI);
+    // without one stored, renderBundlePreview returns null before touching any drawing — nothing to pin
+    const [layout] = await db
+      .select({ id: mockupViews.id })
+      .from(mockupViews)
+      .innerJoin(productVariants, eq(productVariants.id, mockupViews.variantId))
+      .where(and(eq(productVariants.sku, BUNDLE_KEY), like(mockupViews.view, 'layout-x2-%'), isNotNull(mockupViews.blankObjectId)));
+    if (!layout) ctx.skip('no christmas bundle layout stored in this database (seedBundleLayouts needs the founder layers)');
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [a, b] = [await keepsake(), await keepsake()];
     const bcut = await removeBackgroundForAsset(db, sam, b, { keepEnclosedPaper: true });

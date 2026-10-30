@@ -9,6 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { seedCatalogue } from '@/server/catalogue';
+import { ensureTestCosts } from '@/test/costFixture';
 import { addChild } from '@/server/children';
 import { createGiftLink, getGiftLink, listGiftListsForOwner, placeGiftLinkOrder, revokeGiftLink, sendGiftRequest } from '@/server/giftLinks';
 import { deleteSavedDesign, listSavedDesigns, saveDesign } from '@/server/savedDesigns';
@@ -53,7 +54,8 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-  });
+    await ensureTestCosts(db); // the code + referral guards price from DB costs; CI has none without this
+  }, 120_000);
 
   afterAll(async () => {
     for (const k of keys) await deleteObject(k).catch(() => {});
@@ -326,7 +328,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       expect(r.ok).toBe(true);
       if (!r.ok) return;
 
-      // DB unit costs drive the guard: give the framed print a known landed cost for this test.
+      // DB unit costs drive the guard (the framed print's landed cost: real, or ensureTestCosts' fixture).
       const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule });
       expect(res.ok).toBe(true);
       orderRefs.push(res.ref!);
