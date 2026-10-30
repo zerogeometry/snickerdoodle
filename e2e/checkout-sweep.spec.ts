@@ -341,8 +341,12 @@ test.describe('checkout sweep 05', () => {
     async function payOnStripe(page: Page, card: string) {
       await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 60_000 });
       const field = (label: RegExp, autocomplete: string) => page.getByLabel(label).or(page.locator(`input[autocomplete~="${autocomplete}"]`)).first();
-      await field(/^email$/i, 'email').fill('t5-payer@example.test');
-      await field(/^full name$/i, 'name').fill('Test Person');
+      const name = field(/^full name$/i, 'name');
+      await expect(name).toBeVisible({ timeout: 30_000 }); // the form is up
+      // a signed-in parent's email is handed to Stripe, which then shows it as plain text, not a box
+      const email = field(/^email$/i, 'email');
+      if (await email.count()) await email.fill('t5-payer@example.test');
+      await name.fill('Test Person');
       // the address form: line 1, city, postcode (UK only)
       const manual = page.getByRole('button', { name: /enter address manually/i });
       if (await manual.isVisible().catch(() => false)) await manual.click();

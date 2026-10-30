@@ -148,5 +148,5 @@ describe('festive touches print like the preview', () => {
     expect(at(300, 200)).toEqual([255, 255, 255]);
     // the frame is gold at the edge
     expect(at(300, 6)).toEqual([246, 196, 69]);
-  });
+  }, 30_000); // a full-size render — it overran the 5 s default under the whole suite's parallel load
 });
