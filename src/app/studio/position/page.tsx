@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { localPath } from '@/lib/siteMode';
 import { loadDraftStudioData, loadStudioData } from '@/server/studio';
 import { Positioner } from './Positioner';
 
@@ -11,7 +12,7 @@ export default async function PositionPage({
   searchParams: Promise<{ draft?: string; return?: string; variant?: string; source?: string }>;
 }) {
   const { draft, return: returnTo, variant, source } = await searchParams;
-  const safeReturn = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : undefined;
+  const safeReturn = localPath(returnTo); // only ever back to a page on this site (07-B10)
 
   if (draft) {
     const data = await loadDraftStudioData(draft, variant, source);
