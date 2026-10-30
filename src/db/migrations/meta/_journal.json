@@ -351,6 +351,13 @@
       "when": 1793322084548,
       "tag": "0049_order_gift_note_bundle_key",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793382703830,
+      "tag": "0050_order_gift_note_insert",
+      "breakpoints": true
     }
   ]
 }

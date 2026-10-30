@@ -18,6 +18,8 @@ import {
   sessions,
 } from '@/db/schema';
 import { eraseAsset } from './assets';
+import { deleteObject } from '@/storage';
+import { giftNoteInsertKey } from '@/fulfillment/giftNoteInsertKey';
 import { appUrl, sendMail } from './mail';
 import { recordErasure } from './erasureLedger';
 import { eraseProfileImage } from './profile';
@@ -149,6 +151,11 @@ export async function closeAccount(
   await db.update(promoCodes).set({ active: false }).where(eq(promoCodes.ownerAccountId, accountId));
 
   // ── 4. Orders: keep the money record, drop the personal details ─────────────────
+  // A printed gift note's file still waiting for the printer (plan C9) goes too — it holds the note.
+  const withInsert = await db.select({ id: orders.id, insert: orders.giftNoteInsert }).from(orders).where(eq(orders.accountId, accountId));
+  for (const o of withInsert) {
+    if (o.insert?.status === 'sent' || o.insert?.status === 'partly') await deleteObject(giftNoteInsertKey(o.id)).catch(() => {});
+  }
   await db
     .update(orders)
     .set({ buyerEmail: null, shippingAddress: null, giftFromName: null, giftNote: null, tracking: null })
