@@ -3,13 +3,15 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
+import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, type PromoRefusal } from './promos';
+import { receiptLines, receiptSavings, type ReceiptLine } from '@/lib/order-lines';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { fillCalendarPages, isCalendarKey } from '@/lib/calendar';
 import { BUNDLE_COMPONENT_SKUS, bundleSizeOf, expandBundle, isBundleKey, normalizeBundle, pieceOfSku } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { screenCardMessage, type ScreenedCardMessage } from '@/server/textSafety';
+import { screenCardMessage, screenGiftNote, type ScreenedCardMessage } from '@/server/textSafety';
 import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
 import { clampTransform, templateGeom, type RawTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
@@ -44,6 +46,13 @@ async function sourceDimensions(db: DbHandle, assetId: string, sourceObjectId: s
   }
 }
 
+/** The gift note, screened: null (none / not a gift), the note, or 'refused' (abusive). */
+function screenedGiftNote(input: { gift?: boolean; giftNote?: unknown }): string | null | 'refused' {
+  if (!input.gift) return null;
+  const r = screenGiftNote(input.giftNote);
+  return r.ok ? r.value : 'refused';
+}
+
 function newRef(): string {
   const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
   return `SNK-${n.toString().padStart(6, '0')}`;
@@ -70,7 +79,9 @@ export interface PlaceLine {
 
 export interface PlaceOrderResult {
   ok: boolean;
-  reason?: 'empty' | 'too-small';
+  reason?: 'empty' | 'too-small' | 'promo' | 'gift-note';
+  /** For 'promo': why the code can't be used after all (e.g. its last use went a moment ago). */
+  promoError?: PromoRefusal;
   /** For 'too-small': which line (product key) can't print well at its size. */
   productKey?: string;
   ref?: string;
@@ -105,11 +116,17 @@ export async function placeOrder(
     promo?: PromoRule | null;
     /** The signed-in buyer's credit balance (server-resolved from the ledger). */
     creditAvailablePence?: number;
-    /** The signed-in buyer's email (referral checks); guests get theirs from Stripe at payment. */
+    /** The buyer's email: the signed-in account's, or a guest's own (normalised) — referral checks,
+     * the receipt, and Stripe's email (prefilled, so a guest can't pay as someone else). */
     buyerEmail?: string | null;
+    /** A gift order's little note, as typed (untrusted — screened here). */
+    giftNote?: unknown;
   },
 ): Promise<PlaceOrderResult> {
   const { account, joinProvenance } = input;
+  // the gift note is screened BEFORE anything is written (abuse ⇒ the buyer is asked to reword it)
+  const note = screenedGiftNote(input);
+  if (note === 'refused') return { ok: false, reason: 'gift-note' };
   const catalogue = await getCatalogue(db);
   const q = quote(
     input.items.map((l) => ({ productKey: l.productKey, qty: l.qty, ...(isBundleKey(l.productKey) ? { bundle: l.bundle } : {}) })),
@@ -336,7 +353,9 @@ export async function placeOrder(
   };
 
   const ref = newRef();
-  const [order] = await db
+  const promoId = q.promo?.applied && input.promo ? input.promo.id : null;
+  const writeOrder = (h: DbHandle | Tx) =>
+    h
     .insert(orders)
     .values({
       ref,
@@ -352,14 +371,30 @@ export async function placeOrder(
       isGift: q.gift,
       familyId: input.giftLink?.familyId ?? null,
       giftLinkId: input.giftMeta?.linkId ?? null,
-      promoCodeId: q.promo?.applied && input.promo ? input.promo.id : null,
+      promoCodeId: promoId,
       promoSavingPence: q.promoSavingPence,
       partnerCommissionPence: q.partnerCommissionPence,
       creditAppliedPence: q.creditPence,
       buyerEmail: input.buyerEmail ?? null,
       giftFromName: input.giftMeta?.fromName ?? null,
+      giftNote: q.gift ? note : null,
     })
     .returning();
+  // A code is claimed in the SAME transaction that writes the order, its row locked: two checkouts
+  // can't both take a limited code's last use, and a referral code is re-checked against the buyer.
+  let order: typeof orders.$inferSelect | undefined;
+  if (promoId) {
+    const buyer = { accountId: account?.id ?? null, email: input.buyerEmail ?? null };
+    const claimed = await db.transaction(async (tx) => {
+      const refused = await claimPromoForOrder(tx, promoId, buyer);
+      if (refused) return { refused };
+      return { order: (await writeOrder(tx))[0] };
+    });
+    if ('refused' in claimed) return { ok: false, reason: 'promo', promoError: claimed.refused };
+    order = claimed.order;
+  } else {
+    [order] = await writeOrder(db);
+  }
 
   for (let i = 0; i < q.lines.length; i++) {
     const l = q.lines[i]!;
@@ -368,11 +403,11 @@ export async function placeOrder(
     if (parts) {
       // The bundle's pieces, each its OWN variant (Prodigi SKU + template frozen in its spec): ONE
       // Prodigi order, one item per line, all from uk9 → one tracked parcel. Lines add up to the
-      // bundle's price to the penny (expandBundle).
+      // bundle's price to the penny (expandBundle). Each carries the bundle's key, so a receipt shows ONE line.
       for (const p of parts) {
         const [bi] = await db
           .insert(orderItems)
-          .values({ orderId: order!.id, productKey: p.sku, variantId: p.variantId, spec: specByVariantId.get(p.variantId) ?? null, qty: p.qty, unitPricePence: p.unitPricePence, linePence: p.linePence })
+          .values({ orderId: order!.id, productKey: p.sku, bundleKey: l.productKey, variantId: p.variantId, spec: specByVariantId.get(p.variantId) ?? null, qty: p.qty, unitPricePence: p.unitPricePence, linePence: p.linePence })
           .returning();
         await insertArtwork(bi!.id, p.art);
       }
@@ -429,6 +464,9 @@ export async function placeOrder(
       promoSavingPence: q.promoSavingPence + q.creditPence, // credit rides the same one-off coupon
       promoLabel: q.promo?.applied ? q.promo.code : undefined,
       cancelPath: input.cancelPath,
+      customerEmail: input.buyerEmail ?? undefined,
+      // a checkout holding a code's use lets it go when the hold ends (src/server/promos.ts)
+      expiresInSec: promoId ? CHECKOUT_SESSION_TTL_SEC : undefined,
     });
     await db.update(orders).set({ stripeSessionId: session.id }).where(eq(orders.id, order!.id));
     return { ok: true, ref, checkoutUrl: session.url ?? undefined };
@@ -498,7 +536,10 @@ export interface OrderSummary {
   status: string;
   totalPence: number;
   createdAtISO: string;
-  items: { productKey: string; qty: number; linePence: number }[];
+  /** As the family reads it: a christmas bundle is ONE line, every line named (src/lib/order-lines.ts). */
+  items: ReceiptLine[];
+  savings: { label: string; pence: number }[];
+  deliveryPence: number;
   /** Carrier + tracking, once it has shipped (null for untracked post). */
   tracking: { carrier?: string | null; number?: string | null; url?: string | null } | null;
 }
@@ -506,14 +547,20 @@ export interface OrderSummary {
 export async function getOrdersForAccount(db: DbHandle, accountId: string): Promise<OrderSummary[]> {
   const rows = await db.select().from(orders).where(eq(orders.accountId, accountId)).orderBy(desc(orders.createdAt));
   const result: OrderSummary[] = [];
+  const stale = Date.now() - PROMO_HOLD_MS;
   for (const o of rows) {
+    // A checkout left at Stripe (they came back to the basket, or closed the tab) isn't an order the
+    // family made: past the hold it's never shown as "awaiting payment" — it simply appears if paid.
+    if (o.status === 'PENDING' && o.createdAt.getTime() < stale) continue;
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, o.id));
     result.push({
       ref: o.ref,
       status: o.status,
       totalPence: o.totalPence,
       createdAtISO: o.createdAt.toISOString(),
-      items: items.map((i) => ({ productKey: i.productKey, qty: i.qty, linePence: i.linePence })),
+      items: receiptLines(items),
+      savings: receiptSavings(o),
+      deliveryPence: o.deliveryPence,
       tracking: o.tracking ?? null,
     });
   }

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { accountCredits, accounts, orders, promoCodes } from '@/db/schema';
-import type { DbHandle } from './db';
+import type { DbHandle, Tx } from './db';
 
 /** "Give £5, get £5": the friend's first order gets £5 off (over £30); the referrer earns £5 credit. */
 export const REFERRAL_DISCOUNT_PENCE = 500;
@@ -50,7 +50,7 @@ export async function getCreditBalance(db: DbHandle, accountId: string): Promise
 
 /** Has this buyer (by account or email) already had a paid order (other than `exceptOrderId`)? */
 export async function hasPaidOrderBefore(
-  db: DbHandle,
+  db: DbHandle | Tx,
   buyer: { accountId?: string | null; email?: string | null },
   exceptOrderId?: string,
 ): Promise<boolean> {

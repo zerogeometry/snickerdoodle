@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { accounts, orderItems, orders } from '@/db/schema';
-import { CATALOGUE, formatPence, isCatalogueKey } from '@/pricing';
+import { formatPence } from '@/pricing';
+import { receiptLines, receiptSavings } from '@/lib/order-lines';
 import { SUPPORT_EMAIL } from '@/lib/support';
 import type { DbHandle } from './db';
 import { appUrl, sendMail } from './mail';
@@ -19,8 +20,6 @@ async function recipient(db: DbHandle, o: typeof orders.$inferSelect): Promise<{
   return o.buyerEmail ? { email: o.buyerEmail, first: null } : null;
 }
 
-const labelOf = (key: string) => (isCatalogueKey(key) ? CATALOGUE[key].label : key);
-
 export async function sendOrderConfirmed(db: DbHandle, orderId: string): Promise<void> {
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId));
   if (!o) return;
@@ -38,8 +37,13 @@ export async function sendOrderConfirmed(db: DbHandle, orderId: string): Promise
       'Thank you — we’ve got your order, and it’s going into production. Every piece is made especially for you, in the UK.',
       '',
       `Order ${o.ref}`,
-      ...lines.map((l) => `· ${labelOf(l.productKey)}${l.qty > 1 ? ` × ${l.qty}` : ''} — ${formatPence(l.linePence)}`),
+      // a christmas bundle reads as the one bundle bought, each line by its product's name (05-B5)
+      ...receiptLines(lines).map((l) => `· ${l.label}${l.qty > 1 ? ` × ${l.qty}` : ''} — ${formatPence(l.linePence)}`),
+      // the savings it got, so the lines add up to the total
+      ...receiptSavings(o).map((sv) => `· ${sv.label} — −${formatPence(sv.pence)}`),
+      o.deliveryPence > 0 ? `· delivery — ${formatPence(o.deliveryPence)}` : null,
       `Total ${formatPence(o.totalPence)}, delivery included`,
+      ...(o.isGift && o.giftNote ? ['', `Your gift note: “${o.giftNote}”`] : []),
       '',
       'We’ll email you again when it’s on its way.',
       o.accountId ? `You can see your order any time at ${appUrl('/orders')}.` : null,

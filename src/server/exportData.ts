@@ -88,6 +88,7 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     savings: { joinPence: o.joinSavingPence, familySetPence: o.familySetSavingPence, parcelPence: o.parcelSavingPence, multiBuyPence: o.multiBuySavingPence, codePence: o.promoSavingPence, creditPence: o.creditAppliedPence },
     isGift: o.isGift,
     giftSignedAs: o.giftFromName,
+    giftNote: o.giftNote,
     buyerEmail: o.buyerEmail,
     shippingAddress: o.shippingAddress,
     tracking: o.tracking,
