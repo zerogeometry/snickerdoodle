@@ -3,7 +3,8 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 
-export const metadata: Metadata = { title: 'page not found', robots: { index: false, follow: false } };
+// (a 404 is never indexed: Next marks it noindex itself — a second robots tag here would only duplicate it)
+export const metadata: Metadata = { title: 'page not found' };
 
 /**
  * Any address we don't have (09-B5): the brand's own "not found" card — logo, a main landmark for the

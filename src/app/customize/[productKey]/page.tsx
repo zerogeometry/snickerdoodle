@@ -1194,7 +1194,7 @@ function CustomizeProduct() {
               </Button>
             ) : null}
             <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap !px-3 !text-[15px] md:flex-none md:!px-8 md:!text-base" onClick={addToBasket} disabled={!variant || blocked}>
-              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : qty > 1 ? `add ${qty} to basket` : 'add to basket'} · {gbp(variant?.pricePence ?? product.fromPence)}{!edit && qty > 1 ? ' each' : ''}
+              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {!edit && qty > 1 ? `${qty} × ` : ''}{gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
         </div>
