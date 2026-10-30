@@ -178,10 +178,8 @@ export function ProductTile({
               </button>
             </div>
           ) : null}
-          <button type="button" onClick={onCustomize} aria-label={`${customizeLabel} ${p.label}`} className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
+          <button type="button" onClick={onCustomize} aria-label={`${customizeLabel} ${p.label}`} /* named for keyboard + screen-reader users, who can't reach the picture's own button (09-B4) */ className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
             {customizeLabel}
-            {/* named for keyboard + screen-reader users, who can't reach the picture's own button (09-B4) */}
-            <span className="sr-only"> your {p.label}</span>
           </button>
         </div>
       </div>
