@@ -332,6 +332,11 @@ test.describe('admin — review queue and support inbox', () => {
     const item = page.getByRole('list', { name: 'held back for review' }).getByRole('listitem').first();
     await expect(item).toContainText('screening-not-configured');
     await expect(item.getByRole('button', { name: 'it’s fine' })).toHaveCount(0);
+    await expect(item.getByRole('button', { name: 'look' })).toHaveCount(0);
+    // …but it CAN be removed — and that also takes it off the top of the queue for the tests after
+    await item.getByRole('button', { name: 'remove' }).click();
+    await page.getByRole('button', { name: 'yes, remove it' }).click();
+    await expect.poll(async () => (await sql()`select 1 from assets where id = ${held}`).length, { timeout: 30_000 }).toBe(0);
   });
 
   test('support: a help message is acknowledged by email and lands in the admin inbox, where it can be marked answered', async ({ page, browser }) => {

@@ -352,7 +352,11 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   await expect(queue).toBeVisible({ timeout: 15_000 });
   const item = queue.getByRole('listitem').first(); // newest first
   await expect(item).toContainText('reported via a gift link');
-  await expect(item).toContainText('hidden — looking is recorded in the audit log'); // nobody looks unless they choose to
+  // This server has no screening set up, so the upload was held as "screening-not-configured" (the
+  // test then stood in for a reviewer and set it CLEAR). Its CSAM hash check never ran, so after the
+  // report it can only be removed — never looked at or cleared (08-B7).
+  await expect(item).toContainText('can’t be looked at or cleared — only removed');
+  await expect(item.getByRole('button', { name: 'look' })).toHaveCount(0);
   await admin.screenshot({ path: `${SHOTS}/admin-review-reported-desktop.png`, fullPage: true });
   await item.getByRole('button', { name: 'remove' }).click();
   await admin.getByRole('button', { name: 'yes, remove it' }).click();
