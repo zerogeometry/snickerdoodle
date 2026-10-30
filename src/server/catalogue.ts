@@ -261,6 +261,8 @@ function phoneCaseVariants(): VariantDef[] {
 // delivery baked in, ~15% net after ALL costs (card fee, 3% reprints, 5% codes, £0.55 running).
 // Non-garment print files are Prodigi's EXACT printAreaSizes (`px`, bleed 0 — Prodigi's file
 // already carries its own bleed), at the dpi Prodigi specifies them, so nothing rounds from mm.
+/** The greetings card's outer-front panel: a quarter of Prodigi's 6120×2160 card spread (cardPrint.ts). */
+const CARD_PANEL_PX = { w: 1530, h: 2160 } as const;
 function exactPx(px: { w: number; h: number }, dpi: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
   return { wMm: Math.round((px.w / dpi) * 25.4), hMm: Math.round((px.h / dpi) * 25.4), dpi, px, bleedMm: 0 };
 }
@@ -364,8 +366,11 @@ const DEFS: Record<string, ProductDef> = {
       { size: '22″ square', sides: 'double', pricePence: 4500, ...exactPx({ w: 3375, h: 3375 }, 150), prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
     ],
   },
+  // PAUSED (sweep 03-B5): Prodigi refuses a book order without its pages (pageCount + one file per page —
+  // `InvalidPageCount` from the sandbox), and a 24-page book can't be made from one drawing. Not on sale
+  // (placeOrder ignores it) until the book's pages are designed and rendered.
   storybook: {
-    category: 'BOOK', label: 'storybook', blurb: "they're the hero of the story", print: true,
+    category: 'BOOK', label: 'storybook', blurb: "they're the hero of the story", print: true, paused: true,
     description: 'A keepsake hardcover book starring your little one and their artwork — the tale they were always the hero of.',
     specs: { material: 'hardcover, gloss', pages: '24 pages' },
     variants: [
@@ -407,7 +412,9 @@ const DEFS: Record<string, ProductDef> = {
     description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message', envelope: 'included' },
     variants: [
-      { size: '7×5″', pricePence: 550, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      // the design's frame IS the outer-front panel it prints on — a quarter of Prodigi's 6120×2160
+      // spread (cardPrint.ts) — so the positioner and the mockup frame exactly what prints (03-B2)
+      { size: '7×5″', pricePence: 550, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   // Greetings-card MULTIPACKS (founder, 2026-10-21): the same 7×5″ Fedrigoni card, a different (or
@@ -421,8 +428,8 @@ const DEFS: Record<string, ProductDef> = {
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same', envelopes: 'one with every card' },
     variants: [
-      { size: 'pack of 5', pricePence: 1200, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
-      { size: 'pack of 10', pricePence: 2100, wMm: 127, hMm: 178, dpi: 300, prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'pack of 5', pricePence: 1200, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'pack of 10', pricePence: 2100, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   // The DATED 2027 wall calendar (founder, 2026-10-25 — CHRISTMAS-range-and-postage.md §5): Prodigi

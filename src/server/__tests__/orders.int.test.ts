@@ -139,7 +139,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     };
 
     const res = await placeOrder(db, {
-      items: [{ productKey: 'storybook', qty: 1 }], // 2600
+      items: [{ productKey: 'jigsaw', qty: 1 }], // 2600 (the 30-piece jigsaw; the storybook is paused — 03-B5)
       account: { id: ids.rosieId },
       joinProvenance: provenance,
     });
