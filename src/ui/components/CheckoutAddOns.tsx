@@ -10,6 +10,7 @@ import { basketLineId } from '@/lib/basket-line';
 import { defaultPlacementFor } from '@/lib/catalogue-view';
 import { gbp, toast, useBasket, useUpload, type BasketItem } from '@/lib/store';
 import type { AddOn } from '@/server/addOns';
+import { withArticle } from '@/lib/articles';
 
 /**
  * CHECKOUT ADD-ONS (founder, 29 Oct): beneath the basket, up to three things that go with it, each

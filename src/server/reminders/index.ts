@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray } from 'drizzle-orm';
-import { auditRecords, consentRecords, reminderSends } from '@/db/schema';
+import { accounts, auditRecords, consentRecords, reminderSends } from '@/db/schema';
 import { appUrl, sendMail } from '@/server/mail';
+import { readReminderOffToken, reminderOffLinks } from '@/server/mail/reminderOff';
 import type { DbHandle } from '@/server/db';
 import { NUDGES, planDigests } from './planner';
 import { reminderCandidates } from '../occasions';
@@ -75,18 +76,35 @@ export async function runReminders(db: DbHandle, now = new Date()): Promise<{ pl
     if (!lines.length) continue;
     const when = (n: number) => (n >= 25 ? 'in about a month' : n >= 12 ? 'in two weeks' : `in ${n} days`);
     const first = lines[0]!;
+    // a real off switch: no sign-in, and the headers mail apps use for their own one-tap unsubscribe (04-B10)
+    const off = reminderOffLinks(d.accountId);
     await sendMail({
       kind: 'reminder',
       to: d.email,
+      headers: off.headers,
       subject: `coming up: ${first.title}${lines.length > 1 ? ` and ${lines.length - 1} more` : ''} ✦`,
       text:
         `A gentle heads-up from your family calendar:\n\n` +
         lines.map((l) => `• ${l.title}${l.note ? ` (${l.note})` : ''} — ${when(l.inDays)}, ${new Date(`${l.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`).join('\n') +
         `\n\nPlenty of time to turn a drawing into something they'll keep: ${appUrl('/start-creating')}\n\n` +
         `See the whole calendar: ${appUrl('/family')}\n` +
-        `Don't want these nudges? Turn them off in one tap: ${appUrl('/family')}`,
+        `Don't want these nudges? Turn them off here — no need to sign in: ${off.page}`,
     });
     delivered++;
   }
   return { planned: digests.length, sent: delivered };
+}
+
+/**
+ * The reminder email's off switch, from its signed link (no sign-in — 04-B10). Only ever turns
+ * reminders OFF, for the account the link was made for; logged like any other consent change.
+ * A tampered link does nothing.
+ */
+export async function turnRemindersOffByLink(db: DbHandle, token: string, source: 'email-link' | 'one-click'): Promise<{ ok: boolean }> {
+  const accountId = readReminderOffToken(String(token ?? ''));
+  if (!accountId) return { ok: false };
+  const [exists] = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, accountId));
+  if (!exists) return { ok: false };
+  if (await hasReminderConsent(db, accountId)) await setReminderConsent(db, accountId, false, `reminders:${source}`);
+  return { ok: true };
 }

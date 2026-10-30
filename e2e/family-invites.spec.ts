@@ -196,7 +196,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await P.page.goto('/family');
     await P.page.getByRole('button', { name: `cancel the invite to ${E.friend}` }).click();
     await expect(P.page.getByText(/cancelled — the link no longer works/)).toBeVisible();
-    await P.page.getByRole('button', { name: `send the invite to ${E.resend} again` }).click();
+    await P.page.getByRole('button', { name: `resend the invite to ${E.resend}` }).click();
     await expect(P.page.getByText(/sent again to .* a fresh link, good for 14 days/)).toBeVisible();
     await sql()`update invites set expires_at = now() - interval '1 minute' where id = ${inv.expired.id}`;
   });

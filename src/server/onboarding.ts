@@ -63,7 +63,6 @@ export async function listActiveFamilies(db: DbHandle, accountId: string): Promi
       name: families.displayName,
       joinedAt: memberships.joinedAt,
       ownerName: accounts.displayName,
-      ownerEmail: accounts.email,
     })
     .from(memberships)
     .innerJoin(families, eq(families.id, memberships.familyId))
@@ -73,8 +72,9 @@ export async function listActiveFamilies(db: DbHandle, accountId: string): Promi
     .sort((a, b) => Number(b.isOwner) - Number(a.isOwner) || (b.joinedAt?.getTime() ?? 0) - (a.joinedAt?.getTime() ?? 0))
     .map((r) => {
       const named = familyNameForRelatives(r.name);
-      const owner = r.ownerName?.trim() || r.ownerEmail?.split('@')[0] || 'their';
-      return { familyId: r.familyId, name: named ?? (r.isOwner ? 'my keepsakes' : `${owner}'s family`), isOwner: r.isOwner };
+      // a relative sees the parent's first name, never their email handle (04-B9)
+      const owner = r.ownerName?.trim().split(/\s+/)[0];
+      return { familyId: r.familyId, name: named ?? (r.isOwner ? 'my keepsakes' : owner ? `${owner}'s family` : 'a family you joined'), isOwner: r.isOwner };
     });
 }
 

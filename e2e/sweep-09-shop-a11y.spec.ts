@@ -109,7 +109,7 @@ test('09-B8: /home keepsake tiles — the button’s accessible name includes it
   await expectAccessible(page, '/home with a keepsake');
 });
 
-test.fixme('09-B6: the Studio has a <main id="main"> (the skip link lands somewhere; axe "region" + "skip-link")', async ({ page }) => {
+test('09-B6: the Studio has a <main id="main"> (the skip link lands somewhere; axe "region" + "skip-link")', async ({ page }) => {
   await quietCookies(page);
   await uploadAndOpenRange(page);
   await page.getByRole('button', { name: /edit in studio/i }).first().click();

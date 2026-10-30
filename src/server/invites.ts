@@ -1,13 +1,38 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
-import { auditRecords, families, invites, memberships } from '@/db/schema';
+import { accounts, auditRecords, families, invites, memberships } from '@/db/schema';
 import { defaultCircleFor } from '@/domain/relationships';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
 import { familyNameForRelatives } from './onboarding';
+import { sendMail } from './mail';
+import { memberJoinedEmail } from './mail/familyNotices';
 
 const INVITE_TTL_DAYS = 14;
+
+/**
+ * The invite can't go: that address already belongs to someone in the family (sweep 04-B4 — an
+ * invite to an existing member used to be accepted and then silently change nothing). The parent
+ * changes a member's circle/access from their card on /family instead.
+ */
+export class AlreadyInFamilyError extends Error {
+  readonly reason = 'already-member' as const;
+  constructor() {
+    super('already in the family');
+  }
+}
+
+/** Is this address an ACTIVE member of the family already? (case-insensitive, like the join check) */
+export async function isActiveMemberEmail(db: DbHandle, familyId: string, email: string): Promise<boolean> {
+  const [row] = await db
+    .select({ id: memberships.id })
+    .from(memberships)
+    .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+    .where(and(eq(memberships.familyId, familyId), eq(memberships.status, 'ACTIVE'), sql`lower(${accounts.email}) = ${email.trim().toLowerCase()}`))
+    .limit(1);
+  return !!row;
+}
 
 export interface CreateInviteInput {
   familyId: string;
@@ -39,6 +64,7 @@ export async function createInvite(
   }
 
   const email = input.email.trim().toLowerCase();
+  if (await isActiveMemberEmail(db, input.familyId, email)) throw new AlreadyInFamilyError();
   const circle = defaultCircleFor(input.relationship); // server-authoritative
   const token = randomBytes(24).toString('base64url'); // unguessable
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
@@ -160,7 +186,8 @@ export async function acceptInvite(
       ),
     );
 
-  if (!existing[0]) {
+  const joined = !existing[0];
+  if (joined) {
     await db.insert(memberships).values({
       familyId: invite.familyId,
       accountId: account.id,
@@ -180,7 +207,44 @@ export async function acceptInvite(
   }
 
   await db.update(invites).set({ status: 'VERIFIED', verifiedAt: new Date() }).where(eq(invites.id, invite.id));
+  // any OTHER invite still waiting for this address is spent too — they're in now, and an old link
+  // must never quietly change the level the parent has since set for them (04-B4)
+  await db
+    .update(invites)
+    .set({ status: 'REVOKED' })
+    .where(and(eq(invites.familyId, invite.familyId), eq(invites.status, 'PENDING'), ne(invites.id, invite.id), sql`lower(${invites.email}) = ${invite.email.toLowerCase()}`));
+  if (joined) await tellParentTheyJoined(db, invite, account);
   return { ok: true, familyId: invite.familyId };
+}
+
+/**
+ * "{name} joined your family" — to the family's controlling parent ONLY, never to other members.
+ * Their name + the circle/access the parent chose, and a link to /family. A mail hiccup never undoes
+ * the join (the membership is real either way); it's logged for ops.
+ */
+async function tellParentTheyJoined(db: DbHandle, invite: typeof invites.$inferSelect, joiner: { id: string; email: string }) {
+  try {
+    const [parent] = await db
+      .select({ email: accounts.email, name: accounts.displayName })
+      .from(families)
+      .innerJoin(accounts, eq(accounts.id, families.ownerAccountId))
+      .where(eq(families.id, invite.familyId));
+    if (!parent) return;
+    const [who] = await db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, joiner.id));
+    await sendMail(
+      memberJoinedEmail({
+        to: parent.email,
+        parentName: parent.name,
+        joinerName: who?.name ?? null,
+        joinerEmail: invite.email,
+        relationship: invite.relationship,
+        circle: invite.circle,
+        accessLevel: invite.accessLevel,
+      }),
+    );
+  } catch (e) {
+    console.error('[invites] the "they joined" email to the parent failed', e instanceof Error ? e.message : e);
+  }
 }
 
 /**
