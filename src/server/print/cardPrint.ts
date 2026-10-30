@@ -1,5 +1,6 @@
 import sharp, { type OverlayOptions } from 'sharp';
 import { computeLayerRect, type Transform } from './geometry';
+import { visibleLayerPart } from './visibleLayer';
 import { renderCardInsidePanels } from './cardText';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 
@@ -40,14 +41,8 @@ async function placeDesign(design: Buffer, transform: Transform, w: number, face
   const src = { width: meta.width ?? 0, height: meta.height ?? 0 };
   if (!src.width || !src.height) throw new Error('card print: unreadable design image');
   const rect = computeLayerRect({ printWidthPx: w, printHeightPx: H, bleedMm: 0, requiredDpi: REQUIRED_DPI }, src, transform);
-  const layer = await sharp(design).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill' }).toBuffer();
-  const ix = Math.max(0, -rect.x);
-  const iy = Math.max(0, -rect.y);
-  const ox = Math.max(0, rect.x);
-  const oy = Math.max(0, rect.y);
-  const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
-  const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
-  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).toBuffer();
+  // cut from the source BEFORE resizing — a big zoomed layer is never decoded whole (sweep 03-B3)
+  const { part, left: ox, top: oy } = await visibleLayerPart(design, src, rect);
   return sharp({ create: { width: w, height: H, channels: 4, background: faceHex } })
     .composite([{ input: part, left: ox, top: oy }])
     .png()
