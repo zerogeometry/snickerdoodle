@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { definedPriceList } from '@/server/catalogue';
+import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { EXAMPLES } from '@/lib/examples';
 import { CHRISTMAS_FEATURED } from '@/lib/season';
 import { CHRISTMAS_PHOTOS, SHOP_PRODUCTS, productKeyForSlug } from '@/lib/shop-products';
@@ -10,7 +11,8 @@ import { productJsonLd } from '../structuredData';
 import { buildMerchantFeed, merchantFeedItems } from '../merchantFeed';
 
 const ORIGIN = 'https://snickerdoodle.co.uk';
-const onShow = definedPriceList().filter((r) => r.visibleInShop && !r.paused);
+// what the shop really sells on its own: a bundle's extra packs never are (getCatalogue leaves them out too)
+const onShow = definedPriceList().filter((r) => r.visibleInShop && !r.paused && !BUNDLE_ONLY_SKUS.has(r.sku));
 const priceOfSku = new Map(onShow.map((r) => [r.sku, r.pricePence]));
 const shopKeys = new Set(onShow.map((r) => r.productKey));
 
@@ -62,6 +64,39 @@ describe('the public shop listing', () => {
     expect(by.get('cushion')!.offers.find((o) => o.pricePence === 3500)!.label).toBe('12″ square, printed both sides');
     expect(by.get('mug')!.offers).toHaveLength(1);
     expect(by.get('mug')!.offers[0]!.label).toBe('');
+  });
+
+  // 09-B1 (sweep 29 Oct): /products/placemats said "from £16" and listed the bundle-only packs (1/2/6 placemats,
+  // a single coaster) as InStock offers — prices nobody can pay.
+  it('09-B1: a bundle-only pack is never listed — placemats are £60 for 4, coasters from £18', () => {
+    for (const l of shopListings()) for (const o of l.offers) expect(BUNDLE_ONLY_SKUS.has(o.sku), `${l.key}: ${o.sku}`).toBe(false);
+    const by = new Map(shopListings().map((l) => [l.key, l]));
+    const placemat = by.get('placemat');
+    const coaster = by.get('coaster');
+    if (placemat) {
+      expect(placemat.offers.map((o) => o.sku)).toEqual(['placemat']);
+      expect(placemat.fromPence).toBe(6000);
+      expect(JSON.stringify(asLd(productJsonLd(placemat, ORIGIN)))).not.toMatch(/"16\.00"|packof1|packof2|packof6/);
+    }
+    if (coaster) {
+      expect(coaster.offers.map((o) => o.sku).sort()).toEqual(['coaster', 'coaster-packof2', 'coaster-packof4']);
+      expect(coaster.fromPence).toBe(1800);
+    }
+  });
+
+  it('09-B1: the feed can never submit a bundle-only pack — even the day placemats and coasters get a photo', () => {
+    const withPhoto = ['placemat', 'coaster'] as const;
+    const saved = withPhoto.map((k) => SHOP_PRODUCTS[k]?.image);
+    try {
+      for (const k of withPhoto) if (SHOP_PRODUCTS[k]) SHOP_PRODUCTS[k]!.image = { src: EXAMPLES[0]!.src, width: 1200, height: 1200, alt: 'a stand-in photo, only for this test' };
+      const ids = merchantFeedItems(ORIGIN).map((i) => i.id);
+      for (const sku of BUNDLE_ONLY_SKUS) expect(ids).not.toContain(sku);
+      if (SHOP_PRODUCTS.placemat) expect(ids).toContain('placemat');
+    } finally {
+      withPhoto.forEach((k, i) => {
+        if (SHOP_PRODUCTS[k]) SHOP_PRODUCTS[k]!.image = saved[i];
+      });
+    }
   });
 
   it('the christmas flag follows the season’s lead range', () => {
