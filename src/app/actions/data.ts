@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { deleteAsset, resolveViewerContext } from '@/server/assets';
+import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
 import { loadHome } from '@/server/home';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
@@ -48,7 +48,7 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
  * removable on demand. (The login record + financial order history are retained per
  * the legal-basis schedule with the child image already cascaded out of any order.)
  */
-export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok: boolean; deleted: number }> {
+export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok: boolean; deleted: number; inOrders?: number }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, deleted: 0 };
 
@@ -62,11 +62,13 @@ export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok:
     .where(and(eq(assets.familyId, familyId), eq(assets.controllerAccountId, account.id)));
 
   let deleted = 0;
+  let inOrders = 0; // kept until the paid order that needs them is made — the parent is told
   for (const r of rows) {
     try {
       await deleteAsset(db, r.id, viewer);
       deleted++;
-    } catch {
+    } catch (e) {
+      if (e instanceof KeepsakeInUseError) inOrders++;
       // skip any the viewer can't delete; the rest still go
     }
   }
@@ -74,7 +76,7 @@ export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok:
   // (each keepsake is audited as ASSET_DELETED by deleteAsset — this is not an account closure)
 
   revalidatePath('/home');
-  return { ok: true, deleted };
+  return { ok: true, deleted, inOrders };
 }
 
 /**
