@@ -1,0 +1,161 @@
+{
+  "/": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/how-it-works": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/our-story": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/gifts": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/faq": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/help": [
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "input \"\" 20×20",
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/christmas/delivery-dates": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/trust/privacy": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/trust/cookies": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/trust/terms": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/trust/family-promise": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/trust/data-complaint": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ],
+  "/catalogue": [
+    "button \"all\" 47×36",
+    "button \"festive\" 75×36",
+    "button \"cards & prints\" 122×36",
+    "button \"home\" 68×36",
+    "button \"wear\" 64×36",
+    "button \"gifts\" 61×36",
+    "button \"Enlarge christmas family bundle preview\" 24×24",
+    "button \"Enlarge framed print preview\" 24×24",
+    "button \"Enlarge mug preview\" 23×23",
+    "button \"Enlarge cushion preview\" 23×23",
+    "button \"Enlarge kids tee preview\" 22×22",
+    "button \"one fewer kids tee\" 42×42",
+    "button \"add a kids tee\" 42×42",
+    "button \"customize\" 207×44",
+    "button \"Enlarge jigsaw preview\" 23×23",
+    "button \"one fewer jigsaw\" 43×43",
+    "button \"add a jigsaw\" 43×43",
+    "button \"Enlarge fleece blanket preview\" 23×23",
+    "button \"one fewer fleece blanket\" 44×44",
+    "button \"add a fleece blanket\" 44×44",
+    "button \"Enlarge greetings card preview\" 22×22",
+    "button \"one fewer greetings card\" 42×42",
+    "button \"add a greetings card\" 42×42",
+    "button \"Enlarge card pack preview\" 23×23",
+    "button \"one fewer card pack\" 43×43",
+    "button \"add a card pack\" 43×43",
+    "button \"Enlarge calendar preview\" 23×23",
+    "button \"one fewer calendar\" 44×44",
+    "button \"add a calendar\" 44×44",
+    "button \"Enlarge adult tee preview\" 22×22",
+    "button \"one fewer adult tee\" 42×42",
+    "button \"add a adult tee\" 42×42",
+    "button \"Enlarge ceramic christmas ornament previ\" 23×23",
+    "button \"one fewer ceramic christmas ornament\" 43×43",
+    "button \"add a ceramic christmas ornament\" 43×43",
+    "button \"Enlarge christmas bauble preview\" 23×23",
+    "button \"one fewer christmas bauble\" 44×44",
+    "button \"add a christmas bauble\" 44×44",
+    "button \"Enlarge christmas sack preview\" 22×22",
+    "button \"one fewer christmas sack\" 42×42",
+    "button \"add a christmas sack\" 42×42",
+    "button \"Enlarge placemats preview\" 23×23",
+    "button \"one fewer placemats\" 43×43",
+    "button \"add a placemats\" 43×43",
+    "button \"Enlarge coasters preview\" 23×23",
+    "button \"one fewer coasters\" 44×44",
+    "button \"add a coasters\" 44×44",
+    "button \"Enlarge phone case preview\" 22×22",
+    "button \"one fewer phone case\" 42×42",
+    "button \"add a phone case\" 42×42",
+    "button \"Enlarge socks preview\" 23×23",
+    "button \"one fewer socks\" 43×43",
+    "button \"add a socks\" 43×43",
+    "button \"Enlarge height chart preview\" 23×23",
+    "button \"one fewer height chart\" 44×44",
+    "button \"add a height chart\" 44×44",
+    "button \"Enlarge wrapping paper preview\" 22×22",
+    "button \"one fewer wrapping paper\" 42×42",
+    "button \"add a wrapping paper\" 42×42",
+    "button \"Enlarge tea towel preview\" 23×23",
+    "button \"one fewer tea towel\" 43×43",
+    "button \"add a tea towel\" 43×43",
+    "button \"Enlarge playing cards preview\" 23×23",
+    "button \"one fewer playing cards\" 44×44",
+    "button \"add a playing cards\" 44×44"
+  ],
+  "/start-creating": [
+    "a \"log in\" 39×44"
+  ],
+  "/checkout": [
+    "a \"snickerdoodle\" 136×28"
+  ],
+  "/products/mug": [
+    "a \"FAQs\" 29×44",
+    "a \"privacy\" 42×44",
+    "a \"cookies\" 44×44",
+    "a \"hello@snickerdoodle.co.uk\" 137×13"
+  ]
+}

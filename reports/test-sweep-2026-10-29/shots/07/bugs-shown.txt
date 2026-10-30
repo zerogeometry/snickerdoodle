@@ -1,0 +1,234 @@
+
+ RUN  v4.1.12 C:/Users/Simon/dev/Snickerdoodle/.claude/worktrees/sweep-7-breakin-8daac1
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts (16 tests | 10 failed) 2458ms
+     × 07-B2: an EXTENDED-circle, VIEW_BUY grandparent cannot change the Studio edits of a keepsake they can only SEE 112ms
+     × 07-B3: a FAMILY-circle contributor cannot use "copy" to republish a FAMILY-only keepsake to the Extended circle 75ms
+     × 07-B4: a VIEW-access member cannot place an order for the family’s keepsake (VIEW ≠ VIEW_BUY) 52ms
+     × 07-B5: a guest’s "+ keepsake" for someone else’s email does not land the drawing in that person’s family 97ms
+     × 07-B6: a personal referral code (first order only, never your own) is refused when the buyer is a signed-out guest who already paid 10ms
+     × 07-B7: a revoked gift link can no longer be used to put its keepsakes on hold 8ms
+     × 07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id 7ms
+     × 07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id 8ms
+     × 07-B11: rendering a DIFFERENT placement of the same drawing on the same product does not overwrite an existing print file 1459ms
+     × 07-B12: the owner’s gift-list view gives no picture for an item since made ONLY_ME by its controller, or BLOCKED 162ms
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 10 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B2: an EXTENDED-circle, VIEW_BUY grandparent cannot change the Studio edits of a keepsake they can only SEE
+AssertionError: expected { ok: true, design: { …(3) }, …(1) } to match object { ok: false }
+(5 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "ok": false,
++   "ok": true,
+  }
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:112:17
+    110|     const before = (await db.select().from(assets).where(eq(assets.id,…
+    111|     const res = await saveStudioAction({ assetId: extAsset, mask: null…
+    112|     expect(res).toMatchObject({ ok: false });
+       |                 ^
+    113|     expect((await db.select().from(assets).where(eq(assets.id, extAsse…
+    114|     expect(await db.select().from(storageObjects).where(eq(storageObje…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B3: a FAMILY-circle contributor cannot use "copy" to republish a FAMILY-only keepsake to the Extended circle
+AssertionError: the copy stays under the controlling parent: expected 'b0cb9aca-7938-4c32-9be5-5556a64e7491' to be '96bdc63f-d98a-4bee-a8b2-2126cbf2ff82' // Object.is equality
+
+Expected: "96bdc63f-d98a-4bee-a8b2-2126cbf2ff82"
+Received: "b0cb9aca-7938-4c32-9be5-5556a64e7491"
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:124:87
+    122|       const [row] = await db.select().from(assets).where(eq(assets.id,…
+    123|       keys.push(`originals/${copy.assetId}`);
+    124|       expect(row!.controllerAccountId, 'the copy stays under the contr…
+       |                                                                                       ^
+    125|       expect(await setAssetVisibilityAction(copy.assetId, 'EXTENDED'))…
+    126|     }
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B4: a VIEW-access member cannot place an order for the family’s keepsake (VIEW ≠ VIEW_BUY)
+AssertionError: expected { ok: true, ref: 'SNK-946104', …(1) } to match object { ok: false }
+(2 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "ok": false,
++   "ok": true,
+  }
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:133:17
+    131|     actor.current = acct(vicId);
+    132|     const res = await placeOrderAction({ items: [{ productKey: 'mug', …
+    133|     expect(res).toMatchObject({ ok: false });
+       |                 ^
+    134|   });
+    135|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B5: a guest’s "+ keepsake" for someone else’s email does not land the drawing in that person’s family
+AssertionError: expected [ Array(1) ] to not include 'd1217c52-0aaa-4b02-ab15-a6acc66160f2'
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:148:27
+    146|     const done = await finishPendingKeepsAction();
+    147|     const [row] = await db.select().from(assets).where(eq(assets.id, d…
+    148|     expect(done.kept).not.toContain(draft.assetId);
+       |                           ^
+    149|     expect(row!.familyId).not.toBe(ids.bloomId);
+    150|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B6: a personal referral code (first order only, never your own) is refused when the buyer is a signed-out guest who already paid
+AssertionError: expected { ok: true, rule: { …(6) } } to match object { ok: false }
+(7 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "ok": false,
++   "ok": true,
+  }
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:160:62
+    158|       expect(await resolvePromo(db, code, new Date(), { accountId: ids…
+    159|       // the same person checking out signed out (no buyer): should be…
+    160|       expect(await resolvePromo(db, code, new Date(), null)).toMatchOb…
+       |                                                              ^
+    161|     } finally {
+    162|       await db.delete(promoCodes).where(eq(promoCodes.code, code));
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B7: a revoked gift link can no longer be used to put its keepsakes on hold
+AssertionError: expected 'FLAGGED' to be 'CLEAR' // Object.is equality
+
+Expected: "CLEAR"
+Received: "FLAGGED"
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:172:98
+    170|     actor.current = null;
+    171|     await reportGiftLinkAction({ token, reason: 'other', note: 't7' })…
+    172|     expect((await db.select().from(assets).where(eq(assets.id, extAsse…
+       |                                                                                                  ^
+    173|   });
+    174|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id
+AssertionError: expected { ok: true } to deeply equal { ok: false, reason: 'invalid' }
+
+- Expected
++ Received
+
+  {
+-   "ok": false,
+-   "reason": "invalid",
++   "ok": true,
+  }
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:182:20
+    180|       const real = await reportKeepsakeAction({ assetId: extAsset, rea…
+    181|       const ghost = await reportKeepsakeAction({ assetId: randomUUID()…
+    182|       expect(real).toEqual(ghost);
+       |                    ^
+    183|     } finally {
+    184|       await db.update(assets).set({ moderationStatus: 'CLEAR', moderat…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id
+AssertionError: expected { ok: false, reason: 'error' } to deeply equal { ok: false, reason: 'not-found' }
+
+- Expected
++ Received
+
+  {
+    "ok": false,
+-   "reason": "not-found",
++   "reason": "error",
+  }
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:193:18
+    191|     const real = await saveDesignAction({ assetId: famNoChild, variant…
+    192|     const ghost = await saveDesignAction({ assetId: randomUUID(), vari…
+    193|     expect(real).toEqual(ghost);
+       |                  ^
+    194|   });
+    195|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B11: rendering a DIFFERENT placement of the same drawing on the same product does not overwrite an existing print file
+AssertionError: the ordered print file was replaced in place: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:265:145
+    263|     const preview = await renderPrintFile(db, sam, { assetId: famNoChi…
+    264|     const [after] = await db.select().from(storageObjects).where(eq(st…
+    265|     expect(preview.printObjectId === ordered.printObjectId && after!.s…
+       |                                                                                                                                                 ^
+    266|   });
+    267|   // ── 07-B12: the owner's gift-list view mints links to ORIGINALS wi…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B12: the owner’s gift-list view gives no picture for an item since made ONLY_ME by its controller, or BLOCKED
+AssertionError: ONLY_ME original: expected 'http://localhost:9000/snickerdoodle-o…' to be null
+
+- Expected:
+null
+
++ Received:
+"http://localhost:9000/snickerdoodle-originals/assets/50931b81-43a3-4f96-87d7-c66a5544bd21/original?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261029%2Feu-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261029T222756Z&X-Amz-Expires=300&X-Amz-Signature=22358258e7da5ec1ed6a16f82676212cde8a365cf2fb6a7f8200f81ec28343f2&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:278:102
+    276|     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyI…
+    277|     const items = (await listGiftListsForOwner(db, sam, ids.hartleyId)…
+    278|     expect.soft(items.find((i) => i.assetId === mine.assetId)?.imageUr…
+       |                                                                                                      ^
+    279|     expect.soft(items.find((i) => i.assetId === blocked.assetId)?.imag…
+    280|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯
+
+ FAIL  src/app/actions/__tests__/breakInFamily.int.test.ts > break-in: in-family escalation + forgery (integration) > 07-B12: the owner’s gift-list view gives no picture for an item since made ONLY_ME by its controller, or BLOCKED
+AssertionError: BLOCKED original: expected 'http://localhost:9000/snickerdoodle-o…' to be null
+
+- Expected:
+null
+
++ Received:
+"http://localhost:9000/snickerdoodle-originals/assets/af3ac0a5-2d98-416e-969a-cd08e017deb6/original?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=minioadmin%2F20261029%2Feu-west-2%2Fs3%2Faws4_request&X-Amz-Date=20261029T222756Z&X-Amz-Expires=300&X-Amz-Signature=6bdf3ef6329336932fe6e4ff11e9f195bc4621f27a633ba3d051f17bcfb3ee00&X-Amz-SignedHeaders=host&x-amz-checksum-mode=ENABLED&x-id=GetObject"
+
+ ❯ src/app/actions/__tests__/breakInFamily.int.test.ts:279:105
+    277|     const items = (await listGiftListsForOwner(db, sam, ids.hartleyId)…
+    278|     expect.soft(items.find((i) => i.assetId === mine.assetId)?.imageUr…
+    279|     expect.soft(items.find((i) => i.assetId === blocked.assetId)?.imag…
+       |                                                                                                         ^
+    280|   });
+    281| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  10 failed | 6 passed (16)
+   Start at  22:27:51
+   Duration  4.88s (transform 681ms, setup 0ms, import 2.30s, tests 2.46s, environment 0ms)
+
