@@ -1,0 +1,179 @@
+{
+ "desktop:framedPrint": [
+  "default framedPrint £65 composed",
+  "Size=11×14″ → framedPrint £65 composed",
+  "Size=12×16″ → framedPrint-1216-gold £70 composed",
+  "Size=18×24″ → framedPrint-1824-gold £90 composed",
+  "Size=24×32″ → framedPrint-2432-gold £105 composed",
+  "Orientation=portrait → framedPrint-2432-gold £105 composed",
+  "Orientation=landscape → framedPrint-2432-gold-landscape £105 composed",
+  "Colour=gold → framedPrint-2432-gold-landscape £105 composed",
+  "Colour=black → framedPrint-2432-black-landscape £105 composed",
+  "Colour=white → framedPrint-2432-white-landscape £105 composed",
+  "Colour=natural → framedPrint-2432-natural-landscape £105 composed",
+  "Colour=brown → framedPrint-2432-brown-landscape £105 composed",
+  "Colour=dark grey → framedPrint-2432-darkgrey-landscape £105 composed",
+  "Colour=light grey → framedPrint-2432-lightgrey-landscape £105 composed",
+  "Colour=silver → framedPrint-2432-silver-landscape £105 composed"
+ ],
+ "desktop:mug": [
+  "default mug £18 composed",
+  "Colour=blue → mug £18 composed",
+  "Colour=black → mug-11oz-black £18 composed",
+  "Colour=green → mug-11oz-green £18 composed",
+  "Colour=orange → mug-11oz-orange £18 composed",
+  "Colour=pink → mug-11oz-pink £18 composed",
+  "Colour=red → mug-11oz-red £18 composed",
+  "Colour=yellow → mug-11oz-yellow £18 composed"
+ ],
+ "desktop:cushion": [
+  "default cushion £22 composed",
+  "Size=heart → cushion £22 composed",
+  "Size=18″ round → cushion-18round £30 composed",
+  "Size=12″ square → cushion-12square £30 composed",
+  "Size=22″ square → cushion-22square £40 composed"
+ ],
+ "desktop:kidsTee": [
+  "default kidsTee £25 composed",
+  "Size=3-4 years → kidsTee £25 composed",
+  "Size=5-6 years → kidsTee-56years-white £25 composed",
+  "Size=7-8 years → kidsTee-78years-white £25 composed",
+  "Size=9-11 years → kidsTee-911years-white £25 composed",
+  "Size=12-14 years → kidsTee-1214years-white £25 composed",
+  "Colour=white → kidsTee-1214years-white £25 composed",
+  "Colour=heather grey → kidsTee-1214years-heathergrey £27 composed",
+  "Colour=french navy → kidsTee-1214years-frenchnavy £27 composed",
+  "Colour=black → kidsTee-1214years-black £27 composed",
+  "Colour=anthracite → kidsTee-1214years-anthracite £27 composed",
+  "Colour=caribbean blue → kidsTee-1214years-caribbeanblue £27 composed",
+  "Colour=royal blue → kidsTee-1214years-royalblue £27 composed",
+  "Colour=cotton pink → kidsTee-1214years-cottonpink £27 composed",
+  "Colour=bright orange → kidsTee-1214years-brightorange £27 composed",
+  "Colour=ochre → kidsTee-1214years-ochre £27 composed",
+  "Colour=burgundy → kidsTee-1214years-burgundy £27 composed"
+ ],
+ "desktop:jigsaw": [
+  "default jigsaw-30pieces £26 composed",
+  "Size=30 pieces → jigsaw-30pieces £26 composed",
+  "Size=110 pieces → jigsaw-110pieces £30 composed",
+  "Size=252 pieces → jigsaw-252pieces £35 composed",
+  "Orientation=landscape → jigsaw-252pieces-landscape £35 composed",
+  "Orientation=portrait → jigsaw-252pieces £35 composed"
+ ],
+ "desktop:blanket": [
+  "default blanket £60 composed",
+  "Size=medium → blanket £60 composed",
+  "Size=large → blanket-large £75 composed",
+  "Orientation=portrait → blanket-large £75 composed",
+  "Orientation=landscape → blanket-large-landscape £75 composed"
+ ],
+ "desktop:card": [
+  "default card £5.50 composed"
+ ],
+ "desktop:adultTee": [
+  "default adultTee £32 composed",
+  "Size=XS → adultTee-xs-white £32 composed",
+  "Size=S → adultTee-s-white £32 composed",
+  "Size=M → adultTee £32 composed",
+  "Size=L → adultTee-l-white £32 composed",
+  "Size=XL → adultTee-xl-white £32 composed",
+  "Size=2XL → adultTee-2xl-white £32 composed",
+  "Colour=white → adultTee-2xl-white £32 composed",
+  "Colour=heather grey → adultTee-2xl-heathergrey £32 composed",
+  "Colour=french navy → adultTee-2xl-frenchnavy £32 composed",
+  "Colour=black → adultTee-2xl-black £32 composed",
+  "Colour=khaki → adultTee-2xl-khaki £32 composed"
+ ],
+ "desktop:ceramicOrnament": [
+  "default ceramicOrnament £21 composed"
+ ],
+ "desktop:christmasBauble": [
+  "default christmasBauble £19 composed"
+ ],
+ "desktop:sack": [
+  "default sack £35 composed"
+ ],
+ "desktop:placemat": [
+  "default placemat £60 composed"
+ ],
+ "desktop:coaster": [
+  "default coaster £34 composed",
+  "Size=pack of 2 → coaster-packof2 £18 composed",
+  "Size=pack of 4 → coaster-packof4 £26 composed",
+  "Size=pack of 6 → coaster £34 composed"
+ ],
+ "desktop:phoneCase": [
+  "default phoneCase £25 composed",
+  "Pixel 9 Pro XL: 2 variants, chips ok, composed",
+  "Pixel 9 Pro: 2 variants, chips ok, composed",
+  "Pixel 9: 2 variants, chips ok, composed",
+  "Pixel 8 Pro: 2 variants, chips ok, composed",
+  "Pixel 8: 2 variants, chips ok, composed",
+  "Galaxy S26 Ultra: 4 variants, chips ok, composed",
+  "Galaxy S26+: 4 variants, chips ok, composed",
+  "Galaxy S26: 4 variants, chips ok, composed",
+  "Galaxy S25 Ultra: 4 variants, chips ok, composed",
+  "Galaxy S25+: 4 variants, chips ok, composed",
+  "Galaxy S25: 4 variants, chips ok, composed",
+  "Galaxy S24 FE: 2 variants, chips ok, composed",
+  "Galaxy S24 Ultra: 4 variants, chips ok, composed",
+  "Galaxy S24+: 4 variants, chips ok, composed",
+  "Galaxy S24: 4 variants, chips ok, composed",
+  "Galaxy S23 FE: 2 variants, chips ok, composed",
+  "Galaxy S23 Ultra: 4 variants, chips ok, composed",
+  "Galaxy S23+: 4 variants, chips ok, composed",
+  "Galaxy S23: 4 variants, chips ok, composed",
+  "iPhone 18 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 18 Pro: 4 variants, chips ok, composed",
+  "iPhone 17 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 17 Pro: 4 variants, chips ok, composed",
+  "iPhone 17 Air: 4 variants, chips ok, composed",
+  "iPhone 17: 4 variants, chips ok, composed",
+  "iPhone 16e: 2 variants, chips ok, composed",
+  "iPhone 16 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 16 Pro: 4 variants, chips ok, composed",
+  "iPhone 16 Plus: 4 variants, chips ok, composed",
+  "iPhone 16: 4 variants, chips ok, composed",
+  "iPhone 15 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 15 Pro: 4 variants, chips ok, composed",
+  "iPhone 15 Plus: 4 variants, chips ok, composed",
+  "iPhone 15: 4 variants, chips ok, composed",
+  "iPhone 14 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 14 Pro: 4 variants, chips ok, composed",
+  "iPhone 14 Plus: 4 variants, chips ok, composed",
+  "iPhone 14: 4 variants, chips ok, composed",
+  "iPhone 13 Pro Max: 4 variants, chips ok, composed",
+  "iPhone 13 Pro: 4 variants, chips ok, composed",
+  "iPhone 13 mini: 4 variants, chips ok, composed",
+  "iPhone 13: 4 variants, chips ok, composed"
+ ],
+ "desktop:socks": [
+  "default socks £20 composed",
+  "Size=ankle → socks £20 composed",
+  "Size=tube → socks-tube £20 composed"
+ ],
+ "desktop:heightChart": [
+  "default heightChart £31 composed",
+  "Size=20 × 120 cm → heightChart £31 composed",
+  "Size=30 × 120 cm → heightChart-30120cm-natural £34 composed",
+  "Size=20 × 150 cm → heightChart-20150cm-natural £34 composed",
+  "Size=30 × 150 cm → heightChart-30150cm-natural £36 composed",
+  "Colour=natural → heightChart-30150cm-natural £36 composed",
+  "Colour=black → heightChart-30150cm-black £36 composed",
+  "Colour=white → heightChart-30150cm-white £36 composed"
+ ],
+ "desktop:wrappingPaper": [
+  "default wrappingPaper £23 composed",
+  "Size=2 m roll → wrappingPaper £23 composed",
+  "Size=3 m roll → wrappingPaper-3mroll-white £28 composed",
+  "Size=5 m roll → wrappingPaper-5mroll-white £38 composed",
+  "Colour=white → wrappingPaper-5mroll-white £38 composed",
+  "Colour=kraft → wrappingPaper-5mroll-kraft £38 composed"
+ ],
+ "desktop:teaTowel": [
+  "default teaTowel £27 composed"
+ ],
+ "desktop:playingCards": [
+  "default playingCards £24 composed"
+ ]
+}

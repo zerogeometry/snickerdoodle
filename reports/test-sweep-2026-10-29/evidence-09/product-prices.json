@@ -1,0 +1,82 @@
+{
+  "/products/framed-print": {
+    "page": "£65",
+    "tile": "£65"
+  },
+  "/products/mug": {
+    "page": "£18",
+    "tile": "£18"
+  },
+  "/products/cushion": {
+    "page": "£22",
+    "tile": "£22"
+  },
+  "/products/kids-t-shirt": {
+    "page": "£25",
+    "tile": "£25"
+  },
+  "/products/adult-t-shirt": {
+    "page": "£32",
+    "tile": "£32"
+  },
+  "/products/jigsaw": {
+    "page": "£26",
+    "tile": "£26"
+  },
+  "/products/fleece-blanket": {
+    "page": "£60",
+    "tile": "£60"
+  },
+  "/products/greetings-card": {
+    "page": "£5.50",
+    "tile": "£5.50"
+  },
+  "/products/card-pack": {
+    "page": "£12",
+    "tile": "£12"
+  },
+  "/products/wall-calendar": {
+    "page": "£22",
+    "tile": "£22"
+  },
+  "/products/ceramic-christmas-ornament": {
+    "page": "£21",
+    "tile": "£21"
+  },
+  "/products/christmas-bauble": {
+    "page": "£19",
+    "tile": "£19"
+  },
+  "/products/christmas-sack": {
+    "page": "£35",
+    "tile": "£35"
+  },
+  "/products/christmas-family-bundle": {
+    "page": "£78",
+    "tile": "£78"
+  },
+  "/products/phone-case": {
+    "page": "£25",
+    "tile": "£25"
+  },
+  "/products/socks": {
+    "page": "£20",
+    "tile": "£20"
+  },
+  "/products/height-chart": {
+    "page": "£31",
+    "tile": "£31"
+  },
+  "/products/wrapping-paper": {
+    "page": "£23",
+    "tile": "£23"
+  },
+  "/products/tea-towel": {
+    "page": "£27",
+    "tile": "£27"
+  },
+  "/products/playing-cards": {
+    "page": "£24",
+    "tile": "£24"
+  }
+}
