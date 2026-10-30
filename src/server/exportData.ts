@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, or } from 'drizzle-orm';
 import {
   accountCredits,
   accounts,
@@ -15,6 +15,7 @@ import {
   reminderSends,
   rightsRequests,
   savedDesigns,
+  supportRequests,
 } from '@/db/schema';
 import type { DbHandle } from './db';
 import { profileDataFor } from './profile';
@@ -115,6 +116,13 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     .from(rightsRequests)
     .where(and(eq(rightsRequests.subjectAccountId, accountId)));
 
+  // what they've written to us through the help form (08-B11) — signed in, or signed out from the
+  // same (verified) address; kept two years (src/server/support.ts)
+  const helpMessages = await db
+    .select({ ref: supportRequests.ref, topic: supportRequests.topic, name: supportRequests.name, email: supportRequests.email, orderRef: supportRequests.orderRef, message: supportRequests.message, status: supportRequests.status, receivedAt: supportRequests.receivedAt, closedAt: supportRequests.closedAt })
+    .from(supportRequests)
+    .where(account?.email ? or(eq(supportRequests.accountId, accountId), eq(supportRequests.email, account.email.toLowerCase())) : eq(supportRequests.accountId, accountId));
+
   const profile = await profileDataFor(db, accountId);
 
   return {
@@ -132,5 +140,6 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     referralCodes,
     birthdayNudgesSent,
     yourRequestsToUs: requests,
+    yourHelpMessages: helpMessages,
   };
 }
