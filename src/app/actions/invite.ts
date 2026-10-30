@@ -2,7 +2,8 @@
 
 import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
-import { createInvite } from '@/server/invites';
+import { signIn } from '@/auth';
+import { createInvite, sendInviteSignInLink } from '@/server/invites';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
@@ -47,5 +48,19 @@ export async function createInviteAction(input: {
     return { ok: true };
   } catch {
     return { ok: false };
+  }
+}
+
+/**
+ * /join's "email me the link": the server sends the one-tap sign-in link to the INVITED address,
+ * which never reaches the browser (06-B1 — a forwarded gift link lets anyone open /join).
+ */
+export async function sendJoinLinkAction(token: string, next: string | null): Promise<{ ok: boolean }> {
+  try {
+    return await sendInviteSignInLink(getDb(), token, next, async (email, redirectTo) => {
+      await signIn('email', { email, redirect: false, redirectTo });
+    });
+  } catch {
+    return { ok: false }; // e.g. too many links in a row — the page says so, never "check your email"
   }
 }

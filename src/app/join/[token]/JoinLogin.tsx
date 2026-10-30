@@ -1,24 +1,30 @@
 'use client';
 
 import { IconMail, IconUsersPlus } from '@tabler/icons-react';
-import { signIn } from 'next-auth/react';
 import { useState } from 'react';
+import { sendJoinLinkAction } from '@/app/actions/invite';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 
 /** Identity step: the invitee proves they control the invited email by signing in
  * to it. After the magic link, they return here authenticated and the invite is
- * accepted. */
-export function JoinLogin({ email, familyName, token, next }: { email: string; familyName: string | null; token: string; next?: string | null }) {
+ * accepted. Anyone holding a forwarded gift link can open this page, so it only ever
+ * gets the MASKED address (gr•••@example.com) and the server sends the link (06-B1). */
+export function JoinLogin({ maskedEmail, familyName, token, next }: { maskedEmail: string; familyName: string | null; token: string; next?: string | null }) {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState(false);
 
   const go = async () => {
     setBusy(true);
+    setError(false);
     try {
-      await signIn('email', { email, redirect: false, callbackUrl: `/join/${token}${next ? `?next=${encodeURIComponent(next)}` : ''}` });
-      setSent(true);
+      const res = await sendJoinLinkAction(token, next ?? null);
+      if (res.ok) setSent(true);
+      else setError(true);
+    } catch {
+      setError(true);
     } finally {
       setBusy(false);
     }
@@ -34,18 +40,21 @@ export function JoinLogin({ email, familyName, token, next }: { email: string; f
 
       {sent ? (
         <p role="status" className="mt-3 flex items-center justify-center gap-1.5 rounded-[14px] border-2 border-leaf bg-leaf-pale px-3 py-2.5 text-[13px] font-semibold text-green-save">
-          <Icon icon={IconMail} size={15} /> Check {email} for a link to confirm it&apos;s you.
+          <Icon icon={IconMail} size={15} /> Check {maskedEmail} for a link to confirm it&apos;s you.
         </p>
       ) : (
         <>
           <p className="mt-2 text-sm text-ink-soft">
-            To keep everyone&apos;s keepsakes safe, confirm it&apos;s you. We&apos;ll send a one-tap link to{' '}
-            <b className="text-cocoa">{email}</b>.
+            To keep everyone&apos;s keepsakes safe, confirm it&apos;s you. We&apos;ll send a one-tap link to the address
+            this invite was sent to: <b className="text-cocoa">{maskedEmail}</b>.
           </p>
           <Button size="lg" className="mt-5 w-full" onClick={go} disabled={busy}>
-            <Icon icon={IconMail} size={16} /> {busy ? 'sending…' : `email ${email}`}
+            <Icon icon={IconMail} size={16} /> {busy ? 'sending…' : 'email me the link'}
           </Button>
-          <p className="mt-3 text-[11px] text-ink-soft">Only the person who controls that inbox can join.</p>
+          {error ? (
+            <p role="alert" className="mt-2 text-xs font-semibold text-cinnamon">we couldn’t send a link just now — give it a few minutes and try again.</p>
+          ) : null}
+          <p className="mt-3 text-[11px] text-ink-soft">Only the person who controls that inbox can join. Not you? Ask the family to send you your own invite.</p>
         </>
       )}
     </div>

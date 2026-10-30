@@ -96,6 +96,34 @@ export async function getInviteForDisplay(db: DbHandle, token: string): Promise<
   };
 }
 
+/** Where to land after joining. ONLY a gift-link path is honoured (an open redirect is
+ * never possible): the relative came from a gift list, so they go back to finish it. */
+export function safeJoinNext(raw: string | string[] | null | undefined): string | null {
+  const v = Array.isArray(raw) ? raw[0] : raw;
+  return v && /^\/g\/[A-Za-z0-9_-]{8,128}$/.test(v) ? v : null;
+}
+
+/**
+ * The /join page's "email me the link" (06-B1). The invited address never goes to the browser —
+ * a forwarded gift link lets anyone open /join — so the SERVER sends the one-tap sign-in link,
+ * only ever to the address the parent invited, and only while the invite is still open. The
+ * caller learns nothing but ok / not ok. Sign-in links are rate limited per address and device
+ * (src/auth), and the link itself is useless to anyone but the invitee's inbox.
+ */
+export async function sendInviteSignInLink(
+  db: DbHandle,
+  token: string,
+  next: string | null,
+  send: (email: string, callbackUrl: string) => Promise<void>,
+): Promise<{ ok: boolean }> {
+  if (typeof token !== 'string' || !token) return { ok: false };
+  const invite = await getInviteForDisplay(db, token);
+  if (!invite || invite.status !== 'PENDING' || invite.expired) return { ok: false };
+  const safe = safeJoinNext(next);
+  await send(invite.email, `/join/${token}${safe ? `?next=${encodeURIComponent(safe)}` : ''}`);
+  return { ok: true };
+}
+
 export interface AcceptResult {
   ok: boolean;
   reason?: 'not-found' | 'used' | 'expired' | 'wrong-account';
