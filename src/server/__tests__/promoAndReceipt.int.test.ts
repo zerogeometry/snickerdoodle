@@ -193,8 +193,10 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
 
     const history = await getOrdersForAccount(db, ids.samId);
     const shown = history.find((h) => h.ref === o.ref)!;
-    expect(shown.items.map((i) => i.label)).toEqual(['christmas family bundle · a set for 4', expect.stringMatching(/^mug/)]);
-    expect(shown.items[0]!.linePence).toBe(14500);
+    // (line ORDER isn't pinned: getOrdersForAccount reads order_items with no ORDER BY — reported 30 Oct)
+    expect(shown.items.map((i) => i.label)).toEqual(expect.arrayContaining(['christmas family bundle · a set for 4', expect.stringMatching(/^mug/)]));
+    expect(shown.items).toHaveLength(2);
+    expect(shown.items.find((i) => i.label.startsWith('christmas family bundle'))!.linePence).toBe(14500);
     expect(shown.items.reduce((n, i) => n + i.linePence, 0) - shown.savings.reduce((n, sv) => n + sv.pence, 0) + shown.deliveryPence).toBe(o.totalPence);
   });
 
