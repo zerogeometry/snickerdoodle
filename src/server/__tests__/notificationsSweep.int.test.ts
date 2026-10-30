@@ -8,6 +8,7 @@ import { accounts, children, consentRecords, emailChangeRequests, giftLinks, mem
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import type { MailMessage } from '@/server/mail';
 import type { DbHandle } from '@/server/db';
+import { exclusively } from '@/test/globalJobs';
 
 /**
  * Test sweep 2026-10-29 (tester 04): every email the server sends from these paths goes ONLY to the
@@ -62,7 +63,7 @@ describe.skipIf(!DB)('test sweep 04 — who each email goes to (integration)', (
 
   const ours = () => sent.filter((m) => Object.values(email).includes(m.to) || m.to.includes(nonce));
 
-  it('birthday reminders: only people the calendar is shared with AND who said yes; first name only; once', async () => {
+  it('birthday reminders: only people the calendar is shared with AND who said yes; first name only; once', () => exclusively(db, async () => {
     const d = new Date(Date.now() + 28 * 86_400_000);
     const turns = d.getUTCFullYear() - 2021;
     const bday = `2021-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
@@ -87,7 +88,7 @@ describe.skipIf(!DB)('test sweep 04 — who each email goes to (integration)', (
     sent.splice(0);
     await runReminders(db);
     expect(ours().filter((m) => m.kind === 'reminder')).toHaveLength(0);
-  });
+  }));
 
   async function order(over: Partial<typeof orders.$inferInsert>) {
     const [o] = await db

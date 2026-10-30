@@ -1,4 +1,5 @@
 import { definedPriceList, definedProducts } from '@/server/catalogue';
+import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { deliveryDays, shipsTracked } from '@/lib/delivery';
 import { CHRISTMAS_FEATURED } from '@/lib/season';
 import { SHOP_PRODUCTS, productPath, type ShopProductCopy } from '@/lib/shop-products';
@@ -7,6 +8,9 @@ import { SHOP_PRODUCTS, productPath, type ShopProductCopy } from '@/lib/shop-pro
  * The public shop listing (C7 product pages + structured data, C8 Merchant Center feed): every
  * product ON SHOW (visibleInShop, not paused), with its prices from the SERVER catalogue — the same
  * price list the seed writes and the pricing engine charges (never anything from a client).
+ *
+ * A bundle-only pack (BUNDLE_ONLY_SKUS) is never listed: no page, structured data or feed item can
+ * offer a price nobody can pay.
  *
  * Variants are grouped by PRICE: one offer per price a family can actually pay (four frame sizes,
  * snap vs tough phone cases, 2/3/5 m wrap) — never one per phone model or frame colour.
@@ -58,7 +62,9 @@ function groupLabel(key: string, shared: Record<string, string>, values: Map<str
 
 /** The listing for every product on show, in the catalogue's order. Pure: no DB, no clock. */
 export function shopListings(): ShopListing[] {
-  const prices = definedPriceList().filter((r) => r.visibleInShop && !r.paused);
+  // (a bundle's extra packs — the single placemat, the 2- and 6-packs, the single coaster — are never
+  // priced or shown on their own, exactly as the catalogue the shop sells from: getCatalogue)
+  const prices = definedPriceList().filter((r) => r.visibleInShop && !r.paused && !BUNDLE_ONLY_SKUS.has(r.sku));
   const out: ShopListing[] = [];
   for (const p of definedProducts()) {
     if (!p.visibleInShop || p.paused) continue;

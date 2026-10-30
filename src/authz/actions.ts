@@ -1,4 +1,4 @@
-import { activeMembershipFor, type AssetRef, type Decision, type Membership, type ViewerContext } from './policy';
+import { activeMembershipFor, canViewAsset, type AssetRef, type Decision, type Membership, type ViewerContext } from './policy';
 
 /**
  * Action checks. Circle decides what you can SEE (see policy.ts); ACCESS LEVEL
@@ -21,6 +21,39 @@ export function canBuyFromGiftList(membership: Membership | null): boolean {
 /** Add your own creations to the family — needs CONTRIBUTE. */
 export function canContributeCreations(membership: Membership | null): boolean {
   return isActive(membership) && membership.accessLevel === 'CONTRIBUTE';
+}
+
+/**
+ * Change a keepsake's look IN PLACE — save its Studio edits, lift or put back its background, touch
+ * up its cut-out (07-B2). Seeing it is not enough: an Extended grandparent or a VIEW / VIEW_BUY
+ * member could otherwise overwrite (or wipe) the very design the family's orders print from. Needs:
+ *  - to be able to SEE it (family scope, tier × circle, held-for-review — the view policy first);
+ *  - and to be its CONTROLLER (the controlling parent), or an ACTIVE member with CONTRIBUTE access.
+ * A guest's own pre-account draft is editable by the holder of its upload claim (the view policy
+ * already limits it to exactly that one draft).
+ */
+export function canEditAsset(asset: AssetRef, viewer: ViewerContext): Decision {
+  const view = canViewAsset(asset, viewer);
+  if (!view.allowed) return view;
+  if (asset.ephemeralClaimId != null) return { allowed: true, reason: 'ephemeral draft: the upload-claim holder edits their own draft' };
+  if (viewer.accountId !== null && viewer.accountId === asset.controllerAccountId) return { allowed: true, reason: 'viewer is the controller' };
+  if (canContributeCreations(activeMembershipFor(asset, viewer))) return { allowed: true, reason: 'viewer has CONTRIBUTE access' };
+  return { allowed: false, reason: 'editing needs the controller or CONTRIBUTE access' };
+}
+
+/**
+ * Order a family keepsake on a product as a member (04-B2 / 07-B4) — Circle decides what you can
+ * SEE, Access decides what you can DO: VIEW means look only. Needs to SEE it, and to be its
+ * controller or hold VIEW_BUY / CONTRIBUTE. (Buying THROUGH a gift link is a separate capability:
+ * {@link canPurchaseViaGiftLink}.)
+ */
+export function canBuyAsset(asset: AssetRef, viewer: ViewerContext): Decision {
+  const view = canViewAsset(asset, viewer);
+  if (!view.allowed) return view;
+  if (asset.ephemeralClaimId != null) return { allowed: false, reason: 'a draft must be kept before it can be ordered' };
+  if (viewer.accountId !== null && viewer.accountId === asset.controllerAccountId) return { allowed: true, reason: 'viewer is the controller' };
+  if (canBuyFromGiftList(activeMembershipFor(asset, viewer))) return { allowed: true, reason: 'viewer has VIEW_BUY or CONTRIBUTE access' };
+  return { allowed: false, reason: 'view-only access: buying needs VIEW_BUY' };
 }
 
 /** Manage the family (invite, remove, change others' access) — owner only for now. */

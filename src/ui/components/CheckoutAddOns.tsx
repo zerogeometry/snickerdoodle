@@ -9,6 +9,7 @@ import { basketLineId } from '@/lib/basket-line';
 import { defaultPlacementFor } from '@/lib/catalogue-view';
 import { gbp, toast, useBasket, useUpload, type BasketItem } from '@/lib/store';
 import type { AddOn } from '@/server/addOns';
+import { withArticle } from '@/lib/articles';
 
 /**
  * CHECKOUT ADD-ONS (founder, 29 Oct): beneath the basket, up to three things that go with it, each
@@ -68,7 +69,7 @@ export function CheckoutAddOns({ addOns, items, gift }: { addOns: readonly AddOn
                     add(line);
                     toast(`${a.label} added ✓`);
                   }}
-                  aria-label={`add a ${a.label} with your drawing`}
+                  aria-label={`add ${withArticle(a.label)} with your drawing`}
                   className="press absolute bottom-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa shadow-[0_2px_0_var(--color-cocoa)] focus-visible:outline-2"
                   data-addon-plus
                 >

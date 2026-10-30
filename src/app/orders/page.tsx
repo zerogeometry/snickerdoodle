@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { getDb } from '@/db/client';
 import { getCurrentAccount } from '@/server/session';
 import { getOrdersForAccount } from '@/server/orders';
-import { CATALOGUE, formatPence, isCatalogueKey } from '@/pricing';
+import { formatPence } from '@/pricing';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { CartLineItem } from '@/ui/components/CartLineItem';
@@ -63,12 +63,22 @@ export default async function OrdersPage() {
                     <CartLineItem
                       key={`${o.ref}-${i}`}
                       product={item.productKey as ProductKey}
-                      name={isCatalogueKey(item.productKey) ? CATALOGUE[item.productKey].label : item.productKey}
+                      name={item.label}
                       sub={item.qty > 1 ? `qty ${item.qty}` : undefined}
                       price={formatPence(item.linePence)}
                     />
                   ))}
                 </div>
+                {o.savings.length > 0 ? (
+                  <dl className="space-y-1 border-t-2 border-cocoa/10 px-4 py-2 text-[13px] text-green-save">
+                    {o.savings.map((sv) => (
+                      <div key={sv.label} className="flex justify-between">
+                        <dt>{sv.label}</dt>
+                        <dd>−{formatPence(sv.pence)}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                ) : null}
                 <div className="flex items-center justify-between border-t-2 border-cocoa/10 px-4 py-2.5">
                   <span className="text-[13px] text-ink-soft">Total incl. delivery</span>
                   <span className="font-display text-lg text-cocoa">{formatPence(o.totalPence)}</span>

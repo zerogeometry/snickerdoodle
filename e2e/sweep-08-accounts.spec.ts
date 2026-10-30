@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import AxeBuilder from '@axe-core/playwright';
@@ -148,7 +148,7 @@ test.describe('guest drawing adopted on sign-up', () => {
   // type the stranger's email on /login. rememberKeepForEmail stores the guest's claim against that
   // email, and finishPendingKeeps (on /start-creating?resume=keep, any device) adopts it for whoever
   // signs in with it — the drawing lands in the stranger's private family home as if they kept it.
-  test.fixme('08-B1: a guest cannot file their drawing into someone else’s keepsake box by typing their email', async ({ page, browser }) => {
+  test('08-B1: a guest cannot file their drawing into someone else’s keepsake box by typing their email', async ({ page, browser }) => {
     await quietCookies(page);
     await uploadAndOpenRange(page);
     await page.getByRole('button', { name: /\+ keepsake/ }).first().click();
@@ -279,7 +279,7 @@ test.describe('accessibility + both sizes', () => {
 
     // 08-B6: "Delete all your keepsakes" / "Close your account" are berry #E8786E on white — 2.85:1,
     // under the 4.5:1 WCAG AA needs for 13px text (src/app/account/AccountActions.tsx text-berry).
-    test.fixme(`08-B6: /account passes axe — ${size.name}`, async ({ page }) => {
+    test(`08-B6: /account passes axe — ${size.name}`, async ({ page }) => {
       await page.setViewportSize(size);
       await quietCookies(page);
       await signInByEmailLink(page, testEmail(`axe${size.width}`), '/account');

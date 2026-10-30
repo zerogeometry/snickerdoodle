@@ -1,5 +1,6 @@
 'use client';
 
+import { betterSize } from '@/lib/size-suggest';
 import { packLine } from '@/lib/pack-labels';
 import { IconAlertTriangle, IconHeartPlus, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -21,7 +22,8 @@ import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
-import { basketLineId } from '@/lib/basket-line';
+import { basketLineId, selectionForLine } from '@/lib/basket-line';
+import { forgetStudioReturn, noteStudioReturn } from '@/ui/components/usePickerEdits';
 import { colourName, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -140,6 +142,9 @@ function CustomizeProduct() {
   // Outside image span: the drawing on the front panel only ('front', default) or across the
   // whole outside ('full'). Only meaningful in the outside view.
   const [cardSpan, setCardSpan] = useState<'full' | 'front'>('front');
+  // back from the Studio's "lift it off the paper" detour: its return note has done its job
+  useEffect(() => forgetStudioReturn(), []);
+
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
@@ -184,15 +189,8 @@ function CustomizeProduct() {
     // from the still-unchanged basket line would clobber them. Only seed on FIRST entry from
     // the basket. (Fresh entry without resume DOES re-seed, resetting any unsaved stray edits.)
     if (sp.get('resume')) return;
-    useSelection.getState().setSelection(product.key, {
-      size: lv.attributes.size,
-      colour: lv.attributes.colour,
-      orientation: lv.attributes.orientation ?? 'portrait',
-      grade: lv.attributes.grade,
-      finish: lv.attributes.finish,
-      back: line.back, // a cushion line carries its back choice
-      ground: line.ground, // an edge-to-edge line carries its base colour
-    });
+    // everything the line prints with — a card's message + span too (02-B3)
+    useSelection.getState().setSelection(product.key, selectionForLine(line, lv.attributes));
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
     }
@@ -408,18 +406,26 @@ function CustomizeProduct() {
     v?.printGeom && srcSize ? assessPrintResolution(v.printGeom, srcSize, clampTransform(placement), product.key) : null;
   const quality = assessFor(variant);
   const blocked = quality?.decision === 'BLOCK';
-  // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test.
+  // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test and really gives the
+  // drawing more detail than now (src/lib/size-suggest.ts). A phone case's sizes are phone MODELS:
+  // never offered as a fix (02-B2 — a case for a phone the parent may not own).
+  const sizeIsModel = product.key === 'phoneCase';
   const largestSize = (ok: (a: ResolutionAssessment) => boolean) =>
-    [...product.sizes].reverse().find((sz) => {
-      const v = product.variants.find(
-        (x) =>
-          x.attributes.size === sz &&
-          (product.colours.length === 0 || x.attributes.colour === colour) &&
-          (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
-      );
-      const a = assessFor(v);
-      return a !== null && ok(a);
-    }) ?? null;
+    betterSize(
+      product.sizes,
+      (sz) =>
+        assessFor(
+          product.variants.find(
+            (x) =>
+              x.attributes.size === sz &&
+              (product.colours.length === 0 || x.attributes.colour === colour) &&
+              (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
+          ),
+        ),
+      quality,
+      (a) => ok(a as ResolutionAssessment),
+      { sizeIsModel },
+    );
   // blocked → the biggest that prints at all; soft up close → the biggest that's sharp too
   const fitSize = blocked ? largestSize((a) => a.decision !== 'BLOCK') : null;
   const sharpSize = quality?.softUpClose && !blocked ? largestSize((a) => !a.softUpClose) : null;
@@ -536,8 +542,10 @@ function CustomizeProduct() {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
       const id = basketLineId(variant.sku, fields);
+      // edited INTO another line's variant → the two fold into one: theirs + this one's (02-B1)
+      const others = id !== edit.id ? (useBasket.getState().items.find((i) => i.id === id)?.qty ?? 0) : 0;
       update(edit.id, fields, id);
-      setLineQty(id, qty);
+      setLineQty(id, others + qty);
       toast('basket updated ✓');
     } else {
       const id = basketLineId(variant.sku, fields);
@@ -1120,7 +1128,16 @@ function CustomizeProduct() {
               {isDarkGarment(colour) && upload?.opaqueBg && (!upload?.cutout || upload.cutout.trim) ? (
                 <div role="status" className="rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                   <p className="font-semibold">on a coloured tee, the paper prints too — you’d get a pale square behind the drawing.</p>
-                  <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => router.push('/studio')}>
+                  <Button
+                    variant="design"
+                    size="md"
+                    className="mt-2.5 w-full"
+                    onClick={() => {
+                      // back HERE when done, the colour still chosen (01-B3) — not the create page
+                      noteStudioReturn(upload?.assetId, `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`);
+                      router.push('/studio');
+                    }}
+                  >
                     <Icon icon={IconPencil} size={15} /> lift it off the paper in the studio
                   </Button>
                 </div>
@@ -1136,14 +1153,14 @@ function CustomizeProduct() {
               <div role="status" className="mt-5 rounded-[16px] border-2 border-cocoa bg-berry-pale p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                 <p className="flex items-start gap-2 font-semibold">
                   <Icon icon={IconAlertTriangle} size={16} className="mt-0.5 shrink-0 text-cinnamon" />
-                  this drawing is too small to print well at {size || 'this size'} — it would come out blurry.
+                  this drawing is too small to print well {sizeIsModel ? 'on this case' : `at ${size || 'this size'}`} — it would come out blurry.
                 </p>
                 {fitSize ? (
                   <Button variant="secondary" size="md" className="mt-2.5 w-full" onClick={() => setSize(fitSize)}>
                     make it {fitSize} — prints beautifully
                   </Button>
                 ) : (
-                  <p className="mt-1.5 text-xs text-ink-soft">try a smaller product, or a bigger photo of the drawing.</p>
+                  <p className="mt-1.5 text-xs text-ink-soft">{sizeIsModel ? 'try a bigger photo of the drawing — the original, not one sent by message.' : 'try a smaller product, or a bigger photo of the drawing.'}</p>
                 )}
               </div>
             ) : (
@@ -1183,7 +1200,7 @@ function CustomizeProduct() {
               </Button>
             ) : null}
             <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap !px-3 !text-[15px] md:flex-none md:!px-8 md:!text-base" onClick={addToBasket} disabled={!variant || blocked}>
-              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant?.pricePence ?? product.fromPence)}
+              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {!edit && qty > 1 ? `${qty} × ` : ''}{gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
         </div>

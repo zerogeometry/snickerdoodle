@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { expectAccessible } from './a11y';
 import { hasDb, signInByEmailLink, testEmail } from './harness';
 import { quietCookies } from './helpers';
@@ -86,7 +86,7 @@ for (const vp of [
   });
 }
 
-test.fixme('09-B3: /account — "Delete all your keepsakes" / "Close your account" (berry #E8786E on white, 2.85:1) pass contrast', async ({ page }) => {
+test('09-B3: /account — "Delete all your keepsakes" / "Close your account" pass contrast', async ({ page }) => {
   await quietCookies(page);
   await signInByEmailLink(page, testEmail('t9-contrast'), '/account');
   await expectAccessible(page, '/account');

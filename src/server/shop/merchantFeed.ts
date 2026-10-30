@@ -1,3 +1,4 @@
+import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { offerUrl } from './structuredData';
 import { shopListings, type ShopListing } from './listing';
 
@@ -38,7 +39,8 @@ export function merchantFeedItems(origin: string): FeedItem[] {
   return shopListings()
     .filter((l) => l.image && !l.feed?.exclude)
     .flatMap((l) =>
-      l.offers.map((o) => ({
+      // belt and braces: the listing already leaves a bundle's extra packs out (never sold on their own)
+      l.offers.filter((o) => !BUNDLE_ONLY_SKUS.has(o.sku)).map((o) => ({
         id: o.sku,
         title: (o.label ? `${l.title} — ${o.label}` : l.title).slice(0, 150),
         description: `${l.description} Made to order in the UK from your own child’s drawing, with free UK delivery.`.slice(0, 5000),

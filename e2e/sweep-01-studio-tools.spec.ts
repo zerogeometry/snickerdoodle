@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import {
   assetRow,
   derivatives,
@@ -195,8 +195,8 @@ test.describe('desktop', () => {
     // back, twice: under the pen line, then under the words it overlaps
     await appliesAndUndoes(page, 'send back (twice)', async () => {
       await pickHeart();
-      await layerBtn('back').click();
-      await layerBtn('back').click();
+      await layerBtn('send back').click();
+      await layerBtn('send back').click();
     }, 2, putDown);
     await appliesAndUndoes(page, 'duplicate', async () => {
       await pickHeart();

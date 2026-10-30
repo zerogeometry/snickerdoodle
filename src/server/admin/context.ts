@@ -5,7 +5,16 @@ import { accounts } from '@/db/schema';
 import { getDb } from '@/db/client';
 import type { Reviewer } from '@/authz';
 import { getCurrentAccount } from '../session';
-import { ADMIN_STEPUP_COOKIE, verifyStepUp } from './stepUp';
+import { ADMIN_STEPUP_COOKIE, SESSION_COOKIES, verifyStepUp } from './stepUp';
+
+/** This browser's sign-in session token (what the step-up proof is bound to), or null. */
+export function sessionTokenFrom(jar: { get(name: string): { value: string } | undefined }): string | null {
+  for (const name of SESSION_COOKIES) {
+    const v = jar.get(name)?.value;
+    if (v) return v;
+  }
+  return null;
+}
 
 /** Who's asking, as the review rules need it: signed in? an admin? two-step login done? */
 export async function currentReviewer(): Promise<Reviewer & { email: string | null; enrolled: boolean }> {
@@ -18,6 +27,6 @@ export async function currentReviewer(): Promise<Reviewer & { email: string | nu
     email: account.email,
     isAdmin: row?.isAdmin === true,
     enrolled: !!row?.mfa,
-    mfaVerified: row?.isAdmin === true && !!row?.mfa && verifyStepUp(jar.get(ADMIN_STEPUP_COOKIE)?.value, account.id),
+    mfaVerified: row?.isAdmin === true && !!row?.mfa && verifyStepUp(jar.get(ADMIN_STEPUP_COOKIE)?.value, account.id, sessionTokenFrom(jar)),
   };
 }

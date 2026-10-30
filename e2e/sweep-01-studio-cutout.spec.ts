@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { hasDb, signInByEmailLink, testEmail } from './harness';
 import {
   assetRow,
@@ -33,7 +33,7 @@ const cutoutRow = async (assetId: string) => (await derivatives(assetId)).find((
 const designRow = async (assetId: string) => (await derivatives(assetId)).find((d) => d.key.endsWith('/derivatives/design'));
 
 async function liftThenPutBackOnCreatePage(page: Page) {
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: 'remove background', exact: true }).click();
   await expect(page.getByRole('button', { name: 'put the background back' })).toBeVisible({ timeout: 150_000 });
   const lifted = await tabUpload(page);
@@ -131,7 +131,7 @@ test('create page, signed in: lift → put back → keep → studio from the car
 
 /** The bundle builder for the drawing in progress (client-side, from the range). */
 async function openBundle(page: Page) {
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: 'customize christmas family bundle', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/christmasBundle/);
   await expect(page.getByRole('heading', { name: 'christmas family bundle' })).toBeVisible();
@@ -151,6 +151,8 @@ test('bundle picker, guest: lift → put it back → studio → no old cut-out (
   await openBundle(page);
   await page.getByRole('button', { name: /pick a design for the placemats|edit the placemats’ design/ }).click();
   await thisDrawing(page).getByRole('button', { name: 'remove background' }).click();
+  // a guest is asked first (01-B2) — once said, the rest of this visit's edits go straight through
+  await thisDrawing(page).getByRole('button', { name: 'edit every piece' }).click();
   await expect(thisDrawing(page).getByRole('button', { name: 'put it back' })).toBeVisible({ timeout: 150_000 });
   const lifted = await tabUpload(page);
   const assetId = lifted!.assetId!;
@@ -195,7 +197,7 @@ test('bundle, signed in: a Studio edit of ONE ornament leaves the placemats (sam
   await expect(page).toHaveURL(/\/customize\/christmasBundle$/);
 });
 
-test('bundle, guest: a Studio edit of one ornament — what happens to the placemats', async ({ page }) => {
+test('01-B2: bundle, guest: a Studio edit of one ornament asks first, then changes every piece only if told to', async ({ page }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await uploadArt(page);
@@ -203,14 +205,21 @@ test('bundle, guest: a Studio edit of one ornament — what happens to the place
   const A = (await tabUpload(page))!.assetId!;
   await page.getByRole('button', { name: /ornament 1 wears the placemats’ design|edit ornament 1’s design/ }).click();
   await thisDrawing(page).getByRole('button', { name: 'edit in studio' }).click();
+  // 01-B2 (fixed): a guest can't keep a copy, so they're told FIRST that the edit changes every piece —
+  // and offered a log in to edit just this one. Nothing has changed yet.
+  const notice = thisDrawing(page).getByRole('status').filter({ hasText: 'an edit here changes them all' });
+  await expect(notice).toBeVisible({ timeout: 30_000 });
+  await expect(notice.getByRole('link', { name: 'log in' })).toBeVisible();
+  await expect(page).toHaveURL(/\/customize\/christmasBundle/);
+  await notice.getByRole('button', { name: 'edit every piece' }).click();
   await studioReady(page);
-  expect((await tabUpload(page))!.assetId, 'a guest edits the drawing itself (nothing can be kept)').toBe(A);
+  expect((await tabUpload(page))!.assetId, 'a guest who said "edit every piece" edits the drawing itself').toBe(A);
   await nav(page).getByRole('button', { name: 'flip', exact: true }).click();
   await page.getByRole('button', { name: 'sideways' }).click();
   await page.getByRole('banner').getByRole('button', { name: 'done' }).click();
   await expect(page).toHaveURL(/\/customize\/christmasBundle/, { timeout: 60_000 });
   const d = (await bundleDraft(page))!;
-  // RECORDED as 01-B2 in the report: a guest's edit lands on the drawing itself, so every piece wearing it changes
+  // the guest chose "edit every piece": the drawing itself carries the edit, so every piece wearing it changes
   test.info().annotations.push({ type: 'guest-bundle-draft', description: JSON.stringify(d) });
   const placematLook = d.placemat?.sourceObjectId ?? null;
   const design = await designRow(A);

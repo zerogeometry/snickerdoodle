@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { artwork, quietCookies } from './helpers';
 
 // A realistic drawing: the print-quality rule rightly refuses a tiny picture on a frame.

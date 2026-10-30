@@ -45,6 +45,29 @@ export function studioReturnTo(assetId?: string | null): string | null {
 }
 
 /**
+ * Open the Studio from a PRODUCT page and come back to it when done (sweep 01-B3: the dark tee's
+ * "lift it off the paper in the studio" used to land on the create page, the tee lost). The same
+ * note the pickers leave, with no sheet and nothing set aside. The product page tidies it away on
+ * arrival (forgetStudioReturn), so it never steers a later Studio visit.
+ */
+export function noteStudioReturn(assetId: string | null | undefined, returnTo: string): void {
+  try {
+    sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: assetId ?? null, returnTo }));
+  } catch {
+    /* no storage — the Studio goes back to the collection as before */
+  }
+}
+/** Arrived on a product page: drop a return note that pointed at a product page (it has done its job). */
+export function forgetStudioReturn(): void {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null') as { returnTo?: string } | null;
+    if (d?.returnTo?.startsWith('/customize/')) sessionStorage.removeItem(DETOUR_KEY);
+  } catch {
+    /* fine */
+  }
+}
+
+/**
  * Does this visit to a builder CARRY ON the last one? Only on the way back from the Studio (its return
  * address carries ?resume=1). Any other arrival starts fresh — the drawing in progress, nothing from a
  * pack or calendar bailed on earlier (founder, 26 Oct: "I don't want it to be pre-populated with things
@@ -80,7 +103,8 @@ export function usePickerEdits(opts: {
   onCopied?: (assetId: string) => void;
   /** PER-PIECE edits (the family bundle — founder, 29 Oct): the drawing in progress is kept first and its
    * edits made on a COPY, so editing one piece never changes the others showing the same drawing. A guest
-   * (nothing can be kept) still edits it in place. */
+   * (nothing can be kept, so no copy) is ASKED first — edit every piece, or log in to edit just this one
+   * (sweep 01-B2: the edit used to change every piece without a word). */
   forkLoose?: boolean;
 }) {
   const router = useRouter();
@@ -95,6 +119,10 @@ export function usePickerEdits(opts: {
   const [busy, setBusy] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<{ done: number; of: number } | null>(null);
   const restored = useRef(false);
+  // forkLoose, and no copy could be made (a guest): the edit waiting for "edit every piece" — and the
+  // drawing the shopper already said yes for (asked once per visit)
+  const [shared, setShared] = useState<{ assetId: string; action: 'background' | 'studio'; d: Drawingish } | null>(null);
+  const everyPiece = useRef<string | null>(null);
   // Back from the Studio (founder, 26 Oct: "clicked done … out of the picker, with no card picked"):
   // the picker reopens on the card / page it was filling, with the drawing just edited chosen.
   const [resume, setResume] = useState<{ assetId: string; sheet: PickerSheet } | null>(null);
@@ -157,6 +185,15 @@ export function usePickerEdits(opts: {
     opts.onUploaded();
     return true;
   };
+  /** forkLoose: no copy could be made (a guest), so this edit would change EVERY piece showing the
+   * drawing — ask first (unless they've already said yes for it). True = asked; don't edit yet. */
+  const mustAskFirst = async (d: Drawingish, action: 'background' | 'studio'): Promise<boolean> => {
+    if (!opts.forkLoose || !isLooseDrawing(d)) return false;
+    if (await keptForEdit(d)) return false;
+    if (everyPiece.current === d.assetId) return false;
+    setShared({ assetId: d.assetId, action, d });
+    return true;
+  };
   /** The drawing in progress (not a keepsake yet) with its background lifted — "put it back" undoes it. */
   const hasLiftedBackground = (d: Drawingish) => {
     const u = useUpload.getState().upload;
@@ -167,7 +204,7 @@ export function usePickerEdits(opts: {
     if (busy[d.assetId]) return;
     setBusy((b) => ({ ...b, [d.assetId]: 'lifting…' }));
     try {
-      await keptForEdit(d);
+      if (await mustAskFirst(d, 'background')) return;
       if (isLooseDrawing(d)) {
         // the drawing in progress: its own cutout, and back again
         if (hasLiftedBackground(d)) {
@@ -198,7 +235,7 @@ export function usePickerEdits(opts: {
 
   const editInStudio = async (d: Drawingish) => {
     if (busy[d.assetId]) return;
-    await keptForEdit(d);
+    if (await mustAskFirst(d, 'studio')) return;
     const current = useUpload.getState().upload;
     // the drawing in progress, not a keepsake yet: the Studio as usual, back here afterwards
     if (isLooseDrawing(d)) {
@@ -275,5 +312,15 @@ export function usePickerEdits(opts: {
     opts.onUploaded();
   };
 
-  return { busy, uploading, apply, hasLiftedBackground, toggleBackground, editInStudio, uploadToKeepsake, resume, clearResume };
+  /** "edit every piece": the shopper said yes — the waiting edit goes ahead on the drawing itself. */
+  const editEveryPiece = () => {
+    const s = shared;
+    if (!s) return;
+    everyPiece.current = s.assetId;
+    setShared(null);
+    void (s.action === 'studio' ? editInStudio(s.d) : toggleBackground(s.d));
+  };
+  const cancelShared = () => setShared(null);
+
+  return { busy, uploading, apply, hasLiftedBackground, toggleBackground, editInStudio, uploadToKeepsake, resume, clearResume, shared, editEveryPiece, cancelShared };
 }

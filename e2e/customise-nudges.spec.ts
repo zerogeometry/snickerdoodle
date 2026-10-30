@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { basketLines, goClient, optionGroup, rangeReady, waitForAsset } from './shop-db';
 
@@ -73,6 +73,6 @@ test('the add button with 3 chosen (records what it says)', async ({ page }) => 
   await page.getByRole('option').nth(2).click();
   const three = (await addBtn(page).innerText()).trim();
   test.info().annotations.push({ type: 'add button', description: JSON.stringify({ one, three }) });
-  // today the button shows the ONE-mug price with 3 chosen (see the report, 02-B6)
-  expect(three).toBe(one);
+  // 02-B6: with 3 chosen it says so — "add to basket · 3 × £18", never a figure that reads as the total
+  expect(three).toBe(one.replace(' · ', ' · 3 × '));
 });

@@ -64,17 +64,20 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
   });
 
   it('the DB is authoritative — a price set in the DB drives pricing (proved on a throwaway product)', async () => {
-    const [p] = await db
-      .insert(products)
-      .values({ key: TEST_KEY, category: 'ADDON', label: 'test widget' })
-      .onConflictDoUpdate({ target: products.key, set: { label: 'test widget' } })
-      .returning();
-    await db
-      .insert(productVariants)
-      .values({ productId: p!.id, sku: TEST_KEY, label: 'test widget', pricePence: 777 })
-      .onConflictDoUpdate({ target: productVariants.sku, set: { pricePence: 777, productId: p!.id } });
-
-    const cat = await getCatalogue(db);
+    // in ONE transaction: another suite's seedCatalogue retires every product not in the catalogue —
+    // this throwaway one included — and an uncommitted row is out of its reach
+    const cat = await db.transaction(async (tx) => {
+      const [p] = await tx
+        .insert(products)
+        .values({ key: TEST_KEY, category: 'ADDON', label: 'test widget' })
+        .onConflictDoUpdate({ target: products.key, set: { label: 'test widget', active: true } })
+        .returning();
+      await tx
+        .insert(productVariants)
+        .values({ productId: p!.id, sku: TEST_KEY, label: 'test widget', pricePence: 777 })
+        .onConflictDoUpdate({ target: productVariants.sku, set: { pricePence: 777, productId: p!.id, active: true } });
+      return getCatalogue(tx as unknown as DbHandle);
+    });
     expect(cat[TEST_KEY]!.pricePence).toBe(777);
     expect(quote([{ productKey: TEST_KEY, qty: 2 }], { catalogue: cat }).subtotalPence).toBe(1554);
   });

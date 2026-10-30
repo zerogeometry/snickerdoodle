@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, gt, inArray, ne } from 'drizzle-orm';
 import sharp from 'sharp';
 import { accounts, auditRecords, emailChangeRequests, families, memberships, profileImages } from '@/db/schema';
-import { canManageFamily, canViewProfileImage } from '@/authz';
+import { canManageFamily, canViewProfileImage, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz';
 import { deleteObjectConfirmed, getObjectBytes, putObject } from '@/storage';
 import { resolveViewerContext } from './assets';
 import type { DbHandle } from './db';
@@ -71,7 +71,7 @@ export async function setProfileImage(
   // Screening (D8): same gate as drawings. Fail closed in production with no real screening.
   const unscreened = !opts.providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
   const verdict = unscreened
-    ? { status: 'FLAGGED' as const, labels: ['screening-not-configured'] }
+    ? { status: 'FLAGGED' as const, labels: [SCREENING_NOT_CONFIGURED_LABEL] }
     : await moderateImage(
         { buffer: encoded.data, sha256: createHash('sha256').update(encoded.data).digest('hex'), originalBuffer: input.buffer },
         opts.providers ?? defaultProviders(env),
@@ -234,7 +234,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const EMAIL_CHANGE_TTL_MS = 60 * 60 * 1000; // an hour to click the link
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
 
-export type EmailChangeRequest = { ok: true } | { ok: false; reason: 'invalid' | 'same' | 'taken' };
+export type EmailChangeRequest = { ok: true } | { ok: false; reason: 'invalid' | 'same' };
 
 /**
  * Ask to change your email: we send a confirmation link to the NEW address (proving it's yours)
@@ -247,14 +247,24 @@ export async function requestEmailChange(db: DbHandle, accountId: string, rawEma
   const [me] = await db.select({ email: accounts.email, name: accounts.displayName }).from(accounts).where(eq(accounts.id, accountId));
   if (!me) return { ok: false, reason: 'invalid' };
   if (me.email === newEmail) return { ok: false, reason: 'same' };
+  const hi = `Hi${me.name ? ` ${me.name.split(' ')[0]}` : ''},`;
   const [taken] = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.email, newEmail));
-  if (taken) return { ok: false, reason: 'taken' };
+  if (taken) {
+    // The SAME answer as a free address (08-B14: never tell a signed-in person whether an email
+    // already has an account). Only that inbox's owner hears — and nothing changes for anyone.
+    await sendMail({
+      kind: 'email-change',
+      to: newEmail,
+      subject: 'someone tried to use this email on snickerdoodle',
+      text: ['Hi,', '', 'Someone asked to move their Snickerdoodle account to this email address. You already have an account with it, so nothing has changed.', 'If that was you, just sign in with this address instead.', '', '— the Snickerdoodle team'].join('\n'),
+    });
+    return { ok: true };
+  }
 
   const token = randomBytes(32).toString('base64url');
   await db.delete(emailChangeRequests).where(eq(emailChangeRequests.accountId, accountId));
   await db.insert(emailChangeRequests).values({ accountId, newEmail, tokenHash: hashToken(token), expiresAt: new Date(now.getTime() + EMAIL_CHANGE_TTL_MS) });
 
-  const hi = `Hi${me.name ? ` ${me.name.split(' ')[0]}` : ''},`;
   await sendMail({
     kind: 'email-change',
     to: newEmail,

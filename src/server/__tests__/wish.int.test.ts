@@ -4,7 +4,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { assets, auditRecords, children, giftLinks } from '@/db/schema';
+import { assets, auditRecords, children, giftLinks, products, productVariants } from '@/db/schema';
+import { seedCatalogue } from '@/server/catalogue';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { getGiftLink } from '@/server/giftLinks';
 import { mintWish } from '@/server/wish';
@@ -87,6 +88,38 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const view = await getGiftLink(db, tokenOf(res.url));
     expect(view.state).toBe('active');
     if (view.state === 'active') expect(view.items).toHaveLength(2);
+  });
+
+  // 06-B2 (sweep 29 Oct): the wish sold a framed print whatever was in the basket.
+  it('06-B2: the wish sells what the child chose — the basket line’s own variant, placement and price', async () => {
+    await seedCatalogue(db); // idempotent
+    const [mugVariant] = await db
+      .select({ sku: productVariants.sku, price: productVariants.pricePence })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(and(eq(products.key, 'mug'), eq(productVariants.active, true), eq(productVariants.isDefault, false)))
+      .limit(1);
+    const sku = mugVariant?.sku ?? 'mug';
+    const a = await draft('CLEAR');
+    const card = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId, card.claimId], {
+      assetIds: [a.assetId, card.assetId],
+      lines: [
+        { assetId: a.assetId, variantSku: sku, transform: { scale: 0.8, offsetX: 0.1, offsetY: 0, rotationDeg: 0 } },
+        { assetId: card.assetId, variantSku: 'card' }, // a card needs the buyer's own inside message: not giftable
+        { assetId: a.assetId, variantSku: 'not-a-real-sku' },
+      ],
+    });
+    expect(res.ok).toBe(true);
+    const view = await getGiftLink(db, tokenOf(res.url));
+    if (view.state !== 'active') throw new Error(`link should be live, was ${view.state}`);
+    expect(view.items).toHaveLength(1);
+    const item = view.items[0]!;
+    expect(item.assetId).toBe(a.assetId);
+    expect(item.productKey).toBe(sku); // never the default framed print
+    expect(item.label).toMatch(/^mug/);
+    if (mugVariant) expect(item.unitPricePence).toBe(mugVariant.price);
+    expect(item.transform).toMatchObject({ scale: 0.8, offsetX: 0.1 });
   });
 
   it('excludes a FLAGGED creation from the shared link (CLEAR-only) even though it is kept for review', async () => {

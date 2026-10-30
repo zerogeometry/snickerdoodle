@@ -1,8 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { artwork, quietCookies } from './helpers';
 
 /**
- * The "making your range" loader stays until the TOP HALF of the tiles have their photos (founder,
+ * The "making your collection" loader stays until the TOP HALF of the tiles have their photos (founder,
  * 23 Oct), so what's seen first is never still loading: at the reveal no tile on the first screen is
  * still loading (pulsing block or sketch preview) and every photo shown has fully loaded. The bottom
  * half lands just after — walking down, every tile gets its photo within moments. The previews are
@@ -38,7 +38,7 @@ for (const vp of [
 
     const loader = page
       .getByRole('status')
-      .filter({ hasText: 'making your range' });
+      .filter({ hasText: 'making your collection' });
     await expect(loader).toBeVisible({ timeout: 30_000 });
     await expect(loader).toHaveCount(0, { timeout: 90_000 });
 

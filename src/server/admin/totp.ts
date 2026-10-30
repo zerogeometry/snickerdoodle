@@ -59,14 +59,21 @@ export function totpCode(secretB32: string, at = Date.now(), step = 30): string 
 
 /** Does `code` match now, or one step either side (phones drift a little)? Constant-time compare. */
 export function verifyTotp(secretB32: string, code: string, at = Date.now()): boolean {
+  return matchTotpStep(secretB32, code, at) !== null;
+}
+
+/** The time-step `code` belongs to (now, or one either side), or null. Every step is checked, so the
+ * time taken says nothing. The caller spends the step once (src/server/admin/totpReplay.ts). */
+export function matchTotpStep(secretB32: string, code: string, at = Date.now(), step = 30): number | null {
   const c = String(code ?? '').replace(/\s/g, '');
-  if (!/^\d{6}$/.test(c)) return false;
-  let ok = false;
+  if (!/^\d{6}$/.test(c)) return null;
+  let found: number | null = null;
   for (const d of [-1, 0, 1]) {
-    const want = Buffer.from(totpCode(secretB32, at + d * 30_000));
-    ok = timingSafeEqual(want, Buffer.from(c)) || ok;
+    const t = at + d * step * 1000;
+    const want = Buffer.from(totpCode(secretB32, t, step));
+    if (timingSafeEqual(want, Buffer.from(c)) && found === null) found = Math.floor(t / 1000 / step);
   }
-  return ok;
+  return found;
 }
 
 /** The link an authenticator app understands (paste it, or type the key by hand). */

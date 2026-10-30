@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect, type Locator, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from './test';
 import { artwork, quietCookies } from './helpers';
 
 /**
@@ -59,10 +59,10 @@ test('keyboard only: upload → customize → basket → checkout, with a visibl
   const chooser = await chooserP;
   await chooser.setFiles({ name: 'drawing.png', mimeType: 'image/png', buffer: await artwork() });
   await expect(page.getByRole('heading', { name: /masterpiece, made real/i })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
   // customize the mug — by keyboard it's the tile's "+ customize" button (the picture's "customize mug"
-  // button is mouse/touch only, tabIndex -1). 09-B4: that button's name doesn't say which product.
+  // button is mouse/touch only, tabIndex -1). 09-B4 (fixed): it is named "+ customize mug".
   const mugTile = page.getByRole('button', { name: 'Enlarge mug preview' }).locator('xpath=ancestor::div[.//button[normalize-space()="+ customize"]][1]');
   await tabTo(page, mugTile.getByRole('button', { name: '+ customize' }), 200);
   await page.keyboard.press('Enter');
@@ -78,7 +78,7 @@ test('keyboard only: upload → customize → basket → checkout, with a visibl
   // checkout now → "who's this for?" → a first name → keep it & checkout
   const checkoutNow = page.getByRole('button', { name: /checkout now/i });
   await expect(checkoutNow).toBeEnabled({ timeout: 30_000 });
-  await tabTo(page, checkoutNow, 200);
+  await tabTo(page, checkoutNow, 400);
   await page.keyboard.press('Enter');
   const who = page.getByRole('dialog', { name: /who.s this for/i });
   await expect(who).toBeVisible();

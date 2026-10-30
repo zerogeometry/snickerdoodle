@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { artwork, quietCookies, uploadAndOpenRange } from './helpers';
@@ -109,12 +109,12 @@ test('a small drawing: the warning, the one-tap bigger→smaller fix, the editor
 // phone MODELS, so a too-small drawing on an iPhone 17 case offers "make it iPhone 13 mini" (a case for
 // a phone the parent doesn't have). Expected: no model switch is ever offered (just "try a smaller
 // product, or a bigger photo"). src/app/customize/[productKey]/page.tsx:411-424 (largestSize / fitSize).
-test.fixme('02-B2: a small drawing on a phone case never offers to switch the phone model', async ({ page }) => {
+test('02-B2: a small drawing on a phone case never offers to switch the phone model', async ({ page }) => {
   await quietCookies(page);
   await uploadAndOpenRange(page, await small(500));
   await rangeReady(page);
   await waitForAsset(page);
   await goClient(page, '/customize/phoneCase');
-  await expect(page.getByText(/this drawing is too small to print well at/)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/this drawing is too small to print well on this case/)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /^make it .+ — prints beautifully$/ })).toHaveCount(0);
 });

@@ -1,9 +1,9 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies } from './helpers';
 import { artwork } from './helpers';
 
 /**
- * On a phone the "making your range" loader sits right under "your masterpiece, made real", and
+ * On a phone the "making your collection" loader sits right under "your masterpiece, made real", and
  * after saving in the studio the page opens THERE (the drawing + its buttons just above), with the
  * loader under the heading until the range arrives. Desktop keeps its side-by-side layout, unscrolled.
  */
@@ -28,7 +28,7 @@ const studioReady = async (page: Page) => {
   await page.waitForTimeout(500);
 };
 const heading = (page: Page) => page.getByRole('heading', { name: 'Your masterpiece, made real.' });
-const loader = (page: Page) => page.getByRole('status').filter({ hasText: 'making your range' });
+const loader = (page: Page) => page.getByRole('status').filter({ hasText: 'making your collection' });
 
 /** The loader's picture starts within a short gap of the heading's bottom. */
 async function expectLoaderUnderHeading(page: Page) {

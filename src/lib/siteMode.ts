@@ -78,10 +78,74 @@ export function assertTestSiteSafe(env: Env = process.env): void {
 export const TEST_GATE_COOKIE = 'sd_test_gate';
 export const TEST_GATE_DAYS = 30;
 
+/** The real files in public/ — the ONLY static files the lock lets through, by exact path (07-B9:
+ * the old "ends in .png" pattern also matched PAGE paths such as /customize/mug.png, and the page and
+ * its Server Actions then ran without the password). src/lib/__tests__/breakInGate.test.ts fails when
+ * this list and public/ disagree — add a new public file here when you add it there. */
+export const PUBLIC_FILES: ReadonlySet<string> = new Set([
+  '/brand/favicon-180.png',
+  '/brand/favicon-192.png',
+  '/brand/favicon-32.png',
+  '/brand/snickerdoodle-badge.png',
+  '/brand/snickerdoodle-logo.webp',
+  '/brand/snickerfavicon.png',
+  '/brand/snickerlogo.png',
+  '/christmas/ball-and-present.webp',
+  '/christmas/bauble.webp',
+  '/christmas/presents.webp',
+  '/christmas/sack.webp',
+  '/examples/aeroplane-cushion.webp',
+  '/examples/autumnphone.webp',
+  '/examples/blankettiger.webp',
+  '/examples/cakewrappaper.webp',
+  '/examples/cardcastle.webp',
+  '/examples/cardgiraffe.webp',
+  '/examples/christmascard.webp',
+  '/examples/christmastee.webp',
+  '/examples/crayon-girl-mug.webp',
+  '/examples/cushion3.webp',
+  '/examples/cushioncirclefamily.webp',
+  '/examples/cushionfamily.webp',
+  '/examples/cushionheartflower.webp',
+  '/examples/cushionmonkey.webp',
+  '/examples/cushionsunflower.webp',
+  '/examples/family-mug.webp',
+  '/examples/floweranklesocks.webp',
+  '/examples/flowerplayingcards.webp',
+  '/examples/framecar.webp',
+  '/examples/framecow.webp',
+  '/examples/framefamily.webp',
+  '/examples/giraffeheightchart.webp',
+  '/examples/heartcushion.webp',
+  '/examples/lionanklesocks.webp',
+  '/examples/monsterteatowel.webp',
+  '/examples/monstertubesocks.webp',
+  '/examples/mugcat.webp',
+  '/examples/mugfamily.webp',
+  '/examples/mugtruck.webp',
+  '/examples/owlphone.webp',
+  '/examples/penguincard.webp',
+  '/examples/puppy-card.webp',
+  '/examples/puzzledigger.webp',
+  '/examples/range/blanket.webp',
+  '/examples/range/card.webp',
+  '/examples/range/drawing.webp',
+  '/examples/range/framed-print.webp',
+  '/examples/range/heart-cushion.webp',
+  '/examples/range/jigsaw.webp',
+  '/examples/robotwrappaper.webp',
+  '/examples/splatter-mug.webp',
+  '/examples/tractor-cushion.webp',
+  '/examples/underseaphone.webp',
+  '/examples/whaletubesocks.webp',
+  '/examples/zebra-framed-print.webp',
+]);
+
 /** Paths that must work without the password: the lock itself, provider webhooks and the
  * scheduled jobs (each carries its own signature / secret), the health check the deploy and the
- * uptime alarm ask (it says only "ok" + the build; its render check needs the jobs secret), and
- * static assets. */
+ * uptime alarm ask (it says only "ok" + the build; its render check needs the jobs secret), Next's
+ * own build output (/_next/ is reserved — never a page), and the real public/ files above. Never a
+ * page or an API route that merely ends in an image extension. */
 export function isGateExempt(pathname: string): boolean {
   return (
     pathname === '/test-gate' ||
@@ -91,12 +155,10 @@ export function isGateExempt(pathname: string): boolean {
     pathname === '/api/health' ||
     pathname.startsWith('/api/health/') ||
     pathname.startsWith('/_next/') ||
-    pathname.startsWith('/brand/') ||
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/manifest.webmanifest' ||
-    // static brand files only — never an API route that happens to end in .png
-    (!pathname.startsWith('/api/') && /\.(png|jpe?g|webp|svg|ico|woff2?)$/.test(pathname))
+    PUBLIC_FILES.has(pathname)
   );
 }
 
@@ -131,5 +193,19 @@ export function sameSitePath(raw: string, base: string): string {
     return u.origin === origin ? `${u.pathname}${u.search}` : '/';
   } catch {
     return '/';
+  }
+}
+
+/** A `?return=` / `?next=` from the address bar, as a path on THIS site — or undefined. Resolved the
+ * way a browser would, so `/\evil.example` (which browsers read as `//evil.example`), `//x`, tabs and
+ * `https://x` never leave the site (07-B10). No origin needed: works in the browser and the server. */
+export function localPath(raw: string | null | undefined): string | undefined {
+  if (!raw || !raw.startsWith('/')) return undefined;
+  const BASE = 'https://this-site.invalid';
+  try {
+    const u = new URL(raw, BASE);
+    return u.origin === BASE ? `${u.pathname}${u.search}${u.hash}` : undefined;
+  } catch {
+    return undefined;
   }
 }

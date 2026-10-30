@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
@@ -31,11 +31,22 @@ test('family set: build a set → 3 pieces earns the saving → basket → serve
   await expect(page.getByText(/kids tee/).first()).toBeVisible();
   await expect(page.getByText(/adult tee/).first()).toBeVisible();
 
-  // the server re-prices: subtotal 2 × £25 + £32 = £82, and the set saving is applied
+  // the server re-prices: subtotal 2 × £25 + £32 = £82, and ONE saving applies — the 5% set saving
+  // (£4.10), or buy-more-&-save on the two kids tees when that's bigger (it is once the product costs
+  // are loaded: src/pricing/engine.ts, "multiBuyWins"). They never stack.
   const summary = page.locator('dl').first();
   const rowValue = (label: string) => summary.locator(`xpath=.//dt[normalize-space()="${label}"]/following-sibling::dd[1]`);
+  const pence = async (label: string) => Math.round(Number((await rowValue(label).innerText()).replace(/[^0-9.]/g, '')) * 100);
   await expect(rowValue('Subtotal')).toHaveText('£82');
-  await expect(rowValue('Family set saving (5%)')).toHaveText(/£4\.10/); // 5% of £82
-  const total = (await rowValue('Total').innerText()).replace(/[£,]/g, '');
-  expect(Number(total)).toBeCloseTo(82 * 0.95, 1);
+  // wait for the server's pricing to land: exactly one of the two savings is shown
+  await expect(rowValue('Buy more & save').or(rowValue('Family set saving (5%)'))).toHaveCount(1);
+  const multiBuy = (await rowValue('Buy more & save').count()) > 0;
+  if (multiBuy) {
+    await expect(rowValue('Family set saving (5%)')).toHaveCount(0);
+    expect(await pence('Buy more & save')).toBeGreaterThan(410);
+  } else {
+    await expect(rowValue('Family set saving (5%)')).toHaveText(/£4\.10/); // 5% of £82
+  }
+  const saving = multiBuy ? await pence('Buy more & save') : 410;
+  expect(await pence('Total')).toBe(8200 - saving);
 });

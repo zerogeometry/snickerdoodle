@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
@@ -11,7 +11,7 @@ for (const vp of [{ w: 360, h: 780 }, { w: 390, h: 844 }]) {
     await page.setViewportSize({ width: vp.w, height: vp.h });
     await quietCookies(page);
     await uploadAndOpenRange(page);
-    await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
     const buttons = page.getByRole('button', { name: '+ customize' });
     expect(await buttons.count()).toBeGreaterThan(1);

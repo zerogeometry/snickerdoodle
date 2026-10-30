@@ -40,6 +40,8 @@ TEST_SITE_PASSWORD=${password}
 APP_URL=${site}
 AUTH_URL=${site}
 AUTH_SECRET=${secret()}
+# the one client-IP header a visitor can't forge here: Netlify sets it itself (src/server/rateLimit.ts)
+CLIENT_IP_HEADER=x-nf-client-connection-ip
 JOBS_SECRET=${secret()}
 
 # Supabase (London) → Project Settings → Database → Connection string → "Transaction pooler" (port 6543)

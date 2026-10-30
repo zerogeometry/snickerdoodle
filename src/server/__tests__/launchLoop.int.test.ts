@@ -9,6 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
 import { seedCatalogue } from '@/server/catalogue';
+import { ensureTestCosts } from '@/test/costFixture';
 import { addChild } from '@/server/children';
 import { createGiftLink, getGiftLink, listGiftListsForOwner, placeGiftLinkOrder, revokeGiftLink, sendGiftRequest } from '@/server/giftLinks';
 import { deleteSavedDesign, listSavedDesigns, saveDesign } from '@/server/savedDesigns';
@@ -22,6 +23,7 @@ import { runReminders, setReminderConsent } from '@/server/reminders';
 import { deleteObject } from '@/storage';
 import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
+import { exclusively } from '@/test/globalJobs';
 
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
@@ -53,7 +55,8 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-  });
+    await ensureTestCosts(db); // the code + referral guards price from DB costs; CI has none without this
+  }, 120_000);
 
   afterAll(async () => {
     for (const k of keys) await deleteObject(k).catch(() => {});
@@ -274,26 +277,27 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       // the owner can't use their own code
       expect(await resolvePromo(db, code, new Date(), { accountId: ids.samId, email: sam!.email })).toEqual({ ok: false, reason: 'own-code' });
 
-      // a brand-new guest buyer: £5 off a £65 print
-      const r = await resolvePromo(db, code, new Date(), null);
+      // a guest we can't identify isn't given it (07-B6); a brand-new guest, by their email, is: £5 off a £65 print
+      expect(await resolvePromo(db, code, new Date(), null)).toEqual({ ok: false, reason: 'needs-buyer' });
+      const guestEmail = `friend-${ids.nonce}@example.test`;
+      const r = await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail });
       expect(r.ok).toBe(true);
       if (!r.ok) return;
-      const guestEmail = `friend-${ids.nonce}@example.test`;
       const first = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
       orderRefs.push(first.ref!);
       const [o1] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
       expect(o1!.promoSavingPence).toBe(500);
       expect(await getCreditBalance(db, ids.samId)).toBe(500); // dev path pays immediately → reward settled
 
-      // the same buyer again: no second discount, no second reward
+      // the same buyer again: no second discount (refused at placement), no second reward
       const again = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
-      orderRefs.push(again.ref!);
+      expect(again).toEqual({ ok: false, reason: 'promo', promoError: 'first-order-only' });
       expect(await getCreditBalance(db, ids.samId)).toBe(500);
       expect(await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail })).toEqual({ ok: false, reason: 'first-order-only' });
 
-      // a self-referral by email (owner buying as a guest) earns nothing
+      // a self-referral by email (owner buying as a guest): refused, earns nothing
       const self = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: sam!.email });
-      orderRefs.push(self.ref!);
+      expect(self).toEqual({ ok: false, reason: 'promo', promoError: 'own-code' });
       expect(await getCreditBalance(db, ids.samId)).toBe(500);
 
       // Sam spends the credit: £5 off, debited once
@@ -326,7 +330,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       expect(r.ok).toBe(true);
       if (!r.ok) return;
 
-      // DB unit costs drive the guard: give the framed print a known landed cost for this test.
+      // DB unit costs drive the guard (the framed print's landed cost: real, or ensureTestCosts' fixture).
       const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule });
       expect(res.ok).toBe(true);
       orderRefs.push(res.ref!);
@@ -391,7 +395,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   });
 
   // ── G15: the family calendar — the parent's per-invite choice, changeable ──
-  it('family calendar: the invite choice lands on the membership; the parent can change it; only shared relatives get reminders', async () => {
+  it('family calendar: the invite choice lands on the membership; the parent can change it; only shared relatives get reminders', () => exclusively(db, async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [rosie] = await db.select().from(memberships).where(and(eq(memberships.accountId, ids.rosieId), eq(memberships.familyId, ids.hartleyId)));
     expect(rosie!.seesOccasions).toBe(false); // seeded before the choice existed → not shared (safe default)
@@ -427,10 +431,10 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect(await rosieSends()).toHaveLength(0);
     await db.delete(consentRecords).where(eq(consentRecords.accountId, ids.rosieId));
     await db.delete(children).where(eq(children.id, ivy!.id)); // keep later occasion tests independent
-  });
+  }));
 
   // ── G10: reminders — consent-gated, once per occasion ─────────────────────
-  it('reminders: nothing without consent; with consent exactly one per occasion nudge, never twice', async () => {
+  it('reminders: nothing without consent; with consent exactly one per occasion nudge, never twice', () => exclusively(db, async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const soon = new Date(Date.now() + 14 * 86_400_000); // the two-weeks-before nudge
     const bday = `2020-${String(soon.getUTCMonth() + 1).padStart(2, '0')}-${String(soon.getUTCDate()).padStart(2, '0')}`;
@@ -450,5 +454,5 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     await db.delete(reminderSends).where(eq(reminderSends.accountId, ids.samId));
     await runReminders(db);
     expect(await sentFor()).toHaveLength(0);
-  });
+  }));
 });

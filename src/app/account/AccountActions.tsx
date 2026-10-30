@@ -44,7 +44,11 @@ export function AccountActions() {
         toast('couldn’t delete just now — try again');
         return;
       }
-      toast(res.deleted > 0 ? `deleted — ${res.deleted} keepsake${res.deleted === 1 ? '' : 's'} gone for good` : 'nothing to delete');
+      const n = res.inOrders ?? 0;
+      // a keepsake a paid order still needs stays until that order is made — say so, never silently
+      const waiting = n > 0 ? `${n} ${n === 1 ? 'is' : 'are'} being made into an order — delete ${n === 1 ? 'it' : 'them'} once ${n === 1 ? 'it’s' : 'they’re'} on the way` : '';
+      const gone = res.deleted > 0 ? `deleted — ${res.deleted} keepsake${res.deleted === 1 ? '' : 's'} gone for good` : '';
+      toast([gone, waiting].filter(Boolean).join(' · ') || 'nothing to delete');
     });
   };
 
@@ -73,9 +77,9 @@ export function AccountActions() {
 
       <div className="px-4 py-3.5 hover:bg-berry-pale">
         <button type="button" onClick={del} disabled={pending} className="flex w-full items-center gap-3 text-left disabled:opacity-60">
-          <Icon icon={IconTrash} size={18} className="shrink-0 text-berry" />
+          <Icon icon={IconTrash} size={18} className="shrink-0 text-cinnamon" />
           <span className="flex-1">
-            <span className="block text-[13px] font-bold text-berry">
+            <span className="block text-[13px] font-bold text-cinnamon">
               {confirmDelete ? 'tap again — delete everything for good' : 'Delete all your keepsakes'}
             </span>
             <span className="block text-[11px] text-ink-faint">
@@ -92,9 +96,9 @@ export function AccountActions() {
 
       <div className="px-4 py-3.5 hover:bg-berry-pale">
         <button type="button" onClick={() => setCloseOpen(true)} disabled={pending} className="flex min-h-11 w-full items-center gap-3 text-left disabled:opacity-60">
-          <Icon icon={IconDoorExit} size={18} className="shrink-0 text-berry" />
+          <Icon icon={IconDoorExit} size={18} className="shrink-0 text-cinnamon" />
           <span className="flex-1">
-            <span className="block text-[13px] font-bold text-berry">Close your account</span>
+            <span className="block text-[13px] font-bold text-cinnamon">Close your account</span>
             <span className="block text-[11px] text-ink-faint">See exactly what happens first — and hand your family to someone if you like.</span>
           </span>
         </button>

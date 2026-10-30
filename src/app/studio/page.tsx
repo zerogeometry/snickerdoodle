@@ -21,6 +21,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
+import { studioEditTarget } from '@/lib/studioEditTarget';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -160,7 +161,10 @@ function StudioEditor() {
 
   // ── make sure the upload is a stored (screened) asset ──
   const ensureAsset = useCallback(async (): Promise<string | null> => {
-    if (assetId) return assetId;
+    // the drawing in progress NOW — a keepsake picked from the box is swapped for its copy after
+    // the Studio opens, and every edit lands on the copy, never the keepsake it came from (01-B1)
+    const target = studioEditTarget(useUpload.getState().upload, assetId);
+    if (target !== undefined) return target;
     if (!upload) return null;
     const blob = await fetch(upload.dataUrl).then((r) => r.blob());
     const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
@@ -185,6 +189,7 @@ function StudioEditor() {
       // a keepsake picked from the box: the Studio edits a NEW keepsake — an exact copy, made now (the
       // one it came from is never touched; leaving without saving tidies the copy away)
       const id = upload.fromKeepsake ? await forkPickedKeepsake() : await ensureAsset();
+      if (id) setLocalAssetId(id); // the copy, when one was just made
       let g = IDENTITY;
       if (id) {
         const st = await studioStateAction({ assetId: id });
@@ -981,6 +986,10 @@ function StudioEditor() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  // tools that can't do anything yet — greyed out in the toolbar and ignored by their shortcut key
+  const disabled: Partial<Record<ToolId, string>> = {};
+  if (!transparent && !geo.background) disabled.background = 'remove the background first';
+
   // ── keyboard (desktop) ──
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -1005,13 +1014,16 @@ function StudioEditor() {
         e.preventDefault();
         return deleteSelected();
       }
+      // Space on a focused control presses it (the browser's own job); anywhere else it shows the original
+      if (e.key === ' ' && t?.closest?.('button, a, select, summary, [role="button"], [role="switch"], [role="checkbox"], [role="radio"], [role="slider"], [role="tab"], [contenteditable="true"]')) return;
       if (e.key === ' ') {
         e.preventDefault();
         return setComparing(true);
       }
       const map: Record<string, ToolId> = { g: 'removeBg', c: 'removeColour', e: 'erase', b: 'restore', k: 'background', p: 'draw', t: 'text', h: 'shapes', v: 'select', l: 'select', r: 'rotate', f: 'flip', x: 'crop', ...(festive ? { j: 'christmas' as const } : {}) };
       const id = map[e.key.toLowerCase()];
-      if (id && !(scratch && IMAGE_ONLY.includes(id))) onTool(id);
+      // a greyed-out tool stays shut from the keyboard too (the click path checks the same list)
+      if (id && !(scratch && IMAGE_ONLY.includes(id)) && !disabled[id]) onTool(id);
       if (e.key === '+' || e.key === '=') zoomBy(1.2);
       if (e.key === '-') zoomBy(1 / 1.2);
       if (e.key === '0') fit();
@@ -1065,8 +1077,6 @@ function StudioEditor() {
     };
   }
 
-  const disabled: Partial<Record<ToolId, string>> = {};
-  if (!transparent && !geo.background) disabled.background = 'remove the background first';
   const readiness = printReadiness(origSize.current[0], origSize.current[1], geo);
 
   const drawingLayer: DrawingLayer | null = scratch
@@ -1255,7 +1265,8 @@ function StudioEditor() {
         </Button>
       </header>
 
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+      {/* the editor itself is the page's main content (the skip link lands here) */}
+      <main id="main" className="flex min-h-0 flex-1 flex-col md:flex-row">
         <StudioToolbar
           active={tool}
           disabled={disabled}
@@ -1356,8 +1367,8 @@ function StudioEditor() {
         </div>
 
         {/* options: the frosted row over the picture on phones (tray, above); a side panel on bigger screens */}
-        <aside aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{options}</aside>
-      </div>
+        <section aria-label="tool options" className="hidden w-80 shrink-0 overflow-y-auto border-l-2 border-cocoa/10 bg-paper p-5 md:block">{options}</section>
+      </main>
 
       {/* leaving with unsaved changes */}
       <Modal open={leaving} onClose={() => setLeaving(false)} title="save your changes?" subtitle="you’ve edited this drawing">

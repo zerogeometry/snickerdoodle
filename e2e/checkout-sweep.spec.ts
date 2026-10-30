@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import Stripe from 'stripe';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { gbp, quietCookies, uploadAndOpenRange } from './helpers';
@@ -279,7 +279,7 @@ test.describe('checkout sweep 05', () => {
   // 05-B7: checkout only counts drawn/card-pack lines as "personalised" (page.tsx hasPersonalised), so a
   // basket holding only the christmas bundle (or a calendar) tells a guest "No account needed" — then the
   // server sends them to sign up anyway.
-  test.fixme('05-B7: a guest with only a bundle in the basket is told about the sign-up before tapping checkout', async ({ page }) => {
+  test('05-B7: a guest with only a bundle in the basket is told about the sign-up before tapping checkout', async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: 1280, height: 800 });
     await quietCookies(page);
@@ -288,7 +288,7 @@ test.describe('checkout sweep 05', () => {
     await page.getByRole('button', { name: /add to basket · £78/ }).click();
     await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{"state":{"items":[]}}').state.items.length), { timeout: 30_000 }).toBe(1);
     await page.goto('/checkout');
-    await expect(page.locator('aside').getByText(/no account needed/i)).toHaveCount(0); // EXPECTED; today it says "No account needed"
+    await expect(page.locator('aside').getByText(/no account needed/i)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/guest-bundle-copy.png` });
     await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
     await page.waitForURL(/\/login/, { timeout: 30_000 });
@@ -296,7 +296,7 @@ test.describe('checkout sweep 05', () => {
 
   // 05-B6: the gift note box ("add a little note") and the desktop "email for your receipt" box are
   // never sent to the server — whatever the shopper types is silently dropped.
-  test.fixme('05-B6: a gift note typed at checkout reaches the order', async ({ page }) => {
+  test('05-B6: a gift note typed at checkout reaches the order', async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: 1280, height: 800 });
     const actions = recordActions(page);
@@ -304,13 +304,14 @@ test.describe('checkout sweep 05', () => {
     await page.getByRole('switch', { name: 'Send as a gift' }).click();
     await expect(page.locator('main').getByText('gift', { exact: true })).toBeVisible(); // line price tucked away
     await page.getByPlaceholder('add a little note (optional)').fill('Happy Christmas Nana T5NOTE');
-    await page.getByLabel('email for your receipt').fill('t5-receipt@example.test');
+    // signed in: the receipt goes to the account's own email, so there's no box to fill (a guest gets one)
+    await expect(page.getByLabel('email for your receipt')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/gift-note.png` });
     await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
     await expect.poll(() => actions.some((a) => a.body.includes('"artwork"'))).toBe(true);
     const body = actions.find((a) => a.body.includes('"artwork"'))!.body;
     expect(body).toContain('"gift":true');
-    expect(body).toContain('T5NOTE'); // EXPECTED; today the note never leaves the page
+    expect(body).toContain('T5NOTE'); // the note travels with the order (screened + kept server-side)
   });
 
   test('a drawing still held for review (no IWF) can’t be ordered — no order row, the basket stays', async ({ page }) => {
@@ -332,25 +333,40 @@ test.describe('checkout sweep 05', () => {
     test.skip(!stripeTest, 'needs STRIPE_SECRET_KEY=sk_test_… and STRIPE_WEBHOOK_SECRET');
     const stripe = () => new Stripe(KEY);
 
-    /** Fill Stripe Checkout (hosted, test mode) and pay. */
+    /**
+     * Fill Stripe Checkout (hosted, test mode) and pay. Fields are found the way a person finds them —
+     * by their label — falling back to the standard autofill token, never Stripe's internal ids (which
+     * Stripe changes).
+     */
     async function payOnStripe(page: Page, card: string) {
       await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 60_000 });
-      await page.locator('#email').fill('t5-payer@example.test');
-      await page.locator('#shippingName').fill('Test Person');
+      const field = (label: RegExp, autocomplete: string) => page.getByLabel(label).or(page.locator(`input[autocomplete~="${autocomplete}"]`)).first();
+      const name = field(/^full name$/i, 'name');
+      await expect(name).toBeVisible({ timeout: 30_000 }); // the form is up
+      // a signed-in parent's email is handed to Stripe, which then shows it as plain text, not a box
+      const email = field(/^email$/i, 'email');
+      if (await email.count()) await email.fill('t5-payer@example.test');
+      await name.fill('Test Person');
       // the address form: line 1, city, postcode (UK only)
       const manual = page.getByRole('button', { name: /enter address manually/i });
       if (await manual.isVisible().catch(() => false)) await manual.click();
-      await page.locator('#shippingAddressLine1').fill('1 Test Street');
-      await page.locator('#shippingLocality').fill('London');
-      await page.locator('#shippingPostalCode').fill('SW1A 1AA');
-      await page.getByTestId('card-accordion-item-button').dispatchEvent('click');
-      await page.locator('#cardNumber').fill(card);
-      await page.locator('#cardExpiry').fill('12 / 34');
-      await page.locator('#cardCvc').fill('123');
-      const same = page.locator('#billingAddressSameAsShipping, input[name="sameAsShipping"]');
-      if ((await same.count()) && !(await same.first().isChecked())) await same.first().check().catch(() => {});
-      await page.locator('#billingName').fill('Test Person').catch(() => {});
-      await page.getByTestId('hosted-payment-submit-button').click();
+      await field(/^address( line 1)?$/i, 'address-line1').fill('1 Test Street');
+      await field(/^(town or city|city)$/i, 'address-level2').fill('London');
+      await field(/^(postal code|postcode)$/i, 'postal-code').fill('SW1A 1AA');
+      const cardNumber = field(/^card number$/i, 'cc-number');
+      if (!(await cardNumber.isVisible())) {
+        // card is one of several payment methods: open it (the accordion button sits under an overlay)
+        await page.getByRole('button', { name: /^pay with card$/i }).or(page.getByTestId('card-accordion-item-button')).first().dispatchEvent('click');
+      }
+      await cardNumber.fill(card);
+      await field(/^(expiration|expiry)/i, 'cc-exp').fill('12 / 34');
+      await field(/cvc/i, 'cc-csc').fill('123');
+      const same = page.getByRole('checkbox', { name: /same as shipping/i });
+      if ((await same.count()) && !(await same.first().isChecked())) await same.first().check();
+      // never sign up to Stripe's "save my information" (it would ask for a phone number)
+      const save = page.getByRole('checkbox', { name: /save my information/i });
+      if ((await save.count()) && (await save.first().isChecked())) await save.first().uncheck();
+      await page.getByRole('button', { name: 'Pay', exact: true }).or(page.getByTestId('hosted-payment-submit-button')).first().click();
     }
 
     async function orderOf(parent: string) {
@@ -436,19 +452,23 @@ test.describe('checkout sweep 05', () => {
       const parent = await parentWithMug(page);
       await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
       await payOnStripe(page, '4000002760003184');
-      // Stripe's test 3DS page lives in nested iframes: "Complete" passes the challenge
+      // Stripe's test 3DS page lives in nested iframes: "Complete" passes the challenge. Its frame can
+      // still be wiring up when the button first shows, so keep pressing it until the shopper is back
+      let shot = false;
       await expect
         .poll(async () => {
+          if (/\/checkout\/confirmation/.test(page.url())) return true;
           for (const f of page.frames()) {
             const b = f.getByRole('button', { name: /^complete/i });
             if (await b.isVisible().catch(() => false)) {
-              await page.screenshot({ path: `${SHOTS}/stripe-3ds-challenge.png` });
-              await b.click();
-              return true;
+              if (!shot) await page.screenshot({ path: `${SHOTS}/stripe-3ds-challenge.png` });
+              shot = true;
+              await b.click({ timeout: 5_000 }).catch(() => {}); // a frame torn down mid-click: the next round retries
+              break;
             }
           }
           return false;
-        }, { timeout: 90_000 })
+        }, { timeout: 120_000, intervals: [1_000] })
         .toBe(true);
       await page.waitForURL(/\/checkout\/confirmation\?ref=SNK-\d{6}/, { timeout: 90_000 });
       const o = await orderOf(parent);
@@ -459,7 +479,7 @@ test.describe('checkout sweep 05', () => {
 
     // 05-B3: placeOrder() clears the basket BEFORE sending the shopper to Stripe, so Stripe's "back"
     // (cancel_url = /checkout) lands on an EMPTY basket — the drawing-on-a-mug they built is gone.
-    test.fixme('05-B3: going back from Stripe Checkout keeps the basket', async ({ page }) => {
+    test('05-B3: going back from Stripe Checkout keeps the basket', async ({ page }) => {
       test.setTimeout(240_000);
       await page.setViewportSize({ width: 1280, height: 800 });
       await parentWithMug(page);

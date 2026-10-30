@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { basketLines, gbp, goClient, optionGroup, rangeReady, shopCatalogue, waitForAsset } from './shop-db';
@@ -180,7 +180,8 @@ test('extras reach the basket: cushion back, base colour, card span + message â€
 // customised LAST in this tab, so "update basket" on an older card silently swaps its message.
 // CONFIRMED 29 Oct: the reopened "for Gran" card showed "leave it blank" + "front only"; "update basket"
 // then folded it into the blank card â€” 2 cards became 1 and the message was gone (B3-card-reopen.json).
-test.fixme('02-B3: reopening a card from the basket brings back ITS message and span', async ({ page }) => {
+// Fixed: the seed brings back the line's message + span too (selectionForLine, src/lib/basket-line.ts).
+test('02-B3: reopening a card from the basket brings back ITS message and span', async ({ page }) => {
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await ready(page);
@@ -211,6 +212,7 @@ test.fixme('02-B3: reopening a card from the basket brings back ITS message and 
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
   const after = (await basketLines(page)).filter((l) => l.product === 'card') as unknown as Array<{ message?: { greeting: string }; cardImageSpan?: string }>;
+  mkdirSync(SHOTS, { recursive: true });
   writeFileSync(`${SHOTS}/B3-card-reopen.json`, JSON.stringify({ reopenedShows: shows, before: cards, after }, null, 1));
   test.info().annotations.push({ type: '02-B3', description: JSON.stringify({ shows, after }) });
   expect.soft(shows.message, 'reopened card shows its message').toBe('true');

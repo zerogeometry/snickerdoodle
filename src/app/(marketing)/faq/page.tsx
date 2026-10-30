@@ -4,6 +4,7 @@ import { headers } from 'next/headers';
 import { Fragment, type ReactNode } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
 import { definedPriceList } from '@/server/catalogue';
+import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { FAQ, FAQ_PRODUCT_NAMES, FAQ_UPDATED, plainAnswer, type FaqItem } from '@/lib/faq';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
@@ -23,7 +24,7 @@ export const metadata: Metadata = {
 function fromPrices(): { key: string; name: string; pence: number }[] {
   const lowest = new Map<string, number>();
   for (const r of definedPriceList()) {
-    if (!r.visibleInShop || r.paused) continue;
+    if (!r.visibleInShop || r.paused || BUNDLE_ONLY_SKUS.has(r.sku)) continue; // a bundle's extra packs aren't sold alone
     lowest.set(r.productKey, Math.min(lowest.get(r.productKey) ?? Infinity, r.pricePence));
   }
   return Object.entries(FAQ_PRODUCT_NAMES)

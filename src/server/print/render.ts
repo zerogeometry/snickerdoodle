@@ -22,6 +22,7 @@ import { isDarkGarment } from '@/lib/garments';
 import { screenCardMessage } from '@/server/textSafety';
 import { assembleCardPrintSpread, CARD_SPREAD } from './cardPrint';
 import { renderCardBackBadge } from './cardBranding';
+import { visibleLayerPart } from './visibleLayer';
 
 export interface RenderResult {
   printObjectId: string;
@@ -64,6 +65,9 @@ export async function renderPrintFile(
     message?: unknown;
     /** GREETINGS-CARD outer span: 'full' = the design across rear+front; else the front panel. */
     cardSpan?: string;
+    /** The positioner's "preview the exact print file": written to the asset + variant's one
+     * PREVIEW slot (each preview replaces the last), never to an order's print file. */
+    preview?: boolean;
   },
 ): Promise<RenderResult> {
   await getViewableAssetOrThrow(db, input.assetId, viewer); // ← the gate
@@ -92,6 +96,8 @@ export async function renderPrintFile(
 
   const transform = clampTransform(input.transform);
   const geom = templateGeom(tpl);
+  // the base colour stays readable in the name (`-g0b6623`); the identity hash is what makes it unique
+  const fileKind = input.preview ? `printpreview-${input.variantId}` : `printfile-${input.variantId}${groundTag(normalizeGround(input.ground))}-${printFileIdentity(srcBuf, input, transform)}`;
 
   const [variantRow] = await db
     .select({ attributes: productVariants.attributes, key: products.key })
@@ -119,7 +125,7 @@ export async function renderPrintFile(
     }
     // the colour is part of the file's name: red + navy socks of one drawing in one order are two
     // different files — never one overwriting the other
-    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', fileW, fileH, groundTag(ground));
+    return persistPrintFile(db, input.assetId, fileKind, png, tpl.requiredDpi, motifAssess.effectiveDpi, motifAssess.decision === 'UPSCALE', fileW, fileH);
   }
 
   // A HEIGHT CHART prints the drawing beside a cm + ft/in ruler drawn INTO the file at true scale
@@ -132,7 +138,7 @@ export async function renderPrintFile(
     }
     const chartGround = normalizeGround(input.ground);
     const face = await renderHeightChartFace(srcBuf, geom, transform, { groundHex: chartGround ? groundHex(chartGround) : undefined });
-    return persistPrintFile(db, input.assetId, input.variantId, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height, groundTag(chartGround));
+    return persistPrintFile(db, input.assetId, fileKind, face.png, tpl.requiredDpi, chartAssess.effectiveDpi, chartAssess.decision === 'UPSCALE', face.width, face.height);
   }
 
   // THE CALENDAR: a gallery page — the whole drawing fitted inside a 1 cm white margin (founder, 26 Oct).
@@ -150,7 +156,7 @@ export async function renderPrintFile(
       .png()
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
-    return persistPrintFile(db, input.assetId, input.variantId, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+    return persistPrintFile(db, input.assetId, fileKind, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
   }
 
   const assess = assessResolution(geom, judged, transform);
@@ -199,7 +205,7 @@ export async function renderPrintFile(
     outW = CARD_SPREAD.widthPx;
     outH = CARD_SPREAD.heightPx;
     // each colour its own file: a red and a blue card of one drawing never overwrite each other
-    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH, groundTag(cardGround));
+    return persistPrintFile(db, input.assetId, fileKind, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
   }
 
   const rect = computeLayerRect(geom, src, transform);
@@ -207,14 +213,8 @@ export async function renderPrintFile(
   // on a white canvas. Handles both regimes: cover/zoom (layer ≥ canvas → crop, offset 0,
   // identical to the old extract) and contain/zoom-out (layer < canvas → whole image
   // placed centred with white margins — unprinted product surface).
-  const layer = await sharp(srcBuf).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill' }).toBuffer();
-  const ix = Math.max(0, -rect.x);
-  const iy = Math.max(0, -rect.y);
-  const ox = Math.max(0, rect.x);
-  const oy = Math.max(0, rect.y);
-  const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
-  const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
-  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).png().toBuffer();
+  // (cut from the source BEFORE resizing — a big zoomed layer is never decoded whole)
+  const { part, left: ox, top: oy } = await visibleLayerPart(srcBuf, src, rect);
 
   outW = rect.canvasWidth;
   outH = rect.canvasHeight;
@@ -228,7 +228,7 @@ export async function renderPrintFile(
       .png()
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
-    return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
+    return persistPrintFile(db, input.assetId, fileKind, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
   }
 
   // The child's image placed on ONE opaque face — the single-sided print file, and the FRONT (left)
@@ -265,31 +265,64 @@ export async function renderPrintFile(
   }
 
   // each base colour is its own file (two cushions of one drawing in two colours never collide)
-  return persistPrintFile(db, input.assetId, input.variantId, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH, groundTag(ground));
+  return persistPrintFile(db, input.assetId, fileKind, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
 }
 
-/** Write the finished print file as a deterministic write-once DERIVATIVE (idempotent re-render
- * overwrites the same key) and return the render result. Shared by every product path, so the
- * card's 4-panel spread persists identically to a single-face print. */
+/** Bump to give every print file a new key (a render change that must not reuse old files). */
+const PRINT_FILE_REV = 1;
+
+/**
+ * The identity of an ORDER's print file: a hash of everything that changes the output — the source
+ * bytes (the original, a cutout or a Studio design, so a replaced design is a new file), the variant,
+ * the clamped placement, the cushion back, the base colour, the card's message and span. Two lines
+ * that print differently can never share a file, and a later render (another line, another order)
+ * can never overwrite a paid order's file (sweep 03-B1); two lines that print the SAME (a calendar's
+ * pages of one drawing, the same gift ordered twice) share one. Over-inclusive on purpose: a field a
+ * product ignores only ever makes an extra file, never a wrong one.
+ */
+function printFileIdentity(
+  srcBuf: Buffer,
+  input: { variantId: string; back?: string; ground?: string; message?: unknown; cardSpan?: string },
+  transform: ReturnType<typeof clampTransform>,
+): string {
+  const source = createHash('sha256').update(srcBuf).digest('hex');
+  return createHash('sha256')
+    .update(JSON.stringify({
+      rev: PRINT_FILE_REV,
+      source,
+      variant: input.variantId,
+      t: [transform.scale, transform.offsetX, transform.offsetY, transform.rotationDeg],
+      back: normalizeCushionBack(input.back) ?? null,
+      ground: normalizeGround(input.ground) ?? null,
+      message: input.message ?? null,
+      span: input.cardSpan === 'full' ? 'full' : null,
+    }))
+    .digest('hex')
+    .slice(0, 32);
+}
+
+/** Write the finished print file as a DERIVATIVE and return the render result. An order file's key
+ * is its identity (above), so re-rendering the same line rewrites the same bytes and nothing else
+ * ever writes there; the preview slot is the one key that is overwritten. Shared by every product
+ * path, so the card's 4-panel spread persists identically to a single-face print. */
 async function persistPrintFile(
   db: DbHandle,
   assetId: string,
-  variantId: string,
+  /** the key's last part: an order file's `printfile-<variant>-<identity>`, or the preview slot */
+  fileKind: string,
   out: Buffer,
   renderedDpi: number,
   effectiveDpi: number,
   upscaled: boolean,
   widthPx: number,
   heightPx: number,
-  /** distinguishes print files of one asset + variant that differ (a pattern's base colour) */
-  tag = '',
 ): Promise<RenderResult> {
-  const key = derivativeKey(assetId, `printfile-${variantId}${tag}`);
+  const key = derivativeKey(assetId, fileKind);
   await putObject(key, out, 'image/png');
   const sha256 = createHash('sha256').update(out).digest('hex');
   const { bucket } = getS3();
 
-  // Deterministic key → a re-render overwrites the same DERIVATIVE.
+  // Deterministic key → a re-render of the same inputs overwrites the same DERIVATIVE.
   const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
   let printObjectId: string;
   if (existing) {

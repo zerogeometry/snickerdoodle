@@ -1,13 +1,41 @@
-import { and, eq, inArray, isNotNull, lte, ne, notExists, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, lte, ne, notExists, or, sql } from 'drizzle-orm';
 import { assets, auditRecords, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
-import { deleteObjectConfirmed } from '@/storage';
+import { assetPrefix, deleteAllUnderPrefix, deleteObjectConfirmed } from '@/storage';
 import { recordErasure } from './erasureLedger';
 import { forgetAssetPreviews } from './print/previewCache';
 import type { DbHandle, Tx } from './db';
 
 // An order in one of these states still needs its source art (render is pending
 // or in production). Once SHIPPED/CANCELLED the source follows normal retention.
-const IN_FLIGHT_ORDER_STATES = ['PENDING', 'PAID', 'FULFILLING'] as const;
+// A PENDING order is in flight only while its checkout can still be paid (08-B2).
+const IN_FLIGHT_ORDER_STATES = ['PAID', 'FULFILLING'] as const;
+
+/**
+ * How long an unpaid checkout can still turn into a paid order: a Stripe Checkout Session lasts
+ * 24 hours (Stripe's default; src/payments/stripe.ts doesn't change it), plus a margin for a late
+ * webhook. After that an order still PENDING was abandoned — it can never be paid — so it no
+ * longer shields its unkept upload from the purge, and {@link expireAbandonedCheckouts} cancels it.
+ */
+export const ABANDONED_CHECKOUT_HOURS = 26;
+const abandonedBefore = (now: Date) => new Date(now.getTime() - ABANDONED_CHECKOUT_HOURS * 3_600_000);
+
+/**
+ * Cancel checkouts nobody paid for (08-B2): every order still PENDING past
+ * {@link ABANDONED_CHECKOUT_HOURS} — or, from the Stripe webhook, the one whose session just
+ * expired. Nothing was charged (credit is only spent on the PENDING→PAID flip) and the paid-flip
+ * only ever moves a PENDING order, so a cancelled one can't be revived. Its unkept upload then
+ * follows normal retention (its own upload + 30 days). Returns the cancelled order ids.
+ */
+export async function expireAbandonedCheckouts(db: DbHandle, opts: { now?: Date; stripeSessionId?: string } = {}): Promise<string[]> {
+  const now = opts.now ?? new Date();
+  const which = opts.stripeSessionId ? eq(orders.stripeSessionId, opts.stripeSessionId) : lte(orders.createdAt, abandonedBefore(now));
+  const gone = await db
+    .update(orders)
+    .set({ status: 'CANCELLED' })
+    .where(and(eq(orders.status, 'PENDING'), which))
+    .returning({ id: orders.id });
+  return gone.map((o) => o.id);
+}
 
 /** Days an un-kept upload is retained before the purge removes it (CLAUDE.md). */
 export const RETENTION_DAYS = 30;
@@ -43,7 +71,16 @@ export async function purgeExpiredAssets(
     .from(orderItemArtwork)
     .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
-    .where(and(eq(orderItemArtwork.assetId, assets.id), inArray(orders.status, IN_FLIGHT_ORDER_STATES)));
+    .where(
+      and(
+        eq(orderItemArtwork.assetId, assets.id),
+        or(
+          inArray(orders.status, IN_FLIGHT_ORDER_STATES),
+          // an unpaid checkout only while it can still be paid — never an abandoned one (08-B2)
+          and(eq(orders.status, 'PENDING'), gt(orders.createdAt, abandonedBefore(now))),
+        ),
+      ),
+    );
 
   const due = await db
     .select()
@@ -71,6 +108,7 @@ export async function purgeExpiredAssets(
         await deleteObjectConfirmed(obj.key); // provider, confirmed + retried
       }
       await db.delete(assets).where(eq(assets.id, asset.id)); // cascades storage_objects rows
+      await deleteAllUnderPrefix(assetPrefix(asset.id)); // anything that landed mid-purge (a late mockup, 08-B8)
       forgetAssetPreviews(asset.id); // any printed face the compositor still holds in memory
       await db.insert(auditRecords).values({
         familyId: asset.familyId,

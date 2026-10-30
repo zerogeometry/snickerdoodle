@@ -82,7 +82,7 @@ function ProfileEditModal({ open, onClose, profile }: { open: boolean; onClose: 
       if (res.ok) return setEmailMsg({ ok: true, text: `check ${email.trim()} — we’ve sent a link to confirm it. nothing changes until you tap it.` });
       setEmailMsg({
         ok: false,
-        text: res.reason === 'too-many' ? TOO_MANY_COPY : res.reason === 'taken' ? 'that email is already used by another account' : res.reason === 'same' ? 'that’s already your email' : 'that doesn’t look like an email address',
+        text: res.reason === 'too-many' ? TOO_MANY_COPY : res.reason === 'same' ? 'that’s already your email' : 'that doesn’t look like an email address',
       });
     });
 

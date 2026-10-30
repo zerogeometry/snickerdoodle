@@ -7,7 +7,7 @@ import { pickAddOns, type AddOn } from '@/server/addOns';
 import { getDb } from '@/db/client';
 import { getCatalogue, loadCatalogue } from '@/server/catalogue';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
-import { resolvePromo } from '@/server/promos';
+import { normaliseBuyerEmail, resolvePromo, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount } from '@/server/session';
 
@@ -25,12 +25,16 @@ export interface QuoteRequest {
   gift?: boolean;
   /** What the customer typed — resolved + priced server-side; its value is never trusted. */
   promoCode?: string;
+  /** A guest's own email (the receipt field) — a friend's referral code is checked against it. */
+  email?: string;
 }
 
 /** The client's view of a quote: the partner commission is stripped (server-only). */
 export type ClientQuote = Omit<Quote, 'partnerCommissionPence'> & {
   /** A code that couldn't be used at all (unknown / expired / used up / not started). */
-  promoError?: 'unknown' | 'not-started' | 'expired' | 'used-up' | 'own-code' | 'first-order-only';
+  promoError?: PromoRefusal;
+  /** Is someone signed in? (checkout asks a guest for their receipt email; an account has one.) */
+  signedIn: boolean;
   /** Per priced line: its product's multi-buy tiers for 2, 3, 4, 5+ (basis points), from the SERVER's
    * live costs (src/pricing/multibuy.ts) — the basket's quantity dropdown labels its options with
    * them. All 0 = no offer. (The saving itself is only ever what the quote charges.) */
@@ -50,7 +54,7 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const catalogue = await getCatalogue(db);
   const account = await getCurrentAccount();
   const resolved = req.promoCode
-    ? await resolvePromo(db, req.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
+    ? await resolvePromo(db, req.promoCode, new Date(), { accountId: account?.id ?? null, email: account?.email ?? normaliseBuyerEmail(req.email) })
     : null;
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   const opts = { gift: req.gift ?? false, joinProvenance, catalogue, promo: resolved?.ok ? resolved.rule : null, creditAvailablePence };
@@ -58,7 +62,8 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   void _hidden;
   const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) || isCardPackKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
   const addOns = q.lines.length ? pickAddOns(await loadCatalogue(db), items, opts) : [];
-  return resolved && !resolved.ok ? { ...q, lineTiers, addOns, promoError: resolved.reason } : { ...q, lineTiers, addOns };
+  const signedIn = !!account;
+  return resolved && !resolved.ok ? { ...q, lineTiers, addOns, signedIn, promoError: resolved.reason } : { ...q, lineTiers, addOns, signedIn };
 }
 
 /** The real, server-resolved join provenance (a joined member within their

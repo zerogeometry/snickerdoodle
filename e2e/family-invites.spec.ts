@@ -1,8 +1,9 @@
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
-import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Page } from './test';
 import sharp from 'sharp';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
+import { maskEmail } from '../src/lib/maskEmail';
 
 /**
  * Test sweep 2026-10-29, tester 04 — FAMILY, INVITES AND NOTIFICATIONS, through the real pages with
@@ -89,7 +90,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   await signInByEmailLink(P.page, E.parent, '/start-creating');
   for (const fill of ['#C8402A', '#2F5DA8', '#7FA65E']) {
     await uploadAndOpenRange(P.page, await drawing(fill));
-    await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+    await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
     await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
     await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
     await P.page.getByRole('button', { name: 'create another' }).click();
@@ -195,7 +196,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await P.page.goto('/family');
     await P.page.getByRole('button', { name: `cancel the invite to ${E.friend}` }).click();
     await expect(P.page.getByText(/cancelled — the link no longer works/)).toBeVisible();
-    await P.page.getByRole('button', { name: `send the invite to ${E.resend} again` }).click();
+    await P.page.getByRole('button', { name: `resend the invite to ${E.resend}` }).click();
     await expect(P.page.getByText(/sent again to .* a fresh link, good for 14 days/)).toBeVisible();
     await sql()`update invites set expires_at = now() - interval '1 minute' where id = ${inv.expired.id}`;
   });
@@ -209,12 +210,12 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await G.page.goto(`/join/${inv.resend.token}`); // the pre-resend token
     await expect(G.page.getByRole('heading', { level: 1 })).toHaveText(/This invite link isn.t valid/);
     await G.page.goto(`/join/${inv.friend.token}`); // revoked
-    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has already been used');
-    await expect(G.page.getByText(/It.s already been accepted./)).toBeVisible(); // 04-B5: says "accepted" for a CANCELLED invite
+    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite was cancelled'); // 04-B5 (fixed)
+    await expect(G.page.getByText(/cancelled it, or sent a newer one/)).toBeVisible();
     await shot(G.page, 'join-revoked-mobile');
     await G.page.goto(`/join/${inv.expired.token}`);
-    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has already been used'); // 04-B5: an expired one says "already been used"
-    await expect(G.page.getByText('It expired.')).toBeVisible();
+    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has expired'); // 04-B5 (fixed)
+    await expect(G.page.getByText(/Invites last 14 days/)).toBeVisible();
     await shot(G.page, 'join-expired-mobile');
     const { n } = (await sql()`select count(*)::int n from memberships m join accounts a on a.id = m.account_id where a.email in ${sql()([E.friend, E.resend, E.expired])}`)[0]!;
     expect(n).toBe(0);
@@ -233,8 +234,10 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Join The Sweepers');
     if (haveLog) {
       const before = mailsTo(email, 'magic-link').length;
-      await page.getByRole('button', { name: `email ${email}` }).click();
-      await expect(page.getByRole('status')).toContainText(`Check ${email} for a link`);
+      // the page only ever shows the invited address masked (06-B1) — the server sends the link
+      await expect(page.getByRole('main')).not.toContainText(email);
+      await page.getByRole('button', { name: 'email me the link' }).click();
+      await expect(page.getByRole('status')).toContainText(`Check ${maskEmail(email)} for a link`);
       await expect.poll(() => mailsTo(email, 'magic-link').length).toBe(before + 1);
       const m = mailsTo(email, 'magic-link').at(-1)!;
       expect(m.subject).toBe('your one-tap link to snickerdoodle');
@@ -253,7 +256,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await signInByEmailLink(S.page, E.stranger, '/home');
     await S.page.goto(`/join/${inv.aunt.token}`);
     await expect(S.page.getByRole('heading', { level: 1 })).toHaveText('This invite is for someone else');
-    await expect(S.page.getByRole('button', { name: `sign in as ${E.aunt}` })).toBeVisible();
+    await expect(S.page.getByRole('button', { name: `sign in as ${maskEmail(E.aunt)}` })).toBeVisible(); // masked: 06-B1
     await shot(S.page, 'join-wrong-account-desktop');
     const { status } = (await sql()`select status from invites where id = ${inv.aunt.id}`)[0]!;
     expect(status).toBe('PENDING');
@@ -408,16 +411,16 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
  * Extended · VIEW picked the parent's Extended keepsake under "or start from a keepsake", made socks,
  * checked out — the server created order SNK-377806 (PENDING, £19, the parent's asset) and sent them to
  * Stripe's test checkout. canBuyFromGiftList() (src/authz/actions.ts) is never called outside tests;
- * placeOrder (src/server/orders.ts ~L171) only checks canViewAsset. Un-fixme when fixed.
+ * placeOrder (src/server/orders.ts ~L171) only checked canViewAsset. Fixed: canBuyAsset (src/authz).
  */
-test.fixme('04-B2: a VIEW-only relative cannot order a family keepsake', async ({ browser }) => {
+test('04-B2: a VIEW-only relative cannot order a family keepsake', async ({ browser }) => {
   test.setTimeout(400_000);
   const parent = testEmail('vb-parent');
   const granny = testEmail('vb-granny');
   const P = await person(browser);
   await signInByEmailLink(P.page, parent, '/start-creating');
   await uploadAndOpenRange(P.page);
-  await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   await clearForTest(parent);
@@ -438,16 +441,16 @@ test.fixme('04-B2: a VIEW-only relative cannot order a family keepsake', async (
   await G.page.locator('aside').getByRole('button', { name: /^checkout$/i }).first().click();
   await G.page.waitForTimeout(8000);
   const orders = await sql()`select o.id from orders o join accounts a on a.id = o.account_id where a.email = ${granny}`;
-  expect(orders).toHaveLength(0); // FAILS today: the order is created
+  expect(orders).toHaveLength(0); // refused: VIEW is look-only
 });
 
 /**
  * 04-B3 (P2) — "view, buy & add" doesn't add to the family. Observed 2026-10-29 (probe run): a second
  * parent joined at Family · CONTRIBUTE uploaded a drawing and tapped "+ keepsake"; it was filed into a
  * NEW family they own (ensureHomeFamily in keepAndFileCreations / keepCreation), not the family they
- * joined — the controlling parent never sees it. Un-fixme when fixed.
+ * joined — the controlling parent never sees it. Fixed: resolveKeepFamily (src/server/onboarding.ts).
  */
-test.fixme('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they joined', async ({ browser }) => {
+test('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they joined', async ({ browser }) => {
   test.setTimeout(400_000);
   const parent = testEmail('cb-parent');
   const co = testEmail('cb-co');
@@ -459,11 +462,11 @@ test.fixme('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they
   const C = await person(browser);
   await signInByEmailLink(C.page, co, `/join/${token}`);
   await uploadAndOpenRange(C.page);
-  await expect(C.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(C.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await C.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(C.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const rows = await sql()`select a.family_id from assets a join accounts acc on acc.id = a.uploader_account_id where acc.email = ${co} and a.kept_in_home`;
-  expect(rows.map((r) => r.family_id)).toEqual([familyId]); // FAILS today: it's in the co-parent's own new family
+  expect(rows.map((r) => r.family_id)).toEqual([familyId]); // the family they joined (fixed: resolveKeepFamily)
 });
 
 test('profile pictures + the family banner: family members only — a stranger, a signed-out visitor and a removed member get a plain 404', async ({ browser }) => {
@@ -532,7 +535,7 @@ test('a relative leaves a family: gone from it at once, logged; the owner has no
   const P = await person(browser);
   await signInByEmailLink(P.page, parent, '/start-creating');
   await uploadAndOpenRange(P.page);
-  await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const { family_id: familyId, id: parentId } = (await sql()`select m.family_id, a.id from memberships m join accounts a on a.id = m.account_id where a.email = ${parent} and m.is_owner`)[0]!;

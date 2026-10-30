@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
@@ -33,7 +33,7 @@ for (const vp of [
       test.setTimeout(180_000);
       await quietCookies(page);
       await uploadAndOpenRange(page);
-      await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+      await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
       await expectAccessible(page, '/start-creating with a drawing');
 
       for (const key of ['mug', 'framedPrint', 'socks', 'card']) {

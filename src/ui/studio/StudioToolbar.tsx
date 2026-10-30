@@ -193,8 +193,11 @@ export function StudioToolbar({
       </div>
 
       {/* ── Tablet / desktop: left rail ── */}
-      <nav
+      {/* a set of editing tools, not site navigation — a toolbar at every size, like the phone row */}
+      <div
+        role="toolbar"
         aria-label="studio tools"
+        aria-orientation="vertical"
         className={`relative hidden shrink-0 flex-col gap-1.5 overflow-y-auto overflow-x-hidden border-r-2 border-cocoa/10 bg-paper p-2 md:flex ${expanded ? 'w-64' : 'w-[68px]'}`}
       >
         <button
@@ -231,7 +234,7 @@ export function StudioToolbar({
           </Fragment>
         ))}
         {expanded && info ? <div className="mt-2">{infoCard}</div> : null}
-      </nav>
+      </div>
       {tip && !expanded ? (
         <div
           role="tooltip"

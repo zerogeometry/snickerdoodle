@@ -27,6 +27,7 @@ export function GiftCheckout({
   familyName,
   pricing,
   defaultFrom,
+  signedIn = false,
 }: {
   token: string;
   items: GiftItem[];
@@ -36,6 +37,8 @@ export function GiftCheckout({
   pricing: { subtotalPence: number; deliveryPence: number; joinSavingPence: number; totalPence: number };
   /** Pre-fills "who's it from?" for a signed-in relative. */
   defaultFrom: string;
+  /** Someone is signed in — never told "checkout as guest" (06-B4). */
+  signedIn?: boolean;
 }) {
   const [fromName, setFromName] = useState(defaultFrom);
   const remaining = items.filter((i) => !i.purchased);
@@ -68,17 +71,21 @@ export function GiftCheckout({
       <div>
         <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Ready to give</p>
         <div className="mt-2 space-y-2.5">
-          {items.map((item) => (
+          {items.map((item, i) => (
             <div
               key={item.assetId + item.productKey}
-              className={'relative flex items-center gap-3 rounded-xl border border-line bg-white px-3 py-2.5' + (item.purchased ? ' opacity-70' : '')}
+              className={'pop-in relative flex items-center gap-3 rounded-[16px] border-2 border-cocoa bg-paper px-3 py-2.5 shadow-[0_3px_0_var(--color-cocoa)]' + (item.purchased ? ' opacity-70' : '')}
+              style={{ ['--i' as string]: Math.min(i + 1, 8) }}
             >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-line bg-oat">
-                {item.imageUrl ? (
-                  <img src={item.imageUrl} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <ProductArt product={item.productKey as ProductKey} size={30} />
-                )}
+              {/* a little polaroid of the keepsake on its product */}
+              <div className="polaroid shrink-0" style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-3deg', padding: '4px 4px 6px' }}>
+                <div className="flex h-14 w-14 items-center justify-center overflow-hidden bg-oat">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={`${item.label}, made with a drawing from ${familyName ?? 'the family'}`} className="h-full w-full object-cover" />
+                  ) : (
+                    <ProductArt product={item.productKey as ProductKey} size={34} />
+                  )}
+                </div>
               </div>
               <div className="min-w-0 flex-1">
                 <div className="text-[13px] font-bold text-cocoa">{item.label}</div>
@@ -96,7 +103,7 @@ export function GiftCheckout({
         </div>
       </div>
 
-      <aside className="self-start rounded-2xl border border-line bg-white p-4">
+      <aside className="tape self-start rounded-[22px] border-2 border-cocoa bg-paper p-4 shadow-[0_4px_0_var(--color-cocoa)]">
         <dl className={allBought ? "hidden" : "space-y-1.5 text-[13px] text-ink-soft"}>
           <div className="flex justify-between">
             <dt>
@@ -167,7 +174,7 @@ export function GiftCheckout({
           onClick={toCheckout}
           disabled={pending}
         >
-          {pending ? 'one moment…' : joined ? 'checkout' : 'checkout as guest'}
+          {pending ? 'one moment…' : joined || signedIn ? 'checkout' : 'checkout as guest'}
         </Button>
         )}
         {problem ? (

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { basketLines, gbp, goClient, optionGroup, rangeReady, shopCatalogue, waitForAsset } from './shop-db';
 
@@ -60,7 +60,7 @@ test('buy more & save: the dropdown shows each quantity’s saving and adds that
 // (useBasket.update sums their quantities) — then the page's setLineQty(id, qty) overwrites the sum with the
 // EDITED line's own quantity, so 2 + 1 mugs become 1. src/app/customize/[productKey]/page.tsx:556-557.
 // Observed: expected 3, received 1.
-test.fixme('editing a basket line into another line’s variant keeps BOTH quantities (02-B1)', async ({ page }) => {
+test('editing a basket line into another line’s variant keeps BOTH quantities (02-B1)', async ({ page }) => {
   test.setTimeout(180_000);
   await ready(page);
   const mug = (await shopCatalogue()).find((p) => p.key === 'mug')!;
@@ -118,7 +118,7 @@ test('the basket sidebar’s edit reopens THAT line (drawing, variant, placement
 // customize page on the drawing in progress (not the line's), at the default variant + placement, and its
 // button ADDS a second line instead of updating this one. The basket sidebar (Basket.tsx:36) does it right.
 // CONFIRMED 29 Oct: landed on http://localhost:3202/customize/mug with "add to basket · £18".
-test.fixme('02-B4: checkout’s "customize your …" reopens that line in update mode', async ({ page }) => {
+test('02-B4: checkout’s "customize your …" reopens that line in update mode', async ({ page }) => {
   test.setTimeout(180_000);
   await page.setViewportSize({ width: 1280, height: 800 });
   await ready(page);

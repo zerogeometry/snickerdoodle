@@ -59,7 +59,7 @@ export async function updateNameAction(name: string): Promise<{ ok: boolean; nam
   return res;
 }
 
-export async function requestEmailChangeAction(email: string): Promise<{ ok: boolean; reason?: 'invalid' | 'same' | 'taken' | 'too-many' }> {
+export async function requestEmailChangeAction(email: string): Promise<{ ok: boolean; reason?: 'invalid' | 'same' | 'too-many' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
   if (!(await rateLimit(getDb(), { ...LIMITS.emailChange, caller: account.id })).ok) return { ok: false, reason: 'too-many' };

@@ -109,7 +109,10 @@ async function repeatPipeline(
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  const pipeline = sharp({ create: { width: canvas.width, height: canvas.height, channels: 3, background } })
+  // The canvas is the template's own size (never the shopper's), and a 3 m / 5 m kraft roll is 293 /
+  // 489 MP — over sharp's 268 MP default — so the limit is lifted to exactly this canvas (sweep 03-B4).
+  // libvips builds it a strip at a time as the PNG is written, so memory stays bounded by the strip.
+  const pipeline = sharp({ create: { width: canvas.width, height: canvas.height, channels: 3, background }, limitInputPixels: canvas.width * canvas.height })
     .composite([{ input: strip.data, raw: { width: strip.info.width, height: strip.info.height, channels: strip.info.channels }, tile: true, gravity: 'northwest' }])
     .removeAlpha();
   return { pipeline, layout, dpi, width: canvas.width, height: canvas.height };

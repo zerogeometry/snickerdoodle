@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
@@ -10,7 +10,7 @@ async function openStudio(page: Page) {
   await page.setViewportSize({ width: 390, height: 844 });
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /edit in studio/i }).first().click();
   await expect(page).toHaveURL(/\/studio$/);
   // the picture is drawn (a tap before then is ignored)

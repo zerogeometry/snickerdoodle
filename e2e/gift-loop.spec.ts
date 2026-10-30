@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type Browser, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
@@ -20,7 +20,7 @@ async function parentMakesGiftLink(page: Page, invite?: { email: string }) {
   await quietCookies(page);
   await signInByEmailLink(page, parent, '/start-creating');
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   await clearForTest(parent);

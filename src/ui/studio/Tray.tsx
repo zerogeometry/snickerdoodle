@@ -30,6 +30,7 @@ import { layerName, type DrawingLayer, type PenStyle, type ShapeStyle, type Text
 import { STANDARD_COLOURS } from './ColourPicker';
 import { ToolGlyph } from './ToolGlyph';
 import { toolById, type ToolId } from './tools';
+import { withArticle } from '@/lib/articles';
 
 /**
  * The PHONE Studio's tool options (founder, 22 Oct): not a pane, but one slim, frosted row that rises
@@ -392,7 +393,7 @@ export function StudioTray(p: TrayProps): ReactNode {
       return row(
         <>
           {PLAIN_SHAPES.map((k) => (
-            <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
+            <button key={k} type="button" aria-label={`add ${withArticle(SHAPE_LABELS[k])}`} onClick={() => p.onAddShape(k)} className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] border border-cocoa/15 bg-paper/85">
               <svg viewBox="-12 -12 124 124" className="h-7 w-7" aria-hidden>
                 <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
               </svg>

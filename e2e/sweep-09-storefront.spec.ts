@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { quietCookies } from './helpers';
 
@@ -171,7 +171,7 @@ test.describe('public pages', () => {
     expect(mismatches).toEqual([]);
   });
 
-  test.fixme('09-B1: placemats + coasters pages show only packs sold on their own (no bundle-only "pack of 1" from-price)', async ({ page }) => {
+  test('09-B1: placemats + coasters pages show only packs sold on their own (no bundle-only "pack of 1" from-price)', async ({ page }) => {
     await quietCookies(page);
     const tiles = await cataloguePrices(page);
     for (const slug of BUNDLE_PACKS) {
@@ -206,7 +206,7 @@ for (const vp of [
       expect(failures, failures.join('\n\n')).toEqual([]);
     });
 
-    test.fixme('09-B2: /trust/family-promise headings go h1 → h3 (axe heading-order)', async ({ page }) => {
+    test('09-B2: /trust/family-promise headings go h1 → h3 (axe heading-order)', async ({ page }) => {
       await quietCookies(page);
       await page.goto('/trust/family-promise');
       await expectAccessible(page, '/trust/family-promise');
@@ -285,7 +285,7 @@ test.describe('states', () => {
     expect((await (async () => { await chips.filter({ hasText: 'festive' }).click(); return shown(); })())[0]).toBe('christmas family bundle');
   });
 
-  test.fixme('09-B5: an unknown address shows a branded "not found" page with a way back (not the bare framework 404)', async ({ page }) => {
+  test('09-B5: an unknown address shows a branded "not found" page with a way back (not the bare framework 404)', async ({ page }) => {
     await quietCookies(page);
     const res = await page.goto('/no-such-page');
     expect(res?.status()).toBe(404);
@@ -293,13 +293,19 @@ test.describe('states', () => {
     await expect(page.getByRole('link', { name: /start creating|home/i }).first()).toBeVisible();
   });
 
-  test.fixme('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
+  test('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
     await quietCookies(page);
     await page.goto('/catalogue');
     await expect(page.getByRole('group', { name: 'filter the range' })).toBeVisible();
-    // the visible, focusable button (the picture's "customize mug" twin is tabIndex -1)
-    const names = await page.locator('button:not([tabindex="-1"])').evaluateAll((els) => els.map((e) => e.textContent?.trim()).filter((t) => t === 'customize' || t === '+ customize'));
-    expect(names).toEqual([]);
+    // the visible, focusable button (the picture's "customize mug" twin is tabIndex -1): its name says
+    // which product, and starts with the words on it (WCAG 2.5.3, label in name)
+    const named = await page.locator('button:not([tabindex="-1"])').evaluateAll((els) =>
+      els.map((e) => ({ text: e.textContent?.trim() ?? '', name: e.getAttribute('aria-label') ?? e.textContent?.trim() ?? '' })).filter((b) => b.text === 'customize' || b.text === '+ customize'),
+    );
+    expect(named.length).toBeGreaterThan(5);
+    expect(named.filter((b) => b.name === b.text), 'named only "customize"').toEqual([]);
+    expect(named.filter((b) => !b.name.startsWith(b.text)), 'name starts with the visible words').toEqual([]);
+    expect(named.map((b) => b.name)).toContain(`${named[0]!.text} mug`);
   });
 });
 
@@ -324,6 +330,30 @@ test.describe('cookie banner', () => {
     // no non-essential cookie was set by choosing "essential only"
     const names = (await page.context().cookies()).map((c) => c.name);
     expect(names.filter((n) => !/^(authjs|__Secure-authjs|__Host-authjs|sd_)/.test(n))).toEqual([]);
+  });
+
+  // 09-B10 (founder, 30 Oct): equal prominence (ICO cookie guidance, Children's Code std 13) and a way to change your mind.
+  test('09-B10: both choices look the same, and "cookie settings" in the footer brings the choice back', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const banner = page.getByRole('dialog', { name: 'Cookie choices' });
+    await expect(banner).toBeVisible();
+    const look = (name: string) =>
+      banner.getByRole('button', { name }).evaluate((el) => {
+        const c = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return { bg: c.backgroundColor, color: c.color, border: c.borderColor, weight: c.fontWeight, size: c.fontSize, w: Math.round(r.width), h: Math.round(r.height) };
+      });
+    expect(await look('accept all')).toEqual(await look('essential only'));
+    await banner.getByRole('button', { name: 'accept all' }).click();
+    await expect(banner).toHaveCount(0);
+    await page.getByRole('contentinfo').getByRole('button', { name: 'cookie settings' }).click();
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('all cookies');
+    await banner.getByRole('button', { name: 'essential only' }).click();
+    expect(await page.evaluate(() => localStorage.getItem('snickerdoodle.cookie-choice'))).toBe('essential');
+    await page.goto('/trust/cookies');
+    await expect(page.getByText(/cookie settings/).first()).toBeVisible();
   });
 });
 

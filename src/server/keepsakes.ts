@@ -3,7 +3,7 @@ import { and, eq, gt, inArray, lte, or } from 'drizzle-orm';
 import { assets, pendingKeeps } from '@/db/schema';
 import { adoptEphemeralDraft } from '@/server/assets';
 import { resolveChildSubject } from '@/server/children';
-import { ensureHomeFamily } from '@/server/onboarding';
+import { resolveKeepFamily } from '@/server/onboarding';
 import type { DbHandle } from './db';
 
 /**
@@ -31,7 +31,9 @@ export async function keepAndFileCreations(
   const ids = [...new Set((assetIds ?? []).filter((x): x is string => !!x))];
   if (ids.length === 0) return { familyId: null, childId: null };
 
-  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  // the family they'd see it in, if they may add to it (a CONTRIBUTE second parent: the family they
+  // joined — 04-B3); else their own box
+  const { familyId, isOwner } = await resolveKeepFamily(db, account.id, account.name);
 
   const adopted: string[] = [];
   for (const id of ids) {
@@ -43,7 +45,8 @@ export async function keepAndFileCreations(
     }
   }
 
-  const child = subject ? await resolveChildSubject(db, familyId, account.id, subject) : null;
+  // only the family's owner adds a little one; a relative can only file under one it already has
+  const child = subject ? await resolveChildSubject(db, familyId, account.id, subject, { create: isOwner }) : null;
   if (child && adopted.length > 0) {
     await db
       .update(assets)
@@ -71,12 +74,18 @@ export async function keepUpload(db: DbHandle, account: { id: string; name: stri
 // ── "+ keepsake" by a guest, finished after sign-in ─────────────────────────────────────────────
 
 const PENDING_KEEP_HOURS = 24;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const emailHash = (email: string) => createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
 
 /**
  * A guest tapped "+ keepsake", then asked to sign in with this email: remember to keep the drawing
  * once that person is signed in. Only the uploader can ask (their claim must still match the
  * draft); only a hash of the email is stored; it expires after a day.
+ *
+ * The email alone is NEVER enough to finish it (07-B5 / 08-B1): anyone can type anyone's address,
+ * and the genuine sign-in email would then file a stranger's picture into that family's private
+ * keepsake box. {@link finishPendingKeeps} also needs the upload claim — the same browser that
+ * uploaded the drawing and asked for the keep.
  */
 export async function rememberKeepForEmail(
   db: DbHandle,
@@ -93,14 +102,31 @@ export async function rememberKeepForEmail(
   return true;
 }
 
-/** Signed in: keep whatever this person asked to keep as a guest (any device). Returns the kept ids. */
-export async function finishPendingKeeps(db: DbHandle, account: { id: string; name: string | null; email: string }, now = new Date()): Promise<string[]> {
+/**
+ * Signed in: keep whatever this person asked to keep as a guest — only when BOTH match: the email
+ * they signed in with, and the upload claim THIS browser holds (07-B5: never by email alone). A
+ * request made in another browser stays until it expires, in case they come back there signed in.
+ * Returns the kept ids.
+ */
+export async function finishPendingKeeps(
+  db: DbHandle,
+  account: { id: string; name: string | null; email: string },
+  uploadClaims: string[],
+  now = new Date(),
+): Promise<string[]> {
+  const claims = (uploadClaims ?? []).filter((c): c is string => typeof c === 'string' && UUID.test(c));
+  if (claims.length === 0) return [];
   const hash = emailHash(account.email);
-  const rows = await db.select().from(pendingKeeps).where(and(eq(pendingKeeps.emailHash, hash), gt(pendingKeeps.expiresAt, now)));
+  const rows = await db
+    .select()
+    .from(pendingKeeps)
+    .where(and(eq(pendingKeeps.emailHash, hash), inArray(pendingKeeps.claimId, claims), gt(pendingKeeps.expiresAt, now)));
   const kept: string[] = [];
-  for (const r of rows) if (await keepUpload(db, account, [r.claimId], r.assetId)) kept.push(r.assetId);
-  // consumed or expired — either way, gone
-  await db.delete(pendingKeeps).where(or(eq(pendingKeeps.emailHash, hash), lte(pendingKeeps.expiresAt, now)));
+  for (const r of rows) if (await keepUpload(db, account, claims, r.assetId)) kept.push(r.assetId);
+  // the ones this browser could finish are consumed; expired ones are gone either way
+  await db
+    .delete(pendingKeeps)
+    .where(or(and(eq(pendingKeeps.emailHash, hash), inArray(pendingKeeps.claimId, claims)), lte(pendingKeeps.expiresAt, now)));
   return kept;
 }
 

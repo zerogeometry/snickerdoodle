@@ -4,12 +4,23 @@ import { and, eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { deleteAsset, resolveViewerContext } from '@/server/assets';
+import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
 import { loadHome } from '@/server/home';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { closeAccount, closurePreview, type ClosurePreview } from '@/server/accountClosure';
 import { collectAccountData } from '@/server/exportData';
+import { sendMail, type MailMessage } from '@/server/mail';
+import { accountClosedEmail, dataExportEmail, keepsakesDeletedEmail } from '@/server/mail/dataRights';
+
+/** A data-rights confirmation, to the account's own address. A mail hiccup never undoes what was done. */
+async function confirm(message: MailMessage) {
+  try {
+    await sendMail(message);
+  } catch (e) {
+    console.error(`[data] the ${message.kind} confirmation failed`, e instanceof Error ? e.message : e);
+  }
+}
 
 /**
  * Download-your-data (a portable subject-access export). Returns everything we hold
@@ -38,6 +49,8 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
     },
     ...everything,
   };
+  // a heads-up to their own inbox, so a download they didn't make never goes unnoticed
+  await confirm(dataExportEmail({ to: account.email, name: account.name, at: new Date() }));
   return { ok: true, filename: `snickerdoodle-your-data.json`, json: JSON.stringify(data, null, 2) };
 }
 
@@ -48,7 +61,7 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
  * removable on demand. (The login record + financial order history are retained per
  * the legal-basis schedule with the child image already cascaded out of any order.)
  */
-export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok: boolean; deleted: number }> {
+export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok: boolean; deleted: number; inOrders?: number }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, deleted: 0 };
 
@@ -62,11 +75,13 @@ export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok:
     .where(and(eq(assets.familyId, familyId), eq(assets.controllerAccountId, account.id)));
 
   let deleted = 0;
+  let inOrders = 0; // kept until the paid order that needs them is made — the parent is told
   for (const r of rows) {
     try {
       await deleteAsset(db, r.id, viewer);
       deleted++;
-    } catch {
+    } catch (e) {
+      if (e instanceof KeepsakeInUseError) inOrders++;
       // skip any the viewer can't delete; the rest still go
     }
   }
@@ -74,7 +89,8 @@ export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok:
   // (each keepsake is audited as ASSET_DELETED by deleteAsset — this is not an account closure)
 
   revalidatePath('/home');
-  return { ok: true, deleted };
+  if (deleted > 0) await confirm(keepsakesDeletedEmail({ to: account.email, name: account.name, deleted }));
+  return { ok: true, deleted, inOrders };
 }
 
 /**
@@ -91,6 +107,8 @@ export async function closeMyAccountAction(
     handOver: handOver ? { familyId: String(handOver.familyId), newOwnerAccountId: String(handOver.newOwnerAccountId) } : null,
   });
   if (!res.ok) return res.reason === 'not-found' ? { ok: false } : { ok: false, reason: res.reason };
+  // to the address the account had (it's erased now) — the last email we send them
+  await confirm(accountClosedEmail({ to: account.email, name: account.name }));
   revalidatePath('/', 'layout');
   return { ok: true };
 }

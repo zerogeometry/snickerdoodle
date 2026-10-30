@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
@@ -26,7 +26,7 @@ test('touch phone: text fields are 16px or more, and nothing runs off the side',
   expect(await noSideways(page)).toBe(true);
 
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   expect(await noSideways(page)).toBe(true);
 
   // the studio's words editor — the field that zoomed the studio off screen
@@ -52,7 +52,7 @@ test('narrow phone (320px — an SE, or an iPhone with Display Zoom): the basket
   test.setTimeout(180_000);
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   for (const product of ['mug', 'framed print']) {
     await page.getByRole('button', { name: `customize ${product}`, exact: true }).click();
     await page.getByRole('button', { name: /add to basket/ }).click();
