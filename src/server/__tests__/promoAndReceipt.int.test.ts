@@ -17,6 +17,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { getOrdersForAccount, placeOrder } from '@/server/orders';
 import { PROMO_HOLD_MS, resolvePromo } from '@/server/promos';
 import { seedCatalogue } from '@/server/catalogue';
+import { ensureTestCosts } from '@/test/costFixture';
 import type { DbHandle } from '@/server/db';
 
 /**
@@ -45,6 +46,7 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
     client = postgres(URL!, { prepare: false });
     db = drizzle(client, { schema });
     await seedCatalogue(db); // idempotent
+    await ensureTestCosts(db); // first, so the cost restored afterwards is never a null over the fixture
     // the framed print's real cost (the promo margin guard never discounts a product without one)
     [{ unitCostPence: costBefore } = { unitCostPence: null }] = await db.select({ unitCostPence: productVariants.unitCostPence }).from(productVariants).where(eq(productVariants.sku, 'framedPrint'));
     await db.update(productVariants).set({ unitCostPence: 2800 }).where(eq(productVariants.sku, 'framedPrint'));

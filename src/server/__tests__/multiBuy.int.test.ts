@@ -6,6 +6,7 @@ import * as schema from '@/db/schema';
 import { orders, productVariants } from '@/db/schema';
 import { placeOrder } from '@/server/orders';
 import { getCatalogue, loadCatalogue, seedCatalogue } from '@/server/catalogue';
+import { ensureTestCosts } from '@/test/costFixture';
 import type { DbHandle } from '@/server/db';
 
 const URL = process.env.DATABASE_URL;
@@ -24,6 +25,7 @@ describe.skipIf(!URL)('multi-buy — integration', () => {
     client = postgres(URL!, { prepare: false });
     db = drizzle(client, { schema });
     await seedCatalogue(db);
+    await ensureTestCosts(db); // first, so the cost restored afterwards is never a null over the fixture
     [before] = await db.select({ unitCostPence: productVariants.unitCostPence, postFirstPence: productVariants.postFirstPence, postExtraPence: productVariants.postExtraPence }).from(productVariants).where(eq(productVariants.sku, 'mug'));
     // the mug's real costs (Prodigi GB sheet: £5 + £4.30 post, +£1 per extra)
     await db.update(productVariants).set({ unitCostPence: 930, postFirstPence: 430, postExtraPence: 100 }).where(eq(productVariants.sku, 'mug'));

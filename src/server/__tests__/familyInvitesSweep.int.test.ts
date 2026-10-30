@@ -176,10 +176,14 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' });
     const results = await Promise.allSettled([acceptInvite(db, who, token), acceptInvite(db, who, token)]);
     const values = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
-    expect(values.filter((v) => v?.ok)).toHaveLength(1);
-    // (observed 2026-10-29: the loser is told "used"; under a tighter race the partial unique index would refuse it instead)
+    // the loser's answer depends on the timing: told "used", told ok because it found the winner's
+    // membership already there (it joins nobody — "you're already in"), or refused by the partial
+    // unique index. What must hold either way: ONE membership, ONE join on record, ONE note to the parent.
+    expect(values.filter((v) => v?.ok).length).toBeGreaterThanOrEqual(1);
+    for (const v of values) if (v && !v.ok) expect(v.reason).toBe('used');
     const active = await db.select().from(memberships).where(and(eq(memberships.accountId, who.id), eq(memberships.status, 'ACTIVE')));
     expect(active).toHaveLength(1); // the partial unique index holds the line
+    expect(await audits('MEMBERSHIP_CREATED', who.id)).toHaveLength(1);
   });
 
   it('changing a member’s circle and access bites on their very next read, each change audited', async () => {
