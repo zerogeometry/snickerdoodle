@@ -151,7 +151,7 @@ export async function closeAccount(
   // ── 4. Orders: keep the money record, drop the personal details ─────────────────
   await db
     .update(orders)
-    .set({ buyerEmail: null, shippingAddress: null, giftFromName: null, tracking: null })
+    .set({ buyerEmail: null, shippingAddress: null, giftFromName: null, giftNote: null, tracking: null })
     .where(eq(orders.accountId, accountId));
 
   // ── 5. The account row: anonymised, can never sign in again ─────────────────────

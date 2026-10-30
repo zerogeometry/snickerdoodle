@@ -174,9 +174,12 @@ export function HomeView({ data }: { data: HomeData }) {
         className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
       >
         {k.canManage ? (
-          <button type="button" onClick={() => setActive(k)} className="block w-full text-left" aria-label={k.held ? 'being checked after a report — choose who can see this keepsake' : 'choose who can see this keepsake'}>
+          // named by what's on it (keepsake · month · who sees it) and then what it does — never one
+          // label for every tile (09-B8, WCAG 2.5.3)
+          <button type="button" onClick={() => setActive(k)} className="block w-full text-left">
             {/* held after a report: only this parent sees it meanwhile (D8) */}
             <KeepsakeTile index={i} name="Keepsake" meta={monthLabel(k.createdAtISO)} image={(k.thumbUrl ?? k.imageUrl) ?? undefined} badge={k.held ? 'being checked' : VIS_LABEL[k.visibility]} />
+            <span className="sr-only">{k.held ? ' — being checked after a report: choose who can see this keepsake' : ' — choose who can see this keepsake'}</span>
           </button>
         ) : (
           <>

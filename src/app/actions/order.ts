@@ -4,7 +4,7 @@ import { getDb } from '@/db/client';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { keepAndFileCreations } from '@/server/keepsakes';
 import { basketHasPrintWithoutDrawing, placeOrder, type PlaceLine } from '@/server/orders';
-import { resolvePromo } from '@/server/promos';
+import { normaliseBuyerEmail, resolvePromo, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
@@ -44,7 +44,12 @@ export async function placeOrderAction(input: {
   subject?: string;
   /** What the customer typed; resolved + priced server-side. */
   promoCode?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string; reason?: 'too-small'; productKey?: string }> {
+  /** A gift order's little note (untrusted — screened + capped in placeOrder). */
+  giftNote?: string;
+  /** A GUEST's email for their receipt (a signed-in buyer's is their account's). Normalised here;
+   * a friend's referral code is checked against it, and Stripe shows it fixed. */
+  email?: string;
+}): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string; reason?: 'too-small' | 'promo' | 'gift-note'; productKey?: string; promoError?: PromoRefusal }> {
   const items: PlaceLine[] = (input.items ?? []).map((i) => ({
     productKey: String(i.productKey),
     qty: Number(i.qty),
@@ -112,21 +117,29 @@ export async function placeOrderAction(input: {
   }
 
   const joinProvenance = account ? await resolveSessionJoinProvenance() : null;
+  // who's buying: the account, or a guest by the email they gave (never an account wall)
+  const buyerEmail = account?.email ?? normaliseBuyerEmail(input.email);
   const resolved = input.promoCode
-    ? await resolvePromo(db, input.promoCode, new Date(), account ? { accountId: account.id, email: account.email } : null)
+    ? await resolvePromo(db, input.promoCode, new Date(), { accountId: account?.id ?? null, email: buyerEmail })
     : null;
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   try {
     const res = await placeOrder(db, {
       promo: resolved?.ok ? resolved.rule : null,
       creditAvailablePence,
-      buyerEmail: account?.email ?? null,
+      buyerEmail,
       items,
       gift: input.gift ?? false,
+      giftNote: input.giftNote,
       account: account ? { id: account.id } : null,
       joinProvenance,
     });
-    if (!res.ok) return res.reason === 'too-small' ? { ok: false, reason: 'too-small', productKey: res.productKey } : { ok: false };
+    if (!res.ok) {
+      if (res.reason === 'too-small') return { ok: false, reason: 'too-small', productKey: res.productKey };
+      if (res.reason === 'promo') return { ok: false, reason: 'promo', promoError: res.promoError };
+      if (res.reason === 'gift-note') return { ok: false, reason: 'gift-note' };
+      return { ok: false };
+    }
     return { ok: true, ref: res.ref, checkoutUrl: res.checkoutUrl };
   } catch {
     return { ok: false }; // e.g. a personalised line the buyer may not order

@@ -48,6 +48,12 @@ export async function createCheckoutSession(args: {
   /** Where Stripe's "back" goes (an app path). Default: the basket. A gift-link order
    * returns to its gift list — a grandparent never lands in a basket they didn't fill. */
   cancelPath?: string;
+  /** The buyer's email (server-resolved): Stripe shows it fixed, so the receipt + referral checks
+   * are about the person who placed the order. Omitted → Stripe asks for one. */
+  customerEmail?: string;
+  /** Close the session early (seconds from now; Stripe allows 30 min – 24 h) — e.g. while it holds
+   * one of a limited code's uses. Omitted → Stripe's default (24 h). */
+  expiresInSec?: number;
 }): Promise<{ id: string; url: string | null }> {
   const stripe = getStripe();
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = args.lines.map((l) => ({
@@ -94,6 +100,8 @@ export async function createCheckoutSession(args: {
     shipping_address_collection: { allowed_countries: ['GB'] },
     success_url: `${appUrl()}/checkout/confirmation?ref=${args.ref}`,
     cancel_url: `${appUrl()}${args.cancelPath ?? '/checkout'}`,
+    ...(args.customerEmail ? { customer_email: args.customerEmail } : {}),
+    ...(args.expiresInSec ? { expires_at: Math.floor(Date.now() / 1000) + Math.max(1800, Math.min(86_400, Math.round(args.expiresInSec))) } : {}),
   });
   return { id: session.id, url: session.url };
 }

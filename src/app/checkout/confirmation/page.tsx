@@ -9,6 +9,7 @@ import { getCurrentAccount } from '@/server/session';
 import { getDb } from '@/db/client';
 import { listUndecidedCreations } from '@/server/keepChoice';
 import { KeepChoiceCard } from './KeepChoiceCard';
+import { ClearPaidBasket } from './ClearPaidBasket';
 
 export const metadata: Metadata = { title: 'thank you', robots: { index: false, follow: false } };
 
@@ -47,6 +48,7 @@ export default async function ConfirmationPage({ searchParams }: { searchParams:
             <Icon icon={IconMail} size={14} className="text-cinnamon" /> order {ref}
           </p>
         ) : null}
+        {ref ? <ClearPaidBasket orderRef={ref} /> : null}
         {ref && undecided.length > 0 ? <KeepChoiceCard orderRef={ref} creations={undecided} /> : null}
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
           {account ? (

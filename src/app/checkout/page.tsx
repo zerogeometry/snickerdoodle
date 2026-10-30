@@ -15,12 +15,13 @@ import { MultiBuyChip, MultiBuyQty } from '@/ui/components/MultiBuy';
 import { CheckoutAddOns } from '@/ui/components/CheckoutAddOns';
 import { productOfKey } from '@/pricing';
 import { hasMultiBuy } from '@/pricing/multibuy';
-import { basketSubtotal, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { basketSubtotal, CHECKOUT_REF_KEY, DELIVERY_PENCE, gbp, isBundleLine, isCalendarLine, isPackLine, orderItemsFor, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { quoteBasket } from '@/app/actions/quote';
 import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { ClientQuote } from '@/app/actions/quote';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
+import { GIFT_NOTE_MAX } from '@/lib/gift-note';
 
 
 export default function CheckoutPage() {
@@ -32,18 +33,26 @@ export default function CheckoutPage() {
   const router = useRouter();
 
   const [gift, setGift] = useState(false);
+  // the gift's little note — sent with the order (screened server-side) and on the receipt
+  const [giftNote, setGiftNote] = useState('');
+  // a GUEST's receipt email (an account has its own): sent with the order; a friend's code is checked against it
   const [email, setEmail] = useState('');
+  const quoteEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ? email.trim() : undefined;
   const [quote, setQuote] = useState<ClientQuote | null>(null);
   // A discount / partner code: the server resolves + prices it; we only hold the text.
   const [codeInput, setCodeInput] = useState('');
   const [promoCode, setPromoCode] = useState<string | undefined>(undefined);
   const [placing, setPlacing] = useState(false);
   const [subject, setSubject] = useState<string | null>(null);
+  // bumped to re-ask the server (e.g. a code's last use went while this page was open)
+  const [quoteNonce, setQuoteNonce] = useState(0);
 
   const empty = items.length === 0;
-  // A personalised line (a drawing on a product) needs the controlling parent — so
-  // checkout asks a guest to sign up; pure add-ons can still guest-checkout.
-  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length);
+  // A personalised line (a drawing on a product, a card pack, a calendar, the bundle) needs the
+  // controlling parent — so checkout asks a guest to sign up; pure add-ons can still guest-checkout.
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || isCalendarLine(i) || isBundleLine(i));
+  // (from the server's quote: someone signed in needs no sign-up line, and has their own email)
+  const signedIn = quote?.signedIn ?? false;
 
   // The child this is for, named in "Who's this for?" before checkout.
   useEffect(() => {
@@ -104,13 +113,13 @@ export default function CheckoutPage() {
       return;
     }
     // (the christmas bundle sends its drawings + extras: the server counts + prices them)
-    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(isBundleLine(i) ? { bundle: i.bundle } : {}) })), gift, promoCode }).then((q) => {
+    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(isBundleLine(i) ? { bundle: i.bundle } : {}) })), gift, promoCode, email: quoteEmail }).then((q) => {
       if (live) setQuote(q);
     });
     return () => {
       live = false;
     };
-  }, [items, gift, empty, promoCode]);
+  }, [items, gift, empty, promoCode, quoteEmail, quoteNonce]);
 
   // What to tell the customer about their code — plain, friendly, never a dead end.
   const promoMessage = (() => {
@@ -121,6 +130,7 @@ export default function CheckoutPage() {
     if (quote.promoError === 'used-up') return { ok: false, text: 'that code has been fully used' };
     if (quote.promoError === 'own-code') return { ok: false, text: 'that’s your own code — share it with a friend instead ✦' };
     if (quote.promoError === 'first-order-only') return { ok: false, text: 'that code is for a first order — your credit still applies' };
+    if (quote.promoError === 'needs-buyer') return { ok: false, text: 'a friend’s code is for a first order — log in (or add your email) and we’ll check it ✦' };
     const p = quote.promo;
     if (!p) return null;
     if (p.applied) return { ok: true, text: p.capped ? `${p.code} applied — this basket’s maximum saving` : `${p.code} applied ✦` };
@@ -176,8 +186,10 @@ export default function CheckoutPage() {
         // A card pack sends qty 1 + its cards instead (orderItemsFor).
         items: orderItemsFor(items),
         gift,
+        giftNote: gift && giftNote.trim() ? giftNote : undefined,
         subject: liveSubject ?? undefined,
         promoCode,
+        email: signedIn ? undefined : quoteEmail,
       });
       if (res.needsAuth) {
         // a personalised order needs the controlling parent — keep + order after sign-up.
@@ -191,19 +203,36 @@ export default function CheckoutPage() {
         setPlacing(false);
         return;
       }
+      if (!res.ok && res.reason === 'promo') {
+        // e.g. a limited code's last use went a moment ago — say so, and show the basket without it
+        toast(res.promoError === 'used-up' ? 'that code has just been fully used, sorry — here’s your basket without it' : 'that code can’t be used on this order — here’s your basket without it');
+        setQuoteNonce((n) => n + 1);
+        return;
+      }
+      if (!res.ok && res.reason === 'gift-note') {
+        toast('we can’t send that gift note — could you reword it?');
+        return;
+      }
       if (!res.ok) {
         toast('hmm, that didn’t go through — try again');
         return;
       }
-      clear();
+      if (res.checkoutUrl) {
+        // The basket stays put until the payment's through: "back" from Stripe finds it as it was.
+        // The confirmation page empties it, for this order only (CHECKOUT_REF_KEY).
+        try {
+          if (res.ref) sessionStorage.setItem(CHECKOUT_REF_KEY, res.ref);
+        } catch {
+          // ignore
+        }
+        window.location.href = res.checkoutUrl; // → Stripe Checkout
+        return;
+      }
+      clear(); // dev: paid already
       try {
         sessionStorage.removeItem(SUBJECT_KEY); // consumed — don't leak into a later checkout
       } catch {
         // ignore
-      }
-      if (res.checkoutUrl) {
-        window.location.href = res.checkoutUrl; // → Stripe Checkout
-        return;
       }
       router.push(`/checkout/confirmation?ref=${res.ref}`);
     } finally {
@@ -315,7 +344,7 @@ export default function CheckoutPage() {
           <Link href="/start-creating" aria-label="Back to your collection" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center">
             <Icon icon={IconArrowLeft} size={20} className="text-ink-soft" />
           </Link>
-          <Link href="/" className="truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
+          <Link href="/" className="inline-flex min-h-11 items-center truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
         </div>
         {/* narrow phones: just the padlock (the words from 360px), never wrapping into the logo */}
         <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-soft" aria-label="secure checkout">
@@ -352,7 +381,8 @@ export default function CheckoutPage() {
               <div className="mt-3 space-y-2.5">
                 {items.map((item, idx) => {
                   const oneOff = isPackLine(item) || isBundleLine(item);
-                  const editHref = `/customize/${item.product}${oneOff || isCalendarLine(item) ? `?edit=${encodeURIComponent(item.id)}` : ''}`;
+                  // every line re-opens ITS OWN customize, with "update basket" (as the basket sidebar does)
+                  const editHref = `/customize/${item.product}?edit=${encodeURIComponent(item.id)}`;
                   const editLabel = isBundleLine(item) ? `edit your ${item.name}` : isPackLine(item) ? `edit the cards in your ${item.name}` : `customize your ${item.name}`;
                   return (
                   // (founder, 29 Oct) desktop: thumbnail · title + subtitle · buy more & save + quantity · prices · remove / edit;
@@ -439,10 +469,15 @@ export default function CheckoutPage() {
                     <p className="text-[11px] leading-relaxed text-ink-faint">
                       We&apos;ll wrap it and tuck the prices away, so the only surprise is the lovely one.
                     </p>
+                    <label htmlFor="gift-note" className="sr-only">a little note for the gift (optional)</label>
                     <textarea
+                      id="gift-note"
+                      value={giftNote}
+                      onChange={(e) => setGiftNote(e.target.value)}
+                      maxLength={GIFT_NOTE_MAX}
                       placeholder="add a little note (optional)"
                       rows={2}
-                      className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-xs text-cocoa placeholder:text-ink-faint"
+                      className="mt-2 w-full rounded-lg border border-line bg-paper px-3 py-2 text-base text-cocoa placeholder:text-ink-faint sm:text-xs"
                     />
                   </div>
                 ) : null}
@@ -464,20 +499,26 @@ export default function CheckoutPage() {
                 <h2 className="font-display text-base font-semibold text-cocoa">Order summary</h2>
                 {promoBox('desktop')}
 {summaryRows}
-                <label htmlFor="email-d" className="mt-4 block text-[11px] font-bold text-ink-soft">
-                  email for your receipt
-                </label>
-                <input
-                  id="email-d"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
-                />
+                {signedIn ? null : (
+                  <>
+                    <label htmlFor="email-d" className="mt-4 block text-[11px] font-bold text-ink-soft">
+                      email for your receipt
+                    </label>
+                    <input
+                      id="email-d"
+                      type="email"
+                      autoComplete="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="mt-1 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
+                    />
+                  </>
+                )}
                 <Button size="lg" className="mt-3 w-full" onClick={placeOrder} disabled={placing}>
                   {placing ? 'placing your order…' : 'checkout'}
                 </Button>
+                {signedIn ? null : (
                 <p className="mt-3 text-center text-[11px] text-ink-soft">
                   {hasPersonalised ? (
                     <>
@@ -491,6 +532,7 @@ export default function CheckoutPage() {
                     </>
                   )}
                 </p>
+                )}
                 <p className="mt-3 flex items-center justify-center gap-1.5 rounded-lg bg-leaf-pale px-2 py-2 text-[11px] text-green-save">
                   <Icon icon={IconShieldCheck} size={14} /> Your data is yours. Nothing shared, ever.
                 </p>
@@ -512,6 +554,7 @@ export default function CheckoutPage() {
           <Button size="lg" className="w-full" onClick={placeOrder} disabled={placing}>
             {placing ? 'placing…' : 'checkout'}
           </Button>
+          {signedIn ? null : (
           <p className="mt-2 text-center text-[11px] text-ink-soft">
             {hasPersonalised ? (
               <>a quick sign-up keeps your keepsake safe — no password</>
@@ -521,6 +564,7 @@ export default function CheckoutPage() {
               </>
             )}
           </p>
+          )}
         </section>
       ) : null}
     </div>

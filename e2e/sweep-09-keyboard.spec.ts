@@ -63,8 +63,9 @@ test('keyboard only: upload → customize → basket → checkout, with a visibl
 
   // customize the mug — by keyboard it's the tile's "+ customize" button (the picture's "customize mug"
   // button is mouse/touch only, tabIndex -1). 09-B4: that button's name doesn't say which product.
-  const mugTile = page.getByRole('button', { name: 'Enlarge mug preview' }).locator('xpath=ancestor::div[.//button[normalize-space()="+ customize"]][1]');
-  await tabTo(page, mugTile.getByRole('button', { name: '+ customize' }), 200);
+  // (it's named for its product — "+ customize your mug" — 09-B4)
+  await expect(page.getByRole('button', { name: '+ customize your mug', exact: true })).toBeVisible({ timeout: 60_000 });
+  await tabTo(page, page.getByRole('button', { name: '+ customize your mug', exact: true }), 200);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/customize\/mug/);
 
@@ -78,7 +79,7 @@ test('keyboard only: upload → customize → basket → checkout, with a visibl
   // checkout now → "who's this for?" → a first name → keep it & checkout
   const checkoutNow = page.getByRole('button', { name: /checkout now/i });
   await expect(checkoutNow).toBeEnabled({ timeout: 30_000 });
-  await tabTo(page, checkoutNow, 200);
+  await tabTo(page, checkoutNow, 400); // (the whole range comes first: two stops a tile)
   await page.keyboard.press('Enter');
   const who = page.getByRole('dialog', { name: /who.s this for/i });
   await expect(who).toBeVisible();

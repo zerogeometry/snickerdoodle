@@ -452,6 +452,9 @@ export const useOrders = create<{ orders: Order[]; add: (o: Order) => void }>((s
 // the magic-link round-trip via sessionStorage so checkout / share can show + use
 // it. Child FIRST NAME ONLY (never a surname) per the children's-data rules.
 export const SUBJECT_KEY = 'sd_subject';
+/** The ref of the order sent to Stripe from this tab: its confirmation page empties the basket (and
+ * only then — going back from Stripe finds the basket as it was). */
+export const CHECKOUT_REF_KEY = 'sd_checkout_ref';
 
 // ── family members (added via the Add-family-member modal) ───────────────────
 export type Member = { id: string; initial: string; name: string; sub?: string; color: string; textColor?: string };

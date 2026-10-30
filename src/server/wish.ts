@@ -2,13 +2,17 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { assets } from '@/db/schema';
 import { adoptEphemeralDraft, resolveViewerContext } from '@/server/assets';
 import { resolveChildSubject } from '@/server/children';
-import { createGiftLink } from '@/server/giftLinks';
+import { createGiftLink, type GiftLineInput } from '@/server/giftLinks';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { screenChildFirstName } from '@/server/textSafety';
 import type { DbHandle } from './db';
 
 export interface MintWishInput {
   assetIds: string[];
+  /** The basket's lines — each keepsake on the product the child chose (variant, placement,
+   * cutout, back, base colour). Untrusted: createGiftLink re-checks every one. Without them (an old
+   * caller) the keepsakes are offered as the default product. */
+  lines?: GiftLineInput[];
   /** The child this wish is FOR — first name only; screened + turned into the title here. */
   subject?: string | null;
 }
@@ -34,7 +38,8 @@ export async function mintWish(
   uploadClaims: string[],
   input: MintWishInput,
 ): Promise<{ ok: boolean; url?: string; reason?: 'name' }> {
-  const ids = [...new Set((input.assetIds ?? []).filter(Boolean))];
+  const lines = (input.lines ?? []).filter((l) => l && typeof l.assetId === 'string' && typeof l.variantSku === 'string').slice(0, 50);
+  const ids = [...new Set([...(input.assetIds ?? []), ...lines.map((l) => l.assetId)].filter(Boolean))];
   if (ids.length === 0) return { ok: false };
 
   // Screen the child's name BEFORE keeping anything — never store an unscreened
@@ -73,9 +78,11 @@ export async function mintWish(
 
   const viewer = await resolveViewerContext(db, account.id, familyId);
   try {
+    // the wish sells what's in the basket (06-B2): its lines as made; bare keepsakes only for an old caller
     const { token } = await createGiftLink(db, viewer, {
       familyId,
-      assetIds: ids,
+      assetIds: lines.length ? [] : ids,
+      lines,
       title,
       invite: null,
     });

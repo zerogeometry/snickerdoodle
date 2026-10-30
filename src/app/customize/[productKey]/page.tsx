@@ -1,5 +1,6 @@
 'use client';
 
+import { betterSize } from '@/lib/size-suggest';
 import { packLine } from '@/lib/pack-labels';
 import { IconAlertTriangle, IconHeartPlus, IconChevronLeft, IconChevronRight, IconCircleCheck, IconPencil, IconShoppingBag, IconZoomScan } from '@tabler/icons-react';
 import Link from 'next/link';
@@ -405,18 +406,26 @@ function CustomizeProduct() {
     v?.printGeom && srcSize ? assessPrintResolution(v.printGeom, srcSize, clampTransform(placement), product.key) : null;
   const quality = assessFor(variant);
   const blocked = quality?.decision === 'BLOCK';
-  // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test.
+  // One-tap fixes: the LARGEST size (same colour + orientation) that passes a test and really gives the
+  // drawing more detail than now (src/lib/size-suggest.ts). A phone case's sizes are phone MODELS:
+  // never offered as a fix (02-B2 — a case for a phone the parent may not own).
+  const sizeIsModel = product.key === 'phoneCase';
   const largestSize = (ok: (a: ResolutionAssessment) => boolean) =>
-    [...product.sizes].reverse().find((sz) => {
-      const v = product.variants.find(
-        (x) =>
-          x.attributes.size === sz &&
-          (product.colours.length === 0 || x.attributes.colour === colour) &&
-          (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
-      );
-      const a = assessFor(v);
-      return a !== null && ok(a);
-    }) ?? null;
+    betterSize(
+      product.sizes,
+      (sz) =>
+        assessFor(
+          product.variants.find(
+            (x) =>
+              x.attributes.size === sz &&
+              (product.colours.length === 0 || x.attributes.colour === colour) &&
+              (product.orientations.length === 0 || (x.attributes.orientation ?? 'portrait') === orientation),
+          ),
+        ),
+      quality,
+      (a) => ok(a as ResolutionAssessment),
+      { sizeIsModel },
+    );
   // blocked → the biggest that prints at all; soft up close → the biggest that's sharp too
   const fitSize = blocked ? largestSize((a) => a.decision !== 'BLOCK') : null;
   const sharpSize = quality?.softUpClose && !blocked ? largestSize((a) => !a.softUpClose) : null;
@@ -533,8 +542,10 @@ function CustomizeProduct() {
       // Update this exact line in place; if the variant changed, re-key to the new
       // variant's line id (merging if that line already exists) — the store handles it.
       const id = basketLineId(variant.sku, fields);
+      // edited INTO another line's variant → the two fold into one: theirs + this one's (02-B1)
+      const others = id !== edit.id ? (useBasket.getState().items.find((i) => i.id === id)?.qty ?? 0) : 0;
       update(edit.id, fields, id);
-      setLineQty(id, qty);
+      setLineQty(id, others + qty);
       toast('basket updated ✓');
     } else {
       const id = basketLineId(variant.sku, fields);
@@ -1142,14 +1153,14 @@ function CustomizeProduct() {
               <div role="status" className="mt-5 rounded-[16px] border-2 border-cocoa bg-berry-pale p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                 <p className="flex items-start gap-2 font-semibold">
                   <Icon icon={IconAlertTriangle} size={16} className="mt-0.5 shrink-0 text-cinnamon" />
-                  this drawing is too small to print well at {size || 'this size'} — it would come out blurry.
+                  this drawing is too small to print well {sizeIsModel ? 'on this case' : `at ${size || 'this size'}`} — it would come out blurry.
                 </p>
                 {fitSize ? (
                   <Button variant="secondary" size="md" className="mt-2.5 w-full" onClick={() => setSize(fitSize)}>
                     make it {fitSize} — prints beautifully
                   </Button>
                 ) : (
-                  <p className="mt-1.5 text-xs text-ink-soft">try a smaller product, or a bigger photo of the drawing.</p>
+                  <p className="mt-1.5 text-xs text-ink-soft">{sizeIsModel ? 'try a bigger photo of the drawing — the original, not one sent by message.' : 'try a smaller product, or a bigger photo of the drawing.'}</p>
                 )}
               </div>
             ) : (
@@ -1189,7 +1200,7 @@ function CustomizeProduct() {
               </Button>
             ) : null}
             <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap !px-3 !text-[15px] md:flex-none md:!px-8 md:!text-base" onClick={addToBasket} disabled={!variant || blocked}>
-              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {gbp(variant?.pricePence ?? product.fromPence)}
+              <Icon icon={edit ? IconCircleCheck : IconShoppingBag} size={16} /> {edit ? 'update basket' : 'add to basket'} · {!edit && qty > 1 ? `${qty} × ` : ''}{gbp(variant?.pricePence ?? product.fromPence)}
             </Button>
           </div>
         </div>

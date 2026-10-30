@@ -279,7 +279,7 @@ test.describe('accessibility + both sizes', () => {
 
     // 08-B6: "Delete all your keepsakes" / "Close your account" are berry #E8786E on white — 2.85:1,
     // under the 4.5:1 WCAG AA needs for 13px text (src/app/account/AccountActions.tsx text-berry).
-    test.fixme(`08-B6: /account passes axe — ${size.name}`, async ({ page }) => {
+    test(`08-B6: /account passes axe — ${size.name}`, async ({ page }) => {
       await page.setViewportSize(size);
       await quietCookies(page);
       await signInByEmailLink(page, testEmail(`axe${size.width}`), '/account');
