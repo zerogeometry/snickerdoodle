@@ -222,7 +222,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
 
   // 05-B4: maxRedemptions is only counted over PAID orders at the moment a basket is QUOTED/PLACED —
   // two checkouts opened before either is paid both get the discount, so a "1 use" code pays out twice.
-  it.skip('05-B4: a max-1 code can be redeemed only once even when two checkouts are open at the same time', async () => {
+  it('05-B4: a max-1 code can be redeemed only once even when two checkouts are open at the same time', async () => {
     const once = await mkCode({ kind: 'PERCENT', value: 1000, maxRedemptions: 1 });
     const a = await resolvePromo(db, once.code);
     const b = await resolvePromo(db, once.code); // a second shopper, before the first has paid

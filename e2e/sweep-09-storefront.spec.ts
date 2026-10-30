@@ -171,7 +171,7 @@ test.describe('public pages', () => {
     expect(mismatches).toEqual([]);
   });
 
-  test.fixme('09-B1: placemats + coasters pages show only packs sold on their own (no bundle-only "pack of 1" from-price)', async ({ page }) => {
+  test('09-B1: placemats + coasters pages show only packs sold on their own (no bundle-only "pack of 1" from-price)', async ({ page }) => {
     await quietCookies(page);
     const tiles = await cataloguePrices(page);
     for (const slug of BUNDLE_PACKS) {
@@ -206,7 +206,7 @@ for (const vp of [
       expect(failures, failures.join('\n\n')).toEqual([]);
     });
 
-    test.fixme('09-B2: /trust/family-promise headings go h1 → h3 (axe heading-order)', async ({ page }) => {
+    test('09-B2: /trust/family-promise headings go h1 → h3 (axe heading-order)', async ({ page }) => {
       await quietCookies(page);
       await page.goto('/trust/family-promise');
       await expectAccessible(page, '/trust/family-promise');
@@ -285,7 +285,7 @@ test.describe('states', () => {
     expect((await (async () => { await chips.filter({ hasText: 'festive' }).click(); return shown(); })())[0]).toBe('christmas family bundle');
   });
 
-  test.fixme('09-B5: an unknown address shows a branded "not found" page with a way back (not the bare framework 404)', async ({ page }) => {
+  test('09-B5: an unknown address shows a branded "not found" page with a way back (not the bare framework 404)', async ({ page }) => {
     await quietCookies(page);
     const res = await page.goto('/no-such-page');
     expect(res?.status()).toBe(404);
@@ -293,7 +293,7 @@ test.describe('states', () => {
     await expect(page.getByRole('link', { name: /start creating|home/i }).first()).toBeVisible();
   });
 
-  test.fixme('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
+  test('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
     await quietCookies(page);
     await page.goto('/catalogue');
     await expect(page.getByRole('group', { name: 'filter the range' })).toBeVisible();

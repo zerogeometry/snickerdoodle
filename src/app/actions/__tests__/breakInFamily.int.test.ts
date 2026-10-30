@@ -150,7 +150,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B6: first-order-only / own-code promo rules skipped for a guest ─────────────────────────────
-  bug('07-B6: a personal referral code (first order only, never your own) is refused when the buyer is a signed-out guest who already paid', async () => {
+  it('07-B6: a personal referral code (first order only, never your own) is refused when the buyer is a signed-out guest who already paid', async () => {
     const code = `T7REF${randomBytes(3).toString('hex').toUpperCase()}`;
     await db.insert(promoCodes).values({ code, kind: 'FIXED', value: 500, minSpendPence: 3000, ownerAccountId: ids.samId, firstOrderOnly: true, partnerType: 'REFERRAL', active: true } as never);
     try {

@@ -118,7 +118,7 @@ test.fixme('09-B6: the Studio has a <main id="main"> (the skip link lands somewh
   await expectAccessible(page, '/studio');
 });
 
-test.fixme('09-B7: the open mobile menu passes axe (two unnamed <nav> landmarks — "landmark-unique")', async ({ page }) => {
+test('09-B7: the open mobile menu passes axe (its <nav> landmarks are named)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await quietCookies(page);
   await page.goto('/');

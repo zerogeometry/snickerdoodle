@@ -279,7 +279,7 @@ test.describe('checkout sweep 05', () => {
   // 05-B7: checkout only counts drawn/card-pack lines as "personalised" (page.tsx hasPersonalised), so a
   // basket holding only the christmas bundle (or a calendar) tells a guest "No account needed" — then the
   // server sends them to sign up anyway.
-  test.fixme('05-B7: a guest with only a bundle in the basket is told about the sign-up before tapping checkout', async ({ page }) => {
+  test('05-B7: a guest with only a bundle in the basket is told about the sign-up before tapping checkout', async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: 1280, height: 800 });
     await quietCookies(page);
@@ -288,7 +288,7 @@ test.describe('checkout sweep 05', () => {
     await page.getByRole('button', { name: /add to basket · £78/ }).click();
     await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{"state":{"items":[]}}').state.items.length), { timeout: 30_000 }).toBe(1);
     await page.goto('/checkout');
-    await expect(page.locator('aside').getByText(/no account needed/i)).toHaveCount(0); // EXPECTED; today it says "No account needed"
+    await expect(page.locator('aside').getByText(/no account needed/i)).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/guest-bundle-copy.png` });
     await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
     await page.waitForURL(/\/login/, { timeout: 30_000 });
@@ -296,7 +296,7 @@ test.describe('checkout sweep 05', () => {
 
   // 05-B6: the gift note box ("add a little note") and the desktop "email for your receipt" box are
   // never sent to the server — whatever the shopper types is silently dropped.
-  test.fixme('05-B6: a gift note typed at checkout reaches the order', async ({ page }) => {
+  test('05-B6: a gift note typed at checkout reaches the order', async ({ page }) => {
     test.setTimeout(240_000);
     await page.setViewportSize({ width: 1280, height: 800 });
     const actions = recordActions(page);
@@ -304,13 +304,14 @@ test.describe('checkout sweep 05', () => {
     await page.getByRole('switch', { name: 'Send as a gift' }).click();
     await expect(page.locator('main').getByText('gift', { exact: true })).toBeVisible(); // line price tucked away
     await page.getByPlaceholder('add a little note (optional)').fill('Happy Christmas Nana T5NOTE');
-    await page.getByLabel('email for your receipt').fill('t5-receipt@example.test');
+    // signed in: the receipt goes to the account's own email, so there's no box to fill (a guest gets one)
+    await expect(page.getByLabel('email for your receipt')).toHaveCount(0);
     await page.screenshot({ path: `${SHOTS}/gift-note.png` });
     await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
     await expect.poll(() => actions.some((a) => a.body.includes('"artwork"'))).toBe(true);
     const body = actions.find((a) => a.body.includes('"artwork"'))!.body;
     expect(body).toContain('"gift":true');
-    expect(body).toContain('T5NOTE'); // EXPECTED; today the note never leaves the page
+    expect(body).toContain('T5NOTE'); // the note travels with the order (screened + kept server-side)
   });
 
   test('a drawing still held for review (no IWF) can’t be ordered — no order row, the basket stays', async ({ page }) => {
@@ -459,7 +460,7 @@ test.describe('checkout sweep 05', () => {
 
     // 05-B3: placeOrder() clears the basket BEFORE sending the shopper to Stripe, so Stripe's "back"
     // (cancel_url = /checkout) lands on an EMPTY basket — the drawing-on-a-mug they built is gone.
-    test.fixme('05-B3: going back from Stripe Checkout keeps the basket', async ({ page }) => {
+    test('05-B3: going back from Stripe Checkout keeps the basket', async ({ page }) => {
       test.setTimeout(240_000);
       await page.setViewportSize({ width: 1280, height: 800 });
       await parentWithMug(page);
