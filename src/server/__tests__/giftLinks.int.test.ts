@@ -62,7 +62,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 6500 });
     // the holder gets the link's own preview route — never a signed URL to the original
     // (with a product mockup frozen at sharing time the path names the product: ?p=<key> — 06-B8)
-    expect(view.items[0]!.imageUrl.startsWith(giftPreviewPath(token, assetId))).toBe(true);
+    expect(view.items[0]!.imageUrl?.startsWith(giftPreviewPath(token, assetId))).toBe(true);
     expect(view.items[0]!.imageUrl).not.toMatch(/^http/);
   });
 
