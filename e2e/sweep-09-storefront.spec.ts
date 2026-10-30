@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { quietCookies } from './helpers';
 

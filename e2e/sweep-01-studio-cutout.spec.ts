@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { hasDb, signInByEmailLink, testEmail } from './harness';
 import {
   assetRow,
@@ -33,7 +33,7 @@ const cutoutRow = async (assetId: string) => (await derivatives(assetId)).find((
 const designRow = async (assetId: string) => (await derivatives(assetId)).find((d) => d.key.endsWith('/derivatives/design'));
 
 async function liftThenPutBackOnCreatePage(page: Page) {
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: 'remove background', exact: true }).click();
   await expect(page.getByRole('button', { name: 'put the background back' })).toBeVisible({ timeout: 150_000 });
   const lifted = await tabUpload(page);
@@ -131,7 +131,7 @@ test('create page, signed in: lift → put back → keep → studio from the car
 
 /** The bundle builder for the drawing in progress (client-side, from the range). */
 async function openBundle(page: Page) {
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: 'customize christmas family bundle', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/christmasBundle/);
   await expect(page.getByRole('heading', { name: 'christmas family bundle' })).toBeVisible();

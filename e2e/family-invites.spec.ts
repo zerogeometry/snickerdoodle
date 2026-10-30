@@ -1,5 +1,5 @@
 import { mkdirSync, readFileSync, existsSync } from 'node:fs';
-import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Page } from './test';
 import sharp from 'sharp';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
@@ -89,7 +89,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   await signInByEmailLink(P.page, E.parent, '/start-creating');
   for (const fill of ['#C8402A', '#2F5DA8', '#7FA65E']) {
     await uploadAndOpenRange(P.page, await drawing(fill));
-    await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+    await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
     await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
     await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
     await P.page.getByRole('button', { name: 'create another' }).click();
@@ -417,7 +417,7 @@ test.fixme('04-B2: a VIEW-only relative cannot order a family keepsake', async (
   const P = await person(browser);
   await signInByEmailLink(P.page, parent, '/start-creating');
   await uploadAndOpenRange(P.page);
-  await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   await clearForTest(parent);
@@ -459,7 +459,7 @@ test.fixme('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they
   const C = await person(browser);
   await signInByEmailLink(C.page, co, `/join/${token}`);
   await uploadAndOpenRange(C.page);
-  await expect(C.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(C.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await C.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(C.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const rows = await sql()`select a.family_id from assets a join accounts acc on acc.id = a.uploader_account_id where acc.email = ${co} and a.kept_in_home`;
@@ -532,7 +532,7 @@ test('a relative leaves a family: gone from it at once, logged; the owner has no
   const P = await person(browser);
   await signInByEmailLink(P.page, parent, '/start-creating');
   await uploadAndOpenRange(P.page);
-  await expect(P.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const { family_id: familyId, id: parentId } = (await sql()`select m.family_id, a.id from memberships m join accounts a on a.id = m.account_id where a.email = ${parent} and m.is_owner`)[0]!;

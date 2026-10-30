@@ -38,6 +38,15 @@ export async function uploadAndOpenRange(page: Page, art?: Buffer, path = '/star
   await expect(page.getByRole('heading', { name: /masterpiece, made real/i })).toBeVisible({ timeout: 30_000 });
 }
 
+/**
+ * A customize page is ready to use: its preview shows the drawing on the product — so the drawing (an
+ * asset id) and the size + colour (a variant) have both loaded. Before then "edit placement" only says
+ * "pick a size + colour first", and a colour chosen then races the page's first previews.
+ */
+export async function customizeReady(page: Page) {
+  await expect(page.locator('img[alt^="your drawing on a"]').first()).toBeVisible({ timeout: 30_000 });
+}
+
 /** Mirror the app's formatPence: whole pounds have no decimals (£65, not £65.00). */
 export const gbp = (pence: number) => {
   const pounds = Math.abs(pence) / 100;

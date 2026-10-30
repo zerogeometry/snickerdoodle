@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
@@ -20,7 +20,7 @@ test('upload → refresh customize → the drawing is still there (this tab only
   });
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
   await page.evaluate(() => (window as unknown as { next: { router: { push: (u: string) => void } } }).next.router.push('/customize/mug'));
   await expect(page).toHaveURL(/\/customize\/mug/);

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 
 // Direct browser → bucket uploads (S3_DIRECT_UPLOADS=true on the server under test). Proves the

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
 import { artwork, quietCookies, uploadAndOpenRange } from './helpers';

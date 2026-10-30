@@ -44,7 +44,7 @@ export async function shopCatalogue(): Promise<ShopProduct[]> {
 
 /** The drawing is stored (it has an asset id) once the range has finished making. */
 export const rangeReady = (page: Page) =>
-  expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 90_000 });
+  expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
 
 /** Client-side navigation (keeps this tab's in-memory placement store, like a real tap). */
 export async function goClient(page: Page, url: string) {

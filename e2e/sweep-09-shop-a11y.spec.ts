@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { clearForTest, hasDb, signInByEmailLink, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
@@ -32,7 +32,7 @@ for (const vp of [
     };
 
     await uploadAndOpenRange(page);
-    await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
     // the full catalogue pop-up
     await page.getByRole('button', { name: /see the full catalogue/i }).click();
@@ -83,7 +83,7 @@ test('axe on the mobile menu, and a signed-in family home with a keepsake', asyn
   const parent = testEmail('t9-home');
   await signInByEmailLink(page, parent, '/start-creating');
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   await clearForTest(parent);

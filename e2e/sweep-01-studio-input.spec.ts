@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { STAGE, derivatives, openStudioFromCreate, resetRateLimits, stageHash } from './sweep-01-helpers';
 

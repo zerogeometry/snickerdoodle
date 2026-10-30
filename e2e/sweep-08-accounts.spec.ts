@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import AxeBuilder from '@axe-core/playwright';

@@ -1,5 +1,5 @@
-import { test, expect, type Request } from '@playwright/test';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { test, expect, type Request } from './test';
+import { customizeReady, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * The base colour reaches EVERY preview of the printed product on the customize page — the big
@@ -17,11 +17,14 @@ for (const key of ['framedPrint', 'cushion', 'jigsaw', 'card']) {
     await quietCookies(page);
     await uploadAndOpenRange(page);
     // the drawing is in (the range has been made from it)
-    await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+    await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
     // client-side, so the drawing (held in memory) comes too
     await page.waitForFunction(() => Boolean((window as unknown as { next?: { router?: unknown } }).next?.router));
     await page.evaluate((k) => (window as unknown as { next: { router: { push: (u: string) => void } } }).next.router.push(`/customize/${k}`), key);
     await expect(page).toHaveURL(new RegExp(`/customize/${key}`));
+    // ready: the page has drawn its first previews (on the default colour) — only then pick a colour,
+    // as a person would; otherwise those first requests land after the click and read as "not navy"
+    await customizeReady(page);
 
     const bodies: { size?: string; view?: string; ground?: string; variantId: string }[] = [];
     const record = (r: Request) => {

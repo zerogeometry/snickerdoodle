@@ -1,7 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { customizeReady, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * Zooming out a repeat (socks) with a PINCH re-draws the repeat as you go — more, smaller copies —
@@ -44,9 +44,10 @@ test('pinching out a sock repeat re-draws it with more copies as you go', async 
   await page.setViewportSize({ width: 390, height: 844 });
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.evaluate(() => (window as unknown as { next: { router: { push: (u: string) => void } } }).next.router.push('/customize/socks'));
   await expect(page).toHaveURL(/\/customize\/socks/);
+  await customizeReady(page);
   await page.getByRole('button', { name: /edit placement/i }).click();
   await expect(page).toHaveURL(/\/studio\/position/);
   const canvas = page.locator('[role="application"] canvas');

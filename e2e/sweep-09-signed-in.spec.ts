@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { expectAccessible } from './a11y';
 import { hasDb, signInByEmailLink, testEmail } from './harness';
 import { quietCookies } from './helpers';

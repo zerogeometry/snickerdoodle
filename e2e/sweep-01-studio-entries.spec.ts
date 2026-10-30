@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { assetRow, derivatives, resetRateLimits, studioReady, tabUpload, uploadArt } from './sweep-01-helpers';
 
@@ -15,7 +15,7 @@ const flipAndDone = async (page: Page) => {
   await page.getByRole('button', { name: 'sideways' }).click();
   await page.getByRole('banner').getByRole('button', { name: 'done' }).click();
 };
-const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
 for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
   test.describe(`${viewport.width}px`, () => {

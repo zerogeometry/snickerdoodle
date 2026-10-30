@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { test, expect, type Browser, type BrowserContext, type Page } from './test';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
@@ -49,7 +49,7 @@ test.beforeAll(async ({ browser }) => {
   // Family A: a parent who uploads a drawing and keeps it (the real flow → a real family keepsake).
   const a = await signedIn(browser, 'famA', '/start-creating');
   await uploadAndOpenRange(a.page);
-  await expect(a.page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(a.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await a.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(a.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const familyA = await homeFamilyOf(a.accountId);

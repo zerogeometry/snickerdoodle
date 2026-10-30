@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { gbp, goClient, optionGroup, pressedIn, rangeReady, shopCatalogue, waitForAsset, type ShopProduct, type ShopVariant } from './shop-db';

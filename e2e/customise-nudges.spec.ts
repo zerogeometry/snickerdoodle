@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { basketLines, goClient, optionGroup, rangeReady, waitForAsset } from './shop-db';
 

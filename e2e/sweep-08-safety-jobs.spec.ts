@@ -1,5 +1,5 @@
 import { createHmac } from 'node:crypto';
-import { test, expect, type Page, type BrowserContext } from '@playwright/test';
+import { test, expect, type Page, type BrowserContext } from './test';
 import { quietCookies, uploadAndOpenRange } from './helpers';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { accountId, hasServerLog, jobsSecret, mailTo, objectKeys } from './sweep08';

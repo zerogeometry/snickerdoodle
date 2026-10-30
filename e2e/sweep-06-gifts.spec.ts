@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import sharp from 'sharp';
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, type Browser, type Page } from './test';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { artwork, quietCookies, uploadAndOpenRange } from './helpers';
 
@@ -31,7 +31,7 @@ async function otherArt(): Promise<Buffer> {
 /** Upload + keep one drawing as the signed-in parent; returns its asset id. */
 async function keepADrawing(page: Page, art?: Buffer): Promise<string> {
   await uploadAndOpenRange(page, art ?? (await artwork()));
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /\+ keepsake/ }).first().click();
   await expect(page.getByRole('button', { name: /kept ♥/ }).first()).toBeVisible({ timeout: 30_000 });
   const [a] = await sql()`select id from assets where kept_in_home order by created_at desc limit 1`;

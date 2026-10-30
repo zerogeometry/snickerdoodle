@@ -50,7 +50,7 @@ export async function studioReady(page: Page) {
 /** Upload, then "edit in studio" from the create page. */
 export async function openStudioFromCreate(page: Page, art?: Buffer) {
   await uploadArt(page, art);
-  await expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+  await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /edit in studio|fine-tune in studio|back to studio/i }).first().click();
   await studioReady(page);
 }

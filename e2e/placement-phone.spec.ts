@@ -1,5 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { test, expect, type Page } from './test';
+import { customizeReady, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * Edit placement on a phone (founder, 24 Oct): nothing spills sideways, every control is a ≥44px
@@ -9,11 +9,12 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
  * layout; only ctrl/⌘ + wheel (or a trackpad pinch) zooms.
  */
 /** The drawing is stored (it has an asset id) once the range has finished making. */
-const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your range' })).toHaveCount(0, { timeout: 60_000 });
+const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
 async function openPlacement(page: Page, productKey: string) {
   await page.evaluate((k) => (window as unknown as { next: { router: { push: (u: string) => void } } }).next.router.push(`/customize/${k}`), productKey);
   await expect(page).toHaveURL(new RegExp(`/customize/${productKey}`));
+  await customizeReady(page);
   await page.getByRole('button', { name: /edit placement/i }).click();
   await expect(page).toHaveURL(/\/studio\/position/);
   await expect(page.locator('[role="application"]')).toBeVisible({ timeout: 30_000 });
