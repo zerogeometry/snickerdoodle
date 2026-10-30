@@ -71,8 +71,11 @@ export async function rateLimitAll(db: DbHandle, limits: Limit[]): Promise<Limit
  * The caller's IP. A host can name the ONE header its proxy sets and a visitor can't forge, with
  * CLIENT_IP_HEADER (the AWS box: `x-real-ip`, which Caddy overwrites on every request) — then
  * nothing else is read, so a visitor-supplied header can never pick their rate-limit bucket.
- * Unset (Netlify, local dev): the platform's own header first (Netlify sets
- * x-nf-client-connection-ip), else the usual proxy headers. 'unknown' when there's none.
+ * (The Netlify test site pins x-nf-client-connection-ip, which Netlify sets itself:
+ * scripts/test-site-env.mjs.) Unset in PRODUCTION (07-B14): every header is one a visitor could
+ * send, so none is trusted — everyone shares the 'unknown' bucket (limits hold, they just can't be
+ * dodged by changing a header) and it says so loudly once. The AWS deploy refuses to go out without
+ * it (infra/aws-london/bin/fetch-env.sh). Local dev: the usual proxy headers; 'unknown' when none.
  */
 export function ipFromHeaders(h: Pick<Headers, 'get'>, env: Record<string, string | undefined> = process.env): string {
   const pinned = (env.CLIENT_IP_HEADER ?? '').trim().toLowerCase();
@@ -80,7 +83,15 @@ export function ipFromHeaders(h: Pick<Headers, 'get'>, env: Record<string, strin
     const v = h.get(pinned);
     return v ? v.split(',')[0]!.trim() || 'unknown' : 'unknown';
   }
+  if (env.NODE_ENV === 'production') {
+    if (!warnedUnpinned) {
+      warnedUnpinned = true;
+      console.error('[rate-limit] CLIENT_IP_HEADER is not set — no client-IP header is trusted, so per-device limits are shared by everyone. Set it (x-real-ip on the AWS box).');
+    }
+    return 'unknown';
+  }
   const nf = h.get('x-nf-client-connection-ip');
+  if (nf) return nf.trim();
   if (nf) return nf.trim();
   const real = h.get('x-real-ip');
   if (real) return real.trim();
@@ -88,6 +99,8 @@ export function ipFromHeaders(h: Pick<Headers, 'get'>, env: Record<string, strin
   if (xff) return xff.split(',')[0]!.trim();
   return 'unknown';
 }
+
+let warnedUnpinned = false;
 
 /** The current request's IP (server actions / route handlers). */
 export async function clientIp(): Promise<string> {

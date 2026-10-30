@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL, canReview, hashCheckSkipped, type Reviewer } from '@/authz';
-import { base32Encode, openSecret, sealSecret, totpCode, verifyTotp } from '@/server/admin/totp';
+import { base32Encode, matchTotpStep, openSecret, sealSecret, totpCode, verifyTotp } from '@/server/admin/totp';
 import { signStepUp, verifyStepUp } from '@/server/admin/stepUp';
 
 const admin: Reviewer = { accountId: 'a1', isAdmin: true, mfaVerified: true };
@@ -96,12 +96,24 @@ describe('two-step login', () => {
     expect(openSecret(sealed.slice(0, -2) + 'xx')).toBeNull();
   });
 
-  it('the step-up cookie is bound to the account, signed, and expires', () => {
+  it('the step-up cookie is bound to the account AND the sign-in session, signed, and expires', () => {
     const now = 1_700_000_000_000;
-    const c = signStepUp('a1', now);
-    expect(verifyStepUp(c, 'a1', now + 1000)).toBe(true);
-    expect(verifyStepUp(c, 'someone-else', now)).toBe(false);
-    expect(verifyStepUp(c, 'a1', now + 9 * 3_600_000)).toBe(false); // past 8 hours
-    expect(verifyStepUp(c.replace('a1.', 'a2.'), 'a2', now)).toBe(false); // forged account
+    const c = signStepUp('a1', 'session-1', now);
+    expect(verifyStepUp(c, 'a1', 'session-1', now + 1000)).toBe(true);
+    expect(verifyStepUp(c, 'someone-else', 'session-1', now)).toBe(false);
+    expect(verifyStepUp(c, 'a1', 'session-1', now + 9 * 3_600_000)).toBe(false); // past 8 hours
+    expect(verifyStepUp(c.replace('a1.', 'a2.'), 'a2', 'session-1', now)).toBe(false); // forged account
+    // 08-B10 / 07-B15: signed out and back in (a new session) — the old proof is worthless
+    expect(verifyStepUp(c, 'a1', 'session-2', now + 1000)).toBe(false);
+    expect(verifyStepUp(c, 'a1', null, now + 1000)).toBe(false);
+  });
+
+  it('names the time-step a code belongs to (so it can be spent once)', () => {
+    const secret = base32Encode(Buffer.from('12345678901234567890'));
+    const now = 1_111_111_109_000;
+    const step = Math.floor(now / 30_000);
+    expect(matchTotpStep(secret, totpCode(secret, now), now)).toBe(step);
+    expect(matchTotpStep(secret, totpCode(secret, now - 30_000), now)).toBe(step - 1);
+    expect(matchTotpStep(secret, totpCode(secret, now) === '000000' ? '111111' : '000000', now)).toBeNull();
   });
 });

@@ -44,11 +44,13 @@ export async function stripExif(input: Buffer): Promise<SanitisedImage> {
     throw new ImageTooLargeError();
   });
   if (!meta.width || !meta.height || meta.width * meta.height > MAX_UPLOAD_PIXELS) throw new ImageTooLargeError();
-  const pipeline = sharp(input, { failOn: 'none', limitInputPixels: MAX_UPLOAD_PIXELS }).rotate(); // no withMetadata() ⇒ metadata dropped
-  const format = meta.format ?? 'jpeg';
-
-  const buffer = await pipeline.toBuffer();
-  const contentType = FORMAT_TO_MIME[format] ?? 'application/octet-stream';
+  const rotated = sharp(input, { failOn: 'none', limitInputPixels: MAX_UPLOAD_PIXELS }).rotate(); // no withMetadata() ⇒ metadata dropped
+  // A format we don't store as itself (an SVG, which is flattened; HEIF; …) is re-encoded as PNG, so
+  // the stored type always says what the bytes ARE (07-B17: an SVG was labelled octet-stream).
+  const keepsFormat = !!meta.format && meta.format in FORMAT_TO_MIME;
+  const pipeline = keepsFormat ? rotated : rotated.png();
+  const { data: buffer, info } = await pipeline.toBuffer({ resolveWithObject: true });
+  const contentType = FORMAT_TO_MIME[info.format] ?? 'image/png';
   return {
     buffer,
     contentType,

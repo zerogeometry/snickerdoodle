@@ -250,7 +250,8 @@ test.describe('admin — review queue and support inbox', () => {
     await page.getByLabel('six-digit code from your authenticator app').fill('000000' === totp(key) ? '111111' : '000000');
     await page.getByRole('button', { name: 'continue' }).click();
     await expect(page.getByText('that code didn’t match — try the newest one')).toBeVisible();
-    await page.getByLabel('six-digit code from your authenticator app').fill(totp(key));
+    const usedCode = totp(key);
+    await page.getByLabel('six-digit code from your authenticator app').fill(usedCode);
     await page.getByRole('button', { name: 'continue' }).click();
     const queue = page.getByRole('list', { name: 'held back for review' });
     await expect(queue).toBeVisible();
@@ -299,6 +300,11 @@ test.describe('admin — review queue and support inbox', () => {
     const again = await ctx2.newPage();
     await signInByEmailLink(again, email, '/admin/review');
     await expect(again.getByText('your code, please')).toBeVisible();
+    await expect(again.getByRole('list', { name: 'held back for review' })).toHaveCount(0);
+    // 07-B15 / 08-B9: the code already used at enrolment can't be replayed here, even inside its window
+    await again.getByLabel('six-digit code from your authenticator app').fill(usedCode);
+    await again.getByRole('button', { name: 'continue' }).click();
+    await expect(again.getByText('that code didn’t match — try the newest one')).toBeVisible();
     await expect(again.getByRole('list', { name: 'held back for review' })).toHaveCount(0);
     await ctx2.close();
 
