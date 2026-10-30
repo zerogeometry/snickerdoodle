@@ -4,6 +4,7 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -43,6 +44,11 @@ export function quarantineKey(uploadId: string): string {
 }
 
 /** Key for a derived render of an asset (cutout / upscaled / printfile). */
+/** Every object stored for an asset lives under this prefix (its original and all derivatives). */
+export function assetPrefix(assetId: string): string {
+  return `assets/${assetId}/`;
+}
+
 export function derivativeKey(assetId: string, kind: string): string {
   return `assets/${assetId}/derivatives/${kind}`;
 }
@@ -122,6 +128,28 @@ export async function deleteObject(key: string): Promise<void> {
  * retention purge so a child's original is provably removed from the provider
  * (not just best-effort) before the DB record is dropped.
  */
+/**
+ * Delete EVERY object under a prefix (confirmed, one by one) — the erasers' last sweep of an asset's
+ * folder, AFTER its row is gone, so a derivative written while the erase was running (a late mockup:
+ * 08-B8) can't outlive the keepsake untracked. Returns how many it removed.
+ */
+export async function deleteAllUnderPrefix(prefix: string): Promise<number> {
+  if (!prefix.endsWith('/') || prefix.length < 3) throw new Error('refusing to sweep a prefix that is not a folder');
+  const { client, bucket } = getS3();
+  let removed = 0;
+  let token: string | undefined;
+  do {
+    const res = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }));
+    for (const o of res.Contents ?? []) {
+      if (!o.Key) continue;
+      await deleteObjectConfirmed(o.Key);
+      removed++;
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  return removed;
+}
+
 export async function deleteObjectConfirmed(key: string, attempts = 3): Promise<void> {
   const { client, bucket } = getS3();
   for (let i = 0; i < attempts; i++) {

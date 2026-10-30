@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { assets, auditRecords, memberships, storageObjects } from '@/db/schema';
-import { deleteObjectConfirmed, presignDownload } from '@/storage';
+import { assetPrefix, deleteAllUnderPrefix, deleteObjectConfirmed, presignDownload } from '@/storage';
 import {
   AuthzError,
   assertCanViewAsset,
@@ -307,6 +307,10 @@ export async function eraseAsset(
 
   // 3. drop the row — cascades storage_object rows; nulls order/ML asset links.
   await db.delete(assets).where(eq(assets.id, row.id));
+  // 3b. …then sweep the asset's whole folder: a derivative that landed while this erase ran (a
+  // late mockup, 08-B8) is gone too. Anything written after this finds no row and removes itself
+  // (src/server/print/compositor.ts persistDerivative).
+  await deleteAllUnderPrefix(assetPrefix(row.id));
 
   // 4. outside the DB, so a backup restore can't bring it back (erasureLedger.ts)
   if (!opts.skipLedger) await recordErasure({ kind: 'asset', id: row.id });

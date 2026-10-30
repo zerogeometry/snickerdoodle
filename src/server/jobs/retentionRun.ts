@@ -1,5 +1,5 @@
 import type { DbHandle } from '@/server/db';
-import { purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention';
+import { expireAbandonedCheckouts, purgeExpiredAssets, purgeExpiredAuditRecords } from '@/server/retention';
 import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
 import { purgeExpiredRateLimits } from '@/server/rateLimit';
 import { sweepQuarantine } from '@/server/directUpload';
@@ -20,6 +20,8 @@ export const ASSET_BATCH = 500;
 export const MAX_ASSET_BATCHES = 20;
 
 export interface RetentionSteps {
+  /** Unpaid checkouts past the Stripe session lifetime → CANCELLED (08-B2), BEFORE the upload purge. */
+  abandonedCheckouts?: (db: DbHandle) => Promise<number>;
   assets: (db: DbHandle) => Promise<{ scanned: number; purged: number; failed: number }>;
   audit: (db: DbHandle) => Promise<{ purged: number }>;
   pendingKeeps: (db: DbHandle) => Promise<number>;
@@ -29,6 +31,7 @@ export interface RetentionSteps {
 }
 
 export const DEFAULT_STEPS: RetentionSteps = {
+  abandonedCheckouts: async (db) => (await expireAbandonedCheckouts(db)).length,
   assets: (db) => purgeExpiredAssets(db, { limit: ASSET_BATCH }),
   audit: purgeExpiredAuditRecords,
   pendingKeeps: (db) => purgeExpiredPendingKeeps(db),
@@ -43,6 +46,7 @@ export interface RetentionReport {
   scanned: number;
   purged: number;
   failed: number;
+  abandonedCheckoutsCancelled: number | null;
   auditPurged: number | null;
   pendingKeepsPurged: number | null;
   rateLimitsPurged: number | null;
@@ -61,6 +65,9 @@ export async function runRetention(db: DbHandle, steps: RetentionSteps = DEFAULT
       return null;
     }
   };
+
+  // Abandoned checkouts first, so the uploads on them are purged in this same run (08-B2).
+  const abandoned = steps.abandonedCheckouts ? await step('abandoned-checkouts', () => steps.abandonedCheckouts!(db)) : 0;
 
   // Expired uploads, batch by batch. Stop when a batch comes back short (nothing left) or made no
   // progress (every one in it failed — they'd only be picked again), with a hard cap per run.
@@ -89,6 +96,7 @@ export async function runRetention(db: DbHandle, steps: RetentionSteps = DEFAULT
     scanned,
     purged,
     failed,
+    abandonedCheckoutsCancelled: abandoned,
     auditPurged: audit?.purged ?? null,
     pendingKeepsPurged,
     rateLimitsPurged,
