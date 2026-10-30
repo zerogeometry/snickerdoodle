@@ -2,6 +2,7 @@ import { and, eq, gt, sql } from 'drizzle-orm';
 import { auditRecords, rightsRequests } from '@/db/schema';
 import type { DbHandle } from './db';
 import { sendMail } from './mail';
+import { SUPPORT_EMAIL } from '@/lib/support';
 
 /** The statutory window to acknowledge a data-protection complaint (DUAA s.164A). */
 export const COMPLAINT_ACK_DAYS = 30;
@@ -16,8 +17,8 @@ export type ComplaintResult = { ok: true; ref: string } | { ok: false; reason: '
 /**
  * Take a data-protection complaint (the s.164A channel). It is recorded as a COMPLAINT rights
  * request with its due date, audited (ids only — never the complaint's words), and acknowledged
- * by email straight away, so the 30-day acknowledgement duty is met on receipt. If PRIVACY_INBOX
- * is set, the team is told there's a new one (with the reference, not the content).
+ * by email straight away, so the 30-day acknowledgement duty is met on receipt. The team is told
+ * there's a new one (the reference, not the content) at PRIVACY_INBOX — or support@ if it isn't set.
  */
 export async function submitComplaint(
   db: DbHandle,
@@ -85,15 +86,14 @@ export async function submitComplaint(
   });
   await db.update(rightsRequests).set({ complaintAckAt: new Date() }).where(eq(rightsRequests.id, row!.id));
 
-  const inbox = (env.PRIVACY_INBOX ?? '').trim();
-  if (inbox) {
-    await sendMail({
-      kind: 'rights-request',
-      to: inbox,
-      subject: `new data-protection complaint ${ref}`,
-      text: `A complaint came in (${ref}). Acknowledged automatically; respond by ${new Date(now.getTime() + COMPLAINT_ACK_DAYS * 86_400_000).toDateString()}.\nThe details are in rights_requests — not repeated here.`,
-    });
-  }
+  // the team is ALWAYS told: the privacy inbox, or support@ when none is set (sweep 08-B12 — a complaint
+  // used to reach nobody on the team unless PRIVACY_INBOX was configured)
+  await sendMail({
+    kind: 'rights-request',
+    to: (env.PRIVACY_INBOX ?? '').trim() || SUPPORT_EMAIL,
+    subject: `new data-protection complaint ${ref}`,
+    text: `A complaint came in (${ref}). Acknowledged automatically; respond by ${new Date(now.getTime() + COMPLAINT_ACK_DAYS * 86_400_000).toDateString()}.\nThe details are in rights_requests — not repeated here.`,
+  });
 
   return { ok: true, ref };
 }
