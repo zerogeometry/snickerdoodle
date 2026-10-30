@@ -9,8 +9,9 @@ import { useEffect, useState } from 'react';
 import { myAvatarAction } from '@/app/actions/session';
 import { Logo } from './Logo';
 
-/** The account sticker — your own profile picture once you've added one, else the person icon. */
-function AccountSticker() {
+/** The account sticker — your own profile picture once you've added one, else the person icon. On
+ * the account page it's the current place (no tab is — 08-B13), so it says so and wears a ring. */
+function AccountSticker({ current = false }: { current?: boolean }) {
   const [avatar, setAvatar] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
@@ -25,7 +26,8 @@ function AccountSticker() {
     <Link
       href="/account"
       aria-label="Your account"
-      className="press flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-cocoa bg-honey text-cocoa"
+      aria-current={current ? 'page' : undefined}
+      className={`press flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border-2 border-cocoa bg-honey text-cocoa${current ? ' ring-2 ring-cocoa ring-offset-2 ring-offset-oat' : ''}`}
     >
       {avatar ? <img src={avatar} alt="" className="h-full w-full object-cover" /> : <Icon icon={IconUser} size={18} />}
     </Link>
@@ -65,7 +67,7 @@ export function AppDesktopNav({ active }: { active: string }) {
         </Link>
         <div className="flex items-center gap-2">
           <BasketLink count={count} size={20} />
-<AccountSticker />
+<AccountSticker current={active === 'Account'} />
         </div>
       </header>
 
@@ -88,7 +90,7 @@ export function AppDesktopNav({ active }: { active: string }) {
           <span className="ml-2">
             <BasketLink count={count} size={20} />
           </span>
-<AccountSticker />
+<AccountSticker current={active === 'Account'} />
         </nav>
       </header>
     </>

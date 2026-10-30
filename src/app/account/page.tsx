@@ -75,7 +75,7 @@ export default async function AccountPage() {
         </p>
       </main>
 
-      <BottomTabBar tabs={APP_TABS} active="Home" />
+      <BottomTabBar tabs={APP_TABS} active="Account" />
     </div>
   );
 }
