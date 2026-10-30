@@ -6,6 +6,8 @@ export {
   quarantineKey,
   QUARANTINE_PREFIX,
   derivativeKey,
+  assetPrefix,
+  deleteAllUnderPrefix,
   putObject,
   getObjectBytes,
   presignDownload,

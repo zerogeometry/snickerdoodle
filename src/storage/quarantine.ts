@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, HeadObjectCommand, ListObjectVersionsCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
+import { HeadObjectCommand, ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { getPresignS3, getS3 } from './client';
 import { QUARANTINE_PREFIX, deleteObjectConfirmed, encryptionFor, ensureBucket, quarantineKey } from './objects';
@@ -102,17 +102,5 @@ export async function listQuarantine(): Promise<{ key: string; lastModified: Dat
  */
 export async function deleteQuarantineObject(key: string): Promise<void> {
   if (!key.startsWith(QUARANTINE_PREFIX)) throw new Error('not a quarantine key');
-  const { client, bucket } = getS3();
-  await deleteObjectConfirmed(key);
-  let listed;
-  try {
-    listed = await client.send(new ListObjectVersionsCommand({ Bucket: bucket, Prefix: key }));
-  } catch (e) {
-    if ((e as { name?: string }).name === 'NotImplemented') return; // a store without versions has none to remove
-    throw e;
-  }
-  for (const v of [...(listed.Versions ?? []), ...(listed.DeleteMarkers ?? [])]) {
-    if (v.Key !== key || !v.VersionId) continue;
-    await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key, VersionId: v.VersionId }));
-  }
+  await deleteObjectConfirmed(key); // every version and marker of this exact key (src/storage/objects.ts)
 }

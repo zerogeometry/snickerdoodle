@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useEffect, useState } from 'react';
 import { rememberKeepAction } from '@/app/actions/keep';
+import { localPath } from '@/lib/siteMode';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
@@ -28,11 +29,12 @@ export default function LoginPage() {
       // Land them back where they were headed (?next), e.g. the guest
       // place→keep→checkout flow. Only internal paths — never an open redirect.
       const raw = new URLSearchParams(window.location.search).get('next');
-      const next = raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/home';
+      const next = localPath(raw) ?? '/home';
       // Auth.js emails (here: logs) a one-tap magic link; identity is verified
       // when they open it. We stay on the page and show the "check your email" state.
-      // ask the server to keep the drawing for THIS email (claim-checked) — it finishes on whichever
-      // device the link is opened on. Best-effort: sign-in goes ahead regardless.
+      // ask the server to keep the drawing for THIS email (claim-checked) — it finishes only back in
+      // THIS browser, which holds the drawing's upload claim (never by email alone, 07-B5).
+      // Best-effort: sign-in goes ahead regardless.
       if (keepId) await rememberKeepAction(keepId, email.trim()).catch(() => null);
       const res = await signIn('email', { email: email.trim(), redirect: false, callbackUrl: next });
       // a refused send (e.g. too many links in a row) must not claim "check your email"
@@ -81,7 +83,7 @@ export default function LoginPage() {
               </p>
               {keepId ? (
                 <p className="mt-3 rounded-[14px] bg-leaf-pale px-3 py-2 text-center text-xs font-semibold text-green-save">
-                  tap the link and your drawing goes straight into your keepsake box ♥
+                  open the link on this device and your drawing goes straight into your keepsake box ♥
                 </p>
               ) : null}
               <form onSubmit={submit} className="mt-5">

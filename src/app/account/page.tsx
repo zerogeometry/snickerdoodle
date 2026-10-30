@@ -1,7 +1,9 @@
 import { IconLock, IconLogout, IconUser } from '@tabler/icons-react';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { signOut } from '@/auth';
+import { ADMIN_STEPUP_COOKIE } from '@/server/admin/stepUp';
 import { SignOutForm } from '@/ui/components/SignOutForm';
 import { getCurrentAccount } from '@/server/session';
 import { Button } from '@/ui/primitives/Button';
@@ -33,6 +35,7 @@ export default async function AccountPage() {
 
   async function logout() {
     'use server';
+    (await cookies()).delete(ADMIN_STEPUP_COOKIE); // the admin two-step proof goes with the sign-in (08-B10)
     await signOut({ redirectTo: '/' });
   }
 

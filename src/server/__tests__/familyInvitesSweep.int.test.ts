@@ -280,8 +280,8 @@ describe.skipIf(!URL || !S3)('test sweep 04 — who controls an edited copy (int
   // 04-B1 (P0): copyKeepsake → ingestOriginalAsset makes the COPIER the controller when the drawing isn't
   // filed under a child. The relative can then set the copy to "only me": the controlling parent can no
   // longer see, re-share or delete a copy of their child's drawing inside their own family.
-  // it.fails = this passes while the bug is present; when it's fixed, drop `.fails`.
-  it.fails('04-B1: a relative’s edited copy of an UNFILED family drawing should stay under the parent’s control', async () => {
+  // Fixed: the copy keeps the source's controller.
+  it('04-B1: a relative’s edited copy of an UNFILED family drawing should stay under the parent’s control', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const src = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
     made.push(src.assetId);
@@ -291,6 +291,8 @@ describe.skipIf(!URL || !S3)('test sweep 04 — who controls an edited copy (int
     await changeAssetVisibility(db, copy.assetId, jo, 'ONLY_ME').catch(() => {});
     const [row] = await db.select().from(schema.assets).where(eq(schema.assets.id, copy.assetId));
     const ref = assetRefOf(row!);
+    expect(row!.controllerAccountId).toBe(ids.samId);
+    expect(row!.visibility).toBe('FAMILY'); // the relative's "only me" was refused
     expect(canViewAsset(ref, sam).allowed).toBe(true);
     expect(canDeleteAsset(ref, sam)).toBe(true);
   });

@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { assets, storageObjects } from '@/db/schema';
 import type { ViewerContext } from '@/authz';
 import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
-import { getViewableAssetOrThrow } from './assets';
+import { getEditableAssetOrThrow, getViewableAssetOrThrow } from './assets';
 import type { DbHandle } from './db';
 import { applyCutoutMask, cutoutAlphaForAsset, workingBytes } from './magic';
 import { cleanObjects, objectText, type StudioObject } from '@/lib/studio-objects';
@@ -149,7 +149,7 @@ export async function saveStudio(
   input: { mask: Buffer | null; geometry: StudioGeometry; objects?: unknown; clearCutout?: boolean },
   deps: { moderation?: ModerationProviders } = {},
 ): Promise<StudioSaveResult> {
-  const ref = await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  const ref = await getEditableAssetOrThrow(db, assetId, viewer); // ← the EDIT gate: seeing it isn't enough (07-B2)
   const g = cleanGeometry(input.geometry);
   const objects = cleanObjects(input.objects);
   if (objectText(objects).some((t) => containsAbusiveText(t))) throw new StudioTextError('text not allowed');

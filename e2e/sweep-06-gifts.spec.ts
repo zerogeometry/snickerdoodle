@@ -275,7 +275,7 @@ test('06: a guest buys at phone size → the list ticks itself off (never says w
   await granny.context().close();
 });
 
-test('06: the join loop from a forwarded link — a stranger who is NOT the invitee cannot join (but is shown the invitee’s email)', async ({ page, browser }) => {
+test('06: the join loop from a forwarded link — a stranger who is NOT the invitee cannot join, and is never shown the invitee’s email (06-B1)', async ({ page, browser }) => {
   test.setTimeout(240_000);
   const grannyEmail = testEmail('granny');
   const g = await parentMakesGiftLink(page, { invite: { email: grannyEmail } });
@@ -286,16 +286,16 @@ test('06: the join loop from a forwarded link — a stranger who is NOT the invi
   await s.getByRole('link', { name: /join the family · 5% off/ }).click();
   await expect(s).toHaveURL(/\/join\//);
   await expect(s.getByRole('heading', { level: 1 })).toContainText(/Join/);
-  // 06-B: the invitee's full email address is printed for whoever holds the gift link
-  const shownEmail = await s.getByText(grannyEmail).count();
+  // 06-B1 (fixed): whoever holds the gift link sees only a masked address — never the invitee's
   await s.screenshot({ path: `${SHOTS}/join-from-forwarded-link-phone.png`, fullPage: true });
-  test.info().annotations.push({ type: '06-B1', description: `invitee email shown to a signed-out link holder: ${shownEmail > 0}` });
+  expect(await s.content(), 'the invitee’s address is nowhere in the page').not.toContain(grannyEmail);
 
   // a stranger signed in as someone else cannot accept it
   const intruder = testEmail('intruder');
   const joinUrl = new URL(s.url());
   await signInByEmailLink(s, intruder, joinUrl.pathname + joinUrl.search);
   await expect(s.getByRole('heading', { level: 1 })).toHaveText('This invite is for someone else');
+  expect(await s.content(), 'still masked when signed in as someone else').not.toContain(grannyEmail);
   const m = await sql()`select m.status from memberships m join accounts a on a.id = m.account_id where a.email = ${intruder} and m.family_id = ${g.familyId}`;
   expect(m).toHaveLength(0); // no membership for the wrong person
   // …and the intruder buying from the link gets no family saving
@@ -334,6 +334,9 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   await expect(page.getByRole('button', { name: /being checked after a report/ })).toBeVisible();
   const listState = await page.locator('section', { hasText: 'Gift requests' }).innerText().catch(() => '');
   test.info().annotations.push({ type: '06-B-owner-list-after-report', description: listState.replace(/\s+/g, ' ').slice(0, 300) });
+  // 06-B5 (fixed): the list says it's offline, never "0 of 1 bought" as if it still worked
+  expect(listState).toContain('offline while we check something on it');
+  expect(listState).not.toMatch(/\d+ of \d+ bought/);
   await page.screenshot({ path: `${SHOTS}/parent-home-after-report-phone.png`, fullPage: true });
 
   // an admin: signs in, sets up two-step login, and removes it from the review queue
@@ -352,7 +355,11 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   await expect(queue).toBeVisible({ timeout: 15_000 });
   const item = queue.getByRole('listitem').first(); // newest first
   await expect(item).toContainText('reported via a gift link');
-  await expect(item).toContainText('hidden — looking is recorded in the audit log'); // nobody looks unless they choose to
+  // This server has no screening set up, so the upload was held as "screening-not-configured" (the
+  // test then stood in for a reviewer and set it CLEAR). Its CSAM hash check never ran, so after the
+  // report it can only be removed — never looked at or cleared (08-B7).
+  await expect(item).toContainText('can’t be looked at or cleared — only removed');
+  await expect(item.getByRole('button', { name: 'look' })).toHaveCount(0);
   await admin.screenshot({ path: `${SHOTS}/admin-review-reported-desktop.png`, fullPage: true });
   await item.getByRole('button', { name: 'remove' }).click();
   await admin.getByRole('button', { name: 'yes, remove it' }).click();

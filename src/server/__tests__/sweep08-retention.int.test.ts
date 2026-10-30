@@ -9,7 +9,10 @@ import { assets, auditRecords, orderItemArtwork, orderItems, orders, productVari
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { purgeExpiredAssets, RETENTION_DAYS, startRetentionClockForOrder } from '@/server/retention';
+import { ABANDONED_CHECKOUT_HOURS, expireAbandonedCheckouts, purgeExpiredAssets, RETENTION_DAYS, startRetentionClockForOrder } from '@/server/retention';
+import { handleStripeEvent } from '@/payments/webhook';
+import { DEFAULT_STEPS, runRetention } from '@/server/jobs/retentionRun';
+import type Stripe from 'stripe';
 import { seedCatalogue } from '@/server/catalogue';
 import { derivativeKey, putObject } from '@/storage';
 import { getS3 } from '@/storage/client';
@@ -90,7 +93,7 @@ describe.skipIf(!DB || !S3)('sweep 08 — retention purge, DB + bucket', () => {
     const kept = await upload(true);
     await db.update(assets).set({ fulfilledAt: new Date(Date.now() - 400 * DAY) }).where(eq(assets.id, kept));
     const young = await upload(false); // purgeAfter = upload + 30d
-    const run = await purgeExpiredAssets(db, { now: new Date(Date.now() + 29 * DAY) });
+    const run = await purgeExpiredAssets(db); // (never a clock far ahead: other test files share this database)
     expect(run.purgedAssetIds).not.toContain(kept);
     expect(run.purgedAssetIds).not.toContain(young);
     expect((await keysUnder(kept)).length).toBe(2);
@@ -103,27 +106,72 @@ describe.skipIf(!DB || !S3)('sweep 08 — retention purge, DB + bucket', () => {
     const orderId = await orderFor(id, 'PAID');
     expect((await purgeExpiredAssets(db)).purgedAssetIds).not.toContain(id); // a paid order still needs it
 
-    const shipped = new Date();
+    // shipped 29½ days ago — so the purge clock never has to run more than a couple of days ahead
+    // (a purge "31 days from now" would also sweep every other test file's fresh upload in the
+    // shared test database)
+    const shipped = new Date(Date.now() - 29.5 * DAY);
     await db.update(orders).set({ status: 'SHIPPED' }).where(eq(orders.id, orderId));
     await startRetentionClockForOrder(db, orderId, shipped);
     const [a] = await db.select().from(assets).where(eq(assets.id, id));
     expect(a!.fulfilledAt!.getTime()).toBe(shipped.getTime());
     expect(a!.purgeAfter!.getTime()).toBe(shipped.getTime() + RETENTION_DAYS * DAY);
 
-    expect((await purgeExpiredAssets(db, { now: new Date(shipped.getTime() + 29 * DAY) })).purgedAssetIds).not.toContain(id);
-    expect((await purgeExpiredAssets(db, { now: new Date(shipped.getTime() + 31 * DAY) })).purgedAssetIds).toContain(id);
+    expect((await purgeExpiredAssets(db)).purgedAssetIds).not.toContain(id); // 29½ days after shipping
+    expect((await purgeExpiredAssets(db, { now: new Date(shipped.getTime() + 31 * DAY) })).purgedAssetIds).toContain(id); // 31
     expect(await keysUnder(id)).toEqual([]);
   });
 
-  // 08-B2: an order that never got paid (checkout abandoned at Stripe) stays PENDING for ever, and
-  // purgeExpiredAssets treats PENDING as "in flight" — so the unkept upload on it is never purged.
-  // Nothing expires PENDING orders (grep: no job moves PENDING → anything but PAID).
-  it.skip('08-B2: an unkept upload on a checkout abandoned 60 days ago is still purged', async () => {
+  // 08-B2: an order that never got paid (checkout abandoned at Stripe) used to stay PENDING for ever,
+  // and purgeExpiredAssets treated PENDING as "in flight" — so the unkept upload on it was never purged.
+  it('08-B2: an unkept upload on a checkout abandoned 60 days ago is still purged', async () => {
     const id = await upload(false);
     await db.update(assets).set({ purgeAfter: new Date(Date.now() - 30 * DAY) }).where(eq(assets.id, id));
     await orderFor(id, 'PENDING', new Date(Date.now() - 60 * DAY));
     expect((await purgeExpiredAssets(db)).purgedAssetIds).toContain(id);
     expect(await keysUnder(id)).toEqual([]);
+  });
+
+  it('08-B2: a checkout that can still be paid (inside the Stripe session lifetime) keeps its upload; one just past it does not', async () => {
+    const fresh = await upload(false);
+    const stale = await upload(false);
+    await db.update(assets).set({ purgeAfter: new Date(Date.now() - DAY) }).where(inArray(assets.id, [fresh, stale]));
+    await orderFor(fresh, 'PENDING', new Date(Date.now() - 2 * 3_600_000)); // shopper still at Stripe
+    await orderFor(stale, 'PENDING', new Date(Date.now() - (ABANDONED_CHECKOUT_HOURS + 1) * 3_600_000));
+    const { purgedAssetIds } = await purgeExpiredAssets(db);
+    expect(purgedAssetIds).not.toContain(fresh);
+    expect(purgedAssetIds).toContain(stale);
+  });
+
+  it('08-B2: the retention job cancels abandoned checkouts (never a fresh or a paid one) and purges their unkept upload in the same run', async () => {
+    const id = await upload(false);
+    await db.update(assets).set({ purgeAfter: new Date(Date.now() - DAY) }).where(eq(assets.id, id));
+    const abandoned = await orderFor(id, 'PENDING', new Date(Date.now() - 3 * DAY));
+    const fresh = await orderFor(await upload(true), 'PENDING');
+    const paid = await orderFor(await upload(true), 'PAID', new Date(Date.now() - 3 * DAY));
+    // the real steps, minus the quarantine sweep (that one walks the shared local bucket)
+    const report = await runRetention(db, { ...DEFAULT_STEPS, quarantine: async () => ({ deleted: 0, failed: 0 }) });
+    expect(report.abandonedCheckoutsCancelled).toBeGreaterThanOrEqual(1);
+    const status = async (oid: string) => (await db.select({ s: orders.status }).from(orders).where(eq(orders.id, oid)))[0]!.s;
+    expect([await status(abandoned), await status(fresh), await status(paid)]).toEqual(['CANCELLED', 'PENDING', 'PAID']);
+    expect(await keysUnder(id)).toEqual([]);
+    // a second run finds nothing more to cancel among these
+    expect(await expireAbandonedCheckouts(db)).not.toEqual(expect.arrayContaining([abandoned, fresh, paid]));
+  });
+
+  it('08-B2: Stripe’s checkout.session.expired cancels that order at once (idempotently); a paid order is never touched', async () => {
+    const pending = await orderFor(await upload(false), 'PENDING');
+    const paid = await orderFor(await upload(false), 'PAID');
+    const sid = (n: string) => `cs_test_t8_${n}_${Math.random().toString(36).slice(2, 10)}`;
+    const [s1, s2] = [sid('a'), sid('b')];
+    await db.update(orders).set({ stripeSessionId: s1 }).where(eq(orders.id, pending));
+    await db.update(orders).set({ stripeSessionId: s2 }).where(eq(orders.id, paid));
+    const ev = (id: string, session: string) => ({ id, type: 'checkout.session.expired', data: { object: { id: session, object: 'checkout.session' } } }) as unknown as Stripe.Event;
+    const evId = `evt_t8_${Math.random().toString(36).slice(2, 10)}`;
+    expect(await handleStripeEvent(db, ev(evId, s1))).toEqual({ handled: true, duplicate: false });
+    expect(await handleStripeEvent(db, ev(evId, s1))).toEqual({ handled: false, duplicate: true });
+    expect(await handleStripeEvent(db, ev(`${evId}x`, s2))).toEqual({ handled: false, duplicate: false });
+    const status = async (oid: string) => (await db.select({ s: orders.status }).from(orders).where(eq(orders.id, oid)))[0]!.s;
+    expect([await status(pending), await status(paid)]).toEqual(['CANCELLED', 'PAID']);
   });
 });
 
@@ -133,7 +181,7 @@ describe.skipIf(!DB || !S3)('sweep 08 — a mockup finishing after its keepsake 
   // purge, "delete", account closure, review "remove") lands its picture in the bucket after the
   // erase listed the rows — the row insert then fails (asset gone) and the bytes stay, untracked,
   // for ever. Seen for real in the e2e run: 5 mockup thumbnails left under a purged asset.
-  it.skip('08-B8: no picture of an erased keepsake is left in the bucket by a late mockup', async () => {
+  it('08-B8: no picture of an erased keepsake is left in the bucket by a late mockup', async () => {
     const client = postgres(DB!, { prepare: false });
     const db = drizzle(client, { schema });
     const ids = await seedDemoFamilies(db);
@@ -144,6 +192,23 @@ describe.skipIf(!DB || !S3)('sweep 08 — a mockup finishing after its keepsake 
       const { persistDerivative } = await import('@/server/print/compositor');
       await deleteAsset(db, a.assetId, sam); // the erase…
       await persistDerivative(db, a.assetId, derivativeKey(a.assetId, 'mockup-late'), await png()).catch(() => {}); // …then the in-flight mockup lands
+      expect(await keysUnder(a.assetId)).toEqual([]);
+    } finally {
+      await cleanupDemoFamilies(db, ids);
+      await client.end();
+    }
+  });
+
+  it('08-B8: a picture that landed WHILE the erase ran (no row yet) is swept from the asset’s folder too', async () => {
+    const client = postgres(DB!, { prepare: false });
+    const db = drizzle(client, { schema });
+    const ids = await seedDemoFamilies(db);
+    try {
+      const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+      const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
+      await putObject(derivativeKey(a.assetId, 'mockup-mid-erase'), await png(), 'image/webp'); // bytes written, row not yet
+      const { deleteAsset } = await import('@/server/assets');
+      await deleteAsset(db, a.assetId, sam);
       expect(await keysUnder(a.assetId)).toEqual([]);
     } finally {
       await cleanupDemoFamilies(db, ids);

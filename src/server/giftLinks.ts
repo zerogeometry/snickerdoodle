@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { products, productVariants, savedDesigns } from '@/db/schema';
@@ -7,7 +7,7 @@ import { containsAbusiveText } from './textSafety';
 import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
 import sharp from 'sharp';
-import { getObjectBytes, presignDownload } from '@/storage';
+import { derivativeKey, getObjectBytes, getS3, presignDownload, putObject } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
 import { createInvite } from './invites';
@@ -15,7 +15,7 @@ import { familyNameForRelatives } from './onboarding';
 import { placeOrder, type PlaceOrderResult } from './orders';
 import type { RawTransform } from './print/geometry';
 import { appUrl, sendMail } from './mail';
-import { assetRefOf } from './assetRef';
+import { assetRefOf, isHeldForReport } from './assetRef';
 
 /** How long a gift link works (founder, 2026-10-21: 14 days, down from 30 — a forwarded bearer link
  * shows a child's drawing for less time; Children's Code). A parent can always share a fresh one. */
@@ -122,7 +122,7 @@ export async function createGiftLink(
         unitPricePence: prices[v.sku]!.pricePence,
         designId: d.id,
         transform: d.transform,
-        sourceObjectId: d.sourceObjectId,
+        sourceObjectId: await freezeSourceObject(db, a.id, d.sourceObjectId), // never the live, rewritable file (06-B7)
         back: d.back,
         ground: d.ground,
       });
@@ -183,6 +183,46 @@ export type GiftLinkView =
     };
 
 /**
+ * A design's picture (its lifted cut-out, its Studio design) is a file that is REWRITTEN in place
+ * when the drawing is lifted or edited again. A gift link must sell exactly what was shared (06-B7:
+ * the snapshot is immutable), so the link gets its own write-once copy, filed under the same
+ * keepsake (retention, deletion and the erasers' folder sweep cover it like any other derivative).
+ * Null when the object isn't this keepsake's.
+ */
+async function freezeSourceObject(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<string | null> {
+  if (!sourceObjectId) return null;
+  const [src] = await db
+    .select()
+    .from(storageObjects)
+    .where(and(eq(storageObjects.id, sourceObjectId), eq(storageObjects.assetId, assetId)));
+  if (!src) return null;
+  if (src.writeOnce) return src.id; // already immutable
+  const key = derivativeKey(assetId, `gift-${randomUUID()}`);
+  await putObject(key, await getObjectBytes(src.key), src.contentType ?? 'image/png');
+  const [row] = await db
+    .insert(storageObjects)
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket: getS3().bucket, key, contentType: src.contentType, byteSize: src.byteSize, sha256: src.sha256, exifStripped: true, writeOnce: true })
+    .returning({ id: storageObjects.id });
+  return row!.id;
+}
+
+/**
+ * Can a live (not revoked, not expired) link still be used, judged from its keepsakes as stored NOW?
+ * ONE rule for the recipient's page and the parent's own list (06-B5), so the two never disagree:
+ *  - 'gone': a keepsake on it was deleted or CSAM-blocked, or every one was pulled back to "only me";
+ *  - 'held': a keepsake on it isn't content-cleared (held after a report, or awaiting review) — the
+ *    link is offline until review decides;
+ *  - 'ok'.
+ */
+export function linkAvailability(assetIds: readonly string[], present: { id: string; moderationStatus: string; visibility: string }[]): 'ok' | 'held' | 'gone' {
+  if (present.length < new Set(assetIds).size) return 'gone';
+  if (present.some((a) => a.moderationStatus === 'BLOCKED')) return 'gone';
+  if (present.some((a) => a.moderationStatus !== 'CLEAR')) return 'held';
+  if (present.every((a) => a.visibility === 'ONLY_ME')) return 'gone';
+  return 'ok';
+}
+
+/**
  * Resolve a gift link for the recipient. Returns a "gone" state if any source
  * keepsake has since been deleted (the frozen snapshot must never serve bytes
  * that no longer exist), and revoked/expired states accordingly.
@@ -197,14 +237,14 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   const assetIds = items.map((i) => i.assetId);
   const present = await db.select().from(assets).where(inArray(assets.id, assetIds));
   // "gone" if a source was deleted OR is no longer content-cleared — never serve
-  // uncleared/CSAM-blocked bytes to a token holder outside the family (D8).
-  if (present.length < assetIds.length || present.some((a) => a.moderationStatus !== 'CLEAR')) return { state: 'gone' };
+  // uncleared/CSAM-blocked bytes to a token holder outside the family (D8). (The recipient isn't told
+  // WHY: "held" and "gone" look the same from outside.)
+  if (linkAvailability(assetIds, present) !== 'ok') return { state: 'gone' };
 
   // A keepsake the parent has since pulled back to "only me" drops off the list (and can't be
   // bought or previewed — canPurchaseViaGiftLink denies it too).
   const privateIds = new Set(present.filter((a) => a.visibility === 'ONLY_ME').map((a) => a.id));
   const shown = items.filter((i) => !privateIds.has(i.assetId));
-  if (shown.length === 0) return { state: 'gone' };
 
   const bought = await purchasedItems(db, link.id);
   const withImages = shown.map((i) => ({
@@ -407,7 +447,9 @@ export async function purchasedItems(
 export interface OwnerGiftList {
   id: string;
   token: string;
-  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  /** HELD = offline while a keepsake on it is checked (after a report); GONE = a keepsake on it was
+   * deleted / blocked, or all were made "only me" — the same rule the recipient's page uses (06-B5). */
+  status: 'ACTIVE' | 'HELD' | 'GONE' | 'REVOKED' | 'EXPIRED';
   createdAtISO: string;
   items: { assetId: string; label: string; imageUrl: string | null; boughtBy: string | null; bought: boolean }[];
 }
@@ -415,6 +457,11 @@ export interface OwnerGiftList {
 /**
  * The parent's view of their gift lists: every item, and — for the parent ONLY — a sticker
  * saying who bought it. Owner-only (the same check as creating a link).
+ *
+ * Each item's picture is re-checked NOW, item by item (07-B12): a keepsake in a link may since have
+ * been made "only me" by its controller (another parent), erased, CSAM-blocked or held after a report
+ * — then the list shows its label with no picture. Never a signed link to an original the owner
+ * couldn't open from their own keepsake box.
  */
 export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, familyId: string): Promise<OwnerGiftList[]> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) return [];
@@ -425,15 +472,28 @@ export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, 
     .select({ assetId: storageObjects.assetId, key: storageObjects.key })
     .from(storageObjects)
     .where(and(inArray(storageObjects.assetId, allIds), eq(storageObjects.objectClass, 'ORIGINAL')));
-  const keyByAsset = new Map(objs.map((o) => [o.assetId, o.key]));
+  const rows = await db.select().from(assets).where(inArray(assets.id, allIds));
+  const pictured = new Set(
+    rows
+      .filter((r) => r.moderationStatus !== 'BLOCKED' && !isHeldForReport(r) && canViewAsset(assetRefOf(r), owner).allowed)
+      .map((r) => r.id),
+  );
+  const keyByAsset = new Map(objs.filter((o) => pictured.has(o.assetId)).map((o) => [o.assetId, o.key]));
   const now = new Date();
+  const ownerStatus = (l: (typeof links)[number]): OwnerGiftList['status'] => {
+    if (l.status === 'REVOKED') return 'REVOKED';
+    if (l.expiresAt <= now) return 'EXPIRED';
+    const ids = (l.items as GiftItem[]).map((i) => i.assetId);
+    const live = linkAvailability(ids, rows.filter((r) => ids.includes(r.id)));
+    return live === 'ok' ? 'ACTIVE' : live === 'held' ? 'HELD' : 'GONE';
+  };
   return Promise.all(
     links.map(async (l) => {
       const bought = await purchasedItems(db, l.id);
       return {
         id: l.id,
         token: l.token,
-        status: l.status === 'REVOKED' ? 'REVOKED' : l.expiresAt <= now ? 'EXPIRED' : 'ACTIVE',
+        status: ownerStatus(l),
         createdAtISO: l.createdAt.toISOString(),
         items: await Promise.all(
           (l.items as GiftItem[]).map(async (i) => {

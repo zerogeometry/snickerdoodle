@@ -4,6 +4,8 @@ import {
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
+  ListObjectVersionsCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -43,6 +45,11 @@ export function quarantineKey(uploadId: string): string {
 }
 
 /** Key for a derived render of an asset (cutout / upscaled / printfile). */
+/** Every object stored for an asset lives under this prefix (its original and all derivatives). */
+export function assetPrefix(assetId: string): string {
+  return `assets/${assetId}/`;
+}
+
 export function derivativeKey(assetId: string, kind: string): string {
   return `assets/${assetId}/derivatives/${kind}`;
 }
@@ -118,10 +125,77 @@ export async function deleteObject(key: string): Promise<void> {
 }
 
 /**
- * Delete an object and CONFIRM it's gone, retrying a few times. Used by the
- * retention purge so a child's original is provably removed from the provider
- * (not just best-effort) before the DB record is dropped.
+ * Delete an object and CONFIRM it's gone, retrying a few times — EVERY version of it, not just the
+ * current one (08-B4). Used by the retention purge and every erase, so a child's original is
+ * provably removed from the provider (not just best-effort) before the DB record is dropped.
  */
+/** Every key under a prefix that has ANY stored version (current, non-current or a delete marker).
+ * A store without versioning answers NotImplemented — then just the current objects. */
+async function keysWithVersionsUnder(prefix: string): Promise<string[]> {
+  const { client, bucket } = getS3();
+  const keys = new Set<string>();
+  try {
+    let keyMarker: string | undefined;
+    let versionMarker: string | undefined;
+    do {
+      const res = await client.send(new ListObjectVersionsCommand({ Bucket: bucket, Prefix: prefix, KeyMarker: keyMarker, VersionIdMarker: versionMarker }));
+      for (const v of [...(res.Versions ?? []), ...(res.DeleteMarkers ?? [])]) if (v.Key) keys.add(v.Key);
+      keyMarker = res.IsTruncated ? res.NextKeyMarker : undefined;
+      versionMarker = res.IsTruncated ? res.NextVersionIdMarker : undefined;
+    } while (keyMarker);
+    return [...keys];
+  } catch (e) {
+    if ((e as { name?: string }).name !== 'NotImplemented') throw e;
+  }
+  let token: string | undefined;
+  do {
+    const res = await client.send(new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }));
+    for (const o of res.Contents ?? []) if (o.Key) keys.add(o.Key);
+    token = res.IsTruncated ? res.NextContinuationToken : undefined;
+  } while (token);
+  return [...keys];
+}
+
+/**
+ * Delete EVERY object under a prefix (confirmed, every version, one by one) — the erasers' last sweep
+ * of an asset's folder, AFTER its row is gone, so a derivative written while the erase was running
+ * (a late mockup: 08-B8) can't outlive the keepsake untracked. Returns how many keys it removed.
+ */
+export async function deleteAllUnderPrefix(prefix: string): Promise<number> {
+  if (!prefix.endsWith('/') || prefix.length < 3) throw new Error('refusing to sweep a prefix that is not a folder');
+  const keys = await keysWithVersionsUnder(prefix);
+  for (const key of keys) await deleteObjectConfirmed(key);
+  return keys.length;
+}
+
+/**
+ * Remove every stored VERSION (and delete marker) of exactly this key (08-B4). On a versioned bucket
+ * (production — project-office/ops/BACKUPS-AND-ERASURE.md) a plain delete only adds a delete marker
+ * and the bytes linger as a non-current version until the lifecycle rule expires them; CLAUDE.md
+ * says deletion cascades through storage versions, so the app removes them itself. The lifecycle
+ * rule stays as the backstop. A store without versions has none to remove.
+ */
+async function deleteEveryVersion(key: string): Promise<void> {
+  const { client, bucket } = getS3();
+  let keyMarker: string | undefined;
+  let versionMarker: string | undefined;
+  do {
+    let res;
+    try {
+      res = await client.send(new ListObjectVersionsCommand({ Bucket: bucket, Prefix: key, KeyMarker: keyMarker, VersionIdMarker: versionMarker }));
+    } catch (e) {
+      if ((e as { name?: string }).name === 'NotImplemented') return;
+      throw e;
+    }
+    for (const v of [...(res.Versions ?? []), ...(res.DeleteMarkers ?? [])]) {
+      if (v.Key !== key || !v.VersionId) continue;
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key, VersionId: v.VersionId }));
+    }
+    keyMarker = res.IsTruncated ? res.NextKeyMarker : undefined;
+    versionMarker = res.IsTruncated ? res.NextVersionIdMarker : undefined;
+  } while (keyMarker);
+}
+
 export async function deleteObjectConfirmed(key: string, attempts = 3): Promise<void> {
   const { client, bucket } = getS3();
   for (let i = 0; i < attempts; i++) {
@@ -130,7 +204,9 @@ export async function deleteObjectConfirmed(key: string, attempts = 3): Promise<
       await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
       // still present — loop and try again
     } catch {
-      return; // HEAD failed ⇒ confirmed gone
+      // HEAD failed ⇒ the current version is gone; now the older ones and the delete marker too
+      await deleteEveryVersion(key);
+      return;
     }
   }
   throw new Error(`could not confirm deletion of ${key}`);

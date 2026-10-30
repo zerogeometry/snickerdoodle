@@ -37,8 +37,9 @@ import { changeAssetVisibility, resolveViewerContext } from '@/server/assets';
 import { ingestEphemeralUpload, ingestOriginalAsset } from '@/server/ingest';
 import { resolvePromo } from '@/server/promos';
 import { renderPrintFile } from '@/server/print/render';
-import { listGiftListsForOwner } from '@/server/giftLinks';
-import { deleteObject, derivativeKey } from '@/storage';
+import { createGiftLink, listGiftListsForOwner } from '@/server/giftLinks';
+import { deleteObject, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { createHash } from 'node:crypto';
 import { saveStudioAction } from '@/app/actions/magic';
 import { copyKeepsakeAction } from '@/app/actions/keepsakePicker';
 import { finishPendingKeepsAction, rememberKeepAction, setAssetVisibilityAction } from '@/app/actions/keep';
@@ -105,7 +106,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B2: a viewer (EXTENDED / VIEW) can rewrite the family's keepsake look ──────────────────────
-  bug('07-B2: an EXTENDED-circle, VIEW_BUY grandparent cannot change the Studio edits of a keepsake they can only SEE', async () => {
+  it('07-B2: an EXTENDED-circle, VIEW_BUY grandparent cannot change the Studio edits of a keepsake they can only SEE', async () => {
     actor.current = acct(ids.rosieId);
     const before = (await db.select().from(assets).where(eq(assets.id, extAsset)))[0]!.studioDoc;
     const res = await saveStudioAction({ assetId: extAsset, mask: null, geometry: { rotate: 180, background: '#000000' } as never, objects: [] });
@@ -115,26 +116,32 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B3: copy → the copier becomes controller → widens a FAMILY-only drawing to EXTENDED ─────────
-  bug('07-B3: a FAMILY-circle contributor cannot use "copy" to republish a FAMILY-only keepsake to the Extended circle', async () => {
+  it('07-B3: a FAMILY-circle contributor cannot use "copy" to republish a FAMILY-only keepsake to the Extended circle', async () => {
     actor.current = acct(ids.joId);
     const copy = await copyKeepsakeAction({ assetId: famNoChild });
-    if (copy.ok) {
-      const [row] = await db.select().from(assets).where(eq(assets.id, copy.assetId));
-      keys.push(`originals/${copy.assetId}`);
-      expect(row!.controllerAccountId, 'the copy stays under the controlling parent').toBe(ids.samId);
-      expect(await setAssetVisibilityAction(copy.assetId, 'EXTENDED')).toEqual({ ok: false });
-    }
+    expect(copy, 'a contributor can still make an edited copy').toMatchObject({ ok: true });
+    if (!copy.ok) return;
+    const [row] = await db.select().from(assets).where(eq(assets.id, copy.assetId));
+    keys.push(`originals/${copy.assetId}`);
+    expect(row!.controllerAccountId, 'the copy stays under the controlling parent').toBe(ids.samId);
+    expect(row!.uploaderAccountId, 'the relative is only its uploader').toBe(ids.joId);
+    expect(row!.visibility, 'never wider than the source').toBe('FAMILY');
+    expect(await setAssetVisibilityAction(copy.assetId, 'EXTENDED')).toEqual({ ok: false });
+    expect(await setAssetVisibilityAction(copy.assetId, 'ONLY_ME')).toEqual({ ok: false });
+    // the controlling parent can still narrow it (and so delete it)
+    actor.current = acct(ids.samId);
+    expect(await setAssetVisibilityAction(copy.assetId, 'ONLY_ME')).toEqual({ ok: true });
   });
 
   // ── 07-B4: a VIEW member can buy ────────────────────────────────────────────────────────────────
-  bug('07-B4: a VIEW-access member cannot place an order for the family’s keepsake (VIEW ≠ VIEW_BUY)', async () => {
+  it('07-B4: a VIEW-access member cannot place an order for the family’s keepsake (VIEW ≠ VIEW_BUY)', async () => {
     actor.current = acct(vicId);
     const res = await placeOrderAction({ items: [{ productKey: 'mug', qty: 1, artwork: { assetId: famNoChild, transform: TRANSFORM as never } }] });
     expect(res).toMatchObject({ ok: false });
   });
 
   // ── 07-B5: a guest can push a drawing into ANY email's keepsake box ───────────────────────────────
-  bug('07-B5: a guest’s "+ keepsake" for someone else’s email does not land the drawing in that person’s family', async () => {
+  it('07-B5: a guest’s "+ keepsake" for someone else’s email does not land the drawing in that person’s family', async () => {
     const draft = await ingestEphemeralUpload(db, { buffer: await art(), kind: 'DRAWING', termsVersion: 't7' });
     keys.push(draft.key);
     actor.current = null;
@@ -164,16 +171,21 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B7: report on a REVOKED gift link still holds the keepsakes ─────────────────────────────────
-  bug('07-B7: a revoked gift link can no longer be used to put its keepsakes on hold', async () => {
+  it('07-B7: a revoked gift link can no longer be used to put its keepsakes on hold', async () => {
     const token = randomBytes(24).toString('base64url');
     await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token, items: [{ assetId: extAsset, productKey: 'mug', label: 'mug', unitPricePence: 1800 }], status: 'REVOKED', revokedAt: new Date(), expiresAt: new Date(Date.now() + 864e5) });
     actor.current = null;
-    await reportGiftLinkAction({ token, reason: 'other', note: 't7' }).catch(() => ({ ok: false }));
+    expect(await reportGiftLinkAction({ token, reason: 'other', note: 't7' }).catch(() => ({ ok: false }))).toMatchObject({ ok: false });
+    expect((await db.select().from(assets).where(eq(assets.id, extAsset)))[0]!.moderationStatus).toBe('CLEAR');
+    // an EXPIRED (never revoked) link is just as dead
+    const old = randomBytes(24).toString('base64url');
+    await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: old, items: [{ assetId: extAsset, productKey: 'mug', label: 'mug', unitPricePence: 1800 }], expiresAt: new Date(Date.now() - 60_000) });
+    expect(await reportGiftLinkAction({ token: old, reason: 'other', note: 't7' }).catch(() => ({ ok: false }))).toMatchObject({ ok: false });
     expect((await db.select().from(assets).where(eq(assets.id, extAsset)))[0]!.moderationStatus).toBe('CLEAR');
   });
 
   // ── 07-B8: existence/hold oracle on reportKeepsakeAction ──────────────────────────────────────────
-  bug('07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id', async () => {
+  it('07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id', async () => {
     await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { reports: [{ reason: 'other' }] } }).where(eq(assets.id, extAsset));
     try {
       actor.current = acct(ids.blakeId);
@@ -186,7 +198,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B1: existence oracle on saveDesignAction ──────────────────────────────────────────────────
-  bug('07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id', async () => {
+  it('07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id', async () => {
     actor.current = acct(ids.blakeId);
     const real = await saveDesignAction({ assetId: famNoChild, variantSku: 'mug', transform: TRANSFORM as never });
     const ghost = await saveDesignAction({ assetId: randomUUID(), variantSku: 'mug', transform: TRANSFORM as never });
@@ -265,7 +277,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     expect(preview.printObjectId === ordered.printObjectId && after!.sha256 !== before!.sha256, 'the ordered print file was replaced in place').toBe(false);
   });
   // ── 07-B12: the owner's gift-list view mints links to ORIGINALS without re-checking the gate ─────────
-  bug('07-B12: the owner’s gift-list view gives no picture for an item since made ONLY_ME by its controller, or BLOCKED', async () => {
+  it('07-B12: the owner’s gift-list view gives no picture for an item since made ONLY_ME by its controller, or BLOCKED', async () => {
     const jo = await resolveViewerContext(db, ids.joId, ids.hartleyId);
     const mine = await ingestOriginalAsset(db, jo, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true }); // Jo controls it
     const blocked = await ingestOriginalAsset(db, jo, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
@@ -277,5 +289,66 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     const items = (await listGiftListsForOwner(db, sam, ids.hartleyId)).flatMap((l) => l.items);
     expect.soft(items.find((i) => i.assetId === mine.assetId)?.imageUrl ?? null, 'ONLY_ME original').toBeNull();
     expect.soft(items.find((i) => i.assetId === blocked.assetId)?.imageUrl ?? null, 'BLOCKED original').toBeNull();
+    // the items are still listed (by label) — only the picture is withheld
+    expect(items.filter((i) => i.assetId === mine.assetId || i.assetId === blocked.assetId)).toHaveLength(2);
+  });
+
+  it('07-B12: the owner’s gift-list view shows no picture for an item held after a report, and still shows a cleared one', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const held = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    const fine = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    keys.push(held.key, fine.key);
+    await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(eq(assets.id, fine.assetId));
+    await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { reports: [{ at: new Date().toISOString(), reason: 'test' }] } as never }).where(eq(assets.id, held.assetId));
+    const [heldLink] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [held.assetId, fine.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) }).returning();
+    const lists = await listGiftListsForOwner(db, sam, ids.hartleyId);
+    const items = lists.flatMap((l) => l.items);
+    expect(items.find((i) => i.assetId === held.assetId)?.imageUrl ?? null, 'held original').toBeNull();
+    expect(items.find((i) => i.assetId === fine.assetId)?.imageUrl, 'a cleared item keeps its picture').toBeTruthy();
+    // 06-B5: the parent's list says it's offline while that keepsake is checked — never "0 of 2 bought"
+    expect(lists.find((l) => l.id === heldLink!.id)?.status).toBe('HELD');
+  });
+
+  it('06-B7: a shared design keeps the cut-out it was shared with, even when the drawing is lifted again later', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+    const cutKey = derivativeKey(famNoChild, 'cutout');
+    const first = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 47, g: 93, b: 168, alpha: 1 } } }).png().toBuffer();
+    await putObject(cutKey, first, 'image/png');
+    keys.push(cutKey);
+    const [cut] = await db
+      .insert(storageObjects)
+      .values({ assetId: famNoChild, objectClass: 'DERIVATIVE', bucket: getS3().bucket, key: cutKey, contentType: 'image/png', byteSize: first.byteLength, sha256: sha(first), exifStripped: true, writeOnce: false })
+      .onConflictDoUpdate({ target: storageObjects.key, set: { sha256: sha(first), byteSize: first.byteLength } })
+      .returning();
+    const [variant] = await db.select({ sku: schema.productVariants.sku }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(and(eq(schema.products.key, 'mug'), eq(schema.productVariants.isDefault, true)));
+    const [design] = await db.insert(schema.savedDesigns).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, assetId: famNoChild, variantSku: variant!.sku, transform: TRANSFORM, sourceObjectId: cut!.id }).returning();
+    const { id: linkId } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [design!.id] });
+    const [link] = await db.select().from(giftLinks).where(eq(giftLinks.id, linkId));
+    const item = (link!.items as { sourceObjectId?: string | null }[])[0]!;
+    expect(item.sourceObjectId, 'the link holds its own copy, not the live cut-out').not.toBe(cut!.id);
+
+    // later: the drawing is lifted again — the live cut-out is rewritten in place
+    const second = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 200, g: 64, b: 42, alpha: 1 } } }).png().toBuffer();
+    await putObject(cutKey, second, 'image/png');
+    await db.update(storageObjects).set({ sha256: sha(second), byteSize: second.byteLength }).where(eq(storageObjects.id, cut!.id));
+
+    const [frozen] = await db.select().from(storageObjects).where(eq(storageObjects.id, item.sourceObjectId!));
+    keys.push(frozen!.key);
+    expect([frozen!.assetId, frozen!.writeOnce, frozen!.sha256]).toEqual([famNoChild, true, sha(first)]);
+    expect(sha(await getObjectBytes(frozen!.key))).toBe(sha(first)); // the bytes the link prints from never changed
+  });
+
+  it('06-B5: the parent’s list says "no longer open" once a keepsake on it is deleted, and "open" while all is well', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    const b = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    keys.push(a.key, b.key);
+    await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(inArray(assets.id, [a.assetId, b.assetId]));
+    const [link] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [a.assetId, b.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) }).returning();
+    const statusOf = async () => (await listGiftListsForOwner(db, sam, ids.hartleyId)).find((l) => l.id === link!.id)?.status;
+    expect(await statusOf()).toBe('ACTIVE');
+    await db.delete(assets).where(eq(assets.id, b.assetId)); // one keepsake gone
+    expect(await statusOf()).toBe('GONE');
   });
 });

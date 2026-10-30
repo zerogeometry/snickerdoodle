@@ -4,7 +4,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import sharp, { type OverlayOptions, type Sharp } from 'sharp';
 import { mockupViews, printTemplates, products, productVariants, storageObjects, templateAssets } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
-import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
 import { type RawTransform, type Transform, canvasSizePx, clampTransform, computeLayerRect, galleryRect, isGalleryProduct } from './geometry';
@@ -710,17 +710,32 @@ async function renderAndPersist(
  * cover it; private bucket; EXIF stripped by re-encode. The unique index on key makes
  * onConflictDoNothing a genuine arbiter, so a concurrent racer that slipped past the cache check +
  * dedup can't duplicate the row. Returns the storage object's id.
+ *
+ * Never leaves bytes without a row (08-B8): a mockup that finishes after its keepsake was erased
+ * (retention, "delete", account closure, review "remove") finds no keepsake to file it under — then
+ * its bytes are deleted again before the error goes up. (The erasers also sweep the asset's folder
+ * after its row is gone, for a mockup that landed while they ran.)
  */
 export async function persistDerivative(db: DbHandle, assetId: string, key: string, webp: Buffer): Promise<string> {
   const sha256 = createHash('sha256').update(webp).digest('hex');
   const { bucket } = getS3();
   await putObject(key, webp, 'image/webp');
-  const [row] = await db
-    .insert(storageObjects)
-    .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/webp', byteSize: webp.byteLength, sha256, exifStripped: true, writeOnce: true })
-    .onConflictDoNothing({ target: storageObjects.key })
-    .returning();
-  return row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]!.id;
+  try {
+    const [row] = await db
+      .insert(storageObjects)
+      .values({ assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: 'image/webp', byteSize: webp.byteLength, sha256, exifStripped: true, writeOnce: true })
+      .onConflictDoNothing({ target: storageObjects.key })
+      .returning();
+    const id = row?.id ?? (await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)))[0]?.id;
+    if (!id) throw new Error('the keepsake was erased while its mockup was drawn');
+    return id;
+  } catch (e) {
+    // no row tracks these bytes (and none ever will — the keepsake is gone): remove them. If the
+    // database can't even be asked, leave them for the erasers' folder sweep rather than guess.
+    const tracked = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key)).catch(() => null);
+    if (tracked && tracked.length === 0) await deleteObjectConfirmed(key);
+    throw e;
+  }
 }
 
 /**

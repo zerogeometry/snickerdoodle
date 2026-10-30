@@ -7,7 +7,8 @@ import type { Decision } from './policy';
  * (it is preserved for the report, never viewed or redistributed — the runbook handles it); and a
  * picture that was never flagged is not the reviewer's to look at.
  *
- * A picture whose known-CSAM hash check could NOT run (provider down, IWF not configured) is held
+ * A picture whose known-CSAM hash check could NOT run (provider down, IWF not configured, or no
+ * screening set up at all — every upload in production until IWF is connected) is held
  * for review, but review may neither SHOW it nor CLEAR it: looking at it could mean a person viewing
  * known CSAM, and clearing it would let it skip the hash gate. It can only be removed — or the
  * parent uploads it again once the hash check is back.
@@ -15,6 +16,11 @@ import type { Decision } from './policy';
 
 /** The label the moderation gate puts on an upload whose hash check couldn't run. */
 export const HASH_UNCHECKED_LABEL = 'hash-check-unavailable';
+/** The label on an upload held because NO screening is set up (production before IWF + the
+ * classifier are connected). Its hash check never ran either, so it is treated exactly like
+ * {@link HASH_UNCHECKED_LABEL}: removable, never viewed or cleared (08-B7). */
+export const SCREENING_NOT_CONFIGURED_LABEL = 'screening-not-configured';
+const HASH_NEVER_RAN = new Set<unknown>([HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL]);
 export interface Reviewer {
   /** null = signed out */
   accountId: string | null;
@@ -31,11 +37,12 @@ export interface ReviewSubject {
   moderationDetail?: unknown;
 }
 
-/** Did this item's UPLOAD skip the hash check? (A Studio design is never hash-checked — the upload is.) */
+/** Did this item's UPLOAD skip the hash check — it couldn't run, or no screening was set up at all?
+ * (A Studio design is never hash-checked — the upload is.) */
 export function hashCheckSkipped(item: ReviewSubject): boolean {
   const d = (item.moderationDetail ?? {}) as { labels?: unknown; original?: { labels?: unknown } };
-  const labels = Array.isArray(d.original?.labels) ? d.original.labels : Array.isArray(d.labels) ? d.labels : [];
-  return labels.includes(HASH_UNCHECKED_LABEL);
+  const labels: unknown[] = Array.isArray(d.original?.labels) ? d.original.labels : Array.isArray(d.labels) ? d.labels : [];
+  return labels.some((l) => HASH_NEVER_RAN.has(l));
 }
 
 export function canReview(reviewer: Reviewer, action: ReviewAction, item?: ReviewSubject): Decision {

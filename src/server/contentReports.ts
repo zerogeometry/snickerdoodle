@@ -33,7 +33,10 @@ export async function reportGiftLink(
   if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return { ok: false, reason: 'invalid' };
 
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, input.token));
-  if (!link) return { ok: false, reason: 'invalid' };
+  // Only a LIVE link can report (07-B7): a revoked or expired one shows nothing any more, so whoever
+  // still holds it can't keep putting the family's keepsakes on hold (hidden + unprintable) — the
+  // same answer as a made-up token.
+  if (!link || link.status !== 'ACTIVE' || link.expiresAt <= now) return { ok: false, reason: 'invalid' };
   const ids = [...new Set((link.items as { assetId: string }[]).map((i) => i.assetId))];
 
   let held = 0;
@@ -121,8 +124,10 @@ export async function reportKeepsake(
   const [row] = await db.select().from(assets).where(eq(assets.id, input.assetId));
   if (!row) return { ok: false, reason: 'invalid' };
   const ref = assetRefOf(row);
-  // already held by an open report: nothing more to do (and it's hidden from this viewer anyway)
-  if (isHeldForReport(row)) return { ok: true };
+  // already held by an open report: nothing more to do (and it's hidden from this viewer anyway) —
+  // but only someone who'd see it if it weren't held is told so; anyone else gets the same answer
+  // as a made-up id (07-B8: never confirm another family's keepsake exists, or is held)
+  if (isHeldForReport(row)) return canViewAsset({ ...ref, heldForReview: false }, viewer).allowed ? { ok: true } : { ok: false, reason: 'invalid' };
   // only someone who can SEE it, and doesn't manage it (its parent can hide or delete it themselves)
   if (!canViewAsset(ref, viewer).allowed || canSetAssetVisibility(ref, viewer)) return { ok: false, reason: 'invalid' };
   if (row.moderationStatus === 'BLOCKED') return { ok: true }; // the illegal-content runbook owns it

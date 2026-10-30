@@ -3,6 +3,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { orders, webhookEvents } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { markOrderPaid } from '@/server/orders';
+import { expireAbandonedCheckouts } from '@/server/retention';
 
 /**
  * Verify a Stripe webhook signature. constructEvent recomputes the HMAC locally
@@ -60,6 +61,14 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
         handled = true;
       }
     }
+  }
+
+  // The shopper never paid and Stripe closed the session: the order can never be paid now, so it's
+  // cancelled at once and its unkept upload follows normal retention (08-B2; the retention job
+  // catches any whose event never arrives).
+  if (event.type === 'checkout.session.expired') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    if (session.id) handled = (await expireAbandonedCheckouts(db, { stripeSessionId: session.id })).length > 0;
   }
 
   await db.insert(webhookEvents).values({ id: event.id, type: event.type }).onConflictDoNothing();

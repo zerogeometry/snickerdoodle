@@ -7,7 +7,7 @@ import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject 
 import { cropToSheet } from '@/ml/sheetCrop';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from './db';
-import { getViewableAssetOrThrow } from './assets';
+import { getEditableAssetOrThrow, getViewableAssetOrThrow } from './assets';
 
 const PER_CREATION = Number(process.env.ML_BUDGET_PER_CREATION ?? 20);
 const PER_ACCOUNT_30D = Number(process.env.ML_BUDGET_PER_ACCOUNT ?? 500);
@@ -45,7 +45,7 @@ export async function removeBackgroundForAsset(
   assetId: string,
   opts: { keepEnclosedPaper?: boolean } = {},
 ): Promise<MagicResult> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate (member OR upload-claim holder)
+  await getEditableAssetOrThrow(db, assetId, viewer); // ← the EDIT gate (controller / CONTRIBUTE, or the draft's claim holder — 07-B2)
   await assertMlBudget(db, viewer.accountId, assetId);
 
   // the WORKING copy: the table-trimmed drawing when there is one, else the original
@@ -72,7 +72,7 @@ export async function removeBackgroundForAsset(
  * edit). Same gate as lifting it. Returns whether anything was deleted.
  */
 export async function putBackgroundBack(db: DbHandle, viewer: ViewerContext, assetId: string, sourceObjectId: string): Promise<boolean> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  await getEditableAssetOrThrow(db, assetId, viewer); // ← the EDIT gate (07-B2)
   const [a] = await db.select({ kept: assets.keptInHome }).from(assets).where(eq(assets.id, assetId));
   if (!a || a.kept) return false;
   const key = derivativeKey(assetId, 'cutout');
@@ -183,7 +183,7 @@ export async function cutoutAlphaForAsset(db: DbHandle, viewer: ViewerContext, a
  * (so "restore" brings back exactly what was there). The original is never touched.
  */
 export async function applyCutoutMask(db: DbHandle, viewer: ViewerContext, assetId: string, maskPng: Buffer): Promise<MagicResult> {
-  await getViewableAssetOrThrow(db, assetId, viewer); // ← the gate
+  await getEditableAssetOrThrow(db, assetId, viewer); // ← the EDIT gate (07-B2)
   const orig = sharp(await workingBytes(db, assetId)).rotate();
   const { data: rgb, info } = await orig.clone().removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const W = info.width, H = info.height;

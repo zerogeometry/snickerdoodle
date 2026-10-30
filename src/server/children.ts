@@ -26,6 +26,9 @@ export async function resolveChildSubject(
   familyId: string,
   accountId: string,
   rawFirstName: string | null | undefined,
+  /** false = only find a little one the family already has, never add one (a relative keeping into a
+   * family they JOINED — only its owner adds children: 04-B3). */
+  opts: { create: boolean } = { create: true },
 ): Promise<ChildSubject | null> {
   const screened = screenChildFirstName(rawFirstName);
   if (!screened.ok || !screened.value) return null;
@@ -36,6 +39,7 @@ export async function resolveChildSubject(
     .from(children)
     .where(and(eq(children.familyId, familyId), sql`lower(${children.firstName}) = lower(${firstName})`));
   if (existing) return existing;
+  if (!opts.create) return null;
 
   const [created] = await db
     .insert(children)

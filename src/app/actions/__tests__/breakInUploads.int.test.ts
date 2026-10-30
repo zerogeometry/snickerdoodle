@@ -86,6 +86,9 @@ describe.skipIf(!DB || !S3)('break-in: hostile uploads (integration, real ingest
     expect(bytes.includes(Buffer.from('<script'))).toBe(false);
     expect(bytes.includes(Buffer.from('<svg'))).toBe(false);
     expect((await sharp(bytes).metadata()).format).not.toBe('svg');
+    // 07-B17: stored as what the bytes ARE — a PNG — never application/octet-stream
+    expect((await sharp(bytes).metadata()).format).toBe('png');
+    expect(row.contentType).toBe('image/png');
   });
 
   it('an SVG that points at a file on the server does not pull that file into the picture', async () => {

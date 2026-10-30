@@ -148,7 +148,7 @@ test.describe('guest drawing adopted on sign-up', () => {
   // type the stranger's email on /login. rememberKeepForEmail stores the guest's claim against that
   // email, and finishPendingKeeps (on /start-creating?resume=keep, any device) adopts it for whoever
   // signs in with it — the drawing lands in the stranger's private family home as if they kept it.
-  test.fixme('08-B1: a guest cannot file their drawing into someone else’s keepsake box by typing their email', async ({ page, browser }) => {
+  test('08-B1: a guest cannot file their drawing into someone else’s keepsake box by typing their email', async ({ page, browser }) => {
     await quietCookies(page);
     await uploadAndOpenRange(page);
     await page.getByRole('button', { name: /\+ keepsake/ }).first().click();

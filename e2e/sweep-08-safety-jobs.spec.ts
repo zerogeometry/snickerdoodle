@@ -250,7 +250,8 @@ test.describe('admin — review queue and support inbox', () => {
     await page.getByLabel('six-digit code from your authenticator app').fill('000000' === totp(key) ? '111111' : '000000');
     await page.getByRole('button', { name: 'continue' }).click();
     await expect(page.getByText('that code didn’t match — try the newest one')).toBeVisible();
-    await page.getByLabel('six-digit code from your authenticator app').fill(totp(key));
+    const usedCode = totp(key);
+    await page.getByLabel('six-digit code from your authenticator app').fill(usedCode);
     await page.getByRole('button', { name: 'continue' }).click();
     const queue = page.getByRole('list', { name: 'held back for review' });
     await expect(queue).toBeVisible();
@@ -300,6 +301,11 @@ test.describe('admin — review queue and support inbox', () => {
     await signInByEmailLink(again, email, '/admin/review');
     await expect(again.getByText('your code, please')).toBeVisible();
     await expect(again.getByRole('list', { name: 'held back for review' })).toHaveCount(0);
+    // 07-B15 / 08-B9: the code already used at enrolment can't be replayed here, even inside its window
+    await again.getByLabel('six-digit code from your authenticator app').fill(usedCode);
+    await again.getByRole('button', { name: 'continue' }).click();
+    await expect(again.getByText('that code didn’t match — try the newest one')).toBeVisible();
+    await expect(again.getByRole('list', { name: 'held back for review' })).toHaveCount(0);
     await ctx2.close();
 
     // an admin flag removed → the page is gone again, even with the two-step cookie still set
@@ -312,7 +318,7 @@ test.describe('admin — review queue and support inbox', () => {
   // "screening-not-configured" — its known-CSAM hash check NEVER ran — yet hashCheckSkipped() only
   // knows the "hash-check-unavailable" label, so an admin may LOOK at it and CLEAR it, after which
   // orders.ts (CLEAR only) lets it be printed. src/authz/review.ts says such a picture may only be removed.
-  test.fixme('08-B7: an upload whose hash check never ran ("screening-not-configured") can be removed, never looked at or cleared', async ({ page, browser }) => {
+  test('08-B7: an upload whose hash check never ran ("screening-not-configured") can be removed, never looked at or cleared', async ({ page, browser }) => {
     const ctx = await browser.newContext();
     const held = await guestUpload(await ctx.newPage());
     await ctx.close();
@@ -332,6 +338,11 @@ test.describe('admin — review queue and support inbox', () => {
     const item = page.getByRole('list', { name: 'held back for review' }).getByRole('listitem').first();
     await expect(item).toContainText('screening-not-configured');
     await expect(item.getByRole('button', { name: 'it’s fine' })).toHaveCount(0);
+    await expect(item.getByRole('button', { name: 'look' })).toHaveCount(0);
+    // …but it CAN be removed — and that also takes it off the top of the queue for the tests after
+    await item.getByRole('button', { name: 'remove' }).click();
+    await page.getByRole('button', { name: 'yes, remove it' }).click();
+    await expect.poll(async () => (await sql()`select 1 from assets where id = ${held}`).length, { timeout: 30_000 }).toBe(0);
   });
 
   test('support: a help message is acknowledged by email and lands in the admin inbox, where it can be marked answered', async ({ page, browser }) => {

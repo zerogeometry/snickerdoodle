@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { accounts, profileImages } from '@/db/schema';
+import { accounts, emailChangeRequests, profileImages } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { closeAccount } from '@/server/accountClosure';
 import {
@@ -110,7 +110,14 @@ describe.skipIf(!DB || !S3)('profiles — pictures, header, family banner, name,
   it('email changes only once the NEW address confirms; the link is single-use', async () => {
     const newEmail = `sam-new-${ids.nonce}@example.test`;
     const [rosie] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, ids.rosieId));
-    expect(await requestEmailChange(db, ids.samId, rosie!.email)).toEqual({ ok: false, reason: 'taken' });
+    // 08-B14: an address that already has an account gets the SAME answer as a free one — only its
+    // inbox hears, with no link, no request is stored, and the requester's name isn't in it
+    log.mockClear();
+    expect(await requestEmailChange(db, ids.samId, rosie!.email)).toEqual({ ok: true });
+    const toTaken = log.mock.calls.map((c) => String(c[0])).join('\n');
+    expect(toTaken).not.toMatch(/confirm-email\?token=/);
+    expect(toTaken).toContain('You already have an account with it');
+    expect(await db.select().from(emailChangeRequests).where(eq(emailChangeRequests.accountId, ids.samId))).toHaveLength(0);
     expect(await requestEmailChange(db, ids.samId, 'nope')).toEqual({ ok: false, reason: 'invalid' });
 
     log.mockClear();

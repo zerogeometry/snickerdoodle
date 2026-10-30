@@ -6,12 +6,13 @@ import { revalidatePath } from 'next/cache';
 import { accounts, auditRecords } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { AuthzError } from '@/authz';
-import { currentReviewer } from '@/server/admin/context';
+import { currentReviewer, sessionTokenFrom } from '@/server/admin/context';
+import { spendTotpStep } from '@/server/admin/totpReplay';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { decideReview, type ReviewKind } from '@/server/admin/review';
 import { setSupportStatus, type SupportStatus } from '@/server/admin/support';
 import { ADMIN_STEPUP_COOKIE, signStepUp, STEPUP_HOURS } from '@/server/admin/stepUp';
-import { newTotpSecret, openSecret, otpauthUri, sealSecret, verifyTotp } from '@/server/admin/totp';
+import { matchTotpStep, newTotpSecret, openSecret, otpauthUri, sealSecret } from '@/server/admin/totp';
 
 /**
  * Admin two-step login + content-review decisions. Every action re-checks the caller server-side
@@ -39,12 +40,14 @@ export async function confirmMfaEnrolment(code: string): Promise<{ ok: boolean }
   if (!(await rateLimit(getDb(), { ...LIMITS.mfaPerAccount, caller: r.accountId })).ok) return { ok: false };
   const jar = await cookies();
   const secret = openSecret(jar.get(PENDING_COOKIE)?.value);
-  if (!secret || !verifyTotp(secret, code)) return { ok: false };
+  const step = secret ? matchTotpStep(secret, code) : null;
+  const session = sessionTokenFrom(jar);
   const db = getDb();
+  if (!secret || step === null || !session || !(await spendTotpStep(db, r.accountId, step))) return { ok: false }; // each code works once
   await db.update(accounts).set({ mfaSecret: sealSecret(secret) }).where(eq(accounts.id, r.accountId));
   await db.insert(auditRecords).values({ actorAccountId: r.accountId, actorType: 'ADMIN', event: 'ADMIN_MFA_ENROLLED', targetType: 'account', targetId: r.accountId });
   jar.delete(PENDING_COOKIE);
-  jar.set(ADMIN_STEPUP_COOKIE, signStepUp(r.accountId), { ...cookieOpts, maxAge: STEPUP_HOURS * 3600 });
+  jar.set(ADMIN_STEPUP_COOKIE, signStepUp(r.accountId, session), { ...cookieOpts, maxAge: STEPUP_HOURS * 3600 });
   return { ok: true };
 }
 
@@ -55,8 +58,11 @@ export async function verifyMfa(code: string): Promise<{ ok: boolean }> {
   if (!(await rateLimit(getDb(), { ...LIMITS.mfaPerAccount, caller: r.accountId })).ok) return { ok: false };
   const [row] = await getDb().select({ mfa: accounts.mfaSecret }).from(accounts).where(eq(accounts.id, r.accountId));
   const secret = openSecret(row?.mfa);
-  if (!secret || !verifyTotp(secret, code)) return { ok: false };
-  (await cookies()).set(ADMIN_STEPUP_COOKIE, signStepUp(r.accountId), { ...cookieOpts, maxAge: STEPUP_HOURS * 3600 });
+  const step = secret ? matchTotpStep(secret, code) : null;
+  const jar = await cookies();
+  const session = sessionTokenFrom(jar);
+  if (step === null || !session || !(await spendTotpStep(getDb(), r.accountId, step))) return { ok: false }; // each code works once
+  jar.set(ADMIN_STEPUP_COOKIE, signStepUp(r.accountId, session), { ...cookieOpts, maxAge: STEPUP_HOURS * 3600 });
   return { ok: true };
 }
 

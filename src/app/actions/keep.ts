@@ -6,7 +6,7 @@ import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { ensureHomeFamily } from '@/server/onboarding';
+import { resolveKeepFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { ImageTooLargeError } from '@/storage';
@@ -28,7 +28,7 @@ export async function keepCreation(formData: FormData): Promise<{ ok: boolean; n
   if (file.size > 25 * 1024 * 1024) return { ok: false }; // 25MB guard
 
   const db = getDb();
-  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  const { familyId } = await resolveKeepFamily(db, account.id, account.name); // a CONTRIBUTE relative: the family they joined (04-B3)
   const viewer = await resolveViewerContext(db, account.id, familyId);
   const buffer = Buffer.from(await file.arrayBuffer());
 
@@ -65,11 +65,12 @@ export async function rememberKeepAction(assetId: string, email: string): Promis
   return { ok: await rememberKeepForEmail(getDb(), { assetId, email, uploadClaims: await getUploadClaims() }) };
 }
 
-/** Back from signing in: finish any keep they asked for as a guest. */
+/** Back from signing in: finish any keep they asked for as a guest — in THIS browser only (it must
+ * still hold the drawing's upload claim; an email alone never files a picture into a family, 07-B5). */
 export async function finishPendingKeepsAction(): Promise<{ ok: boolean; kept: string[] }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, kept: [] };
-  const kept = await finishPendingKeeps(getDb(), account);
+  const kept = await finishPendingKeeps(getDb(), account, await getUploadClaims());
   if (kept.length) revalidatePath('/home');
   return { ok: true, kept };
 }

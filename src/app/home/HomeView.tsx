@@ -366,9 +366,11 @@ export function HomeView({ data }: { data: HomeData }) {
               <>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
                   {data.isOwner ? 'Tap a keepsake to choose who can see it.' : 'Shared with you by the family.'}
-                  <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
-                    place one on a product →
-                  </Link>
+                  {data.canBuy ? (
+                    <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
+                      place one on a product →
+                    </Link>
+                  ) : null}
                 </p>
                 {highlightNew ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-sunshine bg-honey-band px-3 py-2 text-xs text-ink-faint">
@@ -458,7 +460,15 @@ export function HomeView({ data }: { data: HomeData }) {
                       gift request · {new Date(gl.createdAtISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </p>
                     <p className="text-xs text-ink-soft">
-                      {gl.status === 'ACTIVE' ? `${boughtCount} of ${gl.items.length} bought` : gl.status === 'REVOKED' ? 'switched off' : 'expired'}
+                      {gl.status === 'ACTIVE'
+                        ? `${boughtCount} of ${gl.items.length} bought`
+                        : gl.status === 'HELD'
+                          ? 'offline while we check something on it'
+                          : gl.status === 'GONE'
+                            ? 'no longer open — a keepsake on it was deleted or made private'
+                            : gl.status === 'REVOKED'
+                              ? 'switched off'
+                              : 'expired'}
                     </p>
                   </div>
                   <ul className="mt-4 grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4">
@@ -481,7 +491,7 @@ export function HomeView({ data }: { data: HomeData }) {
                       </li>
                     ))}
                   </ul>
-                  {gl.status === 'ACTIVE' ? (
+                  {gl.status === 'ACTIVE' || gl.status === 'HELD' || gl.status === 'GONE' ? (
                     confirmRevoke === gl.id ? (
                       <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border-2 border-berry bg-berry-pale p-3 sm:flex-row sm:items-center">
                         <p className="flex-1 text-xs text-cocoa">switch this link off? anyone holding it won&apos;t be able to open it any more.</p>
