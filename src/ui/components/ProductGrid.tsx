@@ -11,6 +11,7 @@ import { garmentHex, isGarmentKey } from '@/lib/garments';
 import type { CatalogueProduct } from '@/server/catalogue';
 import type { MockupRequest } from '@/lib/mockupPrefetch';
 import { useLocalPreview } from '@/lib/localPreview';
+import { withArticle } from '@/lib/articles';
 
 /**
  * What a range TILE shows for a product — the variant, placement and view its preview composes
@@ -172,12 +173,12 @@ export function ProductTile({
                 <Icon icon={IconMinus} size={14} />
               </button>
               <span className="min-w-4 text-center text-xs font-bold text-cocoa">{qty}</span>
-              <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="press flex min-h-11 min-w-11 items-center justify-center text-cinnamon">
+              <button type="button" aria-label={`add ${withArticle(p.label)}`} onClick={onAdd} className="press flex min-h-11 min-w-11 items-center justify-center text-cinnamon">
                 <Icon icon={IconPlus} size={14} />
               </button>
             </div>
           ) : null}
-          <button type="button" onClick={onCustomize} className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
+          <button type="button" onClick={onCustomize} aria-label={`${customizeLabel} ${p.label}`} className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
             {customizeLabel}
           </button>
         </div>

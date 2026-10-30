@@ -293,13 +293,19 @@ test.describe('states', () => {
     await expect(page.getByRole('link', { name: /start creating|home/i }).first()).toBeVisible();
   });
 
-  test.fixme('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
+  test('09-B4: each tile’s "+ customize" button names its product for keyboard + screen-reader users', async ({ page }) => {
     await quietCookies(page);
     await page.goto('/catalogue');
     await expect(page.getByRole('group', { name: 'filter the range' })).toBeVisible();
-    // the visible, focusable button (the picture's "customize mug" twin is tabIndex -1)
-    const names = await page.locator('button:not([tabindex="-1"])').evaluateAll((els) => els.map((e) => e.textContent?.trim()).filter((t) => t === 'customize' || t === '+ customize'));
-    expect(names).toEqual([]);
+    // the visible, focusable button (the picture's "customize mug" twin is tabIndex -1): its name says
+    // which product, and starts with the words on it (WCAG 2.5.3, label in name)
+    const named = await page.locator('button:not([tabindex="-1"])').evaluateAll((els) =>
+      els.map((e) => ({ text: e.textContent?.trim() ?? '', name: e.getAttribute('aria-label') ?? e.textContent?.trim() ?? '' })).filter((b) => b.text === 'customize' || b.text === '+ customize'),
+    );
+    expect(named.length).toBeGreaterThan(5);
+    expect(named.filter((b) => b.name === b.text), 'named only "customize"').toEqual([]);
+    expect(named.filter((b) => !b.name.startsWith(b.text)), 'name starts with the visible words').toEqual([]);
+    expect(named.map((b) => b.name)).toContain(`${named[0]!.text} mug`);
   });
 });
 
