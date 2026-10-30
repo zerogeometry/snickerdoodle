@@ -74,6 +74,6 @@ describe.skipIf(!URL)('06-B1: the /join "email me the link" (integration)', () =
   it('safeJoinNext honours a gift-link path only', () => {
     expect(safeJoinNext('/g/abcdefgh12')).toBe('/g/abcdefgh12');
     expect(safeJoinNext(['/g/abcdefgh12', '/home'])).toBe('/g/abcdefgh12');
-    for (const bad of ['/home', '//evil.example', '/\evil.example', '/g/short', null, undefined]) expect(safeJoinNext(bad)).toBeNull();
+    for (const bad of ['/home', '//evil.example', '/\\evil.example', '/g/short', null, undefined]) expect(safeJoinNext(bad)).toBeNull();
   });
 });

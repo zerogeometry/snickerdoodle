@@ -54,15 +54,20 @@ export default async function JoinPage({
   }
 
   if (invite.status !== 'PENDING' || invite.expired) {
+    // each ending says what actually happened (04-B5): cancelled, expired, or already accepted
+    const who = invite.familyName ?? 'the family';
+    const ending =
+      invite.status === 'REVOKED'
+        ? { title: 'This invite was cancelled', text: `${who} cancelled it, or sent a newer one. Ask them for a fresh invite if you still need one.` }
+        : invite.status === 'VERIFIED'
+          ? { title: 'This invite has already been used', text: 'It’s already been accepted. If that was you, just sign in to see the family’s keepsakes.' }
+          : { title: 'This invite has expired', text: `Invites last 14 days. Ask ${who} to send you a fresh one.` };
     return (
       <Shell>
         <div className={CARD}>
           <Icon icon={IconAlertTriangle} size={28} className="mx-auto text-cinnamon" />
-          <h1 className="mt-3 font-display text-2xl leading-tight text-cocoa">This invite has already been used</h1>
-          <p className="mt-2 text-sm text-ink-soft">
-            {invite.expired ? 'It expired.' : 'It’s already been accepted.'} Ask for a fresh invite if you still need
-            one.
-          </p>
+          <h1 className="mt-3 font-display text-2xl leading-tight text-cocoa">{ending.title}</h1>
+          <p className="mt-2 text-sm text-ink-soft">{ending.text}</p>
         </div>
       </Shell>
     );

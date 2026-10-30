@@ -37,8 +37,9 @@ import { changeAssetVisibility, resolveViewerContext } from '@/server/assets';
 import { ingestEphemeralUpload, ingestOriginalAsset } from '@/server/ingest';
 import { resolvePromo } from '@/server/promos';
 import { renderPrintFile } from '@/server/print/render';
-import { listGiftListsForOwner } from '@/server/giftLinks';
-import { deleteObject, derivativeKey } from '@/storage';
+import { createGiftLink, listGiftListsForOwner } from '@/server/giftLinks';
+import { deleteObject, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
+import { createHash } from 'node:crypto';
 import { saveStudioAction } from '@/app/actions/magic';
 import { copyKeepsakeAction } from '@/app/actions/keepsakePicker';
 import { finishPendingKeepsAction, rememberKeepAction, setAssetVisibilityAction } from '@/app/actions/keep';
@@ -184,7 +185,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B8: existence/hold oracle on reportKeepsakeAction ──────────────────────────────────────────
-  bug('07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id', async () => {
+  it('07-B8: an outsider reporting a HELD keepsake of another family gets the same answer as for a made-up id', async () => {
     await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { reports: [{ reason: 'other' }] } }).where(eq(assets.id, extAsset));
     try {
       actor.current = acct(ids.blakeId);
@@ -197,7 +198,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
   });
 
   // ── 07-B1: existence oracle on saveDesignAction ──────────────────────────────────────────────────
-  bug('07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id', async () => {
+  it('07-B1: saveDesignAction answers an outsider the same for another family’s keepsake as for a made-up id', async () => {
     actor.current = acct(ids.blakeId);
     const real = await saveDesignAction({ assetId: famNoChild, variantSku: 'mug', transform: TRANSFORM as never });
     const ghost = await saveDesignAction({ assetId: randomUUID(), variantSku: 'mug', transform: TRANSFORM as never });
@@ -299,9 +300,55 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     keys.push(held.key, fine.key);
     await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(eq(assets.id, fine.assetId));
     await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { reports: [{ at: new Date().toISOString(), reason: 'test' }] } as never }).where(eq(assets.id, held.assetId));
-    await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [held.assetId, fine.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) });
-    const items = (await listGiftListsForOwner(db, sam, ids.hartleyId)).flatMap((l) => l.items);
+    const [heldLink] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [held.assetId, fine.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) }).returning();
+    const lists = await listGiftListsForOwner(db, sam, ids.hartleyId);
+    const items = lists.flatMap((l) => l.items);
     expect(items.find((i) => i.assetId === held.assetId)?.imageUrl ?? null, 'held original').toBeNull();
     expect(items.find((i) => i.assetId === fine.assetId)?.imageUrl, 'a cleared item keeps its picture').toBeTruthy();
+    // 06-B5: the parent's list says it's offline while that keepsake is checked — never "0 of 2 bought"
+    expect(lists.find((l) => l.id === heldLink!.id)?.status).toBe('HELD');
+  });
+
+  it('06-B7: a shared design keeps the cut-out it was shared with, even when the drawing is lifted again later', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const sha = (b: Buffer) => createHash('sha256').update(b).digest('hex');
+    const cutKey = derivativeKey(famNoChild, 'cutout');
+    const first = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 47, g: 93, b: 168, alpha: 1 } } }).png().toBuffer();
+    await putObject(cutKey, first, 'image/png');
+    keys.push(cutKey);
+    const [cut] = await db
+      .insert(storageObjects)
+      .values({ assetId: famNoChild, objectClass: 'DERIVATIVE', bucket: getS3().bucket, key: cutKey, contentType: 'image/png', byteSize: first.byteLength, sha256: sha(first), exifStripped: true, writeOnce: false })
+      .onConflictDoUpdate({ target: storageObjects.key, set: { sha256: sha(first), byteSize: first.byteLength } })
+      .returning();
+    const [variant] = await db.select({ sku: schema.productVariants.sku }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(and(eq(schema.products.key, 'mug'), eq(schema.productVariants.isDefault, true)));
+    const [design] = await db.insert(schema.savedDesigns).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, assetId: famNoChild, variantSku: variant!.sku, transform: TRANSFORM, sourceObjectId: cut!.id }).returning();
+    const { id: linkId } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [design!.id] });
+    const [link] = await db.select().from(giftLinks).where(eq(giftLinks.id, linkId));
+    const item = (link!.items as { sourceObjectId?: string | null }[])[0]!;
+    expect(item.sourceObjectId, 'the link holds its own copy, not the live cut-out').not.toBe(cut!.id);
+
+    // later: the drawing is lifted again — the live cut-out is rewritten in place
+    const second = await sharp({ create: { width: 64, height: 64, channels: 4, background: { r: 200, g: 64, b: 42, alpha: 1 } } }).png().toBuffer();
+    await putObject(cutKey, second, 'image/png');
+    await db.update(storageObjects).set({ sha256: sha(second), byteSize: second.byteLength }).where(eq(storageObjects.id, cut!.id));
+
+    const [frozen] = await db.select().from(storageObjects).where(eq(storageObjects.id, item.sourceObjectId!));
+    keys.push(frozen!.key);
+    expect([frozen!.assetId, frozen!.writeOnce, frozen!.sha256]).toEqual([famNoChild, true, sha(first)]);
+    expect(sha(await getObjectBytes(frozen!.key))).toBe(sha(first)); // the bytes the link prints from never changed
+  });
+
+  it('06-B5: the parent’s list says "no longer open" once a keepsake on it is deleted, and "open" while all is well', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    const b = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
+    keys.push(a.key, b.key);
+    await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(inArray(assets.id, [a.assetId, b.assetId]));
+    const [link] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [a.assetId, b.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) }).returning();
+    const statusOf = async () => (await listGiftListsForOwner(db, sam, ids.hartleyId)).find((l) => l.id === link!.id)?.status;
+    expect(await statusOf()).toBe('ACTIVE');
+    await db.delete(assets).where(eq(assets.id, b.assetId)); // one keepsake gone
+    expect(await statusOf()).toBe('GONE');
   });
 });

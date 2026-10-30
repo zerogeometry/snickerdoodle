@@ -130,6 +130,52 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
     });
   });
 
+  describe('04-B3: a relative with "view, buy & add" keeps into the family they JOINED', () => {
+    const extraFamilies: string[] = [];
+    afterAll(async () => {
+      // the own box a VIEW_BUY relative keeps into (created on first use) — cleared before the seed goes
+      const own = await db.select({ id: schema.families.id }).from(schema.families).where(inArray(schema.families.ownerAccountId, [ids.joId, ids.rosieId]));
+      const famIds = [...new Set([...own.map((f) => f.id), ...extraFamilies])];
+      if (famIds.length) {
+        await db.delete(assets).where(inArray(assets.familyId, famIds));
+        await db.delete(schema.memberships).where(inArray(schema.memberships.familyId, famIds));
+        await db.delete(schema.families).where(inArray(schema.families.id, famIds));
+      }
+    });
+
+    it('a CONTRIBUTE second parent’s "+ keepsake" lands in the joined family, where the parent sees it', async () => {
+      const a = await draft();
+      expect(await keepUpload(db, { id: ids.joId, name: 'Jo' }, [a.claimId], a.assetId)).toBe(true);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect([row!.familyId, row!.keptInHome, row!.visibility]).toEqual([ids.hartleyId, true, 'FAMILY']);
+    });
+
+    it('…but never ADDS a little one to someone else’s family — only an existing one is filed under', async () => {
+      const a = await draft();
+      const name = `Zed${randomUUID().slice(0, 4)}`.replace(/[^A-Za-z]/g, '') || 'Zed';
+      await keepAndFileCreations(db, { id: ids.joId, name: 'Jo' }, [a.claimId], [a.assetId], name);
+      expect(await db.select().from(children).where(eq(children.familyId, ids.hartleyId)).then((c) => c.some((x) => x.firstName.toLowerCase() === name.toLowerCase()))).toBe(false);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect(row!.familyId).toBe(ids.hartleyId);
+      expect(row!.childSubjectId).toBeNull();
+      // an EXISTING little one: filed under them, and their controlling parent becomes the controller
+      const b = await draft();
+      const [olivia] = await db.select().from(children).where(eq(children.id, ids.oliviaId));
+      await keepAndFileCreations(db, { id: ids.joId, name: 'Jo' }, [b.claimId], [b.assetId], olivia!.firstName);
+      const [filed] = await db.select().from(assets).where(eq(assets.id, b.assetId));
+      expect([filed!.childSubjectId, filed!.controllerAccountId]).toEqual([ids.oliviaId, olivia!.controllerAccountId]);
+    });
+
+    it('a VIEW_BUY relative (look + buy, not add) keeps into their OWN box, never the family’s', async () => {
+      const a = await draft();
+      expect(await keepUpload(db, { id: ids.rosieId, name: 'Rosie' }, [a.claimId], a.assetId)).toBe(true);
+      const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+      expect(row!.familyId).not.toBe(ids.hartleyId);
+      const [fam] = await db.select().from(schema.families).where(eq(schema.families.id, row!.familyId!));
+      expect(fam!.ownerAccountId).toBe(ids.rosieId);
+    });
+  });
+
   describe('a guest’s "+ keepsake", finished after they sign in (same browser only)', () => {
     const samAccount = async () => {
       const [a] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, ids.samId));

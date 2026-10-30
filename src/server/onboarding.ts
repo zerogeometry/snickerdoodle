@@ -103,6 +103,22 @@ export async function resolveHomeFamily(
   return ensureHomeFamily(db, accountId, displayName);
 }
 
+/**
+ * Which family something this account KEEPS goes into (04-B3): the family their keepsake home shows
+ * (resolveHomeFamily) when they may ADD to it — they own it, or joined it with CONTRIBUTE ("view,
+ * buy & add") — so a second parent's "+ keepsake" lands where the family sees it. A relative who can
+ * only view / buy keeps into their own box, as before. Returns the family and whether they own it.
+ */
+export async function resolveKeepFamily(db: DbHandle, accountId: string, displayName: string | null): Promise<{ familyId: string; isOwner: boolean }> {
+  const home = await resolveHomeFamily(db, accountId, displayName);
+  const [m] = await db
+    .select({ isOwner: memberships.isOwner, accessLevel: memberships.accessLevel })
+    .from(memberships)
+    .where(and(eq(memberships.accountId, accountId), eq(memberships.familyId, home), eq(memberships.status, 'ACTIVE')));
+  if (m && (m.isOwner || m.accessLevel === 'CONTRIBUTE')) return { familyId: home, isOwner: m.isOwner };
+  return { familyId: await ensureHomeFamily(db, accountId, displayName), isOwner: true };
+}
+
 async function familyHasContent(db: DbHandle, familyId: string, ownerAccountId: string): Promise<boolean> {
   const [kept] = await db.select({ id: assets.id }).from(assets).where(and(eq(assets.familyId, familyId), eq(assets.keptInHome, true))).limit(1);
   if (kept) return true;

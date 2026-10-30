@@ -460,7 +460,15 @@ export function HomeView({ data }: { data: HomeData }) {
                       gift request · {new Date(gl.createdAtISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                     </p>
                     <p className="text-xs text-ink-soft">
-                      {gl.status === 'ACTIVE' ? `${boughtCount} of ${gl.items.length} bought` : gl.status === 'REVOKED' ? 'switched off' : 'expired'}
+                      {gl.status === 'ACTIVE'
+                        ? `${boughtCount} of ${gl.items.length} bought`
+                        : gl.status === 'HELD'
+                          ? 'offline while we check something on it'
+                          : gl.status === 'GONE'
+                            ? 'no longer open — a keepsake on it was deleted or made private'
+                            : gl.status === 'REVOKED'
+                              ? 'switched off'
+                              : 'expired'}
                     </p>
                   </div>
                   <ul className="mt-4 grid grid-cols-3 gap-x-3 gap-y-6 sm:grid-cols-4">
@@ -483,7 +491,7 @@ export function HomeView({ data }: { data: HomeData }) {
                       </li>
                     ))}
                   </ul>
-                  {gl.status === 'ACTIVE' ? (
+                  {gl.status === 'ACTIVE' || gl.status === 'HELD' || gl.status === 'GONE' ? (
                     confirmRevoke === gl.id ? (
                       <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border-2 border-berry bg-berry-pale p-3 sm:flex-row sm:items-center">
                         <p className="flex-1 text-xs text-cocoa">switch this link off? anyone holding it won&apos;t be able to open it any more.</p>

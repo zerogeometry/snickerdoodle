@@ -334,6 +334,9 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   await expect(page.getByRole('button', { name: /being checked after a report/ })).toBeVisible();
   const listState = await page.locator('section', { hasText: 'Gift requests' }).innerText().catch(() => '');
   test.info().annotations.push({ type: '06-B-owner-list-after-report', description: listState.replace(/\s+/g, ' ').slice(0, 300) });
+  // 06-B5 (fixed): the list says it's offline, never "0 of 1 bought" as if it still worked
+  expect(listState).toContain('offline while we check something on it');
+  expect(listState).not.toMatch(/\d+ of \d+ bought/);
   await page.screenshot({ path: `${SHOTS}/parent-home-after-report-phone.png`, fullPage: true });
 
   // an admin: signs in, sets up two-step login, and removes it from the review queue

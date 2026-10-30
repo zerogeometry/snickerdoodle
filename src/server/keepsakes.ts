@@ -3,7 +3,7 @@ import { and, eq, gt, inArray, lte, or } from 'drizzle-orm';
 import { assets, pendingKeeps } from '@/db/schema';
 import { adoptEphemeralDraft } from '@/server/assets';
 import { resolveChildSubject } from '@/server/children';
-import { ensureHomeFamily } from '@/server/onboarding';
+import { resolveKeepFamily } from '@/server/onboarding';
 import type { DbHandle } from './db';
 
 /**
@@ -31,7 +31,9 @@ export async function keepAndFileCreations(
   const ids = [...new Set((assetIds ?? []).filter((x): x is string => !!x))];
   if (ids.length === 0) return { familyId: null, childId: null };
 
-  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  // the family they'd see it in, if they may add to it (a CONTRIBUTE second parent: the family they
+  // joined — 04-B3); else their own box
+  const { familyId, isOwner } = await resolveKeepFamily(db, account.id, account.name);
 
   const adopted: string[] = [];
   for (const id of ids) {
@@ -43,7 +45,8 @@ export async function keepAndFileCreations(
     }
   }
 
-  const child = subject ? await resolveChildSubject(db, familyId, account.id, subject) : null;
+  // only the family's owner adds a little one; a relative can only file under one it already has
+  const child = subject ? await resolveChildSubject(db, familyId, account.id, subject, { create: isOwner }) : null;
   if (child && adopted.length > 0) {
     await db
       .update(assets)

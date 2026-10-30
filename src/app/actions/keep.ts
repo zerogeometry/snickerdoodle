@@ -6,7 +6,7 @@ import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
-import { ensureHomeFamily } from '@/server/onboarding';
+import { resolveKeepFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { ImageTooLargeError } from '@/storage';
@@ -28,7 +28,7 @@ export async function keepCreation(formData: FormData): Promise<{ ok: boolean; n
   if (file.size > 25 * 1024 * 1024) return { ok: false }; // 25MB guard
 
   const db = getDb();
-  const familyId = await ensureHomeFamily(db, account.id, account.name);
+  const { familyId } = await resolveKeepFamily(db, account.id, account.name); // a CONTRIBUTE relative: the family they joined (04-B3)
   const viewer = await resolveViewerContext(db, account.id, familyId);
   const buffer = Buffer.from(await file.arrayBuffer());
 

@@ -210,12 +210,12 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await G.page.goto(`/join/${inv.resend.token}`); // the pre-resend token
     await expect(G.page.getByRole('heading', { level: 1 })).toHaveText(/This invite link isn.t valid/);
     await G.page.goto(`/join/${inv.friend.token}`); // revoked
-    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has already been used');
-    await expect(G.page.getByText(/It.s already been accepted./)).toBeVisible(); // 04-B5: says "accepted" for a CANCELLED invite
+    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite was cancelled'); // 04-B5 (fixed)
+    await expect(G.page.getByText(/cancelled it, or sent a newer one/)).toBeVisible();
     await shot(G.page, 'join-revoked-mobile');
     await G.page.goto(`/join/${inv.expired.token}`);
-    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has already been used'); // 04-B5: an expired one says "already been used"
-    await expect(G.page.getByText('It expired.')).toBeVisible();
+    await expect(G.page.getByRole('heading', { level: 1 })).toHaveText('This invite has expired'); // 04-B5 (fixed)
+    await expect(G.page.getByText(/Invites last 14 days/)).toBeVisible();
     await shot(G.page, 'join-expired-mobile');
     const { n } = (await sql()`select count(*)::int n from memberships m join accounts a on a.id = m.account_id where a.email in ${sql()([E.friend, E.resend, E.expired])}`)[0]!;
     expect(n).toBe(0);
@@ -448,9 +448,9 @@ test('04-B2: a VIEW-only relative cannot order a family keepsake', async ({ brow
  * 04-B3 (P2) — "view, buy & add" doesn't add to the family. Observed 2026-10-29 (probe run): a second
  * parent joined at Family · CONTRIBUTE uploaded a drawing and tapped "+ keepsake"; it was filed into a
  * NEW family they own (ensureHomeFamily in keepAndFileCreations / keepCreation), not the family they
- * joined — the controlling parent never sees it. Un-fixme when fixed.
+ * joined — the controlling parent never sees it. Fixed: resolveKeepFamily (src/server/onboarding.ts).
  */
-test.fixme('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they joined', async ({ browser }) => {
+test('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they joined', async ({ browser }) => {
   test.setTimeout(400_000);
   const parent = testEmail('cb-parent');
   const co = testEmail('cb-co');
@@ -466,7 +466,7 @@ test.fixme('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they
   await C.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(C.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   const rows = await sql()`select a.family_id from assets a join accounts acc on acc.id = a.uploader_account_id where acc.email = ${co} and a.kept_in_home`;
-  expect(rows.map((r) => r.family_id)).toEqual([familyId]); // FAILS today: it's in the co-parent's own new family
+  expect(rows.map((r) => r.family_id)).toEqual([familyId]); // the family they joined (fixed: resolveKeepFamily)
 });
 
 test('profile pictures + the family banner: family members only — a stranger, a signed-out visitor and a removed member get a plain 404', async ({ browser }) => {
