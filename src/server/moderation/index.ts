@@ -4,7 +4,7 @@ import type { DbHandle } from '../db';
 import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
-import { HASH_UNCHECKED_LABEL } from '@/authz/review';
+import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz/review';
 
 const sha256Hex = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -85,7 +85,7 @@ export async function moderateAndRecord(
   // review — it can never reach a print order, and it is never auto-rejected or binned.
   const unscreened = !providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
   const raw: ModerationVerdict = unscreened
-    ? { status: 'FLAGGED', labels: ['screening-not-configured'] }
+    ? { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] }
     : await moderateImage({ buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer }, providers);
   // Fail-safe (D8): a malformed/unrecognised verdict routes to human review — NEVER
   // silently CLEAR. Defends the gate against a future provider returning garbage.
@@ -149,7 +149,7 @@ export async function moderateDesignAndRecord(
 ): Promise<ModerationVerdict> {
   let design: Stored;
   if (!providers && env.NODE_ENV === 'production' && !isModerationConfigured(env)) {
-    design = { status: 'FLAGGED', labels: ['screening-not-configured'] };
+    design = { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] };
   } else {
     const p = providers ?? defaultProviders(env);
     // a classifier that FAILED is not a clean result either — held for review, never CLEAR

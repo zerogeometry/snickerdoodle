@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, gt, inArray, ne } from 'drizzle-orm';
 import sharp from 'sharp';
 import { accounts, auditRecords, emailChangeRequests, families, memberships, profileImages } from '@/db/schema';
-import { canManageFamily, canViewProfileImage } from '@/authz';
+import { canManageFamily, canViewProfileImage, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz';
 import { deleteObjectConfirmed, getObjectBytes, putObject } from '@/storage';
 import { resolveViewerContext } from './assets';
 import type { DbHandle } from './db';
@@ -71,7 +71,7 @@ export async function setProfileImage(
   // Screening (D8): same gate as drawings. Fail closed in production with no real screening.
   const unscreened = !opts.providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
   const verdict = unscreened
-    ? { status: 'FLAGGED' as const, labels: ['screening-not-configured'] }
+    ? { status: 'FLAGGED' as const, labels: [SCREENING_NOT_CONFIGURED_LABEL] }
     : await moderateImage(
         { buffer: encoded.data, sha256: createHash('sha256').update(encoded.data).digest('hex'), originalBuffer: input.buffer },
         opts.providers ?? defaultProviders(env),

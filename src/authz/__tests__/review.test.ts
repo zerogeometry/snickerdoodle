@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { HASH_UNCHECKED_LABEL, canReview, hashCheckSkipped, type Reviewer } from '@/authz';
+import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL, canReview, hashCheckSkipped, type Reviewer } from '@/authz';
 import { base32Encode, openSecret, sealSecret, totpCode, verifyTotp } from '@/server/admin/totp';
 import { signStepUp, verifyStepUp } from '@/server/admin/stepUp';
 
@@ -55,6 +55,20 @@ describe('content review — a picture the hash check never saw', () => {
     // an unchecked upload stays unchecked even after a design is added on top
     const uncheckedWithDesign = { moderationStatus: 'FLAGGED', moderationDetail: { labels: [HASH_UNCHECKED_LABEL, 'drawn-words'], original: { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] }, design: { status: 'FLAGGED', labels: ['drawn-words'] } } };
     expect(canReview(admin, 'clear', uncheckedWithDesign).allowed).toBe(false);
+  });
+
+  // 08-B7: in production with no screening set up (every upload until IWF is connected), the upload
+  // is held as "screening-not-configured" — its hash check never ran either.
+  it('08-B7: an upload held because no screening is set up is treated the same — removable, never viewed or cleared', () => {
+    const unscreened = { moderationStatus: 'FLAGGED', moderationDetail: { labels: [SCREENING_NOT_CONFIGURED_LABEL] } };
+    const unscreenedThenReported = { moderationStatus: 'FLAGGED', moderationDetail: { labels: ['reported via a gift link'], original: { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] }, reports: [{}] } };
+    for (const item of [unscreened, unscreenedThenReported]) {
+      expect(hashCheckSkipped(item)).toBe(true);
+      expect(canReview(admin, 'view', item).allowed).toBe(false);
+      expect(canReview(admin, 'clear', item).allowed).toBe(false);
+      expect(canReview(admin, 'remove', item).allowed).toBe(true);
+    }
+    expect(SCREENING_NOT_CONFIGURED_LABEL).toBe('screening-not-configured'); // the label stored on existing rows
   });
 });
 
