@@ -71,11 +71,11 @@ describe('the "arrives by christmas" promise', () => {
     expect(deliveryPromise('ceramicOrnament', at('2026-10-20T12:00:00Z'))).toEqual({ state: 'off' });
   });
   it('is in time up to and including the last order date', () => {
-    const p = deliveryPromise('ceramicOrnament', at('2026-12-14T21:00:00Z'));
-    expect(p).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-14', daysLeft: 0 });
+    const p = deliveryPromise('ceramicOrnament', at('2026-12-12T21:00:00Z'));
+    expect(p).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-12', daysLeft: 0 });
   });
   it('is missed the day after', () => {
-    expect(deliveryPromise('ceramicOrnament', at('2026-12-15T08:00:00Z'))).toEqual({ state: 'missed', lastOrderDate: '2026-12-14' });
+    expect(deliveryPromise('ceramicOrnament', at('2026-12-13T08:00:00Z'))).toEqual({ state: 'missed', lastOrderDate: '2026-12-12' });
   });
   it('cards close before baubles (Guernsey)', () => {
     const now = at('2026-12-12T12:00:00Z');
@@ -83,7 +83,7 @@ describe('the "arrives by christmas" promise', () => {
     expect(deliveryPromise('ceramicOrnament', now).state).toBe('in-time');
   });
   it('the headline strip follows the main uk9 parcel', () => {
-    expect(headlinePromise(at('2026-11-10T12:00:00Z'))).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-14' });
+    expect(headlinePromise(at('2026-11-10T12:00:00Z'))).toMatchObject({ state: 'in-time', lastOrderDate: '2026-12-12' });
   });
 });
 

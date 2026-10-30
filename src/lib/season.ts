@@ -87,21 +87,25 @@ export type Route = 'uk9' | 'uk3' | 'uk5' | 'uk7' | 'uk15' | 'gb2' | 'gb3' | 'uk
  * "posted here when available" on 2026-10-25). They are deliberately SAFE: Royal Mail's own 2025 last
  * dates were Tracked 48 Fri 19 Dec / 1st Class Sat 20 Dec / Tracked 24 Sun 21 Dec; we allow ~3 working
  * days to make + a margin. Guernsey (cards) and the calendar lab get a day or two more. Phone cases
- * already ship Express. When Prodigi's dates land, edit them here — one place feeds the strip, the
+ * already ship Express. 30 Oct: Prodigi published SOME UK dates (prodigi.com/christmas-delivery-dates) —
+ * homeware (uk9) closes Sat 12 Dec on Standard, EARLIER than our guess, so uk9 now follows it; framed
+ * prints (17 Dec) and the height chart (15 Dec) stay on our safer 14 Dec; wrapping paper + greetings
+ * cards: "usual delivery times apply". Mugs, tees, cushions, blankets, baubles, calendars and phone cases
+ * aren't listed yet. When the rest land, edit them here — one place feeds the strip, the
  * badges, the basket lines and the /christmas/delivery-dates page.
  */
 export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRoute: Record<Route, string> }> = {
   2026: {
     provisional: true,
     byRoute: {
-      uk9: '2026-12-14', // Royal Mail Tracked 48: bauble, sack, mug, tea towel, socks, tees, hoodies, kids jumper
+      uk9: '2026-12-12', // Royal Mail Tracked 48: bauble, sack, mug, tea towel, socks, tees, hoodies, kids jumper, placemats, coasters, the family bundle — PRODIGI'S OWN date (Standard, UK, published 30 Oct: ornaments, sacks, tea towels, coasters, placemats)
       uk3: '2026-12-14', // FedEx Economy: apron, cushion, blanket
       uk5: '2026-12-11', // Royal Mail RM24 (untracked): plastic ball
       uk7: '2026-12-10', // Guernsey Post: cards + card packs
       uk15: '2026-12-11', // the calendar lab ("Mixed" carrier, no express)
       gb2: '2026-12-11', // Royal Mail RM24 (untracked): wrapping paper, Evri for some
       gb3: '2026-12-14', // Evri: framed prints, jigsaws, height chart
-      uk2: '2026-12-14', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date)
+      uk2: '2026-12-12', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date)
       uk6: '2026-12-16', // phone cases go Express
       other: '2026-12-10', // anything we haven't mapped: the earliest date, to be safe
     },
