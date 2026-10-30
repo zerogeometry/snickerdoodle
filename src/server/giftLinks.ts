@@ -13,7 +13,10 @@ import type { DbHandle } from './db';
 import { createInvite } from './invites';
 import { familyNameForRelatives } from './onboarding';
 import { placeOrder, type PlaceOrderResult } from './orders';
-import type { RawTransform } from './print/geometry';
+import { clampTransform, type RawTransform } from './print/geometry';
+import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { isGroundProduct, normalizeGround } from '@/lib/patterns';
+import { isBundleKey } from '@/lib/christmas-bundle';
 import { appUrl, sendMail } from './mail';
 import { assetRefOf } from './assetRef';
 
@@ -42,11 +45,25 @@ export interface GiftItem {
   ground?: string | null;
 }
 
+export interface GiftLineInput {
+  assetId: string;
+  /** The line's variant sku (a product key = its default variant). */
+  variantSku: string;
+  transform?: unknown;
+  sourceObjectId?: string | null;
+  back?: string | null;
+  ground?: string | null;
+}
+
 export interface CreateGiftLinkInput {
   familyId: string;
   assetIds: string[];
   /** "+ Keepsake" saved designs to include, sold exactly as designed (variant + placement). */
   designIds?: string[];
+  /** Basket lines to include as they were made (Share a Wish): the exact variant + placement + cutout +
+   * back + base colour. Untrusted — each is re-checked here (product live + giftable + priced, the
+   * keepsake visible + kept + cleared, the placement clamped, the cutout the keepsake's own). */
+  lines?: GiftLineInput[];
   title?: string | null;
   /** What the keepsakes are offered as (default framed print) — validated server-side. */
   productKey?: string | null;
@@ -67,7 +84,7 @@ export async function createGiftLink(
   if (creator.accountId === null || !canManageFamily(creator.membership) || creator.membership!.familyId !== input.familyId) {
     throw new AuthzError({ allowed: false, reason: 'only the family owner can create a gift link' });
   }
-  if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0) {
+  if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0 && (input.lines?.length ?? 0) === 0) {
     throw new AuthzError({ allowed: false, reason: 'pick at least one keepsake to share' });
   }
 
@@ -125,6 +142,51 @@ export async function createGiftLink(
         sourceObjectId: d.sourceObjectId,
         back: d.back,
         ground: d.ground,
+      });
+    }
+  }
+  // Basket lines (Share a Wish): sold as they were made — never swapped for the default product.
+  if (input.lines?.length) {
+    const lineRows = await db.select().from(assets).where(inArray(assets.id, input.lines.map((l) => l.assetId)));
+    const byId = new Map(lineRows.map((a) => [a.id, a]));
+    const variants = await db
+      .select({ v: productVariants, p: products })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(inArray(productVariants.sku, input.lines.map((l) => String(l.variantSku))));
+    const bySku = new Map(variants.map((r) => [r.v.sku, r]));
+    const prices = await getCatalogue(db);
+    const seen = new Set(items.map((i) => `${i.assetId}|${i.productKey}`));
+    for (const l of input.lines) {
+      const a = byId.get(l.assetId);
+      const row = bySku.get(String(l.variantSku));
+      if (!a || !row) continue;
+      const { v, p } = row;
+      if (a.familyId !== input.familyId || !a.keptInHome || a.moderationStatus !== 'CLEAR') continue;
+      if (!canViewAsset(assetRefOf(a), creator).allowed) continue;
+      if (!p.visibleInShop || !p.active || !v.active || NOT_GIFTABLE.has(p.key) || isBundleKey(p.key) || !prices[v.sku]) continue;
+      const key = `${a.id}|${v.sku}`;
+      if (seen.has(key)) continue; // one line per keepsake-on-a-variant (the list ticks items off by it)
+      seen.add(key);
+      let sourceObjectId: string | null = null;
+      if (l.sourceObjectId) {
+        const [so] = await db
+          .select({ id: storageObjects.id })
+          .from(storageObjects)
+          .where(and(eq(storageObjects.id, String(l.sourceObjectId)), eq(storageObjects.assetId, a.id)));
+        sourceObjectId = so?.id ?? null;
+      }
+      const attrs = (v.attributes as Record<string, string>) ?? {};
+      const detail = [attrs.size, attrs.colour].filter(Boolean).join(' · ');
+      items.push({
+        assetId: a.id,
+        productKey: v.sku,
+        label: detail ? `${p.label} · ${detail}` : p.label,
+        unitPricePence: prices[v.sku]!.pricePence,
+        transform: clampTransform((l.transform ?? {}) as RawTransform),
+        sourceObjectId,
+        back: normalizeCushionBack(typeof l.back === 'string' ? l.back : undefined),
+        ground: isGroundProduct(p.key) ? normalizeGround(typeof l.ground === 'string' ? l.ground : undefined) : null,
       });
     }
   }
