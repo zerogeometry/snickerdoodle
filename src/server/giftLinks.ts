@@ -10,7 +10,7 @@ import sharp from 'sharp';
 import { getObjectBytes, presignDownload } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
-import { createInvite } from './invites';
+import { AlreadyInFamilyError, createInvite } from './invites';
 import { familyNameForRelatives } from './onboarding';
 import { placeOrder, type PlaceOrderResult } from './orders';
 import type { RawTransform } from './print/geometry';
@@ -134,14 +134,18 @@ export async function createGiftLink(
 
   let inviteId: string | null = null;
   if (input.invite?.email.trim()) {
-    const inv = await createInvite(db, creator, {
-      familyId: input.familyId,
-      email: input.invite.email,
-      relationship: input.invite.relationship,
-      accessLevel: input.invite.accessLevel,
-      shareOccasions: input.invite.shareOccasions === true,
-    });
-    inviteId = inv.inviteId;
+    try {
+      const inv = await createInvite(db, creator, {
+        familyId: input.familyId,
+        email: input.invite.email,
+        relationship: input.invite.relationship,
+        accessLevel: input.invite.accessLevel,
+        shareOccasions: input.invite.shareOccasions === true,
+      });
+      inviteId = inv.inviteId;
+    } catch (e) {
+      if (!(e instanceof AlreadyInFamilyError)) throw e; // already in the family: the link needs no invite
+    }
   }
 
   const token = randomBytes(24).toString('base64url');

@@ -13,6 +13,7 @@ import { familyBannerFor, profileImagesFor } from './profile';
 import { keepsakeThumbUrls } from './keepsakeThumbs';
 import { keepsakeLooks } from './keepsakeCopy';
 import { assetRefOf, isHeldForReport } from './assetRef';
+import { memberName } from './memberName';
 
 export interface HomeMember {
   accountId: string;
@@ -98,8 +99,10 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     .innerJoin(accounts, eq(memberships.accountId, accounts.id))
     .where(and(eq(memberships.familyId, familyId), eq(memberships.status, 'ACTIVE')));
 
+  // the parent sees the addresses they invited; relatives never see each other's (04-B9)
+  const viewerIsParent = memberRows.some(({ m, a }) => a.id === account.id && m.isOwner);
   const members: HomeMember[] = memberRows.map(({ m, a }) => {
-    const name = a.displayName ?? a.email.split('@')[0] ?? 'Member';
+    const name = memberName(a, m.relationship, { byThemself: a.id === account.id, byParent: viewerIsParent });
     return {
       accountId: a.id,
       name,

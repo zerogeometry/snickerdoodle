@@ -14,6 +14,7 @@ import type { AccessLevel, Circle, Relationship } from '@/domain/types';
 import { ensureHomeFamily } from './onboarding';
 import { getCurrentAccount } from './session';
 import { familyBannerFor, profileImagesFor } from './profile';
+import { memberName } from './memberName';
 
 export interface FamilyMember {
   accountId: string;
@@ -108,8 +109,10 @@ export async function loadFamily(): Promise<FamilyData | null> {
     .innerJoin(accounts, eq(memberships.accountId, accounts.id))
     .where(and(eq(memberships.familyId, familyId), eq(memberships.status, 'ACTIVE')));
 
+  // the parent sees the addresses they invited; relatives never see each other's (04-B9)
+  const viewerIsParent = memberRows.some(({ m, a }) => a.id === account.id && m.isOwner);
   const members: FamilyMember[] = memberRows.map(({ m, a }) => {
-    const name = a.displayName ?? a.email.split('@')[0] ?? 'Member';
+    const name = memberName(a, m.relationship, { byThemself: a.id === account.id, byParent: viewerIsParent });
     return {
       accountId: a.id,
       name,

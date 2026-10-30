@@ -90,7 +90,7 @@ function Invited({ inv, owner }: { inv: FamilyPendingInvite; owner: boolean }) {
       </div>
       {owner ? (
         <div className="mt-1 flex gap-2">
-          <button type="button" onClick={resend} disabled={pending} aria-label={`send the invite to ${inv.email} again`} className="min-h-11 text-[11px] font-bold text-cinnamon underline disabled:opacity-60">
+          <button type="button" onClick={resend} disabled={pending} aria-label={`resend the invite to ${inv.email}`} className="min-h-11 text-[11px] font-bold text-cinnamon underline disabled:opacity-60">
             resend
           </button>
           <button type="button" onClick={cancel} disabled={pending} aria-label={`cancel the invite to ${inv.email}`} className="min-h-11 text-[11px] font-bold text-ink-soft underline disabled:opacity-60">

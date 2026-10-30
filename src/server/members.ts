@@ -1,10 +1,12 @@
 import { randomBytes } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
-import { auditRecords, invites, memberships, sessions } from '@/db/schema';
+import { accounts, auditRecords, families, invites, memberships, sessions } from '@/db/schema';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import type { AccessLevel, Circle } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
+import { sendMail, type MailMessage } from './mail';
+import { memberAccessChangedEmail, memberRemovedEmail } from './mail/familyNotices';
 
 /**
  * The parent's controls over who is in the family (parent-is-controller). Every change is
@@ -17,6 +19,30 @@ function assertOwnerOf(owner: ViewerContext, familyId: string, what: string): st
     throw new AuthzError({ allowed: false, reason: `only the family owner can ${what}` });
   }
   return owner.accountId;
+}
+
+/**
+ * Tell the member themself what changed (sweep 04): to their own address only, naming the parent
+ * by first name, with no child data. A mail hiccup never undoes the change — it's logged for ops.
+ */
+async function tellMember(
+  db: DbHandle,
+  familyId: string,
+  memberAccountId: string,
+  build: (who: { to: string; memberName: string | null; ownerName: string | null }) => MailMessage,
+) {
+  try {
+    const [member] = await db.select({ email: accounts.email, name: accounts.displayName }).from(accounts).where(eq(accounts.id, memberAccountId));
+    const [owner] = await db
+      .select({ name: accounts.displayName })
+      .from(families)
+      .innerJoin(accounts, eq(accounts.id, families.ownerAccountId))
+      .where(eq(families.id, familyId));
+    if (!member) return;
+    await sendMail(build({ to: member.email, memberName: member.name, ownerName: owner?.name ?? null }));
+  } catch (e) {
+    console.error('[members] the change notice to the member failed', e instanceof Error ? e.message : e);
+  }
 }
 
 const CIRCLES: Circle[] = ['FAMILY', 'EXTENDED'];
@@ -58,6 +84,7 @@ export async function removeMember(
     targetType: 'account',
     targetId: input.memberAccountId,
   });
+  await tellMember(db, input.familyId, input.memberAccountId, (who) => memberRemovedEmail(who));
   return { ok: true };
 }
 
@@ -110,6 +137,12 @@ export async function setMemberAccess(
         targetId: input.memberAccountId,
         metadata: a.metadata,
       })),
+    );
+  }
+  if (audits.length) {
+    // only when something really changed — and only to them
+    await tellMember(db, input.familyId, input.memberAccountId, (who) =>
+      memberAccessChangedEmail({ ...who, circle: input.circle ?? before.circle, accessLevel: input.accessLevel ?? before.accessLevel }),
     );
   }
   return { ok: true };

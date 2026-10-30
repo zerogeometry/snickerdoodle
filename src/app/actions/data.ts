@@ -10,6 +10,17 @@ import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { closeAccount, closurePreview, type ClosurePreview } from '@/server/accountClosure';
 import { collectAccountData } from '@/server/exportData';
+import { sendMail, type MailMessage } from '@/server/mail';
+import { accountClosedEmail, dataExportEmail, keepsakesDeletedEmail } from '@/server/mail/dataRights';
+
+/** A data-rights confirmation, to the account's own address. A mail hiccup never undoes what was done. */
+async function confirm(message: MailMessage) {
+  try {
+    await sendMail(message);
+  } catch (e) {
+    console.error(`[data] the ${message.kind} confirmation failed`, e instanceof Error ? e.message : e);
+  }
+}
 
 /**
  * Download-your-data (a portable subject-access export). Returns everything we hold
@@ -38,6 +49,8 @@ export async function exportMyDataAction(nowISO: string): Promise<{ ok: boolean;
     },
     ...everything,
   };
+  // a heads-up to their own inbox, so a download they didn't make never goes unnoticed
+  await confirm(dataExportEmail({ to: account.email, name: account.name, at: new Date() }));
   return { ok: true, filename: `snickerdoodle-your-data.json`, json: JSON.stringify(data, null, 2) };
 }
 
@@ -74,6 +87,7 @@ export async function deleteAllMyKeepsakesAction(_nowISO: string): Promise<{ ok:
   // (each keepsake is audited as ASSET_DELETED by deleteAsset — this is not an account closure)
 
   revalidatePath('/home');
+  if (deleted > 0) await confirm(keepsakesDeletedEmail({ to: account.email, name: account.name, deleted }));
   return { ok: true, deleted };
 }
 
@@ -91,6 +105,8 @@ export async function closeMyAccountAction(
     handOver: handOver ? { familyId: String(handOver.familyId), newOwnerAccountId: String(handOver.newOwnerAccountId) } : null,
   });
   if (!res.ok) return res.reason === 'not-found' ? { ok: false } : { ok: false, reason: res.reason };
+  // to the address the account had (it's erased now) — the last email we send them
+  await confirm(accountClosedEmail({ to: account.email, name: account.name }));
   revalidatePath('/', 'layout');
   return { ok: true };
 }

@@ -9,7 +9,7 @@ import { accounts, auditRecords, invites, memberships, storageObjects } from '@/
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, canDeleteAsset, canSetAssetVisibility, canViewAsset } from '@/authz';
 import { changeAssetVisibility, listViewableAssets, resolveViewerContext } from '@/server/assets';
-import { acceptInvite, createInvite, getInviteForDisplay, setMemberSeesOccasions } from '@/server/invites';
+import { acceptInvite, AlreadyInFamilyError, createInvite, getInviteForDisplay, setMemberSeesOccasions } from '@/server/invites';
 import { removeMember, resendInvite, revokeInvite, setMemberAccess } from '@/server/members';
 import { assetRefOf } from '@/server/assetRef';
 import { ingestOriginalAsset } from '@/server/ingest';
@@ -221,26 +221,32 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     await changeAssetVisibility(db, ids.assetExtended, sam, 'EXTENDED');
   });
 
-  // 04-B4 (P3): the parent can invite someone who is ALREADY an active member (e.g. to move Granny into the
-  // Family circle). Accepting "succeeds" and the invite is spent, but acceptInvite skips the insert when an
-  // ACTIVE membership exists — the old circle/access silently stay. it.fails = passes while the bug is
-  // present; drop `.fails` when fixed (or refuse such invites up front).
-  it.fails('04-B4: re-inviting an active member at a new circle/access either applies it or is refused', async () => {
+  // 04-B4 (fixed): inviting someone who is ALREADY an active member used to be accepted and then silently
+  // change nothing. Now it's refused up front (the parent changes their level from their card), and a
+  // second invite still waiting when they join is spent, so an old link can't change their level later.
+  it('04-B4: re-inviting an active member is refused up front; the membership is unchanged', async () => {
     const [rosie] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, ids.rosieId));
     const sam = await owner();
     const before = await resolveViewerContext(db, ids.rosieId, ids.hartleyId);
-    expect(before.membership).toMatchObject({ circle: 'EXTENDED', status: 'ACTIVE' });
-    let invited = true;
-    try {
-      const { token } = await createInvite(db, sam, { familyId: ids.hartleyId, email: rosie!.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE' });
-      expect((await acceptInvite(db, { id: ids.rosieId, email: rosie!.email }, token)).ok).toBe(true);
-    } catch {
-      invited = false; // refusing the invite up front is an acceptable fix too
-    }
-    if (invited) {
-      const after = await resolveViewerContext(db, ids.rosieId, ids.hartleyId);
-      expect(after.membership).toMatchObject({ circle: 'FAMILY', accessLevel: 'CONTRIBUTE' });
-    }
+    expect(before.membership).toMatchObject({ circle: 'EXTENDED', accessLevel: 'VIEW_BUY', status: 'ACTIVE' });
+    // any case: the address is matched the way the join check matches it
+    await expect(createInvite(db, sam, { familyId: ids.hartleyId, email: rosie!.email.toUpperCase(), relationship: 'PARENT', accessLevel: 'CONTRIBUTE' })).rejects.toBeInstanceOf(AlreadyInFamilyError);
+    expect(await db.select().from(invites).where(and(eq(invites.familyId, ids.hartleyId), eq(invites.email, rosie!.email), eq(invites.status, 'PENDING')))).toHaveLength(0);
+    const after = await resolveViewerContext(db, ids.rosieId, ids.hartleyId);
+    expect(after.membership).toMatchObject({ circle: 'EXTENDED', accessLevel: 'VIEW_BUY' });
+  });
+
+  it('04-B4: two invites to one address — joining with one spends the other, so it can never change their level later', async () => {
+    const who = await newAccount('twice');
+    const sam = await owner();
+    const first = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW' });
+    const second = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE' });
+    expect((await acceptInvite(db, who, first.token)).ok).toBe(true);
+    const [left] = await db.select({ status: invites.status }).from(invites).where(eq(invites.id, second.inviteId));
+    expect(left!.status).toBe('REVOKED');
+    expect(await acceptInvite(db, who, second.token)).toMatchObject({ ok: false, reason: 'used' });
+    const m = await resolveViewerContext(db, who.id, ids.hartleyId);
+    expect(m.membership).toMatchObject({ circle: 'EXTENDED', accessLevel: 'VIEW' });
   });
 });
 
