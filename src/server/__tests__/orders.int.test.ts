@@ -167,7 +167,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
 
     const eventId = `evt_idem_${ids.nonce}`;
     webhookIds.push(eventId);
-    const event = { id: eventId, type: 'checkout.session.completed', data: { object: { id: sessionId } } } as unknown as Stripe.Event;
+    const event = { id: eventId, type: 'checkout.session.completed', data: { object: { id: sessionId, payment_status: 'paid' } } } as unknown as Stripe.Event;
 
     const first = await handleStripeEvent(db, event);
     const second = await handleStripeEvent(db, event); // replay
@@ -196,6 +196,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       data: {
         object: {
           id: sessionId,
+          payment_status: 'paid',
           collected_information: {
             shipping_details: {
               name: 'Sam Hartley',

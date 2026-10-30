@@ -3,7 +3,7 @@
 import { getDb } from '@/db/client';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { keepAndFileCreations } from '@/server/keepsakes';
-import { placeOrder, type PlaceLine } from '@/server/orders';
+import { basketHasPrintWithoutDrawing, placeOrder, type PlaceLine } from '@/server/orders';
 import { resolvePromo } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
@@ -98,6 +98,8 @@ export async function placeOrderAction(input: {
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
   const db = getDb();
+  // a printed item always comes with its drawing — a basket without one is refused (05-B9)
+  if (await basketHasPrintWithoutDrawing(db, items)) return { ok: false };
 
   // File the basket's creations into the family + under the child, so the
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).

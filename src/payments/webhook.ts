@@ -15,17 +15,33 @@ export function verifyStripeEvent(payload: string, signature: string, secret: st
   return stripe.webhooks.constructEvent(payload, signature, secret);
 }
 
+/** The session events that can carry a paid order. */
+const PAID_EVENTS = new Set(['checkout.session.completed', 'checkout.session.async_payment_succeeded']);
+
+/**
+ * Has the money actually arrived? `checkout.session.completed` fires when the shopper finishes
+ * Checkout — for a delayed method (Bacs, bank transfer) that is BEFORE the money lands, with
+ * payment_status 'unpaid'; the money then arrives as `checkout.session.async_payment_succeeded`
+ * (sweep 05-B2). Only 'paid' (or a nothing-to-pay session) ever queues an order for print.
+ */
+function sessionIsPaid(session: Stripe.Checkout.Session): boolean {
+  return session.payment_status === 'paid' || session.payment_status === 'no_payment_required';
+}
+
 /**
  * Handle a verified event idempotently: a replayed event id is a no-op, so a
- * retried webhook never double-fulfils. Marks the matching order paid on
- * checkout.session.completed.
+ * retried webhook never double-fulfils. Marks the matching order paid once its session is PAID —
+ * on checkout.session.completed (cards, wallets: paid at once), or on
+ * checkout.session.async_payment_succeeded for a delayed method. A completed-but-unpaid session
+ * only records the address; the order stays PENDING (never printed) until the money arrives, and an
+ * async_payment_failed leaves it PENDING for good.
  */
 export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Promise<{ handled: boolean; duplicate: boolean }> {
   const seen = await db.select({ id: webhookEvents.id }).from(webhookEvents).where(eq(webhookEvents.id, event.id));
   if (seen[0]) return { handled: false, duplicate: true };
 
   let handled = false;
-  if (event.type === 'checkout.session.completed') {
+  if (PAID_EVENTS.has(event.type)) {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.id) {
       const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.stripeSessionId, session.id));
@@ -56,8 +72,10 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
         if (payerEmail) {
           await db.update(orders).set({ buyerEmail: payerEmail.toLowerCase() }).where(and(eq(orders.id, order.id), isNull(orders.buyerEmail)));
         }
-        await markOrderPaid(db, order.id);
-        handled = true;
+        if (sessionIsPaid(session)) {
+          await markOrderPaid(db, order.id);
+          handled = true;
+        }
       }
     }
   }
