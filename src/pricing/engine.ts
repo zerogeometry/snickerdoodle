@@ -1,7 +1,7 @@
 import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, isFamilySetKey, type PricedCatalogue } from './catalogue';
 import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
-import { evaluatePromo, type PromoRule } from './promo';
+import { evaluatePromo, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
@@ -49,7 +49,7 @@ export interface Quote {
   /** Pence a promo code took off the goods (0 if none / not used). */
   promoSavingPence: number;
   /** What happened to the code the customer entered (null if none). Safe to show. */
-  promo: null | { code: string; applied: boolean; reason?: 'min-spend' | 'nothing-eligible' | 'better-saving-applied'; minSpendPence?: number; capped?: boolean };
+  promo: null | { code: string; kind: PromoKind; applied: boolean; reason?: PromoNotApplied; minSpendPence?: number; capped?: boolean };
   /** SERVER-ONLY: what the code's partner earns. Strip before returning to a client. */
   partnerCommissionPence: number;
   /** Account credit (e.g. referral rewards) applied to this order. */
@@ -86,6 +86,9 @@ export function lineEconomics(catalogue: PricedCatalogue, key: string): UnitEcon
 
 /** The product a line key belongs to (multi-buy counts a product across its lines and variants). */
 export const productOfKey = (key: string): string => key.split('-')[0]!;
+
+/** The product a free-card code gives one of: the single greetings card (a card PACK is its own product). */
+export const FREE_CARD_PRODUCT = 'card';
 
 /** Basis-points of an amount, rounded to the nearest penny. */
 function bpsOf(amountPence: number, bps: number): number {
@@ -202,7 +205,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
         // unknown ⇒ left out of the code; the rest of the basket still can).
         if (isBundleKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
         const cost = catalogue[l.productKey]?.unitCostPence;
-        return { linePence: l.linePence, lineCostPence: typeof cost === 'number' ? cost * l.qty : null };
+        return {
+          linePence: l.linePence,
+          lineCostPence: typeof cost === 'number' ? cost * l.qty : null,
+          // a single greetings card (any size) — what a free-card code takes off; never a pack
+          freeCardUnitPence: productOfKey(l.productKey) === FREE_CARD_PRODUCT ? l.unitPricePence : null,
+        };
       }),
       discountJoin + discountSet + multiBuySavingPence + parcelSavingPence,
     );
@@ -215,9 +223,9 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
         finalParcel = 0;
         finalMultiBuy = 0; // a code never stacks with multi-buy either
       }
-      promo = { code: opts.promo.code, applied: true, capped: outcome.capped };
+      promo = { code: opts.promo.code, kind: opts.promo.kind, applied: true, capped: outcome.capped };
     } else {
-      promo = { code: opts.promo.code, applied: false, reason: outcome.reason, minSpendPence: outcome.minSpendPence };
+      promo = { code: opts.promo.code, kind: opts.promo.kind, applied: false, reason: outcome.reason, minSpendPence: outcome.minSpendPence };
     }
   }
 

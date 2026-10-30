@@ -129,11 +129,15 @@ export default function CheckoutPage() {
     if (quote.promoError === 'not-started') return { ok: false, text: 'that code isn’t live yet' };
     if (quote.promoError === 'used-up') return { ok: false, text: 'that code has been fully used' };
     if (quote.promoError === 'own-code') return { ok: false, text: 'that’s your own code — share it with a friend instead ✦' };
-    if (quote.promoError === 'first-order-only') return { ok: false, text: 'that code is for a first order — your credit still applies' };
-    if (quote.promoError === 'needs-buyer') return { ok: false, text: 'a friend’s code is for a first order — log in (or add your email) and we’ll check it ✦' };
+    if (quote.promoError === 'first-order-only')
+      return { ok: false, text: quote.creditPence > 0 ? 'that code is for a first order — your credit still applies' : 'that code is for a first order — lovely to see you back ✦' };
+    if (quote.promoError === 'needs-buyer') return { ok: false, text: 'that code is for a first order — log in (or add your email) and we’ll check it ✦' };
     const p = quote.promo;
     if (!p) return null;
+    if (p.applied && p.kind === 'FREE_CARD') return { ok: true, text: `${p.code} applied — one greetings card is on us ✦` };
     if (p.applied) return { ok: true, text: p.capped ? `${p.code} applied — this basket’s maximum saving` : `${p.code} applied ✦` };
+    if (p.reason === 'needs-card') return { ok: false, text: `${p.code} gives you a greetings card free — add one to your basket ✦` };
+    if (p.reason === 'needs-more') return { ok: false, text: `your free card comes with a slightly bigger order — add something else and it’s on us` };
     if (p.reason === 'min-spend') return { ok: false, text: `${p.code} works on orders over ${gbp(p.minSpendPence ?? 0)}` };
     if (p.reason === 'better-saving-applied') return { ok: true, text: `you’re already getting a better saving — we’ve kept that one` };
     return { ok: false, text: `${p.code} doesn’t apply to these items` };
@@ -315,7 +319,7 @@ export default function CheckoutPage() {
       ) : null}
       {promoSavingPence > 0 && quote?.promo ? (
         <div className="pop-in flex justify-between font-semibold text-green-save">
-          <dt>Code {quote.promo.code}</dt>
+          <dt>{quote.promo.kind === 'FREE_CARD' ? `Free card (${quote.promo.code})` : `Code ${quote.promo.code}`}</dt>
           <dd>−{gbp(promoSavingPence)}</dd>
         </div>
       ) : null}

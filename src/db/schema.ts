@@ -928,9 +928,10 @@ export const occasions = pgTable(
 
 // ── promo_codes — discount + partner codes (D15). Priced ONLY server-side (src/pricing/promo.ts):
 // the client sends a code string, never an amount. A code may be a customer discount (PERCENT /
-// FIXED, optional minimum spend), a partner code that earns a commission (influencer, PTA,
-// referral), or both. The margin guard caps discount + commission per order.
-export const promoKind = pgEnum('promo_kind', ['PERCENT', 'FIXED']);
+// FIXED, optional minimum spend, or one FREE_CARD), a partner code that earns a commission
+// (influencer, PTA, referral), or both. The margin guard caps discount + commission per order.
+// Who a code is for (first orders, commission once) lives in ONE place: codeTerms (src/pricing/promo.ts).
+export const promoKind = pgEnum('promo_kind', ['PERCENT', 'FIXED', 'FREE_CARD']);
 export const partnerType = pgEnum('partner_type', ['INFLUENCER', 'PTA', 'REFERRAL', 'CAMPAIGN']);
 export const promoCodes = pgTable(
   'promo_codes',
@@ -938,18 +939,23 @@ export const promoCodes = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     code: text('code').notNull(), // stored UPPER-CASE; matched case-insensitively
     kind: promoKind('kind').notNull(),
-    /** PERCENT: basis points off eligible goods (1000 = 10%). FIXED: pence off. 0 = attribution only. */
+    /** PERCENT: basis points off eligible goods (1000 = 10%). FIXED: pence off. 0 = attribution only.
+     * FREE_CARD: 0 (one greetings card's own price comes off). */
     value: integer('value').notNull(),
     minSpendPence: integer('min_spend_pence').notNull().default(0),
     /** Partner who earns on PAID orders: basis points of the discounted ex-VAT goods. */
     partnerName: text('partner_name'),
     partnerType: partnerType('partner_type'),
     commissionBps: integer('commission_bps').notNull().default(0),
+    /** A creator's own email (stored lower-case): their code never discounts, or earns on, their own
+     * orders — signed in with it, or a guest using it. (A referral code's owner is ownerAccountId.) */
+    partnerEmail: text('partner_email'),
     /** PTA class codes roll up to one partner (partnerName) — e.g. "Year 2". */
     classLabel: text('class_label'),
     /** A parent's personal REFERRAL code: whose it is (can't use your own; rewards go to them). */
     ownerAccountId: uuid('owner_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
-    /** Only valid on the buyer's first paid order (referral codes). */
+    /** Only valid on the buyer's first paid order. (Creator, referral + free-card codes always are:
+     * codeTerms, src/pricing/promo.ts.) */
     firstOrderOnly: boolean('first_order_only').notNull().default(false),
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),
