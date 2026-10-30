@@ -21,7 +21,7 @@ import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
-import { basketLineId } from '@/lib/basket-line';
+import { basketLineId, selectionForLine } from '@/lib/basket-line';
 import { colourName, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -184,15 +184,8 @@ function CustomizeProduct() {
     // from the still-unchanged basket line would clobber them. Only seed on FIRST entry from
     // the basket. (Fresh entry without resume DOES re-seed, resetting any unsaved stray edits.)
     if (sp.get('resume')) return;
-    useSelection.getState().setSelection(product.key, {
-      size: lv.attributes.size,
-      colour: lv.attributes.colour,
-      orientation: lv.attributes.orientation ?? 'portrait',
-      grade: lv.attributes.grade,
-      finish: lv.attributes.finish,
-      back: line.back, // a cushion line carries its back choice
-      ground: line.ground, // an edge-to-edge line carries its base colour
-    });
+    // everything the line prints with — a card's message + span too (02-B3)
+    useSelection.getState().setSelection(product.key, selectionForLine(line, lv.attributes));
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
     }
