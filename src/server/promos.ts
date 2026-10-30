@@ -1,6 +1,6 @@
 import { and, eq, gt, inArray, not, or, sql, type SQL } from 'drizzle-orm';
 import { accounts, orders, promoCodes } from '@/db/schema';
-import { normalisePromoCode, type PromoRule } from '@/pricing';
+import { codeTerms, normalisePromoCode, type PromoRule } from '@/pricing';
 import type { DbHandle, Tx } from './db';
 import { hasPaidOrderBefore } from './referrals';
 
@@ -52,23 +52,29 @@ async function usesOf(db: DbHandle | Tx, codeId: string, now: Date, buyer: Promo
   return count?.n ?? 0;
 }
 
+/** Is this buyer the code's own partner — a referral code's owner, or a creator by their email? */
+async function isOwnCode(db: DbHandle | Tx, row: typeof promoCodes.$inferSelect, buyer: PromoBuyer | null | undefined): Promise<boolean> {
+  const email = buyer?.email?.toLowerCase() ?? null;
+  if (row.partnerEmail && email && row.partnerEmail.toLowerCase() === email) return true;
+  if (!row.ownerAccountId) return false;
+  if (buyer?.accountId === row.ownerAccountId) return true;
+  if (!email) return false;
+  const [owner] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, row.ownerAccountId));
+  return !!owner && owner.email.toLowerCase() === email;
+}
+
 /**
- * A personal referral code — "never your own, first order only". Checked against WHO is buying:
- * a signed-in account, or a guest by their email. With neither, it can't be checked, so it isn't
- * given (the shop asks a guest to sign in at checkout anyway; it applies then).
+ * Who a code is for (codeTerms): never your own; a first-order code only on the buyer's first PAID
+ * order. Checked against WHO is buying: a signed-in account, or a guest by their email. With
+ * neither, it can't be checked, so it isn't given (checkout asks for an email; it applies then).
  */
 async function personalRefusal(db: DbHandle | Tx, row: typeof promoCodes.$inferSelect, buyer: PromoBuyer | null | undefined): Promise<PromoRefusal | null> {
-  if (!row.ownerAccountId && !row.firstOrderOnly) return null;
+  const { firstOrderOnly } = codeTerms(row);
+  if (!row.ownerAccountId && !row.partnerEmail && !firstOrderOnly) return null;
   const email = buyer?.email?.toLowerCase() ?? null;
   if (!buyer?.accountId && !email) return 'needs-buyer';
-  if (row.ownerAccountId) {
-    if (buyer?.accountId === row.ownerAccountId) return 'own-code';
-    if (email) {
-      const [owner] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, row.ownerAccountId));
-      if (owner && owner.email.toLowerCase() === email) return 'own-code';
-    }
-  }
-  if (row.firstOrderOnly && (await hasPaidOrderBefore(db, { accountId: buyer?.accountId, email }))) return 'first-order-only';
+  if (await isOwnCode(db, row, { accountId: buyer?.accountId ?? null, email })) return 'own-code';
+  if (firstOrderOnly && (await hasPaidOrderBefore(db, { accountId: buyer?.accountId, email }))) return 'first-order-only';
   return null;
 }
 
@@ -112,4 +118,31 @@ export async function claimPromoForOrder(tx: Tx, codeId: string, buyer: PromoBuy
   if (row.endsAt && row.endsAt <= now) return 'expired';
   if (row.maxRedemptions !== null && (await usesOf(tx, row.id, now, buyer)) >= row.maxRedemptions) return 'used-up';
   return personalRefusal(tx, row, buyer);
+}
+
+/**
+ * A partner's commission, settled ONCE — inside the transaction that flips the order to PAID
+ * (markOrderPaid), so the order row's partner_commission_pence is final the moment it's paid.
+ * The commission quoted at checkout stands only if this is still the follower's FIRST paid order
+ * (by account or email; codeTerms — a PTA earns on every order) and they aren't the partner. A
+ * per-buyer advisory lock means two first orders paid at the same moment can't both earn: the
+ * second waits, then sees the first one paid. Returns the commission that accrued (0 = none).
+ */
+export async function settlePartnerCommission(tx: Tx, order: typeof orders.$inferSelect): Promise<number> {
+  if (order.partnerCommissionPence <= 0 || !order.promoCodeId) return 0;
+  const [code] = await tx.select().from(promoCodes).where(eq(promoCodes.id, order.promoCodeId));
+  let email = order.buyerEmail?.toLowerCase() ?? null;
+  if (!email && order.accountId) email = (await tx.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, order.accountId)))[0]?.email.toLowerCase() ?? null;
+  const buyer = { accountId: order.accountId, email };
+  let earns = !!code && !(await isOwnCode(tx, code, buyer));
+  if (earns && codeTerms(code!).commissionFirstOrderOnly) {
+    if (!buyer.accountId && !email) earns = false; // can't tell it's a first order → no commission
+    else {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`first-order:${email ?? buyer.accountId}`}))`);
+      earns = !(await hasPaidOrderBefore(tx, buyer, order.id));
+    }
+  }
+  if (earns) return order.partnerCommissionPence;
+  await tx.update(orders).set({ partnerCommissionPence: 0 }).where(eq(orders.id, order.id));
+  return 0;
 }
