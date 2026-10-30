@@ -43,6 +43,27 @@ export interface CreateOrderRequest {
   recipient: ProdigiRecipient;
   items: ProdigiOrderItemInput[];
   metadata?: Record<string, unknown>;
+  /** Per-order printed INSERTS (Prodigi "branding"): each slot is a print-ready file URL. We use ONE
+   * slot, for the gift note (src/fulfillment/giftNoteInsert.ts). A lab that can't make a slot just
+   * leaves it out of that shipment — no error, no charge (API reference, "Branding"). */
+  branding?: Partial<Record<ProdigiInsertSlot, { url: string }>>;
+}
+
+/** The insert slots Prodigi's `branding` takes (the four sticker slots are never used here). */
+export type ProdigiInsertSlot = 'postcard' | 'flyer' | 'packing_slip_bw' | 'packing_slip_color';
+
+/** A quote asking which shipments would carry the named inserts. Names only — no artwork, no URLs. */
+export interface InsertQuoteRequest {
+  shippingMethod: string;
+  destinationCountryCode: string;
+  items: { sku: string; copies: number; attributes?: Record<string, string>; printAreas: string[] }[];
+  inserts: ProdigiInsertSlot[];
+}
+
+/** One shipment of that quote: the lab that makes it and the inserts it would carry. */
+export interface InsertQuoteShipment {
+  lab: string;
+  brandingItems: string[];
 }
 
 export interface ProdigiOrderStatus {
@@ -82,6 +103,9 @@ export interface CreateOrderResult {
 export interface ProdigiOrderTransport {
   createOrder(req: CreateOrderRequest): Promise<CreateOrderResult>;
   getOrder(prodigiOrderId: string): Promise<ProdigiOrder>;
+  /** Which shipments would carry these inserts (read-only POST /quotes). Optional: a transport
+   * without it just means "couldn't check" — Prodigi still skips an insert a lab can't make. */
+  quoteInserts?(req: InsertQuoteRequest): Promise<InsertQuoteShipment[]>;
 }
 
 /** Outcomes the docs list for a successful create (HTTP 200). Compared lower-cased —
@@ -109,4 +133,27 @@ async function getOrder(prodigiOrderId: string): Promise<ProdigiOrder> {
   return body.order;
 }
 
-export const prodigiOrderTransport: ProdigiOrderTransport = { createOrder, getOrder };
+interface QuoteResponse {
+  outcome?: string;
+  quotes?: { shipments?: { fulfillmentLocation?: { labCode?: string }; brandingItems?: string[] | null }[] }[];
+}
+
+async function quoteInserts(req: InsertQuoteRequest): Promise<InsertQuoteShipment[]> {
+  const { status, body } = await request<QuoteResponse>('/quotes', {
+    method: 'POST',
+    body: JSON.stringify({
+      shippingMethod: req.shippingMethod,
+      destinationCountryCode: req.destinationCountryCode,
+      currencyCode: 'GBP',
+      items: req.items.map((i) => ({ sku: i.sku, copies: i.copies, ...(i.attributes ? { attributes: i.attributes } : {}), assets: i.printAreas.map((printArea) => ({ printArea })) })),
+      branding: { inserts: req.inserts },
+    }),
+  });
+  const quote = body?.quotes?.[0];
+  if (status < 200 || status >= 300 || !quote) {
+    throw new ProdigiError(`Prodigi quote failed: HTTP ${status} outcome=${body?.outcome ?? '?'}`, status);
+  }
+  return (quote.shipments ?? []).map((s) => ({ lab: s.fulfillmentLocation?.labCode ?? 'unknown', brandingItems: s.brandingItems ?? [] }));
+}
+
+export const prodigiOrderTransport: ProdigiOrderTransport = { createOrder, getOrder, quoteInserts };
