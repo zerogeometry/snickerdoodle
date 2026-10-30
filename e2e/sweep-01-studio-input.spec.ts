@@ -178,24 +178,46 @@ test.describe('desktop, by keyboard', () => {
   });
 });
 
-test.describe('bugs found in the sweep (fixme until fixed)', () => {
+test.describe('bugs found in the sweep (fixed)', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
 
-  test.fixme('01-B5: axe — the Studio editor has no <main> landmark, so the skip link has no target (region, skip-link)', async ({ page }) => {
+  test('01-B5: axe — the Studio editor is the <main> landmark, so the skip link has a target (region, skip-link)', async ({ page }) => {
     await openStudioFromCreate(page);
+    await expect(page.locator('main#main')).toHaveCount(1);
     await expectAccessible(page, '/studio (desktop)');
   });
 
-  test.fixme('01-B6: Space on a focused Studio button activates it (today it starts "compare" instead)', async ({ page }) => {
+  test('01-B5: axe at phone size too', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openStudioFromCreate(page);
+    await expect(page.locator('main#main')).toHaveCount(1);
+    await expectAccessible(page, '/studio (phone)');
+  });
+
+  test('01-B6: Space on a focused Studio button activates it (not "compare")', async ({ page }) => {
     await openStudioFromCreate(page);
     await tool(page, 'flip').focus();
     await page.keyboard.press(' ');
     await expect(tool(page, 'flip')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  test.fixme('01-B7: the K key does not open the background tool while it is disabled (nothing see-through yet)', async ({ page }) => {
+  test('01-B7: the K key does not open the background tool while it is disabled (nothing see-through yet)', async ({ page }) => {
     await openStudioFromCreate(page);
+    await expect(tool(page, 'background')).toHaveAttribute('aria-disabled', 'true');
     await page.keyboard.press('k');
     await expect(tool(page, 'background')).not.toHaveAttribute('aria-pressed', 'true');
+    await expect(undo(page)).toBeDisabled();
+  });
+
+  test('01-B8 + 01-B9: the desktop tools are a toolbar (not navigation) and the layer buttons say "bring forward" / "send back"', async ({ page }) => {
+    await openStudioFromCreate(page);
+    await expect(page.getByRole('toolbar', { name: 'studio tools' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'studio tools' })).toHaveCount(0);
+    await tool(page, 'shapes').click();
+    await page.getByRole('button', { name: 'add a heart' }).first().click();
+    const layer = page.getByRole('group', { name: 'this layer' });
+    await expect(layer.getByRole('button', { name: 'bring forward', exact: true })).toBeVisible();
+    await expect(layer.getByRole('button', { name: 'send back', exact: true })).toBeVisible();
+    await expect(layer.getByRole('button', { name: /^(back|forward)$/ })).toHaveCount(0);
   });
 });

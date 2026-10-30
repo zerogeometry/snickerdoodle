@@ -1,5 +1,5 @@
 import { and, desc, eq } from 'drizzle-orm';
-import { assertCanViewAsset, canViewAsset } from '@/authz';
+import { canViewAsset } from '@/authz';
 import { assets, products, productVariants, savedDesigns, storageObjects } from '@/db/schema';
 import { presignDownload } from '@/storage';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -40,7 +40,8 @@ export async function saveDesign(
   const [asset] = await db.select().from(assets).where(eq(assets.id, input.assetId));
   if (!asset?.familyId || !asset.keptInHome) return { ok: false, reason: 'not-found' };
   const viewer = await resolveViewerContext(db, account.id, asset.familyId);
-  assertCanViewAsset(assetRefOf(asset), viewer);
+  // someone else's keepsake answers exactly like a made-up id (07-B1: never confirm it exists)
+  if (!canViewAsset(assetRefOf(asset), viewer).allowed || asset.moderationStatus === 'BLOCKED') return { ok: false, reason: 'not-found' };
 
   const [variant] = await db
     .select({ sku: productVariants.sku, productKey: products.key, inShop: products.visibleInShop })

@@ -11,6 +11,7 @@ import { resolveViewerContext } from '@/server/assets';
 import { GIFT_LINK_TTL_DAYS, GIFT_PREVIEW_MAX_PX, createGiftLink, getGiftLink, giftLinkPreview, giftPreviewPath, revokeGiftLink } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { deleteObject } from '@/storage';
+import { persistDerivative } from '@/server/print/compositor';
 import type { DbHandle } from '@/server/db';
 
 const DB = process.env.DATABASE_URL;
@@ -60,7 +61,8 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(view.items).toHaveLength(1);
     expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 6500 });
     // the holder gets the link's own preview route — never a signed URL to the original
-    expect(view.items[0]!.imageUrl).toBe(giftPreviewPath(token, assetId));
+    // (with a product mockup frozen at sharing time the path names the product: ?p=<key> — 06-B8)
+    expect(view.items[0]!.imageUrl?.startsWith(giftPreviewPath(token, assetId))).toBe(true);
     expect(view.items[0]!.imageUrl).not.toMatch(/^http/);
   });
 
@@ -142,6 +144,39 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(meta.format).toBe('webp');
     expect(Math.max(meta.width!, meta.height!)).toBeLessThanOrEqual(GIFT_PREVIEW_MAX_PX);
     expect(meta.exif).toBeUndefined();
+  });
+
+  // 06-B8 (sweep 29 Oct): the gift list showed the bare drawing, never the product as designed.
+  it('06-B8: the preview is the product as the parent shared it (a frozen mockup of THIS keepsake), else the drawing', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const assetId = await keptAsset(64);
+    const other = await keptAsset(64);
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    // start from "no mockup frozen" whatever this machine's mockup templates are (some envs compose one at sharing)
+    const [fresh] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
+    await db.update(giftLinks).set({ items: (fresh!.items as object[]).map((i) => ({ ...i, mockupObjectId: null })) }).where(eq(giftLinks.id, fresh!.id));
+    const colourOf = async (img: Buffer | null) => (await sharp(img!).stats()).channels.slice(0, 3).map((c) => Math.round(c.mean));
+    expect(await colourOf(await giftLinkPreview(db, token, assetId))).toEqual([9, 9, 9]); // no mockup frozen → the drawing
+
+    // a mockup of this keepsake (a DERIVATIVE of it), frozen into the item: that's what's served
+    const mug = await sharp({ create: { width: 48, height: 48, channels: 3, background: { r: 200, g: 40, b: 40 } } }).webp().toBuffer();
+    const mockKey = `test/gift-mockup-${ids.nonce}.webp`;
+    keys.push(mockKey);
+    const mockupObjectId = await persistDerivative(db, assetId, mockKey, mug);
+    const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
+    const items = (link!.items as { assetId: string; productKey: string }[]).map((i) => ({ ...i, mockupObjectId }));
+    await db.update(giftLinks).set({ items }).where(eq(giftLinks.id, link!.id));
+    const [r = 0, g = 0, b = 0] = await colourOf(await giftLinkPreview(db, token, assetId, items[0]!.productKey));
+    expect(r).toBeGreaterThan(150);
+    expect(g + b).toBeLessThan(120);
+    const view = await getGiftLink(db, token);
+    if (view.state === 'active') expect(view.items[0]!.imageUrl).toBe(giftPreviewPath(token, assetId, items[0]!.productKey));
+
+    // never another keepsake's picture, even if a link's item pointed at one: the drawing instead
+    const otherObj = await persistDerivative(db, other, `test/gift-other-${ids.nonce}.webp`, mug);
+    keys.push(`test/gift-other-${ids.nonce}.webp`);
+    await db.update(giftLinks).set({ items: items.map((i) => ({ ...i, mockupObjectId: otherObj })) }).where(eq(giftLinks.id, link!.id));
+    expect(await colourOf(await giftLinkPreview(db, token, assetId))).toEqual([9, 9, 9]);
   });
 
   it('no preview for an asset outside the snapshot, a revoked link, or an unknown token', async () => {

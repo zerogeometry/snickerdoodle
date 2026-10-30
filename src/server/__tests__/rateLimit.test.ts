@@ -22,6 +22,19 @@ describe('rate limiter — who is calling, and the limits themselves', () => {
     expect(ipFromHeaders(h({ 'x-nf-client-connection-ip': '203.0.113.7' }), { CLIENT_IP_HEADER: ' ' })).toBe('203.0.113.7');
   });
 
+  it('07-B14: in production with no pinned header, nothing a visitor can send picks their bucket', () => {
+    const prod = { NODE_ENV: 'production' };
+    for (const hdr of [{ 'x-forwarded-for': '1.2.3.4' }, { 'x-real-ip': '1.2.3.4' }, { 'x-nf-client-connection-ip': '1.2.3.4' }] as Record<string, string>[]) {
+      expect(ipFromHeaders(h(hdr), prod), JSON.stringify(hdr)).toBe('unknown');
+    }
+    // the Netlify test site pins Netlify's own header (scripts/test-site-env.mjs)
+    const netlify = { NODE_ENV: 'production', CLIENT_IP_HEADER: 'x-nf-client-connection-ip' };
+    expect(ipFromHeaders(h({ 'x-nf-client-connection-ip': '203.0.113.7', 'x-forwarded-for': '1.2.3.4' }), netlify)).toBe('203.0.113.7');
+    expect(ipFromHeaders(h({ 'x-forwarded-for': '1.2.3.4', 'x-real-ip': '1.2.3.5' }), netlify)).toBe('unknown');
+    // the AWS box pins x-real-ip: unchanged
+    expect(ipFromHeaders(h({ 'x-real-ip': '198.51.100.2', 'x-forwarded-for': '7.7.7.7' }), { ...prod, CLIENT_IP_HEADER: 'x-real-ip' })).toBe('198.51.100.2');
+  });
+
   it('stores a keyed fingerprint, never the email/IP — and the same person always maps to the same key', () => {
     const k = callerKey('magic-link:email', 'Parent@Example.com', 's3cret');
     expect(k).toMatch(/^magic-link:email:[\w-]{32}$/);

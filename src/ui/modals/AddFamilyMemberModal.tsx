@@ -1,19 +1,11 @@
 'use client';
 
-import {
-  IconCake,
-  IconCameraPlus,
-  IconLock,
-  IconMailShare,
-  IconUserPlus,
-  IconUsers,
-} from '@tabler/icons-react';
-import { useEffect, useRef, useState, useTransition, type ChangeEvent } from 'react';
+import { IconCake, IconLock, IconMailShare, IconUserPlus, IconUsers } from '@tabler/icons-react';
+import { useEffect, useState, useTransition } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Chip } from '@/ui/primitives/Chip';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { Toggle } from '@/ui/primitives/Toggle';
 import { toast } from '@/lib/store';
 import { createInviteAction } from '@/app/actions/invite';
 import { addChildAction } from '@/app/actions/family';
@@ -44,7 +36,6 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
   useEffect(() => {
     if (open) setRel(initialRel);
   }, [open, initialRel]);
-  const [invite, setInvite] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -52,8 +43,6 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
   const [access, setAccess] = useState('view_buy');
   // The family calendar is the point of inviting family — pre-ticked, visible, changeable later.
   const [shareCalendar, setShareCalendar] = useState(true);
-  const [photo, setPhoto] = useState<string | null>(null);
-  const photoRef = useRef<HTMLInputElement>(null);
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -62,19 +51,10 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
   const circle = relOf(rel).circle;
   const isChild = circle === 'subject';
 
-  const onPhoto = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => setPhoto(String(r.result));
-    r.readAsDataURL(f);
-  };
-
   const reset = () => {
     setName('');
     setEmail('');
     setBirthday('');
-    setPhoto(null);
     setRel('Grandparent');
     setShareCalendar(true);
   };
@@ -122,13 +102,16 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
         relationship: relOf(rel).enum,
         accessLevel: ACCESS_ENUM[access] ?? 'VIEW_BUY',
         shareOccasions: shareCalendar,
+        name: first, // only to say hello in the invite email — not kept
       });
       if (res.needsAuth) {
         toast('log in to invite family');
         return;
       }
       if (!res.ok) {
-        toast('couldn’t send that invite — try again');
+        // already in the family (04-B4): say so plainly — their level is changed from their card
+        if (res.reason === 'already-member') setError(`${first} is already in your family — change what they can see from their card on this page`);
+        else toast('couldn’t send that invite — try again');
         return;
       }
       toast(`invite sent to ${first} — they’ll appear once they join`);
@@ -151,29 +134,6 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
         </Button>
       }
     >
-      <input ref={photoRef} type="file" accept="image/*" onChange={onPhoto} className="hidden" />
-      {/* Photo */}
-      <div className="mb-4 flex items-center gap-3.5">
-        <button
-          type="button"
-          onClick={() => photoRef.current?.click()}
-          className="flex h-[62px] w-[62px] shrink-0 flex-col items-center justify-center overflow-hidden rounded-full border-2 border-dashed border-line bg-paper text-cinnamon"
-        >
-          {photo ? (
-            <img src={photo} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <>
-              <Icon icon={IconCameraPlus} size={20} />
-              <span className="mt-0.5 text-[11px] font-bold">add photo</span>
-            </>
-          )}
-        </button>
-        <p className="text-xs leading-relaxed text-ink-soft">
-          <b className="block text-[13px] text-cocoa">Add a photo</b>So everyone knows who&apos;s who in the circle.
-          Change it any time.
-        </p>
-      </div>
-
       {/* Name */}
       <label className="mb-3 block">
         <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">Name</span>
@@ -231,74 +191,75 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
         </div>
       </div>
 
-      {/* Birthday */}
-      <div className="mb-3">
-        <label htmlFor="member-bday" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
-          Birthday <span className="font-normal normal-case text-ink-faint">· optional</span>
-        </label>
-        <div className="flex items-center gap-2.5 rounded-lg border border-line bg-paper px-3 py-2.5">
-          <Icon icon={IconCake} size={15} className="text-ink-faint" />
-          <input
-            id="member-bday"
-            type="date"
-            value={birthday}
-            onChange={(e) => setBirthday(e.target.value)}
-            className="flex-1 bg-transparent text-[13px] text-cocoa outline-none"
-          />
+      {/* Birthday: a little one's, for the family calendar (an adult's isn't needed — 04-B8) */}
+      {isChild ? (
+        <div className="mb-3">
+          <label htmlFor="member-bday" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
+            Birthday <span className="font-normal normal-case text-ink-faint">· optional</span>
+          </label>
+          <div className="flex items-center gap-2.5 rounded-lg border border-line bg-paper px-3 py-2.5">
+            <Icon icon={IconCake} size={15} className="text-ink-faint" />
+            <input
+              id="member-bday"
+              type="date"
+              value={birthday}
+              onChange={(e) => setBirthday(e.target.value)}
+              className="flex-1 bg-transparent text-[13px] text-cocoa outline-none"
+            />
+          </div>
+          {birthday ? <LunarChoice value={lunar} onChange={setLunar} /> : null}
         </div>
-        {isChild && birthday ? <LunarChoice value={lunar} onChange={setLunar} /> : null}
-      </div>
+      ) : null}
 
-      {/* Invite (hidden for a child — a subject, not an invitee) */}
+      {/* Invite (hidden for a child — a subject, not an invitee). A grown-up only ever joins from an
+          invite they accept, so there's no "add without inviting" switch (04-B8). */}
       {!isChild ? (
         <div className="rounded-xl border border-sunshine bg-honey-band p-3">
-          <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-[13px] font-bold text-cocoa">
-              <Icon icon={IconMailShare} size={15} className="text-cinnamon" /> Invite to the family workspace
+          <label htmlFor="member-email" className="flex items-center gap-1.5 text-[13px] font-bold text-cocoa">
+            <Icon icon={IconMailShare} size={15} className="text-cinnamon" /> Their email
+          </label>
+          <input
+            id="member-email"
+            type="email"
+            autoComplete="off"
+            value={email}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              setError(null);
+            }}
+            placeholder="their email"
+            className="mt-2.5 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
+          />
+          <label className="mt-2 flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-xs">
+            <span className="text-ink-soft">They can</span>
+            <select
+              value={access}
+              onChange={(e) => setAccess(e.target.value)}
+              className="bg-transparent font-bold text-cocoa outline-none"
+            >
+              <option value="view">view only</option>
+              <option value="view_buy">view &amp; buy</option>
+              <option value="contribute">view, buy &amp; add</option>
+            </select>
+          </label>
+          <label className="mt-2.5 flex min-h-[44px] items-start gap-2.5 text-xs text-cocoa">
+            <input
+              type="checkbox"
+              checked={shareCalendar}
+              onChange={(e) => setShareCalendar(e.target.checked)}
+              className="mt-0.5 h-5 w-5 shrink-0 accent-cta"
+            />
+            <span>
+              <b>share the family calendar</b>
+              <span className="block text-[11px] text-ink-soft">
+                they&apos;ll see your little ones&apos; birthdays coming up, so they never miss one. change it any time.
+              </span>
             </span>
-            <Toggle on={invite} onChange={setInvite} label="Invite to the family workspace" />
-          </div>
-          {invite ? (
-            <>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="their email"
-                className="mt-2.5 w-full rounded-lg border border-line bg-paper px-3 py-2.5 text-xs text-cocoa placeholder:text-ink-faint"
-              />
-              <label className="mt-2 flex items-center justify-between rounded-lg border border-line bg-white px-3 py-2 text-xs">
-                <span className="text-ink-soft">They can</span>
-                <select
-                  value={access}
-                  onChange={(e) => setAccess(e.target.value)}
-                  className="bg-transparent font-bold text-cocoa outline-none"
-                >
-                  <option value="view">view only</option>
-                  <option value="view_buy">view &amp; buy</option>
-                  <option value="contribute">view, buy &amp; add</option>
-                </select>
-              </label>
-              <label className="mt-2.5 flex min-h-[44px] items-start gap-2.5 text-xs text-cocoa">
-                <input
-                  type="checkbox"
-                  checked={shareCalendar}
-                  onChange={(e) => setShareCalendar(e.target.checked)}
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-cta"
-                />
-                <span>
-                  <b>share the family calendar</b>
-                  <span className="block text-[11px] text-ink-soft">
-                    they&apos;ll see your little ones&apos; birthdays coming up, so they never miss one. change it any time.
-                  </span>
-                </span>
-              </label>
-              <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
-                We&apos;ll email them a link to join. Once they verify it&apos;s them, they&apos;ll see your family
-                workspace at the level you set.
-              </p>
-            </>
-          ) : null}
+          </label>
+          <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">
+            We&apos;ll email them a link to join, saying it&apos;s from you. Once they verify it&apos;s them,
+            they&apos;ll see your family workspace at the level you set — and they can add their own photo.
+          </p>
         </div>
       ) : null}
 

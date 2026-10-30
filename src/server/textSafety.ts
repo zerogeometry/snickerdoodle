@@ -7,6 +7,7 @@
  * reusable for member names / gift messages.
  */
 import { normalizeCardFont, type CardFontToken } from '@/lib/card-fonts';
+import { GIFT_NOTE_MAX } from '@/lib/gift-note';
 
 // Unambiguous profanity / slurs that must never appear in a child's name field.
 // Kept short + strong and matched as a substring of a single name token, which
@@ -59,6 +60,14 @@ export function screenCardMessage(
   const n = typeof raw.fontScale === 'number' && Number.isFinite(raw.fontScale) ? raw.fontScale : CARD_FONT_SCALE.default;
   const fontScale = Math.min(CARD_FONT_SCALE.max, Math.max(CARD_FONT_SCALE.min, n));
   return { ok: true, value: { greeting, message, signature, note, font: normalizeCardFont(raw.font), fontScale } };
+}
+
+// ── Gift note (checkout) ─────────────────────────────────────────────────────
+/** Screen a gift order's little note: trimmed + capped; empty ⇒ ok with null; abusive ⇒ refused. */
+export function screenGiftNote(raw: unknown): { ok: true; value: string | null } | { ok: false } {
+  const note = (typeof raw === 'string' ? raw : '').trim().slice(0, GIFT_NOTE_MAX);
+  if (!note) return { ok: true, value: null };
+  return containsAbusiveText(note) ? { ok: false } : { ok: true, value: note };
 }
 
 // A single first-name token: letters/marks (any script), apostrophe, hyphen.

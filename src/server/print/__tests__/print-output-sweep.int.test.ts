@@ -335,16 +335,16 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
         verdict: problems.length || (want && `${want.w}×${want.h}` !== `${last!.W}×${last!.H}`) ? 'FAIL' : 'PASS', note: problems.join(' | ') || undefined,
       });
       // a card's preview/print shape difference is recorded (03-B2), not failed here
-      // …and so is 03-B3 (the render refusing a big zoomed print): its own it.fails below pins it
-      if (!card) expect(problems.filter((x) => !x.includes('[03-B3]'))).toEqual([]);
+      // (03-B3 — a big zoomed print refusing to render — is fixed, so a render failure fails here too)
+      if (!card) expect(problems).toEqual([]);
     }, 600_000);
   }
 
   // BUG 03-B3 (P1): a paid order the renderer can't make. The 24×32″ frame zoomed to 1.5× (the
   // positioner allows 4×; the DPI gate passes it as UPSCALE) draws the layer at 19200×14400 px, which
   // render.ts:217 re-reads with sharp's default 268 MP input limit → "Input image exceeds pixel limit"
-  // → RENDER_FAILED after payment. `it.fails` passes while the bug is there; make it a plain `it` once fixed.
-  it.fails('03-B3: the 24×32″ frame renders at a 1.5× zoom', async () => {
+  // → RENDER_FAILED after payment. Fixed: the window is cut from the source before resizing (visibleLayer.ts).
+  it('03-B3: the 24×32″ frame renders at a 1.5× zoom', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const variantId = variantIdBySku.get('framedPrint-2432-gold')!;
     const res = await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 1.5, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
@@ -354,7 +354,7 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
   // BUG 03-B1 via the PREVIEW: the positioner's "preview the exact print file" (actions/render.ts) calls
   // renderPrintFile too, writing the SAME key an order's print file lives at — so previewing another
   // placement of a drawing replaces the bytes of an already-rendered (or submitted) order's file.
-  it.fails('03-B1: a later render of the same drawing + variant leaves an earlier print file untouched', async () => {
+  it('03-B1: a later render of the same drawing + variant leaves an earlier print file untouched', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const variantId = variantIdBySku.get('mug')!;
     const order = await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
@@ -362,6 +362,28 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
     await renderPrintFile(db, sam, { assetId, variantId, transform: { scale: 2, offsetX: -1, offsetY: 1, rotationDeg: 180 } }); // a preview
     const after = createHash('sha256').update(await getObjectBytes(order.key)).digest('hex');
     expect(after).toBe(before);
+  }, 300_000);
+
+  // …and the positioner's real preview (actions/render.ts passes `preview: true`) writes its own slot,
+  // never an order file; two lines that differ only in their card message get two files too.
+  it('03-B1: the preview has its own slot; an order file is keyed by everything that prints', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const mug = variantIdBySku.get('mug')!;
+    const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const order = await renderPrintFile(db, sam, { assetId, variantId: mug, transform: tf });
+    const before = createHash('sha256').update(await getObjectBytes(order.key)).digest('hex');
+    const preview = await renderPrintFile(db, sam, { assetId, variantId: mug, transform: { ...tf, scale: 2 }, preview: true });
+    expect(preview.key).toMatch(/\/printpreview-/);
+    expect(preview.key).not.toBe(order.key);
+    expect(createHash('sha256').update(await getObjectBytes(order.key)).digest('hex')).toBe(before);
+    // the very same inputs → the very same file (a calendar's pages, the same gift twice)
+    expect((await renderPrintFile(db, sam, { assetId, variantId: mug, transform: tf })).key).toBe(order.key);
+    // a card: another message, or the other span → its own file (a card never prints another's words)
+    const card = variantIdBySku.get('card')!;
+    const c1 = await renderPrintFile(db, sam, { assetId, variantId: card, transform: tf, message: { greeting: 'dear gran', message: '', signature: '', note: '' } });
+    const c2 = await renderPrintFile(db, sam, { assetId, variantId: card, transform: tf, message: { greeting: 'dear grandad', message: '', signature: '', note: '' } });
+    const c3 = await renderPrintFile(db, sam, { assetId, variantId: card, transform: tf, message: { greeting: 'dear gran', message: '', signature: '', note: '' }, cardSpan: 'full' });
+    expect(new Set([c1.key, c2.key, c3.key]).size).toBe(3);
   }, 300_000);
 
   it('Studio edits are what prints: a render from the saved design derivative carries the edit, not the original', async () => {
@@ -376,11 +398,11 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
 
   // BUG 03-B4 (P1): the 3 m and 5 m KRAFT rolls (8280×35430 / 8280×59070 px, 293 / 489 MP) are over sharp's
   // default 268 MP input limit — pattern.ts creates the full-size canvas, so EVERY order of them fails to
-  // render ("Input image exceeds pixel limit"), whatever the drawing or placement. `it.fails` while the bug
-  // is there; make them plain `it`s once fixed.
+  // render ("Input image exceeds pixel limit"), whatever the drawing or placement. Fixed: the limit is lifted
+  // to exactly the template's canvas (pattern.ts).
   const B4 = new Set(['wrappingPaper-3mroll-kraft', 'wrappingPaper-5mroll-kraft']);
   for (const s of wraps) {
-    (B4.has(s.sku) ? it.fails : it)(`${B4.has(s.sku) ? '03-B4: ' : ''}${s.sku} (${s.prodigiSku}) — the repeat-pattern roll renders at Prodigi's exact px`, async () => {
+    it(`${B4.has(s.sku) ? '03-B4: ' : ''}${s.sku} (${s.prodigiSku}) — the repeat-pattern roll renders at Prodigi's exact px`, async () => {
       const variantId = variantIdBySku.get(s.sku)!;
       const want = prodigiSize(s)!;
       const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);

@@ -2,7 +2,7 @@ import { and, eq, ne, sql } from 'drizzle-orm';
 import { assets, auditRecords, children } from '@/db/schema';
 import { canManageFamily, type ViewerContext } from '@/authz';
 import { screenChildFirstName } from '@/server/textSafety';
-import { deleteAsset } from './assets';
+import { deleteAsset, keepsakesNeededByOrders } from './assets';
 import { recordErasure } from './erasureLedger';
 import type { DbHandle } from './db';
 
@@ -26,6 +26,9 @@ export async function resolveChildSubject(
   familyId: string,
   accountId: string,
   rawFirstName: string | null | undefined,
+  /** false = only find a little one the family already has, never add one (a relative keeping into a
+   * family they JOINED — only its owner adds children: 04-B3). */
+  opts: { create: boolean } = { create: true },
 ): Promise<ChildSubject | null> {
   const screened = screenChildFirstName(rawFirstName);
   if (!screened.ok || !screened.value) return null;
@@ -36,6 +39,7 @@ export async function resolveChildSubject(
     .from(children)
     .where(and(eq(children.familyId, familyId), sql`lower(${children.firstName}) = lower(${firstName})`));
   if (existing) return existing;
+  if (!opts.create) return null;
 
   const [created] = await db
     .insert(children)
@@ -156,12 +160,16 @@ export async function deleteChild(
   db: DbHandle,
   owner: ViewerContext,
   input: { familyId: string; childId: string; alsoDeleteKeepsakes: boolean },
-): Promise<{ ok: boolean; keepsakesDeleted: number }> {
+): Promise<{ ok: boolean; keepsakesDeleted: number; reason?: 'in-order' }> {
   const child = await ownedChild(db, owner, input.familyId, input.childId);
   if (!child) return { ok: false, keepsakesDeleted: 0 };
 
   const filed = await db.select({ id: assets.id }).from(assets).where(eq(assets.childSubjectId, child.id));
   let keepsakesDeleted = 0;
+  // a paid order not yet made still needs its drawing: refuse BEFORE anything is deleted
+  if (input.alsoDeleteKeepsakes && (await keepsakesNeededByOrders(db, filed.map((a) => a.id))).size > 0) {
+    return { ok: false, keepsakesDeleted: 0, reason: 'in-order' };
+  }
   if (input.alsoDeleteKeepsakes) {
     for (const a of filed) {
       await deleteAsset(db, a.id, owner); // throws if not deletable — nothing is half-done silently

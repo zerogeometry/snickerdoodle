@@ -1,15 +1,16 @@
 import { IconAlertTriangle, IconGift, IconLock, IconShieldCheck } from '@tabler/icons-react';
-import Link from 'next/link';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { getDb } from '@/db/client';
 import { getGiftLink } from '@/server/giftLinks';
+import { withLivePrices } from './livePrices';
 import { getCatalogue } from '@/server/catalogue';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { quote } from '@/pricing';
 import { getCurrentAccount } from '@/server/session';
 import { screenFromName } from '@/server/giftLinks';
 import { Icon } from '@/ui/primitives/Icon';
+import { FlowHeader } from '@/ui/components/FlowHeader';
 import { GiftCheckout } from './GiftCheckout';
 import { ReportGiftLink } from './ReportGiftLink';
 
@@ -19,17 +20,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// The same app header as /join and /share-wish (the logo, kraft bar) — the gift list is part of the
+// flow, in the Scrapbook look (06-B6).
 function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
-      <header className="flex items-center justify-between border-b border-line px-6 py-3">
-        <Link href="/" className="font-display text-lg font-semibold text-cocoa">
-          snickerdoodle
-        </Link>
-        <span className="flex items-center gap-1.5 text-xs text-ink-soft">
-          <Icon icon={IconLock} size={14} className="text-green-save" /> secure gift link
-        </span>
-      </header>
+      <FlowHeader
+        right={
+          <span className="flex items-center gap-1.5 text-xs font-bold text-ink-soft">
+            <Icon icon={IconLock} size={14} className="text-green-save" /> secure gift link
+          </span>
+        }
+      />
       {children}
     </div>
   );
@@ -51,8 +53,10 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
     return (
       <Shell>
         <main id="main" className="flex flex-1 items-center justify-center px-6 py-16">
-          <div className="max-w-sm rounded-2xl border border-line bg-white p-7 text-center">
-            <Icon icon={IconAlertTriangle} size={28} className="mx-auto text-honey" />
+          <div className="pop-in tape max-w-sm rounded-[22px] border-2 border-cocoa bg-paper p-7 text-center shadow-[0_4px_0_var(--color-cocoa)]">
+            <span className="sticker mx-auto flex h-12 w-12 -rotate-6 items-center justify-center rounded-full bg-honey">
+              <Icon icon={IconAlertTriangle} size={24} className="text-cocoa" />
+            </span>
             <h1 className="mt-3 font-display text-xl font-semibold text-cocoa">{msg.title}</h1>
             <p className="mt-2 text-sm text-ink-soft">{msg.body}</p>
           </div>
@@ -66,10 +70,13 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
   const db = getDb();
   const provenance = await resolveSessionJoinProvenance();
   const joinProvenance = provenance?.invite?.familyId === view.familyId ? provenance : null;
+  const catalogue = await getCatalogue(db);
   const q = quote(
     view.items.filter((i) => !i.purchased).map((i) => ({ productKey: i.productKey, qty: 1 })), // ticked-off items aren't sold again
-    { gift: true, joinProvenance, catalogue: await getCatalogue(db) },
+    { gift: true, joinProvenance, catalogue },
   );
+  // every line at the price checkout charges, so the lines and the total always agree (06-B3)
+  const items = withLivePrices(view.items, catalogue);
   const pricing = { subtotalPence: q.subtotalPence, deliveryPence: q.deliveryPence, joinSavingPence: q.joinSavingPence, totalPence: q.totalPence };
   const viewer = await getCurrentAccount();
   const defaultFrom = viewer ? (screenFromName(viewer.name) ?? screenFromName(viewer.email.split('@')[0]) ?? '') : '';
@@ -79,7 +86,7 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
       {/* the list's title band and the list itself are the page's main content */}
       <main id="main" className="flex flex-1 flex-col">
       <div className="flex items-center gap-3.5 bg-honey-band px-6 py-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border-2 border-honey bg-paper">
+        <div className="sticker flex h-12 w-12 shrink-0 -rotate-6 items-center justify-center rounded-[14px] bg-paper">
           <Icon icon={IconGift} size={24} className="text-cinnamon" />
         </div>
         <div>
@@ -93,8 +100,9 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
       <div className="mx-auto w-full max-w-5xl flex-1 px-6 py-6">
         <GiftCheckout
           token={token}
-          items={view.items.map(({ assetId, productKey, label, unitPricePence, imageUrl, purchased }) => ({ assetId, productKey, label, unitPricePence, imageUrl, purchased }))}
+          items={items.map(({ assetId, productKey, label, unitPricePence, imageUrl, purchased }) => ({ assetId, productKey, label, unitPricePence, imageUrl, purchased }))}
           defaultFrom={defaultFrom}
+          signedIn={!!viewer}
           inviteToken={view.inviteToken}
           familyName={view.familyName}
           pricing={pricing}

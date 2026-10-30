@@ -142,7 +142,7 @@ export function FamilySetTile({
         </div>
         <span className="-mt-1.5 text-[11px] leading-snug text-ink-soft">matching tees, one colour · 3+ save 5%</span>
         <div className="mt-auto">
-          <button type="button" onClick={onOpen} className="press inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none">
+          <button type="button" onClick={onOpen} aria-label={`${label} family set`} className="press inline-flex min-h-11 w-full items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none">
             {label}
           </button>
         </div>

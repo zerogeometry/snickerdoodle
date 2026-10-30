@@ -59,8 +59,10 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
       await expect(sizes.nth(i)).toContainText(`a set for ${n}`);
       await expect(sizes.nth(i)).toContainText(gbp(price(n)));
       await expect(priceSticker(page)).toHaveText(gbp(price(n)));
-      await expect(page.getByText(`one design on all ${n} placemats`)).toBeVisible();
-      await expect(page.getByText(`one design on all ${n} coasters`)).toBeVisible();
+      // "both" for a set of 2, never "all 2" (02-B7)
+      const on = n === 2 ? 'both' : `all ${n}`;
+      await expect(page.getByText(`one design on ${on} placemats`)).toBeVisible();
+      await expect(page.getByText(`one design on ${on} coasters`)).toBeVisible();
       await expect(page.getByRole('list', { name: 'the ornaments' }).getByRole('listitem')).toHaveCount(n);
       await expect(page.getByRole('button', { name: new RegExp(`^add to basket · ${gbp(price(n))}$`) })).toBeVisible();
     }

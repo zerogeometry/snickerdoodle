@@ -449,6 +449,9 @@ export const orders = pgTable(
     /** Who it's from, as the buyer chose to sign it (shown ONLY to the family's parent, on
      * the list sticker + the "it's been bought" note). Screened text, first-name-ish, ≤40. */
     giftFromName: text('gift_from_name'),
+    /** A gift order's little note, as the buyer typed it at checkout (screened for abuse, ≤200).
+     * Erased with the account like the address (accountClosure). */
+    giftNote: text('gift_note'),
     /** A promo / partner code used on this order (server-resolved), what it took off the
      * goods, and what the partner (influencer / PTA / referrer) earns once it's PAID. */
     promoCodeId: uuid('promo_code_id').references((): AnyPgColumn => promoCodes.id, { onDelete: 'set null' }),
@@ -513,6 +516,9 @@ export const orderItems = pgTable('order_items', {
     providerSku: string | null;
     providerConfig: unknown;
   } | null>(),
+  /** A piece of a CHRISTMAS BUNDLE: the bundle line's key (its size's sku, e.g. christmasBundle-for4),
+   * so a receipt / the orders page shows ONE bundle line, not its packs. null = sold on its own. */
+  bundleKey: text('bundle_key'),
   qty: integer('qty').notNull(),
   unitPricePence: integer('unit_price_pence').notNull(),
   linePence: integer('line_pence').notNull(),

@@ -1,7 +1,7 @@
 'use server';
 
 import { getDb } from '@/db/client';
-import { auditRecords, families } from '@/db/schema';
+import { accounts, auditRecords, families } from '@/db/schema';
 import { canManageFamily } from '@/authz';
 import { eq } from 'drizzle-orm';
 import { resolveViewerContext } from '@/server/assets';
@@ -17,7 +17,8 @@ import { containsAbusiveText } from '@/server/textSafety';
 import { setReminderConsent } from '@/server/reminders';
 import { addOccasion, deleteOccasion, setCelebrate, updateOccasion, type OccasionInput, type OccasionResult } from '@/server/occasions';
 import { resendInvite } from '@/server/members';
-import { appUrl, sendMail } from '@/server/mail';
+import { sendMail } from '@/server/mail';
+import { familyInviteEmail } from '@/server/mail/familyInvite';
 
 /** The family the owner is managing: their OWNED family (only owners add children / rename). */
 async function ownedFamily(accountId: string) {
@@ -143,7 +144,7 @@ export async function updateChildAction(
 }
 
 /** Remove a little one; optionally delete every keepsake filed under them too. */
-export async function deleteChildAction(childId: string, alsoDeleteKeepsakes: boolean): Promise<{ ok: boolean; keepsakesDeleted: number }> {
+export async function deleteChildAction(childId: string, alsoDeleteKeepsakes: boolean): Promise<{ ok: boolean; keepsakesDeleted: number; reason?: 'in-order' }> {
   return asOwner(
     (ctx) => deleteChild(ctx.db, ctx.viewer, { familyId: ctx.familyId, childId: String(childId), alsoDeleteKeepsakes: alsoDeleteKeepsakes === true }),
     { ok: false, keepsakesDeleted: 0 },
@@ -205,15 +206,8 @@ export async function resendInviteAction(inviteId: string): Promise<{ ok: boolea
   return asOwner(async (ctx) => {
     const res = await resendInvite(ctx.db, ctx.viewer, { familyId: ctx.familyId, inviteId: String(inviteId) });
     if (!res.ok) return { ok: false };
-    await sendMail({
-      kind: 'family-invite',
-      to: res.email,
-      subject: 'a little reminder: you’re invited to a family keepsake box',
-      text:
-        `You've been invited to join a family's private keepsake box on snickerdoodle.\n\n` +
-        `Tap to join (it's just for you, and lasts 14 days):\n${appUrl(`/join/${res.token}`)}\n\n` +
-        `Nothing is ever public — only the family you join can see what's inside.`,
-    });
+    const [me] = await ctx.db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, ctx.viewer.accountId!));
+    await sendMail(familyInviteEmail({ to: res.email, token: res.token, inviterName: me?.name ?? null, resend: true }));
     return { ok: true };
   }, { ok: false });
 }

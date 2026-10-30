@@ -63,7 +63,6 @@ export async function listActiveFamilies(db: DbHandle, accountId: string): Promi
       name: families.displayName,
       joinedAt: memberships.joinedAt,
       ownerName: accounts.displayName,
-      ownerEmail: accounts.email,
     })
     .from(memberships)
     .innerJoin(families, eq(families.id, memberships.familyId))
@@ -73,8 +72,9 @@ export async function listActiveFamilies(db: DbHandle, accountId: string): Promi
     .sort((a, b) => Number(b.isOwner) - Number(a.isOwner) || (b.joinedAt?.getTime() ?? 0) - (a.joinedAt?.getTime() ?? 0))
     .map((r) => {
       const named = familyNameForRelatives(r.name);
-      const owner = r.ownerName?.trim() || r.ownerEmail?.split('@')[0] || 'their';
-      return { familyId: r.familyId, name: named ?? (r.isOwner ? 'my keepsakes' : `${owner}'s family`), isOwner: r.isOwner };
+      // a relative sees the parent's first name, never their email handle (04-B9)
+      const owner = r.ownerName?.trim().split(/\s+/)[0];
+      return { familyId: r.familyId, name: named ?? (r.isOwner ? 'my keepsakes' : owner ? `${owner}'s family` : 'a family you joined'), isOwner: r.isOwner };
     });
 }
 
@@ -101,6 +101,22 @@ export async function resolveHomeFamily(
   if (owned && (!joined || (await familyHasContent(db, owned.familyId, accountId)))) return owned.familyId;
   if (joined) return joined.familyId;
   return ensureHomeFamily(db, accountId, displayName);
+}
+
+/**
+ * Which family something this account KEEPS goes into (04-B3): the family their keepsake home shows
+ * (resolveHomeFamily) when they may ADD to it — they own it, or joined it with CONTRIBUTE ("view,
+ * buy & add") — so a second parent's "+ keepsake" lands where the family sees it. A relative who can
+ * only view / buy keeps into their own box, as before. Returns the family and whether they own it.
+ */
+export async function resolveKeepFamily(db: DbHandle, accountId: string, displayName: string | null): Promise<{ familyId: string; isOwner: boolean }> {
+  const home = await resolveHomeFamily(db, accountId, displayName);
+  const [m] = await db
+    .select({ isOwner: memberships.isOwner, accessLevel: memberships.accessLevel })
+    .from(memberships)
+    .where(and(eq(memberships.accountId, accountId), eq(memberships.familyId, home), eq(memberships.status, 'ACTIVE')));
+  if (m && (m.isOwner || m.accessLevel === 'CONTRIBUTE')) return { familyId: home, isOwner: m.isOwner };
+  return { familyId: await ensureHomeFamily(db, accountId, displayName), isOwner: true };
 }
 
 async function familyHasContent(db: DbHandle, familyId: string, ownerAccountId: string): Promise<boolean> {

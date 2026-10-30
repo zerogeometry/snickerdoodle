@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { products, productVariants, savedDesigns } from '@/db/schema';
@@ -6,16 +6,20 @@ import { accounts, assets, auditRecords, memberships, families, giftLinks, invit
 import { containsAbusiveText } from './textSafety';
 import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
+import { composeMockup } from './print/compositor';
 import sharp from 'sharp';
-import { getObjectBytes, presignDownload } from '@/storage';
+import { derivativeKey, getObjectBytes, getS3, presignDownload, putObject } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
-import { createInvite } from './invites';
+import { AlreadyInFamilyError, createInvite } from './invites';
 import { familyNameForRelatives } from './onboarding';
 import { placeOrder, type PlaceOrderResult } from './orders';
-import type { RawTransform } from './print/geometry';
+import { clampTransform, type RawTransform } from './print/geometry';
+import { normalizeCushionBack } from '@/lib/catalogue-view';
+import { isGroundProduct, normalizeGround } from '@/lib/patterns';
+import { isBundleKey } from '@/lib/christmas-bundle';
 import { appUrl, sendMail } from './mail';
-import { assetRefOf } from './assetRef';
+import { assetRefOf, isHeldForReport } from './assetRef';
 
 /** How long a gift link works (founder, 2026-10-21: 14 days, down from 30 — a forwarded bearer link
  * shows a child's drawing for less time; Children's Code). A parent can always share a fresh one. */
@@ -40,6 +44,20 @@ export interface GiftItem {
   back?: string | null;
   /** Repeat-pattern base colour token the parent chose (frozen with the design). */
   ground?: string | null;
+  /** The product AS DESIGNED (06-B8): a mockup composed when the PARENT shared the link (their own
+   * authz), frozen here — a DERIVATIVE of this item's asset. The preview serves it under the link's
+   * capability; without one, the drawing itself. */
+  mockupObjectId?: string | null;
+}
+
+export interface GiftLineInput {
+  assetId: string;
+  /** The line's variant sku (a product key = its default variant). */
+  variantSku: string;
+  transform?: unknown;
+  sourceObjectId?: string | null;
+  back?: string | null;
+  ground?: string | null;
 }
 
 export interface CreateGiftLinkInput {
@@ -47,6 +65,10 @@ export interface CreateGiftLinkInput {
   assetIds: string[];
   /** "+ Keepsake" saved designs to include, sold exactly as designed (variant + placement). */
   designIds?: string[];
+  /** Basket lines to include as they were made (Share a Wish): the exact variant + placement + cutout +
+   * back + base colour. Untrusted — each is re-checked here (product live + giftable + priced, the
+   * keepsake visible + kept + cleared, the placement clamped, the cutout the keepsake's own). */
+  lines?: GiftLineInput[];
   title?: string | null;
   /** What the keepsakes are offered as (default framed print) — validated server-side. */
   productKey?: string | null;
@@ -67,7 +89,7 @@ export async function createGiftLink(
   if (creator.accountId === null || !canManageFamily(creator.membership) || creator.membership!.familyId !== input.familyId) {
     throw new AuthzError({ allowed: false, reason: 'only the family owner can create a gift link' });
   }
-  if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0) {
+  if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0 && (input.lines?.length ?? 0) === 0) {
     throw new AuthzError({ allowed: false, reason: 'pick at least one keepsake to share' });
   }
 
@@ -122,9 +144,54 @@ export async function createGiftLink(
         unitPricePence: prices[v.sku]!.pricePence,
         designId: d.id,
         transform: d.transform,
-        sourceObjectId: d.sourceObjectId,
+        sourceObjectId: await freezeSourceObject(db, a.id, d.sourceObjectId), // never the live, rewritable file (06-B7)
         back: d.back,
         ground: d.ground,
+      });
+    }
+  }
+  // Basket lines (Share a Wish): sold as they were made — never swapped for the default product.
+  if (input.lines?.length) {
+    const lineRows = await db.select().from(assets).where(inArray(assets.id, input.lines.map((l) => l.assetId)));
+    const byId = new Map(lineRows.map((a) => [a.id, a]));
+    const variants = await db
+      .select({ v: productVariants, p: products })
+      .from(productVariants)
+      .innerJoin(products, eq(products.id, productVariants.productId))
+      .where(inArray(productVariants.sku, input.lines.map((l) => String(l.variantSku))));
+    const bySku = new Map(variants.map((r) => [r.v.sku, r]));
+    const prices = await getCatalogue(db);
+    const seen = new Set(items.map((i) => `${i.assetId}|${i.productKey}`));
+    for (const l of input.lines) {
+      const a = byId.get(l.assetId);
+      const row = bySku.get(String(l.variantSku));
+      if (!a || !row) continue;
+      const { v, p } = row;
+      if (a.familyId !== input.familyId || !a.keptInHome || a.moderationStatus !== 'CLEAR') continue;
+      if (!canViewAsset(assetRefOf(a), creator).allowed) continue;
+      if (!p.visibleInShop || !p.active || !v.active || NOT_GIFTABLE.has(p.key) || isBundleKey(p.key) || !prices[v.sku]) continue;
+      const key = `${a.id}|${v.sku}`;
+      if (seen.has(key)) continue; // one line per keepsake-on-a-variant (the list ticks items off by it)
+      seen.add(key);
+      let sourceObjectId: string | null = null;
+      if (l.sourceObjectId) {
+        const [so] = await db
+          .select({ id: storageObjects.id })
+          .from(storageObjects)
+          .where(and(eq(storageObjects.id, String(l.sourceObjectId)), eq(storageObjects.assetId, a.id)));
+        sourceObjectId = so?.id ?? null;
+      }
+      const attrs = (v.attributes as Record<string, string>) ?? {};
+      const detail = [attrs.size, attrs.colour].filter(Boolean).join(' · ');
+      items.push({
+        assetId: a.id,
+        productKey: v.sku,
+        label: detail ? `${p.label} · ${detail}` : p.label,
+        unitPricePence: prices[v.sku]!.pricePence,
+        transform: clampTransform((l.transform ?? {}) as RawTransform),
+        sourceObjectId,
+        back: normalizeCushionBack(typeof l.back === 'string' ? l.back : undefined),
+        ground: isGroundProduct(p.key) ? normalizeGround(typeof l.ground === 'string' ? l.ground : undefined) : null,
       });
     }
   }
@@ -132,16 +199,25 @@ export async function createGiftLink(
     throw new AuthzError({ allowed: false, reason: 'none of those keepsakes can be shared' });
   }
 
+  // Each item's picture as the product it's offered as — composed NOW, as the parent (who may see it),
+  // and frozen, so a gift-list visitor sees the mug, not just the drawing. Best effort: a product with
+  // no mockup template (or any compose failure) just shows the drawing, as before.
+  await freezeItemMockups(db, creator, items);
+
   let inviteId: string | null = null;
   if (input.invite?.email.trim()) {
-    const inv = await createInvite(db, creator, {
-      familyId: input.familyId,
-      email: input.invite.email,
-      relationship: input.invite.relationship,
-      accessLevel: input.invite.accessLevel,
-      shareOccasions: input.invite.shareOccasions === true,
-    });
-    inviteId = inv.inviteId;
+    try {
+      const inv = await createInvite(db, creator, {
+        familyId: input.familyId,
+        email: input.invite.email,
+        relationship: input.invite.relationship,
+        accessLevel: input.invite.accessLevel,
+        shareOccasions: input.invite.shareOccasions === true,
+      });
+      inviteId = inv.inviteId;
+    } catch (e) {
+      if (!(e instanceof AlreadyInFamilyError)) throw e; // already in the family: the link needs no invite
+    }
   }
 
   const token = randomBytes(24).toString('base64url');
@@ -183,6 +259,46 @@ export type GiftLinkView =
     };
 
 /**
+ * A design's picture (its lifted cut-out, its Studio design) is a file that is REWRITTEN in place
+ * when the drawing is lifted or edited again. A gift link must sell exactly what was shared (06-B7:
+ * the snapshot is immutable), so the link gets its own write-once copy, filed under the same
+ * keepsake (retention, deletion and the erasers' folder sweep cover it like any other derivative).
+ * Null when the object isn't this keepsake's.
+ */
+async function freezeSourceObject(db: DbHandle, assetId: string, sourceObjectId: string | null): Promise<string | null> {
+  if (!sourceObjectId) return null;
+  const [src] = await db
+    .select()
+    .from(storageObjects)
+    .where(and(eq(storageObjects.id, sourceObjectId), eq(storageObjects.assetId, assetId)));
+  if (!src) return null;
+  if (src.writeOnce) return src.id; // already immutable
+  const key = derivativeKey(assetId, `gift-${randomUUID()}`);
+  await putObject(key, await getObjectBytes(src.key), src.contentType ?? 'image/png');
+  const [row] = await db
+    .insert(storageObjects)
+    .values({ assetId, objectClass: 'DERIVATIVE', bucket: getS3().bucket, key, contentType: src.contentType, byteSize: src.byteSize, sha256: src.sha256, exifStripped: true, writeOnce: true })
+    .returning({ id: storageObjects.id });
+  return row!.id;
+}
+
+/**
+ * Can a live (not revoked, not expired) link still be used, judged from its keepsakes as stored NOW?
+ * ONE rule for the recipient's page and the parent's own list (06-B5), so the two never disagree:
+ *  - 'gone': a keepsake on it was deleted or CSAM-blocked, or every one was pulled back to "only me";
+ *  - 'held': a keepsake on it isn't content-cleared (held after a report, or awaiting review) — the
+ *    link is offline until review decides;
+ *  - 'ok'.
+ */
+export function linkAvailability(assetIds: readonly string[], present: { id: string; moderationStatus: string; visibility: string }[]): 'ok' | 'held' | 'gone' {
+  if (present.length < new Set(assetIds).size) return 'gone';
+  if (present.some((a) => a.moderationStatus === 'BLOCKED')) return 'gone';
+  if (present.some((a) => a.moderationStatus !== 'CLEAR')) return 'held';
+  if (present.every((a) => a.visibility === 'ONLY_ME')) return 'gone';
+  return 'ok';
+}
+
+/**
  * Resolve a gift link for the recipient. Returns a "gone" state if any source
  * keepsake has since been deleted (the frozen snapshot must never serve bytes
  * that no longer exist), and revoked/expired states accordingly.
@@ -197,21 +313,21 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   const assetIds = items.map((i) => i.assetId);
   const present = await db.select().from(assets).where(inArray(assets.id, assetIds));
   // "gone" if a source was deleted OR is no longer content-cleared — never serve
-  // uncleared/CSAM-blocked bytes to a token holder outside the family (D8).
-  if (present.length < assetIds.length || present.some((a) => a.moderationStatus !== 'CLEAR')) return { state: 'gone' };
+  // uncleared/CSAM-blocked bytes to a token holder outside the family (D8). (The recipient isn't told
+  // WHY: "held" and "gone" look the same from outside.)
+  if (linkAvailability(assetIds, present) !== 'ok') return { state: 'gone' };
 
   // A keepsake the parent has since pulled back to "only me" drops off the list (and can't be
   // bought or previewed — canPurchaseViaGiftLink denies it too).
   const privateIds = new Set(present.filter((a) => a.visibility === 'ONLY_ME').map((a) => a.id));
   const shown = items.filter((i) => !privateIds.has(i.assetId));
-  if (shown.length === 0) return { state: 'gone' };
 
   const bought = await purchasedItems(db, link.id);
   const withImages = shown.map((i) => ({
     ...i,
     // A small, re-encoded preview served through the link's own capability check — the token
     // holder never gets the original file (see giftLinkPreview).
-    imageUrl: giftPreviewPath(token, i.assetId),
+    imageUrl: giftPreviewPath(token, i.assetId, i.mockupObjectId ? i.productKey : undefined),
     purchased: bought.has(itemKey(i)),
   }));
 
@@ -233,9 +349,36 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   };
 }
 
-/** Where a gift link serves an item's preview (same-origin; noindex; the token is the capability). */
-export function giftPreviewPath(token: string, assetId: string): string {
-  return `/api/gift/${encodeURIComponent(token)}/preview/${encodeURIComponent(assetId)}`;
+/** Where a gift link serves an item's preview (same-origin; noindex; the token is the capability).
+ * `productKey` picks the item when one keepsake is on the list as two products. */
+export function giftPreviewPath(token: string, assetId: string, productKey?: string): string {
+  const base = `/api/gift/${encodeURIComponent(token)}/preview/${encodeURIComponent(assetId)}`;
+  return productKey ? `${base}?p=${encodeURIComponent(productKey)}` : base;
+}
+
+/** Compose + freeze each item's product mockup (see GiftItem.mockupObjectId). Never throws. */
+async function freezeItemMockups(db: DbHandle, creator: ViewerContext, items: GiftItem[]): Promise<void> {
+  const skus = [...new Set(items.map((i) => i.productKey))];
+  if (skus.length === 0) return;
+  const variants = await db.select({ id: productVariants.id, sku: productVariants.sku }).from(productVariants).where(inArray(productVariants.sku, skus));
+  const idOf = new Map(variants.map((v) => [v.sku, v.id]));
+  for (const item of items) {
+    const variantId = idOf.get(item.productKey);
+    if (!variantId) continue;
+    try {
+      const res = await composeMockup(db, creator, {
+        assetId: item.assetId,
+        variantId,
+        transform: ((item.transform as RawTransform | undefined) ?? { scale: 0 }) as RawTransform,
+        size: 'thumb',
+        sourceObjectId: item.sourceObjectId ?? undefined,
+        ground: item.ground ?? undefined,
+      });
+      item.mockupObjectId = res.mockupObjectId;
+    } catch {
+      // no template for this product yet, or a compose failure: the drawing it is
+    }
+  }
 }
 
 /** Longest edge of a gift-link preview — plenty for a phone screen, nowhere near print quality. */
@@ -246,7 +389,7 @@ export const GIFT_PREVIEW_MAX_PX = 720;
  * stripped) — never the original. Gated by the SAME capability as buying (live link, item in the
  * frozen snapshot, same family, content-cleared, not pulled back to ONLY_ME). null ⇒ 404.
  */
-export async function giftLinkPreview(db: DbHandle, token: string, assetId: string): Promise<Buffer | null> {
+export async function giftLinkPreview(db: DbHandle, token: string, assetId: string, productKey?: string | null): Promise<Buffer | null> {
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
   if (!link) return null;
   const grant: GiftLinkGrant = {
@@ -257,10 +400,20 @@ export async function giftLinkPreview(db: DbHandle, token: string, assetId: stri
   };
   const [asset] = await db.select().from(assets).where(eq(assets.id, assetId));
   if (!asset || !canPurchaseViaGiftLink(grant, asset, new Date()).allowed) return null;
-  const [obj] = await db
-    .select({ key: storageObjects.key })
-    .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  // the product as designed, when the link froze one (a DERIVATIVE of this very asset), else the drawing
+  const item = (link.items as GiftItem[]).find((i) => i.assetId === assetId && (!productKey || i.productKey === productKey));
+  const [mockup] = item?.mockupObjectId
+    ? await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.id, item.mockupObjectId), eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')))
+    : [];
+  const [obj] = mockup
+    ? [mockup]
+    : await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!obj) return null;
   const bytes = await getObjectBytes(obj.key);
   return sharp(bytes)
@@ -407,7 +560,9 @@ export async function purchasedItems(
 export interface OwnerGiftList {
   id: string;
   token: string;
-  status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
+  /** HELD = offline while a keepsake on it is checked (after a report); GONE = a keepsake on it was
+   * deleted / blocked, or all were made "only me" — the same rule the recipient's page uses (06-B5). */
+  status: 'ACTIVE' | 'HELD' | 'GONE' | 'REVOKED' | 'EXPIRED';
   createdAtISO: string;
   items: { assetId: string; label: string; imageUrl: string | null; boughtBy: string | null; bought: boolean }[];
 }
@@ -415,6 +570,11 @@ export interface OwnerGiftList {
 /**
  * The parent's view of their gift lists: every item, and — for the parent ONLY — a sticker
  * saying who bought it. Owner-only (the same check as creating a link).
+ *
+ * Each item's picture is re-checked NOW, item by item (07-B12): a keepsake in a link may since have
+ * been made "only me" by its controller (another parent), erased, CSAM-blocked or held after a report
+ * — then the list shows its label with no picture. Never a signed link to an original the owner
+ * couldn't open from their own keepsake box.
  */
 export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, familyId: string): Promise<OwnerGiftList[]> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) return [];
@@ -425,15 +585,28 @@ export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, 
     .select({ assetId: storageObjects.assetId, key: storageObjects.key })
     .from(storageObjects)
     .where(and(inArray(storageObjects.assetId, allIds), eq(storageObjects.objectClass, 'ORIGINAL')));
-  const keyByAsset = new Map(objs.map((o) => [o.assetId, o.key]));
+  const rows = await db.select().from(assets).where(inArray(assets.id, allIds));
+  const pictured = new Set(
+    rows
+      .filter((r) => r.moderationStatus !== 'BLOCKED' && !isHeldForReport(r) && canViewAsset(assetRefOf(r), owner).allowed)
+      .map((r) => r.id),
+  );
+  const keyByAsset = new Map(objs.filter((o) => pictured.has(o.assetId)).map((o) => [o.assetId, o.key]));
   const now = new Date();
+  const ownerStatus = (l: (typeof links)[number]): OwnerGiftList['status'] => {
+    if (l.status === 'REVOKED') return 'REVOKED';
+    if (l.expiresAt <= now) return 'EXPIRED';
+    const ids = (l.items as GiftItem[]).map((i) => i.assetId);
+    const live = linkAvailability(ids, rows.filter((r) => ids.includes(r.id)));
+    return live === 'ok' ? 'ACTIVE' : live === 'held' ? 'HELD' : 'GONE';
+  };
   return Promise.all(
     links.map(async (l) => {
       const bought = await purchasedItems(db, l.id);
       return {
         id: l.id,
         token: l.token,
-        status: l.status === 'REVOKED' ? 'REVOKED' : l.expiresAt <= now ? 'EXPIRED' : 'ACTIVE',
+        status: ownerStatus(l),
         createdAtISO: l.createdAt.toISOString(),
         items: await Promise.all(
           (l.items as GiftItem[]).map(async (i) => {

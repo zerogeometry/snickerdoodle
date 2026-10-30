@@ -25,6 +25,7 @@ import { christmasBundleLine, newBundleLineId } from '@/lib/christmas-bundle-lin
 import { EMPTY_DRAFT, resetSlot, setSlot, slotView, specOf, withLooks, type Draft, type Slot, type SlotView } from '@/lib/bundle-draft';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, shownSrc, toast, useBasket, useUpload } from '@/lib/store';
+import { useStoredUpload } from '@/lib/useStoredUpload';
 
 /**
  * The CHRISTMAS FAMILY BUNDLE builder (founder, 29 Oct — three sizes, no add-ons):
@@ -89,6 +90,7 @@ const slotOf = (slot: number): Slot => (slot === PLACEMATS ? 'placemat' : slot =
 export function ChristmasBundleBuilder() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
+  useStoredUpload(); // a direct load: the guest's drawing is stored, so the picker offers it (01-B4)
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
 
@@ -146,6 +148,13 @@ export function ChristmasBundleBuilder() {
     const u = useUpload.getState().upload;
     setD({ ...EMPTY, size, placemat: u?.assetId ? { assetId: u.assetId, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) } : null });
   }, []);
+  // A drawing stored only now (a direct load — 01-B4) goes on the table, if nothing is there yet.
+  useEffect(() => {
+    if (!seededRef.current || edit || !upload?.assetId) return;
+    const a = upload.assetId;
+    setD((old) => (old.placemat || old.coaster || old.ornaments.some(Boolean) ? old : { ...old, placemat: { assetId: a } }));
+  }, [upload?.assetId, edit]);
+
   // Keep this tab's draft (not while editing a basket line — that line IS the saved state).
   useEffect(() => {
     if (!seededRef.current || edit) return;
@@ -343,14 +352,14 @@ export function ChristmasBundleBuilder() {
 
           {/* 2–4 · each piece's design (founder, 29 Oct): the placemats one for all, the coasters one for all,
               the ornaments one each — every one customisable (the picker's remove background / the Studio) */}
-          <Step n={2} title="customize your placemats" note={`one design on all ${d.size} placemats`}>
+          <Step n={2} title="customize your placemats" note={`one design on ${d.size === 2 ? 'both' : `all ${d.size}`} placemats`}>
             <Piece view={slotView(d, 'placemat', pictureOf)} label="placemats" i={0}
               note={d.placemat ? drawingFor(d.placemat.assetId)?.label ?? 'your design' : 'pick a design'}
               aria={d.placemat ? 'edit the placemats’ design' : 'pick a design for the placemats'}
               onClick={() => openSheet(PLACEMATS)}
               blocked={!!d.placemat && assess('placemat', d.placemat)?.decision === 'BLOCK'} />
           </Step>
-          <Step n={3} title="customize your coasters" note={`one design on all ${d.size} coasters`}>
+          <Step n={3} title="customize your coasters" note={`one design on ${d.size === 2 ? 'both' : `all ${d.size}`} coasters`}>
             <Piece view={slotView(d, 'coaster', pictureOf)} label="coasters" i={1}
               note={d.coaster ? drawingFor(d.coaster.assetId)?.label ?? 'your design' : 'same as the placemats'}
               aria={d.coaster ? 'edit the coasters’ design' : 'the coasters wear the placemats’ design — edit or pick another'}

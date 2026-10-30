@@ -1,10 +1,11 @@
-import { and, eq } from 'drizzle-orm';
-import { assets, auditRecords, memberships, storageObjects } from '@/db/schema';
-import { deleteObjectConfirmed, presignDownload } from '@/storage';
+import { and, eq, inArray } from 'drizzle-orm';
+import { assets, auditRecords, memberships, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
+import { assetPrefix, deleteAllUnderPrefix, deleteObjectConfirmed, presignDownload } from '@/storage';
 import {
   AuthzError,
   assertCanViewAsset,
   canDeleteAsset,
+  canEditAsset,
   canSetAssetVisibility,
   canViewAsset,
   type AssetRef,
@@ -153,6 +154,18 @@ export async function getViewableAssetOrThrow(
   return assertViewableRow(row, viewer);
 }
 
+/**
+ * The EDIT gate: change a keepsake's look in place (Studio save, cut-out, background) — the view
+ * gate first, then the controller or CONTRIBUTE access (07-B2; src/authz canEditAsset). An
+ * AuthzError otherwise, the same as for a made-up id.
+ */
+export async function getEditableAssetOrThrow(db: DbHandle, assetId: string, viewer: ViewerContext): Promise<AssetRef> {
+  const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
+  const ref = assertViewableRow(row, viewer);
+  if (!canEditAsset(ref, viewer).allowed) throw denied('not found');
+  return ref;
+}
+
 /** The view gate on an asset row already in hand — the ONE place getViewableAssetOrThrow and the
  * signed-URL grant below decide "may this viewer see it". */
 function assertViewableRow(row: typeof assets.$inferSelect | undefined, viewer: ViewerContext): AssetRef {
@@ -258,8 +271,34 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
   if (!canDeleteAsset(toAssetRef(row), viewer)) {
     throw denied('only the controlling parent may delete this keepsake');
   }
+  // a paid order that isn't made yet still needs the drawing — wait until it's on its way, as
+  // closing the account does (sweep 08-B5: the order used to fail silently, paid and never made)
+  if ((await keepsakesNeededByOrders(db, [assetId])).size > 0) throw new KeepsakeInUseError();
 
   await eraseAsset(db, row, { accountId: viewer.accountId, actorType: 'MEMBER' });
+}
+
+/** Orders that are paid but not yet made (or still with the printer) — they still need the drawing. */
+const ORDER_IN_FLIGHT = ['PAID', 'FULFILLING'] as const;
+
+/** A keepsake can't be deleted yet: an order that's paid for and not yet made still needs it. */
+export class KeepsakeInUseError extends Error {
+  constructor() {
+    super('this keepsake is in an order that isn’t made yet');
+    this.name = 'KeepsakeInUseError';
+  }
+}
+
+/** Which of these keepsakes a paid, not-yet-made order still needs (its print file isn't sent yet). */
+export async function keepsakesNeededByOrders(db: DbHandle, assetIds: string[]): Promise<Set<string>> {
+  if (assetIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ assetId: orderItemArtwork.assetId })
+    .from(orderItemArtwork)
+    .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(and(inArray(orderItemArtwork.assetId, assetIds), inArray(orders.status, [...ORDER_IN_FLIGHT])));
+  return new Set(rows.map((r) => r.assetId).filter((id): id is string => Boolean(id)));
 }
 
 /**
@@ -294,6 +333,10 @@ export async function eraseAsset(
 
   // 3. drop the row — cascades storage_object rows; nulls order/ML asset links.
   await db.delete(assets).where(eq(assets.id, row.id));
+  // 3b. …then sweep the asset's whole folder: a derivative that landed while this erase ran (a
+  // late mockup, 08-B8) is gone too. Anything written after this finds no row and removes itself
+  // (src/server/print/compositor.ts persistDerivative).
+  await deleteAllUnderPrefix(assetPrefix(row.id));
 
   // 4. outside the DB, so a backup restore can't bring it back (erasureLedger.ts)
   if (!opts.skipLedger) await recordErasure({ kind: 'asset', id: row.id });

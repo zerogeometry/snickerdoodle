@@ -97,7 +97,7 @@ test('axe on the mobile menu, and a signed-in family home with a keepsake', asyn
   test.info().annotations.push({ type: '09-B8', description: `visible "${(await tile.innerText()).replace(/\s+/g, ' ')}" vs name "${await tile.getAttribute('aria-label')}"` });
 });
 
-test.fixme('09-B8: /home keepsake tiles — the button’s accessible name includes its visible words (axe label-content-name-mismatch)', async ({ page }) => {
+test('09-B8: /home keepsake tiles — the button’s accessible name includes its visible words (axe label-content-name-mismatch)', async ({ page }) => {
   await quietCookies(page);
   const parent = testEmail('t9-home-b8');
   await signInByEmailLink(page, parent, '/start-creating');
@@ -109,7 +109,7 @@ test.fixme('09-B8: /home keepsake tiles — the button’s accessible name inclu
   await expectAccessible(page, '/home with a keepsake');
 });
 
-test.fixme('09-B6: the Studio has a <main id="main"> (the skip link lands somewhere; axe "region" + "skip-link")', async ({ page }) => {
+test('09-B6: the Studio has a <main id="main"> (the skip link lands somewhere; axe "region" + "skip-link")', async ({ page }) => {
   await quietCookies(page);
   await uploadAndOpenRange(page);
   await page.getByRole('button', { name: /edit in studio/i }).first().click();
@@ -118,7 +118,7 @@ test.fixme('09-B6: the Studio has a <main id="main"> (the skip link lands somewh
   await expectAccessible(page, '/studio');
 });
 
-test.fixme('09-B7: the open mobile menu passes axe (two unnamed <nav> landmarks — "landmark-unique")', async ({ page }) => {
+test('09-B7: the open mobile menu passes axe (its <nav> landmarks are named)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await quietCookies(page);
   await page.goto('/');

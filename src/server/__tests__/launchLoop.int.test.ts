@@ -276,26 +276,27 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       // the owner can't use their own code
       expect(await resolvePromo(db, code, new Date(), { accountId: ids.samId, email: sam!.email })).toEqual({ ok: false, reason: 'own-code' });
 
-      // a brand-new guest buyer: £5 off a £65 print
-      const r = await resolvePromo(db, code, new Date(), null);
+      // a guest we can't identify isn't given it (07-B6); a brand-new guest, by their email, is: £5 off a £65 print
+      expect(await resolvePromo(db, code, new Date(), null)).toEqual({ ok: false, reason: 'needs-buyer' });
+      const guestEmail = `friend-${ids.nonce}@example.test`;
+      const r = await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail });
       expect(r.ok).toBe(true);
       if (!r.ok) return;
-      const guestEmail = `friend-${ids.nonce}@example.test`;
       const first = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
       orderRefs.push(first.ref!);
       const [o1] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
       expect(o1!.promoSavingPence).toBe(500);
       expect(await getCreditBalance(db, ids.samId)).toBe(500); // dev path pays immediately → reward settled
 
-      // the same buyer again: no second discount, no second reward
+      // the same buyer again: no second discount (refused at placement), no second reward
       const again = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
-      orderRefs.push(again.ref!);
+      expect(again).toEqual({ ok: false, reason: 'promo', promoError: 'first-order-only' });
       expect(await getCreditBalance(db, ids.samId)).toBe(500);
       expect(await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail })).toEqual({ ok: false, reason: 'first-order-only' });
 
-      // a self-referral by email (owner buying as a guest) earns nothing
+      // a self-referral by email (owner buying as a guest): refused, earns nothing
       const self = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: sam!.email });
-      orderRefs.push(self.ref!);
+      expect(self).toEqual({ ok: false, reason: 'promo', promoError: 'own-code' });
       expect(await getCreditBalance(db, ids.samId)).toBe(500);
 
       // Sam spends the credit: £5 off, debited once

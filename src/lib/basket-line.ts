@@ -1,5 +1,5 @@
 import { lineIdFor } from '@/lib/catalogue-view';
-import type { BasketItem } from '@/lib/store';
+import type { BasketItem, Selection } from '@/lib/store';
 
 /**
  * WHICH basket line a personalised item belongs to. One line = one thing that prints the same way:
@@ -47,4 +47,27 @@ function hash53(s: string): string {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
   h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
+/**
+ * The customize page's selection for a basket line reopened with `?edit=` — EVERYTHING that line
+ * prints with: the variant's options, the cushion back, the base colour, and a card's inside message
+ * and outside span. A field left out would keep whatever was customised last in the tab, and
+ * "update basket" would then print the line differently (sweep 02-B3: a card's message dropped).
+ */
+export function selectionForLine(
+  line: Pick<BasketItem, 'back' | 'ground' | 'message' | 'cardImageSpan'>,
+  attributes: Record<string, string | undefined>,
+): Selection {
+  return {
+    size: attributes.size,
+    colour: attributes.colour,
+    orientation: attributes.orientation ?? 'portrait',
+    grade: attributes.grade,
+    finish: attributes.finish,
+    back: line.back, // a cushion line carries its back choice
+    ground: line.ground, // an edge-to-edge line carries its base colour
+    message: line.message, // a card: its inside (absent = blank inside — cleared, not kept from before)
+    cardImageSpan: line.cardImageSpan ?? 'front', // a card: its outside span
+  };
 }

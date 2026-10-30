@@ -59,12 +59,14 @@ if grep -q '^MODERATION_PROVIDER=real$' "$tmp.env"; then
   for k in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do has "$k" || missing+=("$k"); done
   [ "${#missing[@]}" -eq 0 ] || die "MODERATION_PROVIDER=real but missing in SSM: ${missing[*]}"
 fi
-# not fatal, but worth a line: an unverified database certificate, an unpinned client-IP header
+# not fatal, but worth a line: an unverified database certificate
 db_url="$(sed -n 's/^DATABASE_URL=//p' "$tmp.env")"
 if [[ "$db_url" != *@db:* && "$db_url" != *sslmode=verify-full* ]]; then
   log "warning: DATABASE_URL does not use sslmode=verify-full — the database's certificate is not checked (runbook §3.8)"
 fi
-has CLIENT_IP_HEADER || log "warning: CLIENT_IP_HEADER is not set — set it to x-real-ip (runbook §3.6)"
+# fatal (07-B14): without it no client-IP header can be trusted, so every visitor would share one
+# rate-limit bucket (src/server/rateLimit.ts) — set it to x-real-ip, which Caddy overwrites
+has CLIENT_IP_HEADER || die "CLIENT_IP_HEADER is not set in SSM — set it to x-real-ip (runbook §3.6)"
 if [ "${COMPOSE_PROFILES:-}" = local-db ] && ! has LOCAL_DB_PASSWORD; then
   die "COMPOSE_PROFILES=local-db but LOCAL_DB_PASSWORD is not in SSM"
 fi

@@ -13,7 +13,10 @@ people must be told plainly what happens.
 - **No separate image backup.** Durability comes from the storage service itself.
 - **Bucket versioning ON** (protects against accidental overwrite/delete for a few days).
 - **Lifecycle rules:** `infra/s3-lifecycle.json`
-  - non-current versions expire after **7 days** → a deleted original is truly gone within a week;
+  - non-current versions expire after **7 days**. This is only a backstop: when the app deletes a
+    picture (retention, "delete", account closure, review "remove") it removes **every version and
+    delete marker** of it straight away (`deleteObjectConfirmed`, src/storage/objects.ts — 08-B4).
+    Versioning still protects against an accidental overwrite;
   - `erasure-ledger/` objects expire after **30 days** (longer than the DB backup window);
   - `quarantine/` (direct uploads not yet checked) expire after **1 day**, non-current versions too —
     a backstop; the app deletes every version itself on finalise (ops/DIRECT-UPLOADS.md).

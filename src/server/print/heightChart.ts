@@ -2,6 +2,7 @@ import './sharp-init';
 import { Resvg } from '@resvg/resvg-js';
 import sharp, { type Sharp } from 'sharp';
 import { computeLayerRect, type TemplateGeom, type Transform } from './geometry';
+import { visibleLayerPart } from './visibleLayer';
 import { heightChartLayout, HEIGHT_CHART_FLOOR_CM, rulerBandSvg } from './height-chart-geometry';
 
 /**
@@ -55,14 +56,8 @@ async function faceAssembly(
   const meta = await sharp(srcBuf).metadata();
   if (!meta.width || !meta.height) throw new Error('unreadable source image');
   const rect = computeLayerRect(artGeom, { width: meta.width, height: meta.height }, transform);
-  const layer = await sharp(srcBuf).rotate(transform.rotationDeg).resize(rect.width, rect.height, { fit: 'fill' }).toBuffer();
-  const ix = Math.max(0, -rect.x);
-  const iy = Math.max(0, -rect.y);
-  const ox = Math.max(0, rect.x);
-  const oy = Math.max(0, rect.y);
-  const iw = Math.max(1, Math.min(rect.width - ix, rect.canvasWidth - ox));
-  const ih = Math.max(1, Math.min(rect.height - iy, rect.canvasHeight - oy));
-  const part = await sharp(layer).extract({ left: ix, top: iy, width: iw, height: ih }).png().toBuffer();
+  // cut from the source BEFORE resizing — a big zoomed layer is never decoded whole (sweep 03-B3)
+  const { part, left: ox, top: oy } = await visibleLayerPart(srcBuf, { width: meta.width, height: meta.height }, rect);
 
   const band = Buffer.from(
     new Resvg(rulerBandSvg(lay, opts.floorCm ?? HEIGHT_CHART_FLOOR_CM), { fitTo: { mode: 'original' }, background: 'white' }).render().asPng(),

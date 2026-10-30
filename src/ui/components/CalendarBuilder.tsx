@@ -24,6 +24,7 @@ import { calendarLine, newCalendarLineId } from '@/lib/calendar-line';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { deliveryLine } from '@/lib/delivery';
 import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine } from '@/lib/store';
+import { useStoredUpload } from '@/lib/useStoredUpload';
 
 /**
  * The dated 2027 WALL CALENDAR builder (CHRISTMAS-range-and-postage.md §5): choose A5 or A4 → put
@@ -70,6 +71,7 @@ function writeDraft(d: { variantId: string | null; slots: Slot[] } | null) {
 export function CalendarBuilder() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
+  useStoredUpload(); // a direct load: the guest's drawing is stored, so the picker offers it (01-B4)
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
 
@@ -136,6 +138,13 @@ export function CalendarBuilder() {
     const u = useUpload.getState().upload;
     if (u?.assetId) setSlots((s) => [{ assetId: u.assetId!, transform: PLACE, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) }, ...s.slice(1)]);
   }, [product]);
+
+  // A drawing stored only now (a direct load — 01-B4) goes on the cover, if no page is filled yet.
+  useEffect(() => {
+    if (!seededRef.current || edit || !upload?.assetId) return;
+    const a = upload.assetId;
+    setSlots((old) => (old.some(Boolean) ? old : [{ assetId: a, transform: PLACE }, ...old.slice(1)]));
+  }, [upload?.assetId, edit]);
 
   // Keep this tab's draft (not while editing a basket line — that line IS the saved state).
   useEffect(() => {

@@ -82,3 +82,18 @@ export async function assertPodEgressAllowed(db: DbHandle, asset: EgressAsset, e
     throw new GateError('LG3 transfer assessment + Article 28 DPA not green — child-image POD egress blocked');
   }
 }
+
+/** Why a line is held when its keepsake isn't CLEAR — on the line (renderError) and the order. */
+export const HELD_FOR_SAFETY_CHECK = 'held for a safety check — the keepsake isn’t cleared for printing';
+
+/**
+ * The content-safety half of the print step (D8). placeOrder only takes a CLEAR keepsake, but one can
+ * be reported or re-screened AFTER payment (a gift-link report, a family member's report, a review
+ * decision) — so the worker re-checks before it renders, the submitter re-checks at the egress moment,
+ * and the release sweep re-checks before it lets a held line go. Anything but CLEAR (FLAGGED, BLOCKED,
+ * still PENDING) is held: the line waits as BLOCKED_GATE, the order stays PAID and visible — nothing
+ * is lost, and nothing prints until a reviewer clears it.
+ */
+export function assertClearedForPrint(asset: { moderationStatus: string | null | undefined }): void {
+  if (asset.moderationStatus !== 'CLEAR') throw new GateError(HELD_FOR_SAFETY_CHECK);
+}

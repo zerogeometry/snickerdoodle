@@ -13,6 +13,7 @@ import { drawStroke, drawTextured } from './objects-canvas';
 import { Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from './panel';
 import { AngleControl } from './AngleControl';
 import type { ToolId } from './tools';
+import { withArticle } from '@/lib/articles';
 
 export interface PenStyle {
   colour: string;
@@ -99,8 +100,8 @@ export function AddedOptions(p: {
   const actions = (
     <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="this layer">
       <ActionButton icon={IconCopy} label="duplicate" onClick={p.onDuplicate} />
-      <ActionButton icon={IconStackPop} label="forward" onClick={p.onForward} />
-      <ActionButton icon={IconStackPush} label="back" onClick={p.onBack} />
+      <ActionButton icon={IconStackPop} label="bring forward" onClick={p.onForward} />
+      <ActionButton icon={IconStackPush} label="send back" onClick={p.onBack} />
       <ActionButton icon={IconTrash} label="delete" onClick={p.onDelete} danger />
     </div>
   );
@@ -220,7 +221,7 @@ export function AddedOptions(p: {
         <Section label="add a shape">
           <div className="grid grid-cols-4 gap-1.5" role="group" aria-label="shapes">
             {PLAIN_SHAPES.map((k) => (
-              <button key={k} type="button" aria-label={`add a ${SHAPE_LABELS[k]}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
+              <button key={k} type="button" aria-label={`add ${withArticle(SHAPE_LABELS[k])}`} onClick={() => p.onAddShape(k)} className="press flex h-14 items-center justify-center rounded-xl border-2 border-cocoa/20 bg-paper hover:border-cocoa">
                 <svg viewBox="-12 -12 124 124" className="h-9 w-9" aria-hidden>
                   <path d={SHAPE_PATHS[k]} fill={p.shapeStyle.fill} fillRule="evenodd" stroke={p.shapeStyle.strokeWidth > 0 ? p.shapeStyle.stroke : 'none'} strokeWidth={Math.max(3, p.shapeStyle.strokeWidth * 100)} strokeLinejoin="round" />
                 </svg>
