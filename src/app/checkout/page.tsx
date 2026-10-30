@@ -344,7 +344,7 @@ export default function CheckoutPage() {
           <Link href="/start-creating" aria-label="Back to your collection" className="-ml-2 flex h-11 w-11 shrink-0 items-center justify-center">
             <Icon icon={IconArrowLeft} size={20} className="text-ink-soft" />
           </Link>
-          <Link href="/" className="truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
+          <Link href="/" className="inline-flex min-h-11 items-center truncate font-display text-xl font-semibold text-cocoa">snickerdoodle</Link>
         </div>
         {/* narrow phones: just the padlock (the words from 360px), never wrapping into the logo */}
         <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs text-ink-soft" aria-label="secure checkout">

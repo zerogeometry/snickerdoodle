@@ -325,6 +325,30 @@ test.describe('cookie banner', () => {
     const names = (await page.context().cookies()).map((c) => c.name);
     expect(names.filter((n) => !/^(authjs|__Secure-authjs|__Host-authjs|sd_)/.test(n))).toEqual([]);
   });
+
+  // 09-B10 (founder, 30 Oct): equal prominence (ICO cookie guidance, Children's Code std 13) and a way to change your mind.
+  test('09-B10: both choices look the same, and "cookie settings" in the footer brings the choice back', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    const banner = page.getByRole('dialog', { name: 'Cookie choices' });
+    await expect(banner).toBeVisible();
+    const look = (name: string) =>
+      banner.getByRole('button', { name }).evaluate((el) => {
+        const c = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return { bg: c.backgroundColor, color: c.color, border: c.borderColor, weight: c.fontWeight, size: c.fontSize, w: Math.round(r.width), h: Math.round(r.height) };
+      });
+    expect(await look('accept all')).toEqual(await look('essential only'));
+    await banner.getByRole('button', { name: 'accept all' }).click();
+    await expect(banner).toHaveCount(0);
+    await page.getByRole('contentinfo').getByRole('button', { name: 'cookie settings' }).click();
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText('all cookies');
+    await banner.getByRole('button', { name: 'essential only' }).click();
+    expect(await page.evaluate(() => localStorage.getItem('snickerdoodle.cookie-choice'))).toBe('essential');
+    await page.goto('/trust/cookies');
+    await expect(page.getByText(/cookie settings/).first()).toBeVisible();
+  });
 });
 
 test.describe('crawlers', () => {

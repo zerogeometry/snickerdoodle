@@ -13,7 +13,7 @@ export function Chip({
       type="button"
       aria-pressed={active}
       className={cn(
-        'wiggle inline-flex min-h-9 flex-none items-center rounded-pill border-2 px-3.5 py-1.5 text-[13px] font-bold transition-colors',
+        'wiggle inline-flex min-h-11 flex-none items-center rounded-pill border-2 px-3.5 py-1.5 text-[13px] font-bold transition-colors',
         active
           ? 'border-cocoa bg-cocoa text-paper'
           : 'border-cocoa/25 bg-paper text-ink-soft hover:border-cocoa',

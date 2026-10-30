@@ -1,3 +1,4 @@
+import { CookieSettingsButton } from '@/ui/components/CookieSettingsButton';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/ui/primitives/Button';
@@ -20,13 +21,13 @@ export default async function MarketingLayout({ children }: { children: ReactNod
             <Logo height={46} className="md:!h-[56px]" />
           </Link>
           <div className="hidden items-center gap-7 text-sm text-ink-soft md:flex">
-            <Link href="/how-it-works" className="hover:text-cinnamon">
+            <Link href="/how-it-works" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               how it works
             </Link>
-            <Link href="/gifts" className="hover:text-cinnamon">
+            <Link href="/gifts" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               gifts
             </Link>
-            <Link href="/our-story" className="hover:text-cinnamon">
+            <Link href="/our-story" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               our story
             </Link>
             <AccountNav signedIn={signedIn} />
@@ -48,7 +49,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
           <span>snickerdoodle · made with care in the UK</span>
           <nav aria-label="footer" className="flex flex-wrap items-center justify-center gap-x-4">
-            <Link href="/faq" className="inline-flex min-h-11 items-center hover:text-cinnamon">
+            <Link href="/faq" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-cinnamon">
               FAQs
             </Link>
             <Link href="/help" className="inline-flex min-h-11 items-center hover:text-cinnamon">
@@ -57,12 +58,13 @@ export default async function MarketingLayout({ children }: { children: ReactNod
             <Link href="/trust/family-promise" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               our promise
             </Link>
-            <Link href="/trust/privacy" className="inline-flex min-h-11 items-center hover:text-cinnamon">
+            <Link href="/trust/privacy" className="inline-flex min-h-11 min-w-11 items-center justify-center hover:text-cinnamon">
               privacy
             </Link>
             <Link href="/trust/cookies" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               cookies
             </Link>
+            <CookieSettingsButton className="inline-flex min-h-11 items-center hover:text-cinnamon" />
             <Link href="/trust/data-complaint" className="inline-flex min-h-11 items-center hover:text-cinnamon">
               data complaint
             </Link>
@@ -78,7 +80,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
           </span>
           <span className="block">
             {COMPANY.street}, {COMPANY.city} {COMPANY.postcode} ·{' '}
-            <a href={`mailto:${COMPANY.email}`} className="underline underline-offset-2 hover:text-cinnamon">
+            <a href={`mailto:${COMPANY.email}`} className="inline-flex min-h-11 items-center underline underline-offset-2 hover:text-cinnamon">
               {COMPANY.email}
             </a>
           </span>
