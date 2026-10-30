@@ -23,6 +23,7 @@ import { runReminders, setReminderConsent } from '@/server/reminders';
 import { deleteObject } from '@/storage';
 import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
+import { exclusively } from '@/test/globalJobs';
 
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
@@ -394,7 +395,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   });
 
   // ── G15: the family calendar — the parent's per-invite choice, changeable ──
-  it('family calendar: the invite choice lands on the membership; the parent can change it; only shared relatives get reminders', async () => {
+  it('family calendar: the invite choice lands on the membership; the parent can change it; only shared relatives get reminders', () => exclusively(db, async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [rosie] = await db.select().from(memberships).where(and(eq(memberships.accountId, ids.rosieId), eq(memberships.familyId, ids.hartleyId)));
     expect(rosie!.seesOccasions).toBe(false); // seeded before the choice existed → not shared (safe default)
@@ -430,10 +431,10 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect(await rosieSends()).toHaveLength(0);
     await db.delete(consentRecords).where(eq(consentRecords.accountId, ids.rosieId));
     await db.delete(children).where(eq(children.id, ivy!.id)); // keep later occasion tests independent
-  });
+  }));
 
   // ── G10: reminders — consent-gated, once per occasion ─────────────────────
-  it('reminders: nothing without consent; with consent exactly one per occasion nudge, never twice', async () => {
+  it('reminders: nothing without consent; with consent exactly one per occasion nudge, never twice', () => exclusively(db, async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const soon = new Date(Date.now() + 14 * 86_400_000); // the two-weeks-before nudge
     const bday = `2020-${String(soon.getUTCMonth() + 1).padStart(2, '0')}-${String(soon.getUTCDate()).padStart(2, '0')}`;
@@ -453,5 +454,5 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     await db.delete(reminderSends).where(eq(reminderSends.accountId, ids.samId));
     await runReminders(db);
     expect(await sentFor()).toHaveLength(0);
-  });
+  }));
 });

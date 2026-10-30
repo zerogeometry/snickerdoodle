@@ -36,6 +36,7 @@ import { createInviteAction } from '@/app/actions/invite';
 import { removeMemberAction, resendInviteAction, setMemberAccessAction } from '@/app/actions/family';
 import { closeMyAccountAction, deleteAllMyKeepsakesAction, exportMyDataAction } from '@/app/actions/data';
 import { POST as oneClickOff } from '@/app/api/reminders/off/[token]/route';
+import { exclusively } from '@/test/globalJobs';
 
 const DB = process.env.DATABASE_URL;
 
@@ -234,7 +235,7 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
     clean(sent[0]!);
   });
 
-  it('04-B10: the reminder carries a real off switch — no sign-in, and List-Unsubscribe for one tap in the mail app', async () => {
+  it('04-B10: the reminder carries a real off switch — no sign-in, and List-Unsubscribe for one tap in the mail app', () => exclusively(db, async () => {
     const d = new Date(Date.now() + 28 * 86_400_000);
     await db.update(children).set({ birthday: `2021-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}` }).where(eq(children.id, ids.oliviaId));
     await setReminderConsent(db, ids.samId, true, 'notices-test');
@@ -257,5 +258,5 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
     expect(await hasReminderConsent(db, ids.samId)).toBe(false);
     const bad = await oneClickOff(new Request('http://x', { method: 'POST' }), { params: Promise.resolve({ token: 'nope.nope' }) });
     expect(bad.status).toBe(404);
-  });
+  }));
 });
