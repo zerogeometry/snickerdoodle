@@ -27,6 +27,7 @@ import { PATTERN_GROUND_WHITE, groundHex, isColouredGround } from '@/lib/pattern
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { deliveryLine } from '@/lib/delivery';
 import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine, type PlacementTransform } from '@/lib/store';
+import { useStoredUpload } from '@/lib/useStoredUpload';
 
 /**
  * The greetings-card PACK builder (D22): choose a pack of 5 or 10 → put a drawing on every card
@@ -55,6 +56,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { d
 export function CardPackBuilder() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
+  useStoredUpload(); // a direct load: the guest's drawing is stored, so the picker offers it (01-B4)
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
 
@@ -185,6 +187,12 @@ export function CardPackBuilder() {
     });
   }, [drawings]);
   const drawingFor = (assetId: string) => drawings.find((d) => d.assetId === assetId) ?? null;
+  // a drawing stored only now (a direct load — 01-B4) goes on card 1, if no card is filled yet
+  useEffect(() => {
+    if (!seededRef.current || edit || !upload?.assetId) return;
+    const a = upload.assetId;
+    setSlots((old) => (old.some(Boolean) ? old : [{ assetId: a, transform: COVER }]));
+  }, [upload?.assetId, edit]);
   // keep this tab's picks (not while editing a basket line — that line IS the saved state)
   useEffect(() => {
     if (!seededRef.current || edit) return;
@@ -601,6 +609,22 @@ export function PickerBody({
                   </button>
                 </div>
               ) : null}
+              {/* a per-piece edit that can't be a copy (no account to keep one): say so BEFORE it changes
+                  every piece showing this drawing (01-B2) */}
+              {tools?.shared?.assetId === d.assetId ? (
+                <div role="status" className="mt-1.5 rounded-[12px] border-2 border-cocoa bg-honey-band p-2 text-[11px] leading-snug text-cocoa">
+                  <p className="font-semibold">this drawing is on every piece — an edit here changes them all.</p>
+                  <p className="mt-0.5">{signedIn ? 'we couldn’t make a copy just now — try again in a moment.' : <>{login} to edit just this piece.</>}</p>
+                  <div className="mt-1.5 flex flex-col gap-1">
+                    <button type="button" onClick={tools.editEveryPiece} className="press inline-flex min-h-11 items-center justify-center rounded-pill border-2 border-cocoa bg-cocoa px-2 text-[11px] font-bold text-paper">
+                      edit every piece
+                    </button>
+                    <button type="button" onClick={tools.cancelShared} className="press inline-flex min-h-11 items-center justify-center rounded-pill border-2 border-cocoa/25 bg-paper px-2 text-[11px] font-bold text-cocoa hover:border-cocoa">
+                      not now
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </li>
           );
         })}
@@ -627,7 +651,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-export type PickerTools = Pick<ReturnType<typeof usePickerEdits>, 'hasLiftedBackground' | 'busy' | 'uploading' | 'toggleBackground' | 'editInStudio' | 'uploadToKeepsake'>;
+export type PickerTools = Pick<ReturnType<typeof usePickerEdits>, 'hasLiftedBackground' | 'busy' | 'uploading' | 'toggleBackground' | 'editInStudio' | 'uploadToKeepsake'> &
+  Partial<Pick<ReturnType<typeof usePickerEdits>, 'shared' | 'editEveryPiece' | 'cancelShared'>>;
 
 /** "upload to keepsake": one or more photos from the computer or the phone's gallery, into the keepsake
  * box (an account keeps them — a guest is asked to log in first). */
