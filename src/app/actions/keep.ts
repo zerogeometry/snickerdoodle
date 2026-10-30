@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { assets } from '@/db/schema';
 import { getDb } from '@/db/client';
-import { changeAssetVisibility, deleteAsset, resolveViewerContext } from '@/server/assets';
+import { changeAssetVisibility, deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { resolveKeepFamily } from '@/server/onboarding';
 import { finishPendingKeeps, keepUpload, rememberKeepForEmail } from '@/server/keepsakes';
@@ -101,7 +101,7 @@ export async function setAssetVisibilityAction(
  * Delete a keepsake on demand (NN8 + children's-data rules) — controller-only,
  * re-checked server-side. Real + cascading: bytes (confirmed) + DB row + audit.
  */
-export async function deleteKeepsakeAction(assetId: string): Promise<{ ok: boolean }> {
+export async function deleteKeepsakeAction(assetId: string): Promise<{ ok: boolean; reason?: 'in-order' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false };
 
@@ -112,8 +112,8 @@ export async function deleteKeepsakeAction(assetId: string): Promise<{ ok: boole
   const viewer = await resolveViewerContext(db, account.id, asset.familyId);
   try {
     await deleteAsset(db, assetId, viewer);
-  } catch {
-    return { ok: false };
+  } catch (e) {
+    return e instanceof KeepsakeInUseError ? { ok: false, reason: 'in-order' } : { ok: false };
   }
   revalidatePath('/home');
   return { ok: true };

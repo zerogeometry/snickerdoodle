@@ -143,7 +143,7 @@ export async function updateChildAction(
 }
 
 /** Remove a little one; optionally delete every keepsake filed under them too. */
-export async function deleteChildAction(childId: string, alsoDeleteKeepsakes: boolean): Promise<{ ok: boolean; keepsakesDeleted: number }> {
+export async function deleteChildAction(childId: string, alsoDeleteKeepsakes: boolean): Promise<{ ok: boolean; keepsakesDeleted: number; reason?: 'in-order' }> {
   return asOwner(
     (ctx) => deleteChild(ctx.db, ctx.viewer, { familyId: ctx.familyId, childId: String(childId), alsoDeleteKeepsakes: alsoDeleteKeepsakes === true }),
     { ok: false, keepsakesDeleted: 0 },

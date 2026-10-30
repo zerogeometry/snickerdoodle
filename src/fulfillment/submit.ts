@@ -5,7 +5,7 @@ import { prodigiOrderTransport, type CreateOrderRequest, type ProdigiOrderTransp
 import { isStripeConfigured, getStripe } from '@/payments/stripe';
 import { presignProviderIngest } from '@/storage';
 import type { DbHandle, Tx } from '@/server/db';
-import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
+import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD_FOR_SAFETY_CHECK, type GateEnv } from './gate';
 import { startRetentionClockForOrder } from '@/server/retention';
 import { sendOrderShipped } from '@/server/orderEmails';
 import { alertHandLines } from './handLines';
@@ -147,6 +147,13 @@ async function recoverStaleClaims(db: DbHandle, onlyOrderIds?: string[]): Promis
   return { recovered: rows.length, refs: rows.map((r) => r.ref) };
 }
 
+/** The order's note for held lines: a safety check outranks the egress gate (it needs a reviewer). */
+function blockedReason(lineErrors: Array<string | null>): string {
+  return lineErrors.some((m) => m === HELD_FOR_SAFETY_CHECK)
+    ? 'held: a keepsake on this order is waiting for a safety check'
+    : 'waiting on the child-image egress gate (LG3/LG6)';
+}
+
 /**
  * Sweep 2 — BLOCKED_GATE RELEASE (the sweep worker.ts always promised): when the gate
  * env flips green, blocked artwork of PAID orders is re-checked; passing rows go back
@@ -171,9 +178,10 @@ export async function releaseBlockedArtwork(db: DbHandle, opts?: { env?: GateEnv
   let released = 0;
   for (const row of rows) {
     if (!row.assetId) continue; // unresolvable asset stays blocked — deny by default
-    const [a] = await db.select({ childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture }).from(assets).where(eq(assets.id, row.assetId));
+    const [a] = await db.select({ childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture, moderationStatus: assets.moderationStatus }).from(assets).where(eq(assets.id, row.assetId));
     if (!a) continue;
     try {
+      assertClearedForPrint(a); // a keepsake held for review stays held until it's CLEAR
       await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind, isBrandSafeFixture: a.isBrandSafeFixture }, env);
     } catch (e) {
       if (e instanceof GateError) continue; // still red — correctly waiting
@@ -299,9 +307,9 @@ async function submitOne(
   }
   const gateBlocked = fulfillable.filter((l) => l.artworkStatus === 'BLOCKED_GATE');
   if (gateBlocked.length > 0) {
-    // Correctly waiting on LG3/LG6 — the release sweep owns recovery; make it visible.
+    // Correctly waiting (LG3/LG6, or a safety check) — the release sweep owns recovery; make it visible.
     summary.blocked++;
-    await db.update(orders).set({ submitError: 'waiting on the child-image egress gate (LG3/LG6)' }).where(eq(orders.id, order.id));
+    await db.update(orders).set({ submitError: blockedReason(gateBlocked.map((l) => l.renderError)) }).where(eq(orders.id, order.id));
     return { ref: order.ref, status: 'blocked', note: 'artwork blocked by the egress gate' };
   }
 
@@ -317,7 +325,7 @@ async function submitOne(
   const assetIds = [...new Set(fulfillable.map((l) => l.assetId).filter((id): id is string => Boolean(id)))];
   const assetRows =
     assetIds.length > 0
-      ? await db.select({ id: assets.id, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture }).from(assets).where(inArray(assets.id, assetIds))
+      ? await db.select({ id: assets.id, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture, moderationStatus: assets.moderationStatus }).from(assets).where(inArray(assets.id, assetIds))
       : [];
   if (missingAsset.length > 0 || assetRows.length !== assetIds.length) {
     const affected = fulfillable.filter((l) => !l.assetId || !assetRows.some((a) => a.id === l.assetId)).map((l) => l.artworkId!);
@@ -328,15 +336,17 @@ async function submitOne(
   }
 
   // RE-ASSERT THE GATE per asset, now, at the egress moment. READY was the state at
-  // render time; the env (POD_MODE / LG3) may have changed since.
+  // render time; the env (POD_MODE / LG3) may have changed since — and so may the keepsake's
+  // moderation (reported or re-screened after it rendered): content safety is re-checked too.
   for (const a of assetRows) {
     try {
+      assertClearedForPrint(a);
       await assertPodEgressAllowed(db, { childSubjectId: a.childSubjectId, kind: a.kind, isBrandSafeFixture: a.isBrandSafeFixture }, env);
     } catch (e) {
       if (e instanceof GateError) {
         const blockedArtwork = fulfillable.filter((l) => l.assetId === a.id).map((l) => l.artworkId!);
         await db.update(orderItemArtwork).set({ status: 'BLOCKED_GATE', renderError: e.message }).where(inArray(orderItemArtwork.id, blockedArtwork));
-        await db.update(orders).set({ submitError: 'waiting on the child-image egress gate (LG3/LG6)' }).where(eq(orders.id, order.id));
+        await db.update(orders).set({ submitError: blockedReason([e.message]) }).where(eq(orders.id, order.id));
         summary.blocked++;
         return { ref: order.ref, status: 'blocked', note: e.message };
       }

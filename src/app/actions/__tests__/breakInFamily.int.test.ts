@@ -265,8 +265,8 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
       if (res.ok) expect((await db.select().from(schema.children).where(and(eq(schema.children.familyId, ids.hartleyId), eq(schema.children.firstName, 'Intruder')))).length).toBe(0);
     }
   });
-  // ── 07-B11: the print file is keyed on asset + variant only → a later preview overwrites a paid order's file
-  bug('07-B11: rendering a DIFFERENT placement of the same drawing on the same product does not overwrite an existing print file', async () => {
+  // ── 07-B11 (fixed): the print file was keyed on asset + variant only → a later preview overwrote a paid order's file
+  it('07-B11: rendering a DIFFERENT placement of the same drawing on the same product does not overwrite an existing print file', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [v] = await db.select({ id: schema.productVariants.id }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(and(eq(schema.products.key, 'mug'), eq(schema.productVariants.isDefault, true)));
     const ordered = await renderPrintFile(db, sam, { assetId: famNoChild, variantId: v!.id, transform: { scale: 1 } }); // the paid order's placement

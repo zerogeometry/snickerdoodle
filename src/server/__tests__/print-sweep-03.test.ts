@@ -109,18 +109,17 @@ describe('sweep 03 — the christmas bundle’s pieces', () => {
 });
 
 describe('sweep 03 — the greetings card: what the positioner frames vs the panel that prints', () => {
-  // The positioner (and the card mockup) place the design on the card's TEMPLATE canvas: 127×178 mm @300
-  // + a 3 mm bleed = 1570×2172. The print places it on the spread's outer-front PANEL, 1530×2160
-  // (cardPrint.ts). Different shapes ⇒ a cover/fill crop and the contain margins differ a little between
-  // what the shopper saw and what prints — 03-B2 (P3). Pinned so a fix (one geometry) shows up here.
+  // 03-B2 (fixed): the positioner and the card mockup placed the design on a 127×178 mm + 3 mm bleed canvas
+  // (1570×2172) while the print placed it on the spread's outer-front PANEL (1530×2160) — a ~2% shape
+  // difference. The card's template is now that panel exactly, so all three frame the same shape.
   const card = specs.find((s) => s.productKey === 'card')!;
-  it('03-B2: the two frames differ in shape by ~2%', () => {
-    const c = canvasSizePx(card.template);
-    expect([c.width, c.height]).toEqual([1570, 2172]);
+  const packs = specs.filter((s) => s.productKey === 'cardPack');
+  it('03-B2: the card (and every pack card) frames exactly the panel that prints', () => {
     const panel = { w: CARD_SPREAD.widthPx / 4, h: CARD_SPREAD.heightPx };
     expect(panel).toEqual({ w: 1530, h: 2160 });
-    const off = c.width / c.height / (panel.w / panel.h) - 1;
-    expect(off).toBeGreaterThan(0.019);
-    expect(off).toBeLessThan(0.022);
+    for (const s of [card, ...packs]) {
+      const c = canvasSizePx(s.template);
+      expect([c.width, c.height], s.sku).toEqual([panel.w, panel.h]);
+    }
   });
 });

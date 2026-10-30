@@ -40,6 +40,7 @@ export async function renderPreviewAction(input: {
       transform: input.transform,
       sourceObjectId: input.sourceObjectId,
       ground: typeof input.ground === 'string' ? input.ground : undefined,
+      preview: true, // its own slot — a preview never touches an order's print file
     });
     const grant = await getStorageObjectGrant(db, res.printObjectId, viewer, 600);
     return {

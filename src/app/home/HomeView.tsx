@@ -148,6 +148,9 @@ export function HomeView({ data }: { data: HomeData }) {
     if (res.ok) {
       toast('keepsake deleted — gone for good');
       router.refresh();
+    } else if (res.reason === 'in-order') {
+      // a paid order still needs it — deleting now would leave that order unmade
+      toast('this one’s being made into an order — you can delete it once it’s on its way');
     } else {
       toast('couldn’t delete that');
     }

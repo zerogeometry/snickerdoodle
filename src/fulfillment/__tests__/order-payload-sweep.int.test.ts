@@ -195,9 +195,9 @@ describe.skipIf(!DB || !S3)('sweep 03 — the Prodigi order payload (integration
   // (render.ts persistPrintFile: `printfile-${variantId}${ground}`) — NOT the placement, the Studio
   // design / cutout, the cushion back or the card message. Two lines of one drawing on one variant
   // that differ in any of those render to the SAME object; the second render overwrites the first,
-  // and both Prodigi items are sent the one URL. `it.fails`: passes while the bug is there — when
-  // it's fixed this flips, so turn it into a plain `it`.
-  it.fails('03-B1: two lines, same drawing + variant, different placement → two different print files', async () => {
+  // and both Prodigi items are sent the one URL. Fixed: the key is a hash of every input (render.ts
+  // printFileIdentity).
+  it('03-B1: two lines, same drawing + variant, different placement → two different print files', async () => {
     const a = await drawing([220, 120, 40], 3000, 2000);
     const { payload } = await placeAndSubmit([
       { productKey: 'framedPrint', qty: 1, artwork: { assetId: a, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } },
@@ -207,7 +207,7 @@ describe.skipIf(!DB || !S3)('sweep 03 — the Prodigi order payload (integration
     expect(k1).not.toBe(k2);
   }, 900_000);
 
-  it.fails('03-B1: two greetings cards of one drawing with different inside messages → two different print files', async () => {
+  it('03-B1: two greetings cards of one drawing with different inside messages → two different print files', async () => {
     const a = await drawing([40, 120, 220], 2000, 2800);
     const tf = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
     const { payload } = await placeAndSubmit([

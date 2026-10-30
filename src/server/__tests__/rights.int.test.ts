@@ -5,6 +5,7 @@ import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 import * as schema from '@/db/schema';
 import { auditRecords, rightsRequests } from '@/db/schema';
+import { SUPPORT_EMAIL } from '@/lib/support';
 import { COMPLAINT_ACK_DAYS, COMPLAINTS_PER_EMAIL_PER_DAY, submitComplaint } from '@/server/rights';
 import type { DbHandle } from '@/server/db';
 
@@ -66,6 +67,19 @@ describe.skipIf(!DB)('submitComplaint — data-protection complaints intake', ()
     const internal = log.mock.calls.map((c) => String(c[0])).find((t) => t.includes('[rights-request]'));
     expect(internal).toBeDefined();
     expect(internal).toContain('privacy@example.test');
+    expect(internal).not.toContain('longer than you said');
+  });
+
+  it('08-B12: with no privacy inbox set, the team is still told — at support@', async () => {
+    const other = `complainer-${randomUUID().slice(0, 8)}@example.test`;
+    log.mockClear();
+    const res = await send({ email: other }, {});
+    expect(res.ok).toBe(true);
+    const rows = await db.select({ id: rightsRequests.id }).from(rightsRequests).where(eq(rightsRequests.subjectEmail, other));
+    made.push(...rows.map((r) => r.id));
+    const internal = log.mock.calls.map((c) => String(c[0])).find((t) => t.includes('[rights-request]'));
+    expect(internal).toBeDefined();
+    expect(internal).toContain(SUPPORT_EMAIL);
     expect(internal).not.toContain('longer than you said');
   });
 

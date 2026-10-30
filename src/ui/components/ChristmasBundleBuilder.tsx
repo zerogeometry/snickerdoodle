@@ -25,6 +25,7 @@ import { christmasBundleLine, newBundleLineId } from '@/lib/christmas-bundle-lin
 import { EMPTY_DRAFT, resetSlot, setSlot, slotView, specOf, withLooks, type Draft, type Slot, type SlotView } from '@/lib/bundle-draft';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { gbp, shownSrc, toast, useBasket, useUpload } from '@/lib/store';
+import { useStoredUpload } from '@/lib/useStoredUpload';
 
 /**
  * The CHRISTMAS FAMILY BUNDLE builder (founder, 29 Oct — three sizes, no add-ons):
@@ -89,6 +90,7 @@ const slotOf = (slot: number): Slot => (slot === PLACEMATS ? 'placemat' : slot =
 export function ChristmasBundleBuilder() {
   const router = useRouter();
   const upload = useUpload((s) => s.upload);
+  useStoredUpload(); // a direct load: the guest's drawing is stored, so the picker offers it (01-B4)
   const add = useBasket((s) => s.add);
   const update = useBasket((s) => s.update);
 
@@ -146,6 +148,13 @@ export function ChristmasBundleBuilder() {
     const u = useUpload.getState().upload;
     setD({ ...EMPTY, size, placemat: u?.assetId ? { assetId: u.assetId, ...(u.cutout?.sourceObjectId ? { sourceObjectId: u.cutout.sourceObjectId } : {}) } : null });
   }, []);
+  // A drawing stored only now (a direct load — 01-B4) goes on the table, if nothing is there yet.
+  useEffect(() => {
+    if (!seededRef.current || edit || !upload?.assetId) return;
+    const a = upload.assetId;
+    setD((old) => (old.placemat || old.coaster || old.ornaments.some(Boolean) ? old : { ...old, placemat: { assetId: a } }));
+  }, [upload?.assetId, edit]);
+
   // Keep this tab's draft (not while editing a basket line — that line IS the saved state).
   useEffect(() => {
     if (!seededRef.current || edit) return;

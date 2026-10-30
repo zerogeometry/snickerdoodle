@@ -4,7 +4,7 @@ import { renderPrintFile } from '@/server/print/render';
 import { getViewableAssetOrThrow, resolveViewerContext } from '@/server/assets';
 import type { RawTransform } from '@/server/print/geometry';
 import type { DbHandle } from '@/server/db';
-import { assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
+import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, type GateEnv } from './gate';
 
 export interface FulfilmentSummary {
   recovered: number; // lines found stuck RENDERING (a restart mid-render) and put back to PENDING
@@ -134,29 +134,42 @@ async function fail(db: DbHandle, artworkId: string, note: string): Promise<{ st
 }
 
 /**
- * A page of the SAME line already rendered from the same drawing (asset + cutout) on the same variant
- * — the print file is keyed by asset + variant (src/server/print/render.ts), and placeOrder gives every
- * calendar page of one drawing the same placement, so the file is the same. Only a page that sends
- * its own file per print area has twins; a single-file line has just the one row.
+ * A page of the SAME line already rendered with exactly the same inputs (drawing + cutout, variant,
+ * placement, back, colour, message, span) — the print file is keyed by those (src/server/print/
+ * render.ts), and placeOrder gives every calendar page of one drawing the same placement, so the file
+ * is the same. Only a page that sends its own file per print area has twins; a single-file line has
+ * just the one row.
  */
 async function renderedTwin(db: DbHandle, item: ClaimedItem): Promise<{ printObjectId: string; renderedDpi: number; upscaled: boolean } | null> {
   if (!item.assetId) return null;
   const rows = await db
-    .select({ id: orderItemArtwork.id, printObjectId: orderItemArtwork.printObjectId, renderedDpi: orderItemArtwork.renderedDpi, upscaled: orderItemArtwork.upscaled, sourceObjectId: orderItemArtwork.sourceObjectId, transform: orderItemArtwork.transform, printArea: orderItemArtwork.printArea })
+    .select({ id: orderItemArtwork.id, printObjectId: orderItemArtwork.printObjectId, renderedDpi: orderItemArtwork.renderedDpi, upscaled: orderItemArtwork.upscaled, sourceObjectId: orderItemArtwork.sourceObjectId, transform: orderItemArtwork.transform, printArea: orderItemArtwork.printArea, back: orderItemArtwork.back, ground: orderItemArtwork.ground, message: orderItemArtwork.message, cardSpan: orderItemArtwork.cardSpan })
     .from(orderItemArtwork)
     .where(and(eq(orderItemArtwork.orderItemId, item.orderItemId), eq(orderItemArtwork.assetId, item.assetId), eq(orderItemArtwork.variantId, item.variantId), inArray(orderItemArtwork.status, ['READY', 'BLOCKED_GATE'])));
-  const same = JSON.stringify(item.transform);
-  const twin = rows.find((r) => r.id !== item.artworkId && r.printArea !== null && r.printObjectId && r.renderedDpi !== null && (r.sourceObjectId ?? null) === (item.sourceObjectId ?? null) && JSON.stringify(r.transform) === same);
+  const inputs = (r: Pick<ClaimedItem, 'sourceObjectId' | 'transform' | 'back' | 'ground' | 'message' | 'cardSpan'>) =>
+    JSON.stringify([r.sourceObjectId ?? null, r.transform, r.back ?? null, r.ground ?? null, r.message ?? null, r.cardSpan ?? null]);
+  const same = inputs(item);
+  const twin = rows.find((r) => r.id !== item.artworkId && r.printArea !== null && r.printObjectId && r.renderedDpi !== null && inputs({ ...r, transform: r.transform as RawTransform }) === same);
   return twin ? { printObjectId: twin.printObjectId!, renderedDpi: twin.renderedDpi!, upscaled: twin.upscaled } : null;
 }
 
 async function processItem(db: DbHandle, item: ClaimedItem, env: GateEnv): Promise<{ status: string; note?: string }> {
   if (!item.assetId) return fail(db, item.artworkId, 'no source asset (purged?)');
   const [asset] = await db
-    .select({ id: assets.id, familyId: assets.familyId, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture })
+    .select({ id: assets.id, familyId: assets.familyId, childSubjectId: assets.childSubjectId, kind: assets.kind, isBrandSafeFixture: assets.isBrandSafeFixture, moderationStatus: assets.moderationStatus })
     .from(assets)
     .where(eq(assets.id, item.assetId));
   if (!asset) return fail(db, item.artworkId, 'source asset not found');
+
+  // CONTENT SAFETY FIRST (D8): a keepsake reported or re-screened since payment is held, NOT rendered —
+  // the release sweep (./submit.ts) puts it back to PENDING once a reviewer clears it.
+  try {
+    assertClearedForPrint(asset);
+  } catch (e) {
+    if (!(e instanceof GateError)) throw e;
+    await db.update(orderItemArtwork).set({ status: 'BLOCKED_GATE', renderError: e.message }).where(eq(orderItemArtwork.id, item.artworkId));
+    return { status: 'BLOCKED_GATE', note: e.message };
+  }
 
   // RENDER (in-VPC; no egress). Authz via the controller's viewer context.
   let render: { printObjectId: string; renderedDpi: number; upscaled: boolean };

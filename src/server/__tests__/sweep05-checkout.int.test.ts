@@ -7,7 +7,7 @@ import Stripe from 'stripe';
 import * as schema from '@/db/schema';
 import { assets, orderItems, orders, promoCodes, storageObjects, webhookEvents } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
-import { placeOrder } from '@/server/orders';
+import { basketHasPrintWithoutDrawing, placeOrder } from '@/server/orders';
 import { resolvePromo } from '@/server/promos';
 import { getCatalogue } from '@/server/catalogue';
 import { resolveViewerContext } from '@/server/assets';
@@ -362,13 +362,42 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
 
   // 05-B2: checkout.session.completed fires for delayed payment methods with payment_status
   // 'unpaid' — the handler marks the order PAID (= queued for print) without checking.
-  it.skip('05-B2: a completed session whose payment is still UNPAID does not mark the order paid', async () => {
+  it('05-B2: a completed session whose payment is still UNPAID does not mark the order paid', async () => {
     const o = await pendingOrder(`cs_test_sw5_${ids.nonce}_unpaid`);
     const ev = completedEvent(o.stripeSessionId!, { payment_status: 'unpaid' });
     webhookIds.push(ev.id);
     await handleStripeEvent(db, ev);
     const [after] = await db.select().from(orders).where(eq(orders.id, o.id));
-    expect(after!.status).toBe('PENDING'); // EXPECTED; today it is PAID
+    expect(after!.status).toBe('PENDING');
+    expect(after!.shippingAddress).toMatchObject({ postcode: 'SW1A 1AA' }); // the address is still kept
+
+    // the money lands later: async_payment_succeeded (a paid session) → PAID, once
+    const paid = { ...completedEvent(o.stripeSessionId!), id: `${ev.id}_async`, type: 'checkout.session.async_payment_succeeded' } as typeof ev;
+    webhookIds.push(paid.id);
+    expect(await handleStripeEvent(db, paid)).toEqual({ handled: true, duplicate: false });
+    const [later] = await db.select().from(orders).where(eq(orders.id, o.id));
+    expect(later!.status).toBe('PAID');
+  });
+
+  it('05-B2: a delayed payment that FAILS leaves the order unpaid (never printed)', async () => {
+    const o = await pendingOrder(`cs_test_sw5_${ids.nonce}_failed`);
+    const ev = { ...completedEvent(o.stripeSessionId!, { payment_status: 'unpaid' }), type: 'checkout.session.async_payment_failed' } as ReturnType<typeof completedEvent>;
+    webhookIds.push(ev.id);
+    expect(await handleStripeEvent(db, ev)).toEqual({ handled: false, duplicate: false });
+    const [after] = await db.select().from(orders).where(eq(orders.id, o.id));
+    expect(after!.status).toBe('PENDING');
+  });
+
+  // 05-B9: a hand-made basket line for a printed product with no drawing used to become a paid
+  // "blank" order. The basket's order action now refuses it (basketHasPrintWithoutDrawing).
+  it('05-B9: a printed item without its drawing is refused; a line with one (or a pack / bundle) is fine', async () => {
+    const tf = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'mug', qty: 1 }])).toBe(true);
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'mug', qty: 1, artwork: { assetId: '00000000-0000-0000-0000-000000000001', transform: tf } }, { productKey: 'card', qty: 1 }])).toBe(true);
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'mug', qty: 1, artwork: { assetId: '00000000-0000-0000-0000-000000000001', transform: tf } }])).toBe(false);
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: '00000000-0000-0000-0000-000000000001' } } }])).toBe(false);
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'giftWrap', qty: 1 }])).toBe(false); // an artless add-on
+    expect(await basketHasPrintWithoutDrawing(db, [{ productKey: 'totally-fake', qty: 1 }])).toBe(false); // ignored anyway
   });
 
   // ── the content-safety hold at fulfilment ───────────────────────────────────────────────────
@@ -413,7 +442,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     // 05-B1: moderation is checked only when the order is PLACED. A drawing REPORTED after payment
     // (held: FLAGGED + an open report — "so nothing prints", contentReports.ts) still renders, passes
     // the egress gate and is sent to Prodigi: neither the worker nor the submitter reads moderation.
-    it.skip('05-B1: a drawing reported after payment is held back from Prodigi', async () => {
+    it('05-B1: a drawing reported after payment is held back from Prodigi', async () => {
       const { o, assetId } = await paidMug();
       const jo = await resolveViewerContext(db, ids.joId, ids.hartleyId);
       expect(await reportKeepsake(db, jo, { assetId, reason: 'inappropriate' })).toEqual({ ok: true });
@@ -430,7 +459,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       }
       const t = fake();
       await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [o.id] });
-      expect(t.created).toHaveLength(0); // EXPECTED; today the reported drawing is submitted
+      expect(t.created).toHaveLength(0); // held: the worker re-checks moderation (gate.ts assertClearedForPrint)
     }, 90_000);
   });
 });

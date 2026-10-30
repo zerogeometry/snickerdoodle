@@ -21,7 +21,8 @@ import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
 import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
-import { basketLineId } from '@/lib/basket-line';
+import { basketLineId, selectionForLine } from '@/lib/basket-line';
+import { forgetStudioReturn, noteStudioReturn } from '@/ui/components/usePickerEdits';
 import { colourName, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
@@ -140,6 +141,9 @@ function CustomizeProduct() {
   // Outside image span: the drawing on the front panel only ('front', default) or across the
   // whole outside ('full'). Only meaningful in the outside view.
   const [cardSpan, setCardSpan] = useState<'full' | 'front'>('front');
+  // back from the Studio's "lift it off the paper" detour: its return note has done its job
+  useEffect(() => forgetStudioReturn(), []);
+
   useEffect(() => {
     setCanSpin(has3D(productKey) && webglOk());
     setView('photo'); // reset when the product changes
@@ -184,15 +188,8 @@ function CustomizeProduct() {
     // from the still-unchanged basket line would clobber them. Only seed on FIRST entry from
     // the basket. (Fresh entry without resume DOES re-seed, resetting any unsaved stray edits.)
     if (sp.get('resume')) return;
-    useSelection.getState().setSelection(product.key, {
-      size: lv.attributes.size,
-      colour: lv.attributes.colour,
-      orientation: lv.attributes.orientation ?? 'portrait',
-      grade: lv.attributes.grade,
-      finish: lv.attributes.finish,
-      back: line.back, // a cushion line carries its back choice
-      ground: line.ground, // an edge-to-edge line carries its base colour
-    });
+    // everything the line prints with — a card's message + span too (02-B3)
+    useSelection.getState().setSelection(product.key, selectionForLine(line, lv.attributes));
     if (line.artwork?.assetId) {
       usePlacements.getState().setPlacement(`${line.artwork.assetId}-${product.key}`, line.artwork.transform);
     }
@@ -1120,7 +1117,16 @@ function CustomizeProduct() {
               {isDarkGarment(colour) && upload?.opaqueBg && (!upload?.cutout || upload.cutout.trim) ? (
                 <div role="status" className="rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                   <p className="font-semibold">on a coloured tee, the paper prints too — you’d get a pale square behind the drawing.</p>
-                  <Button variant="design" size="md" className="mt-2.5 w-full" onClick={() => router.push('/studio')}>
+                  <Button
+                    variant="design"
+                    size="md"
+                    className="mt-2.5 w-full"
+                    onClick={() => {
+                      // back HERE when done, the colour still chosen (01-B3) — not the create page
+                      noteStudioReturn(upload?.assetId, `/customize/${product.key}${edit ? `?edit=${encodeURIComponent(edit.id)}&resume=1` : ''}`);
+                      router.push('/studio');
+                    }}
+                  >
                     <Icon icon={IconPencil} size={15} /> lift it off the paper in the studio
                   </Button>
                 </div>

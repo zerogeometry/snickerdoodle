@@ -63,6 +63,7 @@ export function ManageChildModal({ child, onClose }: { child: ManagedChild | nul
   const remove = (alsoDeleteKeepsakes: boolean) =>
     startTransition(async () => {
       const res = await deleteChildAction(child.id, alsoDeleteKeepsakes);
+      if (!res.ok && res.reason === 'in-order') return toast(`one of ${child.firstName}’s keepsakes is being made into an order — try again once it’s on its way`);
       if (!res.ok) return toast('couldn’t do that — try again');
       toast(
         alsoDeleteKeepsakes

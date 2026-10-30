@@ -1,5 +1,5 @@
-import { and, eq } from 'drizzle-orm';
-import { assets, auditRecords, memberships, storageObjects } from '@/db/schema';
+import { and, eq, inArray } from 'drizzle-orm';
+import { assets, auditRecords, memberships, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { assetPrefix, deleteAllUnderPrefix, deleteObjectConfirmed, presignDownload } from '@/storage';
 import {
   AuthzError,
@@ -271,8 +271,34 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
   if (!canDeleteAsset(toAssetRef(row), viewer)) {
     throw denied('only the controlling parent may delete this keepsake');
   }
+  // a paid order that isn't made yet still needs the drawing — wait until it's on its way, as
+  // closing the account does (sweep 08-B5: the order used to fail silently, paid and never made)
+  if ((await keepsakesNeededByOrders(db, [assetId])).size > 0) throw new KeepsakeInUseError();
 
   await eraseAsset(db, row, { accountId: viewer.accountId, actorType: 'MEMBER' });
+}
+
+/** Orders that are paid but not yet made (or still with the printer) — they still need the drawing. */
+const ORDER_IN_FLIGHT = ['PAID', 'FULFILLING'] as const;
+
+/** A keepsake can't be deleted yet: an order that's paid for and not yet made still needs it. */
+export class KeepsakeInUseError extends Error {
+  constructor() {
+    super('this keepsake is in an order that isn’t made yet');
+    this.name = 'KeepsakeInUseError';
+  }
+}
+
+/** Which of these keepsakes a paid, not-yet-made order still needs (its print file isn't sent yet). */
+export async function keepsakesNeededByOrders(db: DbHandle, assetIds: string[]): Promise<Set<string>> {
+  if (assetIds.length === 0) return new Set();
+  const rows = await db
+    .selectDistinct({ assetId: orderItemArtwork.assetId })
+    .from(orderItemArtwork)
+    .innerJoin(orderItems, eq(orderItems.id, orderItemArtwork.orderItemId))
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(and(inArray(orderItemArtwork.assetId, assetIds), inArray(orders.status, [...ORDER_IN_FLIGHT])));
+  return new Set(rows.map((r) => r.assetId).filter((id): id is string => Boolean(id)));
 }
 
 /**

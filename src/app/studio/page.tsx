@@ -21,6 +21,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { studioReturnTo } from '@/ui/components/usePickerEdits';
 import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
+import { studioEditTarget } from '@/lib/studioEditTarget';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -160,7 +161,10 @@ function StudioEditor() {
 
   // ── make sure the upload is a stored (screened) asset ──
   const ensureAsset = useCallback(async (): Promise<string | null> => {
-    if (assetId) return assetId;
+    // the drawing in progress NOW — a keepsake picked from the box is swapped for its copy after
+    // the Studio opens, and every edit lands on the copy, never the keepsake it came from (01-B1)
+    const target = studioEditTarget(useUpload.getState().upload, assetId);
+    if (target !== undefined) return target;
     if (!upload) return null;
     const blob = await fetch(upload.dataUrl).then((r) => r.blob());
     const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
@@ -185,6 +189,7 @@ function StudioEditor() {
       // a keepsake picked from the box: the Studio edits a NEW keepsake — an exact copy, made now (the
       // one it came from is never touched; leaving without saving tidies the copy away)
       const id = upload.fromKeepsake ? await forkPickedKeepsake() : await ensureAsset();
+      if (id) setLocalAssetId(id); // the copy, when one was just made
       let g = IDENTITY;
       if (id) {
         const st = await studioStateAction({ assetId: id });

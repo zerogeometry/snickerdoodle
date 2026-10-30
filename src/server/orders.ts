@@ -68,6 +68,22 @@ export interface PlaceLine {
   bundle?: unknown;
 }
 
+/**
+ * Does the basket hold a PRINTED item with no drawing? The basket always sends a printed line with
+ * its drawing (or its pack's cards, calendar pages, bundle drawings); a hand-made request that
+ * doesn't would become a paid order for a blank print (sweep 05-B9). The basket's order action
+ * refuses such a basket before anything is priced. An artless add-on (no print template) is fine.
+ */
+export async function basketHasPrintWithoutDrawing(db: DbHandle, items: PlaceLine[]): Promise<boolean> {
+  const bare = items.filter((l) => !l.artwork?.assetId && !l.cards?.length && !l.pages?.some(Boolean) && l.bundle == null);
+  if (bare.length === 0) return false;
+  const variantByKey = await resolveVariantIdsByKey(db, [...new Set(bare.map((l) => l.productKey))]);
+  const variantIds = [...new Set(variantByKey.values())];
+  if (variantIds.length === 0) return false; // not in the catalogue — placeOrder ignores it
+  const printed = await db.select({ id: printTemplates.id }).from(printTemplates).where(inArray(printTemplates.variantId, variantIds)).limit(1);
+  return printed.length > 0;
+}
+
 export interface PlaceOrderResult {
   ok: boolean;
   reason?: 'empty' | 'too-small';

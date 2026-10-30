@@ -44,7 +44,11 @@ export function AccountActions() {
         toast('couldn’t delete just now — try again');
         return;
       }
-      toast(res.deleted > 0 ? `deleted — ${res.deleted} keepsake${res.deleted === 1 ? '' : 's'} gone for good` : 'nothing to delete');
+      const n = res.inOrders ?? 0;
+      // a keepsake a paid order still needs stays until that order is made — say so, never silently
+      const waiting = n > 0 ? `${n} ${n === 1 ? 'is' : 'are'} being made into an order — delete ${n === 1 ? 'it' : 'them'} once ${n === 1 ? 'it’s' : 'they’re'} on the way` : '';
+      const gone = res.deleted > 0 ? `deleted — ${res.deleted} keepsake${res.deleted === 1 ? '' : 's'} gone for good` : '';
+      toast([gone, waiting].filter(Boolean).join(' · ') || 'nothing to delete');
     });
   };
 
