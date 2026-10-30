@@ -129,7 +129,8 @@ test('06: a stranger sees ONLY the one gift — noindex, own previews only, tamp
     // every image on the page is this link's own preview
     const srcs = await s.locator('main img').evaluateAll((els) => els.map((e) => (e as HTMLImageElement).getAttribute('src')));
     expect(srcs.length).toBeGreaterThan(0);
-    for (const src of srcs) expect(src).toBe(`/api/gift/${g.token}/preview/${g.sharedAssetId}`);
+    // (?p=<product> when the link froze the product as designed — 06-B8)
+    for (const src of srcs) expect(src?.split('?')[0]).toBe(`/api/gift/${g.token}/preview/${g.sharedAssetId}`);
     // one-tap report path present
     await expect(s.getByRole('button', { name: /report this gift list/ })).toBeVisible();
     await s.screenshot({ path: `${SHOTS}/gift-link-stranger-${label}.png`, fullPage: true });
@@ -353,7 +354,7 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   await admin.getByRole('button', { name: 'continue' }).click();
   const queue = admin.getByRole('list', { name: 'held back for review' });
   await expect(queue).toBeVisible({ timeout: 15_000 });
-  const item = queue.getByRole('listitem').first(); // newest first
+  const item = queue.getByRole('listitem').filter({ hasText: 'reported via a gift link' }).first(); // newest first (a dev database may hold older items)
   await expect(item).toContainText('reported via a gift link');
   // This server has no screening set up, so the upload was held as "screening-not-configured" (the
   // test then stood in for a reviewer and set it CLEAR). Its CSAM hash check never ran, so after the
@@ -453,6 +454,8 @@ test('06: a saved design ("+ keepsake" on a mug) shared as a link sells EXACTLY 
 });
 
 test('06: invitee joins from the gift link and checks out with 5% at phone size; the saving is one-time', async ({ page, browser }) => {
+  // it pays with the local "mark paid" path, which only a server WITHOUT a Stripe key takes
+  test.skip(!!process.env.STRIPE_SECRET_KEY, 'needs a server with the Stripe key blanked (local mark-paid)');
   test.setTimeout(300_000);
   const grannyEmail = testEmail('granny');
   const g = await parentMakesGiftLink(page, { invite: { email: grannyEmail } });
