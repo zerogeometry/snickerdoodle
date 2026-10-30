@@ -337,7 +337,9 @@ export default function StartCreatingPage() {
                     desktop, once the aspect is known, .art-fit sizes it to fill the stage. */}
                 {!previewLoaded ? <ReadingImageLoader /> : null}
                 <div
-                  className={`pop-in polaroid tape inline-block max-w-full ${upload.aspect ? 'art-fit' : ''} ${previewLoaded ? '' : 'hidden'}`}
+                  // ONE display class: `hidden` beside `inline-block` lost to it, so an empty polaroid showed while the
+                  // picture loaded — and its tape poked past a phone's edge (09-B9)
+                  className={`pop-in polaroid tape max-w-full ${upload.aspect ? 'art-fit' : ''} ${previewLoaded ? 'inline-block' : 'hidden'}`}
                   style={{ ['--tilt' as string]: '-1.5deg', ...(upload.aspect ? { ['--art-aspect' as string]: upload.aspect } : {}) }}
                 >
                   <div className="overflow-hidden bg-paper-2">
