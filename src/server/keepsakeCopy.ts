@@ -23,13 +23,16 @@ const DISCARD_WINDOW_MS = 6 * 60 * 60 * 1000;
  * anything already in a basket or an order prints exactly what was chosen.
  *
  * Authz: the viewer must see the keepsake and be able to add creations to its family (ingest's own
- * CONTRIBUTE gate). The copy keeps the keepsake's child, controller and visibility (never wider).
- * A CSAM-blocked keepsake is never copied.
+ * CONTRIBUTE gate). The copy keeps the keepsake's child, CONTROLLER and visibility (never wider):
+ * the relative who made it is its uploader, never its controller — so they can't widen it to the
+ * Extended circle or hide it from the parent, and the parent can always see and delete it (07-B3 /
+ * 04-B1: an unfiled drawing used to make the copier its controller). A CSAM-blocked keepsake is
+ * never copied.
  */
 export async function copyKeepsake(db: DbHandle, viewer: ViewerContext, sourceId: string): Promise<{ assetId: string }> {
   await getViewableAssetOrThrow(db, sourceId, viewer); // ← the gate
   const [src] = await db.select().from(assets).where(eq(assets.id, sourceId));
-  if (!src?.familyId || !src.keptInHome || src.moderationStatus === 'BLOCKED') throw new AuthzError({ allowed: false, reason: 'not a keepsake that can be copied' });
+  if (!src?.familyId || !src.keptInHome || !src.controllerAccountId || src.moderationStatus === 'BLOCKED') throw new AuthzError({ allowed: false, reason: 'not a keepsake that can be copied' });
   const [orig] = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, sourceId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!orig) throw new Error('no original to copy');
 
@@ -60,7 +63,11 @@ export async function copyKeepsake(db: DbHandle, viewer: ViewerContext, sourceId
       .values({ assetId: copy.assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: d.contentType, byteSize: d.byteSize, sha256: d.sha256, exifStripped: true, writeOnce: false })
       .onConflictDoNothing({ target: storageObjects.key });
   }
-  await db.update(assets).set({ visibility: src.visibility, studioDoc: src.studioDoc }).where(eq(assets.id, copy.assetId));
+  // the source's controller (the controlling parent), never the copier; the same tier, never wider
+  await db
+    .update(assets)
+    .set({ controllerAccountId: src.controllerAccountId, visibility: src.visibility, studioDoc: src.studioDoc })
+    .where(eq(assets.id, copy.assetId));
   return { assetId: copy.assetId };
 }
 

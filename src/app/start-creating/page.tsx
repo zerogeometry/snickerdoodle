@@ -71,7 +71,8 @@ export default function StartCreatingPage() {
   const [settledKey, setSettledKey] = useState<string | null>(null);
   const drawingKey = upload ? (upload.key ?? upload.dataUrl.slice(-64)) : null;
   // Back from signing in after a guest's "+ keepsake": put their drawing back on screen (same
-  // browser) and finish the keep (server-side — works on any device the link was opened on).
+  // browser) and finish the keep (server-side — only in the browser holding the drawing's upload
+  // claim; an email alone never files a picture into a family, 07-B5).
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('resume') !== 'keep') return;
     void (async () => {

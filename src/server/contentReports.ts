@@ -33,7 +33,10 @@ export async function reportGiftLink(
   if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return { ok: false, reason: 'invalid' };
 
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, input.token));
-  if (!link) return { ok: false, reason: 'invalid' };
+  // Only a LIVE link can report (07-B7): a revoked or expired one shows nothing any more, so whoever
+  // still holds it can't keep putting the family's keepsakes on hold (hidden + unprintable) — the
+  // same answer as a made-up token.
+  if (!link || link.status !== 'ACTIVE' || link.expiresAt <= now) return { ok: false, reason: 'invalid' };
   const ids = [...new Set((link.items as { assetId: string }[]).map((i) => i.assetId))];
 
   let held = 0;

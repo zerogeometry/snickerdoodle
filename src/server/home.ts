@@ -1,5 +1,5 @@
 import { and, desc, eq, gt } from 'drizzle-orm';
-import { canSetAssetVisibility, canViewAsset, type AssetRef } from '@/authz';
+import { canBuyFromGiftList, canSetAssetVisibility, canViewAsset, type AssetRef } from '@/authz';
 import { accounts, assets, children, families, invites, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
@@ -62,6 +62,8 @@ export interface HomeData {
   familyName: string;
   /** The viewer owns (controls) this family — only owners invite, share gift links, add children. */
   isOwner: boolean;
+  /** The viewer may order the family's keepsakes on products (VIEW_BUY / CONTRIBUTE; VIEW is look-only — 04-B2). */
+  canBuy: boolean;
   /** Every family the viewer is in, for the switcher (length 1 = no switcher). */
   families: FamilyChoice[];
   members: HomeMember[];
@@ -175,6 +177,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     // rename); a joined relative sees the name as they know it ("Sam's family").
     familyName: isOwner ? (family?.displayName ?? 'Your family') : (familyChoices.find((f) => f.familyId === familyId)?.name ?? 'the family'),
     isOwner,
+    canBuy: canBuyFromGiftList(viewer.membership),
     giftLists: isOwner ? await listGiftListsForOwner(db, viewer, familyId) : [],
     savedDesigns: await listSavedDesigns(db, account.id, familyId),
     families: familyChoices,

@@ -5,6 +5,7 @@ import {
   AuthzError,
   assertCanViewAsset,
   canDeleteAsset,
+  canEditAsset,
   canSetAssetVisibility,
   canViewAsset,
   type AssetRef,
@@ -151,6 +152,18 @@ export async function getViewableAssetOrThrow(
 ): Promise<AssetRef> {
   const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
   return assertViewableRow(row, viewer);
+}
+
+/**
+ * The EDIT gate: change a keepsake's look in place (Studio save, cut-out, background) — the view
+ * gate first, then the controller or CONTRIBUTE access (07-B2; src/authz canEditAsset). An
+ * AuthzError otherwise, the same as for a made-up id.
+ */
+export async function getEditableAssetOrThrow(db: DbHandle, assetId: string, viewer: ViewerContext): Promise<AssetRef> {
+  const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
+  const ref = assertViewableRow(row, viewer);
+  if (!canEditAsset(ref, viewer).allowed) throw denied('not found');
+  return ref;
 }
 
 /** The view gate on an asset row already in hand — the ONE place getViewableAssetOrThrow and the

@@ -11,7 +11,9 @@ export {
 } from './policy';
 
 export {
+  canBuyAsset,
   canBuyFromGiftList,
+  canEditAsset,
   canPurchaseViaGiftLink,
   type GiftLinkAssetRef,
   type GiftLinkGrant,
@@ -23,7 +25,7 @@ export {
 
 export { canViewProfileImage, type ProfileImageRef, type ProfileViewer } from './profileImages';
 
-export { canReview, hashCheckSkipped, HASH_UNCHECKED_LABEL, type Reviewer, type ReviewAction, type ReviewSubject } from './review';
+export { canReview, hashCheckSkipped, HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL, type Reviewer, type ReviewAction, type ReviewSubject } from './review';
 
 export {
   canAddOccasion,

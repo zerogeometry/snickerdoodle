@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
-import { assertCanViewAsset, AuthzError, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
+import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
@@ -170,7 +170,9 @@ export async function placeOrder(
       if (!decision.allowed) throw new AuthzError(decision);
     } else {
       const viewer = await resolveViewerContext(db, account!.id, asset.familyId);
-      assertCanViewAsset(assetRefOf(asset), viewer); // ← the gate; throws on deny
+      // ← the gate: SEE it, and be allowed to BUY — VIEW access is look-only (04-B2 / 07-B4)
+      const decision = canBuyAsset(assetRefOf(asset), viewer);
+      if (!decision.allowed) throw new AuthzError(decision);
       // Content-safety gate (D8): an un-cleared image can never reach fulfilment.
       if (asset.moderationStatus !== 'CLEAR') {
         throw new Error('keepsake is not cleared for printing');

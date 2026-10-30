@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  canBuyAsset,
   canBuyFromGiftList,
+  canEditAsset,
   canContributeCreations,
   canDeleteAsset,
   canManageFamily,
@@ -114,4 +116,77 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
     expect(canDeleteAsset(asset, { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', familyId: 'fam-B' }) })).toBe(false));
   it('anonymous cannot delete', () =>
     expect(canDeleteAsset(asset, { accountId: null, membership: null })).toBe(false));
+});
+
+/**
+ * EDIT and BUY a keepsake as a member (07-B2, 04-B2 / 07-B4): Circle decides what you can SEE,
+ * Access decides what you can DO. The full matrix: tier × circle × access × actor, plus the
+ * family-scope / removed-member / held / ephemeral-draft cases.
+ */
+describe('canEditAsset / canBuyAsset — tier × circle × access × actor', () => {
+  const tiers = ['ONLY_ME', 'FAMILY', 'EXTENDED'] as const;
+  const circles = ['FAMILY', 'EXTENDED'] as const;
+  const levels: AccessLevel[] = ['VIEW', 'VIEW_BUY', 'CONTRIBUTE'];
+  const asset = (visibility: (typeof tiers)[number], over: Partial<AssetRef> = {}): AssetRef => ({
+    id: 'a1',
+    familyId: 'fam-A',
+    uploaderAccountId: 'acct-controller',
+    controllerAccountId: 'acct-controller',
+    visibility,
+    heldForReview: false,
+    ...over,
+  });
+  const member = (circle: (typeof circles)[number], accessLevel: AccessLevel, over: Partial<Membership> = {}): ViewerContext => ({
+    accountId: 'acct-member',
+    membership: mem({ accountId: 'acct-member', circle, accessLevel, ...over }),
+  });
+  const sees = (tier: string, circle: string) => tier === 'EXTENDED' || (tier === 'FAMILY' && circle === 'FAMILY');
+
+  for (const tier of tiers) {
+    for (const circle of circles) {
+      for (const level of levels) {
+        const v = sees(tier, circle);
+        it(`member ${circle}/${level} on a ${tier} keepsake → edit ${v && level === 'CONTRIBUTE'}, buy ${v && level !== 'VIEW'}`, () => {
+          expect(canEditAsset(asset(tier), member(circle, level)).allowed).toBe(v && level === 'CONTRIBUTE');
+          expect(canBuyAsset(asset(tier), member(circle, level)).allowed).toBe(v && level !== 'VIEW');
+        });
+      }
+    }
+    it(`the controller (an active member) edits and buys their own ${tier} keepsake`, () => {
+      const ctl: ViewerContext = { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', accessLevel: 'VIEW' }) };
+      expect(canEditAsset(asset(tier), ctl).allowed).toBe(true);
+      expect(canBuyAsset(asset(tier), ctl).allowed).toBe(true);
+    });
+  }
+
+  it('an uploader who is NOT the controller, demoted to VIEW, can neither edit nor buy', () => {
+    const a = asset('FAMILY', { uploaderAccountId: 'acct-member' });
+    expect(canEditAsset(a, member('FAMILY', 'VIEW')).allowed).toBe(false);
+    expect(canBuyAsset(a, member('FAMILY', 'VIEW')).allowed).toBe(false);
+  });
+
+  it('family scope first: a CONTRIBUTE member of ANOTHER family, a removed member, a guest — nothing', () => {
+    for (const viewer of [
+      member('FAMILY', 'CONTRIBUTE', { familyId: 'fam-B' }),
+      member('FAMILY', 'CONTRIBUTE', { status: 'REMOVED' }),
+      { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', status: 'REMOVED' }) },
+      { accountId: null, membership: null },
+    ] as ViewerContext[]) {
+      expect(canEditAsset(asset('EXTENDED'), viewer).allowed).toBe(false);
+      expect(canBuyAsset(asset('EXTENDED'), viewer).allowed).toBe(false);
+    }
+  });
+
+  it('a keepsake held after a report: only its controller, never a CONTRIBUTE relative', () => {
+    const held = asset('FAMILY', { heldForReview: true });
+    expect(canEditAsset(held, member('FAMILY', 'CONTRIBUTE')).allowed).toBe(false);
+    expect(canBuyAsset(held, member('FAMILY', 'CONTRIBUTE')).allowed).toBe(false);
+  });
+
+  it('a guest’s own draft: the claim holder may edit it, never buy it before it is kept; another claim, nothing', () => {
+    const draft = asset('FAMILY', { familyId: null, uploaderAccountId: null, controllerAccountId: null, ephemeralClaimId: 'claim-1' });
+    expect(canEditAsset(draft, { accountId: null, membership: null, uploadClaim: 'claim-1' }).allowed).toBe(true);
+    expect(canBuyAsset(draft, { accountId: null, membership: null, uploadClaim: 'claim-1' }).allowed).toBe(false);
+    expect(canEditAsset(draft, { accountId: null, membership: null, uploadClaim: 'claim-2' }).allowed).toBe(false);
+  });
 });

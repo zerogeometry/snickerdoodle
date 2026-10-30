@@ -366,9 +366,11 @@ export function HomeView({ data }: { data: HomeData }) {
               <>
                 <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
                   {data.isOwner ? 'Tap a keepsake to choose who can see it.' : 'Shared with you by the family.'}
-                  <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
-                    place one on a product →
-                  </Link>
+                  {data.canBuy ? (
+                    <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
+                      place one on a product →
+                    </Link>
+                  ) : null}
                 </p>
                 {highlightNew ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-sunshine bg-honey-band px-3 py-2 text-xs text-ink-faint">

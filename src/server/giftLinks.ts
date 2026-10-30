@@ -15,7 +15,7 @@ import { familyNameForRelatives } from './onboarding';
 import { placeOrder, type PlaceOrderResult } from './orders';
 import type { RawTransform } from './print/geometry';
 import { appUrl, sendMail } from './mail';
-import { assetRefOf } from './assetRef';
+import { assetRefOf, isHeldForReport } from './assetRef';
 
 /** How long a gift link works (founder, 2026-10-21: 14 days, down from 30 — a forwarded bearer link
  * shows a child's drawing for less time; Children's Code). A parent can always share a fresh one. */
@@ -415,6 +415,11 @@ export interface OwnerGiftList {
 /**
  * The parent's view of their gift lists: every item, and — for the parent ONLY — a sticker
  * saying who bought it. Owner-only (the same check as creating a link).
+ *
+ * Each item's picture is re-checked NOW, item by item (07-B12): a keepsake in a link may since have
+ * been made "only me" by its controller (another parent), erased, CSAM-blocked or held after a report
+ * — then the list shows its label with no picture. Never a signed link to an original the owner
+ * couldn't open from their own keepsake box.
  */
 export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, familyId: string): Promise<OwnerGiftList[]> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) return [];
@@ -425,7 +430,13 @@ export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, 
     .select({ assetId: storageObjects.assetId, key: storageObjects.key })
     .from(storageObjects)
     .where(and(inArray(storageObjects.assetId, allIds), eq(storageObjects.objectClass, 'ORIGINAL')));
-  const keyByAsset = new Map(objs.map((o) => [o.assetId, o.key]));
+  const rows = await db.select().from(assets).where(inArray(assets.id, allIds));
+  const pictured = new Set(
+    rows
+      .filter((r) => r.moderationStatus !== 'BLOCKED' && !isHeldForReport(r) && canViewAsset(assetRefOf(r), owner).allowed)
+      .map((r) => r.id),
+  );
+  const keyByAsset = new Map(objs.filter((o) => pictured.has(o.assetId)).map((o) => [o.assetId, o.key]));
   const now = new Date();
   return Promise.all(
     links.map(async (l) => {

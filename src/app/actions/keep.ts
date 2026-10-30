@@ -65,11 +65,12 @@ export async function rememberKeepAction(assetId: string, email: string): Promis
   return { ok: await rememberKeepForEmail(getDb(), { assetId, email, uploadClaims: await getUploadClaims() }) };
 }
 
-/** Back from signing in: finish any keep they asked for as a guest. */
+/** Back from signing in: finish any keep they asked for as a guest — in THIS browser only (it must
+ * still hold the drawing's upload claim; an email alone never files a picture into a family, 07-B5). */
 export async function finishPendingKeepsAction(): Promise<{ ok: boolean; kept: string[] }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, kept: [] };
-  const kept = await finishPendingKeeps(getDb(), account);
+  const kept = await finishPendingKeeps(getDb(), account, await getUploadClaims());
   if (kept.length) revalidatePath('/home');
   return { ok: true, kept };
 }

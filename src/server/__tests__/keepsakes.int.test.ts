@@ -130,7 +130,7 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
     });
   });
 
-  describe('a guest’s "+ keepsake", finished after they sign in (any device)', () => {
+  describe('a guest’s "+ keepsake", finished after they sign in (same browser only)', () => {
     const samAccount = async () => {
       const [a] = await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, ids.samId));
       return { id: ids.samId, name: 'Sam', email: a!.email! };
@@ -142,8 +142,13 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
       expect(await rememberKeepForEmail(db, { assetId: a.assetId, email: `  ${sam.email.toUpperCase()} `, uploadClaims: [a.claimId] })).toBe(true);
       const [req] = await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId));
       expect(req!.emailHash).not.toContain('@'); // never the address itself
-      // signs in on another device: no cookie, no claims — the server finishes it anyway
-      expect(await finishPendingKeeps(db, sam)).toEqual([a.assetId]);
+      // signed in, but in a browser WITHOUT the drawing's claim: nothing is kept (07-B5), and the
+      // request waits in case they come back in the browser that made it
+      expect(await finishPendingKeeps(db, sam, [])).toEqual([]);
+      expect(await finishPendingKeeps(db, sam, ['00000000-0000-4000-8000-000000000000', 'not-a-uuid'])).toEqual([]);
+      expect(await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId))).toHaveLength(1);
+      // back in the browser that uploaded it and asked: kept
+      expect(await finishPendingKeeps(db, sam, [a.claimId])).toEqual([a.assetId]);
       const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
       expect([row!.controllerAccountId, row!.keptInHome, row!.purgeAfter]).toEqual([ids.samId, true, null]);
       expect(await db.select().from(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId))).toHaveLength(0);
@@ -158,7 +163,7 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
     it('a different person signing in keeps nothing', async () => {
       const a = await draft();
       await rememberKeepForEmail(db, { assetId: a.assetId, email: 'grandma@example.com', uploadClaims: [a.claimId] });
-      expect(await finishPendingKeeps(db, await samAccount())).toEqual([]);
+      expect(await finishPendingKeeps(db, await samAccount(), [a.claimId])).toEqual([]);
       const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
       expect(row!.keptInHome).toBe(false);
       await db.delete(pendingKeeps).where(eq(pendingKeeps.assetId, a.assetId));
@@ -170,7 +175,7 @@ describe.skipIf(!DB)('keepAndFileCreations — keep + file under child (integrat
       const then = new Date(Date.now() - 2 * 86_400_000);
       await rememberKeepForEmail(db, { assetId: a.assetId, email: sam.email, uploadClaims: [a.claimId], now: then });
       expect(await purgeExpiredPendingKeeps(db)).toBeGreaterThanOrEqual(1);
-      expect(await finishPendingKeeps(db, sam)).toEqual([]);
+      expect(await finishPendingKeeps(db, sam, [a.claimId])).toEqual([]);
       const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
       expect(row!.keptInHome).toBe(false);
     });
