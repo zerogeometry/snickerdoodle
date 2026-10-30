@@ -63,7 +63,7 @@ export function MarketingMobileMenu({ signedIn = false }: { signedIn?: boolean }
                 onClick={() => setOpen(false)}
                 className="absolute inset-0 bg-cocoa/40 motion-safe:animate-[fade_.2s_ease]"
               />
-              <nav ref={navRef} className="pt-safe absolute right-0 top-0 flex h-full w-[78%] max-w-xs flex-col overflow-y-auto bg-oat px-6 pb-5 shadow-2xl motion-safe:animate-[slidein_.22s_ease]">
+              <nav ref={navRef} aria-label="menu" className="pt-safe absolute right-0 top-0 flex h-full w-[78%] max-w-xs flex-col overflow-y-auto bg-oat px-6 pb-5 shadow-2xl motion-safe:animate-[slidein_.22s_ease]">
                 <div className="flex items-center justify-between pt-5">
                   <span className="font-display text-xl font-semibold text-cocoa">snickerdoodle</span>
                   <button type="button" aria-label="Close menu" onClick={() => setOpen(false)} className="flex min-h-11 min-w-11 items-center justify-center">

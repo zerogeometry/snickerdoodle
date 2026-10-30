@@ -99,6 +99,7 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
           token={token}
           items={items.map(({ assetId, productKey, label, unitPricePence, imageUrl, purchased }) => ({ assetId, productKey, label, unitPricePence, imageUrl, purchased }))}
           defaultFrom={defaultFrom}
+          signedIn={!!viewer}
           inviteToken={view.inviteToken}
           familyName={view.familyName}
           pricing={pricing}

@@ -1,5 +1,6 @@
 'use client';
 
+import { withArticle } from '@/lib/with-article';
 import { IconPlus } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
@@ -68,7 +69,7 @@ export function CheckoutAddOns({ addOns, items, gift }: { addOns: readonly AddOn
                     add(line);
                     toast(`${a.label} added ✓`);
                   }}
-                  aria-label={`add a ${a.label} with your drawing`}
+                  aria-label={`add ${withArticle(a.label)} with your drawing`}
                   className="press absolute bottom-1.5 right-1.5 flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-honey text-cocoa shadow-[0_2px_0_var(--color-cocoa)] focus-visible:outline-2"
                   data-addon-plus
                 >

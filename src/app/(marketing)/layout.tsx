@@ -15,7 +15,7 @@ export default async function MarketingLayout({ children }: { children: ReactNod
   return (
     <div className="kraft relative flex min-h-dvh flex-col overflow-x-hidden">
       <header className="pt-safe relative z-10">
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <nav aria-label="main" className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
           <Link href="/" className="flex items-center gap-2.5" aria-label="snickerdoodle home">
             <Logo height={46} className="md:!h-[56px]" />
           </Link>

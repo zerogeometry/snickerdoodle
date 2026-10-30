@@ -27,6 +27,7 @@ export function GiftCheckout({
   familyName,
   pricing,
   defaultFrom,
+  signedIn = false,
 }: {
   token: string;
   items: GiftItem[];
@@ -36,6 +37,8 @@ export function GiftCheckout({
   pricing: { subtotalPence: number; deliveryPence: number; joinSavingPence: number; totalPence: number };
   /** Pre-fills "who's it from?" for a signed-in relative. */
   defaultFrom: string;
+  /** Someone is signed in — never told "checkout as guest" (06-B4). */
+  signedIn?: boolean;
 }) {
   const [fromName, setFromName] = useState(defaultFrom);
   const remaining = items.filter((i) => !i.purchased);
@@ -167,7 +170,7 @@ export function GiftCheckout({
           onClick={toCheckout}
           disabled={pending}
         >
-          {pending ? 'one moment…' : joined ? 'checkout' : 'checkout as guest'}
+          {pending ? 'one moment…' : joined || signedIn ? 'checkout' : 'checkout as guest'}
         </Button>
         )}
         {problem ? (

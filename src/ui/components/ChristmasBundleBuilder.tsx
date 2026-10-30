@@ -343,14 +343,14 @@ export function ChristmasBundleBuilder() {
 
           {/* 2–4 · each piece's design (founder, 29 Oct): the placemats one for all, the coasters one for all,
               the ornaments one each — every one customisable (the picker's remove background / the Studio) */}
-          <Step n={2} title="customize your placemats" note={`one design on all ${d.size} placemats`}>
+          <Step n={2} title="customize your placemats" note={`one design on ${d.size === 2 ? 'both' : `all ${d.size}`} placemats`}>
             <Piece view={slotView(d, 'placemat', pictureOf)} label="placemats" i={0}
               note={d.placemat ? drawingFor(d.placemat.assetId)?.label ?? 'your design' : 'pick a design'}
               aria={d.placemat ? 'edit the placemats’ design' : 'pick a design for the placemats'}
               onClick={() => openSheet(PLACEMATS)}
               blocked={!!d.placemat && assess('placemat', d.placemat)?.decision === 'BLOCK'} />
           </Step>
-          <Step n={3} title="customize your coasters" note={`one design on all ${d.size} coasters`}>
+          <Step n={3} title="customize your coasters" note={`one design on ${d.size === 2 ? 'both' : `all ${d.size}`} coasters`}>
             <Piece view={slotView(d, 'coaster', pictureOf)} label="coasters" i={1}
               note={d.coaster ? drawingFor(d.coaster.assetId)?.label ?? 'your design' : 'same as the placemats'}
               aria={d.coaster ? 'edit the coasters’ design' : 'the coasters wear the placemats’ design — edit or pick another'}

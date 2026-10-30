@@ -1,5 +1,6 @@
 'use client';
 
+import { withArticle } from '@/lib/with-article';
 import { fromLabel } from '@/lib/pack-labels';
 import { IconMinus, IconPlus, IconZoomScan } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
@@ -172,13 +173,15 @@ export function ProductTile({
                 <Icon icon={IconMinus} size={14} />
               </button>
               <span className="min-w-4 text-center text-xs font-bold text-cocoa">{qty}</span>
-              <button type="button" aria-label={`add a ${p.label}`} onClick={onAdd} className="press flex min-h-11 min-w-11 items-center justify-center text-cinnamon">
+              <button type="button" aria-label={`add ${withArticle(p.label)}`} onClick={onAdd} className="press flex min-h-11 min-w-11 items-center justify-center text-cinnamon">
                 <Icon icon={IconPlus} size={14} />
               </button>
             </div>
           ) : null}
           <button type="button" onClick={onCustomize} className={`press inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-pill border-2 border-cocoa bg-paper px-3 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)] hover:bg-honey-band active:shadow-none ${showStepper ? 'w-full sm:w-auto' : 'w-full'}`}>
             {customizeLabel}
+            {/* named for keyboard + screen-reader users, who can't reach the picture's own button (09-B4) */}
+            <span className="sr-only"> your {p.label}</span>
           </button>
         </div>
       </div>
