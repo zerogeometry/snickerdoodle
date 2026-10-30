@@ -3,6 +3,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from '@pla
 import sharp from 'sharp';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
+import { maskEmail } from '../src/lib/maskEmail';
 
 /**
  * Test sweep 2026-10-29, tester 04 — FAMILY, INVITES AND NOTIFICATIONS, through the real pages with
@@ -233,8 +234,10 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Join The Sweepers');
     if (haveLog) {
       const before = mailsTo(email, 'magic-link').length;
-      await page.getByRole('button', { name: `email ${email}` }).click();
-      await expect(page.getByRole('status')).toContainText(`Check ${email} for a link`);
+      // the page only ever shows the invited address masked (06-B1) — the server sends the link
+      await expect(page.getByRole('main')).not.toContainText(email);
+      await page.getByRole('button', { name: 'email me the link' }).click();
+      await expect(page.getByRole('status')).toContainText(`Check ${maskEmail(email)} for a link`);
       await expect.poll(() => mailsTo(email, 'magic-link').length).toBe(before + 1);
       const m = mailsTo(email, 'magic-link').at(-1)!;
       expect(m.subject).toBe('your one-tap link to snickerdoodle');
@@ -253,7 +256,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     await signInByEmailLink(S.page, E.stranger, '/home');
     await S.page.goto(`/join/${inv.aunt.token}`);
     await expect(S.page.getByRole('heading', { level: 1 })).toHaveText('This invite is for someone else');
-    await expect(S.page.getByRole('button', { name: `sign in as ${E.aunt}` })).toBeVisible();
+    await expect(S.page.getByRole('button', { name: `sign in as ${maskEmail(E.aunt)}` })).toBeVisible(); // masked: 06-B1
     await shot(S.page, 'join-wrong-account-desktop');
     const { status } = (await sql()`select status from invites where id = ${inv.aunt.id}`)[0]!;
     expect(status).toBe('PENDING');

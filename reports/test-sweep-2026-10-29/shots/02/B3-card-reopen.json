@@ -1,0 +1,81 @@
+{
+ "reopenedShows": {
+  "message": "false",
+  "full": "false"
+ },
+ "before": [
+  {
+   "id": "cat-card~d1on7dkaii5z",
+   "name": "greetings card",
+   "product": "card",
+   "sku": "card",
+   "variantId": "81b0d3c9-90cd-47e4-a780-23eedd3c5509",
+   "pricePence": 550,
+   "sub": "7×5″ · full-width · with a message",
+   "artwork": {
+    "assetId": "d4fb51bc-3c5f-497d-857d-fd8ac2b52468",
+    "transform": {
+     "scale": 1,
+     "offsetX": 0,
+     "offsetY": 0,
+     "rotationDeg": 0
+    }
+   },
+   "ground": "#ffffff",
+   "message": {
+    "greeting": "for Gran",
+    "message": "",
+    "signature": "",
+    "note": "",
+    "font": "caveat",
+    "fontScale": 1
+   },
+   "cardImageSpan": "full",
+   "qty": 1
+  },
+  {
+   "id": "cat-card~d3fmzlo4k2r",
+   "name": "greetings card",
+   "product": "card",
+   "sku": "card",
+   "variantId": "81b0d3c9-90cd-47e4-a780-23eedd3c5509",
+   "pricePence": 550,
+   "sub": "7×5″",
+   "artwork": {
+    "assetId": "d4fb51bc-3c5f-497d-857d-fd8ac2b52468",
+    "transform": {
+     "scale": 1,
+     "offsetX": 0,
+     "offsetY": 0,
+     "rotationDeg": 0
+    }
+   },
+   "ground": "#ffffff",
+   "cardImageSpan": "front",
+   "qty": 1
+  }
+ ],
+ "after": [
+  {
+   "id": "cat-card~d3fmzlo4k2r",
+   "name": "greetings card",
+   "product": "card",
+   "sku": "card",
+   "variantId": "81b0d3c9-90cd-47e4-a780-23eedd3c5509",
+   "pricePence": 550,
+   "sub": "7×5″",
+   "artwork": {
+    "assetId": "d4fb51bc-3c5f-497d-857d-fd8ac2b52468",
+    "transform": {
+     "scale": 1,
+     "offsetX": 0,
+     "offsetY": 0,
+     "rotationDeg": 0
+    }
+   },
+   "ground": "#ffffff",
+   "cardImageSpan": "front",
+   "qty": 1
+  }
+ ]
+}
