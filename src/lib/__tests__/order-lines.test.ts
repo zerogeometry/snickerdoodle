@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { expandBundle } from '@/lib/christmas-bundle';
-import { receiptLines, receiptSavings } from '@/lib/order-lines';
+import { receiptLines, receiptSavings, type StoredOrderLine } from '@/lib/order-lines';
 
 // 05-B5 (sweep 29 Oct): the receipt listed a bundle as "placemats — £63.26 · coaster-packof4 — £19.46 ·
 // ceramic christmas ornament × 4 — £62.28", with no savings, so nothing added up.
@@ -9,7 +9,7 @@ describe('05-B5: how an order reads on the receipt and the orders page', () => {
   const parts = expandBundle(14500, { placemat: art, coaster: null, ornaments: [art, art, art, art] } as never, 4);
 
   it('a christmas bundle is ONE line at its price, however many pieces it was made as', () => {
-    const lines = [
+    const lines: StoredOrderLine[] = [
       ...parts.map((p) => ({ productKey: p.sku, qty: p.qty, linePence: p.linePence, bundleKey: 'christmasBundle-for4' })),
       { productKey: 'mug', qty: 2, linePence: 3600, spec: { attributes: { size: '11oz', colour: 'blue' } } },
       { productKey: 'coaster-packof4', qty: 1, linePence: 2600, spec: { attributes: { size: 'pack of 4' } } },
@@ -23,7 +23,7 @@ describe('05-B5: how an order reads on the receipt and the orders page', () => {
   });
 
   it('never shows a raw sku, and two bundles stay two lines', () => {
-    const two = [
+    const two: StoredOrderLine[] = [
       { productKey: 'placemat-packof2', qty: 1, linePence: 3000, bundleKey: 'christmasBundle' },
       { productKey: 'placemat', qty: 1, linePence: 9000, bundleKey: 'christmasBundle-for4' },
       { productKey: 'coaster-packof2', qty: 1, linePence: 4800, bundleKey: 'christmasBundle' },
