@@ -6,6 +6,7 @@ import { accounts, assets, auditRecords, memberships, families, giftLinks, invit
 import { containsAbusiveText } from './textSafety';
 import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
+import { composeMockup } from './print/compositor';
 import sharp from 'sharp';
 import { getObjectBytes, presignDownload } from '@/storage';
 import type { AccessLevel, Relationship } from '@/domain/types';
@@ -43,6 +44,10 @@ export interface GiftItem {
   back?: string | null;
   /** Repeat-pattern base colour token the parent chose (frozen with the design). */
   ground?: string | null;
+  /** The product AS DESIGNED (06-B8): a mockup composed when the PARENT shared the link (their own
+   * authz), frozen here — a DERIVATIVE of this item's asset. The preview serves it under the link's
+   * capability; without one, the drawing itself. */
+  mockupObjectId?: string | null;
 }
 
 export interface GiftLineInput {
@@ -194,6 +199,11 @@ export async function createGiftLink(
     throw new AuthzError({ allowed: false, reason: 'none of those keepsakes can be shared' });
   }
 
+  // Each item's picture as the product it's offered as — composed NOW, as the parent (who may see it),
+  // and frozen, so a gift-list visitor sees the mug, not just the drawing. Best effort: a product with
+  // no mockup template (or any compose failure) just shows the drawing, as before.
+  await freezeItemMockups(db, creator, items);
+
   let inviteId: string | null = null;
   if (input.invite?.email.trim()) {
     const inv = await createInvite(db, creator, {
@@ -273,7 +283,7 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
     ...i,
     // A small, re-encoded preview served through the link's own capability check — the token
     // holder never gets the original file (see giftLinkPreview).
-    imageUrl: giftPreviewPath(token, i.assetId),
+    imageUrl: giftPreviewPath(token, i.assetId, i.mockupObjectId ? i.productKey : undefined),
     purchased: bought.has(itemKey(i)),
   }));
 
@@ -295,9 +305,36 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   };
 }
 
-/** Where a gift link serves an item's preview (same-origin; noindex; the token is the capability). */
-export function giftPreviewPath(token: string, assetId: string): string {
-  return `/api/gift/${encodeURIComponent(token)}/preview/${encodeURIComponent(assetId)}`;
+/** Where a gift link serves an item's preview (same-origin; noindex; the token is the capability).
+ * `productKey` picks the item when one keepsake is on the list as two products. */
+export function giftPreviewPath(token: string, assetId: string, productKey?: string): string {
+  const base = `/api/gift/${encodeURIComponent(token)}/preview/${encodeURIComponent(assetId)}`;
+  return productKey ? `${base}?p=${encodeURIComponent(productKey)}` : base;
+}
+
+/** Compose + freeze each item's product mockup (see GiftItem.mockupObjectId). Never throws. */
+async function freezeItemMockups(db: DbHandle, creator: ViewerContext, items: GiftItem[]): Promise<void> {
+  const skus = [...new Set(items.map((i) => i.productKey))];
+  if (skus.length === 0) return;
+  const variants = await db.select({ id: productVariants.id, sku: productVariants.sku }).from(productVariants).where(inArray(productVariants.sku, skus));
+  const idOf = new Map(variants.map((v) => [v.sku, v.id]));
+  for (const item of items) {
+    const variantId = idOf.get(item.productKey);
+    if (!variantId) continue;
+    try {
+      const res = await composeMockup(db, creator, {
+        assetId: item.assetId,
+        variantId,
+        transform: ((item.transform as RawTransform | undefined) ?? { scale: 0 }) as RawTransform,
+        size: 'thumb',
+        sourceObjectId: item.sourceObjectId ?? undefined,
+        ground: item.ground ?? undefined,
+      });
+      item.mockupObjectId = res.mockupObjectId;
+    } catch {
+      // no template for this product yet, or a compose failure: the drawing it is
+    }
+  }
 }
 
 /** Longest edge of a gift-link preview — plenty for a phone screen, nowhere near print quality. */
@@ -308,7 +345,7 @@ export const GIFT_PREVIEW_MAX_PX = 720;
  * stripped) — never the original. Gated by the SAME capability as buying (live link, item in the
  * frozen snapshot, same family, content-cleared, not pulled back to ONLY_ME). null ⇒ 404.
  */
-export async function giftLinkPreview(db: DbHandle, token: string, assetId: string): Promise<Buffer | null> {
+export async function giftLinkPreview(db: DbHandle, token: string, assetId: string, productKey?: string | null): Promise<Buffer | null> {
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
   if (!link) return null;
   const grant: GiftLinkGrant = {
@@ -319,10 +356,20 @@ export async function giftLinkPreview(db: DbHandle, token: string, assetId: stri
   };
   const [asset] = await db.select().from(assets).where(eq(assets.id, assetId));
   if (!asset || !canPurchaseViaGiftLink(grant, asset, new Date()).allowed) return null;
-  const [obj] = await db
-    .select({ key: storageObjects.key })
-    .from(storageObjects)
-    .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+  // the product as designed, when the link froze one (a DERIVATIVE of this very asset), else the drawing
+  const item = (link.items as GiftItem[]).find((i) => i.assetId === assetId && (!productKey || i.productKey === productKey));
+  const [mockup] = item?.mockupObjectId
+    ? await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.id, item.mockupObjectId), eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'DERIVATIVE')))
+    : [];
+  const [obj] = mockup
+    ? [mockup]
+    : await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.assetId, assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
   if (!obj) return null;
   const bytes = await getObjectBytes(obj.key);
   return sharp(bytes)

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   if (!gate.ok) return new NextResponse(null, { status: 429, headers: { ...headers, 'retry-after': String(gate.retryAfterSec) } });
   let img: Buffer | null = null;
   try {
-    img = await giftLinkPreview(getDb(), token, assetId);
+    img = await giftLinkPreview(getDb(), token, assetId, req.nextUrl.searchParams.get('p'));
   } catch {
     img = null;
   }
