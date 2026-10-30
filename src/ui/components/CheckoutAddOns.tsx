@@ -1,6 +1,5 @@
 'use client';
 
-import { withArticle } from '@/lib/with-article';
 import { IconPlus } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';

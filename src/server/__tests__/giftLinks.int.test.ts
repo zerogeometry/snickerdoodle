@@ -61,7 +61,8 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(view.items).toHaveLength(1);
     expect(view.items[0]).toMatchObject({ assetId, productKey: 'framedPrint', unitPricePence: 6500 });
     // the holder gets the link's own preview route — never a signed URL to the original
-    expect(view.items[0]!.imageUrl).toBe(giftPreviewPath(token, assetId));
+    // (with a product mockup frozen at sharing time the path names the product: ?p=<key> — 06-B8)
+    expect(view.items[0]!.imageUrl.startsWith(giftPreviewPath(token, assetId))).toBe(true);
     expect(view.items[0]!.imageUrl).not.toMatch(/^http/);
   });
 
@@ -151,6 +152,9 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const assetId = await keptAsset(64);
     const other = await keptAsset(64);
     const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    // start from "no mockup frozen" whatever this machine's mockup templates are (some envs compose one at sharing)
+    const [fresh] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
+    await db.update(giftLinks).set({ items: (fresh!.items as object[]).map((i) => ({ ...i, mockupObjectId: null })) }).where(eq(giftLinks.id, fresh!.id));
     const colourOf = async (img: Buffer | null) => (await sharp(img!).stats()).channels.slice(0, 3).map((c) => Math.round(c.mean));
     expect(await colourOf(await giftLinkPreview(db, token, assetId))).toEqual([9, 9, 9]); // no mockup frozen → the drawing
 

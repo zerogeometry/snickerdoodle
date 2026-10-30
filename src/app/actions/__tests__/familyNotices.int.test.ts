@@ -209,7 +209,7 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
       { familyId, kind: 'DRAWING', uploaderAccountId: me.id, childSubjectId: kid!.id, controllerAccountId: me.id, visibility: 'FAMILY' },
       { familyId, kind: 'DRAWING', uploaderAccountId: me.id, childSubjectId: kid!.id, controllerAccountId: me.id, visibility: 'ONLY_ME' },
     ]);
-    expect(await deleteAllMyKeepsakesAction(new Date().toISOString())).toEqual({ ok: true, deleted: 2 });
+    expect(await deleteAllMyKeepsakesAction(new Date().toISOString())).toEqual({ ok: true, deleted: 2, inOrders: 0 });
     expect(sent.map((m) => [m.kind, m.to])).toEqual([['data-deleted', me.email]]);
     expect(sent[0]!.subject).toBe('your keepsakes have been deleted');
     expect(sent[0]!.text).toContain('we\'ve deleted 2 keepsakes');
@@ -217,7 +217,7 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
     clean(sent[0]!);
 
     sent.splice(0);
-    expect(await deleteAllMyKeepsakesAction(new Date().toISOString())).toEqual({ ok: true, deleted: 0 });
+    expect(await deleteAllMyKeepsakesAction(new Date().toISOString())).toEqual({ ok: true, deleted: 0, inOrders: 0 });
     expect(sent).toHaveLength(0);
     await db.delete(children).where(eq(children.id, kid!.id));
   });

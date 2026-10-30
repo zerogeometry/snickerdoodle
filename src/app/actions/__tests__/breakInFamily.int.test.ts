@@ -49,8 +49,6 @@ import { saveDesignAction } from '@/app/actions/designs';
 import { addChildAction, updateChildAction } from '@/app/actions/family';
 
 const DB = process.env.DATABASE_URL;
-/** Known bugs: skipped so the suite stays green; T7_SHOW_BUGS=1 runs them to show each one failing. */
-const bug = process.env.T7_SHOW_BUGS ? it : it.skip;
 const S3 = process.env.S3_ENDPOINT;
 
 const art = () =>

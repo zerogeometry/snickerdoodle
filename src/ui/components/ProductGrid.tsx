@@ -1,6 +1,5 @@
 'use client';
 
-import { withArticle } from '@/lib/with-article';
 import { fromLabel } from '@/lib/pack-labels';
 import { IconMinus, IconPlus, IconZoomScan } from '@tabler/icons-react';
 import { Icon } from '@/ui/primitives/Icon';
