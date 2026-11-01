@@ -326,12 +326,13 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       .returning();
     try {
       // lower-case + spaces as a customer might type it
-      const r = await resolvePromo(db, ` ${code.toLowerCase()} `);
+      const guest = `guest-${ids.nonce}@example.test`; // a creator code is for a FIRST order: the guest gives their email (C10)
+      const r = await resolvePromo(db, ` ${code.toLowerCase()} `, new Date(), { accountId: null, email: guest });
       expect(r.ok).toBe(true);
       if (!r.ok) return;
 
       // DB unit costs drive the guard (the framed print's landed cost: real, or ensureTestCosts' fixture).
-      const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule });
+      const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guest });
       expect(res.ok).toBe(true);
       orderRefs.push(res.ref!);
       const [o] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
