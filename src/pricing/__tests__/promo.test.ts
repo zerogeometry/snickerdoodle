@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { evaluatePromo, normalisePromoCode, type PromoLine, type PromoRule } from '../promo';
+import { codeTerms, evaluatePromo, normalisePromoCode, type PromoLine, type PromoRule } from '../promo';
 
 // Real unit economics (scripts/discount-headroom.mjs, live prices × Prodigi costs, 2026-10-12).
 const MUG: PromoLine = { linePence: 1800, lineCostPence: 930 }; // £5.00 + £4.30 delivery
@@ -120,5 +120,76 @@ describe('evaluatePromo — unknown costs + codes', () => {
     expect(normalisePromoCode('  welcome 10 ')).toBe('WELCOME10');
     expect(normalisePromoCode('x')).toBeNull();
     expect(normalisePromoCode('DROP TABLE;')).toBeNull();
+  });
+});
+
+describe('codeTerms — who a code is for (founder, Oct 2026)', () => {
+  const t = (over: Partial<Parameters<typeof codeTerms>[0]>) => codeTerms({ kind: 'PERCENT', partnerType: null, firstOrderOnly: false, ...over });
+  it('a creator code: the follower’s 10% and the creator’s 5% are both first-order only', () => {
+    expect(t({ partnerType: 'INFLUENCER' })).toEqual({ firstOrderOnly: true, commissionFirstOrderOnly: true });
+  });
+  it('a free-card code is always first-order only', () => {
+    expect(t({ kind: 'FREE_CARD' }).firstOrderOnly).toBe(true);
+  });
+  it('a friend’s referral code is first-order only (even with the flag off)', () => {
+    expect(t({ partnerType: 'REFERRAL' }).firstOrderOnly).toBe(true);
+  });
+  it('a PTA code works on every order and earns on every order (“a share of every order”)', () => {
+    expect(t({ partnerType: 'PTA' })).toEqual({ firstOrderOnly: false, commissionFirstOrderOnly: false });
+  });
+  it('a campaign / plain code: every order unless flagged; any commission still first-order only', () => {
+    expect(t({ partnerType: 'CAMPAIGN' })).toEqual({ firstOrderOnly: false, commissionFirstOrderOnly: true });
+    expect(t({}).firstOrderOnly).toBe(false);
+    expect(t({ firstOrderOnly: true }).firstOrderOnly).toBe(true);
+  });
+});
+
+describe('evaluatePromo — a free first card', () => {
+  const FREE = rule({ kind: 'FREE_CARD', value: 0 });
+  const card = (price = 550): PromoLine => ({ linePence: price, lineCostPence: 195, freeCardUnitPence: price });
+  const MUG_ = MUG;
+
+  it('a card + a mug: the card’s whole price comes off', () => {
+    const lines = [card(), MUG_];
+    const o = evaluatePromo(FREE, lines, 0);
+    expect(o).toMatchObject({ applied: true, discountPence: 550, capped: false, replacesOtherSavings: true });
+    expect(kept(lines, 550, 0)).toBeGreaterThanOrEqual((550 + 1800) / 1.2 / 10 - 1);
+  });
+
+  it('one card free of three — never more than ONE card, whatever the quantity', () => {
+    const three: PromoLine = { linePence: 1650, lineCostPence: 585, freeCardUnitPence: 550 };
+    expect(evaluatePromo(FREE, [three, MUG_], 0)).toMatchObject({ applied: true, discountPence: 550 });
+  });
+
+  it('two card sizes: the cheaper one is the free one', () => {
+    expect(evaluatePromo(FREE, [card(550), card(700), MUG_], 0)).toMatchObject({ applied: true, discountPence: 550 });
+  });
+
+  it('margin guard: a card on its own can’t be given away — it waits for a bigger order (never a part-price card)', () => {
+    expect(evaluatePromo(FREE, [card()], 0)).toEqual({ applied: false, reason: 'needs-more' });
+    expect(evaluatePromo(FREE, [card(), SMALL_CUSHION], 0)).toEqual({ applied: false, reason: 'needs-more' });
+  });
+
+  it('margin guard: a commission on a free-card code is trimmed so the order still keeps its floor', () => {
+    const lines = [card(), MUG_];
+    const o = evaluatePromo({ ...FREE, commissionBps: 3000 }, lines, 0);
+    expect(o).toMatchObject({ applied: true, discountPence: 550, capped: true });
+    if (o.applied) expect(kept(lines, 550, o.commissionPence)).toBeGreaterThanOrEqual((550 + 1800) / 1.2 / 10 - 1);
+  });
+
+  it('no single card in the basket (a pack is not a single card) → it says so', () => {
+    expect(evaluatePromo(FREE, [MUG_, { linePence: 1200, lineCostPence: 600, freeCardUnitPence: null }], 0)).toEqual({ applied: false, reason: 'needs-card' });
+  });
+
+  it('a card whose cost is unknown is never given away', () => {
+    expect(evaluatePromo(FREE, [{ linePence: 550, lineCostPence: null, freeCardUnitPence: 550 }, MUG_], 0)).toEqual({ applied: false, reason: 'needs-card' });
+  });
+
+  it('never stacks: a bigger saving the basket already has wins, and the code is not used', () => {
+    expect(evaluatePromo(FREE, [card(), FRAMED_11X14], 975)).toEqual({ applied: false, reason: 'better-saving-applied' });
+  });
+
+  it('a minimum spend set on the code still applies', () => {
+    expect(evaluatePromo({ ...FREE, minSpendPence: 1500 }, [card(), { linePence: 550, lineCostPence: 195 }], 0)).toEqual({ applied: false, reason: 'min-spend', minSpendPence: 1500 });
   });
 });

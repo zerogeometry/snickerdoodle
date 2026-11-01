@@ -53,3 +53,17 @@ pushes, where a round number feels nicer.
 ## Referral + class codes (D17)
 - **Give £5, get £5:** every parent's code is on their account page with copy/share. The friend gets £5 off their first order over £30; the referrer gets £5 credit once it's paid, which comes off their next order automatically.
 - **PTA class codes:** `create STMARYS-Y2 --percent 0 --commission 10 --partner "St Mary's PTA" --class "Year 2" --type PTA`. `scripts/promo-codes.mjs partners` shows each school's total and per-class split (the number to pay the PTA).
+
+## First-order codes + the free first card (C10, 30 Oct 2026)
+- **Creator codes are for a follower's FIRST order.** The follower's 10% only works on their first paid
+  order (signed in, or a guest by their email), and the creator's 5% is earned on that order only —
+  exactly once, settled the moment it's paid, never on a later order and never on the creator's own
+  (add `--partner-email` so the shop knows who the creator is). One rule, one place: `codeTerms` in
+  `src/pricing/promo.ts`.
+- **PTA codes are unchanged:** the school earns its share on every order (the PTA pitch).
+- **Free first card:** `create FIRSTCARD --free-card` takes one greetings card's price off a first order
+  (the cheapest single card; a card pack doesn't count). Never stacks with other savings — the bigger one
+  wins. All or nothing under the margin guard: a card on its own (or with only thin items) can't be given
+  away, so the code asks for a slightly bigger order instead of knocking off part of the card.
+- Known gap: someone with two checkouts open at once could get a first-order DISCOUNT twice (we don't
+  block retries from the basket). The creator still only earns once.

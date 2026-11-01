@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
-import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, type PromoRefusal } from './promos';
+import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
 import { receiptLines, receiptSavings, type ReceiptLine } from '@/lib/order-lines';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
@@ -516,6 +516,8 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
     if (updated.joinSavingPence > 0 && updated.accountId) {
       await consumeJoinSaving(tx, updated.accountId);
     }
+    // a partner's commission: the follower's first paid order only, exactly once (src/server/promos.ts)
+    await settlePartnerCommission(tx, updated);
     return updated;
   });
   // AFTER commit, and only on the real PENDING→PAID transition (so a webhook retry never
