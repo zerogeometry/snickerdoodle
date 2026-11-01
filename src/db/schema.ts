@@ -452,6 +452,16 @@ export const orders = pgTable(
     /** A gift order's little note, as the buyer typed it at checkout (screened for abuse, ≤200).
      * Erased with the account like the address (accountClosure). */
     giftNote: text('gift_note'),
+    /** The printed gift-note insert (plan C9, src/fulfillment/giftNoteInsert.ts): what happened to it
+     * at submission — sent / partly (a lab couldn't) / skipped, and why. Null when the switch was off
+     * or there was no note. Holds no note text. */
+    giftNoteInsert: jsonb('gift_note_insert').$type<{
+      slot: 'postcard' | 'packing_slip_bw';
+      status: 'sent' | 'partly' | 'skipped';
+      why?: string;
+      labs?: { lab: string; prints: boolean }[];
+      at: string;
+    } | null>(),
     /** A promo / partner code used on this order (server-resolved), what it took off the
      * goods, and what the partner (influencer / PTA / referrer) earns once it's PAID. */
     promoCodeId: uuid('promo_code_id').references((): AnyPgColumn => promoCodes.id, { onDelete: 'set null' }),

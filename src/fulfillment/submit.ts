@@ -3,12 +3,13 @@ import { assets, orderItemArtwork, orderItems, orders, storageObjects } from '@/
 import { isProdigiConfigured, isSandboxHost, ProdigiError } from '@/server/prodigi/client';
 import { prodigiOrderTransport, type CreateOrderRequest, type ProdigiOrderTransport, type ProdigiRecipient } from '@/server/prodigi/orders';
 import { isStripeConfigured, getStripe } from '@/payments/stripe';
-import { presignProviderIngest } from '@/storage';
+import { deleteObject, presignProviderIngest, putObject } from '@/storage';
 import type { DbHandle, Tx } from '@/server/db';
 import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD_FOR_SAFETY_CHECK, type GateEnv } from './gate';
 import { startRetentionClockForOrder } from '@/server/retention';
 import { sendOrderShipped } from '@/server/orderEmails';
 import { alertHandLines } from './handLines';
+import { giftNoteInsertKey, giftNoteInsertSlot, planGiftNoteInsert, type GiftNoteInsertRecord, type GiftNoteInsertSlot } from './giftNoteInsert';
 
 /**
  * POD ORDER SUBMISSION — the READY → SUBMITTED step (proposal/04 §6, the last leg of
@@ -198,13 +199,21 @@ export async function releaseBlockedArtwork(db: DbHandle, opts?: { env?: GateEnv
 
 export async function submitReadyOrders(
   db: DbHandle,
-  opts?: { limit?: number; env?: GateEnv; transport?: ProdigiOrderTransport; onlyOrderIds?: string[] },
+  opts?: {
+    limit?: number;
+    env?: GateEnv;
+    transport?: ProdigiOrderTransport;
+    onlyOrderIds?: string[];
+    /** The gift-note insert switch; undefined = read GIFT_NOTE_INSERT (OFF unless set). Tests pin it. */
+    giftNoteSlot?: GiftNoteInsertSlot | null;
+  },
 ): Promise<SubmitSummary> {
   const env = opts?.env ?? gateEnv();
   const transport = opts?.transport ?? prodigiOrderTransport;
   // The consistency check validates the REAL config; an injected fake has no host.
   if (!opts?.transport) assertProdigiConfigConsistent(env);
   const limit = opts?.limit ?? 25;
+  const giftNoteSlot = opts?.giftNoteSlot !== undefined ? opts.giftNoteSlot : giftNoteInsertSlot();
   const summary: SubmitSummary = { considered: 0, submitted: 0, waiting: 0, blocked: 0, failed: 0, skipped: 0, recovered: 0, orders: [] };
 
   const swept = await recoverStaleClaims(db, opts?.onlyOrderIds);
@@ -213,7 +222,16 @@ export async function submitReadyOrders(
 
   const now = new Date();
   const candidates = await db
-    .select({ id: orders.id, ref: orders.ref, shippingAddress: orders.shippingAddress, stripeSessionId: orders.stripeSessionId, submitAttempts: orders.submitAttempts })
+    .select({
+      id: orders.id,
+      ref: orders.ref,
+      shippingAddress: orders.shippingAddress,
+      stripeSessionId: orders.stripeSessionId,
+      submitAttempts: orders.submitAttempts,
+      isGift: orders.isGift,
+      giftNote: orders.giftNote,
+      giftFromName: orders.giftFromName,
+    })
     .from(orders)
     .where(
       and(
@@ -230,7 +248,7 @@ export async function submitReadyOrders(
   for (const order of candidates) {
     summary.considered++;
     try {
-      const note = await submitOne(db, order, env, transport, summary);
+      const note = await submitOne(db, order, env, transport, summary, giftNoteSlot);
       if (note) summary.orders.push(note);
     } catch (e) {
       // One poisoned order must never abort the tick for the rest of the batch.
@@ -262,10 +280,14 @@ async function submitOne(
     shippingAddress: { name: string; line1: string; line2?: string | null; townOrCity: string; postcode: string; countryCode: string } | null;
     stripeSessionId: string | null;
     submitAttempts: number;
+    isGift: boolean;
+    giftNote: string | null;
+    giftFromName: string | null;
   },
   env: GateEnv,
   transport: ProdigiOrderTransport,
   summary: SubmitSummary,
+  giftNoteSlot: GiftNoteInsertSlot | null,
 ): Promise<{ ref: string; status: string; note?: string }> {
   // Load the order's lines + their artwork state.
   const lines = await db
@@ -427,6 +449,7 @@ async function submitOne(
   if (claimed.length === 0) return { ref: order.ref, status: 'skipped', note: 'claimed by another tick' };
 
   let latched = false; // prodigiOrderId persisted — after this, NEVER revert to PAID
+  let insertStored = false; // a gift-note insert file was written for this attempt
   try {
     // Mint provider-ingestion URLs (the gate above authorised this) + build the payload
     // from the FROZEN spec — sku/attributes exactly as sold, never a live lookup.
@@ -470,15 +493,50 @@ async function submitOne(
       });
     }
 
-    const result = await transport.createOrder({
+    // PLAN C9 — the printed gift note, ONLY when the switch is on (GIFT_NOTE_INSERT; OFF by default).
+    // Re-screened, first name only, per-lab checked; it can skip itself but never fails the order.
+    const insert = await planGiftNoteInsert({
+      slot: giftNoteSlot,
+      order,
+      quote: {
+        shippingMethod,
+        destinationCountryCode: recipient.address.countryCode,
+        items: items.map((i) => ({ sku: i.sku, copies: i.copies, attributes: i.attributes, printAreas: [...new Set(i.assets.map((a) => a.printArea))] })),
+      },
+      quoteInserts: transport.quoteInserts ? (req) => transport.quoteInserts!(req) : undefined,
+      store: async (key, png) => {
+        await putObject(key, png, 'image/png');
+        insertStored = true;
+        return presignProviderIngest(key);
+      },
+    });
+    let insertRecord: GiftNoteInsertRecord | null = insert.record;
+
+    const request: CreateOrderRequest = {
       merchantReference: order.ref,
       shippingMethod,
       idempotencyKey: order.id, // stable + complex; Prodigi returns the SAME order on retry
       recipient,
       items,
-    });
+    };
+    let result: Awaited<ReturnType<ProdigiOrderTransport['createOrder']>>;
+    try {
+      result = await transport.createOrder(insert.branding ? { ...request, branding: insert.branding } : request);
+    } catch (e) {
+      // Prodigi checks insert files too. If it turned the order down WITH the insert, try once more
+      // WITHOUT it: the parcel matters more than the note. A refusal that wasn't about the insert
+      // fails again and goes through the normal failure path.
+      if (!insert.branding || !(e instanceof ProdigiError) || e.status < 400 || e.status >= 500) throw e;
+      result = await transport.createOrder(request);
+      insertRecord = { ...insertRecord!, status: 'skipped', why: `Prodigi turned the order down with it, so it went without: ${redactUrls(e.message).slice(0, 200)}` };
+      await deleteObject(giftNoteInsertKey(order.id)).catch(() => {});
+      insertStored = false;
+    }
 
-    await db.update(orders).set({ prodigiOrderId: result.order.id, submitError: null, submitAttempts: 0, nextSubmitAttemptAt: null }).where(eq(orders.id, order.id));
+    await db
+      .update(orders)
+      .set({ prodigiOrderId: result.order.id, submitError: null, submitAttempts: 0, nextSubmitAttemptAt: null, giftNoteInsert: insertRecord })
+      .where(eq(orders.id, order.id));
     latched = true;
     await db
       .update(orderItemArtwork)
@@ -505,6 +563,8 @@ async function submitOne(
       summary.failed++;
       return { ref: order.ref, status: 'failed', note: `post-submit bookkeeping failed: ${msg}` };
     }
+    // This attempt's insert file goes with it (the next attempt makes a fresh one).
+    if (insertStored) await deleteObject(giftNoteInsertKey(order.id)).catch(() => {});
     // Revert the claim — guarded so it can never un-claim a latched order — and back off.
     const kind = e instanceof ProdigiError && raw && (e as ProdigiError).status >= 400 && (e as ProdigiError).status < 500 ? 'permanent' : 'transient';
     await db
@@ -547,7 +607,7 @@ export async function syncSubmittedOrders(
   const summary: SyncSummary = { checked: 0, shipped: 0, cancelled: 0, inProgress: 0, midSubmit: 0, stalled: 0, orders: [] };
 
   const rows = await db
-    .select({ id: orders.id, ref: orders.ref, prodigiOrderId: orders.prodigiOrderId, claimedAt: orders.claimedAt })
+    .select({ id: orders.id, ref: orders.ref, prodigiOrderId: orders.prodigiOrderId, claimedAt: orders.claimedAt, giftNoteInsert: orders.giftNoteInsert })
     .from(orders)
     .where(and(eq(orders.status, 'FULFILLING'), ...(opts?.onlyOrderIds ? [inArray(orders.id, opts.onlyOrderIds)] : [])))
     .orderBy(asc(orders.claimedAt))
@@ -583,6 +643,7 @@ export async function syncSubmittedOrders(
         });
         // "it's on its way" (+ tracking) — once, after commit; a mail failure never undoes the sync
         if (moved) await sendOrderShipped(db, row.id).catch((e) => console.error('shipped email not sent', row.ref, (e as Error).message));
+        await dropGiftNoteInsertFile(row);
         summary.shipped++;
         summary.orders.push({ ref: row.ref, stage });
       } else if (stage === 'Cancelled') {
@@ -591,6 +652,7 @@ export async function syncSubmittedOrders(
           await setArtworkStatus(tx, row.id, 'CANCELLED');
           await startRetentionClockForOrder(tx, row.id);
         });
+        await dropGiftNoteInsertFile(row);
         summary.cancelled++;
         summary.orders.push({ ref: row.ref, stage, note: issues.join('; ') || undefined });
       } else {
@@ -618,6 +680,13 @@ export async function syncSubmittedOrders(
 }
 
 type ArtworkStatus = (typeof orderItemArtwork.status.enumValues)[number];
+
+/** The printed note's file has done its job once the parcel has gone (or been cancelled): delete it.
+ * Best effort — a failed delete never undoes the sync (account closure deletes it too). */
+async function dropGiftNoteInsertFile(row: { id: string; giftNoteInsert: { status: string } | null }): Promise<void> {
+  if (row.giftNoteInsert?.status !== 'sent' && row.giftNoteInsert?.status !== 'partly') return;
+  await deleteObject(giftNoteInsertKey(row.id)).catch((e) => console.error('gift-note insert file not deleted', row.id, (e as Error).message));
+}
 
 async function setArtworkStatus(db: DbHandle | Tx, orderId: string, status: ArtworkStatus, onlyFrom?: ArtworkStatus[]): Promise<void> {
   const itemIds = (await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, orderId))).map((r) => r.id);

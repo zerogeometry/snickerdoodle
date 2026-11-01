@@ -358,6 +358,13 @@
       "when": 1793382567536,
       "tag": "0050_promo_free_card_partner_email",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793567100737,
+      "tag": "0051_order_gift_note_insert",
+      "breakpoints": true
     }
   ]
 }
