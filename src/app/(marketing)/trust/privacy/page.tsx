@@ -102,6 +102,7 @@ export default function PrivacyNoticePage() {
         <h2>8. How long we keep it</h2>
         <ul>
           <li><strong>Drawings and photos you upload:</strong> only as long as we need them to make and send your order, plus 30 days after it&apos;s sent in case anything needs reprinting — then we delete them, <strong>unless</strong> you choose to keep them in your Keepsake Home (we ask after you order).</li>
+          <li><strong>The print file we send our printer:</strong> Prodigi keeps it for about 45 days after making your order, in case it needs reprinting, then deletes it.</li>
           <li><strong>Keepsake Home items:</strong> for as long as you want them. Delete any time.</li>
           <li><strong>Profile pictures, profile headers and family banners:</strong> until you change or remove them, or close your account. Only people in your family can see them, and we strip location data from every one.</li>
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
