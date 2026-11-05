@@ -25,7 +25,7 @@ export async function sendOrderConfirmed(db: DbHandle, orderId: string): Promise
   if (!o) return;
   const to = await recipient(db, o);
   if (!to) return;
-  const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+  const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId)).orderBy(orderItems.seq); // as placed
   await sendMail({
     kind: 'order-confirmed',
     to: to.email,
