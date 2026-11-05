@@ -12,6 +12,7 @@ import {
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 import { BUNDLE_ONLY_SKUS, BUNDLE_SIZES, isBundleKey } from '@/lib/christmas-bundle';
+import { FRAME_GRIDS, MULTI_FRAME_COLOURS } from '@/lib/multi-photo-frame';
 
 export { mmToPx };
 
@@ -452,6 +453,27 @@ const DEFS: Record<string, ProductDef> = {
       size: c.size, pricePence: c.pricePence, ...exactPx(c.px, 300), prodigiSku: c.sku,
       printTo: ['cover', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'],
     })),
+  },
+  // The MULTI PHOTO FRAME (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md; src/lib/multi-photo-frame.ts):
+  // one framed print of a GRID of their drawings, 60 mm squares 20 mm apart — 12×12″ with no mount
+  // (9 drawings) or 16×16″ mounted (16). Made at gb3 since Prodigi's "global" change. The frame
+  // colour is a Prodigi `color` attribute of one SKU per size (all eight; gold leads). The print file
+  // is Prodigi's exact printAreaSizes (sandbox GET /v4.0/products, 5 Nov: 3543² / 4724², 'default'
+  // only), bleed 0 — the grid, margins and each square's bleed are drawn INTO it (frameGrid.ts).
+  // Priced ≈ 20% net after every cost: (1.03 × landed + £0.75) / 0.61 — £28 + £7.85 → £62,
+  // £39 + £7.85 → £80. HIDDEN until the founder's layered frame photos are in (seedMockups).
+  multiPhotoFrame: {
+    category: 'PRINT', label: 'multi photo frame', blurb: 'a whole gallery of their art, in one frame', print: true, visibleInShop: false,
+    description: 'Nine or sixteen of their drawings in one frame, each in its own little square — a whole gallery wall of wonky masterpieces, ready to hang. Pick a drawing for every square, or let your favourite fill the gaps.',
+    specs: { drawings: '9 (12×12″) or 16 (16×16″, with a white mount)', squares: '6 × 6 cm, 2 cm apart', frame: 'classic wooden frame, eight colours', glazing: 'shatterproof', made: 'in the UK' },
+    variants: FRAME_GRIDS.flatMap((g) =>
+      MULTI_FRAME_COLOURS.map((colour) => ({
+        size: g.size, colour,
+        pricePence: g.mounted ? 8000 : 6200,
+        ...exactPx({ w: g.px, h: g.px }, 300),
+        prodigiSku: g.sku, prodigiAttrs: { color: colour },
+      })),
+    ),
   },
   adultTee: {
     category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,

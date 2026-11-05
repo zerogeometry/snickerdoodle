@@ -48,6 +48,8 @@ for (const file of readdirSync(DIR)) {
 //  - the DATED 2027 calendar (25 Oct, CHRISTMAS-range-and-postage.md): uk15, £4.35, two for £5.35.
 //  - playing cards, kraft wrap rolls, height charts (29 Oct 2026, 1 copy + 2 copies quoted for the plus-one);
 //    a height chart always ships in its own parcel, so its plus-one is a full second post.
+//  - the multi photo frames (5 Nov 2026, PRODUCT-RANGE-global-uk-nov.md): gb3 → Evri Next Day 24 (tracked),
+//    £7.85, two for £10.85 (gold quoted; the colour is an attribute of one SKU, same price).
 // (Still missing — so no multi-buy offer or code discount until added: hidden jumpers, bandana.)
 const SANDBOX = {
   'H-PLACE-1PK': [900, 430, 100], 'H-PLACE-2PK': [1650, 430, 100], 'H-PLACE-4PK': [3250, 430, 100], 'H-PLACE-6PK': [4850, 430, 100],
@@ -57,6 +59,7 @@ const SANDBOX = {
   'WRAP-KFT-ROL-70X200': [800, 570, 100], 'WRAP-KFT-ROL-70X300': [1100, 570, 100], 'WRAP-KFT-ROL-70X500': [1700, 570, 100],
   'POSTER-HANGER-20-CAN-ROL-SC-8X48': [1200, 675, 675], 'POSTER-HANGER-20-CAN-ROL-SC-8X60': [1400, 675, 675],
   'POSTER-HANGER-30-CAN-ROL-SC-12X48': [1400, 675, 675], 'POSTER-HANGER-30-CAN-ROL-SC-12X60': [1500, 675, 675],
+  'GLOBAL-MPF-12X12': [2800, 785, 300], 'GLOBAL-MPFM-16X16': [3900, 785, 300],
 };
 for (const [sku, [cost, ship, extra]] of Object.entries(SANDBOX)) if (!bySku.has(sku)) bySku.set(sku, [{ cost, ship, extra, method: 'standard', src: 'GB' }]);
 // Phone cases (29 Oct 2026, all 152 GB case SKUs quoted, 0 exceptions): a basket with a case ships EXPRESS

@@ -19,6 +19,8 @@ import { cylinderWarp } from './cylinder';
 import { ByteLru, designCache, faceCache } from './previewCache';
 import { composeLayoutTile, isLayoutProduct, layoutTileKey } from './bundleCompose';
 import { isBundleKey } from '@/lib/christmas-bundle';
+import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
+import { renderFrameGridFacePixels } from './frameGrid';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -470,7 +472,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   }
   if (!tpl) throw new NoMockupTemplateError('variant has no mockup template for this view');
   const face: Face | undefined = !input.fill && (!input.view || PRIMARY_VIEWS.has(input.view))
-    ? isPatternProduct(prod?.key) ? 'pattern' : isHeightChart(prod?.key) ? 'heightChart' : isGalleryProduct(prod?.key) ? 'gallery' : undefined
+    ? faceOf(prod?.key)
     : undefined;
 
   // 4. Deterministic, VERSIONED cache key. templateVersion + size + the SOURCE OBJECT id
@@ -492,7 +494,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
   const ground = !fill && (face === 'pattern' || isGroundProduct(prod?.key)) ? normalizeGround(input.ground) : null;
   const gTag = groundTag(ground);
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : 'hc'}${FACE_REV}${gTag}` : gTag;
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : face === 'frameGrid' ? 'grid' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. The template's picture layers (blank; optional product-silhouette mask the design is clipped
@@ -550,8 +552,12 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 }
 
 /** the PRINTED FACE a product's mockup shows (the print code's own render): the repeat, the height chart,
- * the calendar's gallery page (the whole drawing inside a white margin) */
-type Face = 'pattern' | 'heightChart' | 'gallery';
+ * the calendar's gallery page (the whole drawing inside a white margin), the multi photo frame's grid
+ * (the drawing in every square) */
+type Face = 'pattern' | 'heightChart' | 'gallery' | 'frameGrid';
+/** Which printed face a product's mockup shows (none = the drawing, placed). */
+const faceOf = (key: string | null | undefined): Face | undefined =>
+  isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : undefined;
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
 const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
 /** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
@@ -576,6 +582,11 @@ export async function renderPrintedFace(
   const canvas = face === 'pattern' ? canvasSizePx(geom) : { width: print.widthPx, height: print.heightPx };
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
   if (face === 'pattern') return renderRepeatPatternPixels(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale });
+  if (face === 'frameGrid') {
+    const grid = frameGridForPx(print.widthPx);
+    if (!grid) throw new NoMockupTemplateError(`no multi photo frame grid for a ${print.widthPx} px print`);
+    return renderFrameGridFacePixels(srcBuf, grid, transform, scale);
+  }
   if (face === 'gallery') {
     // the page as it prints (no bleed — the mockup shows the trimmed page): white, the whole drawing in the margin
     const r = galleryRect(geom, await designSize(srcBuf));
@@ -607,7 +618,7 @@ export async function renderTemplatePreview(args: {
   /** the placement (default: the product's default) */
   transform?: Transform;
 }): Promise<Buffer> {
-  const face: Face | undefined = isPatternProduct(args.productKey) ? 'pattern' : isHeightChart(args.productKey) ? 'heightChart' : isGalleryProduct(args.productKey) ? 'gallery' : undefined;
+  const face: Face | undefined = faceOf(args.productKey);
   let transform: Transform = args.transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   let designBuf: Design = args.design;
   if (face) {

@@ -28,6 +28,7 @@ import { basketLineId } from '@/lib/basket-line';
 import { defaultPlacementFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
+import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { isBundleKey } from '@/lib/christmas-bundle';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
@@ -196,8 +197,9 @@ export function FlowCatalogue({
     }
     // A card pack needs its N drawings chosen — "+" opens the pack builder, never a blank pack. A
     // calendar likewise opens its builder (the drawing goes on the cover, ready to flip through).
-    // The christmas family bundle too: its size + a drawing for the table and each ornament.
-    if (isCardPackKey(p.key) || isCalendarKey(p.key) || isBundleKey(p.key)) {
+    // The christmas family bundle too: its size + a drawing for the table and each ornament. And the
+    // multi photo frame: a drawing per square (this one in every square to start).
+    if (isCardPackKey(p.key) || isCalendarKey(p.key) || isBundleKey(p.key) || isMultiPhotoFrameKey(p.key)) {
       void customize(p);
       return;
     }

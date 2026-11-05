@@ -5,6 +5,7 @@ import { eq, inArray } from 'drizzle-orm';
 import { printTemplates, products, productVariants, templateAssets } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { isPatternProduct } from '@/lib/patterns';
+import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { getObjectBytes, presignDownload, putObject } from '@/storage';
 import { isHeightChart } from './height-chart-geometry';
 import type { InstantContext } from '@/lib/instantMockup';
@@ -22,7 +23,7 @@ const URL_TTL_S = 900;
  *
  * Only for previews the browser can draw faithfully with the SAME placement geometry: a flat
  * (axis-aligned) print area on the primary view. A mug (cylinder wrap), an angled view
- * (perspective), a repeat pattern or a height chart (the printed face) → null; those tiles wait
+ * (perspective), a repeat pattern, a height chart or a multi photo frame (the printed face) → null; those tiles wait
  * for the server's mockup, and the catalogue asks for them first.
  */
 export async function instantContexts(db: DbHandle, variantIds: string[]): Promise<Record<string, InstantContext | null>> {
@@ -45,7 +46,7 @@ export async function instantContexts(db: DbHandle, variantIds: string[]): Promi
       const blank = t?.blankObjectId ? byId.get(t.blankObjectId) : undefined;
       const quad = t?.printQuad;
       const cylinder = t?.materialClass === 'CERAMIC' && !!t.maskObjectId;
-      if (!r || !t || !blank?.widthPx || !blank.heightPx || !quad || !axisAligned(quad) || cylinder || isPatternProduct(r.key) || isHeightChart(r.key)) {
+      if (!r || !t || !blank?.widthPx || !blank.heightPx || !quad || !axisAligned(quad) || cylinder || isPatternProduct(r.key) || isHeightChart(r.key) || isMultiPhotoFrameKey(r.key)) {
         out[id] = null;
         return;
       }

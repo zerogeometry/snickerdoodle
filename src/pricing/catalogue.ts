@@ -51,6 +51,8 @@ export const CATALOGUE = {
   babyBodysuit: { pricePence: 2200, label: 'baby bodysuit' },
   card: { pricePence: 550, label: 'greetings card' },
   calendar: { pricePence: 2200, label: 'calendar' }, // A5 (A4 £24 — DB per variant)
+  // The multi photo frame (5 Nov 2026) — seeded hidden until the founder's layered frame photos are in.
+  multiPhotoFrame: { pricePence: 6200, label: 'multi photo frame' }, // the default: 12×12″, 9 drawings (16×16″ mounted £80 — DB per variant)
   adultTee: { pricePence: 3200, label: 'adult tee' },
   apron: { pricePence: 2500, label: 'apron' },
   ceramicOrnament: { pricePence: 2100, label: 'ceramic christmas ornament' },

@@ -26,6 +26,8 @@ export const EXPECTED_POPULARITY = [
   'calendar',
   // the Christmas table set (founder, 27–28 Oct)
   'placemat', 'coaster',
+  // the multi photo frame (5 Nov) — hidden until its photos are in; last, so it moves nobody else's start
+  'multiPhotoFrame',
 ];
 
 /** Always first, whatever sells (founder, 29 Oct: the family bundle "appears at the top of the catalogue"). */

@@ -21,7 +21,7 @@ import { FlowHeader } from '@/ui/components/FlowHeader';
 
 // The paper card each state sits on (Scrapbook D12).
 const CARD = 'pop-in tape rounded-[22px] border-2 border-cocoa bg-paper p-7 shadow-[0_4px_0_var(--color-cocoa)]';
-import { isBundleLine, isCalendarLine, isPackLine, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
+import { isBundleLine, isCalendarLine, isFrameGridLine, isPackLine, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { createWishAction } from '@/app/actions/wish';
 
 type State = 'minting' | 'needsAuth' | 'ready' | 'error' | 'empty' | 'badName';
@@ -50,10 +50,10 @@ export default function ShareWishPage() {
     // Read the basket fresh from the (persisted) store — the page may mount before
     // sessionStorage hydration completes, so the subscription value can lag.
     const items = useBasket.getState().items;
-    // Each creation on the product the child chose (06-B2) — a card pack, a calendar or the bundle
+    // Each creation on the product the child chose (06-B2) — a card pack, a calendar, a multi photo frame or the bundle
     // can't go on a gift link (they need the buyer's own choices), so they stay in the basket only.
     const lines = items
-      .filter((i) => i.artwork && !isPackLine(i) && !isCalendarLine(i) && !isBundleLine(i) && i.product !== 'card')
+      .filter((i) => i.artwork && !isPackLine(i) && !isCalendarLine(i) && !isFrameGridLine(i) && !isBundleLine(i) && i.product !== 'card')
       .map((i) => ({ assetId: i.artwork!.assetId, variantSku: i.sku ?? i.product, transform: i.artwork!.transform, sourceObjectId: i.artwork!.sourceObjectId, back: i.back, ground: i.ground }));
     const assetIds = [...new Set(lines.map((l) => l.assetId))];
     if (assetIds.length === 0) {

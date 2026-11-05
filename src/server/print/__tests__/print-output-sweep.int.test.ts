@@ -16,6 +16,8 @@ import { canvasSizePx, computeLayerRect, galleryRect, isGalleryProduct, template
 import { heightChartArtGeom, heightChartLayout, isHeightChart } from '@/server/print/height-chart-geometry';
 import { CARD_PANEL_X, CARD_SPREAD } from '@/server/print/cardPrint';
 import { isPatternProduct } from '@/lib/patterns';
+import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
+import { frameSlotGeom } from '@/server/print/pattern-geometry';
 import { DTG_GARMENT_KEYS } from '@/server/print/apparel';
 import { deleteObject, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -221,6 +223,13 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
   });
 
   function frameOf(s: Spec, t: TemplateGeom): FileFrame {
+    // a multi photo frame's render is ONE square's tile (its 60 mm window + bleed); the whole sheet is
+    // composed from the tiles at submit — its exact px + positions: frameGrid.test.ts, multiPhotoFrame.int.test.ts
+    const cell = frameCell(s, t);
+    if (cell) {
+      const cc = canvasSizePx(cell);
+      return { place: cell, dx: 0, dy: 0, cw: cc.width, ch: cc.height, turn: false };
+    }
     const c = canvasSizePx(t);
     if (isHeightChart(s.productKey)) return { place: heightChartArtGeom(t), dx: heightChartLayout(c, t.requiredDpi).bandPx, dy: 0, cw: c.width, ch: c.height, turn: false };
     if (s.productKey === 'card' || s.productKey === 'cardPack') {
@@ -229,6 +238,12 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
       return { place: t, dx: CARD_PANEL_X.outerFront, dy: 0, cw: CARD_SPREAD.widthPx, ch: CARD_SPREAD.heightPx, turn: false };
     }
     return { place: t, dx: 0, dy: 0, cw: c.width, ch: c.height, turn: turnedFile(s) };
+  }
+
+  /** A multi photo frame's square, as its own print geometry (null for every other product). */
+  function frameCell(s: Spec, t: TemplateGeom): TemplateGeom | null {
+    const grid = isMultiPhotoFrameKey(s.productKey) ? frameGridForPx(t.printWidthPx) : null;
+    return grid ? frameSlotGeom(grid, t) : null;
   }
 
   it('the calibration drawing went in at its full size (no resize on ingest)', () => {
@@ -240,7 +255,9 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
       const variantId = variantIdBySku.get(s.sku)!;
       expect(variantId, `${s.sku} seeded`).toBeTruthy();
       const t = tplByVariant.get(variantId)!;
-      const want = prodigiSize(s);
+      const cell = frameCell(s, t);
+      // (a frame's square: its tile's own size — the composed sheet is Prodigi's, checked elsewhere)
+      const want = cell ? { w: canvasSizePx(cell).width, h: canvasSizePx(cell).height } : prodigiSize(s);
       const pattern = isPatternProduct(s.productKey);
       const gallery = isGalleryProduct(s.productKey);
       const garment = DTG_GARMENT_KEYS.has(s.productKey);

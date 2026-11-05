@@ -11,8 +11,9 @@ import { keepAndFileCreations } from './keepsakes';
 import { assetRefOf } from './assetRef';
 
 /** Products that can be saved/gifted as a design (a card needs its buyer's own inside message; a card
- * pack is built from N drawings at the basket, a calendar from its 13 pages). */
-const NOT_SAVABLE = new Set(['card', 'cardPack', 'calendar']);
+ * pack is built from N drawings at the basket, a calendar from its 13 pages, a multi photo frame from a
+ * drawing per square). */
+const NOT_SAVABLE = new Set(['card', 'cardPack', 'calendar', 'multiPhotoFrame']);
 
 export interface SaveDesignInput {
   assetId: string;

@@ -41,6 +41,7 @@ export const FAQ_UPDATED = '2026-10-25';
 /** Friendly names for the price table — every product in the shop needs one (unit-tested). */
 export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   framedPrint: 'Framed print',
+  multiPhotoFrame: 'Multi photo frame (9 or 16 drawings)',
   mug: 'Mug',
   cushion: 'Cushion (square, round or heart)',
   kidsTee: 'Kids’ organic T-shirt',

@@ -17,6 +17,9 @@ describe('multi-buy tiers — derived from each product’s cost (founder, 27 Oc
     ['adult tee', e(3200, 1630, 430, 150, false), '15/15/15/15'],
     ['jigsaw, 30 pieces', e(2600, 1675, 675, 0, false), '15/15/15/15'],
     ['framed print 11×14', e(6500, 3785, 785, 300, false), '10/15/15/15'],
+    // the multi photo frames (5 Nov sandbox quotes: gb3, £7.85 + £3.00 a frame)
+    ['multi photo frame 12×12', e(6200, 3585, 785, 300, false), '10/15/15/15'],
+    ['multi photo frame 16×16', e(8000, 4685, 785, 300, false), '10/10/10/10'],
     ['12″ square cushion', e(3000, 1630, 430, 100), '15/15/15/15'],
     ['18″ round cushion', e(3000, 1730, 430, 100), '10/10/10/10'],
     ['heart cushion', e(2200, 1330, 430, 100), '5/5/10/10'],

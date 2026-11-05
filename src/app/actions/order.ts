@@ -9,6 +9,7 @@ import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
 import { CALENDAR_PAGE_COUNT } from '@/lib/calendar';
+import { MAX_FRAME_SLOTS } from '@/lib/multi-photo-frame';
 import { bundleSizeOf, coasterArt, normalizeBundle } from '@/lib/christmas-bundle';
 
 /** Never more cards than the biggest pack could hold, whatever the request says. */
@@ -37,6 +38,8 @@ export async function placeOrderAction(input: {
     ground?: string;
     /** A CALENDAR line: its pages (cover + months; null = not chosen). Re-filled + checked server-side. */
     pages?: ({ assetId: string; transform: RawTransform; sourceObjectId?: string } | null)[];
+    /** A MULTI PHOTO FRAME line: a drawing per square (null = not chosen). Re-filled + checked server-side. */
+    slots?: ({ assetId: string; transform: RawTransform; sourceObjectId?: string } | null)[];
     /** The CHRISTMAS BUNDLE: its drawings. Normalised to its size (the key) + priced server-side. */
     bundle?: unknown;
   }[];
@@ -89,6 +92,17 @@ export async function placeOrderAction(input: {
           ),
         }
       : {}),
+    // Untrusted: only WHICH drawing in which square — never more than the biggest frame's 16; placeOrder
+    // fills the gaps to the frame's own size and checks every square.
+    ...(Array.isArray(i.slots)
+      ? {
+          slots: i.slots.slice(0, MAX_FRAME_SLOTS).map((p) =>
+            p && typeof p === 'object' && typeof p.assetId === 'string'
+              ? { assetId: p.assetId, transform: p.transform ?? {}, sourceObjectId: typeof p.sourceObjectId === 'string' ? p.sourceObjectId : undefined }
+              : null,
+          ),
+        }
+      : {}),
     // Untrusted: WHICH drawings — normalised to the size its key names; placeOrder prices + checks them.
     ...(i.bundle !== undefined ? { bundle: bundleSizeOf(String(i.productKey)) ? normalizeBundle(i.bundle, bundleSizeOf(String(i.productKey))!) : null } : {}),
   }));
@@ -98,7 +112,7 @@ export async function placeOrderAction(input: {
     const b = raw as ReturnType<typeof normalizeBundle> | undefined; // normalised just above
     return b ? [b.placemat, coasterArt(b), ...b.ornaments].map((a) => a.assetId) : [];
   };
-  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean) || bundleArt(i.bundle).length > 0);
+  const hasPersonalised = items.some((i) => i.artwork || i.cards?.length || i.pages?.some(Boolean) || i.slots?.some(Boolean) || bundleArt(i.bundle).length > 0);
   // Personalised orders require the controlling parent — a guest signs up first.
   if (hasPersonalised && !account) return { ok: false, needsAuth: true };
 
@@ -110,7 +124,7 @@ export async function placeOrderAction(input: {
   // personalised lines reference real, controller-owned keepsakes (placeOrder requires it).
   if (account && hasPersonalised) {
     const claims = await getUploadClaims();
-    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId), ...bundleArt(i.bundle)]).filter((x): x is string => !!x))];
+    const assetIds = [...new Set(items.flatMap((i) => [i.artwork?.assetId, ...(i.cards ?? []).map((c) => c.assetId), ...(i.pages ?? []).map((p) => p?.assetId), ...(i.slots ?? []).map((p) => p?.assetId), ...bundleArt(i.bundle)]).filter((x): x is string => !!x))];
     // Filed (so the order can print it) but NOT kept: after purchase the parent chooses —
     // keep it in their keepsake box, or have it erased as soon as the order ships.
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });

@@ -9,6 +9,7 @@ import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
 import { fillCalendarPages, isCalendarKey } from '@/lib/calendar';
+import { fillFrameSlots, frameSlotCountOf, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { BUNDLE_COMPONENT_SKUS, bundleSizeOf, expandBundle, isBundleKey, normalizeBundle, pieceOfSku } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { screenCardMessage, screenGiftNote, type ScreenedCardMessage } from '@/server/textSafety';
@@ -72,6 +73,9 @@ export interface PlaceLine {
   /** A CALENDAR line only: its pages in order (0 = the cover, 1–12 = January…December); a null page
    * is "not chosen" and is filled by repeating the chosen drawings (src/lib/calendar.ts). */
   pages?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string } | null>;
+  /** A MULTI PHOTO FRAME line only: a drawing per square, row by row (null = not chosen — filled with
+   * the main drawing, src/lib/multi-photo-frame.ts). */
+  slots?: Array<{ assetId: string; transform: RawTransform; sourceObjectId?: string } | null>;
   /** The CHRISTMAS BUNDLE only: its placemat drawing, its coaster drawing (or none = the placemats')
    * and a drawing per ornament (untrusted — normalised server-side; src/lib/christmas-bundle.ts). */
   bundle?: unknown;
@@ -79,12 +83,12 @@ export interface PlaceLine {
 
 /**
  * Does the basket hold a PRINTED item with no drawing? The basket always sends a printed line with
- * its drawing (or its pack's cards, calendar pages, bundle drawings); a hand-made request that
+ * its drawing (or its pack's cards, calendar pages, frame squares, bundle drawings); a hand-made request that
  * doesn't would become a paid order for a blank print (sweep 05-B9). The basket's order action
  * refuses such a basket before anything is priced. An artless add-on (no print template) is fine.
  */
 export async function basketHasPrintWithoutDrawing(db: DbHandle, items: PlaceLine[]): Promise<boolean> {
-  const bare = items.filter((l) => !l.artwork?.assetId && !l.cards?.length && !l.pages?.some(Boolean) && l.bundle == null);
+  const bare = items.filter((l) => !l.artwork?.assetId && !l.cards?.length && !l.pages?.some(Boolean) && !l.slots?.some(Boolean) && l.bundle == null);
   if (bare.length === 0) return false;
   const variantByKey = await resolveVariantIdsByKey(db, [...new Set(bare.map((l) => l.productKey))]);
   const variantIds = [...new Set(variantByKey.values())];
@@ -272,6 +276,8 @@ export async function placeOrder(
   const packByIndex = new Map<number, Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }>>();
   // A CALENDAR line → ONE order line carrying 13 artwork rows, one per print area (cover + months).
   const calendarByIndex = new Map<number, Array<{ art: PreparedArt; printArea: string }>>();
+  // A MULTI PHOTO FRAME line → ONE order line carrying an artwork row per square (slot-1…slot-N).
+  const frameByIndex = new Map<number, Array<{ art: PreparedArt; printArea: string }>>();
   // A CHRISTMAS BUNDLE line → one order line per Prodigi item (a pack, or an ornament design).
   const bundleByIndex = new Map<number, Array<{ art: PreparedArt; sku: string; variantId: string; qty: number; unitPricePence: number; linePence: number }>>();
   for (let i = 0; i < valid.length; i++) {
@@ -326,6 +332,28 @@ export async function placeOrder(
       calendarByIndex.set(i, prepared);
       continue;
     }
+    if (isMultiPhotoFrameKey(line.productKey)) {
+      if (input.giftLink) throw new Error('a multi photo frame can’t be bought through a gift link');
+      // its number of squares is its variant's (the key the SERVER priced), never the request's
+      const count = frameSlotCountOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
+      if (!variantId || !count) throw new Error('unknown multi photo frame');
+      // WHICH drawing goes in which square is the client's (re-filled here to exactly `count` squares);
+      // every square passes the very same gates as any print — authz, moderation, the DPI check on
+      // its own 60 mm square — and keeps its own placement (each square is its own tile).
+      const slots = fillFrameSlots(line.slots ?? (line.artwork ? [line.artwork] : []), count);
+      const byDesign = new Map<string, PreparedArt | 'too-small' | null>(); // a repeated drawing + placement is checked once
+      const prepared: Array<{ art: PreparedArt; printArea: string }> = [];
+      for (const s of slots) {
+        const k = JSON.stringify([s.assetId, s.sourceObjectId ?? null, clampTransform(s.transform)]);
+        if (!byDesign.has(k)) byDesign.set(k, await prepareArtwork({ assetId: s.assetId, transform: s.transform, sourceObjectId: s.sourceObjectId ?? undefined }, line.productKey, variantId));
+        const art = byDesign.get(k)!;
+        if (art === 'too-small') return { ok: false, reason: 'too-small', productKey: line.productKey };
+        if (!art) throw new Error('multi photo frame has no print template');
+        prepared.push({ art, printArea: s.printArea });
+      }
+      frameByIndex.set(i, prepared);
+      continue;
+    }
     if (isCardPackKey(line.productKey)) {
       if (input.giftLink) throw new Error('a card pack can’t be bought through a gift link');
       const packSize = packSizeOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
@@ -355,7 +383,7 @@ export async function placeOrder(
   const insertArtwork = async (orderItemId: string, art: PreparedArt, printArea: string | null = null) => {
     await db.insert(orderItemArtwork).values({
       orderItemId,
-      printArea, // a calendar page's area; null = the one file for the whole line
+      printArea, // a calendar page's area / a frame's square (slot-N); null = the one file for the whole line
       assetId: art.assetId,
       variantId: art.variantId,
       controllerAccountId: art.controllerAccountId,
@@ -468,6 +496,9 @@ export async function placeOrder(
     if (art) await insertArtwork(oi!.id, art);
     // a calendar: its 13 pages, each frozen to its own print area (rendered + sent one file each)
     for (const p of calendarByIndex.get(i) ?? []) await insertArtwork(oi!.id, p.art, p.printArea);
+    // a multi photo frame: a row per square — every drawing in the frame is on the order (retention,
+    // deletion, the moderation hold all see each one); fulfilment composes them into ONE print file
+    for (const p of frameByIndex.get(i) ?? []) await insertArtwork(oi!.id, p.art, p.printArea);
   }
 
   if (isStripeConfigured()) {

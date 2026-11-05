@@ -3,7 +3,10 @@ import { assets, orderItemArtwork, orderItems, orders, storageObjects } from '@/
 import { isProdigiConfigured, isSandboxHost, ProdigiError } from '@/server/prodigi/client';
 import { prodigiOrderTransport, type CreateOrderRequest, type ProdigiOrderTransport, type ProdigiRecipient } from '@/server/prodigi/orders';
 import { isStripeConfigured, getStripe } from '@/payments/stripe';
-import { deleteObject, presignProviderIngest, putObject } from '@/storage';
+import { deleteObject, getObjectBytes, presignProviderIngest, putObject } from '@/storage';
+import { frameGridOf, isMultiPhotoFrameKey, slotIndexOf, type FrameGrid } from '@/lib/multi-photo-frame';
+import { composeFrameGrid } from '@/server/print/frameGrid';
+import { frameGridKey } from './frameGridKey';
 import type { DbHandle, Tx } from '@/server/db';
 import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD_FOR_SAFETY_CHECK, type GateEnv } from './gate';
 import { startRetentionClockForOrder } from '@/server/retention';
@@ -116,6 +119,31 @@ export function printAreaAssets(printTo: string[] | null | undefined, rows: Arra
     throw new Error(`print areas don’t match the product (missing: ${missing.join(', ') || 'none'}; unexpected: ${extra.join(', ') || 'none'})`);
   }
   return areas.map((printArea) => ({ printArea, printObjectId: byArea.get(printArea)! }));
+}
+
+/**
+ * A MULTI PHOTO FRAME line's squares, in order (square 1 = top-left): one tile per square from its
+ * artwork rows (print areas `slot-1`…`slot-N`), N from the FROZEN size. null = not a frame line (no
+ * slot rows). Deny by default: a missing, doubled or unexpected square, or slot rows mixed with any
+ * other kind, is refused — a frame with a hole must never reach the printer. The tiles are composed
+ * into the ONE file for Prodigi's 'default' area at submit (composeFrameGrid).
+ */
+export function frameSlotTiles(size: string | null | undefined, rows: Array<{ printArea: string | null; printObjectId: string }>): { grid: FrameGrid; tiles: string[] } | null {
+  const slotRows = rows.filter((r) => slotIndexOf(r.printArea) !== null);
+  if (slotRows.length === 0) return null;
+  if (slotRows.length !== rows.length) throw new Error('a frame line mixes its squares with other print files');
+  const grid = frameGridOf(size);
+  if (!grid) throw new Error(`a frame line of an unknown size (${size ?? 'none'})`);
+  const count = grid.n * grid.n;
+  const tiles: Array<string | undefined> = Array.from({ length: count }, () => undefined);
+  for (const r of slotRows) {
+    const i = slotIndexOf(r.printArea)!;
+    if (i >= count || tiles[i] !== undefined) throw new Error(`a ${grid.size} frame has an unexpected or doubled square (${r.printArea})`);
+    tiles[i] = r.printObjectId;
+  }
+  const missing = tiles.flatMap((t, i) => (t === undefined ? [i + 1] : []));
+  if (missing.length) throw new Error(`a ${grid.size} frame is missing square${missing.length > 1 ? 's' : ''} ${missing.join(', ')}`);
+  return { grid, tiles: tiles as string[] };
 }
 
 /** Is this frozen line spec fulfilled by Prodigi? (Legacy specs lack `provider`; for
@@ -425,10 +453,20 @@ async function submitOne(
   const byItem = new Map<string, typeof fulfillable>();
   for (const l of fulfillable) byItem.set(l.itemId, [...(byItem.get(l.itemId) ?? []), l]);
   const itemAssets = new Map<string, Array<{ printArea: string; printObjectId: string }>>();
+  // a multi photo frame: its squares' tiles, composed into the ONE file below (after the claim)
+  const frameItems = new Map<string, { grid: FrameGrid; tiles: string[]; printTo: string[] }>();
   try {
     for (const [itemId, rows] of byItem) {
-      const cfg = ((rows[0]!.spec as NonNullable<LineSpec>).providerConfig ?? null) as { printTo?: string[] } | null;
-      itemAssets.set(itemId, printAreaAssets(cfg?.printTo, rows.map((r) => ({ printArea: r.printArea, printObjectId: r.printObjectId! }))));
+      const spec = rows[0]!.spec as NonNullable<LineSpec>;
+      const cfg = (spec.providerConfig ?? null) as { printTo?: string[] } | null;
+      const flat = rows.map((r) => ({ printArea: r.printArea, printObjectId: r.printObjectId! }));
+      const frame = frameSlotTiles(spec.attributes?.size, flat);
+      if (frame) {
+        if (!isMultiPhotoFrameKey(rows[0]!.productKey)) throw new Error('square print files on a line that isn’t a multi photo frame');
+        frameItems.set(itemId, { ...frame, printTo: cfg?.printTo?.length ? cfg.printTo : ['default'] });
+        continue;
+      }
+      itemAssets.set(itemId, printAreaAssets(cfg?.printTo, flat));
     }
   } catch (e) {
     const msg = redactUrls((e as Error).message).slice(0, 500);
@@ -450,6 +488,7 @@ async function submitOne(
 
   let latched = false; // prodigiOrderId persisted — after this, NEVER revert to PAID
   let insertStored = false; // a gift-note insert file was written for this attempt
+  const framesStored: string[] = []; // composed multi-photo-frame files written for this attempt
   try {
     // Mint provider-ingestion URLs (the gate above authorised this) + build the payload
     // from the FROZEN spec — sku/attributes exactly as sold, never a live lookup.
@@ -468,7 +507,23 @@ async function submitOne(
       // one URL per distinct print file (a single-file line's one file may fill several areas)
       const urlByObject = new Map<string, string>();
       const assets: Array<{ printArea: string; url: string }> = [];
-      for (const a of itemAssets.get(itemId)!) {
+      const frame = frameItems.get(itemId);
+      if (frame) {
+        // A MULTI PHOTO FRAME: its squares' tiles (every one gate-cleared above) composed in-VPC into
+        // the ONE print file at Prodigi's exact pixels, kept just long enough for Prodigi to fetch it.
+        const tiles: Buffer[] = [];
+        for (const id of frame.tiles) {
+          const key = keyByObjectId.get(id);
+          if (!key) throw new Error(`print object ${id} has no storage key`);
+          tiles.push(await getObjectBytes(key));
+        }
+        const fileKey = frameGridKey(order.id, itemId);
+        await putObject(fileKey, await composeFrameGrid(frame.grid, tiles), 'image/png');
+        framesStored.push(fileKey);
+        const url = await presignProviderIngest(fileKey);
+        for (const printArea of frame.printTo) assets.push({ printArea, url });
+      }
+      for (const a of itemAssets.get(itemId) ?? []) {
         if (!urlByObject.has(a.printObjectId)) {
           const key = keyByObjectId.get(a.printObjectId);
           if (!key) throw new Error(`print object ${a.printObjectId} has no storage key`);
@@ -565,6 +620,8 @@ async function submitOne(
     }
     // This attempt's insert file goes with it (the next attempt makes a fresh one).
     if (insertStored) await deleteObject(giftNoteInsertKey(order.id)).catch(() => {});
+    // …and so do its composed frame files (the next attempt composes them again).
+    for (const k of framesStored) await deleteObject(k).catch(() => {});
     // Revert the claim — guarded so it can never un-claim a latched order — and back off.
     const kind = e instanceof ProdigiError && raw && (e as ProdigiError).status >= 400 && (e as ProdigiError).status < 500 ? 'permanent' : 'transient';
     await db
@@ -644,6 +701,7 @@ export async function syncSubmittedOrders(
         // "it's on its way" (+ tracking) — once, after commit; a mail failure never undoes the sync
         if (moved) await sendOrderShipped(db, row.id).catch((e) => console.error('shipped email not sent', row.ref, (e as Error).message));
         await dropGiftNoteInsertFile(row);
+        await dropFrameGridFiles(db, row.id);
         summary.shipped++;
         summary.orders.push({ ref: row.ref, stage });
       } else if (stage === 'Cancelled') {
@@ -653,6 +711,7 @@ export async function syncSubmittedOrders(
           await startRetentionClockForOrder(tx, row.id);
         });
         await dropGiftNoteInsertFile(row);
+        await dropFrameGridFiles(db, row.id);
         summary.cancelled++;
         summary.orders.push({ ref: row.ref, stage, note: issues.join('; ') || undefined });
       } else {
@@ -686,6 +745,17 @@ type ArtworkStatus = (typeof orderItemArtwork.status.enumValues)[number];
 async function dropGiftNoteInsertFile(row: { id: string; giftNoteInsert: { status: string } | null }): Promise<void> {
   if (row.giftNoteInsert?.status !== 'sent' && row.giftNoteInsert?.status !== 'partly') return;
   await deleteObject(giftNoteInsertKey(row.id)).catch((e) => console.error('gift-note insert file not deleted', row.id, (e as Error).message));
+}
+
+/** A multi photo frame's composed file has done its job once the parcel has gone (or been cancelled):
+ * delete it — it holds every square's drawing at once. Best effort, like the gift-note file (account
+ * closure deletes it too); each square's own tile stays with its keepsake (retention covers those). */
+async function dropFrameGridFiles(db: DbHandle, orderId: string): Promise<void> {
+  const lines = await db.select({ id: orderItems.id, productKey: orderItems.productKey }).from(orderItems).where(eq(orderItems.orderId, orderId));
+  for (const l of lines) {
+    if (!isMultiPhotoFrameKey(l.productKey)) continue;
+    await deleteObject(frameGridKey(orderId, l.id)).catch((e) => console.error('frame file not deleted', orderId, (e as Error).message));
+  }
 }
 
 async function setArtworkStatus(db: DbHandle | Tx, orderId: string, status: ArtworkStatus, onlyFrom?: ArtworkStatus[]): Promise<void> {

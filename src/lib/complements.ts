@@ -21,6 +21,7 @@ export const COMPLEMENTS: Readonly<Record<string, readonly string[]>> = {
   wrappingPaper: ['card', 'cardPack', 'sack'],
   calendar: ['framedPrint', 'mug', 'card'],
   framedPrint: ['jigsaw', 'card', 'mug'],
+  multiPhotoFrame: ['framedPrint', 'calendar', 'cardPack'],
   jigsaw: ['framedPrint', 'mug', 'card'],
   cushion: ['blanket', 'framedPrint', 'mug'],
   blanket: ['cushion', 'teaTowel', 'mug'],
@@ -55,17 +56,19 @@ export function suggestComplements(basketProducts: readonly string[], onShow: Re
 }
 
 /** The shopper's drawing to make the add-ons with: the first drawn line's — for the family bundle, the
- * placemats' (else its first ornament's); for a card pack its first card; for a calendar its cover. */
+ * placemats' (else its first ornament's); for a card pack its first card; for a calendar its cover; for a
+ * multi photo frame its first square. */
 export function basketDrawing(
   items: ReadonlyArray<{
     artwork?: { assetId: string; sourceObjectId?: string | null } | null;
     bundle?: { placemat?: { assetId: string; sourceObjectId?: string | null } | null; ornaments?: Array<{ assetId: string; sourceObjectId?: string | null }> } | null;
     cards?: Array<{ assetId: string; sourceObjectId?: string | null }> | null;
     pages?: Array<{ assetId: string; sourceObjectId?: string | null } | null> | null;
+    slots?: Array<{ assetId: string; sourceObjectId?: string | null } | null> | null;
   }>,
 ): { assetId: string; sourceObjectId: string | null } | null {
   for (const i of items) {
-    const a = i.artwork ?? i.bundle?.placemat ?? i.bundle?.ornaments?.[0] ?? i.cards?.[0] ?? i.pages?.find(Boolean) ?? null;
+    const a = i.artwork ?? i.bundle?.placemat ?? i.bundle?.ornaments?.[0] ?? i.cards?.[0] ?? i.pages?.find(Boolean) ?? i.slots?.find(Boolean) ?? null;
     if (a?.assetId) return { assetId: a.assetId, sourceObjectId: a.sourceObjectId ?? null };
   }
   return null;

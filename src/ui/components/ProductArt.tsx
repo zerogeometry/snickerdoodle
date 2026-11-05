@@ -10,6 +10,7 @@ export type ProductKey =
   | 'card'
   | 'cardPack'
   | 'framedPrint'
+  | 'multiPhotoFrame'
   | 'mug'
   | 'kidsTee'
   | 'adultTee'
@@ -118,6 +119,20 @@ const ART: Record<ProductKey, ReactNode> = {
     <>
       <rect x="16" y="16" width="64" height="64" fill="var(--color-paper)" stroke="var(--color-sunshine)" strokeWidth="7" />
       <House transform="translate(30,34) scale(1)" />
+    </>
+  ),
+  multiPhotoFrame: (
+    <>
+      <rect x="16" y="16" width="64" height="64" fill="var(--color-paper)" stroke="var(--color-sunshine)" strokeWidth="7" />
+      <rect x="25" y="25" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="41" y="25" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="57" y="25" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="25" y="41" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="41" y="41" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="57" y="41" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="25" y="57" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="41" y="57" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
+      <rect x="57" y="57" width="13" height="13" fill="none" stroke="var(--color-sky)" strokeWidth="2" />
     </>
   ),
   mug: (

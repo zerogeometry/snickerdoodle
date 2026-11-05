@@ -4,6 +4,7 @@
  * The pixels are drawn by src/server/print/pattern.ts.
  */
 import { isPatternProduct } from '@/lib/patterns';
+import { frameGridForPx, isMultiPhotoFrameKey, slotBleedMm, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
 import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
 import { GALLERY_FIT, type ResolutionAssessment, type TemplateGeom, type Transform, assessResolution, canvasSizePx, galleryArtGeom, isGalleryProduct, mmToPx } from './geometry';
 
@@ -143,7 +144,21 @@ export function patternMotifCentres(layout: PatternLayout, canvas: { width: numb
  * so resolution is judged on the motif — a 5 m roll needs no bigger a photo than a pair of socks.
  * Every other product: the ordinary whole-canvas assessResolution.
  */
+/**
+ * ONE square of a multi photo frame as a print of its own: the 60 mm window (+ its bleed under a
+ * mount) at the frame file's dpi. The tile renderer, the order-time gate and the builder's badges all
+ * judge and place a square's drawing on this, so they can never disagree.
+ */
+export function frameSlotGeom(g: FrameGrid, frame: Pick<TemplateGeom, 'requiredDpi' | 'gateDpi'>): TemplateGeom {
+  return { printWidthPx: slotPx(g), printHeightPx: slotPx(g), bleedMm: slotBleedMm(g), requiredDpi: frame.requiredDpi, ...(frame.gateDpi ? { gateDpi: frame.gateDpi } : {}) };
+}
+
 export function assessPrintResolution(t: TemplateGeom, src: { width: number; height: number }, transform: Transform, productKey?: string | null): ResolutionAssessment {
+  // a multi photo frame: each drawing prints in its own 60 mm square — judged on that square
+  if (isMultiPhotoFrameKey(productKey)) {
+    const g = frameGridForPx(t.printWidthPx);
+    if (g) return assessResolution(frameSlotGeom(g, t), src, transform);
+  }
   // A height chart prints the drawing in the ART AREA beside its ruler — judged on that area.
   if (isHeightChart(productKey)) return assessResolution(heightChartArtGeom(t), src, transform);
   // the calendar: the whole drawing inside the page's margin, whatever placement was sent
