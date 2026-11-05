@@ -1,8 +1,10 @@
-import type { CSSProperties, ReactElement } from 'react';
+import type { CSSProperties } from 'react';
+import { DOODLE_PATHS } from './doodlePaths';
 
 /**
  * Ambient crayon doodles — hearts, stars, clouds, squiggles, suns, balloons, a
- * little house — drifting gently *across* each section. Decorative only
+ * little house — drifting gently *across* each section. Drawn like a child would
+ * (founder, 5 Nov: wobbly, imperfect, uneven line weight — not clean icons). Decorative only
  * (pointer-events none, aria-hidden), behind the content, reduced-motion-safe.
  *
  * `tone` recolours the set to suit each section's background, so the same playful
@@ -17,62 +19,34 @@ const PALETTES: Record<Tone, { colors: string[]; baseOpacity: number }> = {
   dark: { colors: ['paper', 'sunshine', 'honey-band', 'berry-pale', 'sky'].map((t) => `var(--color-${t})`), baseOpacity: 0.5 },
 };
 
-type ShapeFn = (color: string, scale: number) => ReactElement;
+/** Native size (px) of each doodle at scale 1 — unchanged from the clean set they replace. */
+const SIZE: Record<keyof typeof DOODLE_PATHS, [number, number]> = {
+  heart: [44, 44],
+  star: [40, 40],
+  cloud: [58, 40],
+  squiggle: [64, 24],
+  sun: [42, 42],
+  balloon: [34, 52],
+  house: [46, 42],
+};
 
-const Heart: ShapeFn = (c, s) => (
-  <svg width={44 * s} height={44 * s} viewBox="0 0 24 24">
-    <path d="M12 21 C5 15 3 11 6 8 C8 6 11 7 12 9 C13 7 16 6 18 8 C21 11 19 15 12 21 Z" fill={c} />
-  </svg>
-);
-const Star: ShapeFn = (c, s) => (
-  <svg width={40 * s} height={40 * s} viewBox="0 0 24 24">
-    <polygon points="12,2 14.6,9 22,9 16,13.6 18.4,21 12,16.6 5.6,21 8,13.6 2,9 9.4,9" fill={c} />
-  </svg>
-);
-const Cloud: ShapeFn = (c, s) => (
-  <svg width={58 * s} height={38 * s} viewBox="0 0 58 38">
-    <path d="M15 32 a11 11 0 0 1 0 -22 a13 13 0 0 1 24 -2 a10 10 0 0 1 5 24 Z" fill={c} />
-  </svg>
-);
-const Squiggle: ShapeFn = (c, s) => (
-  <svg width={64 * s} height={24 * s} viewBox="0 0 64 24">
-    <path d="M2 12 q8 -11 16 0 t16 0 t16 0 t12 0" fill="none" stroke={c} strokeWidth="3" strokeLinecap="round" />
-  </svg>
-);
-const Sun: ShapeFn = (c, s) => (
-  <svg width={42 * s} height={42 * s} viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="5" fill={c} />
-    <g stroke={c} strokeWidth="2" strokeLinecap="round">
-      <line x1="12" y1="1" x2="12" y2="4" />
-      <line x1="12" y1="20" x2="12" y2="23" />
-      <line x1="1" y1="12" x2="4" y2="12" />
-      <line x1="20" y1="12" x2="23" y2="12" />
-      <line x1="4.2" y1="4.2" x2="6" y2="6" />
-      <line x1="18" y1="18" x2="19.8" y2="19.8" />
-      <line x1="4.2" y1="19.8" x2="6" y2="18" />
-      <line x1="18" y1="6" x2="19.8" y2="4.2" />
-    </g>
-  </svg>
-);
-const Balloon: ShapeFn = (c, s) => (
-  <svg width={34 * s} height={52 * s} viewBox="0 0 34 52">
-    <ellipse cx="17" cy="17" rx="14" ry="16" fill={c} />
-    <path d="M17 33 l-3 5 h6 z" fill={c} />
-    <path d="M17 38 q5 7 0 13" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" />
-  </svg>
-);
-const House: ShapeFn = (c, s) => (
-  <svg width={46 * s} height={42 * s} viewBox="0 0 48 44">
-    <rect x="10" y="20" width="22" height="18" fill="none" stroke={c} strokeWidth="2.4" />
-    <path d="M6 22 L21 9 L36 22" fill="none" stroke={c} strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="40" cy="10" r="3" fill={c} />
-  </svg>
-);
-
-const SHAPES = { heart: Heart, star: Star, cloud: Cloud, squiggle: Squiggle, sun: Sun, balloon: Balloon, house: House };
+/** One doodle as crayon strokes (wobbly, uneven weight — drawn by scripts/brand/doodle-paths.mjs). */
+function Doodle({ shape, color, scale }: { shape: keyof typeof DOODLE_PATHS; color: string; scale: number }) {
+  const { vb, strokes } = DOODLE_PATHS[shape];
+  const [w, h] = SIZE[shape];
+  return (
+    <svg width={w * scale} height={h * scale} viewBox={`0 0 ${vb[0]} ${vb[1]}`} overflow="visible">
+      <g fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round">
+        {strokes.map((st) => (
+          <path key={st.w} d={st.d} strokeWidth={st.w} />
+        ))}
+      </g>
+    </svg>
+  );
+}
 
 type Item = {
-  shape: keyof typeof SHAPES;
+  shape: keyof typeof DOODLE_PATHS;
   top: string;
   left: string;
   s: number;
@@ -105,7 +79,6 @@ export function FloatingDoodles({ tone = 'warm' }: { tone?: Tone }) {
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       {LAYOUT.map((it, i) => {
         const color = pal.colors[it.ci % pal.colors.length] ?? 'currentColor';
-        const Shape = SHAPES[it.shape];
         const style = {
           top: it.top,
           left: it.left,
@@ -119,7 +92,7 @@ export function FloatingDoodles({ tone = 'warm' }: { tone?: Tone }) {
         } as unknown as CSSProperties;
         return (
           <span key={i} className="doodle" style={style}>
-            {Shape(color, it.s)}
+            <Doodle shape={it.shape} color={color} scale={it.s} />
           </span>
         );
       })}

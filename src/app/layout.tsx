@@ -31,10 +31,12 @@ export const metadata: Metadata = {
   title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
   description:
     "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
-  openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website' },
+  // the share card for any page without its own picture: the lockup on paper (never a child's drawing)
+  openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website', images: [{ url: '/brand/og-default.png', width: 1200, height: 630, alt: 'snickerdoodle' }] },
   manifest: '/manifest.webmanifest',
   appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
-  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32' }, { url: '/brand/favicon-192.png', sizes: '192x192' }], apple: '/brand/favicon-180.png' },
+  // /favicon.ico comes from src/app/favicon.ico (16/32/48); these are the sharper PNGs
+  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32', type: 'image/png' }, { url: '/brand/favicon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/brand/favicon-180.png' },
 };
 
 export const viewport: Viewport = {

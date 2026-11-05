@@ -48,6 +48,25 @@ for (const vp of WIDTHS) {
       await shot(page, `${vp.name}-help`);
     });
 
+    // Founder brief 5 Nov: the new logo in the header, and the two doodle-paper textures (still,
+    // a shade off the section colour). Element shots, so a texture or logo change shows up on its own.
+    test('brand: header logo + doodle-paper sections', async ({ page }) => {
+      await quietCookies(page);
+      await page.goto('/');
+      await page.waitForLoadState('networkidle').catch(() => {});
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator('header').first()).toHaveScreenshot(`${vp.name}-brand-header.png`);
+      const pinned = page.locator('div.kraft.fixed'); // the phone's thumb-zone CTA can sit over a section
+      const steps = page.locator('section.doodle-paper-everyday');
+      await steps.scrollIntoViewIfNeeded();
+      await expect(steps).toHaveScreenshot(`${vp.name}-doodle-paper-steps.png`, { mask: [pinned] });
+      const xmas = page.locator('section.doodle-paper-christmas'); // in season only (1 Nov → 6 Jan)
+      if (await xmas.count()) {
+        await xmas.scrollIntoViewIfNeeded();
+        await expect(xmas).toHaveScreenshot(`${vp.name}-doodle-paper-christmas.png`, { mask: [xmas.locator('img'), pinned] });
+      }
+    });
+
     test('christmas last order dates (D24)', async ({ page }) => {
       await quietCookies(page);
       await page.goto('/christmas/delivery-dates');

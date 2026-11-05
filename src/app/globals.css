@@ -413,6 +413,48 @@ body {
   will-change: transform;
 }
 
+/* Doodle-paper section textures (founder, 5 Nov) — still, never animated. Children's line doodles
+   (public/textures/*-doodles.webp, built by scripts/textures/build.py) are a MASK: the lines take
+   their colour from tokens here, a shade away from the section, with a soft diagonal sheen across
+   them, over a gentle gradient — the "luxurious shimmer". The tile wraps seamlessly; one repeat is
+   1000px. Content sits above (z-10), so text contrast is the section colour's, ± that one shade. */
+.doodle-paper {
+  position: relative;
+  isolation: isolate;
+  background-color: var(--paper-base);
+  background-image:
+    radial-gradient(ellipse 75% 65% at 30% 0%, var(--paper-glow), transparent 70%),
+    linear-gradient(165deg, var(--paper-base) 30%, var(--paper-deep));
+}
+.doodle-paper::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(115deg, var(--paper-ink) 0%, var(--paper-ink) 25%, var(--paper-sheen) 45%, var(--paper-ink) 65%, var(--paper-ink) 100%);
+  -webkit-mask: var(--paper-tile) 0 0 / 1000px 1000px repeat;
+  mask: var(--paper-tile) 0 0 / 1000px 1000px repeat;
+}
+/* "Christmas, drawn by them" — on the honey band */
+.doodle-paper-christmas {
+  --paper-tile: url('/textures/christmas-doodles.webp');
+  --paper-base: var(--color-honey-band);
+  --paper-glow: color-mix(in oklab, var(--color-paper) 70%, transparent);
+  --paper-deep: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine) 16%);
+  --paper-ink: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine-deep) 19%);
+  --paper-sheen: color-mix(in oklab, var(--color-honey-band), var(--color-paper) 50%);
+}
+/* "From fridge door to forever" — on cobalt */
+.doodle-paper-everyday {
+  --paper-tile: url('/textures/everyday-doodles.webp');
+  --paper-base: var(--color-cobalt);
+  --paper-glow: color-mix(in oklab, var(--color-sky) 9%, transparent);
+  --paper-deep: color-mix(in oklab, var(--color-cobalt), var(--color-cobalt-deep) 30%);
+  --paper-ink: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 9%);
+  --paper-sheen: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 13%);
+}
+
 /* Mobile menu / banner entrances. */
 @keyframes fade {
   from {

@@ -86,6 +86,9 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/brand/favicon-180.png',
   '/brand/favicon-192.png',
   '/brand/favicon-32.png',
+  '/brand/favicon-512.png',
+  '/brand/favicon-maskable-512.png',
+  '/brand/og-default.png',
   '/brand/snickerdoodle-badge.png',
   '/brand/snickerdoodle-logo.webp',
   '/brand/snickerfavicon.png',
@@ -146,6 +149,8 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/products/coasters.webp',
   '/products/placemats.webp',
   '/products/wall-calendar.webp',
+  '/textures/christmas-doodles.webp',
+  '/textures/everyday-doodles.webp',
 ]);
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the

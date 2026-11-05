@@ -117,9 +117,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Christmas shelf (in season only) — three taped snapshots into the create flow */}
+      {/* Christmas shelf (in season only) — three taped snapshots into the create flow, on christmas doodle paper */}
       {christmas ? (
-        <section className="relative bg-honey-band px-6 py-12 md:py-16" aria-labelledby="xmas-shelf">
+        <section className="doodle-paper doodle-paper-christmas px-6 py-12 md:py-16" aria-labelledby="xmas-shelf">
           <div className="relative z-10 mx-auto max-w-6xl">
             <h2 id="xmas-shelf" className="text-center font-display text-3xl text-cocoa md:text-4xl">
               Christmas, drawn by them
@@ -196,9 +196,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Three steps — numbered stickers on cobalt */}
-      <section className="relative bg-cobalt px-6 py-16 md:py-24">
-        <FloatingDoodles tone="dark" />
+      {/* Three steps — numbered stickers on cobalt, over children's everyday doodles (the still texture
+          replaces the floating doodles here: both at once fought the copy) */}
+      <section className="doodle-paper doodle-paper-everyday px-6 py-16 md:py-24">
         <div className="relative z-10 mx-auto max-w-6xl">
           <h2 className="text-center font-display text-3xl text-white md:text-4xl">From fridge door to forever, in three steps</h2>
           <ol className="mx-auto mt-12 grid max-w-4xl gap-12 sm:grid-cols-3 sm:gap-8">
