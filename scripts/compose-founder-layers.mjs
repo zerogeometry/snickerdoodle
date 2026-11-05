@@ -51,15 +51,15 @@ const SETS = [
   { out: 'bauble/ceramic', productFromPrintmap: true, printmap: 'ceramic-print.png', overlays: ['ceramic-edgeblur.png', 'ceramic-string.png'], fill: 0.72 },
   // plastic ball: the print area is the ball; the glass highlights + chrome cap + string go on top
   { out: 'bauble/ball', productFromPrintmap: true, printmap: 'bauble-print.png', overlays: ['bauble-overlay.png'], fill: 0.8 },
-  // ── the Apple Watch strap (founder's PSD, 5 Nov 2026 — applewatch.psd): the two halves laid out straight, buckle
-  // half on top. product = 'blackoutlinebacking' (the strap's black outline, under the art), print = 'Printmap' (the
-  // two leather halves — what Prodigi prints), overlay = 'Overlay' (buckle, lugs, holes). Both sizes share it; the
-  // seeder registers each size's print file onto the two halves from Prodigi's template (src/lib/watch-strap.ts).
-  // whiteUnderPrint: the backing is solid black (it only gives the outline) — the leather itself is white where the
-  // drawing doesn't cover, so the print area is laid in white over it, leaving the black edge showing round it.
-  // keepOverlayDetail: the overlay's strap holes and dotted stitching are tiny separate pieces — the speck
-  // clean-up (despeckle, for stray cut-out pixels) would delete every one of them, so it's skipped here.
-  { out: 'watchStrap', product: 'watch-strap.png', printmap: 'watch-strap-print.png', overlay: 'watch-strap-overlay.png', fill: 0.85, whiteUnderPrint: true, keepOverlayDetail: true },
+  // ── the Apple Watch strap (founder's applewatch2.psd, 5 Nov 2026 — simpler): TWO layers. print = 'Printmap', the
+  // two leather halves (what Prodigi prints) — the strap itself is that shape in white leather under the drawing;
+  // overlay = 'Overlay', the buckle, the watch and the holes on top. Both sizes share it; the compositor lays each
+  // size's print file onto the two halves HALF BY HALF from Prodigi's template (src/lib/watch-strap.ts strapBands).
+  // keepOverlayDetail: the holes are tiny separate pieces the speck clean-up (despeckle) would delete.
+  // stitch: the strap's EMBROIDERED edge (founder, 5 Nov — as on Prodigi's straps): small, close, quietly shaded
+  // stitches a little in from the edge, round the buckle end and the tip, the sides running right up to the watch;
+  // over the drawing, under the buckle and the watch. Canvas px (the strap is ~145 px ≈ 23 mm wide: ~6 px a mm).
+  { out: 'watchStrap', productFromPrintmap: true, printmap: 'watch-strap-print.png', overlay: 'watch-strap-overlay.png', fill: 0.85, keepOverlayDetail: true, stitch: { inset: 10, dash: 8, gap: 5 } },
 ];
 
 /** Load as RGBA raw, turned if asked. */
@@ -207,6 +207,69 @@ for (const set of SETS) {
   await compose(set, set.out);
 }
 
+/**
+ * STITCHING along each separate piece of a print area (a watch strap's two halves), a little in from the edge — a
+ * fine dark thread with a soft light highlight, so it reads as embroidery over whatever is printed. It runs round the
+ * piece's closed end (the buckle end, the rounded tip) but stays OPEN where two pieces face each other (the watch end
+ * of each half): the two side lines run right up to that end, as on Prodigi's straps. The outline is eroded with a
+ * round brush, so closed ends stay round; at an open end the piece is treated as carrying on, so the sides run to
+ * its very edge. Returns a transparent canvas-sized PNG.
+ */
+async function stitchFrom(alpha, { inset, dash, gap }) {
+  const W = CANVAS, H = CANVAS;
+  const ext = []; // per row: [left, right] of the opaque area (null when empty)
+  for (let y = 0; y < H; y++) {
+    let l = -1, r = -1;
+    for (let x = 0; x < W; x++) if (alpha[y * W + x] >= 128) { if (l < 0) l = x; r = x; }
+    ext.push(l < 0 ? null : [l, r]);
+  }
+  // the separate pieces, top to bottom (a few stray rows don't count)
+  const pieces = [];
+  for (let y = 0; y < H; y++) {
+    if (!ext[y]) continue;
+    if (pieces.length && pieces[pieces.length - 1].y1 === y - 1) pieces[pieces.length - 1].y1 = y;
+    else pieces.push({ y0: y, y1: y });
+  }
+  const big = pieces.filter((p) => p.y1 - p.y0 > H * 0.05);
+  const paths = [];
+  big.forEach((p, k) => {
+    // a piece is OPEN at the end that faces another piece (the watch end of a strap half)
+    const openTop = k > 0, openBottom = k < big.length - 1;
+    // (an open end's last few rows are a soft, anti-aliased edge — the strap's full width is taken from just inside it)
+    const EDGE = 4;
+    const at = (y) =>
+      openTop && y < p.y0 + EDGE ? ext[p.y0 + EDGE] : openBottom && y > p.y1 - EDGE ? ext[p.y1 - EDGE] : y < p.y0 || y > p.y1 ? null : ext[y];
+    const rows = [];
+    for (let y = p.y0; y <= p.y1; y++) {
+      let l = -Infinity, r = Infinity, ok = true;
+      for (let dy = -inset; dy <= inset && ok; dy++) {
+        const e = at(y + dy);
+        if (!e) { ok = false; break; }
+        const reach = Math.sqrt(inset * inset - dy * dy);
+        l = Math.max(l, e[0] + reach); r = Math.min(r, e[1] - reach);
+      }
+      if (ok && r - l > 2) rows.push([y, l, r]);
+    }
+    if (rows.length < 5) return;
+    const thin = rows.filter((_, i) => i % 3 === 0 || i === rows.length - 1);
+    const pt = (x, y) => `${x.toFixed(1)} ${y}`;
+    const left = thin.map(([y, l]) => pt(l, y)), right = thin.map(([y, , r]) => pt(r, y));
+    if (openBottom && !openTop) paths.push(`M${[...left].reverse().join(' L')} L${right.join(' L')}`); // up the left, across the top, down the right
+    else if (openTop && !openBottom) paths.push(`M${left.join(' L')} L${[...right].reverse().join(' L')}`); // down the left, round the tip, up the right
+    else if (openTop && openBottom) paths.push(`M${left.join(' L')}`, `M${right.join(' L')}`); // just the two sides
+    else paths.push(`M${left.join(' L')} L${[...right].reverse().join(' L')} Z`); // all the way round
+  });
+  const d = paths.join(' ');
+  const line = (stroke, opacity, width, shift) =>
+    `<path d="${d}" fill="none" stroke="${stroke}" stroke-opacity="${opacity}" stroke-width="${width}" stroke-dasharray="${dash} ${gap}" stroke-linecap="round" stroke-linejoin="round"${shift ? ` transform="translate(${shift} ${shift})"` : ''}/>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">` +
+    line('#fff', 0.38, 1.6, -0.7) + // the light catching the thread's top edge
+    line('#1d1712', 0.36, 2.1, 0) + // the thread
+    line('#fff', 0.18, 0.8, -0.5) + // a soft sheen along it
+    `</svg>`;
+  return sharp(Buffer.from(svg)).png().toBuffer();
+}
+
 async function compose(set, out) {
   const printmap = set.printmap ? despeckle(await load(set.printmap, set.rotate)) : null;
   const product = set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate));
@@ -223,12 +286,16 @@ async function compose(set, out) {
   const left = Math.round((CANVAS - bw * scale) / 2);
   const top = Math.round((CANVAS - bh * scale) / 2 - CANVAS * 0.01); // a hair above centre, room for the shadow
 
-  let productPng = await place(product, box, scale, left, top);
-  const overlayPng = overlay ? await place(overlay, box, scale, left, top) : null;
+  const productPng = await place(product, box, scale, left, top);
+  let overlayPng = overlay ? await place(overlay, box, scale, left, top) : null;
   const printmapPng = set.sackPanel
     ? await sackPanel(productPng, set.sackPanel)
     : printmap ? await whiteFrom(await place(printmap, box, scale, left, top)) : await whiteFrom(productPng);
-  if (set.whiteUnderPrint) productPng = await sharp(productPng).composite([{ input: printmapPng }]).png().toBuffer();
+  // embroidered edge, under the founder's overlay (the buckle / watch sit on top of the thread)
+  if (set.stitch) {
+    const stitches = await stitchFrom(await alphaOf(printmapPng), set.stitch);
+    overlayPng = overlayPng ? await sharp(stitches).composite([{ input: overlayPng }]).png().toBuffer() : stitches;
+  }
 
   // Shadow from everything that sits on the table: the product, plus the overlay where it overhangs.
   const pa = await alphaOf(productPng);

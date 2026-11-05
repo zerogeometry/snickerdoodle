@@ -17,6 +17,7 @@ import { isGroundProduct } from '@/lib/patterns';
 import { assessResolution, canvasSizePx, computeLayerRect, type Transform } from '@/server/print/geometry';
 import { plan } from '@/server/print/seedMockups';
 import { drawWatchStrapMockup } from '@/server/print/strapMockup';
+import { renderPrintedFace } from '@/server/print/compositor';
 
 /**
  * The APPLE WATCH STRAP — made in the UK since Prodigi's "global" change (5 Nov 2026 — project-office/briefs/
@@ -176,6 +177,23 @@ describe('the mockup pipeline — lights up when the founder’s layers are drop
       expect(top!.from[1]).toBeLessThan(fl0);
       expect([top!.from[0], top!.from[1]]).toEqual([0, bottom!.from[0]]);
       expect(bottom!.from[1]).toBe(1);
+    }
+  });
+
+  it('the strap’s preview face is cut to Prodigi’s printed halves: drawing only where it prints, see-through elsewhere', async () => {
+    for (const s of WATCH_STRAP_SIZES) {
+      const red = await sharp({ create: { width: 600, height: 800, channels: 3, background: '#ff0000' } }).png().toBuffer();
+      const face = await renderPrintedFace(red, 'strap', { widthPx: s.px.w, heightPx: s.px.h, bleedMm: 0, requiredDpi: 300 }, { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
+      const at = (fx: number, fy: number) => face.data[(Math.round(fy * (face.height - 1)) * face.width + Math.round(fx * (face.width - 1))) * face.channels + 3]!;
+      const [top, bottom] = s.pieces as [Array<[number, number, number]>, Array<[number, number, number]>];
+      // printed: the middle of each half
+      expect(at(0.5, (top[0]![0] + top.at(-1)![0]) / 2), s.size).toBe(255);
+      expect(at(0.5, (bottom[0]![0] + bottom.at(-1)![0]) / 2), s.size).toBe(255);
+      // not printed: behind the watch, the trimmed side bands, beyond the tip
+      expect(at(0.5, (top.at(-1)![0] + bottom[0]![0]) / 2), s.size).toBe(0);
+      expect(at(0.02, 0.2), s.size).toBe(0);
+      expect(at(0.98, 0.75), s.size).toBe(0);
+      expect(at(0.5, 0.998), s.size).toBe(0);
     }
   });
 
