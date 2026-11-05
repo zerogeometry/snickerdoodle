@@ -68,7 +68,7 @@ describe('the frame print file — exact px, every square in place, each with it
       expect(near(at(5, 5), WHITE)).toBe(true);
       const [a, c] = frameSlotRects(grid);
       expect(near(at(Math.round((a!.x + a!.size + c!.x) / 2), a!.y + 10), WHITE)).toBe(true);
-    }, 60_000); // up to a 52-megapixel sheet of 40 tiles
+    }, 120_000); // up to a 75-megapixel sheet of 60 tiles
   }
 
   it('each square keeps its OWN placement (a pan shows that part of its drawing; the default fills it whole)', async () => {
@@ -91,8 +91,8 @@ describe('the frame print file — exact px, every square in place, each with it
     const grid = FRAME_GRIDS[0]!;
     const tiles = await tilesFor(grid, (i) => solid(colourOf(i), 300, 300));
     await expect(composeFrameGrid(grid, tiles.slice(0, 8))).rejects.toThrow(/needs 9 squares/);
-    const big = FRAME_GRIDS.find((g) => g.size === '20×30″')!;
-    await expect(composeFrameGrid(big, tiles)).rejects.toThrow(/needs 40 squares/);
+    const big = FRAME_GRIDS.find((g) => g.size === '24×36″')!;
+    await expect(composeFrameGrid(big, tiles)).rejects.toThrow(/needs 60 squares/);
     const wrong = await sharp({ create: { width: slotPx(grid) + 2, height: slotPx(grid) + 2, channels: 3, background: '#fff' } }).png().toBuffer();
     await expect(composeFrameGrid(grid, [...tiles.slice(0, 8), wrong])).rejects.toThrow(/square 9.s tile/);
   });

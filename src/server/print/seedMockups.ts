@@ -2,12 +2,14 @@ import 'server-only';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { setBundleLayout, setMockupTemplate, setMockupView } from './templates';
-import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, ROLE_PIECE, type BundleLayoutName } from './bundleMockup';
-import { BUNDLE_KEY, BUNDLE_PIECE_GEOM } from '@/lib/christmas-bundle';
+import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, regionGeom, type BundleLayoutName } from './bundleMockup';
+import { buildFrameLayout, frameLayoutDir } from './frameLayout';
+import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
+import { BUNDLE_KEY } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
@@ -150,17 +152,38 @@ async function storeLayout(db: DbHandle, sku: string, layout: string, built: Awa
     layout,
     base: built.base,
     regions: built.regions.map((r) => {
-      const g = BUNDLE_PIECE_GEOM[ROLE_PIECE[r.role]];
+      const g = regionGeom(r.role).geom;
       return { ...r, printWidthPx: g.printWidthPx, printHeightPx: g.printHeightPx, materialClass: r.role === 'ornament' ? ('GLOSS' as const) : ('PAPER' as const) };
     }),
   });
   return built.regions.length;
 }
 
-/** Every staged flattened layout: the family bundle's four pictures, the placemat + coaster tiles, and
- * the placemat's back photo. Returns how many print areas were stored. */
-export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+/** Every staged flattened layout: the family bundle's four pictures, the placemat + coaster tiles, the
+ * placemat's back photo, and the multi photo frames (each size × colour). Returns how many print areas
+ * were stored. */
+/** The multi photo frames' pictures (frameLayout.ts): the founder's layers for each size, the frame in
+ * each colour, stored on that variant. A size whose layers aren't staged keeps its drawn frame. */
+async function seedFrameLayouts(db: DbHandle): Promise<number> {
+  if (!existsSync(BUNDLE_BACKDROP)) return 0;
+  const rows = await db
+    .select({ sku: productVariants.sku, attrs: productVariants.attributes })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(products.key, MULTI_PHOTO_FRAME_KEY), eq(productVariants.active, true))); // (a retired variant keeps no picture)
   let n = 0;
+  for (const r of rows) {
+    const a = (r.attrs as Record<string, string>) ?? {};
+    const grid = frameGridOf(a.size, a.orientation);
+    const dir = grid ? frameLayoutDir(grid) : null;
+    if (!dir || !a.colour) continue;
+    n += await storeLayout(db, r.sku, 'tile', await buildFrameLayout(dir, a.colour, BUNDLE_BACKDROP));
+  }
+  return n;
+}
+
+export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+  let n = await seedFrameLayouts(db);
   for (const name of BUNDLE_LAYOUTS) {
     const dir = bundleLayoutDir(name);
     if (dir) n += await storeLayout(db, BUNDLE_KEY, name, await buildBundleLayout(dir, BUNDLE_BACKDROP));
@@ -263,28 +286,6 @@ function layeredFlatDir(name: string): string | null {
   return has('background.png') && has('shadow.png') && has('product.png') && has('printmap.png') ? dir : null;
 }
 
-/**
- * Founder-authored MULTI PHOTO FRAME layers — one folder per size and frame colour:
- *   .prodigi-assets/blanks/layered/multiPhotoFrame/<size>/<colour>/  — size: 12x12, 16x16,
- *   16x24-landscape, 16x24-portrait, 20x30-landscape, 20x30-portrait (the rectangles hang either way);
- *   colour as Prodigi names it, spaces → hyphens: gold, black, white, natural, brown, dark-grey,
- *   light-grey, silver
- * holding, all on ONE canvas (the layered-flat set, like the calendar's):
- *   background.png — the wall / backdrop
- *   shadow.png     — the frame's shadow on it
- *   product.png    — the frame, straight on (its inside can stay see-through or white)
- *   printmap.png   — WHITE exactly where the print sheet sits behind the glass (the whole sheet,
- *                    edge to edge, at its true shape), transparent everywhere else
- *   overlay.png    — 16×16″ only: the snow-white MOUNT, with its 16 windows cut see-through (and any
- *                    glass sheen) — laid OVER the art. Optional on the others (no mount).
- * The art (the grid print file itself) cover-fits the printmap, so a printmap at the sheet's true
- * square size puts every square exactly where it prints.
- */
-function multiPhotoFrameDir(size: string, orientation: string, colour: string): string | null {
-  const folder = size.replace('×', 'x').replace('″', '') + (orientation ? `-${orientation}` : '');
-  return layeredFlatDir(`multiPhotoFrame/${folder}/${colour.replace(/\s+/g, '-')}`);
-}
-
 const FRAME: Record<string, string> = {
   gold:'prodigi-classic-frame-blanks/Gold Classic Frame_blank.png',
   black: 'prodigi-classic-frame-blanks/Black classic frame_blank.png',
@@ -311,13 +312,11 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
         ? { file: FRAME[colour], material: 'PAPER', register: 'window-cover', ...(orientation === 'landscape' ? { rotate: 90 as const } : {}) }
         : null;
     }
-    case 'multiPhotoFrame': {
-      // The founder's layered photos, per size + frame colour (see multiPhotoFrameDir): the art is the
-      // frame's PRINTED FACE (the drawing in every square), laid on the printmap; the mount (16×16″)
-      // rides over it as the overlay. Not staged ⇒ the drawn frame (drawnMockups.ts).
-      const dir = multiPhotoFrameDir(size, attrs.orientation ?? '', colour);
-      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'multiPhotoFrame' };
-    }
+    case 'multiPhotoFrame':
+      // the PRIMARY picture is the founder's frame photo with a drawing in every numbered square — a
+      // flattened layout per size × colour (frameLayout.ts, seedFrameLayouts); this drawn frame is only
+      // its stand-in where those layers aren't staged
+      return { material: 'PAPER', register: 'drawn', key: 'multiPhotoFrame' };
     case 'cushion': {
       // heart / 18″ round / (12″ | 22″) square — the two squares share one shape (both 1:1).
       const shape = size === 'heart' ? 'heart' : size === '18″ round' ? 'round' : 'square';

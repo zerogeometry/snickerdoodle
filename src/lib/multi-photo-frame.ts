@@ -4,29 +4,29 @@
  * print of a GRID of the family's drawings — Prodigi's spec is 60×60 mm photos with 20 mm between
  * them, in a classic frame (8 colours).
  *
- *   12×12″ (300×300 mm sheet), NO mount — 9 drawings, 3×3     — GLOBAL-MPF-12X12,  3543×3543 px
- *   16×16″ (400×400 mm sheet), MOUNTED — 16 drawings, 4×4     — GLOBAL-MPFM-16X16, 4724×4724 px
- *   16×24″ (600×400 mm sheet), NO mount — 24 drawings, 6×4    — GLOBAL-MPF-16X24,  4724×7086 px
- *   20×30″ (750×500 mm sheet), NO mount — 40 drawings, 8×5    — GLOBAL-MPF-20X30,  5905×8858 px
+ *   3 × 3  —  9 drawings — 12×12″ (300×300 mm), no mount — GLOBAL-MPF-12X12, 3543×3543 px
+ *   6 × 4  — 24 drawings — 16×24″ (600×400 mm), no mount — GLOBAL-MPF-16X24, 4724×7086 px
+ *   10 × 6 — 60 drawings — 24×36″ (900×600 mm), no mount — GLOBAL-MPF-24X36, 7086×10629 px
+ * (founder, 5 Nov: these three, named by their drawings; each has the founder's layered photo —
+ * src/server/print/frameLayout.ts)
  *
  * LAYOUT — checked against Prodigi's own print-file templates (prodigi.com product page, "print file
- * templates": prodigi-multi-photo-frame-small-square-12x12.png, -medium-square-16x16.png,
- * -medium-16x24.png, -large-20x30.png, 5 Nov 2026), drawn at the print's own pixels. Every window
- * ("window trim line") is 60 mm square, one every 80 mm, the grid centred on the sheet: 40 mm margin on
- * the 12×12, 50 mm on the 16×16, 70 × 50 mm on the 16×24, 65 × 60 mm on the 20×30. The red "safe
+ * templates": prodigi-multi-photo-frame-small-square-12x12.png, -medium-16x24.png,
+ * -x-large-24x36.png, 5 Nov 2026), drawn at the print's own pixels. Every window ("window trim line")
+ * is 60 mm square, one every 80 mm, the grid centred on the sheet: 40 mm margin on the 12×12, 70 × 50 mm
+ * on the 16×24, 60 × 70 mm on the 24×36. The red "safe
  * area" sits 2 mm inside every window. The pixel sizes are Prodigi's printAreaSizes (sandbox GET
  * /v4.0/products, 5 Nov).
  *
- * ORIENTATION (the two rectangular sizes): Prodigi's templates are drawn LANDSCAPE, but its print
- * file is PORTRAIT (4724×7086 / 5905×8858). Like the framed print, how it hangs is OURS: a landscape
- * frame is designed on the landscape sheet (Prodigi's template, 6 across × 4 down) and the finished
- * file turned 90° to Prodigi's portrait spec; a portrait frame is the same sheet the other way up
- * (4 across × 6 down), sent as it is. The square sizes have no orientation.
+ * ORIENTATION (the two rectangles): they hang LANDSCAPE, as Prodigi's templates and the founder's
+ * photos are drawn — but Prodigi's print file is PORTRAIT (4724×7086 / 7086×10629). Like the framed
+ * print, the frame is designed on the landscape sheet and the finished file turned 90° to Prodigi's
+ * spec. (Portrait is the same sheet the other way up; the machinery takes it — FRAME_GRIDS just
+ * doesn't offer it, as there's no photo of it.) The square has no orientation.
  *
- * BLEED: on the MOUNTED frame the mount's windows sit over the print, so each drawing runs 3 mm past
- * its window (Prodigi: "each image should extend into the bleed area") and the mount hides the edge
- * even if it sits a touch off. With NO mount the print IS what you see, so each drawing is exactly
- * its 60 mm square and the 20 mm between them stays clean white paper.
+ * BLEED: with NO mount (all three) the print IS what you see, so each drawing is exactly its 60 mm
+ * square and the 20 mm between them stays clean white paper. (A MOUNTED frame would run each drawing
+ * 3 mm past its window, under the mount — kept for if one is ever offered.)
  *
  * In the basket a frame is ONE line carrying a drawing per square (unfilled squares repeat the main
  * drawing). At order time the server re-fills + re-checks every square (authz, moderation, DPI) and
@@ -49,7 +49,7 @@ export const SAFE_INSET_MM = 2;
 /** How far a drawing runs past its window under a MOUNT (none without one). */
 export const MOUNT_BLEED_MM = 3;
 
-export type FrameSize = '12×12″' | '16×16″' | '16×24″' | '20×30″';
+export type FrameSize = '12×12″' | '16×24″' | '24×36″';
 /** How the frame hangs — the square sizes have no choice. */
 export type FrameOrientation = 'square' | 'landscape' | 'portrait';
 
@@ -57,7 +57,9 @@ export interface FrameGrid {
   /** our variant size attribute */
   size: FrameSize;
   orientation: FrameOrientation;
-  sku: 'GLOBAL-MPF-12X12' | 'GLOBAL-MPFM-16X16' | 'GLOBAL-MPF-16X24' | 'GLOBAL-MPF-20X30';
+  sku: 'GLOBAL-MPF-12X12' | 'GLOBAL-MPF-16X24' | 'GLOBAL-MPF-24X36';
+  /** how the founder names it — its drawings across × down ('3x3', '6x4', '10x6'): its layered photo's folder */
+  name: string;
   /** the print sheet as it HANGS (Prodigi's glaze size), mm */
   wMm: number;
   hMm: number;
@@ -76,39 +78,38 @@ export interface FrameGrid {
  * squares counted on Prodigi's template. Prodigi's own orientation is portrait (or square). */
 const SIZES: Array<{ size: FrameSize; sku: FrameGrid['sku']; shortMm: number; longMm: number; shortPx: number; longPx: number; shortN: number; longN: number; mounted: boolean }> = [
   { size: '12×12″', sku: 'GLOBAL-MPF-12X12', shortMm: 300, longMm: 300, shortPx: 3543, longPx: 3543, shortN: 3, longN: 3, mounted: false },
-  { size: '16×16″', sku: 'GLOBAL-MPFM-16X16', shortMm: 400, longMm: 400, shortPx: 4724, longPx: 4724, shortN: 4, longN: 4, mounted: true },
   { size: '16×24″', sku: 'GLOBAL-MPF-16X24', shortMm: 400, longMm: 600, shortPx: 4724, longPx: 7086, shortN: 4, longN: 6, mounted: false },
-  { size: '20×30″', sku: 'GLOBAL-MPF-20X30', shortMm: 500, longMm: 750, shortPx: 5905, longPx: 8858, shortN: 5, longN: 8, mounted: false },
+  { size: '24×36″', sku: 'GLOBAL-MPF-24X36', shortMm: 600, longMm: 900, shortPx: 7086, longPx: 10629, shortN: 6, longN: 10, mounted: false },
 ];
 
-/** Every frame as it can hang: the squares once, the rectangles landscape (Prodigi's template) + portrait. */
+/** Every frame we sell: the square, and the rectangles hung landscape (Prodigi's template, the founder's photos). */
 export const FRAME_GRIDS: readonly FrameGrid[] = SIZES.flatMap((s) => {
   const square = s.shortMm === s.longMm;
   const make = (orientation: FrameOrientation): FrameGrid => {
     const landscape = orientation === 'landscape';
     const wMm = landscape ? s.longMm : s.shortMm;
     const hMm = landscape ? s.shortMm : s.longMm;
+    const cols = landscape ? s.longN : s.shortN, rows = landscape ? s.shortN : s.longN;
     return {
-      size: s.size, orientation, sku: s.sku, wMm, hMm, cols: landscape ? s.longN : s.shortN, rows: landscape ? s.shortN : s.longN, mounted: s.mounted,
+      size: s.size, orientation, sku: s.sku, name: `${cols}x${rows}`, wMm, hMm, cols: landscape ? s.longN : s.shortN, rows: landscape ? s.shortN : s.longN, mounted: s.mounted,
       pxW: landscape ? s.longPx : s.shortPx, pxH: landscape ? s.shortPx : s.longPx, turned: landscape,
     };
   };
-  return square ? [make('square')] : [make('landscape'), make('portrait')];
+  return square ? [make('square')] : [make('landscape')];
 });
 
 /** The sizes, in shop order (one entry per size, whatever its orientations). */
 export const FRAME_SIZES: readonly FrameSize[] = SIZES.map((s) => s.size);
 
-/** A size's grid, hung this way (a square size ignores it; a rectangle with none hangs landscape). */
+/** A size's grid, hung this way (a square ignores it; a rectangle with none hangs landscape; a way up
+ * we don't offer is null). */
 export function frameGridOf(size: string | null | undefined, orientation?: string | null): FrameGrid | null {
-  const mine = FRAME_GRIDS.filter((g) => g.size === size);
-  if (mine.length === 0) return null;
-  if (mine.length === 1) return mine[0]!;
-  return mine.find((g) => g.orientation === (orientation === 'portrait' ? 'portrait' : 'landscape')) ?? null;
+  const want = orientation === 'portrait' ? 'portrait' : 'landscape';
+  return FRAME_GRIDS.find((g) => g.size === size && (g.orientation === 'square' || g.orientation === want)) ?? null;
 }
 /** The grid DESIGNED at these pixels (a variant's print template) — how the print code finds it. */
 export const frameGridForPx = (w: number, h: number): FrameGrid | null => FRAME_GRIDS.find((g) => g.pxW === w && g.pxH === h) ?? null;
-/** How many drawings a frame holds (9 / 16 / 24 / 40); null = not a frame size. */
+/** How many drawings a frame holds (9 / 24 / 60); null = not a frame size. */
 export const frameSlotCountOf = (size: string | null | undefined, orientation?: string | null): number | null => {
   const g = frameGridOf(size, orientation);
   return g ? g.cols * g.rows : null;

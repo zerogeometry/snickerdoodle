@@ -11,7 +11,7 @@ import { goClient, optionGroup, rangeReady, shopCatalogue, waitForAsset } from '
  *  - a small drawing (500 px): what every product says, the "too small" block + "make it <size>" fix,
  *    the editor's BLOCK (save greyed, "zoom out to fix"), and an enhanced print-file preview.
  */
-const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle']);
+const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle', 'multiPhotoFrame']);
 const SHOTS = 'reports/test-sweep-2026-10-29/shots/02';
 
 async function small(px: number): Promise<Buffer> {

@@ -124,7 +124,7 @@ export function MultiPhotoFrameBuilder() {
   const sizeNow = size && (sizes as readonly string[]).includes(size) ? size : (fallback?.attributes.size ?? null);
   // the two big sizes hang either way — landscape (Prodigi's own template) unless chosen otherwise
   const orientations = FRAME_GRIDS.filter((g) => g.size === sizeNow && g.orientation !== 'square').map((g) => g.orientation);
-  const orientationNow = orientations.length ? (orientation && (orientations as string[]).includes(orientation) ? orientation : 'landscape') : null;
+  const orientationNow = orientations.length ? (orientation && (orientations as string[]).includes(orientation) ? orientation : orientations[0]!) : null;
   const ofSize = (v: CatalogueVariant) => v.attributes.size === sizeNow && (v.attributes.orientation ?? null) === orientationNow;
   const coloursNow = MULTI_FRAME_COLOURS.filter((c) => variants.some((v) => ofSize(v) && v.attributes.colour === c));
   const colourNow = colour && (coloursNow as readonly string[]).includes(colour) ? colour : (fallback?.attributes.colour ?? coloursNow[0] ?? null);
@@ -370,7 +370,9 @@ export function MultiPhotoFrameBuilder() {
         <div className="min-w-0">
           <div className="polaroid tape relative mx-auto mt-3 w-full md:max-w-[min(100%,calc(100dvh-25rem))]">
             <div className="flex w-full items-center justify-center bg-paper-2 p-4">
-              <FramePreview grid={grid} squares={squares} own={mine} imageFor={(a) => drawingFor(a)?.thumbUrl ?? drawingFor(a)?.imageUrl ?? null} colour={colourNow ?? 'gold'} />
+              <FramePicture sku={variant.sku} squares={squares} alt={frameLabel(grid, colourNow ?? 'gold', squares.length, filledCount)}>
+                <FramePreview grid={grid} squares={squares} own={mine} imageFor={(a) => drawingFor(a)?.thumbUrl ?? drawingFor(a)?.imageUrl ?? null} colour={colourNow ?? 'gold'} />
+              </FramePicture>
             </div>
           </div>
 
@@ -498,9 +500,12 @@ export function MultiPhotoFrameBuilder() {
                   <button key={sz} type="button" onClick={() => setSize(sz)} aria-pressed={sz === sizeNow} className={`${OPT} ${sz === sizeNow ? OPT_ON : OPT_OFF}`}>
                     <span className="flex flex-col items-start leading-tight">
                       <span>
-                        {sz} · {g.cols * g.rows} drawings{p ? ` · ${gbp(p)}` : ''}
+                        {g.cols * g.rows} drawings{p ? ` · ${gbp(p)}` : ''}
                       </span>
-                      <span className={`text-[10px] font-semibold ${sz === sizeNow ? 'text-paper' : 'text-ink-soft'}`}>{g.mounted ? 'with a white mount' : 'no mount'}</span>
+                      <span className={`text-[10px] font-semibold ${sz === sizeNow ? 'text-paper' : 'text-ink-soft'}`}>
+                        {g.cols} × {g.rows} · {sz}
+                        {g.mounted ? ' · white mount' : ''}
+                      </span>
                     </span>
                   </button>
                 );
@@ -510,7 +515,7 @@ export function MultiPhotoFrameBuilder() {
           </div>
 
           {/* How it hangs — the two big sizes only */}
-          {orientations.length ? (
+          {orientations.length > 1 ? (
             <div className="mt-5">
               <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Hangs</p>
               <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="which way it hangs">
@@ -605,6 +610,76 @@ export function MultiPhotoFrameBuilder() {
   );
 }
 
+/** What the frame's picture shows, in words (the photo and the drawn stand-in say the same). */
+const frameLabel = (grid: FrameGrid, colour: string, squares: number, chosen: number) =>
+  `your ${grid.size} ${grid.orientation === 'square' ? '' : `${grid.orientation} `}frame in ${colour}: ${squares} squares, ${chosen} chosen${chosen < squares && chosen > 0 ? ', the rest repeat the first drawing' : ''}`;
+
+/**
+ * The frame as it really is: the founder's photo of this size in this colour with each square's own
+ * drawing, composed server-side (/api/mockup/frame — every drawing authz-checked there, nothing stored).
+ * Until it lands — or where the frame's layers aren't seeded — the drawn preview (`children`) stands in;
+ * the last picture stays up while the next is made, and an older set is never shown as this one.
+ */
+function FramePicture({ sku, squares, alt, children }: { sku: string; squares: Slot[]; alt: string; children: React.ReactNode }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const filled = squares.every(Boolean) && squares.length > 0;
+  const body = filled ? JSON.stringify({ sku, squares: squares.map((c) => ({ assetId: c!.assetId, transform: c!.transform, ...(c!.sourceObjectId ? { sourceObjectId: c!.sourceObjectId } : {}) })) }) : null;
+  useEffect(() => {
+    if (!body) {
+      setUrl((old) => {
+        if (old) URL.revokeObjectURL(old);
+        return null;
+      });
+      return;
+    }
+    let stale = false;
+    setBusy(true);
+    // a short pause: a run of quick picks makes one picture, not five
+    const t = window.setTimeout(() => {
+      fetch('/api/mockup/frame', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+        .then(async (r) => {
+          if (!r.ok) throw new Error(String(r.status));
+          const blob = await r.blob();
+          if (stale) return;
+          const next = URL.createObjectURL(blob);
+          setUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return next;
+          });
+          setBusy(false);
+        })
+        .catch(() => {
+          if (stale) return;
+          // the drawn frame stands in — never an older set as if it were this one
+          setUrl((old) => {
+            if (old) URL.revokeObjectURL(old);
+            return null;
+          });
+          setBusy(false);
+        });
+    }, 250);
+    return () => {
+      stale = true;
+      window.clearTimeout(t);
+    };
+  }, [body]);
+  const urlRef = useRef<string | null>(null);
+  useEffect(() => {
+    urlRef.current = url;
+  }, [url]);
+  useEffect(() => () => {
+    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+  }, []);
+  if (!url) return <>{children}</>;
+  return (
+    <div className="relative w-full" aria-busy={busy}>
+      <img src={url} alt={alt} className="block aspect-square w-full object-contain" />
+      {busy ? <span aria-hidden className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-honey motion-safe:animate-pulse" /> : null}
+    </div>
+  );
+}
+
 /**
  * The frame at a glance, drawn at the PRINT's own geometry: the moulding in its colour, the white
  * sheet, every square where it prints (frameSlotRects), each drawing filling its square exactly as
@@ -625,7 +700,7 @@ function FramePreview({ grid, squares, own, imageFor, colour }: { grid: FrameGri
   return (
     <div
       role="img"
-      aria-label={`your ${grid.size} ${grid.orientation === 'square' ? '' : `${grid.orientation} `}frame in ${colour}: ${squares.length} squares, ${chosen} chosen${chosen < squares.length && chosen > 0 ? ', the rest repeat the first drawing' : ''}`}
+      aria-label={frameLabel(grid, colour, squares.length, chosen)}
       className="relative rounded-[3px] shadow-[0_8px_18px_rgb(43_33_24/0.25)]"
       style={{
         backgroundColor: FRAME_MOULDING_HEX[colour] ?? FRAME_MOULDING_HEX.gold,

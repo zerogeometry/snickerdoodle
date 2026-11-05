@@ -70,12 +70,11 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.artwork, productType: 'Home > Framed prints',
     image: ex('framefamily', 1200, 1200, 'A child’s crayon drawing of a family holding hands by a little blue house, in a light wooden frame'),
   },
-  // The multi photo frame joins this list the day it goes on show (a hidden product may not be listed —
-  // unit-tested). Its entry, ready:
-  //   multiPhotoFrame: {
-  //     slug: 'multi-photo-frame', name: 'multi photo frame', title: 'Multi photo frame of your child’s drawings — 9 or 16 in one frame',
-  //     googleCategory: CAT.artwork, productType: 'Home > Framed prints',
-  //   },
+  multiPhotoFrame: {
+    slug: 'multi-photo-frame', name: 'multi photo frame', title: 'Multi photo frame of your child’s drawings — 9, 24 or 60 in one frame',
+    googleCategory: CAT.artwork, productType: 'Home > Framed prints',
+    // no brand-safe marketing photo yet (the page shows the drawn product art; the feed leaves it out)
+  },
   mug: {
     slug: 'mug', name: 'mug', title: 'Personalised mug with your child’s drawing',
     googleCategory: CAT.mugs, productType: 'Home > Mugs',

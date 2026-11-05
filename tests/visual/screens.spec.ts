@@ -115,25 +115,18 @@ for (const vp of WIDTHS) {
       await shot(page, `${vp.name}-studio`, { fullPage: false });
     });
 
-    test('the multi photo frame builder (hidden until its photos are in — shown for this check)', async ({ page }) => {
-      test.skip(!hasDb, 'needs DATABASE_URL to put the hidden frame on show for the check');
+    test('the multi photo frame builder', async ({ page }) => {
       test.setTimeout(180_000);
-      await sql()`update products set visible_in_shop = true where key = 'multiPhotoFrame'`;
-      try {
-        await quietCookies(page);
-        await uploadAndOpenRange(page);
-        await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
-        // the frame drawn at the print's own geometry, the drawing in every square, the squares under it
-        await push(page, '/customize/multiPhotoFrame');
-        await expect(page.getByRole('heading', { name: 'multi photo frame' })).toBeVisible();
-        await expect(page.getByText('1 of 9 chosen')).toBeVisible();
-        await shot(page, `${vp.name}-customize-multi-photo-frame`);
-        await page.getByRole('group', { name: 'frame size' }).getByRole('button', { name: /^16×16″/ }).click();
-        await expect(page.getByText('1 of 16 chosen')).toBeVisible();
-        await shot(page, `${vp.name}-customize-multi-photo-frame-16`);
-      } finally {
-        await sql()`update products set visible_in_shop = false where key = 'multiPhotoFrame'`;
-      }
+      await quietCookies(page);
+      await uploadAndOpenRange(page);
+      await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
+      // the 6 × 4 on the founder's frame photo, the drawing in every square, the squares under it
+      await push(page, '/customize/multiPhotoFrame');
+      await expect(page.getByRole('heading', { name: 'multi photo frame' })).toBeVisible();
+      await expect(page.getByText('1 of 24 chosen')).toBeVisible();
+      const photo = page.getByRole('img', { name: /^your 16×24″ landscape frame/ });
+      await expect(photo).toHaveAttribute('src', /^blob:/, { timeout: 30_000 });
+      await shot(page, `${vp.name}-customize-multi-photo-frame`, { mask: [photo] });
     });
 
     test('family home and a gift link (signed in)', async ({ page, browser }) => {

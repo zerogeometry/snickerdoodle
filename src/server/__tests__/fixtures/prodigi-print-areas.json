@@ -182,30 +182,17 @@
     {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":7086}}}
    ]
   },
-  "GLOBAL-MPF-20X30": {
+  "GLOBAL-MPF-24X36": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}},
-    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":5905,"h":8858}}}
-   ]
-  },
-  "GLOBAL-MPFM-16X16": {
-   "printAreas": ["default"],
-   "variants": [
-    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}},
-    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"2.4mm","mountColor":"Snow white","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":4724,"h":4724}}}
+    {"attributes":{"frame":"Classic","color":"black","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"brown","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"dark grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"gold","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"light grey","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"natural","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"silver","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}},
+    {"attributes":{"frame":"Classic","color":"white","glaze":"Acrylic / Perspex","mount":"No mount / Mat","paperType":"EMA","substrateWeight":"200gsm"},"printAreaSizes":{"default":{"w":7086,"h":10629}}}
    ]
   },
   "GLOBAL-SWEAT-AWD-JH030": {

@@ -61,7 +61,7 @@ describe('the bundle compositor — pre-flattened, exact', () => {
     const layout = await decodeBundleLayout(b.base, b.regions);
     const red = await solid(220, 30, 30), blue = await solid(30, 60, 220), green = await solid(40, 170, 60);
     const art = { placemat: red, coaster: blue, ornament: [green, red] } as const;
-    const fast = await renderBundleLayers(layout, (role, i) => (role === 'ornament' ? art.ornament[i]! : art[role]));
+    const fast = await renderBundleLayers(layout, (role, i) => (role === 'ornament' ? art.ornament[i]! : role === 'square' ? null : art[role]));
 
     // the naive way: every layer composited in order, the art clipped by its print area
     const shadow = async (src: Buffer) => {

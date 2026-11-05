@@ -121,7 +121,7 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   card: 'uk7', cardPack: 'uk7',
   calendar: 'uk15',
   wrappingPaper: 'gb2',
-  framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3', multiPhotoFrame: 'gb3', // the multi photo frames: gb3, Evri Next Day (sandbox, 5 Nov)
+  framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3', multiPhotoFrame: 'gb3', // the multi photo frames: gb3 — Evri / DPD Local / FedEx by size (sandbox, 5 Nov)
   christmasJumper: 'uk2', babyBodysuit: 'uk2',
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
   christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24

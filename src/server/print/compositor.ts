@@ -434,7 +434,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   const [tpl, [prod], [srcObj]] = await Promise.all([
     loadResolvedTemplate(db, input.variantId, input.view),
     db
-      .select({ key: products.key })
+      .select({ key: products.key, sku: productVariants.sku })
       .from(productVariants)
       .innerJoin(products, eq(productVariants.productId, products.id))
       .where(eq(productVariants.id, input.variantId)),
@@ -453,14 +453,14 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   if (layoutProduct || isBundle) {
     const size: MockupSize = input.size ?? 'thumb';
     const placement = isBundle ? undefined : clampTransform(input.transform);
-    const key = layoutProduct ? await layoutTileKey(db, prod!.key, input.assetId, srcObj, size, placement ? transformHash(placement) : '') : null;
+    const key = layoutProduct ? await layoutTileKey(db, prod!.key, input.assetId, srcObj, size, placement ? transformHash(placement) : '', prod!.sku) : null;
     if (!key && isBundle) throw new NoMockupTemplateError('the bundle has no layout yet');
     if (key) {
       const [existing] = await db.select({ id: storageObjects.id }).from(storageObjects).where(eq(storageObjects.key, key));
       if (existing) return { mockupObjectId: existing.id, key, format: 'webp', tier: 'FLAT', cached: true };
       const pending = inFlight.get(key);
       if (pending) return pending;
-      const p = withLimit(() => composeLayoutTile(db, { productKey: prod!.key, assetId: input.assetId, key, srcObj, size, placement, memo: input.memo }));
+      const p = withLimit(() => composeLayoutTile(db, { productKey: prod!.key, variantSku: prod!.sku, assetId: input.assetId, key, srcObj, size, placement, memo: input.memo }));
       inFlight.set(key, p);
       try {
         return await p;
