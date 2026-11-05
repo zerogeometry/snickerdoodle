@@ -102,8 +102,8 @@ export const KIDS_JUMPER_CHEST_MM: Record<string, number> = { ...KIDS_HOODIE_CHE
 export const ADULT_JUMPER_CHEST_MM: Record<string, number> = { S: 510, M: 560, L: 610, XL: 660, '2XL': 710 };
 
 // ── The little ones (5 Nov 2026 — Prodigi's "global" change made these in the UK; PRODUCT-RANGE-global-uk-nov.md) ──
-// Rabbit Skins fine jersey (100% ringspun cotton), Prodigi lab uk2 → Royal Mail 1st Class (UNTRACKED on
-// Standard). Every size × colour below sandbox-quoted to GB from uk2 on 5 Nov; colours Prodigi makes only
+// Rabbit Skins fine jersey (100% ringspun cotton), Prodigi lab uk2 — sent EXPRESS (DPD) so they're tracked (founder,
+// 5 Nov; uk2's Standard is untracked 1st Class — src/lib/delivery.ts). Every size × colour below sandbox-quoted to GB from uk2 on 5 Nov; colours Prodigi makes only
 // in Canada or Australia (and the ones whose GB print area differs between routes) are left out on purpose.
 // Our colour names are friendlier than Prodigi's (`attr`).
 const HEATHER: GarmentColour = { name: 'heather grey', attr: 'heather', hex: '#a9aaad' };

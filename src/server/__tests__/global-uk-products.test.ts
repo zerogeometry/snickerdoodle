@@ -6,7 +6,7 @@ import { definedPriceList, definedPrintSpecs, definedProducts } from '@/server/c
 import { EXPECTED_POPULARITY } from '@/server/popularity';
 import { resolveShippingMethod } from '@/fulfillment/submit';
 import { CHRISTMAS_LAST_ORDER, deliveryPromise, routeOf, routeOfLineKey } from '@/lib/season';
-import { DELIVERY_DAYS, deliveryLine, shipsTracked } from '@/lib/delivery';
+import { DELIVERY_DAYS, deliveryLine, shippingMethodFor, shipsTracked } from '@/lib/delivery';
 import { FAQ_PRODUCT_NAMES } from '@/lib/faq';
 import { SHOP_PRODUCTS, WAITING_FOR_PHOTOS } from '@/lib/shop-products';
 import { COMPLEMENTS } from '@/lib/complements';
@@ -29,12 +29,13 @@ const list = definedPriceList();
 const rows = (k: string) => list.filter((r) => r.productKey === k);
 const specs = definedPrintSpecs();
 
-/** The sandbox quotes (5 Nov): the DEARER colour's product cost, first post, the "plus one" post. Pence, ex-VAT. */
+/** The sandbox quotes (5 Nov): the DEARER colour's product cost, first post, the "plus one" post. Pence, ex-VAT.
+ * The garments on EXPRESS — tracked (founder, 5 Nov): uk2 → DPD Classic by Road, £10.75 for one or several. */
 const QUOTED: Record<string, { sku: string[]; lab: string; cost: number; post: number; extra: number }> = {
-  babyTee: { sku: ['GLOBAL-TEE-RS-3322'], lab: 'uk2', cost: 900, post: 235, extra: 100 }, // white £8
-  toddlerTee: { sku: ['GLOBAL-TEE-RS-3321'], lab: 'uk2', cost: 900, post: 235, extra: 100 }, // white £8
-  babyBodysuit: { sku: ['GLOBAL-BB-RS-4411'], lab: 'uk2', cost: 1000, post: 235, extra: 100 }, // white £9
-  babyBodysuitShort: { sku: ['GLOBAL-BB-RS-4424'], lab: 'uk2', cost: 900, post: 235, extra: 100 },
+  babyTee: { sku: ['GLOBAL-TEE-RS-3322'], lab: 'uk2', cost: 900, post: 1075, extra: 0 }, // white £8
+  toddlerTee: { sku: ['GLOBAL-TEE-RS-3321'], lab: 'uk2', cost: 900, post: 1075, extra: 0 }, // white £8
+  babyBodysuit: { sku: ['GLOBAL-BB-RS-4411'], lab: 'uk2', cost: 1000, post: 1075, extra: 0 }, // white £9
+  babyBodysuitShort: { sku: ['GLOBAL-BB-RS-4424'], lab: 'uk2', cost: 900, post: 1075, extra: 0 },
   watchStrap: { sku: ['GLOBAL-TECH-AP-WS-FL-38MM', 'GLOBAL-TECH-AP-WS-FL-42MM'], lab: 'uk6', cost: 2200, post: 400, extra: 50 },
 };
 
@@ -50,12 +51,12 @@ describe('the new UK-made products are in the catalogue — hidden until their p
     for (const [k, q] of Object.entries(QUOTED)) expect([...new Set(rows(k).map((r) => r.prodigiSku))].sort(), k).toEqual([...q.sku].sort());
   });
 
-  it('the prices: £20 tees + short-sleeve bodysuit, £22 long-sleeve, £45 strap — the static fallback agrees', () => {
+  it('the prices (tracked): £35 tees + short-sleeve bodysuit, £36 long-sleeve, £45 strap — the static fallback agrees', () => {
     const prices = (k: string) => [...new Set(rows(k).map((r) => r.pricePence))];
-    expect(prices('babyTee')).toEqual([2000]);
-    expect(prices('toddlerTee')).toEqual([2000]);
-    expect(prices('babyBodysuitShort')).toEqual([2000]);
-    expect(prices('babyBodysuit')).toEqual([2200]);
+    expect(prices('babyTee')).toEqual([3500]);
+    expect(prices('toddlerTee')).toEqual([3500]);
+    expect(prices('babyBodysuitShort')).toEqual([3500]);
+    expect(prices('babyBodysuit')).toEqual([3600]);
     expect(prices('watchStrap')).toEqual([4500]);
     for (const k of NEW) expect(CATALOGUE[k as keyof typeof CATALOGUE].pricePence, k).toBe(rows(k).find((r) => r.isDefault)!.pricePence);
   });
@@ -88,12 +89,13 @@ describe('pricing — ~20% net at full price, ≥ 15% on every multi-buy', () =>
     }
   });
 
-  it('…and the tiers they get: 10% for two, 15% for three or more (a second in one parcel posts for only +£1 / +50p)', () => {
+  it('…and the tiers they get: 15% from two (a second garment rides free in the DPD parcel); the strap 10/15/15/15', () => {
     const pct = (t: number[]) => t.map((b) => b / 100).join('/');
-    for (const k of Object.keys(QUOTED)) expect(pct(multiBuyTiers(econ(k))), k).toBe('10/15/15/15');
+    for (const k of ['babyTee', 'toddlerTee', 'babyBodysuit', 'babyBodysuitShort']) expect(pct(multiBuyTiers(econ(k))), k).toBe('15/15/15/15');
+    expect(pct(multiBuyTiers(econ('watchStrap')))).toBe('10/15/15/15');
   });
 
-  it('none joins a same-parcel group (uk2’s second item saves only ~£1.35 of post — less than the £3 we’d give)', () => {
+  it('none joins a same-parcel group (the multi-buy already passes on the garments’ free second post)', () => {
     for (const k of [...NEW, 'babyBodysuit']) expect(parcelGroupOf(k), k).toBeNull();
   });
 });
@@ -166,13 +168,30 @@ describe('only what Prodigi makes in the UK, with one GB print area', () => {
 });
 
 describe('labs, post and Christmas', () => {
-  it('the garments are uk2 (Royal Mail 1st Class — untracked, so never called tracked)', () => {
+  it('the garments go EXPRESS from uk2 so they’re tracked (founder, 5 Nov) — and say so', () => {
     for (const k of ['babyTee', 'toddlerTee', 'babyBodysuit', 'babyBodysuitShort']) {
-      expect(routeOf(k), k).toBe('uk2');
-      expect(shipsTracked(k), k).toBe(false);
-      expect(shipsTracked(`${k}-612months-pink`), k).toBe(false);
+      expect(routeOf(k), k).toBe('uk2x');
+      expect(shipsTracked(k), k).toBe(true);
+      expect(shippingMethodFor([k]), k).toBe('Express');
+      expect(resolveShippingMethod([`${k}-612months-pink`]), k).toBe('Express');
+      expect(deliveryLine(k), k).toBe('free tracked delivery');
     }
-    expect(deliveryLine(['babyTee', 'mug'])).toBe('free delivery');
+    expect(deliveryLine(['babyTee', 'mug'])).toBe('free tracked delivery');
+  });
+
+  it('an order with one goes Express AS A WHOLE (Prodigi takes one method per order) — like a phone case', () => {
+    expect(resolveShippingMethod(['babyTee', 'mug', 'kidsTee-34years-white'])).toBe('Express');
+    expect(resolveShippingMethod(['framedPrint', 'toddlerTee-12years-navy'])).toBe('Express');
+    expect(resolveShippingMethod(['kidsTee', 'mug'])).toBe('Standard'); // nothing needing it: Standard as ever
+    expect(resolveShippingMethod(['phoneCase'])).toBe('Express');
+  });
+
+  it('…except with a calendar: Prodigi has no Express for it (it would refuse the order), so Standard — and the basket doesn’t say tracked', () => {
+    expect(resolveShippingMethod(['babyTee', 'calendar-a4'])).toBe('Standard');
+    expect(resolveShippingMethod(['phoneCase', 'calendar'])).toBe('Standard');
+    expect(deliveryLine(['babyTee', 'calendar'])).toBe('free delivery');
+    expect(deliveryLine(['phoneCase', 'calendar'])).toBe('free delivery');
+    expect(deliveryLine(['calendar', 'mug'])).toBe('free tracked delivery');
   });
 
   it('the strap is uk6 on Standard — Royal Mail Standard TRACKED, so it needs no Express (unlike a phone case)', () => {
@@ -184,12 +203,14 @@ describe('labs, post and Christmas', () => {
     expect(DELIVERY_DAYS.uk6std).toBeDefined();
   });
 
-  it('their last order dates for Christmas 2026: 12 December (Tracked 48 / 1st Class)', () => {
+  it('their last order dates for Christmas 2026: garments 14 December (DPD courier), the strap 12 December (Tracked 48)', () => {
     const t = CHRISTMAS_LAST_ORDER[2026]!.byRoute;
-    expect(t.uk2).toBe('2026-12-12');
+    expect(t.uk2x).toBe('2026-12-14');
     expect(t.uk6std).toBe('2026-12-12');
+    expect(DELIVERY_DAYS.uk2x).toBeDefined();
     expect(deliveryPromise('watchStrap', new Date('2026-12-13T09:00:00Z'))).toMatchObject({ state: 'missed' });
-    expect(deliveryPromise('toddlerTee', new Date('2026-12-12T09:00:00Z'))).toMatchObject({ state: 'in-time', daysLeft: 0 });
+    expect(deliveryPromise('toddlerTee', new Date('2026-12-14T09:00:00Z'))).toMatchObject({ state: 'in-time', daysLeft: 0 });
+    expect(deliveryPromise('babyBodysuit', new Date('2026-12-15T09:00:00Z'))).toMatchObject({ state: 'missed' });
   });
 });
 

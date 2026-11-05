@@ -196,9 +196,10 @@ function adultTeeVariants(): VariantDef[] {
   );
 }
 
-// Baby bodysuit: Rabbit Skins LONG-sleeve 4411, GB lab uk2 → Royal Mail 1st Class (untracked). Re-verified
-// against the sandbox 5 Nov 2026 (GET /v4.0/products/GLOBAL-BB-RS-4411 + a quote for every size × colour):
-// front 2130×2130px (@300dpi = 180×180mm) for every size × colour we sell; £9 white, £10 colours (+ £2.35).
+// Baby bodysuit: Rabbit Skins LONG-sleeve 4411, GB lab uk2, sent EXPRESS to be tracked (founder, 5 Nov — uk2's
+// Standard is untracked 1st Class; Express is DPD, £10.75). Re-verified against the sandbox 5 Nov 2026 (GET
+// /v4.0/products/GLOBAL-BB-RS-4411 + a quote for every size × colour): front 2130×2130px (@300dpi = 180×180mm)
+// for every size × colour we sell; £9 white, £10 colours. £36 = the ~20% rule on £10 + £10.75.
 // The sizes + colours it's made in, with ONE GB print area, are src/lib/garments.ts → babyBodysuitMade: no
 // heather newborn, and 18–24 months only in light pink + navy (white / heather / red / black list two GB
 // routes at 18–24 months, 2130² and 1500×2010 — sold again once Prodigi says which their UK lab uses).
@@ -206,7 +207,7 @@ function adultTeeVariants(): VariantDef[] {
 function babyVariants(): VariantDef[] {
   return BABY_SIZES.flatMap((size) =>
     BABY_BODYSUIT_COLOURS.filter((c) => babyBodysuitMade(size, c.name)).map((c) => ({
-      size, colour: c.name, pricePence: 2200, ...exactPx({ w: 2130, h: 2130 }, 300), gateDpi: 150,
+      size, colour: c.name, pricePence: 3600, ...exactPx({ w: 2130, h: 2130 }, 300), gateDpi: 150,
       prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: c.attr }, printTo: ['front'],
     })),
   );
@@ -403,34 +404,35 @@ const DEFS: Record<string, ProductDef> = {
     variants: babyVariants(),
   },
   // ── The little ones (5 Nov 2026 — Prodigi's "global" change; PRODUCT-RANGE-global-uk-nov.md). HIDDEN until
-  // the founder's layered photos are in (seedMockups → layered/<product>/<colour>/). All uk2 → Royal Mail
-  // 1st Class (untracked); every size × colour sandbox-quoted to GB 5 Nov; colours in src/lib/garments.ts.
-  // Priced on the dearer colour cost: P ≈ (1.03 × landed + £0.75) / 0.61 → £20 on £9 + £2.35. ──
+  // the founder's layered photos are in (seedMockups → layered/<product>/<colour>/). All uk2, every size × colour
+  // sandbox-quoted to GB 5 Nov; colours in src/lib/garments.ts. TRACKED (founder, 5 Nov): they go Express (DPD
+  // Classic by Road, £10.75 — one or several in a parcel), so an order with one goes Express as a whole
+  // (src/lib/delivery.ts). Priced on the dearer colour: P ≈ (1.03 × landed + £0.75) / 0.61 → £35 on £9 + £10.75. ──
   babyBodysuitShort: {
     category: 'APPAREL', label: 'short-sleeve baby bodysuit', blurb: 'their first masterpiece, for warmer days', print: true,
     description: "A soft short-sleeved cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little. In eight colours (the long-sleeved one comes in white).",
     specs: { material: '100% ringspun cotton, fine jersey', sleeves: 'short', fastening: 'envelope neck, poppers underneath', print: 'up to 21 × 30 cm on the front', care: 'machine washable', made: 'in the UK' },
     // Rabbit Skins 4424 (GLOBAL-BB-RS-4424): front 2490×3510px. Its WHITE is made in Canada, so no white here.
-    variants: garmentVariants({ sku: 'GLOBAL-BB-RS-4424', sizes: BABY_SIZES, colours: BABY_BODYSUIT_SHORT_COLOURS, printPx: { w: 2490, h: 3510 }, pricePence: 2000 }),
+    variants: garmentVariants({ sku: 'GLOBAL-BB-RS-4424', sizes: BABY_SIZES, colours: BABY_BODYSUIT_SHORT_COLOURS, printPx: { w: 2490, h: 3510 }, pricePence: 3500 }),
   },
   babyTee: {
     category: 'APPAREL', label: 'baby tee', blurb: 'a tiny tee for their tiny masterpiece', print: true,
     description: 'A soft little cotton tee with their own drawing on the front — sized from newborn to 2, for the days a bodysuit is too much.',
     specs: { material: '100% ringspun cotton, fine jersey', sizes: 'newborn to 18–24 months', neck: 'envelope neck, easy over little heads', print: 'up to 15 × 15 cm on the front', care: 'machine washable', made: 'in the UK' },
     // LAT/Rabbit Skins 3322 (GLOBAL-TEE-RS-3322): front 1770×1770px, every size.
-    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3322', sizes: BABY_SIZES, colours: BABY_TEE_COLOURS, printPx: { w: 1770, h: 1770 }, pricePence: 2000 }),
+    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3322', sizes: BABY_SIZES, colours: BABY_TEE_COLOURS, printPx: { w: 1770, h: 1770 }, pricePence: 3500 }),
   },
   // A NEW product, not extra sizes on the kids tee: it's a different tee (Rabbit Skins fine jersey, not
   // Stanley/Stella organic), a different shape of print (portrait, 26×32 cm vs the kids tee's 26×26 cm
-  // square), different colours, a different price (£20 vs £25–27) and a different lab + post (uk2 1st Class
-  // vs uk9 Tracked 48 — the Christmas date and "tracked" are per product). Folded into the kids tee, a parent
+  // square), different colours, a different price (£35 vs £25–27) and a different lab + post (uk2 Express
+  // vs uk9 Tracked 48 — the Christmas date and the shipping method are per product). Folded into the kids tee, a parent
   // would see 1–2 years appear and vanish as they changed colour, and two different "3–4 years".
   toddlerTee: {
     category: 'APPAREL', label: 'toddler tee', blurb: 'their masterpiece, for little legs on the go', print: true,
     description: 'A soft cotton tee with their own drawing on the front, for 1 to 4 year olds — the little sibling of our kids tee.',
     specs: { material: '100% ringspun cotton, fine jersey', sizes: '1–2 years · 3–4 years', print: 'up to 26 × 32 cm on the front', care: 'machine washable', made: 'in the UK' },
     // LAT/Rabbit Skins 3321 (GLOBAL-TEE-RS-3321): front 3060×3780px. Prodigi's UK lab makes 1–2 and 3–4 years only.
-    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3321', sizes: TODDLER_TEE_SIZES, colours: TODDLER_TEE_COLOURS, printPx: { w: 3060, h: 3780 }, pricePence: 2000 }),
+    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3321', sizes: TODDLER_TEE_SIZES, colours: TODDLER_TEE_COLOURS, printPx: { w: 3060, h: 3780 }, pricePence: 3500 }),
   },
   // 7×5 portrait on Prodigi's Fedrigoni "classic" stock — the one built to print INSIDE and out
   // (CLASSIC-GRE-FEDR-7X5). One premium stock (founder call). The print file is a 4-panel spread

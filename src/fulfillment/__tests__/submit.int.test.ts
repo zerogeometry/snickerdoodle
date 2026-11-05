@@ -34,8 +34,16 @@ describe('resolveShippingMethod', () => {
     expect(resolveShippingMethod(['phoneCaseholder'])).toBe('Standard'); // only the real key
   });
   it('Standard otherwise (garments, prints, the family set)', () => {
-    expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee', 'babyBodysuit'])).toBe('Standard');
+    expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee'])).toBe('Standard');
     expect(resolveShippingMethod(['framedPrint'])).toBe('Standard');
+  });
+  it('a baby or toddler garment makes the whole order Express too — tracked (founder, 5 Nov), a family set with a bodysuit included', () => {
+    expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee', 'babyBodysuit'])).toBe('Express');
+    expect(resolveShippingMethod(['babyTee-612months-pink'])).toBe('Express');
+  });
+  it('never Express with a calendar in the order — Prodigi has none for it and would refuse the whole order', () => {
+    expect(resolveShippingMethod(['phoneCase', 'calendar-a4'])).toBe('Standard');
+    expect(resolveShippingMethod(['toddlerTee', 'calendar'])).toBe('Standard');
   });
 });
 

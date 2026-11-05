@@ -42,11 +42,18 @@ Re-checked in the sandbox the same day, every size × colour (POST /quotes to GB
 - **Long-sleeve bodysuit**: now 6 colours (£9 white / £10 colours). No heather in newborn; 18–24 months only in light
   pink and navy until Prodigi says which print file its UK lab uses for the others (two are listed).
 - **Short-sleeve bodysuit**: added — made in the UK in 8 colours, but **not white** (Prodigi makes white in Canada).
-- All the baby/toddler clothes go Royal Mail 1st Class (untracked) from uk2: the shop says "free delivery", not "tracked".
-  Last order for Christmas: 12 Dec (strap too).
+- **The baby/toddler clothes go TRACKED** (founder, 5 Nov). uk2's Standard is Royal Mail 1st Class, untracked; its only
+  tracked service is **Express — DPD Classic by Road, £10.75**, the same for one garment or several in one parcel (no
+  Overnight). Prodigi takes one shipping method per order, so an order with one of these goes Express as a whole,
+  like a phone case. What that adds to the OTHER items in the order (their Express post over their Standard,
+  sandbox 5 Nov): mug, ceramic ornament, jigsaw, wrapping paper +£1.05 · watch strap +£1.95 · cushion +£2.15 ·
+  framed print +£2.90 · kids or adult tee +£6.45 · greetings card +£7.65 · socks +£8.05. The 2027 calendar has NO
+  Express at all, so an order with a calendar stays on Standard (the garment then goes untracked, and the basket
+  says "free delivery", not "tracked"). Last order for Christmas: 14 Dec (a DPD courier, like uk3/gb3); the strap 12 Dec.
 
-Prices: baby tee, toddler tee, short-sleeve bodysuit £20; long-sleeve bodysuit £22; strap £45 (each ~19–20% net; the
-multi-buy tiers they get are 10% for two, 15% for three or more, all ≥15% net).
+Prices: baby tee, toddler tee, short-sleeve bodysuit **£35** (£9 + £10.75); long-sleeve bodysuit **£36** (£10 + £10.75);
+strap £45 — each ~20% net. Multi-buy: the garments 15% off from two (a second garment rides free in the DPD parcel),
+the strap 10% for two and 15% for three or more — all ≥15% net.
 
 ### What the founder sends, to switch each one on
 Drop these into `.prodigi-assets/blanks/founder-raw/`, run `node scripts/compose-founder-layers.mjs`, then seed the

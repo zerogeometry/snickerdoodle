@@ -48,7 +48,7 @@ export const CATALOGUE = {
   kidsTee: { pricePence: 2500, label: 'kids tee' },
   jigsaw: { pricePence: 2600, label: 'jigsaw' },
   blanket: { pricePence: 6000, label: 'fleece blanket' },
-  babyBodysuit: { pricePence: 2200, label: 'baby bodysuit' },
+  babyBodysuit: { pricePence: 3600, label: 'baby bodysuit' }, // tracked: Express from uk2 (founder, 5 Nov)
   card: { pricePence: 550, label: 'greetings card' },
   calendar: { pricePence: 2200, label: 'calendar' }, // A5 (A4 £24 — DB per variant)
   adultTee: { pricePence: 3200, label: 'adult tee' },
@@ -69,9 +69,9 @@ export const CATALOGUE = {
   kidsJumper: { pricePence: 3800, label: 'kids jumper' },
   christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
   // The little ones + the watch strap (5 Nov 2026, Prodigi's "global" change) — seeded hidden until their photos are in.
-  babyTee: { pricePence: 2000, label: 'baby tee' },
-  toddlerTee: { pricePence: 2000, label: 'toddler tee' },
-  babyBodysuitShort: { pricePence: 2000, label: 'short-sleeve baby bodysuit' },
+  babyTee: { pricePence: 3500, label: 'baby tee' },
+  toddlerTee: { pricePence: 3500, label: 'toddler tee' },
+  babyBodysuitShort: { pricePence: 3500, label: 'short-sleeve baby bodysuit' },
   watchStrap: { pricePence: 4500, label: 'watch strap' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)

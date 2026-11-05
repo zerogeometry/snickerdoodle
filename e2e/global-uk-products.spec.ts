@@ -30,7 +30,7 @@ async function checkoutTotal(page: Page, label: RegExp, total: string) {
   await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText(total);
 }
 
-test('toddler tee: 3–4 years in navy → basket → checkout at £20', async ({ page }) => {
+test('toddler tee: 3–4 years in navy → basket → checkout at £35, tracked', async ({ page }) => {
   test.setTimeout(240_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -50,15 +50,15 @@ test('toddler tee: 3–4 years in navy → basket → checkout at £20', async (
   await chip(page, 'Size', '3-4 years').click();
   await chip(page, 'Colour', 'navy').click();
   await expect(chip(page, 'Colour', 'navy')).toHaveAttribute('aria-pressed', 'true');
-  await expect(addButton(page)).toHaveText(/· £20$/);
-  // the honest post line: uk2 sends it Royal Mail 1st Class, untracked
-  await expect(page.getByText('free delivery', { exact: true })).toBeVisible();
+  await expect(addButton(page)).toHaveText(/· £35$/);
+  // it goes Express from uk2 so it's tracked (founder, 5 Nov) — and says so
+  await expect(page.getByText('free tracked delivery', { exact: true })).toBeVisible();
   await addButton(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
   await expect(page.getByText(/1 item added to your basket/i)).toBeVisible({ timeout: 30_000 });
   expect((await basketLines(page)).map((l) => l.sku)).toEqual(['toddlerTee-34years-navy']);
 
-  await checkoutTotal(page, /toddler tee/, '£20');
+  await checkoutTotal(page, /toddler tee/, '£35');
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);
 });
 
