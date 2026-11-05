@@ -19,7 +19,8 @@ import { seasonalExpected, seasonClock } from '@/lib/season';
 export const EXPECTED_POPULARITY = [
   // the christmas family bundle leads the shop (founder, 29 Oct: "the bundle appears at the top of the catalogue")
   'christmasBundle',
-  'framedPrint', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
+  // the multi photo frame sits up with the framed print (founder, 5 Nov: "fairly high up")
+  'framedPrint', 'multiPhotoFrame', 'mug', 'kidsTee', 'card', 'phoneCase', 'cushion', 'jigsaw', 'adultTee', 'blanket', 'storybook', 'babyBodysuit',
   // the range expansion (D21) joins the same range — one collection, shown together (founder, 2026-10-21)
   'cardPack', 'heightChart', 'socks', 'teaTowel', 'wrappingPaper', 'playingCards', 'kidsHoodie', 'adultHoodie', 'petBandana',
   // the dated 2027 wall calendar (D23, Christmas 2026 → mid-January)

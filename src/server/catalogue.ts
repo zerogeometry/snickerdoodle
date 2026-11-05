@@ -12,6 +12,7 @@ import {
 } from '@/lib/garments';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 import { BUNDLE_ONLY_SKUS, BUNDLE_SIZES, isBundleKey } from '@/lib/christmas-bundle';
+import { FRAME_GRIDS, MULTI_FRAME_COLOURS, type FrameSize } from '@/lib/multi-photo-frame';
 
 export { mmToPx };
 
@@ -79,6 +80,10 @@ const FRAME_COLOURS = ['gold', 'black', 'white', 'natural', 'brown', 'dark grey'
 // Every size is Prodigi's EXACT printAreaSizes (sandbox, 27 Oct), bleed 0 — Prodigi's area already
 // carries its bleed. The 12×16″ black and white frames take a slightly different file from the rest
 // (3614×4795 vs 3600×4800) — Prodigi's own data, so they get their own (`colourPx`).
+// Multi photo frames, priced ≈ 20% net after every cost: (1.03 × landed + £0.75) / 0.61, to the nearest
+// pound, on Prodigi's sandbox quotes to GB (5 Nov, standard prices): 3 × 3 £28 + £7.85 → £62 ·
+// 6 × 4 £40 + £10.75 → £87 · 10 × 6 £59 + £14.05 → £125 (every colour the same).
+const MULTI_FRAME_PRICE: Record<FrameSize, number> = { '12×12″': 6200, '16×24″': 8700, '24×36″': 12500 };
 const FRAME_SIZES: Array<{ size: string; sku: string; pricePence: number; colourPx?: Record<string, { w: number; h: number }> } & Canvas> = [
   { size: '11×14″', sku: 'GLOBAL-CFP-11X14', ...exactPx({ w: 3307, h: 4192 }, 300), pricePence: 6500 },
   { size: '12×16″', sku: 'GLOBAL-CFP-12X16', ...exactPx({ w: 3600, h: 4800 }, 300), colourPx: { black: { w: 3614, h: 4795 }, white: { w: 3614, h: 4795 } }, pricePence: 7000 },
@@ -138,6 +143,7 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
   framedPrint: 'portrait',
   jigsaw: 'landscape',
   blanket: 'landscape', // Prodigi's fleece-blanket print file is fixed LANDSCAPE (5905×3838 / 8740×5787px)
+  multiPhotoFrame: 'portrait', // the 16×24″ / 24×36″ files are portrait (their templates + our frames hang landscape)
 };
 
 /**
@@ -452,6 +458,29 @@ const DEFS: Record<string, ProductDef> = {
       size: c.size, pricePence: c.pricePence, ...exactPx(c.px, 300), prodigiSku: c.sku,
       printTo: ['cover', 'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'],
     })),
+  },
+  // The MULTI PHOTO FRAME (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md; src/lib/multi-photo-frame.ts):
+  // one framed print of a GRID of their drawings, 60 mm squares 20 mm apart, no mount — 3 × 3 (12×12″),
+  // 6 × 4 (16×24″) or 10 × 6 (24×36″), the rectangles hung landscape (founder, 5 Nov: these three, named
+  // by their drawings, each with the founder's layered photo). Made at gb3. The frame colour is a
+  // Prodigi `color` attribute of one SKU per size (all eight; gold leads). The print file is Prodigi's
+  // exact printAreaSizes (sandbox GET /v4.0/products, 5 Nov), 'default' only, bleed 0 — the grid and
+  // margins are drawn INTO it (frameGrid.ts). The 6 × 4 in gold is the catalogue's picture (the default).
+  multiPhotoFrame: {
+    category: 'PRINT', label: 'multi photo frame', blurb: 'a whole gallery of their art, in one frame', print: true, visibleInShop: true,
+    description: 'A whole gallery wall of wonky masterpieces in one frame — 9, 24 or 60 of their drawings, each in its own little square, ready to hang. Pick a drawing for every square, or let your favourite fill the gaps.',
+    specs: { drawings: '9 (3 × 3, 12×12″), 24 (6 × 4, 16×24″) or 60 (10 × 6, 24×36″)', squares: '6 × 6 cm, 2 cm apart', hangs: 'landscape (the 3 × 3 is square)', frame: 'classic wooden frame, eight colours', glazing: 'shatterproof', made: 'in the UK' },
+    // one variant per size × how it hangs × colour; a landscape rectangle's canvas is its landscape
+    // design (Prodigi's template), turned back to their portrait file at fulfilment (frameGrid.ts)
+    variants: FRAME_GRIDS.flatMap((g) =>
+      MULTI_FRAME_COLOURS.map((colour) => ({
+        size: g.size, colour, ...(g.orientation === 'square' ? {} : { orientation: g.orientation as 'landscape' | 'portrait' }),
+        pricePence: MULTI_FRAME_PRICE[g.size],
+        ...(g.name === '6x4' && colour === 'gold' ? { default: true } : {}), // the catalogue's picture
+        ...exactPx({ w: g.pxW, h: g.pxH }, 300),
+        prodigiSku: g.sku, prodigiAttrs: { color: colour },
+      })),
+    ),
   },
   adultTee: {
     category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,

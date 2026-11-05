@@ -15,7 +15,9 @@ import { GALLERY_FIT, type RawTransform, assessResolution, canvasSizePx, clampTr
 import { renderRepeatPattern } from './pattern';
 import { renderHeightChartFace } from './heightChart';
 import { isHeightChart } from './height-chart-geometry';
-import { assessPrintResolution } from './pattern-geometry';
+import { assessPrintResolution, frameSlotGeom } from './pattern-geometry';
+import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
+import { renderFrameTile } from './frameGrid';
 import { printSourceDims } from './sourceDims';
 import { DTG_GARMENT_KEYS, firmEdges } from './apparel';
 import { isDarkGarment } from '@/lib/garments';
@@ -157,6 +159,22 @@ export async function renderPrintFile(
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
     return persistPrintFile(db, input.assetId, fileKind, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+  }
+
+  // A MULTI PHOTO FRAME square: this drawing's TILE — its 60 mm window (+ the bleed under a mount),
+  // placed exactly like any print on that square. One tile per square, each a derivative of ITS OWN
+  // keepsake (so erasing a drawing erases its tile); fulfilment composes the frame's tiles into the
+  // one print file Prodigi gets, at the template's exact positions (src/server/print/frameGrid.ts).
+  if (variantRow?.key && isMultiPhotoFrameKey(variantRow.key)) {
+    const grid = frameGridForPx(tpl.printWidthPx, tpl.printHeightPx);
+    if (!grid) throw new Error(`no multi photo frame grid for a ${tpl.printWidthPx}×${tpl.printHeightPx} px print`);
+    const cell = frameSlotGeom(grid, geom);
+    const tileAssess = assessResolution(cell, judged, transform);
+    if (tileAssess.decision === 'BLOCK') {
+      throw new Error(`source too low-res for this product (would need ${tileAssess.upscaleFactor.toFixed(1)}× upscale)`);
+    }
+    const tile = await renderFrameTile(srcBuf, src, grid, transform, 1, tpl.requiredDpi);
+    return persistPrintFile(db, input.assetId, fileKind, tile.png, tpl.requiredDpi, tileAssess.effectiveDpi, tileAssess.decision === 'UPSCALE', tile.edge, tile.edge);
   }
 
   const assess = assessResolution(geom, judged, transform);

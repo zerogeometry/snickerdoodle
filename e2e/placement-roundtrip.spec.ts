@@ -12,7 +12,7 @@ import { basketLines, goClient, optionGroup, rangeReady, shopCatalogue, waitForA
  * In the editor: keyboard zoom (+), nudge (arrows), rotate (R) and the honest DPI badge; a mouse
  * drag moves the drawing; a two-finger pinch zooms; F resets; undo steps back.
  */
-const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle']);
+const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle', 'multiPhotoFrame']);
 type Tf = { scale: number; offsetX: number; offsetY: number; rotationDeg: number };
 
 const app = (page: Page) => page.locator('[role="application"]');

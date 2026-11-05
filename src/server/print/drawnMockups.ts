@@ -1,5 +1,6 @@
 import 'server-only';
 import { Resvg } from '@resvg/resvg-js';
+import { FRAME_MOULDING_HEX, frameGridForPx, frameSlotRects } from '@/lib/multi-photo-frame';
 
 /**
  * DRAWN product mockups for the range-expansion products with no photo yet (height chart, bandana),
@@ -13,7 +14,7 @@ import { Resvg } from '@resvg/resvg-js';
  * Shapes only — no text — so there are no fonts to bundle.
  */
 
-export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards', 'plasticBauble'] as const;
+export const DRAWN_PRODUCT_KEYS = ['socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'petBandana', 'playingCards', 'plasticBauble', 'multiPhotoFrame'] as const;
 export type DrawnProductKey = (typeof DRAWN_PRODUCT_KEYS)[number];
 export const isDrawnProduct = (key: string): key is DrawnProductKey => (DRAWN_PRODUCT_KEYS as readonly string[]).includes(key);
 
@@ -108,6 +109,30 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
         overlay: png(svg(`<rect x="${r.x + r.w * 0.2}" y="${r.y + r.h * 0.02}" width="${r.w * 0.42}" height="${cuffH}" fill="#fff" fill-opacity="0.35"/>${ribs}<path d="${sock}" fill="none" stroke="${INK}" stroke-opacity="0.35" stroke-width="3"/>`)),
         quad: quadOf(r),
         material: 'LIGHT_FABRIC',
+        W, H,
+      };
+    }
+    case 'multiPhotoFrame': {
+      // the classic frame in its colour, hung straight on (square, or long side across / down): the print sheet behind the glass is the
+      // print area; on the MOUNTED size a snow-white mount lies over it with a window over every square
+      // (the windows at the print's own positions — frameSlotRects — so the mount sits where it prints)
+      const grid = frameGridForPx(print.w, print.h);
+      const r = fit(a, 760, 760, W / 2, H / 2);
+      const face = Math.round(Math.max(r.w, r.h) * 0.05); // the moulding, a touch of the frame's size
+      const wood = FRAME_MOULDING_HEX[attrs.colour ?? ''] ?? FRAME_MOULDING_HEX.gold!;
+      const k = grid ? r.w / grid.pxW : 0;
+      const windows = grid?.mounted
+        ? frameSlotRects(grid).map((s) => `M${r.x + s.x * k} ${r.y + s.y * k} h${s.size * k} v${s.size * k} h${-s.size * k} Z`).join(' ')
+        : '';
+      const mount = grid?.mounted
+        ? `<path d="M${r.x} ${r.y} h${r.w} v${r.h} h${-r.w} Z ${windows}" fill="#FBFAF6" fill-rule="evenodd"/><path d="${windows}" fill="none" stroke="#000" stroke-opacity="0.12" stroke-width="2"/>`
+        : '';
+      const moulding = `<path d="M${r.x - face} ${r.y - face} h${r.w + 2 * face} v${r.h + 2 * face} h${-(r.w + 2 * face)} Z M${r.x} ${r.y} v${r.h} h${r.w} v${-r.h} Z" fill="${wood}" fill-rule="evenodd" stroke="${INK}" stroke-opacity="0.35" stroke-width="2"/>`;
+      return {
+        blank: png(svg(`${SHADOW_DEFS}<rect x="${r.x - face + 10}" y="${r.y - face + 16}" width="${r.w + 2 * face}" height="${r.h + 2 * face}" fill="#000" opacity="0.2" filter="url(#s)"/><rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="#fff"/>`, OAT)),
+        overlay: png(svg(`${mount}${moulding}`)),
+        quad: quadOf(r),
+        material: 'PAPER',
         W, H,
       };
     }

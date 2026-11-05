@@ -44,7 +44,7 @@ async function storedLayout(db: DbHandle, layout: BundleLayoutName | 'tile', sku
   if (!baseKey) return null;
   const regions: Stored['regions'] = [];
   for (const r of rows) {
-    const m = /^layout-[a-z0-9]+-(placemat|coaster|ornament)-(\d+)$/.exec(r.view);
+    const m = /^layout-[a-z0-9]+-(placemat|coaster|ornament|square)-(\d+)$/.exec(r.view);
     const weightKey = r.mask ? keys.get(r.mask) : undefined;
     if (!m || !weightKey || !r.quad) continue;
     regions.push({ role: m[1] as RegionRole, index: Number(m[2]), quad: r.quad, weightKey });
@@ -63,28 +63,39 @@ async function decodedLayout(s: Stored, edge: number): Promise<DecodedBundleLayo
 type SourceObject = { id: string; key: string; sha256: string | null };
 const designTag = (o: SourceObject) => `${o.id}${o.sha256 ? `.${o.sha256.slice(0, 10)}` : ''}`;
 
-/** Products whose catalogue + customize picture is a flattened layout (the founder's print maps, 29 Oct):
- * product key → [the variant sku the layout is stored on, the layout]. */
-const LAYOUT_PRODUCTS: Record<string, [string, BundleLayoutName | 'tile']> = {
+/** Products whose catalogue + customize picture is a flattened layout (the founder's print maps, 29 Oct;
+ * the multi photo frames, 5 Nov): product key → [the variant sku the layout is stored on — null = each
+ * variant's OWN (a frame per size × colour) — and the layout]. */
+const LAYOUT_PRODUCTS: Record<string, [string | null, BundleLayoutName | 'tile']> = {
   christmasBundle: [BUNDLE_KEY, 'thumb'], // the shopper's one drawing on every piece
   placemat: ['placemat', 'tile'],
   coaster: ['coaster', 'tile'],
+  multiPhotoFrame: [null, 'tile'], // the shopper's one drawing in every square (the catalogue tile)
 };
 export const isLayoutProduct = (productKey: string | null | undefined): boolean => !!productKey && productKey in LAYOUT_PRODUCTS;
+/** The sku a product's layout is stored on, for this variant. */
+const layoutSku = (productKey: string, variantSku?: string): string | null => {
+  const entry = LAYOUT_PRODUCTS[productKey];
+  return entry ? (entry[0] ?? variantSku ?? null) : null;
+};
 
-/** A layout picture's derivative key — null while that product has no layout stored. `placement` (a
- * hash of the shopper's placement) only for the standalone placemat / coaster. */
-export async function layoutTileKey(db: DbHandle, productKey: string, assetId: string, srcObj: SourceObject, size: MockupSize, placement = ''): Promise<string | null> {
-  const [sku, layout] = LAYOUT_PRODUCTS[productKey] ?? [];
+/** A layout picture's derivative key — null while that product (variant) has no layout stored.
+ * `placement` (a hash of the shopper's placement) for the standalone placemat / coaster + the frames. */
+export async function layoutTileKey(db: DbHandle, productKey: string, assetId: string, srcObj: SourceObject, size: MockupSize, placement = '', variantSku?: string): Promise<string | null> {
+  const [, layout] = LAYOUT_PRODUCTS[productKey] ?? [];
+  const sku = layoutSku(productKey, variantSku);
   if (!sku || !layout) return null;
   const s = await storedLayout(db, layout, sku);
-  return s ? derivativeKey(assetId, `mockup-${productKey}-${layout}-${size}-v${s.version}${BUNDLE_REV}-${designTag(srcObj)}${placement ? `-${placement}` : ''}`) : null;
+  // a per-variant layout names its variant (each frame colour + size is its own picture)
+  const own = LAYOUT_PRODUCTS[productKey]![0] === null ? `-${sku}` : '';
+  return s ? derivativeKey(assetId, `mockup-${productKey}${own}-${layout}-${size}-v${s.version}${BUNDLE_REV}-${designTag(srcObj)}${placement ? `-${placement}` : ''}`) : null;
 }
 
 /** Render + store a layout picture (the caller passed composeMockup's authz gate for this asset): the
  * one drawing on every print area, at the shopper's placement when given. */
-export async function composeLayoutTile(db: DbHandle, args: { productKey: string; assetId: string; key: string; srcObj: SourceObject; size: MockupSize; placement?: Transform; memo?: ComposeMemo }): Promise<MockupResult> {
-  const [sku, layout] = LAYOUT_PRODUCTS[args.productKey] ?? [];
+export async function composeLayoutTile(db: DbHandle, args: { productKey: string; variantSku?: string; assetId: string; key: string; srcObj: SourceObject; size: MockupSize; placement?: Transform; memo?: ComposeMemo }): Promise<MockupResult> {
+  const [, layout] = LAYOUT_PRODUCTS[args.productKey] ?? [];
+  const sku = layoutSku(args.productKey, args.variantSku);
   const s = sku && layout ? await storedLayout(db, layout, sku) : null;
   if (!s) throw new Error('no layout yet');
   const [decodedL, drawing] = await Promise.all([
@@ -144,5 +155,56 @@ export async function renderBundlePreview(
   const [layout, placemat, coaster, ...ornaments] = await Promise.all([decodedLayout(s, EDGE.builder), ...arts.map(drawingOf)]);
   const pick = (role: RegionRole, i: number) => (role === 'placemat' ? placemat! : role === 'coaster' ? coaster! : (ornaments[i] ?? placemat!));
   const out = await withLimit(async () => encodeBundle(await renderBundleLayers(layout, pick)));
+  return { webp: out.buffer, ms: Math.round(performance.now() - t0) };
+}
+
+/** Is there a builder picture for this frame variant (its layout seeded)? */
+export async function hasFrameLayout(db: DbHandle, variantSku: string): Promise<boolean> {
+  return (await storedLayout(db, 'tile', variantSku)) !== null;
+}
+
+/**
+ * The MULTI PHOTO FRAME builder's picture: the founder's frame (that size, that colour) with each
+ * square's own drawing at its own placement. EVERY distinct drawing passes the authz gate
+ * (assertCanViewAsset) before a byte of it is read; a source object must belong to its asset. Rendered in
+ * memory and handed straight back — never stored (a picture of several keepsakes can't belong to one).
+ */
+export async function renderFramePreview(
+  db: DbHandle,
+  who: { accountId: string | null; uploadClaims: string[] },
+  input: { variantSku: string; squares: Array<{ assetId: string; sourceObjectId?: string | null; transform?: Transform }> },
+): Promise<{ webp: Buffer; ms: number } | null> {
+  const t0 = performance.now();
+  for (const id of new Set(input.squares.map((a) => a.assetId))) {
+    const viewer = await resolveAssetViewer(db, id, who.accountId, who.uploadClaims);
+    try {
+      await getViewableAssetOrThrow(db, id, viewer); // ← assertCanViewAsset; throws on deny
+    } catch {
+      throw new BundlePreviewDenied('not yours to see');
+    }
+  }
+  const s = await storedLayout(db, 'tile', input.variantSku);
+  if (!s) return null;
+  const memo: ComposeMemo = new Map();
+  const byArt = new Map<string, Promise<DecodedDrawing>>();
+  const drawingOf = (a: { assetId: string; sourceObjectId?: string | null }) => {
+    const k = `${a.assetId}|${a.sourceObjectId ?? ''}`;
+    let p = byArt.get(k);
+    if (!p) {
+      p = (async () => {
+        const [o] = a.sourceObjectId
+          ? await db.select().from(storageObjects).where(and(eq(storageObjects.id, a.sourceObjectId), eq(storageObjects.assetId, a.assetId)))
+          : await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, a.assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
+        if (!o) throw new BundlePreviewDenied('no such drawing');
+        return decodeDrawing(await designBytes(o.key, THUMB_DESIGN_EDGE, memo, { assetId: a.assetId, tag: designTag(o) }));
+      })();
+      byArt.set(k, p);
+    }
+    return p;
+  };
+  const [layout, ...drawings] = await Promise.all([decodedLayout(s, EDGE.builder), ...input.squares.map(drawingOf)]);
+  const out = await withLimit(async () =>
+    encodeBundle(await renderBundleLayers(layout, (role, i) => (role === 'square' ? (drawings[i] ?? null) : null), undefined, (role, i) => (role === 'square' ? input.squares[i]?.transform : undefined))),
+  );
   return { webp: out.buffer, ms: Math.round(performance.now() - t0) };
 }

@@ -2,12 +2,14 @@ import 'server-only';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { setBundleLayout, setMockupTemplate, setMockupView } from './templates';
-import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, ROLE_PIECE, type BundleLayoutName } from './bundleMockup';
-import { BUNDLE_KEY, BUNDLE_PIECE_GEOM } from '@/lib/christmas-bundle';
+import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, regionGeom, type BundleLayoutName } from './bundleMockup';
+import { buildFrameLayout, frameLayoutDir } from './frameLayout';
+import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
+import { BUNDLE_KEY } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
@@ -150,17 +152,38 @@ async function storeLayout(db: DbHandle, sku: string, layout: string, built: Awa
     layout,
     base: built.base,
     regions: built.regions.map((r) => {
-      const g = BUNDLE_PIECE_GEOM[ROLE_PIECE[r.role]];
+      const g = regionGeom(r.role).geom;
       return { ...r, printWidthPx: g.printWidthPx, printHeightPx: g.printHeightPx, materialClass: r.role === 'ornament' ? ('GLOSS' as const) : ('PAPER' as const) };
     }),
   });
   return built.regions.length;
 }
 
-/** Every staged flattened layout: the family bundle's four pictures, the placemat + coaster tiles, and
- * the placemat's back photo. Returns how many print areas were stored. */
-export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+/** Every staged flattened layout: the family bundle's four pictures, the placemat + coaster tiles, the
+ * placemat's back photo, and the multi photo frames (each size × colour). Returns how many print areas
+ * were stored. */
+/** The multi photo frames' pictures (frameLayout.ts): the founder's layers for each size, the frame in
+ * each colour, stored on that variant. A size whose layers aren't staged keeps its drawn frame. */
+async function seedFrameLayouts(db: DbHandle): Promise<number> {
+  if (!existsSync(BUNDLE_BACKDROP)) return 0;
+  const rows = await db
+    .select({ sku: productVariants.sku, attrs: productVariants.attributes })
+    .from(productVariants)
+    .innerJoin(products, eq(products.id, productVariants.productId))
+    .where(and(eq(products.key, MULTI_PHOTO_FRAME_KEY), eq(productVariants.active, true))); // (a retired variant keeps no picture)
   let n = 0;
+  for (const r of rows) {
+    const a = (r.attrs as Record<string, string>) ?? {};
+    const grid = frameGridOf(a.size, a.orientation);
+    const dir = grid ? frameLayoutDir(grid) : null;
+    if (!dir || !a.colour) continue;
+    n += await storeLayout(db, r.sku, 'tile', await buildFrameLayout(dir, a.colour, BUNDLE_BACKDROP));
+  }
+  return n;
+}
+
+export async function seedBundleLayouts(db: DbHandle): Promise<number> {
+  let n = await seedFrameLayouts(db);
   for (const name of BUNDLE_LAYOUTS) {
     const dir = bundleLayoutDir(name);
     if (dir) n += await storeLayout(db, BUNDLE_KEY, name, await buildBundleLayout(dir, BUNDLE_BACKDROP));
@@ -289,6 +312,11 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
         ? { file: FRAME[colour], material: 'PAPER', register: 'window-cover', ...(orientation === 'landscape' ? { rotate: 90 as const } : {}) }
         : null;
     }
+    case 'multiPhotoFrame':
+      // the PRIMARY picture is the founder's frame photo with a drawing in every numbered square — a
+      // flattened layout per size × colour (frameLayout.ts, seedFrameLayouts); this drawn frame is only
+      // its stand-in where those layers aren't staged
+      return { material: 'PAPER', register: 'drawn', key: 'multiPhotoFrame' };
     case 'cushion': {
       // heart / 18″ round / (12″ | 22″) square — the two squares share one shape (both 1:1).
       const shape = size === 'heart' ? 'heart' : size === '18″ round' ? 'round' : 'square';

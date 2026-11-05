@@ -9,9 +9,9 @@ import { gbp, goClient, optionGroup, pressedIn, rangeReady, shopCatalogue, waitF
  * for the chosen variant, painted on screen), nothing spills sideways, the primary action sits in the
  * thumb zone on a phone, and EVERY option chip (size / orientation / colour / phone case / finish)
  * picks the database's variant for that combination at the database's price — with a fresh preview
- * of that variant. The builders (card pack, calendar, family bundle) have their own specs.
+ * of that variant. The builders (card pack, calendar, family bundle, multi photo frame) have their own specs.
  */
-const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle']);
+const BUILDERS = new Set(['cardPack', 'calendar', 'christmasBundle', 'multiPhotoFrame']);
 const GROUPS = ['Size', 'Orientation', 'Colour', 'Case', 'Finish'] as const;
 const ATTR: Record<(typeof GROUPS)[number], string> = { Size: 'size', Orientation: 'orientation', Colour: 'colour', Case: 'grade', Finish: 'finish' };
 const BR = String.fromCharCode(10);

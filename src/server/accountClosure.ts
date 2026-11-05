@@ -10,6 +10,7 @@ import {
   giftLinks,
   invites,
   memberships,
+  orderItems,
   orders,
   profileImages,
   promoCodes,
@@ -20,7 +21,9 @@ import {
 import { eraseAsset } from './assets';
 import { deleteObject } from '@/storage';
 import { giftNoteInsertKey } from '@/fulfillment/giftNoteInsertKey';
+import { frameGridKey } from '@/fulfillment/frameGridKey';
 import { appUrl, sendMail } from './mail';
+import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { recordErasure } from './erasureLedger';
 import { eraseProfileImage } from './profile';
 import type { DbHandle } from './db';
@@ -156,6 +159,12 @@ export async function closeAccount(
   for (const o of withInsert) {
     if (o.insert?.status === 'sent' || o.insert?.status === 'partly') await deleteObject(giftNoteInsertKey(o.id)).catch(() => {});
   }
+  // …and a multi photo frame's composed file (it holds every square's drawing) — normally gone already,
+  // deleted when the order shipped or was cancelled; best effort, a missing file is fine.
+  const frameLines = withInsert.length
+    ? await db.select({ id: orderItems.id, orderId: orderItems.orderId, productKey: orderItems.productKey }).from(orderItems).where(inArray(orderItems.orderId, withInsert.map((o) => o.id)))
+    : [];
+  for (const l of frameLines) if (isMultiPhotoFrameKey(l.productKey)) await deleteObject(frameGridKey(l.orderId, l.id)).catch(() => {});
   await db
     .update(orders)
     .set({ buyerEmail: null, shippingAddress: null, giftFromName: null, giftNote: null, tracking: null })

@@ -104,7 +104,7 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
       uk7: '2026-12-10', // Guernsey Post: cards + card packs
       uk15: '2026-12-11', // the calendar lab ("Mixed" carrier, no express)
       gb2: '2026-12-11', // Royal Mail RM24 (untracked): wrapping paper, Evri for some
-      gb3: '2026-12-14', // Evri: framed prints, jigsaws, height chart
+      gb3: '2026-12-14', // Evri: framed prints, multi photo frames, jigsaws, height chart
       uk2: '2026-12-12', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date)
       uk6: '2026-12-16', // phone cases go Express
       other: '2026-12-10', // anything we haven't mapped: the earliest date, to be safe
@@ -121,7 +121,7 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   card: 'uk7', cardPack: 'uk7',
   calendar: 'uk15',
   wrappingPaper: 'gb2',
-  framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3',
+  framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3', multiPhotoFrame: 'gb3', // the multi photo frames: gb3 — Evri / DPD Local / FedEx by size (sandbox, 5 Nov)
   christmasJumper: 'uk2', babyBodysuit: 'uk2',
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
   christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24

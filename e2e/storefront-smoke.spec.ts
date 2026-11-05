@@ -82,6 +82,7 @@ async function uploadAndOpenRange(page: Page, art: Buffer) {
 }
 
 test('storefront: every live product renders, adds, and prices to the server total', async ({ page }) => {
+  test.setTimeout(120_000); // eleven products, each composed on the range and on its customize page (it sat at ~30 s)
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
 

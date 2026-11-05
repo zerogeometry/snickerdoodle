@@ -4,7 +4,9 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { BUNDLE_PIECE_GEOM, type BundlePiece, type BundleSize } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { clampTransform, computeLayerRect, type Transform } from './geometry';
+import { clampTransform, computeLayerRect, type TemplateGeom, type Transform } from './geometry';
+import { MULTI_PHOTO_FRAME_KEY, PHOTO_MM } from '@/lib/multi-photo-frame';
+import { mmToPx } from './geometry';
 
 /**
  * The CHRISTMAS FAMILY BUNDLE's pictures (founder, 29 Oct), composed from the founder's own PSD layers
@@ -32,9 +34,18 @@ export type BundleLayoutName = 'thumb' | 'x2' | 'x4' | 'x8';
 export const BUNDLE_LAYOUTS: readonly BundleLayoutName[] = ['thumb', 'x2', 'x4', 'x8'];
 export const layoutForSize = (n: BundleSize): BundleLayoutName => (n === 2 ? 'x2' : n === 4 ? 'x4' : 'x8');
 
-/** A print area of a layout. `index` counts that role's areas in stacking order (ornament 0, 1, …). */
-export type RegionRole = 'placemat' | 'coaster' | 'ornament';
-export const ROLE_PIECE: Record<RegionRole, BundlePiece> = { placemat: 'placemat', coaster: 'coaster', ornament: 'ceramicOrnament' };
+/** A print area of a layout. `index` counts that role's areas in stacking order (ornament 0, 1, …); a
+ * multi photo frame's `square` is its numbered print map (square 1 = index 0). */
+export type RegionRole = 'placemat' | 'coaster' | 'ornament' | 'square';
+export const ROLE_PIECE: Record<Exclude<RegionRole, 'square'>, BundlePiece> = { placemat: 'placemat', coaster: 'coaster', ornament: 'ceramicOrnament' };
+/** One square of a multi photo frame as it's SEEN: its 60 mm window (no mount ⇒ no bleed), 300 dpi. */
+export const FRAME_SQUARE_GEOM: TemplateGeom = { printWidthPx: mmToPx(PHOTO_MM, 300), printHeightPx: mmToPx(PHOTO_MM, 300), bleedMm: 0, requiredDpi: 300 };
+/** A print area's print canvas + the drawing's default placement on it (the print file's own). */
+export function regionGeom(role: RegionRole): { geom: TemplateGeom; place: Transform } {
+  if (role === 'square') return { geom: FRAME_SQUARE_GEOM, place: clampTransform(defaultTransformFor(MULTI_PHOTO_FRAME_KEY)) };
+  const piece = ROLE_PIECE[role];
+  return { geom: BUNDLE_PIECE_GEOM[piece], place: clampTransform(defaultTransformFor(piece)) };
+}
 
 /** Seed-time output: the flattened base + per area its weight mask and oriented rectangle. */
 export interface BuiltBundleLayout {
@@ -48,9 +59,13 @@ export interface BuiltBundleLayout {
 interface ManifestLayer {
   order: number;
   file: string;
-  role: 'placemat' | 'coaster' | 'ornament-print' | 'ornament-edge' | 'ornament-string';
+  /** the bundle's pieces; a multi photo frame's `square` print maps over its `backing` + `frame`; a
+   * `shadow` layer is never drawn — its silhouette casts the soft contact shadow */
+  role: 'placemat' | 'coaster' | 'ornament-print' | 'ornament-edge' | 'ornament-string' | 'square' | 'backing' | 'frame' | 'shadow';
   bbox: [number, number, number, number];
 }
+/** A layer for buildLayout: its file, or its pixels already made (a recoloured frame), on the canvas. */
+export type LayoutLayer = { file: string | Buffer; role: ManifestLayer['role'] };
 
 /** The soft contact shadow under each piece: its silhouette, blurred, nudged down-right, faint black. */
 export const SHADOW = { blurFrac: 0.009, dxFrac: 0.002, dyFrac: 0.007, opacity: 0.32 } as const;
@@ -113,11 +128,11 @@ export function coverQuadAt(alpha: Uint8Array | Buffer, W: number, H: number, pr
 }
 
 const printAspectOf = (role: RegionRole) => {
-  const g = BUNDLE_PIECE_GEOM[ROLE_PIECE[role]];
+  const g = regionGeom(role).geom;
   return g.printWidthPx / g.printHeightPx;
 };
 
-async function rgbaOf(file: string, W: number, H: number): Promise<Uint8Array> {
+async function rgbaOf(file: string | Buffer, W: number, H: number): Promise<Uint8Array> {
   const { data, info } = await sharp(file).resize(W, H, { fit: 'fill' }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   if (info.channels !== 4) throw new Error(`${file}: expected RGBA`);
   return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
@@ -181,7 +196,7 @@ export async function buildBundleLayout(dir: string, backdropFile: string): Prom
  * The same, from a plain list of layers (bottom → top) — e.g. the standalone placemat's one print map,
  * the coasters' back + front (the front's shadow falls on the back one).
  */
-export async function buildLayout(layers: ReadonlyArray<{ file: string; role: ManifestLayer['role'] }>, canvas: [number, number], backdropFile: string): Promise<BuiltBundleLayout> {
+export async function buildLayout(layers: ReadonlyArray<LayoutLayer>, canvas: [number, number], backdropFile: string): Promise<BuiltBundleLayout> {
   const [W, H] = canvas;
   const N = W * H;
 
@@ -194,13 +209,26 @@ export async function buildLayout(layers: ReadonlyArray<{ file: string; role: Ma
   if (backdrop.info.channels !== 4) throw new Error('backdrop: expected RGBA');
   stack.push({ kind: 'fixed', rgb: new Uint8Array(backdrop.data.buffer, backdrop.data.byteOffset, backdrop.data.byteLength), a: new Float32Array(N).fill(1), aScale: 1 });
 
-  const counts: Record<RegionRole, number> = { placemat: 0, coaster: 0, ornament: 0 };
+  const counts: Record<RegionRole, number> = { placemat: 0, coaster: 0, ornament: 0, square: 0 };
   const quads: Array<{ role: RegionRole; index: number; quad: [number, number][] }> = [];
   for (let i = 0; i < layers.length; i++) {
     const l = layers[i]!;
     const rgba = await rgbaOf(l.file, W, H);
-    const isShape = l.role === 'placemat' || l.role === 'coaster' || l.role === 'ornament-print';
+    const isShape = l.role === 'placemat' || l.role === 'coaster' || l.role === 'ornament-print' || l.role === 'square';
     const a = isShape ? shapeMaskOf(rgba) : alphaOf(rgba);
+    if (l.role === 'shadow') {
+      // never drawn: its silhouette's soft contact shadow on whatever is below (a frame on its backdrop)
+      stack.push({ kind: 'fixed', rgb: [0, 0, 0], a: await shadowOf(a, W, H), aScale: 1 });
+      continue;
+    }
+    if (l.role === 'square') {
+      // a multi photo frame's numbered print map: an upright square, laid exactly on the map (no shadow
+      // of its own — the frame's is under everything)
+      const index = counts.square++;
+      stack.push({ kind: 'slot', role: 'square', index, a });
+      quads.push({ role: 'square', index, quad: coverQuadAt(a, W, H, 1, 0) });
+      continue;
+    }
     if (l.role === 'placemat' || l.role === 'coaster' || l.role === 'ornament-print') {
       const role: RegionRole = l.role === 'ornament-print' ? 'ornament' : l.role;
       // an ornament's shadow is its whole disc: the print face and its edge together
@@ -321,9 +349,9 @@ export async function decodeDrawing(buf: Buffer): Promise<DecodedDrawing> {
 
 /** The drawing laid on a piece's print canvas exactly as its print file (white, at `placement` — the
  * piece's default unless the shopper placed it), at `w × h` px, turned `deg` — RGBA. */
-async function pieceArt(d: DecodedDrawing, piece: BundlePiece, w: number, h: number, deg: number, placement?: Transform): Promise<{ data: Buffer; width: number; height: number }> {
-  const geom = BUNDLE_PIECE_GEOM[piece];
-  const t = placement ?? clampTransform(defaultTransformFor(piece));
+async function pieceArt(d: DecodedDrawing, role: RegionRole, w: number, h: number, deg: number, placement?: Transform): Promise<{ data: Buffer; width: number; height: number }> {
+  const { geom, place } = regionGeom(role);
+  const t = placement ?? place;
   const r = computeLayerRect(geom, { width: d.width, height: d.height }, t);
   const s = w / geom.printWidthPx;
   const rw = Math.max(1, Math.round(r.width * s)), rh = Math.max(1, Math.round(r.height * s));
@@ -362,6 +390,8 @@ export async function renderBundleLayers(
   drawingFor: (role: RegionRole, index: number) => DecodedDrawing | null,
   /** the shopper's own placement (a standalone placemat / coaster); absent ⇒ each piece's default */
   placement?: Transform,
+  /** a print area's own placement (a frame's squares, each its shopper's), over `placement` */
+  placementFor?: (role: RegionRole, index: number) => Transform | undefined,
 ): Promise<{ data: Buffer; width: number; height: number }> {
   const { W, H } = layout;
   const out = Buffer.from(layout.base); // a copy — the base is cached
@@ -378,9 +408,10 @@ export async function renderBundleLayers(
       const deg = Math.round(((Math.atan2(ey, ex) * 180) / Math.PI) * 10) / 10;
       const cx = (tl[0] + (tr[0] - tl[0]) / 2 + (bl[0] - tl[0]) / 2) * W, cy = (tl[1] + (tr[1] - tl[1]) / 2 + (bl[1] - tl[1]) / 2) * H;
       // the same drawing at the same size + angle (a row of ornaments) is laid out once
-      const id = `${r.role}|${w}x${h}@${deg}|${drawingKey(d)}`;
+      const own = placementFor?.(r.role, r.index) ?? placement;
+      const id = `${r.role}|${w}x${h}@${deg}|${drawingKey(d)}|${own ? `${own.scale},${own.offsetX},${own.offsetY},${own.rotationDeg}` : ''}`;
       let p = made.get(id);
-      if (!p) made.set(id, (p = pieceArt(d, ROLE_PIECE[r.role], w, h, deg, placement)));
+      if (!p) made.set(id, (p = pieceArt(d, r.role, w, h, deg, own)));
       const art = await p;
       const ox = Math.round(cx - art.width / 2), oy = Math.round(cy - art.height / 2);
       const { box, weight } = r;

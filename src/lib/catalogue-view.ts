@@ -47,7 +47,8 @@ export const isLineOfSku = (id: string, sku: string) => id === lineIdForSku(sku)
 // scaled without stretching (a little of the edges may crop).
 // + the coaster (founder's bundle, 27 Oct): a small square the drawing fills.
 // + the placemat (founder, 29 Oct: "scaled to fill the whole placemat, as standard for most of our products").
-const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug', 'calendar', 'ceramicOrnament', 'christmasBauble', 'coaster', 'placemat']);
+// + the multi photo frame (5 Nov): each drawing fills its square, like a card in a pack.
+const COVER_DEFAULT = new Set(['framedPrint', 'jigsaw', 'cushion', 'blanket', 'card', 'cardPack', 'mug', 'calendar', 'ceramicOrnament', 'christmasBauble', 'coaster', 'placemat', 'multiPhotoFrame']);
 export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
 /**
  * Which way a landscape drawing turns (clockwise degrees, as the renderer's rotate): a quarter turn

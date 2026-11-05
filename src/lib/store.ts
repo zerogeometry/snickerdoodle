@@ -5,6 +5,7 @@ import type { ProductKey } from '@/ui/components/ProductArt';
 import { DELIVERY_PENCE, formatPence } from '@/pricing';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
+import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { isBundleKey, type BundleSpec } from '@/lib/christmas-bundle';
 import { basketLineId } from '@/lib/basket-line';
 import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadSessionState } from '@/lib/uploadSession';
@@ -278,6 +279,10 @@ export type BasketItem = {
    * filled by repeating). `artwork` mirrors the cover, for the thumbnails. The server re-fills and
    * re-checks every page at order time; qty = copies of the same calendar. */
   pages?: PackCardLine[];
+  /** A MULTI PHOTO FRAME line only: one drawing per square, row by row from the top-left (9 or 16 —
+   * gaps already filled with the main drawing). `artwork` mirrors the first square, for the
+   * thumbnails. The server re-fills and re-checks every square at order time; qty = copies. */
+  slots?: PackCardLine[];
   /** DISPLAY ONLY (pack lines): the single-card variant the pack's fronts preview on, so the basket
    * can show the real first card. Never sent to the server. */
   previewVariantId?: string;
@@ -292,6 +297,8 @@ export type PackCardLine = { assetId: string; transform: PlacementTransform; sou
 export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.product);
 /** Is this basket line a calendar? (Its pages are edited in the calendar builder.) */
 export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(i.product);
+/** Is this basket line a multi photo frame? (Its squares are edited in the frame builder.) */
+export const isFrameGridLine = (i: Pick<BasketItem, 'product'>) => isMultiPhotoFrameKey(i.product);
 /** Is this basket line the Christmas family bundle? (Always ONE bundle; edited in its builder.) */
 export const isBundleLine = (i: Pick<BasketItem, 'product'>) => isBundleKey(i.product);
 /** A line that is always exactly ONE (a card pack, the bundle): re-adding replaces it, qty stays 1. */
@@ -387,7 +394,7 @@ export const basketSubtotal = (items: BasketItem[]) => items.reduce((n, i) => n 
  * The basket as the order action receives it: product keys (the variant sku when chosen) + qty, and
  * WHICH drawings — never a price. A personalised line folds its per-print details (cushion back,
  * card inside message, span) into `artwork`; a card PACK sends qty 1 + its `cards` (+ its one base
- * colour) instead, and a CALENDAR its 13 `pages`.
+ * colour) instead, a CALENDAR its 13 `pages`, and a MULTI PHOTO FRAME its `slots` (one per square).
  */
 export function orderItemsFor(items: BasketItem[]) {
   return items.map((i) => {
@@ -395,6 +402,7 @@ export function orderItemsFor(items: BasketItem[]) {
     if (isPackLine(i)) return { productKey, qty: 1, ...(i.ground ? { ground: i.ground } : {}), cards: (i.cards ?? []).map((c) => ({ assetId: c.assetId, transform: c.transform, ...(c.sourceObjectId ? { sourceObjectId: c.sourceObjectId } : {}) })) };
     if (isBundleLine(i)) return { productKey, qty: 1, bundle: i.bundle ?? null };
     if (isCalendarLine(i) && i.pages?.length) return { productKey, qty: i.qty, pages: i.pages.map((p) => ({ assetId: p.assetId, transform: p.transform, ...(p.sourceObjectId ? { sourceObjectId: p.sourceObjectId } : {}) })) };
+    if (isFrameGridLine(i) && i.slots?.length) return { productKey, qty: i.qty, slots: i.slots.map((p) => ({ assetId: p.assetId, transform: p.transform, ...(p.sourceObjectId ? { sourceObjectId: p.sourceObjectId } : {}) })) };
     return { productKey, qty: i.qty, ...(i.artwork ? { artwork: { ...i.artwork, back: i.back, ground: i.ground, message: i.message, cardImageSpan: i.cardImageSpan } } : {}) };
   });
 }
