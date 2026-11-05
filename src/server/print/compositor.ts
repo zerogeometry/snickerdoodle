@@ -616,10 +616,12 @@ export async function renderTemplatePreview(args: {
   }
   const meta = await sharp(args.blank).metadata();
   const placedGround = !face && isGroundProduct(args.productKey) && normalizeGround(args.ground) ? groundHex(args.ground) : undefined;
-  const common = { blankBuf: args.blank, designBuf, ids: {}, quad: args.quad, transform, workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print, groundHex: placedGround };
-  const out = !isAxisAligned(args.quad) || args.extraQuads?.length
-    ? await renderPerspective({ ...common, extraQuads: args.extraQuads?.length ? args.extraQuads : undefined, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, paperTone: PAPER_TONE[args.productKey] })
-    : await renderFlat({ ...common, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass });
+  // the shop's own tier choice (perspective / the mug's cylinder / flat)
+  const out = await renderMockupLayers({
+    blank: args.blank, mask: args.mask, overlay: args.overlay, design: designBuf, quad: args.quad, extraQuads: args.extraQuads, transform,
+    workEdge: Math.max(meta.width ?? 0, meta.height ?? 0), outputEdge: OUTPUT_EDGE[args.size ?? 'zoom'], print: args.print,
+    materialClass: args.materialClass, groundHex: placedGround, paperTone: PAPER_TONE[args.productKey],
+  });
   return out.buffer;
 }
 

@@ -139,6 +139,11 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/examples/underseaphone.webp',
   '/examples/whaletubesocks.webp',
   '/examples/zebra-framed-print.webp',
+  '/products/adult-t-shirt.webp',
+  '/products/christmas-family-bundle.webp',
+  '/products/coasters.webp',
+  '/products/placemats.webp',
+  '/products/wall-calendar.webp',
 ]);
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the

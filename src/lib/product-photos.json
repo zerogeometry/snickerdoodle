@@ -1,0 +1,27 @@
+{
+  "adultTee": {
+    "src": "/products/adult-t-shirt.webp",
+    "width": 983,
+    "height": 968
+  },
+  "calendar": {
+    "src": "/products/wall-calendar.webp",
+    "width": 1200,
+    "height": 1200
+  },
+  "christmasBundle": {
+    "src": "/products/christmas-family-bundle.webp",
+    "width": 1024,
+    "height": 1024
+  },
+  "coaster": {
+    "src": "/products/coasters.webp",
+    "width": 1024,
+    "height": 1024
+  },
+  "placemat": {
+    "src": "/products/placemats.webp",
+    "width": 1024,
+    "height": 1024
+  }
+}

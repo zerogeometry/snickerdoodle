@@ -685,7 +685,7 @@ function variantAttributes(v: VariantDef): Record<string, string> {
   return a;
 }
 
-export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; dpi: number; bleedMm: number }> {
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; mm: { w: number; h: number }; dpi: number; bleedMm: number }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     return def.variants.map((v, i) => ({
@@ -693,7 +693,7 @@ export function definedPriceList(): Array<{ productKey: string; sku: string; isD
       pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
       visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
       px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
-      dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
+      mm: { w: v.wMm, h: v.hMm }, dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
     }));
   });
 }
