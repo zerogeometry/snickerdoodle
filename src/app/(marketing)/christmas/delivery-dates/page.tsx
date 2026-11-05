@@ -29,6 +29,7 @@ const ROWS: { route: Route; what: string; how: string }[] = [
   { route: 'gb2', what: 'wrapping paper', how: 'standard (untracked)' },
   { route: 'uk7', what: 'cards and card packs', how: 'standard (untracked)' },
   { route: 'uk6', what: 'phone cases', how: 'express, tracked' },
+  { route: 'uk6std', what: 'apple watch straps', how: 'tracked' },
 ];
 
 export default function DeliveryDatesPage() {

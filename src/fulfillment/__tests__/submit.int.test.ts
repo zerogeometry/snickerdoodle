@@ -33,6 +33,10 @@ describe('resolveShippingMethod', () => {
     expect(resolveShippingMethod(['framedPrint', 'phoneCase-iphone16-tough-matte'])).toBe('Express');
     expect(resolveShippingMethod(['phoneCaseholder'])).toBe('Standard'); // only the real key
   });
+  it('never Express with a calendar in the order — Prodigi has none for it and would refuse the whole order', () => {
+    expect(resolveShippingMethod(['phoneCase', 'calendar-a4'])).toBe('Standard');
+    expect(resolveShippingMethod(['calendar'])).toBe('Standard');
+  });
   it('Standard otherwise (garments, prints, the family set)', () => {
     expect(resolveShippingMethod(['kidsTee-34years-white', 'adultTee', 'babyBodysuit'])).toBe('Standard');
     expect(resolveShippingMethod(['framedPrint'])).toBe('Standard');

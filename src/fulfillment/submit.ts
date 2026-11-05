@@ -12,6 +12,7 @@ import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD
 import { startRetentionClockForOrder } from '@/server/retention';
 import { sendOrderShipped } from '@/server/orderEmails';
 import { alertHandLines } from './handLines';
+import { shippingMethodFor } from '@/lib/delivery';
 import { giftNoteInsertKey, giftNoteInsertSlot, planGiftNoteInsert, type GiftNoteInsertRecord, type GiftNoteInsertSlot } from './giftNoteInsert';
 
 /**
@@ -89,11 +90,12 @@ export function assertProdigiConfigConsistent(env: GateEnv): void {
  *
  * PHONE CASES opt back in (founder, 2026-10-21: "definitely tracked"): their Standard service is
  * often untracked Royal Mail 24 (lab uk8), Express is Royal Mail Tracked (lab uk6). Prodigi takes
- * ONE method per order, so an order with a case goes Express as a whole (~£1–3 more on the
- * other items, re-quoted 2026-10-21) — simpler and safer than splitting the order.
+ * ONE method per order, so an order with a case goes Express as a whole (+£1.05 to +£8.05 on the
+ * other items — src/lib/delivery.ts, sandbox 5 Nov) — simpler and safer than splitting the order. An
+ * order with a calendar stays Standard: Prodigi has no Express for it and would refuse the whole order.
  */
 export function resolveShippingMethod(productKeys: string[]): 'Standard' | 'Express' {
-  return productKeys.some((k) => k === 'phoneCase' || k.startsWith('phoneCase-')) ? 'Express' : 'Standard';
+  return shippingMethodFor(productKeys);
 }
 
 /**

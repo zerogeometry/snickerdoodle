@@ -1,4 +1,4 @@
-import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
+import { BUNDLE_KEY, BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { offerUrl } from './structuredData';
 import { shopListings, type ShopListing } from './listing';
 
@@ -78,7 +78,8 @@ export function buildMerchantFeed(origin: string): string {
       ...(l.feed?.color ? [el('color', l.feed.color)] : []),
       ...(l.feed?.ageGroup ? [el('age_group', l.feed.ageGroup)] : []),
       ...(l.feed?.gender ? [el('gender', l.feed.gender)] : []),
-      el('is_bundle', 'no'),
+      // the family bundle is several different products sold together (Google's definition of a bundle)
+      el('is_bundle', l.key === BUNDLE_KEY ? 'yes' : 'no'),
       el('min_handling_time', l.delivery.handling[0]),
       el('max_handling_time', l.delivery.handling[1]),
       `<g:shipping>${el('country', 'GB')}${el('service', l.tracked ? 'Free tracked delivery' : 'Free delivery')}${el('price', '0.00 GBP')}${el('min_transit_time', l.delivery.transit[0])}${el('max_transit_time', l.delivery.transit[1])}</g:shipping>`,

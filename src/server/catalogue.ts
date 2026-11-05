@@ -10,6 +10,7 @@ import {
   KIDS_TEE_COLOURS, KIDS_TEE_SIZES, type GarmentColour,
   ADULT_JUMPER_COLOURS, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
 } from '@/lib/garments';
+import { WATCH_STRAP_SIZES } from '@/lib/watch-strap';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 import { BUNDLE_ONLY_SKUS, BUNDLE_SIZES, isBundleKey } from '@/lib/christmas-bundle';
 import { FRAME_GRIDS, MULTI_FRAME_COLOURS, type FrameSize } from '@/lib/multi-photo-frame';
@@ -589,6 +590,17 @@ const DEFS: Record<string, ProductDef> = {
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
+  // The Apple Watch strap (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md): faux leather, uk6, Royal Mail Standard
+  // TRACKED (£22 + £4; no Express needed, unlike the phone cases). ON SHOW (founder, 5 Nov) — previewed on the
+  // founder's photo set (applewatch.psd), or a drawn strap where it isn't staged (strapMockup.ts). ONE print file covers both halves end to end with
+  // an unprinted gap behind the watch (src/lib/watch-strap.ts traces Prodigi's template). £45 ≈ 20% net.
+  watchStrap: {
+    category: 'TECH', label: 'watch strap', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
+    description: "Their drawing printed along a faux-leather Apple Watch strap — a little masterpiece to glance at all day. In two sizes: small fits 38, 40 and 41 mm watches (and the 42 mm Series 10 and newer); large fits 44, 45, 46 and 49 mm (and the 42 mm Series 1–3). The size is on the back of the watch.",
+    specs: { material: 'vegan faux leather, scratch-resistant finish', fittings: 'black', small: WATCH_STRAP_SIZES[0]!.fits, large: WATCH_STRAP_SIZES[1]!.fits, print: 'along both halves of the strap', made: 'in the UK' },
+    // Prodigi's EXACT print files (sandbox GET /v4.0/products, 5 Nov: 305×2738 / 363×2932 px @300dpi), bleed 0
+    variants: WATCH_STRAP_SIZES.map((s) => ({ size: s.size, pricePence: 4500, ...exactPx(s.px, 300), prodigiSku: s.sku })),
+  },
   // ── Range expansion (D21) — LIVE 2026-10-21 (founder): socks, height chart, wrapping paper,
 // tea towel, playing cards (+ card packs above). HELD until ready: the hoodies (need a hoodie
 // packshot + confirmed chest sizes) and the pet bandana (its shape is drawn from a guess) ──
@@ -714,7 +726,7 @@ function variantAttributes(v: VariantDef): Record<string, string> {
   return a;
 }
 
-export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; dpi: number; bleedMm: number }> {
+export function definedPriceList(): Array<{ productKey: string; sku: string; isDefault: boolean; pricePence: number; prodigiSku: string | null; prodigiAttrs: Record<string, string> | null; attributes: Record<string, string>; visibleInShop: boolean; paused: boolean; px: { w: number; h: number } | null; mm: { w: number; h: number }; dpi: number; bleedMm: number }> {
   return Object.entries(DEFS).flatMap(([productKey, def]) => {
     const defaultIndex = Math.max(0, def.variants.findIndex((v) => v.default));
     return def.variants.map((v, i) => ({
@@ -722,7 +734,7 @@ export function definedPriceList(): Array<{ productKey: string; sku: string; isD
       pricePence: v.pricePence, prodigiSku: v.prodigiSku ?? null, prodigiAttrs: v.prodigiAttrs ?? null, attributes: variantAttributes(v),
       visibleInShop: def.visibleInShop ?? false, paused: def.paused ?? false,
       px: v.px ?? (def.print ? { w: mmToPx(v.wMm, v.dpi ?? 300), h: mmToPx(v.hMm, v.dpi ?? 300) } : null),
-      dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
+      mm: { w: v.wMm, h: v.hMm }, dpi: v.dpi ?? 300, bleedMm: v.bleedMm ?? 3,
     }));
   });
 }

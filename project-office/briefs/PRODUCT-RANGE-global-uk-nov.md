@@ -27,3 +27,34 @@ table; gb3 (frames) 14 Dec in our table (Prodigi: framed prints 17 Dec). Books t
 
 Every new product also needs the founder's layered product photos (packshots) before it goes on show —
 the same reason the baby bodysuit and hoodies are hidden today.
+
+## Built (5 Nov 2026): the Apple Watch strap — hidden until the photos are in
+
+**The baby and toddler clothes are NOT being added** (founder, 5 Nov). Prodigi's UK lab for them (uk2) only tracks
+by Express — DPD, £10.75 — and Prodigi takes one shipping method per order, so any order with one would have gone
+Express as a whole: £1.05–£8.05 more post on every other item in it (kids/adult tees +£6.45, cards +£7.65, socks
++£8.05), and the garments themselves up to £35. Not worth it. (Checked in the sandbox on 5 Nov: the toddler tee is
+made in the UK in 1–2 and 3–4 years only; the short-sleeve bodysuit's white comes from Canada; uk2 has no Overnight.)
+The long-sleeve baby bodysuit already in the catalogue stays exactly as it was: hidden, white, £22.
+
+**The watch strap**, re-checked in the sandbox the same day:
+- The **42 mm** print file is 363×2932 px (only the 38 mm is 305×2738). Both go Royal Mail **Standard Tracked** from
+  uk6 (£22 + £4.00; a second strap +£0.50) — tracked, so no Express. **£45** (~20% net; multi-buy 10% for two, 15% for
+  three or more, all ≥15% net). Last order for Christmas: 12 Dec.
+- Shown as **small** (38, 40, 41 mm and the 42 mm Series 10+) and **large** (44, 45, 46, 49 mm and the 42 mm Series 1–3).
+- One print file covers both halves; the middle fifth sits behind the watch and doesn't print — the placement screen
+  shades it, and the drawing starts just below the watch.
+
+- A **base colour** off the wheel, like the phone case and the other edge-to-edge products (founder, 5 Nov): a drawing
+  with no background of its own sits on the colour the parent picks.
+
+### Photos: supplied (applewatch.psd, 5 Nov)
+The founder's PSD layers are staged in `.prodigi-assets/blanks/founder-raw/` — `watch-strap.png` (blackoutlinebacking:
+the black outline), `watch-strap-print.png` (Printmap: the two leather halves) and `watch-strap-overlay.png` (Overlay:
+buckle and lugs) — and composed with the catalogue's standard backdrop and shadow by
+`node scripts/compose-founder-layers.mjs watchStrap` (the leather is white under the drawing; the black only rings
+it). Both sizes use them. The PSD's gap between the halves is a little longer than Prodigi's, so each size's print
+file is registered onto the two halves from Prodigi's template (within ~2–3% of the strap's length), not stretched
+over the outline. To go on show: flip `visibleInShop` in src/server/catalogue.ts, move its page copy from
+`WAITING_FOR_PHOTOS` into `SHOP_PRODUCTS` (src/lib/shop-products.ts), add it to the /christmas/delivery-dates list,
+and reseed (catalogue + mockups).

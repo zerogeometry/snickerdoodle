@@ -1,5 +1,6 @@
 import type { BasketItem } from '@/lib/store';
 import { groundTag } from '@/lib/patterns';
+import { isWatchStrap, STRAP_ASPECT, STRAP_DEFAULT_TOP } from '@/lib/watch-strap';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
@@ -56,8 +57,25 @@ export const PORTRAIT_FILL = new Set(['phoneCase', 'playingCards']);
  */
 const LANDSCAPE_TURN: Record<string, number> = { phoneCase: 90, playingCards: 90 };
 export function defaultTransformFor(productKey: string, aspect?: number | null): { scale: number; offsetX: number; offsetY: number; rotationDeg: number } {
+  if (isWatchStrap(productKey)) return strapDefault(aspect);
   if (PORTRAIT_FILL.has(productKey)) return { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: aspect && aspect > 1 ? LANDSCAPE_TURN[productKey] ?? 90 : 0 };
   return { scale: COVER_DEFAULT.has(productKey) ? 1 : 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+}
+
+/**
+ * The WATCH STRAP's default (5 Nov 2026): its file's middle sits BEHIND THE WATCH (src/lib/watch-strap.ts), so
+ * the usual fit-and-centre would hide the drawing. Instead the whole drawing (contain) runs ALONG the strap — a
+ * landscape one turned a quarter, like the phone case — on the lower half just below the watch, the most-seen
+ * part of the strap and clear of the holes. The parent can move it anywhere in the editor.
+ */
+function strapDefault(aspect?: number | null) {
+  const rotationDeg = aspect && aspect > 1 ? 90 : 0;
+  const a = aspect && aspect > 0 ? (rotationDeg ? 1 / aspect : aspect) : 0.75; // the drawing's w/h as placed
+  const drawH = Math.min(1, STRAP_ASPECT / a); // contain on a strip this thin is width-limited: its height, as a share of the length
+  const centre = STRAP_DEFAULT_TOP + drawH / 2; // its top edge just below the watch
+  const slack = 1 - drawH;
+  const offsetY = slack > 0 ? Math.max(-1, Math.min(1, ((centre - 0.5) * 2) / slack)) : 0;
+  return { scale: 0, offsetX: 0, offsetY: Math.round(offsetY * 1000) / 1000, rotationDeg };
 }
 
 /**

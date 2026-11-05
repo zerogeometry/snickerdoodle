@@ -1146,7 +1146,8 @@ function CustomizeProduct() {
                 </div>
               ) : null}
               <p className="text-xs leading-relaxed text-ink-soft">
-                printed straight onto organic cotton, at the size shown — colours come out a touch softer than on screen.
+                {/* organic only where it is (the Stanley/Stella range) — the baby + toddler pieces are ringspun cotton */}
+                printed straight onto {/organic/i.test(product.specs.material ?? '') ? 'organic cotton' : 'the fabric'}, at the size shown — colours come out a touch softer than on screen.
               </p>
             </div>
           ) : null}

@@ -27,6 +27,9 @@ export const EXPECTED_POPULARITY = [
   'calendar',
   // the Christmas table set (founder, 27–28 Oct)
   'placemat', 'coaster',
+  // the Apple Watch strap (made in the UK since Prodigi's "global" change, 5 Nov 2026) — appended, so no live
+  // rank moves; hidden until its photos are in
+  'watchStrap',
 ];
 
 /** Always first, whatever sells (founder, 29 Oct: the family bundle "appears at the top of the catalogue"). */

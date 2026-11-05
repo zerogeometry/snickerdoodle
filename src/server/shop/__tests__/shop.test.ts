@@ -1,11 +1,14 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { definedPriceList } from '@/server/catalogue';
 import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
 import { EXAMPLES } from '@/lib/examples';
 import { CHRISTMAS_FEATURED } from '@/lib/season';
 import { CHRISTMAS_PHOTOS, SHOP_PRODUCTS, productKeyForSlug } from '@/lib/shop-products';
+import { DEMO_DRAWING, PRODUCT_PHOTO_DIR, productPhoto } from '@/lib/product-photos';
+import generatedPhotos from '@/lib/product-photos.json';
 import { shopListings, shopListingBySlug } from '../listing';
 import { productJsonLd } from '../structuredData';
 import { buildMerchantFeed, merchantFeedItems } from '../merchantFeed';
@@ -16,11 +19,15 @@ const onShow = definedPriceList().filter((r) => r.visibleInShop && !r.paused && 
 const priceOfSku = new Map(onShow.map((r) => [r.sku, r.pricePence]));
 const shopKeys = new Set(onShow.map((r) => r.productKey));
 
+/** The demo photos scripts/render-product-photos.ts rendered (the sample drawing on each product's mockup). */
+const DEMO_PHOTOS = Object.values(generatedPhotos as Record<string, { src: string }>).map((p) => p.src);
 /** The ONLY images a public page or the feed may use: brand-safe marketing photos, never a family's. */
-const BRAND_SAFE = new Set<string>([...EXAMPLES.map((e) => e.src), ...CHRISTMAS_PHOTOS]);
+const BRAND_SAFE = new Set<string>([...EXAMPLES.map((e) => e.src), ...CHRISTMAS_PHOTOS, ...DEMO_PHOTOS]);
 /** Round-trip through JSON: the markup exactly as a crawler reads it. */
 const asLd = (x: unknown) => JSON.parse(JSON.stringify(x));
-const isBrandSafe = (src: string) => BRAND_SAFE.has(src) && (src.startsWith('/examples/') || src.startsWith('/christmas/'));
+const isBrandSafe = (src: string) =>
+  BRAND_SAFE.has(src) && (src.startsWith('/examples/') || src.startsWith('/christmas/') || /^\/products\/[a-z0-9]+(-[a-z0-9]+)*\.webp$/.test(src));
+const PUBLIC = path.join(process.cwd(), 'public');
 
 describe('the public shop listing', () => {
   it('covers exactly the products on show — every one has public copy, nothing hidden is listed', () => {
@@ -44,6 +51,13 @@ describe('the public shop listing', () => {
       expect(isBrandSafe(c.image.src), `${key}: ${c.image.src}`).toBe(true);
       expect(existsSync(path.join(process.cwd(), 'public', c.image.src)), c.image.src).toBe(true);
       expect(c.image.alt.length, key).toBeGreaterThan(20);
+    }
+  });
+
+  it('every product on show has a photo on its page — never the drawn placeholder', () => {
+    for (const [key, c] of Object.entries(SHOP_PRODUCTS)) {
+      expect(c.image?.src, `${key} has no photo: run scripts/render-product-photos.ts (see src/lib/product-photos.ts)`).toBeTruthy();
+      expect(existsSync(path.join(PUBLIC, c.image!.src)), c.image!.src).toBe(true);
     }
   });
 
@@ -101,6 +115,39 @@ describe('the public shop listing', () => {
 
   it('the christmas flag follows the season’s lead range', () => {
     for (const l of shopListings()) expect(l.christmas, l.key).toBe((CHRISTMAS_FEATURED as readonly string[]).includes(l.key));
+  });
+});
+
+describe('the demo product photos (scripts/render-product-photos.ts)', () => {
+  const entries = Object.entries(generatedPhotos as Record<string, { src: string; width: number; height: number }>);
+
+  it('the shared demo drawing is the brand-safe sample painting in /public/examples', () => {
+    expect(DEMO_DRAWING.startsWith('examples/')).toBe(true);
+    expect(existsSync(path.join(PUBLIC, DEMO_DRAWING)), DEMO_DRAWING).toBe(true);
+  });
+
+  it('one photo per product with a public page, named by its slug, in /products — the sizes are the files’ own', async () => {
+    for (const [key, p] of entries) {
+      expect(SHOP_PRODUCTS[key], `${key} has a photo but no public page`).toBeTruthy();
+      expect(p.src).toBe(`/${PRODUCT_PHOTO_DIR}/${SHOP_PRODUCTS[key]!.slug}.webp`);
+      const meta = await sharp(path.join(PUBLIC, p.src)).metadata();
+      expect([meta.format, meta.width, meta.height], p.src).toEqual(['webp', p.width, p.height]);
+      expect(Math.max(p.width, p.height), p.src).toBeGreaterThanOrEqual(800); // Merchant Center's recommended minimum
+      expect(Math.max(p.width, p.height), p.src).toBeLessThanOrEqual(1200);
+    }
+  });
+
+  it('nothing else sits in /public/products — every file there came from the script', () => {
+    const files = readdirSync(path.join(PUBLIC, PRODUCT_PHOTO_DIR)).map((f) => `/${PRODUCT_PHOTO_DIR}/${f}`);
+    expect(files.sort()).toEqual(DEMO_PHOTOS.sort());
+  });
+
+  it('a page uses its demo photo only where there is no hand-made one, with its own alt text', () => {
+    for (const [key, c] of Object.entries(SHOP_PRODUCTS)) {
+      if (!c.image?.src.startsWith(`/${PRODUCT_PHOTO_DIR}/`)) continue;
+      expect(c.image).toMatchObject(productPhoto(key)!);
+      expect(c.image.alt, key).toMatch(/child’s painting/);
+    }
   });
 });
 
@@ -200,6 +247,27 @@ describe('the Google Merchant Center feed (C8)', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const id of ids) expect(priceOfSku.has(id!), `${id} is a sku on show`).toBe(true);
     expect(items.filter((i) => field(i, 'item_group_id') === 'phoneCase')).toHaveLength(2);
+  });
+
+  it('a product joins the feed once it has a photo, and leaves it without one', () => {
+    const ids = () => new Set(merchantFeedItems(ORIGIN).map((i) => i.listing.key));
+    // the demo photos put the calendar, the table set and the family bundle in the feed
+    for (const k of ['calendar', 'placemat', 'coaster', 'christmasBundle']) expect(ids().has(k), k).toBe(true);
+    // clothing stays out until it has one item per size + colour, photo or not
+    expect(ids().has('adultTee')).toBe(false);
+    const saved = SHOP_PRODUCTS.calendar!.image;
+    try {
+      SHOP_PRODUCTS.calendar!.image = undefined;
+      expect(ids().has('calendar')).toBe(false);
+    } finally {
+      SHOP_PRODUCTS.calendar!.image = saved;
+    }
+    expect(ids().has('calendar')).toBe(true);
+  });
+
+  it('the family bundle says it is a bundle; nothing else does', () => {
+    for (const i of items) expect(field(i, 'is_bundle'), field(i, 'id')).toBe(field(i, 'item_group_id') === 'christmasBundle' ? 'yes' : 'no');
+    expect(items.some((i) => field(i, 'is_bundle') === 'yes')).toBe(true);
   });
 
   it('every price matches the catalogue, in GBP', () => {

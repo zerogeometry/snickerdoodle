@@ -43,6 +43,8 @@ import {
   KIDS_TEE_PRINT_MM, teePrintRegion, type GarmentPhoto,
 } from '@/lib/garments';
 import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawnMockups';
+import { drawWatchStrapMockup } from './strapMockup';
+import { strapPhotoBox, strapSizeOf } from '@/lib/watch-strap';
 
 /**
  * Mockup template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -95,6 +97,8 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
+  | { file?: undefined; material: Material; register: 'drawn-strap' }
+  | { file?: undefined; material: Material; register: 'layered-strap'; dir: string; size: string }
 );
 
 /** The first image in a staged blank folder whose name matches — Prodigi's zips are named
@@ -412,6 +416,13 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
     }
     case 'babyBodysuit':
       return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
+    // The watch strap: the founder's layered set (applewatch.psd, 5 Nov — layered/watchStrap/: the black outline,
+    // the two leather halves as the printmap, buckle + lugs + holes on top), both sizes, each size's print file
+    // registered onto the halves from Prodigi's template (layeredStrapTemplate). Not staged ⇒ the DRAWN strap.
+    case 'watchStrap': {
+      const dir = layeredFlatDir('watchStrap');
+      return dir ? { material: 'PAPER', register: 'layered-strap', dir, size } : { material: 'PAPER', register: 'drawn-strap' };
+    }
     case 'mug': {
       // Founder's per-colour two-tone layers (background → shadow → real mug photo). One shared
       // band; the compositor CYLINDER tier wraps the art onto the real ceramic.
@@ -888,6 +899,29 @@ export async function layeredFlatTemplate(
   return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), W: d.W, H: d.H };
 }
 
+/**
+ * The founder's WATCH STRAP set as a mockup template: the layered-flat blank / mask / overlay, with the print quad
+ * registered onto the photo's two leather halves from Prodigi's traced template (strapPhotoBox) — not stretched
+ * over the whole outline, since the photo's gap between the halves isn't the file's. Mask = the halves.
+ */
+export async function layeredStrapTemplate(dir: string, size: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; W: number; H: number; residualPx: number } | null> {
+  const d = await layeredFlat(dir);
+  const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const runs: Array<[number, number]> = [];
+  let x0 = d.W, x1 = -1, inRun = false;
+  for (let y = 0; y < d.H; y++) {
+    let on = false;
+    for (let x = 0; x < d.W; x++) if (a[y * d.W + x]! >= 128) { on = true; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    if (on && !inRun) runs.push([y, y + 1]);
+    if (on) runs[runs.length - 1]![1] = y + 1;
+    inRun = on;
+  }
+  const halves = runs.filter(([s, e]) => e - s > d.H * 0.05); // the two halves (ignore any stray sliver)
+  if (halves.length !== 2 || x1 < 0) return null;
+  const b = strapPhotoBox(strapSizeOf(size), [halves[0]!, halves[1]!], (x0 + x1 + 1) / 2);
+  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad({ x0: b.x / d.W, y0: b.y / d.H, x1: (b.x + b.w) / d.W, y1: (b.y + b.h) / d.H }), W: d.W, H: d.H, residualPx: b.residualPx };
+}
+
 /** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
 export function layeredFlatPath(name: string): string | null {
   return layeredFlatDir(name);
@@ -1332,6 +1366,238 @@ async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: 
   return { blank, overlay, W, H, frontBox, fullBox };
 }
 
+/** One variant's print geometry — what the seeder reads from print_templates (and the product photo
+ * script, scripts/render-product-photos.ts, from the catalogue). */
+export interface TemplateRow {
+  sku: string; key: string; attrs: Record<string, string>;
+  printWmm: number; printHmm: number; printWpx: number; printHpx: number;
+}
+/** A variant's mockup template, authored in memory (setMockupTemplate stores it). */
+export interface AuthoredTemplate {
+  blank: Buffer; contentType: 'image/png' | 'image/jpeg'; printQuad: Quad; extraQuads?: Quad[];
+  materialClass: Material; mask?: Buffer; overlay?: Buffer;
+}
+/** An alternate display view authored alongside it (the mug's centre view). */
+type AuthoredView = { blank: Buffer; contentType: 'image/png'; printQuad: Quad; printWidthPx: number; printHeightPx: number; materialClass: Material; mask?: Buffer };
+type Registration = SeedMockupsResult['registration'][number];
+export type AuthorResult = { template: AuthoredTemplate; centre?: AuthoredView; registration: Registration } | { skip: string };
+/** Detection caches shared across one seeding run (several variants share a photo). */
+export type AuthorCtx = { detected: Map<string, Awaited<ReturnType<typeof detectProduct>>>; windows: Map<string, Box>; dims: Map<string, { W: number; H: number }> };
+export const authorCtx = (): AuthorCtx => ({ detected: new Map(), windows: new Map(), dims: new Map() });
+
+/**
+ * Author ONE variant's mockup template from the staged photos — in memory, no database, no storage
+ * (seedMockups stores it; scripts/render-product-photos.ts renders the brand-safe demo drawing on it).
+ * A product whose photos aren't staged on this machine is a `skip` (with the reason), never a crash.
+ */
+export async function authorTemplate(r: TemplateRow, ctx: AuthorCtx = authorCtx()): Promise<AuthorResult> {
+  // Phone cases: a DRAWN case per phone × grade × finish (no photography yet) — the print area
+  // is the whole case back at the print file's exact aspect, so registration drift is 0.
+  if (r.key === 'phoneCase') {
+    const a = r.attrs;
+    const { traced, source } = await caseTrace(a.size!, a.grade as CaseGrade);
+    const d = await drawPhoneCase(a.size!, a.grade as CaseGrade, a.finish as CaseFinish, traced ?? undefined);
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: a.finish === 'gloss' ? 'GLOSS' : 'PAPER', mask: d.mask, overlay: d.overlay };
+    return { template, registration: { sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `phone-case: ${source}`, quadAspect: null, printAspect: Math.round((r.printWmm / r.printHmm) * 1000) / 1000, driftPct: 0 } };
+  }
+  const p = plan(r.key, r.attrs);
+  if (!p) return { skip: r.key };
+  const printAspectEarly = r.printWmm / r.printHmm;
+
+  if (p.register === 'layered-strap') {
+    const d = await layeredStrapTemplate(p.dir, p.size);
+    if (!d) return { skip: `${r.key} (no two strap halves in ${p.dir})` };
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask, overlay: d.overlay };
+    const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `layered-strap (halves ±${d.residualPx.toFixed(0)}px)`,
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'drawn' || p.register === 'drawn-strap') {
+    const d = p.register === 'drawn-strap' ? drawWatchStrapMockup({ w: r.printWpx, h: r.printHpx }) : drawProductMockup(p.key, r.attrs, { w: r.printWpx, h: r.printHpx });
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: d.material, mask: d.mask, overlay: d.overlay };
+    const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
+    const pa = r.printWpx / r.printHpx;
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'drawn',
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(pa * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qa / pa - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-frame') {
+    const d = await layeredFrame(p.dir, p.orientation);
+    const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask };
+    const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-frame',
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-jigsaw') {
+    const d = await layeredJigsaw(p.dir, p.orientation);
+    const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+    // The piece lines ride along as the compositor's foreground overlay (over the art).
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay };
+    const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-jigsaw',
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-cushion') {
+    const d = await layeredCushion(p.dir);
+    const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+    // plumpness.png rides along as the compositor's foreground overlay (the 3D form over the art).
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay };
+    const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-cushion',
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-blanket') {
+    const d = await layeredBlanket(p.dir, p.orientation);
+    const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask };
+    const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-blanket',
+      quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-mug') {
+    const d = await layeredMug(p.dir);
+    // CERAMIC + axis-aligned + a MASK (the printmap) → the compositor's cylinder tier warps the
+    // art onto the printmap surface. The printmap rides along as the template mask.
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask };
+    // CENTRE view (head-on, design middle) as a mockup_view — same cylinder tier, centred photo.
+    const c = await layeredMugCentre(p.dir);
+    let centre: AuthoredView | undefined;
+    if (c) {
+      const pw = Math.round((r.printWmm * 300) / 25.4), ph = Math.round((r.printHmm * 300) / 25.4);
+      centre = { blank: c.blank, contentType: 'image/png', printQuad: c.quad, printWidthPx: pw, printHeightPx: ph, materialClass: 'CERAMIC', mask: c.mask };
+    }
+    return { template, centre, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
+      quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
+    } };
+  }
+
+  if (p.register === 'layered-flat') {
+    const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
+    if (!d) return { skip: `${r.key} (no print area in ${p.dir})` };
+    const quad = d.quad;
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay };
+    const qa = p.tilted ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `${p.tilted ? 'layered-flat (tilted)' : 'layered-flat'}${d.extraQuads?.length ? ` · ${d.extraQuads.length + 1} print areas` : ''}`,
+      quadAspect: qa == null ? null : Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
+      driftPct: qa == null ? null : Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+    } };
+  }
+
+  if (p.register === 'layered-card-single') {
+    const d = await buildCardSingle(p.dir);
+    if (!d) return { skip: r.key };
+    // The detected corners are a PERSPECTIVE quad (angled card face) — passed verbatim, NOT
+    // aspect-locked; the compositor auto-selects the perspective warp via isAxisAligned.
+    const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask };
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-card-single',
+      quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
+    } };
+  }
+
+  const filePath = path.join(ROOT, p.file);
+  // A blank that isn't staged on this machine is a SKIP, not a crash — the product keeps its
+  // plain tile and every other product still gets its mockup.
+  if (!existsSync(filePath)) return { skip: `${r.key} (blank not staged: ${p.file})` };
+  const raw = readFileSync(filePath);
+  // Rotate the blank into the print canvas's orientation where needed (cache by file+rotation).
+  const cacheKey = p.rotate ? `${p.file}#r${p.rotate}` : p.file;
+  const buf = p.rotate ? await sharp(raw).rotate(p.rotate).jpeg({ quality: 92 }).toBuffer() : raw;
+  const contentType = p.rotate ? 'image/jpeg' : p.file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+  let d = ctx.dims.get(cacheKey);
+  if (!d) { const m = await sharp(buf).metadata(); d = { W: m.width!, H: m.height! }; ctx.dims.set(cacheKey, d); }
+  const printAspect = r.printWmm / r.printHmm;
+
+  let quad: Quad;
+  let mask: Buffer | undefined;
+  if (p.register === 'window-cover') {
+    let win = ctx.windows.get(cacheKey);
+    if (!win) { win = await frameWindow(buf); ctx.windows.set(cacheKey, win); }
+    quad = asQuad(aspectRect(win, d.W, d.H, printAspect, 'cover'));
+    // Store the blank with the transparent window FLATTENED TO WHITE (the paper): with a
+    // contain placement the design no longer covers the whole window, and the uncovered
+    // margin must read as paper, not a transparent hole. (Detection above used the alpha.)
+    const flat = await sharp(buf).flatten({ background: '#ffffff' }).png().toBuffer();
+    const template: AuthoredTemplate = { blank: flat, contentType: 'image/png', printQuad: quad, materialClass: p.material };
+    const qaF = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+    return { template, registration: {
+      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.register,
+      quadAspect: Math.round(qaF * 1000) / 1000, printAspect: Math.round(printAspect * 1000) / 1000,
+      driftPct: Math.round(Math.abs(qaF / printAspect - 1) * 1000) / 10,
+    } };
+  } else {
+    let det = ctx.detected.get(cacheKey);
+    if (!det) { det = await detectProduct(buf); ctx.detected.set(cacheKey, det); }
+    const useMask = p.mask && det.coverage >= 0.35; // quality gate: never clip with a failed silhouette
+    mask = useMask ? det.mask : undefined;
+    if (p.register === 'face-cover') {
+      quad = asQuad(aspectRect(det.bbox, d.W, d.H, printAspect, 'cover'));
+    } else if (p.register === 'panel-physical') {
+      // TRUE physical scale: px-per-mm from the product's detected extent + real width.
+      const pxPerMm = ((det.bbox.x1 - det.bbox.x0) * d.W) / p.productWidthMm;
+      const w = r.printWmm * pxPerMm, h = r.printHmm * pxPerMm;
+      const cx = ((det.bbox.x0 + det.bbox.x1) / 2) * d.W;
+      const y1 = (det.bbox.y1 - p.bottomInsetFrac * (det.bbox.y1 - det.bbox.y0)) * d.H;
+      quad = asQuad({ x0: (cx - w / 2) / d.W, y0: (y1 - h) / d.H, x1: (cx + w / 2) / d.W, y1: y1 / d.H });
+    } else if (p.register === 'panel-contain') {
+      // frame 'canvas': the region is AUTHORED in full-canvas fractions (our synthetic
+      // garment blanks declare their chest panel in the blank's own coordinates — the
+      // same constants the 3D builders use, so photo and spin views agree by
+      // construction). Default 'bbox': fractions of the detected product extent
+      // (real photography, where the product's position in frame isn't authored).
+      const region: Box = p.frame === 'canvas'
+        ? p.region
+        : {
+            x0: det.bbox.x0 + p.region.x0 * (det.bbox.x1 - det.bbox.x0), y0: det.bbox.y0 + p.region.y0 * (det.bbox.y1 - det.bbox.y0),
+            x1: det.bbox.x0 + p.region.x1 * (det.bbox.x1 - det.bbox.x0), y1: det.bbox.y0 + p.region.y1 * (det.bbox.y1 - det.bbox.y0),
+          };
+      quad = asQuad(aspectRect(region, d.W, d.H, printAspect, 'contain'));
+    } else {
+      // band (mug): the stated region of the bbox, aspect deliberately unlocked (cylinder).
+      const b = det.bbox;
+      quad = asQuad({
+        x0: b.x0 + p.region.x0 * (b.x1 - b.x0), y0: b.y0 + p.region.y0 * (b.y1 - b.y0),
+        x1: b.x0 + p.region.x1 * (b.x1 - b.x0), y1: b.y0 + p.region.y1 * (b.y1 - b.y0),
+      });
+    }
+  }
+
+  const template: AuthoredTemplate = { blank: buf, contentType, printQuad: quad, materialClass: p.material, mask };
+
+  const qa = p.register === 'band' ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
+  return { template, registration: {
+    sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.register,
+    quadAspect: qa === null ? null : Math.round(qa * 1000) / 1000,
+    printAspect: Math.round(printAspect * 1000) / 1000,
+    driftPct: qa === null ? null : Math.round(Math.abs(qa / printAspect - 1) * 1000) / 10,
+  } };
+}
+
 export interface SeedMockupsResult {
   authored: number;
   authoredViews: number;
@@ -1356,230 +1622,19 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     .innerJoin(printTemplates, eq(printTemplates.variantId, productVariants.id))
     .where(eq(productVariants.active, true));
 
-  const detected = new Map<string, Awaited<ReturnType<typeof detectProduct>>>();
-  const windows = new Map<string, Box>();
-  const dims = new Map<string, { W: number; H: number }>();
+  const ctx = authorCtx();
   let authored = 0;
   let authoredViews = 0; // alternate mockup views (the jigsaw tin, the mug centre)
   const skipped: string[] = [];
-  const registration: { sku: string; print: string; mode: string; quadAspect: number | null; printAspect: number; driftPct: number | null }[] = [];
+  const registration: SeedMockupsResult['registration'] = [];
 
   for (const r of rows) {
-    // Phone cases: a DRAWN case per phone × grade × finish (no photography yet) — the print area
-    // is the whole case back at the print file's exact aspect, so registration drift is 0.
-    if (r.key === 'phoneCase') {
-      const a = (r.attrs as Record<string, string>) ?? {};
-      const { traced, source } = await caseTrace(a.size!, a.grade as CaseGrade);
-      const d = await drawPhoneCase(a.size!, a.grade as CaseGrade, a.finish as CaseFinish, traced ?? undefined);
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: a.finish === 'gloss' ? 'GLOSS' : 'PAPER', mask: d.mask, overlay: d.overlay });
-      authored++;
-      registration.push({ sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `phone-case: ${source}`, quadAspect: null, printAspect: Math.round((r.printWmm / r.printHmm) * 1000) / 1000, driftPct: 0 });
-      continue;
-    }
-    const p = plan(r.key, (r.attrs as Record<string, string>) ?? {});
-    if (!p) { skipped.push(r.key); continue; }
-    const printAspectEarly = r.printWmm / r.printHmm;
-
-    if (p.register === 'drawn') {
-      const d = drawProductMockup(p.key, (r.attrs as Record<string, string>) ?? {}, { w: r.printWpx, h: r.printHpx });
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: d.material, mask: d.mask, overlay: d.overlay });
-      authored++;
-      const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
-      const pa = r.printWpx / r.printHpx;
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'drawn',
-        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(pa * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qa / pa - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-frame') {
-      const d = await layeredFrame(p.dir, p.orientation);
-      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
-      authored++;
-      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-frame',
-        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-jigsaw') {
-      const d = await layeredJigsaw(p.dir, p.orientation);
-      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
-      // The piece lines ride along as the compositor's foreground overlay (over the art).
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
-      authored++;
-      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-jigsaw',
-        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-cushion') {
-      const d = await layeredCushion(p.dir);
-      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
-      // plumpness.png rides along as the compositor's foreground overlay (the 3D form over the art).
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
-      authored++;
-      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-cushion',
-        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-blanket') {
-      const d = await layeredBlanket(p.dir, p.orientation);
-      const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask });
-      authored++;
-      const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-blanket',
-        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-mug') {
-      const d = await layeredMug(p.dir);
-      // CERAMIC + axis-aligned + a MASK (the printmap) → the compositor's cylinder tier warps the
-      // art onto the printmap surface. The printmap rides along as the template mask.
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask });
-      authored++;
-      // CENTRE view (head-on, design middle) as a mockup_view — same cylinder tier, centred photo.
-      const c = await layeredMugCentre(p.dir);
-      if (c) {
-        const pw = Math.round((r.printWmm * 300) / 25.4), ph = Math.round((r.printHmm * 300) / 25.4);
-        await setMockupView(db, { variantId: r.id, view: 'centre', blank: c.blank, contentType: 'image/png', printQuad: c.quad, printWidthPx: pw, printHeightPx: ph, materialClass: 'CERAMIC', mask: c.mask });
-        authoredViews++;
-      }
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-mug',
-        quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-flat') {
-      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
-      if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
-      const quad = d.quad;
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay });
-      authored++;
-      const qa = p.tilted ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `${p.tilted ? 'layered-flat (tilted)' : 'layered-flat'}${d.extraQuads?.length ? ` · ${d.extraQuads.length + 1} print areas` : ''}`,
-        quadAspect: qa == null ? null : Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000,
-        driftPct: qa == null ? null : Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
-      });
-      continue;
-    }
-
-    if (p.register === 'layered-card-single') {
-      const d = await buildCardSingle(p.dir);
-      if (!d) { skipped.push(r.key); continue; }
-      // The detected corners are a PERSPECTIVE quad (angled card face) — passed verbatim, NOT
-      // aspect-locked; the compositor auto-selects the perspective warp via isAxisAligned.
-      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask });
-      authored++;
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: 'layered-card-single',
-        quadAspect: null, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: null,
-      });
-      continue;
-    }
-
-    const filePath = path.join(ROOT, p.file);
-    // A blank that isn't staged on this machine is a SKIP, not a crash — the product keeps its
-    // plain tile and every other product still gets its mockup.
-    if (!existsSync(filePath)) { skipped.push(`${r.key} (blank not staged: ${p.file})`); continue; }
-    const raw = readFileSync(filePath);
-    // Rotate the blank into the print canvas's orientation where needed (cache by file+rotation).
-    const cacheKey = p.rotate ? `${p.file}#r${p.rotate}` : p.file;
-    const buf = p.rotate ? await sharp(raw).rotate(p.rotate).jpeg({ quality: 92 }).toBuffer() : raw;
-    const contentType = p.rotate ? 'image/jpeg' : p.file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
-    let d = dims.get(cacheKey);
-    if (!d) { const m = await sharp(buf).metadata(); d = { W: m.width!, H: m.height! }; dims.set(cacheKey, d); }
-    const printAspect = r.printWmm / r.printHmm;
-
-    let quad: Quad;
-    let mask: Buffer | undefined;
-    if (p.register === 'window-cover') {
-      let win = windows.get(cacheKey);
-      if (!win) { win = await frameWindow(buf); windows.set(cacheKey, win); }
-      quad = asQuad(aspectRect(win, d.W, d.H, printAspect, 'cover'));
-      // Store the blank with the transparent window FLATTENED TO WHITE (the paper): with a
-      // contain placement the design no longer covers the whole window, and the uncovered
-      // margin must read as paper, not a transparent hole. (Detection above used the alpha.)
-      const flat = await sharp(buf).flatten({ background: '#ffffff' }).png().toBuffer();
-      await setMockupTemplate(db, { variantId: r.id, blank: flat, contentType: 'image/png', printQuad: quad, materialClass: p.material });
-      authored++;
-      const qaF = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-      registration.push({
-        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.register,
-        quadAspect: Math.round(qaF * 1000) / 1000, printAspect: Math.round(printAspect * 1000) / 1000,
-        driftPct: Math.round(Math.abs(qaF / printAspect - 1) * 1000) / 10,
-      });
-      continue;
-    } else {
-      let det = detected.get(cacheKey);
-      if (!det) { det = await detectProduct(buf); detected.set(cacheKey, det); }
-      const useMask = p.mask && det.coverage >= 0.35; // quality gate: never clip with a failed silhouette
-      mask = useMask ? det.mask : undefined;
-      if (p.register === 'face-cover') {
-        quad = asQuad(aspectRect(det.bbox, d.W, d.H, printAspect, 'cover'));
-      } else if (p.register === 'panel-physical') {
-        // TRUE physical scale: px-per-mm from the product's detected extent + real width.
-        const pxPerMm = ((det.bbox.x1 - det.bbox.x0) * d.W) / p.productWidthMm;
-        const w = r.printWmm * pxPerMm, h = r.printHmm * pxPerMm;
-        const cx = ((det.bbox.x0 + det.bbox.x1) / 2) * d.W;
-        const y1 = (det.bbox.y1 - p.bottomInsetFrac * (det.bbox.y1 - det.bbox.y0)) * d.H;
-        quad = asQuad({ x0: (cx - w / 2) / d.W, y0: (y1 - h) / d.H, x1: (cx + w / 2) / d.W, y1: y1 / d.H });
-      } else if (p.register === 'panel-contain') {
-        // frame 'canvas': the region is AUTHORED in full-canvas fractions (our synthetic
-        // garment blanks declare their chest panel in the blank's own coordinates — the
-        // same constants the 3D builders use, so photo and spin views agree by
-        // construction). Default 'bbox': fractions of the detected product extent
-        // (real photography, where the product's position in frame isn't authored).
-        const region: Box = p.frame === 'canvas'
-          ? p.region
-          : {
-              x0: det.bbox.x0 + p.region.x0 * (det.bbox.x1 - det.bbox.x0), y0: det.bbox.y0 + p.region.y0 * (det.bbox.y1 - det.bbox.y0),
-              x1: det.bbox.x0 + p.region.x1 * (det.bbox.x1 - det.bbox.x0), y1: det.bbox.y0 + p.region.y1 * (det.bbox.y1 - det.bbox.y0),
-            };
-        quad = asQuad(aspectRect(region, d.W, d.H, printAspect, 'contain'));
-      } else {
-        // band (mug): the stated region of the bbox, aspect deliberately unlocked (cylinder).
-        const b = det.bbox;
-        quad = asQuad({
-          x0: b.x0 + p.region.x0 * (b.x1 - b.x0), y0: b.y0 + p.region.y0 * (b.y1 - b.y0),
-          x1: b.x0 + p.region.x1 * (b.x1 - b.x0), y1: b.y0 + p.region.y1 * (b.y1 - b.y0),
-        });
-      }
-    }
-
-    await setMockupTemplate(db, { variantId: r.id, blank: buf, contentType, printQuad: quad, materialClass: p.material, mask });
+    const a = await authorTemplate({ sku: r.sku, key: r.key, attrs: (r.attrs as Record<string, string>) ?? {}, printWmm: r.printWmm, printHmm: r.printHmm, printWpx: r.printWpx, printHpx: r.printHpx }, ctx);
+    if ('skip' in a) { skipped.push(a.skip); continue; }
+    await setMockupTemplate(db, { variantId: r.id, ...a.template });
     authored++;
-
-    const qa = p.register === 'band' ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
-    registration.push({
-      sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: p.register,
-      quadAspect: qa === null ? null : Math.round(qa * 1000) / 1000,
-      printAspect: Math.round(printAspect * 1000) / 1000,
-      driftPct: qa === null ? null : Math.round(Math.abs(qa / printAspect - 1) * 1000) / 10,
-    });
+    if (a.centre) { await setMockupView(db, { variantId: r.id, view: 'centre', ...a.centre }); authoredViews++; }
+    registration.push(a.registration);
   }
   // Alternate view — the jigsaw TIN (perspective). One tin, authored for every jigsaw variant
   // (the customer's placement is warped onto the lid at compose time). Display-only: never a

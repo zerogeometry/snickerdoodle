@@ -30,6 +30,7 @@ export const COMPLEMENTS: Readonly<Record<string, readonly string[]>> = {
   babyBodysuit: ['kidsTee', 'blanket', 'mug'],
   socks: ['mug', 'teaTowel', 'adultTee'],
   phoneCase: ['mug', 'playingCards', 'socks'],
+  watchStrap: ['phoneCase', 'mug', 'socks'], // (hidden until its photos are in — the server skips what isn't on show)
   playingCards: ['jigsaw', 'mug', 'card'],
   heightChart: ['framedPrint', 'kidsTee', 'blanket'],
   storybook: ['framedPrint', 'jigsaw', 'card'],

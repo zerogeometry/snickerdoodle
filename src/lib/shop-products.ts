@@ -1,13 +1,17 @@
+import { productPhoto } from './product-photos';
+
 /**
  * The PUBLIC face of each product in the shop (C6–C8, GTM plan 27 Oct): the evergreen URL of its
  * public product page, the words search engines and Merchant Center see, its Google product
  * category, and ONE brand-safe photo.
  *
  * IMAGES: only brand-safe marketing images may appear here — the founder-made example keepsakes
- * (src/lib/examples.ts, synthetic sample drawings) and the Christmas concept photos in
- * /public/christmas. NEVER a customer's upload, a child's picture or anything from a bucket — a unit
- * test holds every `src` to those two folders + lists. A product with no photo yet gets no image:
- * its page shows the drawn product art, and the Merchant feed leaves it out (an image is required).
+ * (src/lib/examples.ts, synthetic sample drawings), the Christmas concept photos in /public/christmas,
+ * and the DEMO photos in /public/products (src/lib/product-photos.ts: one sample drawing rendered on
+ * each product's own mockup by scripts/render-product-photos.ts) for a product with no hand-made one.
+ * NEVER a customer's upload, a child's picture or anything from a bucket — a unit test holds every
+ * `src` to those three folders + lists. A product with no photo at all gets no image: its page shows
+ * the drawn product art, and the Merchant feed leaves it out (an image is required).
  *
  * Every product on show needs an entry here (unit-tested), the way the FAQ's price table does.
  * Prices are NOT here: they come from the server catalogue only.
@@ -41,6 +45,11 @@ export interface ShopProductCopy {
 
 const ex = (file: string, width: number, height: number, alt: string): ShopImage => ({ src: `/examples/${file}.webp`, width, height, alt });
 const xmas = (file: string, width: number, height: number, alt: string): ShopImage => ({ src: `/christmas/${file}.webp`, width, height, alt });
+/** The demo photo the script rendered for this product (undefined until it has). */
+const demo = (key: string, alt: string): ShopImage | undefined => {
+  const p = productPhoto(key);
+  return p ? { ...p, alt } : undefined;
+};
 
 /** The brand-safe Christmas concept photos (synthetic sample art, true to the real products — e74ceb5). */
 export const CHRISTMAS_PHOTOS = ['/christmas/bauble.webp', '/christmas/ball-and-present.webp', '/christmas/sack.webp', '/christmas/presents.webp'] as const;
@@ -62,6 +71,7 @@ const CAT = {
   wrap: { id: 2816, path: 'Arts & Entertainment > Party & Celebration > Gift Giving > Gift Wrapping > Wrapping Paper' },
   teaTowels: { id: 4257, path: 'Home & Garden > Linens & Bedding > Towels > Kitchen Towels' },
   cardGames: { id: 1247, path: 'Toys & Games > Games > Card Games' },
+  watchBands: { id: 5123, path: 'Clothing & Accessories > Jewellery & Watches > Watch Accessories > Watch Bands' },
 } as const;
 
 export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
@@ -96,7 +106,9 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   adultTee: {
     slug: 'adult-t-shirt', name: 'adult tee', title: 'Adult organic T-shirt with your child’s drawing',
     googleCategory: CAT.tops, productType: 'Clothing > Adult T-shirts',
-    // no brand-safe photo of the adult tee yet (the burgundy one is the kids tee)
+    image: demo('adultTee', 'A white adult T-shirt printed with a child’s painting of their family holding hands by a yellow house, with the dog'),
+    // like the kids tee: clothing needs ONE size + colour per feed item (6 sizes × 5 colours) — left out until that's worth doing
+    feed: { exclude: 'clothing needs one item per size and colour' },
   },
   jigsaw: {
     slug: 'jigsaw', name: 'jigsaw', title: 'Jigsaw puzzle made from your child’s drawing',
@@ -121,7 +133,8 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   calendar: {
     slug: 'wall-calendar', name: '2027 calendar', title: '2027 wall calendar with your child’s drawings',
     googleCategory: CAT.calendars, productType: 'Prints > Calendars',
-    // no photo yet: the concept image isn't the real layout (e74ceb5) — added when samples land
+    // the demo photo is the real layout (the founder's calendar photo); the concept image wasn't (e74ceb5)
+    image: demo('calendar', 'A wall calendar hanging open on its May page, the top page printed with a child’s painting of their family by a yellow house'),
   },
   ceramicOrnament: {
     slug: 'ceramic-christmas-ornament', name: 'ceramic christmas ornament', title: 'Personalised ceramic Christmas ornament from your child’s drawing',
@@ -138,20 +151,23 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.holiday, productType: 'Christmas > Sacks',
     image: xmas('sack', 1000, 778, 'A natural cotton Christmas sack printed with a child’s crayon reindeer, by a fireplace'),
   },
-  // The Christmas table set + the family bundle (founder, 27–29 Oct). No photos yet (samples on order), so the
-  // feed leaves them out until they have one. Category: the seasonal-decorations node already checked
+  // The Christmas table set + the family bundle (founder, 27–29 Oct): demo photos on the founder's print maps
+  // until the samples are photographed. Category: the seasonal-decorations node already checked
   // above, until a precise placemat/coaster taxonomy id is verified against the en-GB list.
   placemat: {
     slug: 'placemats', name: 'placemats', title: 'Personalised placemats with your child’s drawing (set of 4)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
+    image: demo('placemat', 'A placemat printed with a child’s painting of their family holding hands by a yellow house, with flowers and the dog'),
   },
   coaster: {
     slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (packs of 2, 4 or 6)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
+    image: demo('coaster', 'Two square coasters, one on the other, printed with a child’s painting of their family by a yellow house'),
   },
   christmasBundle: {
     slug: 'christmas-family-bundle', name: 'christmas family bundle', title: 'Christmas family bundle: placemats, coasters and ornaments with your children’s drawings',
     googleCategory: CAT.holiday, productType: 'Christmas > Bundles',
+    image: demo('christmasBundle', 'Two placemats, two coasters and two round ceramic ornaments, all printed with the same child’s painting of their family by a yellow house'),
   },
   phoneCase: {
     slug: 'phone-case', name: 'phone case', title: 'Phone case with your child’s drawing',
@@ -183,6 +199,12 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     slug: 'playing-cards', name: 'playing cards', title: 'Playing cards with your child’s drawing on the back',
     googleCategory: CAT.cardGames, productType: 'Games > Playing cards',
     image: ex('flowerplayingcards', 1200, 1200, 'A deck of playing cards with a child’s painting of sunflowers in a blue vase on the back'),
+  },
+  // the photo fills the strap with the drawing (founder, 5 Nov) — the shop's own default sits small, below the watch
+  watchStrap: {
+    slug: 'apple-watch-strap', name: 'watch strap', title: 'Apple Watch strap printed with your child’s drawing',
+    googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',
+    image: demo('watchStrap', 'A white leather Apple Watch strap with black buckle, printed end to end with a child’s painting — blue sky, a brown dog and a little green figure'),
   },
 };
 

@@ -44,6 +44,8 @@ for (const file of readdirSync(DIR)) {
   }
 }
 // SKUs the sheets don't carry yet — Prodigi SANDBOX quotes to GB, Standard: [cost, first post, plus-one post].
+//  - the watch strap (5 Nov 2026, Prodigi's "global" change; PRODUCT-RANGE-global-uk-nov.md): uk6 → Royal Mail
+//    Standard Tracked £4.00, two £4.50.
 //  - the christmas table packs (27 Oct 2026): uk9 → Royal Mail Tracked 48, £4.30 + £1.00 per extra item;
 //  - the DATED 2027 calendar (25 Oct, CHRISTMAS-range-and-postage.md): uk15, £4.35, two for £5.35.
 //  - playing cards, kraft wrap rolls, height charts (29 Oct 2026, 1 copy + 2 copies quoted for the plus-one);
@@ -53,6 +55,7 @@ for (const file of readdirSync(DIR)) {
 //    Next Day £10.75, 24×36: FedEx £14.05 — each +£4.50 for a second.
 // (Still missing — so no multi-buy offer or code discount until added: hidden jumpers, bandana.)
 const SANDBOX = {
+  'GLOBAL-TECH-AP-WS-FL-38MM': [2200, 400, 50], 'GLOBAL-TECH-AP-WS-FL-42MM': [2200, 400, 50],
   'H-PLACE-1PK': [900, 430, 100], 'H-PLACE-2PK': [1650, 430, 100], 'H-PLACE-4PK': [3250, 430, 100], 'H-PLACE-6PK': [4850, 430, 100],
   'H-COAST-1PK': [400, 430, 100], 'H-COAST-2PK': [550, 430, 100], 'H-COAST-4PK': [1000, 430, 100], 'H-COAST-6PK': [1500, 430, 100],
   'CALENDAR-A5-L-DATED': [900, 435, 100], 'CALENDAR-A4-L-DATED': [1000, 435, 100],
