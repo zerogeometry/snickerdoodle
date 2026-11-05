@@ -42,7 +42,7 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
     expect(prices('blanket')).toEqual([6000, 7500]);
     expect(price('card')).toBe(550); // +50p
     expect(prices('storybook')).toEqual([2600, 2900]);
-    expect(prices('babyBodysuit')).toEqual([3600]); // tracked: Express from uk2 (founder, 5 Nov)
+    expect(prices('babyBodysuit')).toEqual([2200]);
     expect(prices('calendar')).toEqual([2200, 2400]); // A5 / A4, dated 2027 (founder, 2026-10-25)
     expect(prices('apron')).toEqual([2500, 2900]);
     expect(prices('christmasBauble')).toEqual([1900]); // the plastic ball £19 (D24)

@@ -88,6 +88,26 @@ export function strapHoles(s: StrapSize, box: { x: number; y: number; w: number;
 }
 
 /**
+ * Where the print file sits on a PHOTO of the strap (the founder's layers): the photo's two leather halves are
+ * matched to Prodigi's traced halves — the file's top, the gap behind the watch and its bottom — by a least-squares
+ * fit along the strap's length, so the drawing lands on each half where it really prints. Across the strap it's
+ * aspect-locked to the file and centred (the photo's strap is a touch narrower than Prodigi's, so the preview
+ * shows a little LESS of the sides than prints — never more). `halves` are the photo's two halves, top first:
+ * [y0, y1) in px; `cx` the strap's centre line. Returns the quad box (px) and how far each half's ends land from
+ * the photo's (px) — the registration error.
+ */
+export function strapPhotoBox(s: StrapSize, halves: [[number, number], [number, number]], cx: number): { x: number; y: number; w: number; h: number; residualPx: number } {
+  const f = [s.pieces[0]![0]![0], s.pieces[0]!.at(-1)![0], s.pieces[1]![0]![0], s.pieces[1]!.at(-1)![0]];
+  const y = [halves[0][0], halves[0][1], halves[1][0], halves[1][1]];
+  const mf = f.reduce((a, b) => a + b, 0) / 4, my = y.reduce((a, b) => a + b, 0) / 4;
+  const h = f.reduce((n, fi, i) => n + (fi - mf) * (y[i]! - my), 0) / f.reduce((n, fi) => n + (fi - mf) ** 2, 0);
+  const top = my - h * mf;
+  const w = (h * s.px.w) / s.px.h;
+  const residualPx = Math.max(...f.map((fi, i) => Math.abs(top + fi * h - y[i]!)));
+  return { x: cx - w / 2, y: top, w, h, residualPx };
+}
+
+/**
  * What DOESN'T print, as an SVG the size of the print file (`w`×`h` px): everything outside the two halves,
  * shaded, plus the holes. Laid over the placement screen's print layout, so a parent sees which part of
  * their drawing sits behind the watch.

@@ -14,7 +14,6 @@ import { basketLineId } from '@/lib/basket-line';
 import { FAMILY_SET_MIN_QTY, isFamilySetKey } from '@/pricing';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { FAMILY_SET_COLOURS, garmentHex } from '@/lib/garments';
-import { deliveryLine } from '@/lib/delivery';
 
 const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image
 
@@ -27,11 +26,12 @@ const SET_MEMBERS: { key: string; who: string }[] = [
 
 type Member = { uid: number; key: string; size: string | null };
 
-/** Does this garment come in the set's colour? (The baby bodysuit's colours aren't the tees' — in a colour it
- * isn't made in, it sits the set out.) */
-const comesIn = (p: CatalogueProduct, colour: string) => p.colours.length === 0 || p.variants.some((v) => v.attributes.colour === colour);
+/** The baby bodysuit is made in white only — it joins a white set, and sits out a coloured one. */
+const WHITE_ONLY = new Set(['babyBodysuit']);
+const colourFor = (key: string, setColour: string) => (WHITE_ONLY.has(key) ? 'white' : setColour);
 
-function resolveVariant(p: CatalogueProduct, m: Member, colour: string): CatalogueVariant | null {
+function resolveVariant(p: CatalogueProduct, m: Member, setColour: string): CatalogueVariant | null {
+  const colour = colourFor(p.key, setColour);
   return (
     p.variants.find(
       (v) => (p.sizes.length === 0 || v.attributes.size === m.size) && (p.colours.length === 0 || v.attributes.colour === colour),
@@ -49,7 +49,7 @@ const swatchColour = (name: string): string => garmentHex(name) ?? 'var(--color-
 
 /**
  * "Dress the whole family" — build a matching set (the SAME drawing, in the SAME colour, on kids
- * tees, grown-up tees and — in the colours it comes in — a baby bodysuit) and add it to the basket in one tap. Each
+ * tees, grown-up tees and — in white — a baby bodysuit) and add it to the basket in one tap. Each
  * person's preview is their own size, so the print shows true to scale on every tee. The 5%
  * family-set saving is decided SERVER-side at quote/checkout from line keys +
  * quantities; the figure shown here is the same rule, for honesty of expectation.
@@ -85,8 +85,8 @@ export function FamilySetModal({
   const [setColour, setSetColour] = useState<string>(FAMILY_SET_COLOURS[0] ?? 'white');
   const chooseColour = (c: string) => {
     setSetColour(c);
-    // a garment not made in that colour (the baby bodysuit's range differs) sits out
-    setMembers((ms) => ms.filter((m) => { const p = garments.find((g) => g.product.key === m.key)?.product; return !p || comesIn(p, c); }));
+    // a coloured set: the white-only bodysuit sits out
+    if (c !== 'white') setMembers((ms) => ms.filter((m) => !WHITE_ONLY.has(m.key)));
   };
 
   const memberFor = (p: CatalogueProduct): Member => {
@@ -194,9 +194,9 @@ export function FamilySetModal({
               first.
             </p>
           ) : null}
-          {garments.filter((g) => !comesIn(g.product, setColour)).map((g) => (
-            <p key={g.product.key} className="mt-1.5 text-[11px] text-ink-soft">the {g.product.label} doesn’t come in {setColour} — pick another colour to add one.</p>
-          ))}
+          {setColour !== 'white' && garments.some((g) => WHITE_ONLY.has(g.product.key)) ? (
+            <p className="mt-1.5 text-[11px] text-ink-soft">the baby bodysuit only comes in white — pick white to add one.</p>
+          ) : null}
         </div>
         {rows.length === 0 ? (
           // success-but-empty: never a bare footer over a void
@@ -260,7 +260,7 @@ export function FamilySetModal({
 
         {/* Grow the set — one tap per family member */}
         <div className="flex flex-wrap gap-2">
-          {garments.filter((g) => comesIn(g.product, setColour)).map((g, i) => (
+          {garments.filter((g) => setColour === 'white' || !WHITE_ONLY.has(g.product.key)).map((g, i) => (
             <Button key={g.product.key} variant="secondary" {...(i === 0 ? { 'data-add': true } : {})} onClick={() => setMembers((ms) => [...ms, memberFor(g.product)])}>
               <Icon icon={IconPlus} size={14} /> {g.product.label}
             </Button>
@@ -288,11 +288,7 @@ export function FamilySetModal({
           <Button size="lg" className="mt-3 w-full" onClick={addSet} disabled={!allResolved || adding}>
             {adding ? 'adding your set…' : `add the set to basket · ${gbp(totalPence)}`}
           </Button>
-          {/* true for THIS set: the baby bodysuit is ringspun (not organic) cotton and goes by 1st Class (untracked) */}
-          <p className="mt-2 text-center text-[11px] text-ink-soft">
-            {rows.every((r) => /organic/i.test(r.product?.specs.material ?? '')) ? 'organic cotton · ' : ''}
-            {deliveryLine(rows.map((r) => r.variant?.sku ?? r.m.key))} · savings confirmed at checkout
-          </p>
+          <p className="mt-2 text-center text-[11px] text-ink-soft">organic cotton · free tracked delivery · savings confirmed at checkout</p>
         </div>
       </div>
     </Modal>

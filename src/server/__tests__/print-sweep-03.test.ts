@@ -55,7 +55,7 @@ describe('sweep 03 — every print area a variant fills is Prodigi’s exact siz
     const areasOf = (key: string) => [...new Set(specs.filter((s) => s.productKey === key).map((s) => s.printTo.join('+')))];
     expect(areasOf('jigsaw')).toEqual(['jigsaw+lid']); // both required
     expect(areasOf('calendar')).toEqual(['cover+january+february+march+april+may+june+july+august+september+october+november+december']); // 'back cover' is optional
-    for (const g of ['kidsTee', 'adultTee', 'kidsHoodie', 'adultHoodie', 'kidsJumper', 'christmasJumper', 'babyBodysuit', 'babyBodysuitShort', 'babyTee', 'toddlerTee']) expect(areasOf(g), g).toEqual(['front']); // 'back' optional
+    for (const g of ['kidsTee', 'adultTee', 'kidsHoodie', 'adultHoodie', 'kidsJumper', 'christmasJumper', 'babyBodysuit']) expect(areasOf(g), g).toEqual(['front']); // 'back' optional
     expect(areasOf('socks')).toEqual(['front', 'default']); // ankle → front, tube → default
   });
 });

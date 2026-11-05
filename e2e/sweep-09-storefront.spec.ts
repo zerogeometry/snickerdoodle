@@ -149,6 +149,7 @@ test.describe('public pages', () => {
     'ceramic-christmas-ornament': 'ceramic christmas ornament', 'christmas-bauble': 'christmas bauble', 'christmas-sack': 'christmas sack',
     'christmas-family-bundle': 'christmas family bundle', 'phone-case': 'phone case', socks: 'socks', 'height-chart': 'height chart',
     'wrapping-paper': 'wrapping paper', 'tea-towel': 'tea towel', 'playing-cards': 'playing cards', placemats: 'placemats', coasters: 'coasters',
+    'apple-watch-strap': 'watch strap',
   };
   // 09-B1: the public pages for placemats + coasters list the bundle-only packs (BUNDLE_ONLY_SKUS) and lead with them
   const BUNDLE_PACKS = ['placemats', 'coasters'];

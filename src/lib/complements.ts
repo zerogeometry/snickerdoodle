@@ -26,15 +26,10 @@ export const COMPLEMENTS: Readonly<Record<string, readonly string[]>> = {
   blanket: ['cushion', 'teaTowel', 'mug'],
   kidsTee: ['adultTee', 'mug', 'socks'],
   adultTee: ['kidsTee', 'mug', 'socks'],
-  babyBodysuit: ['babyTee', 'blanket', 'mug'],
-  // 5 Nov 2026 (hidden until their photos are in — the server skips what isn't on show): the little ones
-  // suggest each other (one uk2 parcel), the strap the phone case (one uk6 lab)
-  babyBodysuitShort: ['babyTee', 'blanket', 'mug'],
-  babyTee: ['babyBodysuit', 'blanket', 'mug'],
-  toddlerTee: ['adultTee', 'kidsTee', 'mug'],
-  watchStrap: ['phoneCase', 'mug', 'socks'],
+  babyBodysuit: ['kidsTee', 'blanket', 'mug'],
   socks: ['mug', 'teaTowel', 'adultTee'],
   phoneCase: ['mug', 'playingCards', 'socks'],
+  watchStrap: ['phoneCase', 'mug', 'socks'], // (hidden until its photos are in — the server skips what isn't on show)
   playingCards: ['jigsaw', 'mug', 'card'],
   heightChart: ['framedPrint', 'kidsTee', 'blanket'],
   storybook: ['framedPrint', 'jigsaw', 'card'],

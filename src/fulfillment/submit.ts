@@ -86,12 +86,10 @@ export function assertProdigiConfigConsistent(env: GateEnv): void {
  * now Evri Standard 48, tracked (founder: Standard is fine so long as it's tracked).
  *
  * PHONE CASES opt back in (founder, 2026-10-21: "definitely tracked"): their Standard service is
- * often untracked Royal Mail 24 (lab uk8), Express is Royal Mail Tracked (lab uk6). So do the BABY +
- * TODDLER clothes (founder, 5 Nov: uk2's Standard is untracked 1st Class; its Express is DPD). Prodigi
- * takes ONE method per order, so an order with one goes Express as a whole — simpler and safer than
- * splitting the order. What that costs the other items is at src/lib/delivery.ts
- * (EXPRESS_FOR_TRACKING_KEYS: +£1.05 to +£8.05 each). An order with a calendar stays Standard —
- * Prodigi has no Express for it and would refuse the whole order.
+ * often untracked Royal Mail 24 (lab uk8), Express is Royal Mail Tracked (lab uk6). Prodigi takes
+ * ONE method per order, so an order with a case goes Express as a whole (+£1.05 to +£8.05 on the
+ * other items — src/lib/delivery.ts, sandbox 5 Nov) — simpler and safer than splitting the order. An
+ * order with a calendar stays Standard: Prodigi has no Express for it and would refuse the whole order.
  */
 export function resolveShippingMethod(productKeys: string[]): 'Standard' | 'Express' {
   return shippingMethodFor(productKeys);

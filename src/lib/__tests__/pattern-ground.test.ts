@@ -38,6 +38,8 @@ describe('base colours — any colour off the wheel, checked on the server', () 
     for (const k of ['kidsTee', 'adultTee', 'kidsHoodie', 'babyBodysuit', 'apron', 'calendar', null, undefined, '']) expect(isGroundProduct(k), String(k)).toBe(false);
     // founder, 26 Oct: every other product takes one — incl. the mug, the christmas range and the calendar
     for (const k of ['mug', 'sack', 'ceramicOrnament', 'christmasBauble', 'heightChart']) expect(isGroundProduct(k), k).toBe(true);
+    // founder, 5 Nov: the watch strap too (a cut-out drawing sits on a colour of the parent's choosing)
+    for (const k of ['watchStrap', 'watchStrap-large']) expect(isGroundProduct(k), k).toBe(true);
   });
 
   it('a picked colour gets a friendly name for the basket line', () => {

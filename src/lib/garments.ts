@@ -101,85 +101,12 @@ export const ADULT_JUMPER_PRINT_MM = { w: 390, h: 490 } as const; // 4606×5787p
 export const KIDS_JUMPER_CHEST_MM: Record<string, number> = { ...KIDS_HOODIE_CHEST_MM };
 export const ADULT_JUMPER_CHEST_MM: Record<string, number> = { S: 510, M: 560, L: 610, XL: 660, '2XL': 710 };
 
-// ── The little ones (5 Nov 2026 — Prodigi's "global" change made these in the UK; PRODUCT-RANGE-global-uk-nov.md) ──
-// Rabbit Skins fine jersey (100% ringspun cotton), Prodigi lab uk2 — sent EXPRESS (DPD) so they're tracked (founder,
-// 5 Nov; uk2's Standard is untracked 1st Class — src/lib/delivery.ts). Every size × colour below sandbox-quoted to GB from uk2 on 5 Nov; colours Prodigi makes only
-// in Canada or Australia (and the ones whose GB print area differs between routes) are left out on purpose.
-// Our colour names are friendlier than Prodigi's (`attr`).
-const HEATHER: GarmentColour = { name: 'heather grey', attr: 'heather', hex: '#a9aaad' };
-/** Baby tee 3–24 months: LAT/Rabbit Skins 3322 (GLOBAL-TEE-RS-3322). Front 1770×1770px, every size. £8 white,
- * £9 colours (+ £2.35). Left out: navy (6–12 and 12–18 months list a different, portrait print area). */
-export const BABY_TEE_COLOURS: GarmentColour[] = [
-  { name: 'white', attr: 'white', hex: '#ffffff' },
-  HEATHER,
-  { name: 'pink', attr: 'pink', hex: '#f4c6cf' },
-  { name: 'light blue', attr: 'light blue', hex: '#b9d3ea' },
-  { name: 'butter yellow', attr: 'butter', hex: '#f6e7a6' },
-  { name: 'apple green', attr: 'apple', hex: '#9cc96b' },
-  { name: 'red', attr: 'red', hex: '#c8202f' },
-  { name: 'black', attr: 'black', hex: '#232325' },
-];
-/** Prodigi's own size values — shown as they are (the bodysuit has always used them). */
-export const BABY_SIZES = ['newborn', '6-12 months', '12-18 months', '18-24 months'];
-/** Toddler tee: LAT/Rabbit Skins 3321 (GLOBAL-TEE-RS-3321). Prodigi's UK lab makes only TWO sizes, 1–2 and
- * 3–4 years (2–3, 4–5, 5–6 don't quote to GB). Front 3060×3780px. Left out: pink + light blue (Canada),
- * yellow, grass + slate (Australia). */
-export const TODDLER_TEE_COLOURS: GarmentColour[] = [
-  { name: 'white', attr: 'white', hex: '#ffffff' },
-  HEATHER,
-  { name: 'ballet pink', attr: 'ballerina', hex: '#f2cfd6' },
-  { name: 'butter yellow', attr: 'butter', hex: '#f6e7a6' },
-  { name: 'apple green', attr: 'apple', hex: '#9cc96b' },
-  { name: 'orange', attr: 'orange', hex: '#ef7a33' },
-  { name: 'red', attr: 'red', hex: '#c8202f' },
-  { name: 'navy', attr: 'navy blue', hex: '#232c46' },
-];
-export const TODDLER_TEE_SIZES = ['1-2 years', '3-4 years'];
-/** Long-sleeve bodysuit: Rabbit Skins 4411 (GLOBAL-BB-RS-4411). Front 2130×2130px. £9 white, £10 colours.
- * Heather isn't made in newborn; 18–24 months in white / heather / red / black lists TWO GB print areas
- * (2130² and 1500×2010 — we can't tell which Prodigi's lab will use), so that size is sold only in the
- * colours with one (light pink, navy) until Prodigi confirms. */
-export const BABY_BODYSUIT_COLOURS: GarmentColour[] = [
-  { name: 'white', attr: 'white', hex: '#ffffff' },
-  HEATHER,
-  { name: 'light pink', attr: 'light pink', hex: '#f4ccd4' },
-  { name: 'navy', attr: 'navy blue', hex: '#232c46' },
-  { name: 'red', attr: 'red', hex: '#c8202f' },
-  { name: 'black', attr: 'black', hex: '#232325' },
-];
-/** Is this long-sleeve bodysuit size + colour one Prodigi's UK lab makes with ONE print area? */
-export function babyBodysuitMade(size: string, colour: string): boolean {
-  if (size === 'newborn' && colour === 'heather grey') return false;
-  if (size === '18-24 months') return colour === 'light pink' || colour === 'navy';
-  return true;
-}
-/** Short-sleeve bodysuit: Rabbit Skins 4424 (GLOBAL-BB-RS-4424). Made in the UK in COLOURS only — its white
- * (and ballerina, grass, yellow) come from Canada / Australia. Front 2490×3510px. £9 (+ £2.35). */
-export const BABY_BODYSUIT_SHORT_COLOURS: GarmentColour[] = [
-  HEATHER,
-  { name: 'pink', attr: 'pink', hex: '#f4c6cf' },
-  { name: 'light blue', attr: 'light blue', hex: '#b9d3ea' },
-  { name: 'butter yellow', attr: 'butter', hex: '#f6e7a6' },
-  { name: 'apple green', attr: 'apple', hex: '#9cc96b' },
-  { name: 'red', attr: 'red', hex: '#c8202f' },
-  { name: 'navy', attr: 'navy blue', hex: '#232c46' },
-  { name: 'black', attr: 'black', hex: '#232325' },
-];
-
 /** The garment products (printed direct-to-garment). */
-export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie', 'kidsJumper', 'christmasJumper', 'babyTee', 'toddlerTee', 'babyBodysuitShort'] as const;
+export const GARMENT_PRODUCT_KEYS = ['kidsTee', 'adultTee', 'babyBodysuit', 'kidsHoodie', 'adultHoodie', 'kidsJumper', 'christmasJumper'] as const;
 export const isGarmentKey = (key: string | null | undefined): boolean => !!key && (GARMENT_PRODUCT_KEYS as readonly string[]).includes(key);
 
-/** Every colour a garment product comes in — the mockup layers are composed per colour from these. */
-export const GARMENT_COLOURS_BY_PRODUCT: Record<string, GarmentColour[]> = {
-  babyTee: BABY_TEE_COLOURS, toddlerTee: TODDLER_TEE_COLOURS, babyBodysuit: BABY_BODYSUIT_COLOURS, babyBodysuitShort: BABY_BODYSUIT_SHORT_COLOURS,
-};
-
-const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS, ...KIDS_JUMPER_COLOURS, ...ADULT_JUMPER_COLOURS, ...BABY_TEE_COLOURS, ...TODDLER_TEE_COLOURS, ...BABY_BODYSUIT_COLOURS];
+const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS, ...KIDS_JUMPER_COLOURS, ...ADULT_JUMPER_COLOURS];
 export const garmentHex = (name: string): string | null => ALL.find((c) => c.name === name)?.hex ?? null;
-
-/** A colour as a path segment (`light blue` → `light-blue`) — the mockup layer folders are named this way. */
-export const colourSlug = (name: string): string => name.trim().toLowerCase().replace(/\s+/g, '-');
 
 /**
  * Coloured garments print with a WHITE UNDERBASE (direct-to-garment): whatever isn't fully

@@ -12,17 +12,14 @@ import { routeOf, type Route } from './season';
 export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper'];
 
 /**
- * Products that go EXPRESS so they're tracked — Prodigi takes ONE shipping method per order, so an order with any
- * of these goes Express as a whole:
- *  - phone cases (founder, 21 Oct: "definitely tracked"): Standard is often untracked Royal Mail 24 (uk8);
- *  - the baby + toddler tees and both bodysuits (founder, 5 Nov: "must go tracked"): uk2's Standard is Royal Mail
- *    1st Class, untracked; its only tracked service is Express, DPD Classic by Road (£10.75 for one, and the same
- *    for two or more in one parcel; there's no Overnight). Sandbox quotes, 5 Nov 2026.
- * What it costs the OTHER items in such an order (their Express post over their Standard — sandbox, 5 Nov): mug,
- * ornament, jigsaw, wrapping paper +£1.05 · watch strap +£1.95 · cushion +£2.15 · framed print +£2.90 · kids or
- * adult tee +£6.45 · greetings card +£7.65 · socks +£8.05.
+ * Products that go EXPRESS so they're tracked — Prodigi takes ONE shipping method per order, so an order with one
+ * goes Express as a whole: phone cases (founder, 21 Oct: "definitely tracked" — their Standard is often untracked
+ * Royal Mail 24, uk8). What that adds to the OTHER items' post (sandbox, 5 Nov): mug, ornament, jigsaw, wrapping
+ * paper +£1.05 · watch strap +£1.95 · cushion +£2.15 · framed print +£2.90 · kids or adult tee +£6.45 · greetings
+ * card +£7.65 · socks +£8.05 — which is why the baby + toddler clothes (uk2: tracked only on Express, DPD £10.75)
+ * were NOT added (founder, 5 Nov).
  */
-export const EXPRESS_FOR_TRACKING_KEYS: readonly string[] = ['phoneCase', 'babyTee', 'toddlerTee', 'babyBodysuit', 'babyBodysuitShort'];
+export const EXPRESS_FOR_TRACKING_KEYS: readonly string[] = ['phoneCase'];
 /** Products Prodigi has NO Express service for — the dated calendar (lab uk15). An order with one can't go Express. */
 export const NO_EXPRESS_KEYS: readonly string[] = ['calendar'];
 
@@ -58,7 +55,6 @@ export const DELIVERY_DAYS: Record<Route, { handling: [number, number]; transit:
   uk2: { handling: [1, 3], transit: [1, 2] }, // Royal Mail 1st Class
   uk6: { handling: [1, 3], transit: [1, 2] }, // Express (phone cases)
   uk6std: { handling: [1, 3], transit: [2, 3] }, // Royal Mail Standard Tracked (the watch strap)
-  uk2x: { handling: [1, 3], transit: [1, 2] }, // Express, DPD Classic by Road (the baby + toddler clothes)
   other: { handling: [1, 3], transit: [2, 5] }, // unmapped: the widest range, to be safe
 };
 

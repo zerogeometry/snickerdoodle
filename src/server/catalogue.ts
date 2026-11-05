@@ -9,7 +9,6 @@ import {
   ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_SIZES, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
   KIDS_TEE_COLOURS, KIDS_TEE_SIZES, type GarmentColour,
   ADULT_JUMPER_COLOURS, ADULT_JUMPER_SIZES, KIDS_JUMPER_COLOURS, KIDS_JUMPER_SIZES,
-  BABY_BODYSUIT_COLOURS, BABY_BODYSUIT_SHORT_COLOURS, BABY_SIZES, BABY_TEE_COLOURS, babyBodysuitMade, TODDLER_TEE_COLOURS, TODDLER_TEE_SIZES,
 } from '@/lib/garments';
 import { WATCH_STRAP_SIZES } from '@/lib/watch-strap';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
@@ -196,21 +195,23 @@ function adultTeeVariants(): VariantDef[] {
   );
 }
 
-// Baby bodysuit: Rabbit Skins LONG-sleeve 4411, GB lab uk2, sent EXPRESS to be tracked (founder, 5 Nov — uk2's
-// Standard is untracked 1st Class; Express is DPD, £10.75). Re-verified against the sandbox 5 Nov 2026 (GET
-// /v4.0/products/GLOBAL-BB-RS-4411 + a quote for every size × colour): front 2130×2130px (@300dpi = 180×180mm)
-// for every size × colour we sell; £9 white, £10 colours. £36 = the ~20% rule on £10 + £10.75.
-// The sizes + colours it's made in, with ONE GB print area, are src/lib/garments.ts → babyBodysuitMade: no
-// heather newborn, and 18–24 months only in light pink + navy (white / heather / red / black list two GB
-// routes at 18–24 months, 2130² and 1500×2010 — sold again once Prodigi says which their UK lab uses).
-// (The short-sleeve 4424 is its own product below: its white is made in Canada.)
+// Baby bodysuit: Rabbit Skins LONG-sleeve 4411. The short-sleeve 4424 is GB-fulfilled only in
+// colours — its WHITE ships from Canada/Australia (5–21 days, and a child's image routed to a
+// non-UK/EU lab fails our residency posture). White 4411 is GB-made, £9, next-day. Tracked
+// shipping for a bodysuit-ALONE order is Express-only — flagged to the founder; in a family-set
+// order the garments ship together tracked.
+// Print canvas per size from Prodigi's API printAreaSizes (GET /v4.0/products/
+// GLOBAL-BB-RS-4411, 2026-07-07): white NB/6-12/12-18 = 2130×2130px (@300dpi =
+// 180×180mm). White 18-24 months lists TWO GB fulfilment routes with DIFFERENT
+// print areas (2130×2130 AND 1500×2010 = 127×170mm) — Prodigi picks the lab at
+// order time, so we design to the smaller INTERSECTION for that size; flagged in
+// the founder's support email for confirmation.
 function babyVariants(): VariantDef[] {
-  return BABY_SIZES.flatMap((size) =>
-    BABY_BODYSUIT_COLOURS.filter((c) => babyBodysuitMade(size, c.name)).map((c) => ({
-      size, colour: c.name, pricePence: 3600, ...exactPx({ w: 2130, h: 2130 }, 300), gateDpi: 150,
-      prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: c.attr }, printTo: ['front'],
-    })),
-  );
+  return ['newborn', '6-12 months', '12-18 months', '18-24 months'].map((size) => ({
+    size, colour: 'white', pricePence: 2200,
+    ...exactPx(size === '18-24 months' ? { w: 1500, h: 2010 } : { w: 2130, h: 2130 }, 300), gateDpi: 150,
+    prodigiSku: 'GLOBAL-BB-RS-4411', prodigiAttrs: { size, color: 'white' }, printTo: ['front'],
+  }));
 }
 
 // Fleece blanket: WHITE only for now (founder call — no pink/blue). Orientation is OURS like the
@@ -400,39 +401,8 @@ const DEFS: Record<string, ProductDef> = {
   babyBodysuit: {
     category: 'APPAREL', label: 'baby bodysuit', blurb: 'their first masterpiece, worn tiny', print: true,
     description: "A soft long-sleeved cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little.",
-    specs: { material: '100% ringspun cotton, fine jersey', sleeves: 'long', fastening: 'envelope neck, poppers underneath', print: 'up to 18 × 18 cm on the front', care: 'machine washable', made: 'in the UK' },
+    specs: { material: 'fine jersey cotton', sleeves: 'long', care: 'machine washable' },
     variants: babyVariants(),
-  },
-  // ── The little ones (5 Nov 2026 — Prodigi's "global" change; PRODUCT-RANGE-global-uk-nov.md). HIDDEN until
-  // the founder's layered photos are in (seedMockups → layered/<product>/<colour>/). All uk2, every size × colour
-  // sandbox-quoted to GB 5 Nov; colours in src/lib/garments.ts. TRACKED (founder, 5 Nov): they go Express (DPD
-  // Classic by Road, £10.75 — one or several in a parcel), so an order with one goes Express as a whole
-  // (src/lib/delivery.ts). Priced on the dearer colour: P ≈ (1.03 × landed + £0.75) / 0.61 → £35 on £9 + £10.75. ──
-  babyBodysuitShort: {
-    category: 'APPAREL', label: 'short-sleeve baby bodysuit', blurb: 'their first masterpiece, for warmer days', print: true,
-    description: "A soft short-sleeved cotton bodysuit with their drawing on the front — for the littlest artist, while they're still this little. In eight colours (the long-sleeved one comes in white).",
-    specs: { material: '100% ringspun cotton, fine jersey', sleeves: 'short', fastening: 'envelope neck, poppers underneath', print: 'up to 21 × 30 cm on the front', care: 'machine washable', made: 'in the UK' },
-    // Rabbit Skins 4424 (GLOBAL-BB-RS-4424): front 2490×3510px. Its WHITE is made in Canada, so no white here.
-    variants: garmentVariants({ sku: 'GLOBAL-BB-RS-4424', sizes: BABY_SIZES, colours: BABY_BODYSUIT_SHORT_COLOURS, printPx: { w: 2490, h: 3510 }, pricePence: 3500 }),
-  },
-  babyTee: {
-    category: 'APPAREL', label: 'baby tee', blurb: 'a tiny tee for their tiny masterpiece', print: true,
-    description: 'A soft little cotton tee with their own drawing on the front — sized from newborn to 2, for the days a bodysuit is too much.',
-    specs: { material: '100% ringspun cotton, fine jersey', sizes: 'newborn to 18–24 months', neck: 'envelope neck, easy over little heads', print: 'up to 15 × 15 cm on the front', care: 'machine washable', made: 'in the UK' },
-    // LAT/Rabbit Skins 3322 (GLOBAL-TEE-RS-3322): front 1770×1770px, every size.
-    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3322', sizes: BABY_SIZES, colours: BABY_TEE_COLOURS, printPx: { w: 1770, h: 1770 }, pricePence: 3500 }),
-  },
-  // A NEW product, not extra sizes on the kids tee: it's a different tee (Rabbit Skins fine jersey, not
-  // Stanley/Stella organic), a different shape of print (portrait, 26×32 cm vs the kids tee's 26×26 cm
-  // square), different colours, a different price (£35 vs £25–27) and a different lab + post (uk2 Express
-  // vs uk9 Tracked 48 — the Christmas date and the shipping method are per product). Folded into the kids tee, a parent
-  // would see 1–2 years appear and vanish as they changed colour, and two different "3–4 years".
-  toddlerTee: {
-    category: 'APPAREL', label: 'toddler tee', blurb: 'their masterpiece, for little legs on the go', print: true,
-    description: 'A soft cotton tee with their own drawing on the front, for 1 to 4 year olds — the little sibling of our kids tee.',
-    specs: { material: '100% ringspun cotton, fine jersey', sizes: '1–2 years · 3–4 years', print: 'up to 26 × 32 cm on the front', care: 'machine washable', made: 'in the UK' },
-    // LAT/Rabbit Skins 3321 (GLOBAL-TEE-RS-3321): front 3060×3780px. Prodigi's UK lab makes 1–2 and 3–4 years only.
-    variants: garmentVariants({ sku: 'GLOBAL-TEE-RS-3321', sizes: TODDLER_TEE_SIZES, colours: TODDLER_TEE_COLOURS, printPx: { w: 3060, h: 3780 }, pricePence: 3500 }),
   },
   // 7×5 portrait on Prodigi's Fedrigoni "classic" stock — the one built to print INSIDE and out
   // (CLASSIC-GRE-FEDR-7X5). One premium stock (founder call). The print file is a 4-panel spread
@@ -592,11 +562,11 @@ const DEFS: Record<string, ProductDef> = {
     variants: phoneCaseVariants(),
   },
   // The Apple Watch strap (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md): faux leather, uk6, Royal Mail Standard
-  // TRACKED (£22 + £4; no Express needed, unlike the phone cases). HIDDEN until the founder's photos are in —
-  // until then a drawn strap (drawnMockups.ts) previews it. ONE print file covers both halves end to end with
+  // TRACKED (£22 + £4; no Express needed, unlike the phone cases). ON SHOW (founder, 5 Nov) — previewed on the
+  // founder's photo set (applewatch.psd), or a drawn strap where it isn't staged (strapMockup.ts). ONE print file covers both halves end to end with
   // an unprinted gap behind the watch (src/lib/watch-strap.ts traces Prodigi's template). £45 ≈ 20% net.
   watchStrap: {
-    category: 'TECH', label: 'watch strap', blurb: 'their masterpiece, on your wrist', print: true,
+    category: 'TECH', label: 'watch strap', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
     description: "Their drawing printed along a faux-leather Apple Watch strap — a little masterpiece to glance at all day. In two sizes: small fits 38, 40 and 41 mm watches (and the 42 mm Series 10 and newer); large fits 44, 45, 46 and 49 mm (and the 42 mm Series 1–3). The size is on the back of the watch.",
     specs: { material: 'vegan faux leather, scratch-resistant finish', fittings: 'black', small: WATCH_STRAP_SIZES[0]!.fits, large: WATCH_STRAP_SIZES[1]!.fits, print: 'along both halves of the strap', made: 'in the UK' },
     // Prodigi's EXACT print files (sandbox GET /v4.0/products, 5 Nov: 305×2738 / 363×2932 px @300dpi), bleed 0

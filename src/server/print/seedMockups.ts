@@ -37,11 +37,12 @@ async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: Tra
   return { traced: caseTraces.get(key) ?? null, source: manifest[model]?.[grade] ? 'prodigi template' : 'prodigi template (other grade)' };
 }
 import {
-  ADULT_HOODIE_CHEST_MM, ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, colourSlug, garmentPrintRegion, HOODIE_PRINT_MM, isDarkGarment, KIDS_HOODIE_CHEST_MM, KIDS_TEE_CHEST_MM,
+  ADULT_HOODIE_CHEST_MM, ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, garmentPrintRegion, HOODIE_PRINT_MM, isDarkGarment, KIDS_HOODIE_CHEST_MM, KIDS_TEE_CHEST_MM,
   KIDS_TEE_PRINT_MM, teePrintRegion, type GarmentPhoto,
 } from '@/lib/garments';
 import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawnMockups';
 import { drawWatchStrapMockup } from './strapMockup';
+import { strapPhotoBox, strapSizeOf } from '@/lib/watch-strap';
 
 /**
  * Mockup template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -92,9 +93,10 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
-  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean; contain?: boolean }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
   | { file?: undefined; material: Material; register: 'drawn-strap' }
+  | { file?: undefined; material: Material; register: 'layered-strap'; dir: string; size: string }
 );
 
 /** The first image in a staged blank folder whose name matches — Prodigi's zips are named
@@ -384,27 +386,14 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
         region: teePrintRegion(kids ? KIDS_TEE_PRINT_MM : ADULT_TEE_PRINT_MM, chest),
       };
     }
-    // The little ones (5 Nov 2026): the founder's layered photo set PER COLOUR, composed by
-    // scripts/compose-founder-layers.mjs into layered/<product>/<colour>/ (a real photo of that colour, or the
-    // one white photo tinted to it). The print area is the founder's printmap; the print file sits INSIDE it at
-    // its own shape (contain), so the whole print shows — nothing the preview hides gets printed, or vice versa.
-    // Not staged ⇒ the long-sleeve bodysuit keeps its white derived photo (white only — a coloured variant
-    // never shows a white one); the others keep the plain tile.
     case 'babyBodysuit':
-    case 'babyBodysuitShort':
-    case 'babyTee':
-    case 'toddlerTee': {
-      const dir = colour ? layeredFlatDir(`${key}/${colourSlug(colour)}`) : null;
-      if (dir) return { material: isDarkGarment(colour) ? 'DARK_FABRIC' : 'LIGHT_FABRIC', register: 'layered-flat', dir, contain: true };
-      if (key === 'babyBodysuit' && colour === 'white') return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
-      return null;
-    }
-    // The watch strap (5 Nov 2026): the founder's layered set per size (layered/watchStrap/<small|large>/ — the
-    // printmap is the two leather halves, the watch + buckle the overlay), else the DRAWN strap, traced from
-    // Prodigi's own template (src/lib/watch-strap.ts) — the drawing shows only where it really prints.
+      return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
+    // The watch strap: the founder's layered set (applewatch.psd, 5 Nov — layered/watchStrap/: the black outline,
+    // the two leather halves as the printmap, buckle + lugs + holes on top), both sizes, each size's print file
+    // registered onto the halves from Prodigi's template (layeredStrapTemplate). Not staged ⇒ the DRAWN strap.
     case 'watchStrap': {
-      const dir = layeredFlatDir(`watchStrap/${size === 'large' ? 'large' : 'small'}`);
-      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn-strap' };
+      const dir = layeredFlatDir('watchStrap');
+      return dir ? { material: 'PAPER', register: 'layered-strap', dir, size } : { material: 'PAPER', register: 'drawn-strap' };
     }
     case 'mug': {
       // Founder's per-colour two-tone layers (background → shadow → real mug photo). One shared
@@ -860,8 +849,6 @@ export async function layeredFlatTemplate(
   /** each separate piece of the print area (a pair of socks) shows the WHOLE print file — one
    * print area per piece (`quad` + `extraQuads`), each at its own angle, left to right */
   pieces = false,
-  /** the print file sits INSIDE the print map at its own shape (a garment's chest panel), rather than covering it */
-  contain = false,
 ): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; extraQuads?: Quad[]; W: number; H: number } | null> {
   const d = await layeredFlat(dir);
   if (window) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.window), W: d.W, H: d.H };
@@ -881,7 +868,30 @@ export async function layeredFlatTemplate(
     const corners = orientedCoverQuad(a, d.W, d.H, printAspect, tiltOf(a, d.W, d.H));
     return corners ? { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: corners, W: d.W, H: d.H } : null;
   }
-  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, contain ? 'contain' : 'cover')), W: d.W, H: d.H };
+  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), W: d.W, H: d.H };
+}
+
+/**
+ * The founder's WATCH STRAP set as a mockup template: the layered-flat blank / mask / overlay, with the print quad
+ * registered onto the photo's two leather halves from Prodigi's traced template (strapPhotoBox) — not stretched
+ * over the whole outline, since the photo's gap between the halves isn't the file's. Mask = the halves.
+ */
+export async function layeredStrapTemplate(dir: string, size: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; W: number; H: number; residualPx: number } | null> {
+  const d = await layeredFlat(dir);
+  const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
+  const runs: Array<[number, number]> = [];
+  let x0 = d.W, x1 = -1, inRun = false;
+  for (let y = 0; y < d.H; y++) {
+    let on = false;
+    for (let x = 0; x < d.W; x++) if (a[y * d.W + x]! >= 128) { on = true; if (x < x0) x0 = x; if (x > x1) x1 = x; }
+    if (on && !inRun) runs.push([y, y + 1]);
+    if (on) runs[runs.length - 1]![1] = y + 1;
+    inRun = on;
+  }
+  const halves = runs.filter(([s, e]) => e - s > d.H * 0.05); // the two halves (ignore any stray sliver)
+  if (halves.length !== 2 || x1 < 0) return null;
+  const b = strapPhotoBox(strapSizeOf(size), [halves[0]!, halves[1]!], (x0 + x1 + 1) / 2);
+  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad({ x0: b.x / d.W, y0: b.y / d.H, x1: (b.x + b.w) / d.W, y1: (b.y + b.h) / d.H }), W: d.W, H: d.H, residualPx: b.residualPx };
 }
 
 /** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
@@ -1376,6 +1386,19 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     if (!p) { skipped.push(r.key); continue; }
     const printAspectEarly = r.printWmm / r.printHmm;
 
+    if (p.register === 'layered-strap') {
+      const d = await layeredStrapTemplate(p.dir, p.size);
+      if (!d) { skipped.push(`${r.key} (no two strap halves in ${p.dir})`); continue; }
+      await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: p.material, mask: d.mask, overlay: d.overlay });
+      authored++;
+      const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
+      registration.push({
+        sku: r.sku, print: `${r.printWmm}x${r.printHmm}mm`, mode: `layered-strap (halves ±${d.residualPx.toFixed(0)}px)`,
+        quadAspect: Math.round(qa * 1000) / 1000, printAspect: Math.round(printAspectEarly * 1000) / 1000, driftPct: Math.round(Math.abs(qa / printAspectEarly - 1) * 1000) / 10,
+      });
+      continue;
+    }
+
     if (p.register === 'drawn' || p.register === 'drawn-strap') {
       const d = p.register === 'drawn-strap' ? drawWatchStrapMockup({ w: r.printWpx, h: r.printHpx }) : drawProductMockup(p.key, (r.attrs as Record<string, string>) ?? {}, { w: r.printWpx, h: r.printHpx });
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: d.material, mask: d.mask, overlay: d.overlay });
@@ -1469,7 +1492,7 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     }
 
     if (p.register === 'layered-flat') {
-      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces, !!p.contain);
+      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
       if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
       const quad = d.quad;
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay });

@@ -62,7 +62,6 @@ const CAT = {
   wrap: { id: 2816, path: 'Arts & Entertainment > Party & Celebration > Gift Giving > Gift Wrapping > Wrapping Paper' },
   teaTowels: { id: 4257, path: 'Home & Garden > Linens & Bedding > Towels > Kitchen Towels' },
   cardGames: { id: 1247, path: 'Toys & Games > Games > Card Games' },
-  babyTops: { id: 5410, path: 'Clothing & Accessories > Clothing > Baby & Toddler Clothing > Baby & Toddler Tops' },
   watchBands: { id: 5123, path: 'Clothing & Accessories > Jewellery & Watches > Watch Accessories > Watch Bands' },
 } as const;
 
@@ -181,34 +180,7 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.cardGames, productType: 'Games > Playing cards',
     image: ex('flowerplayingcards', 1200, 1200, 'A deck of playing cards with a child’s painting of sunflowers in a blue vase on the back'),
   },
-};
-
-/**
- * Public copy READY for the products still waiting for their photos (5 Nov 2026 — hidden in the catalogue).
- * SHOP_PRODUCTS must list exactly the products on show (unit-tested), so these wait here: when one's
- * `visibleInShop` flips on, MOVE its entry up into SHOP_PRODUCTS (the test fails until you do).
- */
-export const WAITING_FOR_PHOTOS: Record<string, ShopProductCopy> = {
-  babyTee: {
-    slug: 'baby-t-shirt', name: 'baby tee', title: 'Baby T-shirt with your child’s drawing (newborn to 2)',
-    googleCategory: CAT.babyTops, productType: 'Clothing > Baby T-shirts',
-    feed: { exclude: 'clothing needs one item per size and colour' },
-  },
-  toddlerTee: {
-    slug: 'toddler-t-shirt', name: 'toddler tee', title: 'Toddler T-shirt with their own drawing (1 to 4)',
-    googleCategory: CAT.babyTops, productType: 'Clothing > Toddler T-shirts',
-    feed: { exclude: 'clothing needs one item per size and colour' },
-  },
-  babyBodysuit: {
-    slug: 'baby-bodysuit', name: 'baby bodysuit', title: 'Long-sleeved baby bodysuit with your child’s drawing',
-    googleCategory: CAT.babyTops, productType: 'Clothing > Baby bodysuits',
-    feed: { exclude: 'clothing needs one item per size and colour' },
-  },
-  babyBodysuitShort: {
-    slug: 'short-sleeve-baby-bodysuit', name: 'short-sleeve baby bodysuit', title: 'Short-sleeved baby bodysuit with your child’s drawing',
-    googleCategory: CAT.babyTops, productType: 'Clothing > Baby bodysuits',
-    feed: { exclude: 'clothing needs one item per size and colour' },
-  },
+  // (no brand-safe photo of the strap yet — its page shows the product art; the Merchant feed leaves it out)
   watchStrap: {
     slug: 'apple-watch-strap', name: 'watch strap', title: 'Apple Watch strap printed with your child’s drawing',
     googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',

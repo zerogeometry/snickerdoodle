@@ -28,44 +28,33 @@ table; gb3 (frames) 14 Dec in our table (Prodigi: framed prints 17 Dec). Books t
 Every new product also needs the founder's layered product photos (packshots) before it goes on show —
 the same reason the baby bodysuit and hoodies are hidden today.
 
-## Built (5 Nov 2026): baby tee, toddler tee, both bodysuits, the watch strap — hidden until the photos are in
+## Built (5 Nov 2026): the Apple Watch strap — hidden until the photos are in
 
-Re-checked in the sandbox the same day, every size × colour (POST /quotes to GB, Standard). What changed from the table above:
-- **Watch strap 42 mm** is 363×2932 px (only the 38 mm is 305×2738). Both go Royal Mail **Standard Tracked** from uk6
-  (£4.00; a second strap +£0.50) — tracked, so no Express. Shown as **small** (38, 40, 41 mm and the 42 mm Series 10+)
-  and **large** (44, 45, 46, 49 mm and the 42 mm Series 1–3). One print file covers both halves; the middle fifth sits
-  behind the watch and doesn't print — the placement screen shades it, and the drawing starts just below the watch.
-- **Toddler tee**: Prodigi's UK lab makes only 1–2 and 3–4 years. Pink, light blue (Canada) and yellow, grass, slate
-  (Australia) are left out. It's its own product, not extra sizes on the kids tee (different tee, print shape, colours,
-  price, lab and post).
-- **Baby tee**: navy left out (two sizes list a different print area). 8 colours, newborn to 18–24 months.
-- **Long-sleeve bodysuit**: now 6 colours (£9 white / £10 colours). No heather in newborn; 18–24 months only in light
-  pink and navy until Prodigi says which print file its UK lab uses for the others (two are listed).
-- **Short-sleeve bodysuit**: added — made in the UK in 8 colours, but **not white** (Prodigi makes white in Canada).
-- **The baby/toddler clothes go TRACKED** (founder, 5 Nov). uk2's Standard is Royal Mail 1st Class, untracked; its only
-  tracked service is **Express — DPD Classic by Road, £10.75**, the same for one garment or several in one parcel (no
-  Overnight). Prodigi takes one shipping method per order, so an order with one of these goes Express as a whole,
-  like a phone case. What that adds to the OTHER items in the order (their Express post over their Standard,
-  sandbox 5 Nov): mug, ceramic ornament, jigsaw, wrapping paper +£1.05 · watch strap +£1.95 · cushion +£2.15 ·
-  framed print +£2.90 · kids or adult tee +£6.45 · greetings card +£7.65 · socks +£8.05. The 2027 calendar has NO
-  Express at all, so an order with a calendar stays on Standard (the garment then goes untracked, and the basket
-  says "free delivery", not "tracked"). Last order for Christmas: 14 Dec (a DPD courier, like uk3/gb3); the strap 12 Dec.
+**The baby and toddler clothes are NOT being added** (founder, 5 Nov). Prodigi's UK lab for them (uk2) only tracks
+by Express — DPD, £10.75 — and Prodigi takes one shipping method per order, so any order with one would have gone
+Express as a whole: £1.05–£8.05 more post on every other item in it (kids/adult tees +£6.45, cards +£7.65, socks
++£8.05), and the garments themselves up to £35. Not worth it. (Checked in the sandbox on 5 Nov: the toddler tee is
+made in the UK in 1–2 and 3–4 years only; the short-sleeve bodysuit's white comes from Canada; uk2 has no Overnight.)
+The long-sleeve baby bodysuit already in the catalogue stays exactly as it was: hidden, white, £22.
 
-Prices: baby tee, toddler tee, short-sleeve bodysuit **£35** (£9 + £10.75); long-sleeve bodysuit **£36** (£10 + £10.75);
-strap £45 — each ~20% net. Multi-buy: the garments 15% off from two (a second garment rides free in the DPD parcel),
-the strap 10% for two and 15% for three or more — all ≥15% net.
+**The watch strap**, re-checked in the sandbox the same day:
+- The **42 mm** print file is 363×2932 px (only the 38 mm is 305×2738). Both go Royal Mail **Standard Tracked** from
+  uk6 (£22 + £4.00; a second strap +£0.50) — tracked, so no Express. **£45** (~20% net; multi-buy 10% for two, 15% for
+  three or more, all ≥15% net). Last order for Christmas: 12 Dec.
+- Shown as **small** (38, 40, 41 mm and the 42 mm Series 10+) and **large** (44, 45, 46, 49 mm and the 42 mm Series 1–3).
+- One print file covers both halves; the middle fifth sits behind the watch and doesn't print — the placement screen
+  shades it, and the drawing starts just below the watch.
 
-### What the founder sends, to switch each one on
-Drop these into `.prodigi-assets/blanks/founder-raw/`, run `node scripts/compose-founder-layers.mjs`, then seed the
-mockups. Cut-outs on a transparent background, straight-on, the print-area file on the SAME canvas as its photo.
-- `baby-tee.png` + `baby-tee-print.png` (a white rectangle where the 15 × 15 cm print sits)
-- `toddler-tee.png` + `toddler-tee-print.png` (26 × 32 cm print)
-- `baby-bodysuit.png` + `baby-bodysuit-print.png` (long sleeves; 18 × 18 cm print)
-- `baby-bodysuit-short.png` + `baby-bodysuit-short-print.png` (short sleeves; 21 × 30 cm print)
-- One WHITE garment each is enough — every colour is made from it. A real photo of a colour, named like
-  `baby-tee-light-blue.png`, is used instead whenever it's there.
-- Strap, per size (`small`, `large`): `watch-strap-small.png` (strap laid straight, buckle half on top, the watch
-  face-up in the middle), `watch-strap-small-print.png` (just the two leather halves), `watch-strap-small-watch.png`
-  (the watch + buckle, laid over the drawing). Until then the strap shows a drawn strap that's true to Prodigi's template.
-Then flip `visibleInShop` in src/server/catalogue.ts, move its page copy from `WAITING_FOR_PHOTOS` into
-`SHOP_PRODUCTS` (src/lib/shop-products.ts), add it to the /christmas/delivery-dates list, and reseed.
+- A **base colour** off the wheel, like the phone case and the other edge-to-edge products (founder, 5 Nov): a drawing
+  with no background of its own sits on the colour the parent picks.
+
+### Photos: supplied (applewatch.psd, 5 Nov)
+The founder's PSD layers are staged in `.prodigi-assets/blanks/founder-raw/` — `watch-strap.png` (blackoutlinebacking:
+the black outline), `watch-strap-print.png` (Printmap: the two leather halves) and `watch-strap-overlay.png` (Overlay:
+buckle and lugs) — and composed with the catalogue's standard backdrop and shadow by
+`node scripts/compose-founder-layers.mjs watchStrap` (the leather is white under the drawing; the black only rings
+it). Both sizes use them. The PSD's gap between the halves is a little longer than Prodigi's, so each size's print
+file is registered onto the two halves from Prodigi's template (within ~2–3% of the strap's length), not stretched
+over the outline. To go on show: flip `visibleInShop` in src/server/catalogue.ts, move its page copy from
+`WAITING_FOR_PHOTOS` into `SHOP_PRODUCTS` (src/lib/shop-products.ts), add it to the /christmas/delivery-dates list,
+and reseed (catalogue + mockups).

@@ -230,11 +230,11 @@ describe('family-set saving — 3+ garments in one order', () => {
     const q = priceBasket([
       { productKey: 'kidsTee', qty: 1 }, // 2500
       { productKey: 'adultTee', qty: 1 }, // 3200
-      { productKey: 'babyBodysuit', qty: 1 }, // 3600 (tracked, 5 Nov)
-    ]); // garments 9300
+      { productKey: 'babyBodysuit', qty: 1 }, // 2200
+    ]); // garments 7900
     expect(q.familySetApplied).toBe(true);
-    expect(q.familySetSavingPence).toBe(465); // 5% of 9300
-    expect(q.totalPence).toBe(9300 - 465 + DELIVERY_PENCE);
+    expect(q.familySetSavingPence).toBe(395); // 5% of 7900
+    expect(q.totalPence).toBe(7900 - 395 + DELIVERY_PENCE);
   });
 
   it('two garments → no set saving', () => {
