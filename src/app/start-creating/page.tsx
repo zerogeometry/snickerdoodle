@@ -59,10 +59,11 @@ export default function StartCreatingPage() {
   };
   useEffect(loadCatalogue, []);
 
-  // Hold the "making your collection" loader over the catalogue until the TOP HALF of the tiles have their
-  // real photos (founder, 23 Oct) — what's seen first is never a grid still filling in, and the
-  // bottom half lands just after (src/lib/mockupPrefetch.ts revealPlan). A generous safety timeout
-  // lifts it regardless.
+  // Hold the "making your collection" loader over the catalogue until the FIRST SIX tiles have painted the
+  // drawing on their products — the browser's instant preview or the server's photo (founder, 5 Nov) —
+  // so what's seen first is never a grid still filling in; the rest are asked for six at a time as the
+  // shopper scrolls near them (src/lib/mockupPrefetch.ts revealRange). A generous safety timeout lifts
+  // it regardless.
   // Both are tied to the drawing + edit they're FOR (rangeKey below): the catalogue can report a cached
   // range "settled" in the same commit the key changes — an effect resetting a plain flag afterwards
   // wiped that signal and stranded the loader until its safety timeout (founder, 26 Oct: "every time I
@@ -140,14 +141,13 @@ export default function StartCreatingPage() {
     const safety = setTimeout(() => setReadyKey(rangeKey), 45_000); // never strand the shopper
     return () => clearTimeout(safety);
   }, [rangeKey]);
-  // The top half's photos are ready: give the tiles a beat to swap them in, and let the loader play at least
-  // its little moment so the reveal lands as a reveal, not a flicker.
+  // The first six have painted (already on screen under the loader — nothing left to swap in): let the
+  // loader play at least its little moment so the reveal lands as a reveal, not a flicker.
   useEffect(() => {
     if (!rangeSettled || rangeReady) return;
     const MIN_LOADER_MS = 1200;
-    const SWAP_MS = 450; // a tile's instant preview → photo cross-fade
     const key = rangeKey;
-    const t = setTimeout(() => setReadyKey(key), Math.max(SWAP_MS, MIN_LOADER_MS - (Date.now() - shownAtRef.current)));
+    const t = setTimeout(() => setReadyKey(key), Math.max(0, MIN_LOADER_MS - (Date.now() - shownAtRef.current)));
     return () => clearTimeout(t);
   }, [rangeSettled, rangeReady, rangeKey]);
 

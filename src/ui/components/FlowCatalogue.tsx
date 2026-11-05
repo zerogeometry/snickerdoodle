@@ -15,12 +15,12 @@ import { ProductGrid, tileMockupInputs } from '@/ui/components/ProductGrid';
 import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
-import { FamilySetTile, familySetRequests } from '@/ui/components/FamilySetTile';
+import { FamilySetTile, familySetRequests, familySetVariantIds } from '@/ui/components/FamilySetTile';
 import { applyIngested, basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from './ChristmasPromise';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
-import { instantContext, mockupKey, prefetchContexts, prefetchMockups, revealPlan, whenMockupsSettled, type MockupRequest } from '@/lib/mockupPrefetch';
+import { instantContext, mockupKey, prefetchContexts, RANGE_GROUP, rangeGroups, revealRange, whenPainted, type RangeReveal } from '@/lib/mockupPrefetch';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
@@ -37,6 +37,9 @@ function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour, v.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean);
   return bits.length ? bits.join(' · ') : undefined;
 }
+
+/** The family set's place in the range's order (it's a tile of its own, beside the tee). */
+const FAMILY_TILE = '__family';
 
 function SectionLabel({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <h2 className={`mb-1 font-display text-lg text-cocoa ${className}`}>{children}</h2>;
@@ -69,8 +72,8 @@ export function FlowCatalogue({
   compact?: boolean; // denser grid for the narrower Start-Creating column
   scrollable?: boolean; // scroll the range inside a fixed-height container
   className?: string;
-  /** Called once every tile in the range has its photo ready to show (or definitely has none) —
-   * the create page holds its loader until then. */
+  /** Called once the FIRST SIX tiles have painted the drawing on their products (the instant preview
+   * or the server's photo — or definitely have none) — the create page holds its loader until then. */
   onRangeReady?: () => void;
 }) {
   const router = useRouter();
@@ -240,9 +243,17 @@ export function FlowCatalogue({
 
   const { picks, popular } = useMemo(() => splitCatalogue(products, items), [products, items]);
 
-  // ── The REVEAL: get every tile's picture as early as possible (src/lib/mockupPrefetch.ts).
-  // The range tiles, in the order they're shown (the full-catalogue modal fetches its own).
-  const rangeProducts = useMemo(() => (mode === 'sections' ? [...picks, ...popular] : products.filter((p) => p.category !== 'ADDON')), [mode, picks, popular, products]);
+  // flat mode (the standalone /catalogue page): category chips over one grid
+  const flatCategories = useMemo(
+    () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
+    [products],
+  );
+  const flatShown = useMemo(() => products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category)), [products, category]);
+
+  // ── The REVEAL (src/lib/mockupPrefetch.ts): every tile draws the drawing on its product at once, in
+  // the browser, and the server's photos follow in the order the tiles are shown. The range tiles, in
+  // that order (the full-catalogue modal fetches its own).
+  const rangeProducts = useMemo(() => (mode === 'sections' ? [...picks, ...popular] : flatShown), [mode, picks, popular, flatShown]);
   const tileInputs = useCallback(
     (p: CatalogueProduct) => {
       const sel = useSelection.getState().selections[p.key];
@@ -251,41 +262,82 @@ export function FlowCatalogue({
     },
     [upload],
   );
-  // 1) instant-preview photos: they don't depend on the drawing, only on which variant each tile
-  //    shows (its orientation follows the drawing's shape) — ask as soon as that's known.
-  const aspect = upload?.aspect;
-  useEffect(() => {
-    if (!aspect) return;
-    void prefetchContexts(rangeProducts.map((p) => tileInputs(p).variantId));
-  }, [aspect, rangeProducts, tileInputs]);
-  // 2) the photoreal mockups: the whole range, the moment the drawing is ingested — tiles that
-  //    can't show an instant preview (mugs, patterns, angled views) first, then in display order.
-  const assetId = upload?.assetId;
-  const cutoutId = upload?.cutout?.sourceObjectId;
-  useEffect(() => {
-    if (!assetId) return;
-    // the range in display order — the family set's tees in their place, right after the tee the
-    // set sits beside (so they're drawn with the rest and the tile can appear whole)
-    const familyAfter = mode === 'sections' ? popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee' : null;
-    const family = familyAfter ? familySetRequests(products, upload, usePlacements.getState().placements) : [];
-    const reqs: MockupRequest[] = rangeProducts.flatMap((p) => {
-      // a tile still waiting on the drawing's background colour is asked for once it's measured (moments later)
-      const { pending, ...inputs } = tileInputs(p);
-      return [...(pending ? [] : [{ ...inputs, assetId, size: 'thumb' as const }]), ...(p.key === familyAfter ? family : [])];
-    });
-    const { top, order } = revealPlan(reqs, (r) => !!instantContext(r.variantId));
-    prefetchMockups(order);
-    // the loader lifts when the TOP half's photos are ready (founder, 23 Oct); the rest were asked
-    // for straight after and land moments later, below the fold
-    return whenMockupsSettled(top.map(mockupKey), () => onRangeReadyRef.current?.());
-  }, [assetId, cutoutId, rangeProducts, tileInputs, mode, popular, products, upload]);
-
   // The banner promises "matching organic tees + a bodysuit" — only show it when all
   // three garments are actually purchasable (an unseeded/partial catalogue would
   // otherwise open a dead-end set builder). With the curated storefront this also
   // parks the whole family-set flow until the garments graduate back on show.
   // the set needs the two tees; the (white-only) bodysuit joins when it's in the shop
   const familySetAvailable = ['kidsTee', 'adultTee'].every((k) => products.some((p) => p.key === k));
+  // the set sits next to whichever tee parents reach for first (at the end when neither is popular)
+  const familyAfter = popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee';
+  // …and so the range's tiles, as laid out: the family set's in its place (ProductGrid's insert)
+  const rangeTiles = useMemo(() => {
+    const ids = rangeProducts.map((p) => p.key);
+    if (mode === 'sections' && familySetAvailable && popular.length) {
+      const at = popular.findIndex((p) => p.key === familyAfter);
+      ids.splice(at >= 0 ? picks.length + at + 1 : ids.length, 0, FAMILY_TILE);
+    }
+    return ids;
+  }, [rangeProducts, mode, familySetAvailable, popular, picks, familyAfter]);
+  const tileGroup = useMemo(() => new Map(rangeTiles.map((id, i) => [id, Math.floor(i / RANGE_GROUP)])), [rangeTiles]);
+
+  // 1) instant-preview photos (and the plain product photos for the tiles the browser can't draw):
+  //    they don't depend on the drawing, only on which variant each tile shows (its orientation
+  //    follows the drawing's shape) — ask as soon as that's known.
+  const aspect = upload?.aspect;
+  useEffect(() => {
+    if (!aspect) return;
+    void prefetchContexts([
+      ...rangeProducts.map((p) => {
+        const i = tileInputs(p);
+        return { variantId: i.variantId, view: i.view };
+      }),
+      ...(familySetAvailable ? familySetVariantIds(products) : []),
+    ]);
+  }, [aspect, rangeProducts, tileInputs, familySetAvailable, products]);
+  // 2) the server's photos BY POSITION, the moment the drawing is stored (founder, 5 Nov): the first
+  //    six at once — the loader waits for those to PAINT, instant preview or photo — then six at a
+  //    time as the shopper scrolls near them, each group only after the one before has answered.
+  //    Within a group, the tiles with no instant preview go first.
+  const assetId = upload?.assetId;
+  const cutoutId = upload?.cutout?.sourceObjectId;
+  const rangeRef = useRef<RangeReveal | null>(null);
+  // the furthest group the shopper has come near — their scroll position, kept across edits of the drawing
+  const wantedRef = useRef(0);
+  const wantNear = useCallback(
+    (id: string) => {
+      const g = tileGroup.get(id);
+      if (g === undefined) return;
+      wantedRef.current = Math.max(wantedRef.current, g);
+      rangeRef.current?.want(g);
+    },
+    [tileGroup],
+  );
+  useEffect(() => {
+    if (!assetId) return;
+    const placements = usePlacements.getState().placements;
+    const tiles = rangeTiles.map((id) => {
+      if (id === FAMILY_TILE) return { reqs: familySetRequests(products, upload, placements), pending: false };
+      // a tile still waiting on the drawing's background colour is asked for once it's measured (moments later)
+      const { pending, ...inputs } = tileInputs(rangeProducts.find((p) => p.key === id)!);
+      return { reqs: pending ? [] : [{ ...inputs, assetId, size: 'thumb' as const }], pending };
+    });
+    const groups = rangeGroups(tiles);
+    const range = revealRange(
+      groups.map((g) => g.flatMap((t) => t.reqs)),
+      (r) => !r.view && !r.fill && !!instantContext(r.variantId),
+    );
+    range.want(wantedRef.current);
+    rangeRef.current = range;
+    // the loader lifts once the FIRST SIX have painted the drawing on their products
+    const first = groups[0] ?? [];
+    const stopLoader = first.some((t) => t.pending) ? undefined : whenPainted(first.flatMap((t) => t.reqs.map(mockupKey)), () => onRangeReadyRef.current?.());
+    return () => {
+      stopLoader?.();
+      range.stop();
+      if (rangeRef.current === range) rangeRef.current = null;
+    };
+  }, [assetId, cutoutId, rangeTiles, rangeProducts, tileInputs, products, upload]);
 
   // "Full catalogue" earns its place only when it holds something beyond the sections
   // already on screen — a one-product storefront must not open a modal of the same tile.
@@ -293,13 +345,6 @@ export function FlowCatalogue({
     () => products.some((p) => p.category !== 'ADDON' && p.popularRank == null && !picks.some((x) => x.key === p.key)),
     [products, picks],
   );
-
-  // flat mode (the standalone /catalogue page): category chips over one grid
-  const flatCategories = useMemo(
-    () => ['all', ...new Set(products.filter((p) => p.category !== 'ADDON').map((p) => groupOf(p.category)))],
-    [products],
-  );
-  const flatShown = products.filter((p) => p.category !== 'ADDON' && (category === 'all' || groupOf(p.category) === category));
 
   const gridClassName = compact
     ? 'grid grid-cols-1 gap-y-7 pt-3 sm:grid-cols-2 sm:gap-x-4' // phones: one column (name, price + button each get room); 2-up from sm
@@ -316,6 +361,7 @@ export function FlowCatalogue({
     onAdd: (p: CatalogueProduct) => quickAdd(p, 1),
     onSub: (p: CatalogueProduct) => quickAdd(p, -1),
     onCustomize: customize,
+    onNear: (p: CatalogueProduct) => wantNear(p.key),
   };
 
   return (
@@ -348,8 +394,8 @@ export function FlowCatalogue({
                     familySetAvailable
                       ? {
                           // the set sits next to whichever tee parents reach for first
-                          afterKey: popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee',
-                          render: (i) => <FamilySetTile products={products} upload={upload} index={i} label={gridProps.customizeLabel} onOpen={() => { if (guardUpload()) setFamilyOpen(true); }} />,
+                          afterKey: familyAfter,
+                          render: (i) => <FamilySetTile products={products} upload={upload} index={i} label={gridProps.customizeLabel} onNear={() => wantNear(FAMILY_TILE)} onOpen={() => { if (guardUpload()) setFamilyOpen(true); }} />,
                         }
                       : undefined
                   }

@@ -1,15 +1,23 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { mockupKey, prefetchMockups, whenMockupsSettled, type MockupRequest } from '@/lib/mockupPrefetch';
+import { mockupKey, type MockupRequest } from '@/lib/mockupPrefetch';
+import { useInstantSrc } from '@/ui/components/ProductGrid';
 import { gbp, usePlacements, type PlacementTransform, type Upload } from '@/lib/store';
 import type { CatalogueProduct } from '@/server/catalogue';
 
 const pick = (p: CatalogueProduct, size: string) => p.variants.find((v) => v.attributes.size === size && v.attributes.colour === 'white') ?? p.variants[0]!;
 const teeTransform = (p: CatalogueProduct, upload: Upload, placements: Record<string, PlacementTransform | undefined>): PlacementTransform =>
   (upload?.assetId && placements[`${upload.assetId}-${p.key}`]) || defaultTransformFor(p.key);
+
+/** The two tees the family set tile shows (for their instant-preview photos). */
+export function familySetVariantIds(products: CatalogueProduct[]): string[] {
+  const adult = products.find((p) => p.key === 'adultTee');
+  const kids = products.find((p) => p.key === 'kidsTee');
+  return adult && kids ? [pick(adult, 'M').id, pick(kids, '7-8 years').id] : [];
+}
 
 /**
  * The family set's pictures (one grown-up tee, one kids tee — each shown twice), as the range
@@ -40,6 +48,7 @@ export function FamilySetTile({
   lazy = true,
   label = 'build your set',
   onOpen,
+  onNear,
 }: {
   products: CatalogueProduct[];
   upload: Upload;
@@ -47,44 +56,29 @@ export function FamilySetTile({
   lazy?: boolean;
   label?: string;
   onOpen: () => void;
+  /** The tile is getting near the screen — the range asks for its group of six (FlowCatalogue). */
+  onNear?: () => void;
 }) {
   const adult = products.find((p) => p.key === 'adultTee');
   const kids = products.find((p) => p.key === 'kidsTee');
   const placements = usePlacements((s) => s.placements);
+  const instantSrc = useInstantSrc(upload);
 
   // Shown as ONE piece (founder, 23 Oct: "fully rendered as one piece when I scroll to it"): the tees
-  // stay hidden until every one of their pictures is ready, then appear together.
+  // stay hidden until all four have PAINTED — the instant previews (the drawing on each tee at once)
+  // or the photos — then appear together; each tee's photo then fades in over its instant preview.
   const reqs = familySetRequests(products, upload, placements);
   const reqKey = reqs.length ? JSON.stringify(reqs.map(mockupKey)) : '';
-  const [ready, setReady] = useState<string | null>(null);
+  const [painted, setPainted] = useState<{ key: string; tees: Set<number> }>({ key: '', tees: new Set() });
+  const teePainted = (i: number) => setPainted((s) => (s.key === reqKey && s.tees.has(i) ? s : { key: reqKey, tees: new Set([...(s.key === reqKey ? s.tees : []), i]) }));
+  // a few seconds at most: then show what's there rather than a block for ever
+  const [gaveUp, setGaveUp] = useState<string | null>(null);
   useEffect(() => {
     if (!reqKey) return;
-    const keys = JSON.parse(reqKey) as string[];
-    // normally already asked for with the range; this is the safety net (after the range has queued)
-    const t = setTimeout(() => prefetchMockups(familySetRequests(products, upload, placements)), 0);
-    const stop = whenMockupsSettled(keys, () => setReady(reqKey));
-    return () => {
-      clearTimeout(t);
-      stop();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reqKey is the requests by value
+    const t = setTimeout(() => setGaveUp(reqKey), 8000);
+    return () => clearTimeout(t);
   }, [reqKey]);
-  // …and then until all four tees have actually PAINTED (arrived ≠ on screen); a few seconds at most
-  const layerRef = useRef<HTMLDivElement>(null);
-  const [painted, setPainted] = useState<string | null>(null);
-  useEffect(() => {
-    if (!reqKey || ready !== reqKey || painted === reqKey) return;
-    const giveUpAt = Date.now() + 8000;
-    let raf = 0;
-    const check = () => {
-      const imgs = [...(layerRef.current?.querySelectorAll('img') ?? [])];
-      if ((imgs.length === 4 && imgs.every((i) => i.complete && i.naturalWidth > 0)) || Date.now() > giveUpAt) setPainted(reqKey);
-      else raf = requestAnimationFrame(check);
-    };
-    check();
-    return () => cancelAnimationFrame(raf);
-  }, [reqKey, ready, painted]);
-  const shown = !!reqKey && painted === reqKey;
+  const shown = !!reqKey && ((painted.key === reqKey && painted.tees.size === 4) || gaveUp === reqKey);
 
   if (!adult || !kids) return null;
 
@@ -94,7 +88,7 @@ export function FamilySetTile({
   const fromPence = cheapest(adult) + cheapest(kids);
   const tf = (p: CatalogueProduct) => teeTransform(p, upload, placements);
 
-  const tee = (p: CatalogueProduct, variantId: string, cls: string, style: React.CSSProperties) => (
+  const tee = (i: number, p: CatalogueProduct, variantId: string, cls: string, style: React.CSSProperties) => (
     <div aria-hidden className={`absolute aspect-square ${cls}`} style={{ filter: 'drop-shadow(0 3px 4px rgb(43 33 24 / 0.16))', ...style }}>
       <MockupPreview
         productKey={p.key as never}
@@ -104,8 +98,11 @@ export function FamilySetTile({
         size="thumb"
         sourceObjectId={upload?.cutout?.sourceObjectId}
         px={128}
-        lazy={lazy && !reqKey}
+        lazy={lazy}
         placeholder={false}
+        instant={instantSrc && upload?.aspect ? { src: instantSrc, aspect: upload.aspect } : null}
+        onNear={onNear}
+        onPainted={() => teePainted(i)}
       />
     </div>
   );
@@ -124,13 +121,13 @@ export function FamilySetTile({
         {/* one calm block until the whole picture is ready — never a tee at a time */}
         {!shown ? <div aria-hidden className="absolute inset-0 bg-line motion-safe:animate-pulse" /> : null}
         {/* the picture is the image (the tap-anywhere button below sits beside it, not inside it) */}
-        <div ref={layerRef} role="img" aria-label="your drawing on two grown-up tees and two kids tees — a matching family set" className={`absolute inset-0 transition-opacity duration-300 ${shown ? 'opacity-100' : 'opacity-0'}`}>
+        <div role="img" aria-label="your drawing on two grown-up tees and two kids tees — a matching family set" className={`absolute inset-0 transition-opacity duration-300 ${shown ? 'opacity-100' : 'opacity-0'}`}>
         {/* grown-ups at the back… */}
-        {tee(adult, adultV.id, 'left-[-4%] top-[0%] w-[64%]', { transform: 'rotate(-6deg)', zIndex: 1 })}
-        {tee(adult, adultV.id, 'right-[-4%] top-[0%] w-[64%]', { transform: 'rotate(6deg)', zIndex: 0 })}
+        {tee(0, adult, adultV.id, 'left-[-4%] top-[0%] w-[64%]', { transform: 'rotate(-6deg)', zIndex: 1 })}
+        {tee(1, adult, adultV.id, 'right-[-4%] top-[0%] w-[64%]', { transform: 'rotate(6deg)', zIndex: 0 })}
         {/* …little ones in front */}
-        {tee(kids, kidsV.id, 'bottom-[8%] left-[12%] w-[46%]', { transform: 'rotate(-3deg)', zIndex: 2 })}
-        {tee(kids, kidsV.id, 'bottom-[8%] right-[12%] w-[46%]', { transform: 'rotate(4deg)', zIndex: 3 })}
+        {tee(2, kids, kidsV.id, 'bottom-[8%] left-[12%] w-[46%]', { transform: 'rotate(-3deg)', zIndex: 2 })}
+        {tee(3, kids, kidsV.id, 'bottom-[8%] right-[12%] w-[46%]', { transform: 'rotate(4deg)', zIndex: 3 })}
         </div>
         <button type="button" tabIndex={-1} onClick={onOpen} aria-label="build a family set" className="absolute inset-0 z-10 cursor-pointer" />
       </div>

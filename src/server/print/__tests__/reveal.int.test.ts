@@ -11,7 +11,7 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { seedCatalogue } from '@/server/catalogue';
 import type { ComposeMemo } from '@/server/print/compositor';
 import { drawProductMockup, type DrawnProductKey } from '@/server/print/drawnMockups';
-import { instantContexts } from '@/server/print/instantContext';
+import { instantContexts, serverOnlyReason } from '@/server/print/instantContext';
 import { composeForViewer } from '@/server/print/mockupRequest';
 import { setMockupTemplate } from '@/server/print/templates';
 import { deleteObject } from '@/storage';
@@ -73,14 +73,41 @@ describe.skipIf(!DB || !S3)('catalogue reveal — instant contexts + batch compo
   });
 
   it('instant contexts: a small brand-safe photo + the print area for flat products; none where the browser can’t draw it', async () => {
-    const ctx = await instantContexts(db, [variant.bandana!, variant.socks!]);
+    const { contexts: ctx, photos } = await instantContexts(db, [variant.bandana!, variant.socks!, variant.cards!]);
     expect(ctx[variant.socks!]).toBeNull(); // a repeat pattern: the server's printed face only
+    expect(ctx[variant.cards!]).not.toBeNull(); // this drawn deck is a flat print area: the browser draws it
     const bandana = ctx[variant.bandana!]!;
     expect(bandana.quad).toHaveLength(4);
     expect(bandana.material).toBe('LIGHT_FABRIC');
+    expect(bandana.face).toBeUndefined();
     const photo = await sharp(Buffer.from(await (await fetch(bandana.blankUrl)).arrayBuffer())).metadata();
     expect(Math.max(photo.width!, photo.height!)).toBeLessThanOrEqual(600); // the small copy, not the full photo
     expect(bandana.blankW / bandana.blankH).toBeCloseTo(photo.width! / photo.height!, 2);
+    // the ones the browser can't draw get their plain product photo to show meanwhile (same shape as the picture)
+    expect(photos[variant.bandana!]).toBeNull(); // drawn instead
+    for (const id of [variant.socks!]) {
+      const p = photos[id]!;
+      const m = await sharp(Buffer.from(await (await fetch(p.url)).arrayBuffer())).metadata();
+      expect(Math.max(m.width!, m.height!)).toBeLessThanOrEqual(600);
+      expect(p.w / p.h).toBeCloseTo(m.width! / m.height!, 2);
+    }
+  });
+
+  it('which products the browser draws — and why the rest wait for the server', () => {
+    const flat: [number, number][] = [[0.2, 0.1], [0.8, 0.1], [0.8, 0.9], [0.2, 0.9]];
+    const tilted: [number, number][] = [[0.23, 0.247], [0.577, 0.2245], [0.6085, 0.7105], [0.2615, 0.733]];
+    const base = { quad: flat, materialClass: 'PAPER', hasMask: true, extraQuads: 0 };
+    for (const key of ['framedPrint', 'cushion', 'kidsTee', 'adultTee', 'phoneCase', 'jigsaw', 'blanket', 'sack', 'ceramicOrnament', 'christmasBauble', 'calendar', 'petBandana']) {
+      expect(serverOnlyReason({ ...base, key }), key).toBeNull();
+    }
+    expect(serverOnlyReason({ ...base, key: 'mug', materialClass: 'CERAMIC' })).toMatch(/cylinder/);
+    expect(serverOnlyReason({ ...base, key: 'card', quad: tilted })).toMatch(/perspective/);
+    expect(serverOnlyReason({ ...base, key: 'wrappingPaper' })).toMatch(/repeat/);
+    expect(serverOnlyReason({ ...base, key: 'socks', extraQuads: 1 })).toMatch(/repeat/);
+    expect(serverOnlyReason({ ...base, key: 'heightChart' })).toMatch(/ruler/);
+    expect(serverOnlyReason({ ...base, key: 'watchStrap' })).toMatch(/half by half/);
+    for (const key of ['christmasBundle', 'placemat', 'coaster', 'multiPhotoFrame']) expect(serverOnlyReason({ ...base, key }), key).toMatch(/layout/);
+    expect(serverOnlyReason({ ...base, key: 'someFlat', extraQuads: 1 })).toMatch(/several/);
   });
 
   it('batch compose: one drawing download for the whole batch, each item its own photo', async () => {

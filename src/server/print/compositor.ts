@@ -23,6 +23,7 @@ import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { renderFrameGridFacePixels } from './frameGrid';
 import { isWatchStrap, strapBands, strapSizeForCanvas } from '@/lib/watch-strap';
 import { visibleLayerPart } from './visibleLayer';
+import { FACE_MAX_EDGE, mockupSizing, OUTPUT_EDGE, THUMB_DESIGN_EDGE, type MockupSize, type MockupSizing } from './thumbSizing';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -68,7 +69,6 @@ const MAX_INPUT_PIXELS = 50_000_000; // decompression-bomb guard on every decode
 const MAX_DRAWN_PIXELS = 16_000_000;
 /** The angled-view preview canvas's longest edge (never printed — warped onto the working photo). */
 const PERSPECTIVE_CANVAS_EDGE = 3000;
-const OUTPUT_EDGE: Record<MockupSize, number> = { thumb: 400, zoom: 1200 };
 const MAX_CONCURRENT = 3;
 // Render-engine revision — part of the cache key, so an engine upgrade (e.g. the Tier-B
 // fabric fx) re-renders cached mockups without a per-template version bump.
@@ -82,7 +82,7 @@ const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
 
 const RENDER_REV = 'r21'; // r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
-export type MockupSize = 'thumb' | 'zoom';
+export type { MockupSize };
 
 export interface MockupResult {
   mockupObjectId: string;
@@ -124,10 +124,9 @@ export interface ComposeMockupInput {
 }
 export type ComposeMemo = Map<string, Promise<Buffer>>;
 
-/** Thumbs (400px out) work at ≤ 800px — 3.5× fewer pixels than the 1500px zoom tier, no visible loss. */
-const THUMB_WORK_EDGE = 800;
-/** …and draw from a copy of the design no bigger than this (a 4500px original is ~10× the pixels). */
-export const THUMB_DESIGN_EDGE = 1200;
+// A thumb's sizes (working photo, drawing, printed face, WebP effort) follow the tile's real on-screen
+// size: thumbSizing.ts. THUMB_DESIGN_EDGE is re-exported for the layout tiles (bundleCompose.ts).
+export { THUMB_DESIGN_EDGE };
 
 /** The design's bytes — shrunk for a thumb, memoised per request when a memo is given. */
 export async function designBytes(key: string, edge: number | null, memo?: ComposeMemo, shared?: { assetId: string; tag: string }): Promise<Buffer> {
@@ -166,10 +165,21 @@ function templateRaw(id: string | undefined, step: string, make: () => Promise<R
  * Fill the template-layer cache when the server starts (founder, 26 Oct: "the image upload on first
  * testing seemed to take too long" — a fresh server fetched every product photo from storage during
  * the first shopper's catalogue reveal). Only BRAND-SAFE, NON-child template images (template_assets);
- * never a design. Best-effort and bounded: a byte budget below the cache's own, a few at a time, and
- * any failure simply leaves that layer to load on first use as before.
+ * never a design. Best-effort and bounded: a byte budget below the cache's own, and any failure simply
+ * leaves that layer to load on first use as before.
+ *
+ * LOW PRIORITY (it ran ~19 s after each deploy, alongside the first shoppers): one photo at a time,
+ * yielding to the event loop between them, and stepping aside while a live preview is being composed
+ * (those fetch the photos they need themselves) — a little at most, so it still finishes.
  */
-export async function warmTemplateCache(db: DbHandle, budgetBytes = 120 * 1024 * 1024): Promise<{ layers: number; bytes: number }> {
+export async function warmTemplateCache(
+  db: DbHandle,
+  budgetBytes = 120 * 1024 * 1024,
+  opts: { busy?: () => boolean; pauseMs?: number; maxWaitMs?: number } = {},
+): Promise<{ layers: number; bytes: number }> {
+  const busy = opts.busy ?? (() => active > 0 || waiters.length > 0);
+  const pauseMs = opts.pauseMs ?? 50;
+  const maxWaitMs = opts.maxWaitMs ?? 2000;
   const rows = await db.select({ key: templateAssets.key, byteSize: templateAssets.byteSize }).from(templateAssets);
   let bytes = 0, layers = 0;
   const todo = rows.filter((r) => {
@@ -179,15 +189,16 @@ export async function warmTemplateCache(db: DbHandle, budgetBytes = 120 * 1024 *
     return true;
   });
   bytes = 0;
-  for (let i = 0; i < todo.length; i += 4) {
-    await Promise.all(todo.slice(i, i + 4).map(async (r) => {
-      try {
-        bytes += (await templateBytes(r.key)).byteLength;
-        layers++;
-      } catch {
-        /* loads on first use instead */
-      }
-    }));
+  for (const r of todo) {
+    // a shopper's preview is being made: let it have the box (up to maxWaitMs per photo)
+    for (let waited = 0; busy() && waited < maxWaitMs; waited += pauseMs) await new Promise((ok) => setTimeout(ok, pauseMs));
+    await new Promise((ok) => setImmediate(ok));
+    try {
+      bytes += (await templateBytes(r.key)).byteLength;
+      layers++;
+    } catch {
+      /* loads on first use instead */
+    }
   }
   return { layers, bytes };
 }
@@ -259,12 +270,12 @@ function placedPart(designBuf: Design, transform: Transform, size: { width: numb
 }
 
 /** The final step, unchanged: downscale to the display size (lanczos), sharpen, encode sRGB WebP. */
-async function encodeOutput(img: Raw, outputEdge: number): Promise<{ buffer: Buffer; width: number; height: number }> {
+async function encodeOutput(img: Raw, outputEdge: number, effort = 4): Promise<{ buffer: Buffer; width: number; height: number }> {
   const out = await fromRaw(img)
     .resize(outputEdge, outputEdge, { fit: 'inside', kernel: 'lanczos3', withoutEnlargement: true })
     .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
     .withMetadata({ icc: 'srgb' })
-    .webp({ quality: 82, effort: 4 })
+    .webp({ quality: 82, effort })
     .toBuffer({ resolveWithObject: true });
   return { buffer: out.data, width: out.info.width, height: out.info.height };
 }
@@ -533,9 +544,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
       extraQuads: tpl.extraQuads,
       transform: t,
       spanHalf,
-      workEdge: size === 'thumb' ? Math.min(tpl.mapResolutionPx, THUMB_WORK_EDGE) : tpl.mapResolutionPx,
-      outputEdge: OUTPUT_EDGE[size],
-      thumb: size === 'thumb',
+      sizing: mockupSizing(size, tpl.mapResolutionPx),
       memo: input.memo,
       print: { widthPx: tpl.printWidthPx, heightPx: tpl.printHeightPx, bleedMm: tpl.bleedMm, requiredDpi: tpl.requiredDpi },
       materialClass: tpl.materialClass,
@@ -562,12 +571,9 @@ const faceOf = (key: string | null | undefined): Face | undefined =>
   isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : isWatchStrap(key) ? 'strap' : undefined;
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
 const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
-/** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
- * the photo's print area is never more than the ~1500 px working edge, so 2× that is plenty). */
-const FACE_MAX_EDGE = 3000;
+/** The most pixels a preview face is rendered at (a 5 m roll is 122 MP in print); its longest edge is
+ * FACE_MAX_EDGE for a close-up, THUMB_FACE_EDGE for a thumb (thumbSizing.ts). */
 const FACE_MAX_PIXELS = 8_000_000;
-/** A thumb's face only needs to cover its ≤ 800px working photo. */
-const THUMB_FACE_EDGE = 1000;
 
 /** Render a product's printed face at preview size — the same functions renderPrintFile uses — as
  * pixels: the compositor lays it straight onto the photo, so it is never encoded in between. */
@@ -716,10 +722,12 @@ async function renderAndPersist(
     /** the source object's id + content hash — what a cached printed face was made from */
     designTag: string;
     fillHex?: string; groundHex?: string; quad: [number, number][]; extraQuads?: [number, number][][];
-    transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
+    transform: Transform; spanHalf?: 'front' | 'back';
+    /** working photo, drawing, face, output + encoder effort for this size (thumbSizing.ts) */
+    sizing: MockupSizing;
     print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
     materialClass: string; mugMode?: 'front' | 'back' | 'centre'; face?: Face;
-    thumb?: boolean; memo?: ComposeMemo;
+    memo?: ComposeMemo;
     /** preview-only paper tone (PAPER_TONE) */
     paperTone?: number;
     /** "the back": render the front, turned over (FLIP_BACK_KEYS) */
@@ -732,7 +740,7 @@ async function renderAndPersist(
   // (shared across a batch via `memo`) and every template layer comes from the in-process cache,
   // decoded at the thumb's working size — far less to download, decode and composite (the
   // catalogue reveal).
-  const source = () => (args.fillHex ? solidFill(args.fillHex) : designBytes(args.designKey, args.thumb ? THUMB_DESIGN_EDGE : null, args.memo, { assetId: args.assetId, tag: args.designTag }));
+  const source = () => (args.fillHex ? solidFill(args.fillHex) : designBytes(args.designKey, args.sizing.designEdge, args.memo, { assetId: args.assetId, tag: args.designTag }));
   let designBuf: Design;
   let transform = args.transform;
   if (args.face) {
@@ -742,7 +750,7 @@ async function renderAndPersist(
     // by this exact source object + content hash, dropped when the asset is erased), so flipping
     // back to a colour, a sibling size with the same print canvas, or a re-render after a template
     // bump reuses it without fetching the drawing again.
-    const faceEdge = args.thumb ? THUMB_FACE_EDGE : FACE_MAX_EDGE;
+    const faceEdge = args.sizing.faceEdge;
     const p = args.print;
     const faceKey = `${args.assetId}|${args.designTag}|${args.face}${FACE_REV}|${faceEdge}|${p.widthPx}x${p.heightPx}@${p.requiredDpi}+${p.bleedMm}|${transformHash(args.transform)}|${args.groundHex ?? ''}`;
     designBuf = await faceCache.get(faceKey, async () => renderPrintedFace(await source(), args.face!, p, args.transform, faceEdge, args.groundHex));
@@ -766,8 +774,9 @@ async function renderAndPersist(
     extraQuads: args.extraQuads,
     transform,
     spanHalf: args.spanHalf,
-    workEdge: args.workEdge,
-    outputEdge: args.outputEdge,
+    workEdge: args.sizing.workEdge,
+    outputEdge: args.sizing.outputEdge,
+    webpEffort: args.sizing.webpEffort,
     print: args.print,
     materialClass: args.materialClass,
     mugMode: args.mugMode,
@@ -830,6 +839,8 @@ export async function renderMockupLayers(args: {
    * then cached in process. Absent ⇒ nothing is cached. Never an id for the design. */
   layerIds?: { blank?: string; mask?: string; overlay?: string };
   transform: Transform; spanHalf?: 'front' | 'back'; workEdge: number; outputEdge: number;
+  /** WebP encoder effort (default 4, the close-up's) */
+  webpEffort?: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   materialClass: string; mugMode?: 'front' | 'back' | 'centre';
   /** Base colour under a PLACED drawing (#rrggbb), edge to edge on the print area (flat, perspective, the mug's wrap). */
@@ -847,7 +858,7 @@ export async function renderMockupLayers(args: {
   // A ceramic mug WITH a printmap (mask) → CYLINDER warp onto that surface. Without a printmap
   // (the plain-white fallback blank) it falls through to FLAT.
   const cylinder = !perspective && args.materialClass === 'CERAMIC' && !!args.mask;
-  const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, print: args.print };
+  const common = { blankBuf: args.blank, designBuf: args.design, ids: args.layerIds ?? {}, quad: args.quad, transform: args.transform, workEdge: args.workEdge, outputEdge: args.outputEdge, webpEffort: args.webpEffort, print: args.print };
   const out = perspective
     ? await renderPerspective({ ...common, extraQuads: extra, spanHalf: args.spanHalf, maskBuf: args.mask, overlayBuf: args.overlay, materialClass: args.materialClass, groundHex: args.groundHex, paperTone: args.paperTone })
     : cylinder
@@ -877,6 +888,7 @@ async function renderFlat(args: {
   transform: Transform;
   workEdge: number;
   outputEdge: number;
+  webpEffort?: number;
   /** The variant's real print geometry, for bleed-exact windowing. */
   print: { widthPx: number; bleedMm: number; requiredDpi: number };
   /** Base colour under the drawing, filling the whole print area (#rrggbb); none = see-through. */
@@ -884,7 +896,7 @@ async function renderFlat(args: {
   /** Drives the Tier-B fabric fx intensities (fold displacement + shading). */
   materialClass: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, designBuf, ids, quad, transform, workEdge, outputEdge, print, materialClass, groundHex: ground } = args;
+  const { blankBuf, maskBuf, overlayBuf, designBuf, ids, quad, transform, workEdge, outputEdge, webpEffort, print, materialClass, groundHex: ground } = args;
 
   const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
   const rect = quadBboxPx(quad, WW, WH);
@@ -1026,7 +1038,7 @@ async function renderFlat(args: {
     }
   }
 
-  return encodeOutput(flattened, outputEdge);
+  return encodeOutput(flattened, outputEdge, webpEffort);
 }
 
 /**
@@ -1054,12 +1066,13 @@ async function renderPerspective(args: {
   spanHalf?: 'front' | 'back';
   workEdge: number;
   outputEdge: number;
+  webpEffort?: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   /** Base colour under the drawing, filling the whole print area (#rrggbb); none = white stock. */
   groundHex?: string;
   paperTone?: number;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, extraQuads, transform, spanHalf, workEdge, outputEdge, print } = args;
+  const { blankBuf, maskBuf, overlayBuf, materialClass, designBuf, ids, quad, extraQuads, transform, spanHalf, workEdge, outputEdge, webpEffort, print } = args;
 
   // Working blank (cap the longest edge; the quad is normalised, so it scales with it).
   const { img: workingBlank, WW, WH } = await workingBlankOf(blankBuf, workEdge, ids.blank);
@@ -1150,7 +1163,7 @@ async function renderPerspective(args: {
     }
   }
 
-  return encodeOutput(composited, outputEdge);
+  return encodeOutput(composited, outputEdge, webpEffort);
 }
 
 /** A quad's centre (the mean of its corners). */
@@ -1255,13 +1268,14 @@ async function renderCylinder(args: {
   transform: Transform;
   workEdge: number;
   outputEdge: number;
+  webpEffort?: number;
   print: { widthPx: number; heightPx: number; bleedMm: number; requiredDpi: number };
   mode: 'front' | 'back' | 'centre';
   ellipseCx: number;
   /** a base colour under the drawing, all round the printed wrap (#rrggbb) */
   groundHex?: string;
 }): Promise<{ buffer: Buffer; width: number; height: number }> {
-  const { blankBuf, printmapBuf, designBuf, ids, transform, workEdge, outputEdge, print, mode, ellipseCx } = args;
+  const { blankBuf, printmapBuf, designBuf, ids, transform, workEdge, outputEdge, webpEffort, print, mode, ellipseCx } = args;
   const wrapBg = args.groundHex ?? '#ffffff';
   const back = mode === 'back';
 
@@ -1316,5 +1330,5 @@ async function renderCylinder(args: {
       .toColourspace('srgb'),
   );
 
-  return encodeOutput(composited, outputEdge);
+  return encodeOutput(composited, outputEdge, webpEffort);
 }

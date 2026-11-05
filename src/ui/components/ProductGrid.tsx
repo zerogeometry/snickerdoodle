@@ -38,6 +38,17 @@ export function tileMockupInputs(
   };
 }
 
+/**
+ * The drawing as this browser already holds it, for the instant previews (nothing is sent anywhere): the
+ * cutout once made, else a small local copy of the upload — but only once the drawing is STORED (the table
+ * trimmed off at upload — founder, 26 Oct: it must never flash up); a trim is the drawing itself, so it
+ * previews from the page's own copy.
+ */
+export function useInstantSrc(upload: Upload): string | null {
+  const localSrc = useLocalPreview(!upload?.assetId || (upload.cutout && !upload.cutout.trim) ? null : upload.dataUrl);
+  return (upload?.cutout && !upload.cutout.trim ? upload.cutout.url : null) ?? localSrc;
+}
+
 const SWATCH: Record<string, string> = {
   oak: '#C8A06A', black: '#2E2723', white: '#F7F2E8', sky: '#84BBD0', pink: '#E8A6B8',
   natural: '#E7D9BE', gold: '#D9B45B', blue: '#5B8AC0', 'caribbean blue': '#3FA9C9', 'cotton pink': '#E8A6B8',
@@ -68,6 +79,7 @@ export function ProductTile({
   onSub,
   onCustomize,
   onZoom,
+  onNear,
   index = 0,
 }: {
   p: CatalogueProduct;
@@ -85,6 +97,8 @@ export function ProductTile({
   onSub: () => void;
   onCustomize: () => void;
   onZoom?: () => void;
+  /** The tile is getting near the screen — the range asks for its group of six (FlowCatalogue). */
+  onNear?: () => void;
 }) {
   // Reflect the shopper's OWN choices so the tile shows what they set — not the defaults.
   // Placement (zoom/position) is carried in usePlacements, keyed by (asset, product) to
@@ -95,11 +109,7 @@ export function ProductTile({
   // so the tile can never show a landscape frame while "+" quietly adds the portrait default:
   // explicit selection wins; else auto-orient to the drawing's aspect; else the plain default.
   const shown = tileMockupInputs(p, upload, sel, savedTf);
-  // the instant preview: the drawing as this browser already holds it (the cutout once made)
-  // the instant preview waits for the STORED drawing (the table trimmed off at upload — founder, 26 Oct:
-  // it must never flash up); a trim is the drawing itself, so it previews from the page's own copy
-  const localSrc = useLocalPreview(!upload?.assetId || (upload.cutout && !upload.cutout.trim) ? null : upload.dataUrl);
-  const instantSrc = (upload?.cutout && !upload.cutout.trim ? upload.cutout.url : null) ?? localSrc;
+  const instantSrc = useInstantSrc(upload);
   return (
     // A taped polaroid (Scrapbook D12): white border, washi tape, a small resting tilt that
     // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape
@@ -127,6 +137,9 @@ export function ProductTile({
           px={128}
           lazy={lazy}
           instant={instantSrc && upload?.aspect ? { src: instantSrc, aspect: upload.aspect } : null}
+          // a product the browser can't draw shows its plain photo meanwhile — never a blank square
+          standIn
+          onNear={onNear}
         />
         {/* Tapping the preview opens the product — the SAME action as the customize button
             below. A mouse/touch convenience only (tabIndex -1): keyboard + screen-reader users
@@ -206,6 +219,7 @@ export function ProductGrid({
   onSub,
   onCustomize,
   onZoom,
+  onNear,
   insert,
 }: {
   /** An extra tile slotted in after a product (e.g. the family set after the tees); appended
@@ -223,6 +237,8 @@ export function ProductGrid({
   onSub: (p: CatalogueProduct) => void;
   onCustomize: (p: CatalogueProduct) => void;
   onZoom?: (p: CatalogueProduct) => void;
+  /** A tile is getting near the screen (the range asks for its group). */
+  onNear?: (p: CatalogueProduct) => void;
 }) {
   return (
     <div className={gridClassName}>
@@ -248,6 +264,7 @@ export function ProductGrid({
                 onSub={() => onSub(p)}
                 onCustomize={() => onCustomize(p)}
                 onZoom={onZoom ? () => onZoom(p) : undefined}
+                onNear={onNear ? () => onNear(p) : undefined}
               />
             </div>
           );

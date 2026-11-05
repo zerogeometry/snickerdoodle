@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { cachedMockup, forgetMockup, instantContext, mockupKey, pendingMockup, rememberMockup, subscribeMockups } from '@/lib/mockupPrefetch';
+import { cachedMockup, forgetMockup, instantContext, markPainted, mockupKey, pendingMockup, productPhoto, rememberMockup, subscribeMockups } from '@/lib/mockupPrefetch';
 import { clampTransform } from '@/server/print/geometry';
-import { InstantMockup } from './InstantMockup';
+import { normalizeGround } from '@/lib/patterns';
+import { InstantMockup, ProductPhotoStandIn } from './InstantMockup';
 import { PreviewLoader } from './PreviewLoader';
 import type { ProductKey } from './ProductArt';
 import type { PlacementTransform } from '@/lib/store';
@@ -15,6 +16,18 @@ export const MOCKUP_READY_EVENT = 'sd:mockup-ready';
 
 /** The key a close-up's small stand-in is shown under — painted, it lifts the loader (same picture). */
 const standInKey = (inputKey: string) => `small:${inputKey}`;
+
+/** The nearest scrolling ancestor — the range scrolls inside its own box, and an IntersectionObserver's
+ * margin only stretches its ROOT, so the observer must be rooted there for a margin to mean anything. */
+function scrollRoot(el: HTMLElement): Element | null {
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY;
+    if (o === 'auto' || o === 'scroll') return p;
+  }
+  return null;
+}
+/** How far ahead (beyond the visible part of the scroller) a tile counts as NEAR: its group of six is asked for. */
+const NEAR_MARGIN = '120% 0px';
 
 type MockupPreviewResult =
   | { ok: true; url: string; tier: 'FLAT' | 'PERSPECTIVE'; widthPx?: number; heightPx?: number }
@@ -32,7 +45,9 @@ type MockupPreviewResult =
  *
  * `lazy` defers the compose call until the tile scrolls into view (IntersectionObserver),
  * so a big grid — e.g. the Full Catalogue — doesn't fire dozens of renders at once; it
- * composes a tile only as the shopper browses to it.
+ * composes a tile only as the shopper browses to it. In the range, `onNear` tells the range's
+ * plan (src/lib/mockupPrefetch.ts revealRange) the shopper is getting close, well before that, and
+ * the tile then waits for the plan's request rather than asking itself.
  */
 export function MockupPreview({
   productKey,
@@ -49,7 +64,10 @@ export function MockupPreview({
   lazy = false,
   placeholder = true,
   instant,
+  standIn = false,
   loader = false,
+  onNear,
+  onPainted,
 }: {
   productKey: ProductKey;
   assetId?: string | null;
@@ -75,6 +93,12 @@ export function MockupPreview({
   /** The drawing as the BROWSER already holds it (+ its width ÷ height): while the photoreal
    * mockup is being made, draw an instant preview from it (src/ui/components/InstantMockup.tsx). */
   instant?: { src: string; aspect: number } | null;
+  /** No instant preview possible (a mug's wrap, a repeat…): show the plain product photo while the picture is made. */
+  standIn?: boolean;
+  /** The tile is getting near the screen (a generous margin) — the range asks for its group. */
+  onNear?: () => void;
+  /** Something real has painted: the instant preview or the photo. */
+  onPainted?: () => void;
   /** Lay the "making it" loader over the preview while a newer photo is on its way, until it has
    * painted (the customize page's big preview). Off for grids: a tile just holds its photo. */
   loader?: boolean;
@@ -90,6 +114,12 @@ export function MockupPreview({
   const [currentKey, setCurrentKey] = useState<string | null>(null);
   const [paintedKey, setPaintedKey] = useState<string | null>(null);
   const [resting, setResting] = useState(false);
+  // the instant preview / product photo under the photo is let go once the photo has faded in over it
+  const [underlayGoneKey, setUnderlayGoneKey] = useState<string | null>(null);
+  const onNearRef = useRef(onNear);
+  onNearRef.current = onNear;
+  const onPaintedRef = useRef(onPainted);
+  onPaintedRef.current = onPainted;
   const [attempt, setAttempt] = useState(0); // bumped to re-run a failed compose
   const [visible, setVisible] = useState(!lazy);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -151,15 +181,35 @@ export function MockupPreview({
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
+          onNearRef.current?.(); // the range's plan first, so the tile finds its request on the way
           setVisible(true);
           io.disconnect();
         }
       },
-      { rootMargin: '250px' }, // warm a little before it's actually on screen
+      { root: scrollRoot(el), rootMargin: '250px' }, // warm a little before it's actually on screen
     );
     io.observe(el);
     return () => io.disconnect();
   }, [lazy, visible]);
+
+  // NEAR: a generous margin ahead of the scroll — the range asks for this tile's group of six.
+  const near = !!onNear;
+  useEffect(() => {
+    if (!near) return;
+    const el = containerRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return void onNearRef.current?.();
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          onNearRef.current?.();
+          io.disconnect();
+        }
+      },
+      { root: scrollRoot(el), rootMargin: NEAR_MARGIN },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [near]);
 
   // ── Compose: dispatch, and apply the result if it is the LATEST request (a monotonic
   // seq, not this effect-run's closure) — so a valid result is applied even when React
@@ -223,14 +273,16 @@ export function MockupPreview({
       }
     }
     // … or have it on the way: wait for that rather than asking twice.
-    const inflight = pendingMockup(inputKey);
-    if (inflight) {
-      void inflight.then((r) => {
+    const waitFor = (p: Promise<{ ok: true; url: string } | { ok: false; transient?: boolean }>) =>
+      void p.then((r) => {
         if (!isLatest()) return;
         if (r.ok) show(r.url);
         else if (r.transient) retryOrRest();
         else setResting(true);
       });
+    const inflight = pendingMockup(inputKey);
+    if (inflight) {
+      waitFor(inflight);
       return;
     }
     if (!visible) return;
@@ -241,39 +293,59 @@ export function MockupPreview({
     // mount re-renders, so the compose never fired. A superseded request is aborted; the
     // seq-gate ignores its result; the recovery effect retries a genuinely stuck one.
     const ctrl = new AbortController();
-    fetch('/api/mockup', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        assetId,
-        variantId,
-        transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
-        size,
-        sourceObjectId: sourceObjectId ?? undefined,
-        view: view ?? undefined,
-        fill: fill ?? undefined,
-        ground: ground ?? undefined,
-        spanHalf: spanHalf ?? undefined,
-      }),
-      signal: ctrl.signal,
-    })
-      .then((res) => res.json() as Promise<MockupPreviewResult>)
-      .then((r) => {
-        if (!isLatest()) return;
-        if (!r.ok) {
-          setCurrent(null);
-          setResting(true); // no template / blocked — settle on the plain block
-          return;
-        }
-        // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
-        rememberMockup(inputKey, r.url);
-        show(r.url);
+    const selfCompose = () =>
+      fetch('/api/mockup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          assetId,
+          variantId,
+          transform: transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // 0 = contain (default placement)
+          size,
+          sourceObjectId: sourceObjectId ?? undefined,
+          view: view ?? undefined,
+          fill: fill ?? undefined,
+          ground: ground ?? undefined,
+          spanHalf: spanHalf ?? undefined,
+        }),
+        signal: ctrl.signal,
       })
-      .catch(() => {
-        // an aborted/superseded request is expected (the seq-gate ignores it); a genuine
-        // failure retries, then settles (the recovery effect below also retries a stuck one)
-        retryOrRest();
-      });
+        .then((res) => res.json() as Promise<MockupPreviewResult>)
+        .then((r) => {
+          if (!isLatest()) return;
+          if (!r.ok) {
+            setCurrent(null);
+            setResting(true); // no template / blocked — settle on the plain block
+            return;
+          }
+          // Preload OFF-SCREEN and swap only once the pixels are ready — no half-loaded pop.
+          rememberMockup(inputKey, r.url);
+          show(r.url);
+        })
+        .catch(() => {
+          // an aborted/superseded request is expected (the seq-gate ignores it); a genuine
+          // failure retries, then settles (the recovery effect below also retries a stuck one)
+          retryOrRest();
+        });
+    // In the range, its plan asks for this picture (in order, six at a time — src/lib/mockupPrefetch.ts):
+    // tell it the tile is here, and let its effect run (just after this one, on the first render) before
+    // asking alone — then wait for the plan's request instead.
+    if (onNearRef.current) {
+      onNearRef.current();
+      const t = setTimeout(() => {
+        if (!isLatest()) return;
+        const planned = pendingMockup(inputKey);
+        const got = cachedMockup(inputKey);
+        if (planned) waitFor(planned);
+        else if (got) show(got);
+        else void selfCompose();
+      }, 0);
+      return () => {
+        clearTimeout(t);
+        ctrl.abort();
+      };
+    }
+    void selfCompose();
     return () => ctrl.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- tfKey is `transform` by value (a fresh object each render would refetch forever)
   }, [visible, assetId, variantId, tfKey, size, sourceObjectId, view, fill, ground, spanHalf, attempt, prefetchTick]);
@@ -296,20 +368,38 @@ export function MockupPreview({
     return () => clearTimeout(id);
   }, [visible, assetId, variantId, current, resting, attempt]);
 
-  // The instant preview stands in until the photo lands (and stays under it while it fades in).
+  // The instant preview stands in until the photo lands (and stays under it while it fades in); a tile
+  // the browser can't draw shows the plain product photo instead. Both are let go once the photo is in.
+  const painted = (key: string | null) => {
+    if (key && !key.startsWith('small:')) markPainted(key);
+    onPaintedRef.current?.();
+    // tells the create page's "making your range" loader that real pixels are on screen
+    window.dispatchEvent(new Event(MOCKUP_READY_EVENT));
+  };
+  const underlay = underlayGoneKey !== inputKey;
   const ctx = instant && variantId && !view && !fill ? instantContext(variantId) : undefined;
-  const instantLayer = ctx ? (
+  const instantLayer = ctx && underlay ? (
     <div className="absolute inset-0" data-instant>
       <InstantMockup
+        // a new drawing or photo is a new picture: counted afresh
+        key={`${instant!.src}|${ctx.blankUrl}`}
         ctx={ctx}
         src={instant!.src}
         aspect={instant!.aspect}
         transform={clampTransform((transform ?? { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }) as Parameters<typeof clampTransform>[0])}
+        ground={normalizeGround(ground)}
         // the instant preview counts as "real pixels" for the create page's loader
-        onReady={() => window.dispatchEvent(new Event(MOCKUP_READY_EVENT))}
+        onReady={() => painted(assetId ? inputKey : null)}
       />
     </div>
   ) : null;
+  const photo = !ctx && standIn && variantId && !fill ? productPhoto(variantId, view) : undefined;
+  const standInLayer = photo && underlay ? (
+    <div className="absolute inset-0">
+      <ProductPhotoStandIn photo={photo} />
+    </div>
+  ) : null;
+  const under = instantLayer ?? standInLayer;
 
   // Busy = a newer photo is on its way and hasn't painted yet (and we haven't given up on it).
   // (a painted stand-in for this exact choice counts: it's the same picture, just smaller)
@@ -319,18 +409,20 @@ export function MockupPreview({
     // h-full so a fixed-size parent (the square tile) bounds the preview; in an auto-height
     // parent (customize page) it falls back to content height and max-h-full is inert.
     <div ref={containerRef} className="relative flex h-full w-full items-center justify-center">
-      {instantLayer}
+      {under}
       {current ? (
         <img
           src={current}
           alt={`your drawing on a ${productKey}`}
           width={px}
           height={px}
-          className={`h-auto max-h-full w-full rounded-lg object-contain ${instantLayer ? 'relative motion-safe:animate-[fade_.35s_ease-out]' : ''}`}
-          // tells the create page's "making your range" loader that real pixels are on screen
+          className={`h-auto max-h-full w-full rounded-lg object-contain ${under ? 'relative motion-safe:animate-[fade_.35s_ease-out]' : ''}`}
           onLoad={() => {
             setPaintedKey(currentKey);
-            window.dispatchEvent(new Event(MOCKUP_READY_EVENT));
+            painted(currentKey);
+            // the photo has faded in over the instant preview / product photo: let that go
+            const k = currentKey;
+            if (k) setTimeout(() => mountedRef.current && setUnderlayGoneKey(k), 450);
           }}
           onError={() => {
             // an expired signed URL: drop the dead image and recompose (fresh URL)
@@ -344,7 +436,7 @@ export function MockupPreview({
             }
           }}
         />
-      ) : instantLayer || !placeholder ? null : (
+      ) : under || !placeholder ? null : (
         // No photo yet: a calm oat block, pulsing only while work is under way —
         // deliberately never the SVG stand-in (founder call).
         <div

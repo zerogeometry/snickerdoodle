@@ -3,8 +3,9 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * The family set tile appears as ONE piece (founder, 23 Oct): never a tee at a time. Whenever its
- * picture is showing, all four tees are fully loaded; before that, one calm placeholder. The
- * previews are slowed so the in-between moment is really there to catch.
+ * picture is showing, all four tees have painted — the instant preview (the drawing on each tee, drawn in
+ * the browser at once) or the photo; before that, one calm placeholder. The photos are slowed so the
+ * in-between moment is really there to catch.
  */
 for (const vp of [{ w: 390, h: 844 }, { w: 1280, h: 900 }]) {
   test(`the family set tile appears whole (${vp.w}px)`, async ({ page }) => {
@@ -27,10 +28,16 @@ for (const vp of [{ w: 390, h: 844 }, { w: 1280, h: 900 }]) {
       const s = await tile.evaluate((el) => {
         // the role=img element IS the fading layer (or, in older markup, wraps it)
         const layer = el.classList.contains('transition-opacity') ? el : el.querySelector<HTMLElement>('.transition-opacity')!;
-        const imgs = [...layer.querySelectorAll<HTMLImageElement>('img')];
+        const ok = (i: HTMLImageElement) => i.complete && i.naturalWidth > 0;
+        // each tee: its photo, or its instant preview with every layer loaded
+        const tees = [...layer.children].map((tee) => {
+          const photo = tee.querySelector<HTMLImageElement>('img[alt^="your drawing on"]');
+          const inst = [...tee.querySelectorAll<HTMLImageElement>('[data-instant] img')];
+          return (!!photo && ok(photo)) || (inst.length >= 2 && inst.every(ok));
+        });
         return {
           visible: getComputedStyle(layer).opacity !== '0',
-          whole: imgs.length === 4 && imgs.every((i) => i.complete && i.naturalWidth > 0),
+          whole: tees.length === 4 && tees.every(Boolean),
         };
       });
       if (s.visible) {

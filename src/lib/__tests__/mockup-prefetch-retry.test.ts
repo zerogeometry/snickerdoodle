@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * The create page's "making your range" loader waits for every tile's photo (whenMockupsSettled).
- * A batch that hiccups (a slow host timing out) must NOT count as settled straight away — the photos
- * are asked for again, one by one, and the loader stays up (founder, 23 Oct: "the loading animation
- * is disappearing before the catalogue appears").
+ * Whatever waits on a set of photos (whenMockupsSettled — the family set tile) must not count a request
+ * that hiccups (a slow host timing out) as settled straight away — the photo is asked for again, after a
+ * pause, and the wait goes on (founder, 23 Oct: "the loading animation is disappearing before the
+ * catalogue appears").
  */
 const req = (n: number) => ({ assetId: 'a1', variantId: `v${n}`, size: 'thumb' as const, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } });
 
@@ -29,14 +29,14 @@ describe('the range waits through a hiccup', () => {
     vi.unstubAllGlobals();
   });
 
-  it('a timed-out batch is retried item by item; settled only once every photo is in', async () => {
+  it('a timed-out request is asked again; settled only once every photo is in', async () => {
     let calls = 0;
     vi.stubGlobal(
       'fetch',
       vi.fn(async (_url: string, init: { body: string }) => {
         calls++;
         const items = JSON.parse(init.body).items as { variantId: string }[];
-        if (calls === 1) return { ok: false, json: async () => ({}) }; // the first batch times out (504)
+        if (calls === 1) return { ok: false, json: async () => ({}) }; // the first request times out (504)
         return { ok: true, json: async () => ({ results: items.map((i) => ({ ok: true, url: `https://x/${i.variantId}.webp` })) }) };
       }),
     );
@@ -50,7 +50,7 @@ describe('the range waits through a hiccup', () => {
     expect(settled).not.toHaveBeenCalled(); // the hiccup alone doesn't lift the loader
     await vi.advanceTimersByTimeAsync(3000); // the retries, then the photos load
     expect(settled).toHaveBeenCalledTimes(1);
-    expect(calls).toBe(1 + 3); // one failed batch, then each photo on its own
+    expect(calls).toBe(3 + 1); // one request per photo, then the one that timed out again
   });
 
   it('after the last try it stops waiting (the tile retries itself when shown)', async () => {

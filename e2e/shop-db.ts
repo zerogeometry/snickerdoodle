@@ -46,6 +46,22 @@ export async function shopCatalogue(): Promise<ShopProduct[]> {
 export const rangeReady = (page: Page) =>
   expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
 
+/** Scroll the range to its end, like a parent browsing it: its pictures are asked for six at a time as the
+ * tiles come near (src/lib/mockupPrefetch.ts revealRange), so a test about a tile further down walks to it. */
+export async function walkRange(page: Page) {
+  const scroller = page.locator('.brand-scroll').filter({ has: page.locator('.polaroid') }).first();
+  for (let step = 0; step < 60; step++) {
+    const atEnd = await scroller.evaluate((el) => {
+      const own = el.scrollHeight > el.clientHeight + 2;
+      if (own) el.scrollBy(0, el.clientHeight * 0.8);
+      else window.scrollBy(0, window.innerHeight * 0.8);
+      return own ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : window.innerHeight + window.scrollY >= document.body.scrollHeight - 2;
+    });
+    await page.waitForTimeout(250);
+    if (atEnd) return;
+  }
+}
+
 /** Client-side navigation (keeps this tab's in-memory placement store, like a real tap). */
 export async function goClient(page: Page, url: string) {
   await page.evaluate((u) => (window as unknown as { next: { router: { push: (u: string) => void } } }).next.router.push(u), url);
