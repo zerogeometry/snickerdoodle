@@ -31,8 +31,9 @@ export default defineConfig({
     // KMS key (docker-compose.yml) — the real encrypted-storage path, not a bypass.
     command:
       // …and its own address (sign-in links come back to :3100, not a dev server's :3000) and the console mailer
-      // (production refuses to start without a mail provider; the complaint form insists its acknowledgement is sent).
-      `cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local APP_URL=${BASE} AUTH_URL=${BASE} MAIL_PROVIDER=console npm run start -- -p ${PORT}`,
+      // (production refuses to start without a mail provider; the complaint form insists its acknowledgement is sent),
+      // and a build tag like a deploy's (an open tab checks it to move onto a newer build — e2e/fresh-build.spec.ts).
+      `cross-env NEXT_DIST_DIR=.next-e2e npm run build && cross-env NEXT_DIST_DIR=.next-e2e S3_KMS_KEY_ALIAS=snickerdoodle-local S3_KMS_KEY_ALIAS_ORIGINALS=snickerdoodle-local APP_URL=${BASE} AUTH_URL=${BASE} MAIL_PROVIDER=console APP_BUILD=e2e npm run start -- -p ${PORT}`,
     url: BASE,
     reuseExistingServer: true,
     timeout: 300_000,
