@@ -20,7 +20,7 @@ async function checkoutTotal(page: Page, label: RegExp, total: string) {
   await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText(total);
 }
 
-test('watch strap: large → the placement editor shades what’s behind the watch → basket → checkout at £45', async ({ page }) => {
+test('watch strap: large → the drawing fills the strap → the placement editor shades what’s behind the watch → basket → £45', async ({ page }) => {
   test.setTimeout(240_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -57,9 +57,16 @@ test('watch strap: large → the placement editor shades what’s behind the wat
   await expect(layout.locator('img[src^="data:image/svg+xml"]')).toHaveCount(1);
   const box = (await layout.boundingBox())!;
   expect(box.height / box.width, 'the layout is the strap’s long, thin shape').toBeGreaterThan(5);
-  // the drawing starts on the visible strap, not behind the watch (gap ends about half-way down)
+  // by default the drawing FILLS the strap (founder, 5 Nov): it reaches every edge of the print layout
   const art = (await layout.locator('img[alt="your keepsake"]').boundingBox())!;
-  expect((art.y - box.y) / box.height).toBeGreaterThan(0.48);
+  expect(art.x).toBeLessThanOrEqual(box.x + 2);
+  expect(art.y).toBeLessThanOrEqual(box.y + 2);
+  expect(art.x + art.width).toBeGreaterThanOrEqual(box.x + box.width - 2);
+  expect(art.y + art.height).toBeGreaterThanOrEqual(box.y + box.height - 2);
+  // the strap shows as it prints — the server's own preview (laid half by half from Prodigi's template), not an
+  // in-browser approximation: no "on the strap" photo toggle, a live preview instead
+  await expect(page.getByRole('button', { name: 'on the strap' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: /^on the / })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('status').filter({ hasText: /too small|blurry|soft/i })).toHaveCount(0);
   await page.getByRole('button', { name: /save & return/ }).click();
   await expect(page).toHaveURL(/\/customize\/watchStrap/);

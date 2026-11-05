@@ -6,13 +6,13 @@ import { parcelGroupOf } from '@/pricing/parcels';
 import { definedPriceList, definedPrintSpecs, definedProducts } from '@/server/catalogue';
 import { EXPECTED_POPULARITY } from '@/server/popularity';
 import { resolveShippingMethod } from '@/fulfillment/submit';
-import { CHRISTMAS_LAST_ORDER, deliveryPromise, routeOf, routeOfLineKey } from '@/lib/season';
+import { CHRISTMAS_LAST_ORDER, deliveryPromise, routeOf, routeOfLineKey, seasonalExpected } from '@/lib/season';
 import { DELIVERY_DAYS, deliveryLine, shipsTracked } from '@/lib/delivery';
 import { FAQ_PRODUCT_NAMES } from '@/lib/faq';
 import { SHOP_PRODUCTS } from '@/lib/shop-products';
 import { COMPLEMENTS } from '@/lib/complements';
 import { defaultTransformFor } from '@/lib/catalogue-view';
-import { strapPhotoBox, strapSizeOf, strapShadeSvg, WATCH_STRAP_SIZES } from '@/lib/watch-strap';
+import { strapBands, strapPhotoBox, strapShadeSvg, WATCH_STRAP_SIZES } from '@/lib/watch-strap';
 import { isGroundProduct } from '@/lib/patterns';
 import { assessResolution, canvasSizePx, computeLayerRect, type Transform } from '@/server/print/geometry';
 import { plan } from '@/server/print/seedMockups';
@@ -112,10 +112,13 @@ describe('post and Christmas', () => {
 });
 
 describe('on show', () => {
-  it('a friendly FAQ name, add-on suggestions and a place in the expected popularity', () => {
+  it('a friendly FAQ name, add-on suggestions — and it sits straight after the phone case in the shop (founder, 5 Nov)', () => {
     expect(FAQ_PRODUCT_NAMES.watchStrap).toBeTruthy();
     expect(COMPLEMENTS.watchStrap?.length).toBeGreaterThan(0);
-    expect(EXPECTED_POPULARITY).toContain('watchStrap');
+    expect(EXPECTED_POPULARITY.indexOf('watchStrap')).toBe(EXPECTED_POPULARITY.indexOf('phoneCase') + 1);
+    // …and the Christmas ordering (seasonalExpected) leaves the two side by side
+    const xmas = seasonalExpected(EXPECTED_POPULARITY, new Date('2026-11-20T12:00:00Z'));
+    expect(xmas.indexOf('watchStrap')).toBe(xmas.indexOf('phoneCase') + 1);
   });
 
   it('it has its public page: /products/apple-watch-strap, in Google’s watch-bands category', () => {
@@ -152,6 +155,27 @@ describe('the mockup pipeline — lights up when the founder’s layers are drop
       // …and the founder's photo (a longer gap than Prodigi's) still lands each end within ~3% of the strap's length
       const founder = strapPhotoBox(s, [[247, 733], [1116, 1864]], 995);
       expect(founder.residualPx / (1864 - 247), s.size).toBeLessThan(0.035);
+    }
+  });
+
+  it('…and then laid HALF BY HALF (strapBands), so each half of the file lands EXACTLY on its half of the photo', () => {
+    for (const s of WATCH_STRAP_SIZES) {
+      const [fu0, fu1] = [s.pieces[0]![0]![0], s.pieces[0]!.at(-1)![0]];
+      const [fl0, fl1] = [s.pieces[1]![0]![0], s.pieces[1]!.at(-1)![0]];
+      // the founder's halves, as fractions of the print area (a longer gap than the file's)
+      const halves: [[number, number], [number, number]] = [[0.02, 0.31], [0.55, 0.99]];
+      const [top, bottom] = strapBands(s, halves);
+      const map = (b: { from: [number, number]; to: [number, number] }, f: number) => b.to[0] + ((f - b.from[0]) * (b.to[1] - b.to[0])) / (b.from[1] - b.from[0]);
+      // Prodigi's top half (file rows fu0…fu1) lands exactly on the photo's top half; the bottom on the bottom
+      expect(map(top!, fu0)).toBeCloseTo(0.02, 9);
+      expect(map(top!, fu1)).toBeCloseTo(0.31, 9);
+      expect(map(bottom!, fl0)).toBeCloseTo(0.55, 9);
+      expect(map(bottom!, fl1)).toBeCloseTo(0.99, 9);
+      // the file is cut in its unprinted gap — nothing that prints is lost; together the bands cover the whole file
+      expect(top!.from[1]).toBeGreaterThan(fu1);
+      expect(top!.from[1]).toBeLessThan(fl0);
+      expect([top!.from[0], top!.from[1]]).toEqual([0, bottom!.from[0]]);
+      expect(bottom!.from[1]).toBe(1);
     }
   });
 
@@ -195,31 +219,29 @@ describe('the watch strap’s long, thin print file', () => {
     }
   });
 
-  it('the default placement shows the drawing on the strap — never hidden behind the watch', () => {
+  it('the default placement FILLS the strap (founder, 5 Nov: "scale to fit the watch", everywhere): upright, covering the whole file', () => {
     for (const size of ['small', 'large']) {
       const t = geomOf(size);
-      const s = strapSizeOf(size);
-      const gapBottom = s.pieces[1]![0]![0];
       const { width: CW, height: CH } = canvasSizePx(t);
       for (const [w, h] of [[1200, 1600], [1600, 1200], [1000, 1000], [600, 1800], [2400, 900]] as const) {
         const tf = defaultTransformFor('watchStrap', w / h) as Transform;
+        expect(tf, `${size} ${w}×${h}`).toEqual({ scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 });
         const r = computeLayerRect(t, { width: w, height: h }, tf);
-        const rotated = tf.rotationDeg % 180 !== 0;
-        const top = rotated ? r.y + (r.height - r.width) / 2 : r.y; // the turned drawing's box
-        expect(top / CH, `${size} ${w}×${h}`).toBeGreaterThanOrEqual(gapBottom - 0.002);
-        expect(r.x + r.width / 2).toBeCloseTo(CW / 2, 0);
-        if (w > h) expect(tf.rotationDeg, 'a landscape drawing runs along the strap').toBe(90);
+        // the drawing reaches every edge of the print file — so both printed halves, end to end
+        expect(r.x, `${size} ${w}×${h}`).toBeLessThanOrEqual(0);
+        expect(r.y).toBeLessThanOrEqual(0);
+        expect(r.x + r.width).toBeGreaterThanOrEqual(CW);
+        expect(r.y + r.height).toBeGreaterThanOrEqual(CH);
       }
     }
   });
 
-  it('the print-quality check works on the thin strip: a phone photo is print-ready, a tiny thumbnail is blocked', () => {
+  it('the print-quality check works on the thin strip at that fill: a phone photo is print-ready, a thumbnail is blocked', () => {
     for (const size of ['small', 'large']) {
       const t = geomOf(size);
       const tf = defaultTransformFor('watchStrap', 3 / 4) as Transform;
       expect(assessResolution(t, { width: 3000, height: 4000 }, tf).decision, size).toBe('OK');
-      expect(assessResolution(t, { width: 60, height: 80 }, tf).decision, size).toBe('BLOCK');
-      expect(assessResolution(t, { width: 400, height: 533 }, tf).decision, size).toBe('OK'); // the strap is only ~2.5–3 cm wide
+      expect(assessResolution(t, { width: 120, height: 160 }, tf).decision, size).toBe('BLOCK');
     }
   });
 });

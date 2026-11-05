@@ -57,7 +57,9 @@ const SETS = [
   // seeder registers each size's print file onto the two halves from Prodigi's template (src/lib/watch-strap.ts).
   // whiteUnderPrint: the backing is solid black (it only gives the outline) — the leather itself is white where the
   // drawing doesn't cover, so the print area is laid in white over it, leaving the black edge showing round it.
-  { out: 'watchStrap', product: 'watch-strap.png', printmap: 'watch-strap-print.png', overlay: 'watch-strap-overlay.png', fill: 0.85, whiteUnderPrint: true },
+  // keepOverlayDetail: the overlay's strap holes and dotted stitching are tiny separate pieces — the speck
+  // clean-up (despeckle, for stray cut-out pixels) would delete every one of them, so it's skipped here.
+  { out: 'watchStrap', product: 'watch-strap.png', printmap: 'watch-strap-print.png', overlay: 'watch-strap-overlay.png', fill: 0.85, whiteUnderPrint: true, keepOverlayDetail: true },
 ];
 
 /** Load as RGBA raw, turned if asked. */
@@ -208,7 +210,7 @@ for (const set of SETS) {
 async function compose(set, out) {
   const printmap = set.printmap ? despeckle(await load(set.printmap, set.rotate)) : null;
   const product = set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate));
-  const overlay = set.overlays ? await stack(set.overlays, set.rotate) : set.overlay ? despeckle(await load(set.overlay, set.rotate)) : null;
+  const overlay = set.overlays ? await stack(set.overlays, set.rotate) : set.overlay ? (set.keepOverlayDetail ? await load(set.overlay, set.rotate) : despeckle(await load(set.overlay, set.rotate))) : null;
   for (const l of [overlay, printmap]) {
     if (l && (l.W !== product.W || l.H !== product.H)) throw new Error(`${set.out}: layers must share one canvas`);
   }

@@ -55,12 +55,6 @@ export const WATCH_STRAP_SIZES: StrapSize[] = [
   },
 ];
 
-/** Both files are about 1 : 8.5 (0.111 small, 0.124 large) — near enough one shape for the default placement. */
-export const STRAP_ASPECT = 0.117;
-/** Where the default placement starts, down the file: just below the watch on the lower half (the gap ends at
- * 0.513 / 0.4995 of the length), on the part of the strap most seen on the wrist. */
-export const STRAP_DEFAULT_TOP = 0.53;
-
 export const WATCH_STRAP_KEY = 'watchStrap';
 export const isWatchStrap = (key: string | null | undefined): boolean => key === WATCH_STRAP_KEY;
 
@@ -105,6 +99,28 @@ export function strapPhotoBox(s: StrapSize, halves: [[number, number], [number, 
   const w = (h * s.px.w) / s.px.h;
   const residualPx = Math.max(...f.map((fi, i) => Math.abs(top + fi * h - y[i]!)));
   return { x: cx - w / 2, y: top, w, h, residualPx };
+}
+
+/**
+ * Lay the PRINT FILE onto a PHOTO of the strap HALF BY HALF, exactly as Prodigi prints it: the file's top half
+ * (Prodigi's template: its upper leather piece) lands on the photo's top half and its bottom half on the bottom one,
+ * each at its own place, so the drawing shows on each half exactly where it prints — even though the photo's gap
+ * behind the watch isn't the file's. `halves` are the photo's two leather halves, top first, as fractions of the
+ * print area's height (the print quad); the result is two bands: rows `from` of the file (fractions of its height)
+ * drawn into rows `to` of the print area. The file is split at the middle of its unprinted gap, so nothing that
+ * prints is lost. Each half keeps the file's own scale when the photo's halves are in Prodigi's proportions (the
+ * founder's are, within 1%) — never stretched to fit.
+ */
+export function strapBands(s: StrapSize, halves: [[number, number], [number, number]]): Array<{ from: [number, number]; to: [number, number] }> {
+  const [fu0, fu1] = [s.pieces[0]![0]![0], s.pieces[0]!.at(-1)![0]];
+  const [fl0, fl1] = [s.pieces[1]![0]![0], s.pieces[1]!.at(-1)![0]];
+  const up = (f: number) => halves[0][0] + ((f - fu0) * (halves[0][1] - halves[0][0])) / (fu1 - fu0);
+  const low = (f: number) => halves[1][0] + ((f - fl0) * (halves[1][1] - halves[1][0])) / (fl1 - fl0);
+  const mid = (fu1 + fl0) / 2;
+  return [
+    { from: [0, mid], to: [up(0), up(mid)] },
+    { from: [mid, 1], to: [low(mid), low(1)] },
+  ];
 }
 
 /**

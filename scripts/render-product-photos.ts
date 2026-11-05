@@ -31,14 +31,10 @@ const EDGE = 1200;
 const MANIFEST = path.join('src', 'lib', 'product-photos.json');
 
 /**
- * Where a PHOTO places the drawing when the shop's default placement makes a poor picture of the product
- * (founder, 5 Nov). The photo only — the shop, the editor and the print keep defaultPlacementFor().
- *  - watchStrap: the default puts the whole drawing small, just below the watch; the photo scales it up to
- *    fill the strap, both halves, end to end ("scale to fit the watch"). `scale` is a share of the cover fit.
+ * Where a PHOTO places the drawing when the shop's default placement makes a poor picture of the product. None
+ * today: the watch strap's default now fills the strap everywhere (founder, 5 Nov), so its photo uses it too.
  */
-const PHOTO_PLACEMENT: Record<string, Transform> = {
-  watchStrap: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // upright reads better than turned (the dog, a figure)
-};
+const PHOTO_PLACEMENT: Record<string, Transform> = {};
 
 const args = process.argv.slice(2);
 const flag = (name: string): string | undefined => {

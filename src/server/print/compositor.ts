@@ -21,6 +21,8 @@ import { composeLayoutTile, isLayoutProduct, layoutTileKey } from './bundleCompo
 import { isBundleKey } from '@/lib/christmas-bundle';
 import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { renderFrameGridFacePixels } from './frameGrid';
+import { isWatchStrap, strapBands, strapSizeForCanvas } from '@/lib/watch-strap';
+import { visibleLayerPart } from './visibleLayer';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
  * covers ~WRAP° of the circumference (209mm on an ~82mm-ø mug). Tunables for the cylinder tier. */
@@ -494,7 +496,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
   const ground = !fill && (face === 'pattern' || isGroundProduct(prod?.key)) ? normalizeGround(input.ground) : null;
   const gTag = groundTag(ground);
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : face === 'frameGrid' ? 'grid' : 'hc'}${FACE_REV}${gTag}` : gTag;
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : face === 'frameGrid' ? 'grid' : face === 'strap' ? 'strap' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. The template's picture layers (blank; optional product-silhouette mask the design is clipped
@@ -554,10 +556,10 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 /** the PRINTED FACE a product's mockup shows (the print code's own render): the repeat, the height chart,
  * the calendar's gallery page (the whole drawing inside a white margin), the multi photo frame's grid
  * (the drawing in every square) */
-type Face = 'pattern' | 'heightChart' | 'gallery' | 'frameGrid';
+type Face = 'pattern' | 'heightChart' | 'gallery' | 'frameGrid' | 'strap';
 /** Which printed face a product's mockup shows (none = the drawing, placed). */
 const faceOf = (key: string | null | undefined): Face | undefined =>
-  isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : undefined;
+  isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : isWatchStrap(key) ? 'strap' : undefined;
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
 const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
 /** The longest edge / the most pixels a preview face is rendered at (a 5 m roll is 122 MP in print;
@@ -587,6 +589,20 @@ export async function renderPrintedFace(
     if (!grid) throw new NoMockupTemplateError(`no multi photo frame grid for a ${print.widthPx}×${print.heightPx} px print`);
     return renderFrameGridFacePixels(srcBuf, grid, transform, scale);
   }
+  if (face === 'strap') {
+    // the watch strap's print file as it prints: the drawing at its placement on the whole file, on its base
+    // colour (or see-through — the strap is white leather); laid half by half onto the photo by strapFaceOnPhoto
+    const W = Math.max(1, Math.round(print.widthPx * scale)), H = Math.max(1, Math.round(print.heightPx * scale));
+    const src = await designSize(srcBuf);
+    const rect = computeLayerRect({ printWidthPx: W, printHeightPx: H, bleedMm: 0, requiredDpi: print.requiredDpi * scale }, src, transform);
+    const { part, left, top } = await visibleLayerPart(srcBuf, src, rect);
+    const bg = groundHex === '#ffffff' ? { r: 0, g: 0, b: 0, alpha: 0 } : groundHex;
+    const { data, info } = await sharp({ create: { width: W, height: H, channels: 4, background: bg } })
+      .composite([{ input: part, left, top }])
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return { data, width: info.width, height: info.height, channels: 4 };
+  }
   if (face === 'gallery') {
     // the page as it prints (no bleed — the mockup shows the trimmed page): white, the whole drawing in the margin
     const r = galleryRect(geom, await designSize(srcBuf));
@@ -600,6 +616,49 @@ export async function renderPrintedFace(
     return { data, width: info.width, height: info.height, channels: info.channels as 3 };
   }
   return renderHeightChartFacePixels(srcBuf, geom, transform, { scale, groundHex: groundHex === '#ffffff' ? undefined : groundHex });
+}
+
+/**
+ * The watch strap's printed face laid onto the founder's photo HALF BY HALF (strapBands): the photo's two leather
+ * halves are read off its mask (the print map), and each half of the print file is drawn exactly onto its half —
+ * so the preview shows each part of the drawing where Prodigi prints it, even though the photo's gap between the
+ * halves isn't the file's. The result has the face's own size, so it still cover-fits the print quad 1:1. A mask
+ * without two halves (the drawn strap is already the file's own shape) leaves the face as it is.
+ */
+async function strapFaceOnPhoto(face: Raw, maskBuf: Buffer, quad: [number, number][]): Promise<Raw> {
+  const { data, info } = await sharp(maskBuf).greyscale().raw().toBuffer({ resolveWithObject: true });
+  const { width: MW, height: MH, channels: MC } = info;
+  const runs: Array<[number, number]> = [];
+  let inRun = false;
+  for (let y = 0; y < MH; y++) {
+    let on = false;
+    for (let x = 0; x < MW && !on; x++) if (data[(y * MW + x) * MC]! >= 128) on = true;
+    if (on && !inRun) runs.push([y, y + 1]);
+    if (on) runs[runs.length - 1]![1] = y + 1;
+    inRun = on;
+  }
+  const halves = runs.filter(([a, b]) => b - a > MH * 0.05);
+  if (halves.length !== 2) return face;
+  const qy0 = quad[0]![1] * MH, qy1 = quad[3]![1] * MH;
+  const rel = (y: number) => (y - qy0) / (qy1 - qy0);
+  const bands = strapBands(strapSizeForCanvas(face.width, face.height), [[rel(halves[0]![0]), rel(halves[0]![1])], [rel(halves[1]![0]), rel(halves[1]![1])]]);
+  const W = face.width, H = face.height;
+  const src = sharp(face.data, { raw: { width: W, height: H, channels: face.channels } });
+  const pieces: OverlayOptions[] = [];
+  for (const b of bands) {
+    let [s0, s1] = [Math.round(b.from[0] * H), Math.round(b.from[1] * H)];
+    let [d0, d1] = [b.to[0] * H, b.to[1] * H];
+    // keep what falls inside the print area (trim the source rows in step)
+    const k = (s1 - s0) / Math.max(1e-6, d1 - d0);
+    if (d0 < 0) { s0 += Math.round(-d0 * k); d0 = 0; }
+    if (d1 > H) { s1 -= Math.round((d1 - H) * k); d1 = H; }
+    const dh = Math.round(d1) - Math.round(d0);
+    if (s1 - s0 < 1 || dh < 1) continue;
+    const band = await src.clone().extract({ left: 0, top: s0, width: W, height: s1 - s0 }).resize(W, dh, { fit: 'fill' }).png().toBuffer();
+    pieces.push({ input: band, left: 0, top: Math.round(d0) });
+  }
+  const out = await sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(pieces).raw().toBuffer({ resolveWithObject: true });
+  return { data: out.data, width: out.info.width, height: out.info.height, channels: 4 };
 }
 
 /**
@@ -623,6 +682,7 @@ export async function renderTemplatePreview(args: {
   let designBuf: Design = args.design;
   if (face) {
     designBuf = await renderPrintedFace(args.design, face, args.print, transform, undefined, groundHex(args.ground));
+    if (face === 'strap' && args.mask) designBuf = await strapFaceOnPhoto(designBuf, args.mask, args.quad);
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   }
   const meta = await sharp(args.blank).metadata();
@@ -682,6 +742,8 @@ async function renderAndPersist(
     const p = args.print;
     const faceKey = `${args.assetId}|${args.designTag}|${args.face}${FACE_REV}|${faceEdge}|${p.widthPx}x${p.heightPx}@${p.requiredDpi}+${p.bleedMm}|${transformHash(args.transform)}|${args.groundHex ?? ''}`;
     designBuf = await faceCache.get(faceKey, async () => renderPrintedFace(await source(), args.face!, p, args.transform, faceEdge, args.groundHex));
+    // the watch strap: each half of the file onto its half of the photo (the mask is its print map)
+    if (args.face === 'strap' && args.maskKey) designBuf = await strapFaceOnPhoto(designBuf as Raw, await templateBytes(args.maskKey), args.quad);
     transform = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
   } else {
     designBuf = await source();

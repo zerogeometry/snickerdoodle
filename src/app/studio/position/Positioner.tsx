@@ -253,7 +253,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   // a placed drawing on a base colour: the print area shows the colour edge to edge, like the print
   const groundFill: React.CSSProperties | undefined = isGround && !isPattern && isColouredGround(groundToken) ? { background: groundHex } : undefined;
   const isChart = isHeightChart(variant.productKey);
-  const noProductView = isMug || isPattern || isChart;
+  // the watch strap too: its photo is laid HALF BY HALF from Prodigi's template (compositor strapFaceOnPhoto), which
+  // the in-browser photo view can't do — so it gets the live server preview, exactly as it prints
+  const isStrap = isWatchStrap(variant.productKey);
+  const noProductView = isMug || isPattern || isChart || isStrap;
   // …so those show the REAL product preview instead (founder, 23 Oct: "a quality preview of the print
   // on the product, not just as a print") — the same renderer as the customize page and the print, so
   // a curve round a mug or a repeat round a sock is exactly what arrives. It follows your changes a
@@ -265,7 +268,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     const id = setTimeout(() => setSettledTf(JSON.parse(tfKey) as Transform), 450);
     return () => clearTimeout(id);
   }, [tfKey, noProductView]);
-  const productNoun = isMug ? 'mug' : variant.productKey === 'socks' ? 'socks' : variant.productKey === 'teaTowel' ? 'tea towel' : variant.productKey === 'wrappingPaper' ? 'paper' : isChart ? 'chart' : 'product';
+  const productNoun = isMug ? 'mug' : variant.productKey === 'socks' ? 'socks' : variant.productKey === 'teaTowel' ? 'tea towel' : variant.productKey === 'wrappingPaper' ? 'paper' : isChart ? 'chart' : isStrap ? 'strap' : 'product';
   // The "on the product" preview-toggle label mirrors the mockup the shopper sees for this product.
   const onProductLabel =
     variant.productKey === 'cushion' ? 'on the cushion'
@@ -313,7 +316,6 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   );
   // The watch strap: ONE file for both halves, but only the leather prints — the middle sits behind the watch
   // and the edges are trimmed (Prodigi's template, src/lib/watch-strap.ts). Shade what doesn't print.
-  const isStrap = isWatchStrap(variant.productKey);
   const strapShadeSrc = useMemo(
     () => (isStrap ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(strapShadeSvg(strapSizeForCanvas(canvas.width, canvas.height), canvas.width, canvas.height))}` : null),
     [isStrap, canvas.width, canvas.height],
