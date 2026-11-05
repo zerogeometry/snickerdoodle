@@ -1,5 +1,6 @@
 node_modules/
 .prodigi-assets/
+.texture-work/
 .next/
 .next-e2e/
 .next-preview/
