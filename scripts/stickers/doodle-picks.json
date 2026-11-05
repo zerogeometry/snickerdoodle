@@ -1,0 +1,59 @@
+{
+  "gingerbread": {
+    "file": "gingerbread_v2.png",
+    "seed": 927407042,
+    "remap": {
+      "honey": "ginger"
+    }
+  },
+  "reindeer": {
+    "file": "reindeer_v3.png",
+    "seed": 909638853
+  },
+  "snowman": {
+    "file": "snowman_v3.png",
+    "seed": 238632835
+  },
+  "santa": {
+    "file": "santa_v1.png",
+    "seed": 1065435598
+  },
+  "mrsClaus": {
+    "file": "mrsClaus_v1.png",
+    "seed": 727794385
+  },
+  "penguin": {
+    "file": "penguin_v2.png",
+    "seed": 1469212343
+  },
+  "star": {
+    "file": "star_v1.png",
+    "seed": 1032256105
+  },
+  "holly": {
+    "file": "holly_v1.png",
+    "seed": 664706261,
+    "no_paper": true
+  },
+  "candyCane": {
+    "file": "candyCane_v2.png",
+    "seed": 712904675
+  },
+  "tinsel": {
+    "file": "tinsel_v2.png",
+    "seed": 1058090650,
+    "line": 3
+  },
+  "sack": {
+    "file": "sack_v3.png",
+    "seed": 1259975580,
+    "blur": 17,
+    "remap": {
+      "skin": "band"
+    }
+  },
+  "present": {
+    "file": "present_v1.png",
+    "seed": 495688907
+  }
+}

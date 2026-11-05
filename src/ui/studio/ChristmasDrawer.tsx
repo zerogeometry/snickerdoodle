@@ -2,7 +2,7 @@
 
 import { IconFrame, IconSnowflake, IconX } from '@tabler/icons-react';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
-import { STICKERS, stickerDataUrl, type StickerId } from '@/lib/stickers';
+import { STICKERS, stickerUrl, type StickerId } from '@/lib/stickers';
 import { presetIsOn, type FestivePreset } from '@/lib/studio-festive';
 import type { StudioObject } from '@/lib/studio-objects';
 import { Button } from '@/ui/primitives/Button';
@@ -57,7 +57,7 @@ function DrawerBody({ objects, onSticker, onToggle, onClose, compact }: DrawerPr
               className="press wiggle pop-in flex aspect-square w-full items-center justify-center rounded-[16px] border-2 border-cocoa/15 bg-paper-2 p-1 hover:border-cocoa"
               style={{ '--i': i } as CSSProperties}
             >
-              <img src={stickerDataUrl(s.id)} alt="" className="h-full w-full" draggable={false} />
+              <img src={stickerUrl(s.id)} alt="" className="h-full w-full" draggable={false} />
             </button>
           </li>
         ))}

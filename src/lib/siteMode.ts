@@ -146,6 +146,18 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/products/coasters.webp',
   '/products/placemats.webp',
   '/products/wall-calendar.webp',
+  '/stickers/christmas/candyCane.svg',
+  '/stickers/christmas/gingerbread.svg',
+  '/stickers/christmas/holly.svg',
+  '/stickers/christmas/mrsClaus.svg',
+  '/stickers/christmas/penguin.svg',
+  '/stickers/christmas/present.svg',
+  '/stickers/christmas/reindeer.svg',
+  '/stickers/christmas/sack.svg',
+  '/stickers/christmas/santa.svg',
+  '/stickers/christmas/snowman.svg',
+  '/stickers/christmas/star.svg',
+  '/stickers/christmas/tinsel.svg',
 ]);
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the

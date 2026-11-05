@@ -22,7 +22,7 @@ import {
 import { useState, type ReactNode } from 'react';
 import { cardFontCss, pickerFonts, type CardFontToken } from '@/lib/card-fonts';
 import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_STICKER_SIZE, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
-import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
+import { stickerLabel, stickerUrl } from '@/lib/stickers';
 import { normAngle, snapAngle } from '@/lib/studio-geometry';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import { Icon } from '@/ui/primitives/Icon';
@@ -558,7 +558,7 @@ function LayersTray(p: TrayProps) {
           return (
             <TChip key={o.id} on={on} onClick={() => p.onSelect(on ? null : o.id)} label={`layer: ${layerName(o)}`}>
               {o.type === 'sticker' ? (
-                <img src={stickerDataUrl(o.sticker)} alt="" className="h-5 w-5" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
+                <img src={stickerUrl(o.sticker)} alt="" className="h-5 w-5" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
               ) : o.type === 'shape' ? (
                 <svg viewBox="-10 -10 120 120" className="h-4 w-4" aria-hidden>
                   <path d={SHAPE_PATHS[o.shape]} fill={o.fill} fillRule="evenodd" />

@@ -31,3 +31,6 @@ cutout-sheet.png
 # Netlify CLI link (site id) — local only
 .netlify/
 .dev-captures/
+
+# sticker doodle candidates (scripts/stickers/doodle_generate.py) — local working files
+/sticker-art/

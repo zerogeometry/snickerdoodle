@@ -3,7 +3,7 @@ import satori from 'satori';
 import { Resvg } from '@resvg/resvg-js';
 import sharp, { type OverlayOptions } from 'sharp';
 import { SHAPE_PATHS, TEXT_LINE_HEIGHT, textureOf, type ShapeObject, type StickerObject, type StudioObject } from '@/lib/studio-objects';
-import { stickerSvg } from '@/lib/stickers';
+import { stickerSvg } from '@/lib/stickers/art';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { loadCardFontWoff } from './cardFonts';
 

@@ -1,28 +1,79 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { Resvg } from '@resvg/resvg-js';
 import { describe, expect, it } from 'vitest';
 import { CHRISTMAS_STICKER_SVG } from '@/lib/stickers/christmas-art';
-import { isStickerId, STICKER_IDS, STICKERS, stickerSvg } from '@/lib/stickers';
+import { isStickerId, STICKER_IDS, STICKERS, stickerUrl } from '@/lib/stickers';
+import { stickerSvg } from '@/lib/stickers/art';
 import { cleanObjects, MAX_OBJECTS, MAX_STICKER_SIZE, rotateObjects, type StickerObject } from '@/lib/studio-objects';
 import { CARD_FONTS, normalizeCardFont, pickerFonts } from '@/lib/card-fonts';
 
-const DIR = path.resolve(__dirname, '../../ui/studio/stickers/christmas');
+const PUBLIC = path.resolve(__dirname, '../../../public');
+const DIR = path.join(PUBLIC, 'stickers/christmas');
+const ORDER = ['gingerbread', 'reindeer', 'snowman', 'santa', 'mrsClaus', 'penguin', 'star', 'holly', 'candyCane', 'tinsel', 'sack', 'present'];
+/** globals.css tokens + the family's derived browns / skin (scripts/stickers/doodle_trace.py PALETTE). */
+const PALETTE = ['#2b2118', '#c8402a', '#f6c445', '#fbe9b7', '#7fa65e', '#3f6e29', '#8fb5d6', '#2f5da8', '#e8786e', '#fffbf2', '#d78a36', '#9c5327', '#fbe7cc'];
 
 describe('the Christmas sticker family: manifest ↔ art', () => {
-  it('twelve stickers, one SVG file each, and the art module is exactly those files', () => {
-    const files = readdirSync(DIR).filter((f) => f.endsWith('.svg')).map((f) => f.replace(/\.svg$/, '')).sort();
-    expect(STICKERS).toHaveLength(12);
-    expect([...STICKER_IDS].sort()).toEqual(files);
-    expect(Object.keys(CHRISTMAS_STICKER_SVG).sort()).toEqual(files);
-    for (const id of STICKER_IDS) expect(stickerSvg(id)).toBe(readFileSync(path.join(DIR, `${id}.svg`), 'utf8').trim());
+  it('the same twelve, in the same order with the same ids, as saved designs expect', () => {
+    expect(STICKER_IDS).toEqual(ORDER);
+    expect(STICKERS.map((s) => s.label)).toEqual(['gingerbread man', 'reindeer', 'snowman', 'santa', 'mrs claus', 'penguin', 'star', 'holly', 'candy cane', 'tinsel', 'christmas sack', 'present']);
   });
 
-  it('each is a self-contained square SVG: no scripts, no external links, ids prefixed so they never collide', () => {
+  it('one SVG file each, and what the browser loads is byte-for-byte what the print draws', () => {
+    const files = readdirSync(DIR).filter((f) => f.endsWith('.svg')).map((f) => f.replace(/\.svg$/, '')).sort();
+    expect([...STICKER_IDS].sort()).toEqual(files);
+    expect(Object.keys(CHRISTMAS_STICKER_SVG).sort()).toEqual(files);
+    for (const id of STICKER_IDS) {
+      expect(stickerUrl(id)).toBe(`/stickers/christmas/${id}.svg`);
+      expect(stickerSvg(id)).toBe(readFileSync(path.join(PUBLIC, stickerUrl(id)), 'utf8').trim());
+    }
+  });
+
+  it('each is a self-contained square vector: paths only, no ids, scripts, links or embedded pictures', () => {
     for (const id of STICKER_IDS) {
       const svg = stickerSvg(id);
       expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 200 200" width="200" height="200">/);
-      expect(svg).not.toMatch(/<script|<foreignObject|on[a-z]+=|href="(?!#)|url\((?!#)/i);
-      for (const [, defined] of svg.matchAll(/ id="([^"]+)"/g)) expect(defined!.startsWith(`${id}-`)).toBe(true);
+      expect(svg).not.toMatch(/<script|<foreignObject|<image|on[a-z]+=|href=|url\(| id=/i);
+      const tags = new Set([...svg.matchAll(/<([a-z]+)[\s>/]/gi)].map((m) => m[1]));
+      expect([...tags].sort()).toEqual(['g', 'path', 'svg']);
+    }
+  });
+
+  it('brand colours only, and every one has the doodle ink line', () => {
+    for (const id of STICKER_IDS) {
+      const colours = new Set([...stickerSvg(id).matchAll(/(?:fill|stroke)="(#[0-9a-f]{6})"/g)].map((m) => m[1]));
+      for (const c of colours) expect(PALETTE, `${id} uses ${c}`).toContain(c);
+      expect(colours.has('#2b2118'), `${id} has no ink line`).toBe(true);
+      expect(colours.size, `${id} is more than one colour`).toBeGreaterThan(2);
+    }
+  });
+
+  it('at print size: crisp, see-through round the art, centred with the same even padding', () => {
+    const px = 2400; // a sticker a third of a big blanket's short side — vector, so any size is as sharp
+    for (const id of STICKER_IDS) {
+      const img = new Resvg(stickerSvg(id), { fitTo: { mode: 'width', value: px } }).render();
+      expect([img.width, img.height]).toEqual([px, px]);
+      const pix = img.pixels; // (a getter that copies: read it once)
+      const a = (x: number, y: number) => pix[(y * px + x) * 4 + 3]!;
+      let minX = px, minY = px, maxX = 0, maxY = 0, opaque = 0, clear = 0;
+      for (let y = 0; y < px; y += 2)
+        for (let x = 0; x < px; x += 2) {
+          const v = a(x, y);
+          if (v === 0) clear++;
+          if (v > 0) [minX, minY, maxX, maxY] = [Math.min(minX, x), Math.min(minY, y), Math.max(maxX, x), Math.max(maxY, y)];
+          if (v === 255) opaque++;
+        }
+      const total = (px / 2) ** 2;
+      for (const [x, y] of [[0, 0], [px - 1, 0], [0, px - 1], [px - 1, px - 1]]) expect(a(x!, y!), `${id} corner`).toBe(0);
+      expect(clear / total, `${id}: transparent background`).toBeGreaterThan(0.12);
+      expect(opaque / total, `${id}: solid art`).toBeGreaterThan(0.12); // (the tinsel is a long, thin swag)
+      // the art's longer side spans ~90% of the box (5% padding), centred on both axes
+      const w = maxX - minX, h = maxY - minY;
+      expect(Math.max(w, h) / px, `${id} size`).toBeGreaterThan(0.87);
+      expect(Math.max(w, h) / px, `${id} size`).toBeLessThan(0.93);
+      expect(Math.abs((minX + maxX) / 2 - px / 2) / px, `${id} centred across`).toBeLessThan(0.02);
+      expect(Math.abs((minY + maxY) / 2 - px / 2) / px, `${id} centred down`).toBeLessThan(0.02);
     }
   });
 
