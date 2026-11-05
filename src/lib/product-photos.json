@@ -23,5 +23,10 @@
     "src": "/products/placemats.webp",
     "width": 1024,
     "height": 1024
+  },
+  "watchStrap": {
+    "src": "/products/apple-watch-strap.webp",
+    "width": 1200,
+    "height": 1200
   }
 }

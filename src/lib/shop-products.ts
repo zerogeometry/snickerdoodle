@@ -195,10 +195,11 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.cardGames, productType: 'Games > Playing cards',
     image: ex('flowerplayingcards', 1200, 1200, 'A deck of playing cards with a child’s painting of sunflowers in a blue vase on the back'),
   },
-  // (no brand-safe photo of the strap yet — its page shows the product art; the Merchant feed leaves it out)
+  // the photo fills the strap with the drawing (founder, 5 Nov) — the shop's own default sits small, below the watch
   watchStrap: {
     slug: 'apple-watch-strap', name: 'watch strap', title: 'Apple Watch strap printed with your child’s drawing',
     googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',
+    image: demo('watchStrap', 'A white leather Apple Watch strap with black buckle, printed end to end with a child’s painting — blue sky, a brown dog and a little green figure'),
   },
 };
 

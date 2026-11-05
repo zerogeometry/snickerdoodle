@@ -28,6 +28,16 @@ import { assertQuadFitsBlank } from '@/server/print/templates';
 const EDGE = 1200;
 const MANIFEST = path.join('src', 'lib', 'product-photos.json');
 
+/**
+ * Where a PHOTO places the drawing when the shop's default placement makes a poor picture of the product
+ * (founder, 5 Nov). The photo only — the shop, the editor and the print keep defaultPlacementFor().
+ *  - watchStrap: the default puts the whole drawing small, just below the watch; the photo scales it up to
+ *    fill the strap, both halves, end to end ("scale to fit the watch"). `scale` is a share of the cover fit.
+ */
+const PHOTO_PLACEMENT: Record<string, Transform> = {
+  watchStrap: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, // upright reads better than turned (the dog, a figure)
+};
+
 const args = process.argv.slice(2);
 const flag = (name: string): string | undefined => {
   const i = args.indexOf(name);
@@ -55,7 +65,7 @@ async function main() {
     const copy = SHOP_PRODUCTS[key];
     if (!copy) { notes.push(`${key}: no SHOP_PRODUCTS entry (no public page)`); continue; }
     const v = onShow.find((x) => x.productKey === key && x.isDefault) ?? onShow.find((x) => x.productKey === key)!;
-    const placement = defaultPlacementFor(key, v.attributes, aspect) as Transform;
+    const placement = PHOTO_PLACEMENT[key] ?? (defaultPlacementFor(key, v.attributes, aspect) as Transform);
     let webp: Buffer | null = null;
     let how = '';
 
