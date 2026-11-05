@@ -156,7 +156,7 @@ export function frameSlotGeom(g: FrameGrid, frame: Pick<TemplateGeom, 'requiredD
 export function assessPrintResolution(t: TemplateGeom, src: { width: number; height: number }, transform: Transform, productKey?: string | null): ResolutionAssessment {
   // a multi photo frame: each drawing prints in its own 60 mm square — judged on that square
   if (isMultiPhotoFrameKey(productKey)) {
-    const g = frameGridForPx(t.printWidthPx);
+    const g = frameGridForPx(t.printWidthPx, t.printHeightPx);
     if (g) return assessResolution(frameSlotGeom(g, t), src, transform);
   }
   // A height chart prints the drawing in the ART AREA beside its ruler — judged on that area.

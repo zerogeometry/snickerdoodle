@@ -583,8 +583,8 @@ export async function renderPrintedFace(
   const scale = Math.min(1, maxEdge / Math.max(canvas.width, canvas.height), Math.sqrt(FACE_MAX_PIXELS / (canvas.width * canvas.height)));
   if (face === 'pattern') return renderRepeatPatternPixels(srcBuf, canvas, print.requiredDpi, transform, groundHex, { scale });
   if (face === 'frameGrid') {
-    const grid = frameGridForPx(print.widthPx);
-    if (!grid) throw new NoMockupTemplateError(`no multi photo frame grid for a ${print.widthPx} px print`);
+    const grid = frameGridForPx(print.widthPx, print.heightPx);
+    if (!grid) throw new NoMockupTemplateError(`no multi photo frame grid for a ${print.widthPx}×${print.heightPx} px print`);
     return renderFrameGridFacePixels(srcBuf, grid, transform, scale);
   }
   if (face === 'gallery') {

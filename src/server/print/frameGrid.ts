@@ -1,6 +1,6 @@
 import './sharp-init';
 import sharp from 'sharp';
-import { frameSlotRects, slotBleedPx, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
+import { frameSlotRects, prodigiPx, slotBleedPx, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
 import { computeLayerRect, type Transform } from './geometry';
 import { frameSlotGeom } from './pattern-geometry';
 import { visibleLayerPart } from './visibleLayer';
@@ -28,11 +28,12 @@ export async function renderFrameTile(srcBuf: Buffer, src: { width: number; heig
 
 /**
  * The MULTI PHOTO FRAME's ONE print file, composed from its squares' tiles (each rendered on its own
- * by render.ts — the drawing on its 60 mm window + bleed). White sheet at Prodigi's exact pixels
- * (3543² / 4724²), every tile centred on its window from frameSlotRects — the positions measured
- * against Prodigi's print-file template — so the photos land where the mount's windows (or, with no
- * mount, the clean 20 mm white gaps) expect them. In-VPC, deterministic: the same tiles always make
- * the same file.
+ * by render.ts — the drawing on its 60 mm window + bleed). A white sheet as the frame hangs, every
+ * tile centred on its window from frameSlotRects — the positions measured against Prodigi's
+ * print-file template — so the photos land where the mount's windows (or, with no mount, the clean
+ * 20 mm white gaps) expect them; a frame that hangs LANDSCAPE is then turned 90° to Prodigi's portrait
+ * file. Out comes exactly Prodigi's printAreaSizes (prodigiPx). In-VPC, deterministic: the same tiles
+ * always make the same file.
  *
  * `tiles[i]` is square i (row by row from the top-left). Deny by default: a missing square or a
  * tile of the wrong size is refused here — a frame with a hole must never reach the printer.
@@ -48,12 +49,16 @@ export async function composeFrameGrid(grid: FrameGrid, tiles: Buffer[], dpi = 3
     if (m.width !== edge || m.height !== edge) throw new Error(`square ${i + 1}'s tile is ${m.width}×${m.height}, not ${edge}×${edge}`);
     inputs.push({ input: tile, left: rects[i]!.x - bleed, top: rects[i]!.y - bleed });
   }
-  return sharp({ create: { width: grid.px, height: grid.px, channels: 3, background: '#ffffff' } })
+  const sheet = await sharp({ create: { width: grid.pxW, height: grid.pxH, channels: 3, background: '#ffffff' } })
     .composite(inputs)
     .flatten({ background: '#ffffff' })
     .png()
-    .withMetadata({ density: dpi })
     .toBuffer();
+  const out = await (grid.turned ? sharp(sheet).rotate(90) : sharp(sheet)).png().withMetadata({ density: dpi }).toBuffer();
+  const m = await sharp(out).metadata();
+  const want = prodigiPx(grid);
+  if (m.width !== want.w || m.height !== want.h) throw new Error(`the ${grid.size} frame file came out ${m.width}×${m.height}, not ${want.w}×${want.h}`);
+  return out;
 }
 
 /**
@@ -71,9 +76,11 @@ export async function renderFrameGridFacePixels(
   const src = { width: m.width ?? 0, height: m.height ?? 0 };
   if (!src.width || !src.height) throw new Error('unreadable source image');
   const { png } = await renderFrameTile(srcBuf, src, grid, transform, scale);
-  const W = Math.max(1, Math.round(grid.px * scale));
+  // the face as the frame HANGS (the mockup's print area is the variant's own, designed canvas)
+  const W = Math.max(1, Math.round(grid.pxW * scale));
+  const H = Math.max(1, Math.round(grid.pxH * scale));
   const bleed = slotBleedPx(grid);
-  const { data, info } = await sharp({ create: { width: W, height: W, channels: 3, background: '#ffffff' } })
+  const { data, info } = await sharp({ create: { width: W, height: H, channels: 3, background: '#ffffff' } })
     .composite(frameSlotRects(grid).map((r) => ({ input: png, left: Math.round((r.x - bleed) * scale), top: Math.round((r.y - bleed) * scale) })))
     .flatten({ background: '#ffffff' })
     .removeAlpha()

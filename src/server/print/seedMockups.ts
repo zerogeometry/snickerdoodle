@@ -265,21 +265,23 @@ function layeredFlatDir(name: string): string | null {
 
 /**
  * Founder-authored MULTI PHOTO FRAME layers — one folder per size and frame colour:
- *   .prodigi-assets/blanks/layered/multiPhotoFrame/<12x12 | 16x16>/<colour>/   (colour as Prodigi
- *   names it, spaces → hyphens: gold, black, white, natural, brown, dark-grey, light-grey, silver)
+ *   .prodigi-assets/blanks/layered/multiPhotoFrame/<size>/<colour>/  — size: 12x12, 16x16,
+ *   16x24-landscape, 16x24-portrait, 20x30-landscape, 20x30-portrait (the rectangles hang either way);
+ *   colour as Prodigi names it, spaces → hyphens: gold, black, white, natural, brown, dark-grey,
+ *   light-grey, silver
  * holding, all on ONE canvas (the layered-flat set, like the calendar's):
  *   background.png — the wall / backdrop
  *   shadow.png     — the frame's shadow on it
  *   product.png    — the frame, straight on (its inside can stay see-through or white)
- *   printmap.png   — WHITE exactly where the print sheet sits behind the glass (the whole 300 × 300 /
- *                    400 × 400 mm sheet, square, edge to edge), transparent everywhere else
+ *   printmap.png   — WHITE exactly where the print sheet sits behind the glass (the whole sheet,
+ *                    edge to edge, at its true shape), transparent everywhere else
  *   overlay.png    — 16×16″ only: the snow-white MOUNT, with its 16 windows cut see-through (and any
- *                    glass sheen) — laid OVER the art. Optional on the 12×12″ (no mount).
+ *                    glass sheen) — laid OVER the art. Optional on the others (no mount).
  * The art (the grid print file itself) cover-fits the printmap, so a printmap at the sheet's true
  * square size puts every square exactly where it prints.
  */
-function multiPhotoFrameDir(size: string, colour: string): string | null {
-  const folder = size.replace('×', 'x').replace('″', '');
+function multiPhotoFrameDir(size: string, orientation: string, colour: string): string | null {
+  const folder = size.replace('×', 'x').replace('″', '') + (orientation ? `-${orientation}` : '');
   return layeredFlatDir(`multiPhotoFrame/${folder}/${colour.replace(/\s+/g, '-')}`);
 }
 
@@ -313,7 +315,7 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // The founder's layered photos, per size + frame colour (see multiPhotoFrameDir): the art is the
       // frame's PRINTED FACE (the drawing in every square), laid on the printmap; the mount (16×16″)
       // rides over it as the overlay. Not staged ⇒ the drawn frame (drawnMockups.ts).
-      const dir = multiPhotoFrameDir(size, colour);
+      const dir = multiPhotoFrameDir(size, attrs.orientation ?? '', colour);
       return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'multiPhotoFrame' };
     }
     case 'cushion': {

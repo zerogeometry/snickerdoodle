@@ -40,7 +40,7 @@ describe('drawn mockups — the print area IS the print file’s shape (preview 
         expect([m.width, m.height], key).toEqual([d.W, d.H]);
       }
     }
-  });
+  }, 30_000); // one drawn product after another (~0.3 s each, more on a busy machine)
 });
 
 describe('shop art', () => {

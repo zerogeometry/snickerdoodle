@@ -334,8 +334,9 @@ export async function placeOrder(
     }
     if (isMultiPhotoFrameKey(line.productKey)) {
       if (input.giftLink) throw new Error('a multi photo frame can’t be bought through a gift link');
-      // its number of squares is its variant's (the key the SERVER priced), never the request's
-      const count = frameSlotCountOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
+      // its number of squares is its variant's (size + how it hangs — the key the SERVER priced), never the request's
+      const attrs = variantId ? specByVariantId.get(variantId)?.attributes : undefined;
+      const count = frameSlotCountOf(attrs?.size, attrs?.orientation);
       if (!variantId || !count) throw new Error('unknown multi photo frame');
       // WHICH drawing goes in which square is the client's (re-filled here to exactly `count` squares);
       // every square passes the very same gates as any print — authz, moderation, the DPI check on

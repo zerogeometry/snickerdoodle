@@ -18,7 +18,7 @@ async function drawing(fill: string): Promise<Buffer> {
 
 type FrameLine = { product: string; sku?: string; qty: number; pricePence: number; sub?: string; slots?: Array<{ assetId: string }> };
 
-test('multi photo frame: one drawing in every square → a square of its own from the keepsake box → black, 12×12″ → basket → reopen → £62', async ({ page }) => {
+test('multi photo frame: one drawing in every square → a square of its own from the keepsake box → the four sizes, both ways up → black, 12×12″ → basket → reopen → £62', async ({ page }) => {
   test.setTimeout(300_000);
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
@@ -64,10 +64,26 @@ test('multi photo frame: one drawing in every square → a square of its own fro
     await expect(page.getByRole('button', { name: /too small to print/ })).toHaveCount(0);
 
     // the 16×16″ keeps the same picks (16 squares, 2 chosen); back to the 12×12″ in black
-    await page.getByRole('group', { name: 'frame size' }).getByRole('button', { name: /^16×16″/ }).click();
+    const sizes = page.getByRole('group', { name: 'frame size' });
+    await expect(sizes.getByRole('button')).toHaveCount(4);
+    await expect(page.getByRole('group', { name: 'which way it hangs' })).toHaveCount(0); // a square frame hangs one way
+    await sizes.getByRole('button', { name: /^16×16″/ }).click();
     await expect(page.getByText('2 of 16 chosen')).toBeVisible();
     await expect(page.getByRole('button', { name: 'add to basket · £80' })).toBeVisible();
-    await page.getByRole('group', { name: 'frame size' }).getByRole('button', { name: /^12×12″/ }).click();
+    // the big ones: 20×30″, 40 squares, landscape (Prodigi's own layout) or portrait
+    await expect(sizes.getByRole('button', { name: /^20×30″/ })).toContainText('20×30″ · 40 drawings · £102');
+    await expect(sizes.getByRole('button', { name: /^16×24″/ })).toContainText('16×24″ · 24 drawings · £87');
+    await sizes.getByRole('button', { name: /^20×30″/ }).click();
+    const hangs = page.getByRole('group', { name: 'which way it hangs' });
+    await expect(hangs.getByRole('button', { pressed: true })).toHaveText('landscape · 8 across, 5 down');
+    await expect(page.getByText('2 of 40 chosen')).toBeVisible();
+    await expect(page.getByRole('button', { name: /: repeats this drawing/ })).toHaveCount(38);
+    await expect(page.getByRole('img', { name: /^your 20×30″ landscape frame in gold: 40 squares, 2 chosen/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'add to basket · £102' })).toBeVisible();
+    await hangs.getByRole('button', { name: /^portrait/ }).click();
+    await expect(hangs.getByRole('button', { pressed: true })).toHaveText('portrait · 5 across, 8 down');
+    await expect(page.getByRole('img', { name: /^your 20×30″ portrait frame in gold: 40 squares/ })).toBeVisible();
+    await sizes.getByRole('button', { name: /^12×12″/ }).click();
     await page.getByRole('group', { name: 'frame colour' }).getByRole('button', { name: 'black' }).click();
     await expect(page.getByRole('group', { name: 'frame colour' }).getByRole('button', { name: 'black' })).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('img', { name: /^your 12×12″ frame in black: 9 squares, 2 chosen/ })).toBeVisible();

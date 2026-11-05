@@ -242,7 +242,7 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
 
   /** A multi photo frame's square, as its own print geometry (null for every other product). */
   function frameCell(s: Spec, t: TemplateGeom): TemplateGeom | null {
-    const grid = isMultiPhotoFrameKey(s.productKey) ? frameGridForPx(t.printWidthPx) : null;
+    const grid = isMultiPhotoFrameKey(s.productKey) ? frameGridForPx(t.printWidthPx, t.printHeightPx) : null;
     return grid ? frameSlotGeom(grid, t) : null;
   }
 

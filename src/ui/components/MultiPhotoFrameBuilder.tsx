@@ -19,8 +19,8 @@ import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import {
-  FRAME_GRIDS, FRAME_MOULDING_HEX, MAX_FRAME_SLOTS, MULTI_FRAME_COLOURS, MULTI_PHOTO_FRAME_KEY,
-  fillFrameSlots, frameGridOf, frameSlotRects, slotBleedPx, type FrameGrid,
+  FRAME_GRIDS, FRAME_MOULDING_HEX, FRAME_SIZES, MAX_FRAME_SLOTS, MULTI_FRAME_COLOURS, MULTI_PHOTO_FRAME_KEY,
+  fillFrameSlots, frameGridOf, frameSlotRects, slotBleedPx, type FrameGrid, type FrameSize,
 } from '@/lib/multi-photo-frame';
 import { frameGridLine, newFrameLineId } from '@/lib/multi-photo-frame-line';
 import { defaultTransformFor } from '@/lib/catalogue-view';
@@ -29,8 +29,9 @@ import { gbp, shownSrc, toast, useBasket, useUpload, type PackCardLine } from '@
 import { useStoredUpload } from '@/lib/useStoredUpload';
 
 /**
- * The MULTI PHOTO FRAME builder (5 Nov 2026 — src/lib/multi-photo-frame.ts): choose 12×12″ (9
- * drawings) or 16×16″ mounted (16) and a frame colour → put a drawing in every square, exactly the
+ * The MULTI PHOTO FRAME builder (5 Nov 2026 — src/lib/multi-photo-frame.ts): choose a size (9, 16,
+ * 24 or 40 drawings — the two big ones hang landscape or portrait) and a frame colour → put a drawing
+ * in every square, exactly the
  * way a card pack is filled (the same keepsake-box picker and its workshop: upload to the keepsake
  * box, remove background, edit in studio) → any square left empty repeats the MAIN drawing (square
  * 1's), so one drawing makes a whole frame → add ONE basket line.
@@ -52,14 +53,15 @@ const NEXT = '/customize/multiPhotoFrame';
 
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
-type Draft = { size: string | null; colour: string | null; slots: Slot[] };
+type Draft = { size: string | null; orientation: string | null; colour: string | null; slots: Slot[] };
 function readDraft(): Draft | null {
   try {
     const raw = sessionStorage.getItem(DRAFT_KEY);
-    const d = raw ? (JSON.parse(raw) as { size?: unknown; colour?: unknown; slots?: unknown }) : null;
+    const d = raw ? (JSON.parse(raw) as { size?: unknown; orientation?: unknown; colour?: unknown; slots?: unknown }) : null;
     if (!d || !Array.isArray(d.slots)) return null;
     const slots = d.slots.slice(0, MAX_FRAME_SLOTS).map((s) => (s && typeof s === 'object' && typeof (s as PackCardLine).assetId === 'string' ? (s as PackCardLine) : null));
-    return { size: typeof d.size === 'string' ? d.size : null, colour: typeof d.colour === 'string' ? d.colour : null, slots };
+    const str = (v: unknown) => (typeof v === 'string' ? v : null);
+    return { size: str(d.size), orientation: str(d.orientation), colour: str(d.colour), slots };
   } catch {
     return null;
   }
@@ -83,6 +85,7 @@ export function MultiPhotoFrameBuilder() {
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [catalogueFailed, setCatalogueFailed] = useState(false);
   const [size, setSize] = useState<string | null>(null);
+  const [orientation, setOrientation] = useState<string | null>(null);
   const [colour, setColour] = useState<string | null>(null);
   // kept as long as the biggest frame, so 16 → 9 → 16 doesn't lose squares 10–16
   const [slots, setSlots] = useState<Slot[]>(() => Array.from({ length: MAX_FRAME_SLOTS }, () => null));
@@ -117,13 +120,18 @@ export function MultiPhotoFrameBuilder() {
   const product = products?.find((p) => p.key === MULTI_PHOTO_FRAME_KEY) ?? null;
   const variants = useMemo(() => product?.variants ?? [], [product]);
   const fallback = variants.find((v) => v.isDefault) ?? variants[0] ?? null;
-  const sizes = useMemo(() => FRAME_GRIDS.filter((g) => variants.some((v) => v.attributes.size === g.size)), [variants]);
-  const sizeNow = size && sizes.some((g) => g.size === size) ? size : (fallback?.attributes.size ?? null);
-  const coloursNow = MULTI_FRAME_COLOURS.filter((c) => variants.some((v) => v.attributes.size === sizeNow && v.attributes.colour === c));
+  const sizes = useMemo(() => FRAME_SIZES.filter((sz) => variants.some((v) => v.attributes.size === sz)), [variants]);
+  const sizeNow = size && (sizes as readonly string[]).includes(size) ? size : (fallback?.attributes.size ?? null);
+  // the two big sizes hang either way — landscape (Prodigi's own template) unless chosen otherwise
+  const orientations = FRAME_GRIDS.filter((g) => g.size === sizeNow && g.orientation !== 'square').map((g) => g.orientation);
+  const orientationNow = orientations.length ? (orientation && (orientations as string[]).includes(orientation) ? orientation : 'landscape') : null;
+  const ofSize = (v: CatalogueVariant) => v.attributes.size === sizeNow && (v.attributes.orientation ?? null) === orientationNow;
+  const coloursNow = MULTI_FRAME_COLOURS.filter((c) => variants.some((v) => ofSize(v) && v.attributes.colour === c));
   const colourNow = colour && (coloursNow as readonly string[]).includes(colour) ? colour : (fallback?.attributes.colour ?? coloursNow[0] ?? null);
-  const variant: CatalogueVariant | null = variants.find((v) => v.attributes.size === sizeNow && v.attributes.colour === colourNow) ?? fallback;
-  const grid = frameGridOf(variant?.attributes.size);
-  const count = grid ? grid.n * grid.n : 0;
+  const variant: CatalogueVariant | null = variants.find((v) => ofSize(v) && v.attributes.colour === colourNow) ?? fallback;
+  const grid = frameGridOf(variant?.attributes.size, variant?.attributes.orientation);
+  const count = grid ? grid.cols * grid.rows : 0;
+  const compact = count > 16; // the big frames: a compact grid of squares
   const mine = useMemo(() => slots.slice(0, count), [slots, count]);
   const filledCount = mine.filter(Boolean).length;
 
@@ -141,6 +149,7 @@ export function MultiPhotoFrameBuilder() {
       const v = product.variants.find((x) => x.id === line.variantId);
       if (v) {
         setSize(v.attributes.size ?? null);
+        setOrientation(v.attributes.orientation ?? null);
         setColour(v.attributes.colour ?? null);
       }
       setSlots(Array.from({ length: MAX_FRAME_SLOTS }, (_, i) => (line.slots![i] ? { ...line.slots![i]! } : null)));
@@ -152,6 +161,7 @@ export function MultiPhotoFrameBuilder() {
     const draft = resuming ? readDraft() : null;
     if (draft?.slots.some(Boolean)) {
       setSize(draft.size);
+      setOrientation(draft.orientation);
       setColour(draft.colour);
       setSlots(Array.from({ length: MAX_FRAME_SLOTS }, (_, i) => draft.slots[i] ?? null));
       return;
@@ -170,8 +180,8 @@ export function MultiPhotoFrameBuilder() {
   // Keep this tab's draft (not while editing a basket line — that line IS the saved state).
   useEffect(() => {
     if (!seededRef.current || edit) return;
-    writeDraft(slots.some(Boolean) ? { size: sizeNow, colour: colourNow, slots } : null);
-  }, [slots, sizeNow, colourNow, edit]);
+    writeDraft(slots.some(Boolean) ? { size: sizeNow, orientation: orientationNow, colour: colourNow, slots } : null);
+  }, [slots, sizeNow, orientationNow, colourNow, edit]);
 
   // Every drawing on offer: the one in progress first, then the keepsake box. One entry per drawing.
   const drawingsRaw = useMemo(() => {
@@ -350,7 +360,8 @@ export function MultiPhotoFrameBuilder() {
   }
 
   const sheetDrawing = chosen ? drawingFor(chosen) : null;
-  const priceOf = (g: FrameGrid) => variants.find((v) => v.attributes.size === g.size && v.attributes.colour === colourNow)?.pricePence ?? variants.find((v) => v.attributes.size === g.size)?.pricePence ?? null;
+  const priceOf = (sz: FrameSize) => variants.find((v) => v.attributes.size === sz && v.attributes.colour === colourNow)?.pricePence ?? variants.find((v) => v.attributes.size === sz)?.pricePence ?? null;
+  const gridOfSize = (sz: FrameSize) => frameGridOf(sz, 'landscape')!;
 
   return (
     <Shell>
@@ -373,12 +384,37 @@ export function MultiPhotoFrameBuilder() {
           {ready && filledCount < count ? (
             <CaveatNote className="mt-1 text-lg">the empty squares repeat your favourite ↻</CaveatNote>
           ) : null}
-          <ol className="mt-4 grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4" aria-label="the squares of your frame">
+          <ol className={`mt-4 grid ${compact ? 'grid-cols-6 gap-2 sm:grid-cols-8 md:grid-cols-6 lg:grid-cols-8' : 'grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4'}`} aria-label="the squares of your frame">
             {squares.map((c, i) => {
               const own = mine[i];
               const d = c ? drawingFor(c.assetId) : null;
               const q = c ? assess(c) : null;
               const badge = !q ? null : q.decision === 'BLOCK' ? 'too small to print' : q.softUpClose ? 'a little soft up close' : 'print-ready';
+              if (compact) {
+                // a big frame: picture-only squares, numbered, so the options aren't 40 tiles away on a
+                // phone; a too-small drawing is ringed; "clear" lives in the picker sheet
+                const src = d?.thumbUrl ?? d?.imageUrl ?? null;
+                return (
+                  <li key={i}>
+                    <button
+                      type="button"
+                      onClick={() => openSheet(i, !own)}
+                      aria-label={c ? `square ${i + 1}: ${own ? (d?.label ?? 'a drawing') : `repeats ${d?.label ?? 'a drawing'}`}${badge ? `, ${badge}` : ''} — ${own ? 'swap it' : 'pick its own drawing'}` : `pick a drawing for square ${i + 1}`}
+                      className={`press relative block aspect-square w-full min-h-11 overflow-hidden rounded-[8px] border-2 bg-white ${q?.decision === 'BLOCK' ? 'border-cinnamon' : own ? 'border-cocoa' : 'border-dashed border-cocoa/30'}`}
+                    >
+                      {src ? <img src={src} alt="" loading="lazy" className={`h-full w-full object-cover ${own ? '' : 'opacity-50'}`} /> : null}
+                      <span aria-hidden className="absolute bottom-0.5 left-0.5 rounded-[4px] bg-paper/90 px-1 text-[10px] font-extrabold leading-4 text-cocoa">
+                        {i + 1}
+                      </span>
+                      {q?.decision === 'BLOCK' ? (
+                        <span aria-hidden className="absolute right-0.5 top-0.5 text-cinnamon">
+                          <Icon icon={IconAlertTriangle} size={14} />
+                        </span>
+                      ) : null}
+                    </button>
+                  </li>
+                );
+              }
               return (
                 <li key={i} className="relative">
                   {c ? (
@@ -455,15 +491,16 @@ export function MultiPhotoFrameBuilder() {
           <div className="mt-5">
             <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Size</p>
             <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="frame size">
-              {sizes.map((g) => {
-                const p = priceOf(g);
+              {sizes.map((sz) => {
+                const p = priceOf(sz);
+                const g = gridOfSize(sz);
                 return (
-                  <button key={g.size} type="button" onClick={() => setSize(g.size)} aria-pressed={g.size === sizeNow} className={`${OPT} ${g.size === sizeNow ? OPT_ON : OPT_OFF}`}>
+                  <button key={sz} type="button" onClick={() => setSize(sz)} aria-pressed={sz === sizeNow} className={`${OPT} ${sz === sizeNow ? OPT_ON : OPT_OFF}`}>
                     <span className="flex flex-col items-start leading-tight">
                       <span>
-                        {g.size} · {g.n * g.n} drawings{p ? ` · ${gbp(p)}` : ''}
+                        {sz} · {g.cols * g.rows} drawings{p ? ` · ${gbp(p)}` : ''}
                       </span>
-                      <span className={`text-[10px] font-semibold ${g.size === sizeNow ? 'text-paper' : 'text-ink-soft'}`}>{g.mounted ? 'with a white mount' : 'no mount'}</span>
+                      <span className={`text-[10px] font-semibold ${sz === sizeNow ? 'text-paper' : 'text-ink-soft'}`}>{g.mounted ? 'with a white mount' : 'no mount'}</span>
                     </span>
                   </button>
                 );
@@ -471,6 +508,23 @@ export function MultiPhotoFrameBuilder() {
             </div>
             <p className="mt-1.5 text-xs text-ink-faint">every drawing in its own 6 cm square, 2 cm apart</p>
           </div>
+
+          {/* How it hangs — the two big sizes only */}
+          {orientations.length ? (
+            <div className="mt-5">
+              <p className="text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">Hangs</p>
+              <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="which way it hangs">
+                {orientations.map((o) => {
+                  const g = frameGridOf(sizeNow, o)!;
+                  return (
+                    <button key={o} type="button" onClick={() => setOrientation(o)} aria-pressed={o === orientationNow} className={`${OPT} ${o === orientationNow ? OPT_ON : OPT_OFF}`}>
+                      {o} · {g.cols} across, {g.rows} down
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
 
           {/* Frame colour */}
           <div className="mt-5">
@@ -523,6 +577,21 @@ export function MultiPhotoFrameBuilder() {
               <Button size="md" className="flex-1 !px-3" onClick={putInSquare} disabled={!sheetDrawing?.printable}>
                 put it in square {(sheet?.slot ?? 0) + 1}
               </Button>
+              {compact && sheet && mine[sheet.slot] ? (
+                // (the compact squares have no × of their own)
+                <Button
+                  variant="secondary"
+                  size="md"
+                  className="!px-3"
+                  aria-label={`clear square ${sheet.slot + 1}`}
+                  onClick={() => {
+                    clearSquare(sheet.slot);
+                    setSheet(null);
+                  }}
+                >
+                  <Icon icon={IconX} size={16} />
+                </Button>
+              ) : null}
             </div>
           ) : null
         }
@@ -545,21 +614,34 @@ export function MultiPhotoFrameBuilder() {
 function FramePreview({ grid, squares, own, imageFor, colour }: { grid: FrameGrid; squares: Slot[]; own: Slot[]; imageFor: (assetId: string) => string | null; colour: string }) {
   const rects = frameSlotRects(grid);
   const bleed = slotBleedPx(grid);
-  const pct = (px: number) => `${(px / grid.px) * 100}%`;
+  const pctX = (px: number) => `${(px / grid.pxW) * 100}%`;
+  const pctY = (px: number) => `${(px / grid.pxH) * 100}%`;
+  // the moulding, the same on every side: a share of the frame's longer side, as a fraction of its
+  // WIDTH (CSS % padding is always of the width). The outer shape then follows so the sheet inside
+  // keeps the print's own shape: inner w/h = (1 − 2p) / (1/A − 2p) = wMm/hMm.
+  const p = 0.045 * (Math.max(grid.wMm, grid.hMm) / grid.wMm);
+  const outerAspect = 1 / (2 * p + (1 - 2 * p) * (grid.hMm / grid.wMm));
   const chosen = own.filter(Boolean).length;
   return (
     <div
       role="img"
-      aria-label={`your ${grid.size} frame in ${colour}: ${squares.length} squares, ${chosen} chosen${chosen < squares.length && chosen > 0 ? ', the rest repeat the first drawing' : ''}`}
-      className="relative aspect-square w-full max-w-[520px] rounded-[3px] p-[6%] shadow-[0_8px_18px_rgb(43_33_24/0.25)]"
-      style={{ backgroundColor: FRAME_MOULDING_HEX[colour] ?? FRAME_MOULDING_HEX.gold }}
+      aria-label={`your ${grid.size} ${grid.orientation === 'square' ? '' : `${grid.orientation} `}frame in ${colour}: ${squares.length} squares, ${chosen} chosen${chosen < squares.length && chosen > 0 ? ', the rest repeat the first drawing' : ''}`}
+      className="relative rounded-[3px] shadow-[0_8px_18px_rgb(43_33_24/0.25)]"
+      style={{
+        backgroundColor: FRAME_MOULDING_HEX[colour] ?? FRAME_MOULDING_HEX.gold,
+        // the frame at its true shape (moulding included); a portrait one narrower, so it's never taller than wide-ish
+        aspectRatio: String(outerAspect),
+        width: grid.hMm > grid.wMm ? `${Math.round(outerAspect * 100)}%` : '100%',
+        maxWidth: grid.hMm > grid.wMm ? undefined : '520px',
+        padding: `${p * 100}%`,
+      }}
     >
       <div className="relative h-full w-full overflow-hidden bg-white shadow-[inset_0_0_6px_rgb(43_33_24/0.35)]">
         {squares.map((c, i) => {
           const r = rects[i]!;
           const url = c ? imageFor(c.assetId) : null;
           return (
-            <div key={i} className={`absolute overflow-hidden ${grid.mounted ? 'shadow-[inset_1px_1px_2px_rgb(43_33_24/0.3)]' : ''} ${c ? '' : 'border border-dashed border-cocoa/25 bg-paper-2'}`} style={{ left: pct(r.x), top: pct(r.y), width: pct(r.size), height: pct(r.size) }}>
+            <div key={i} className={`absolute overflow-hidden ${grid.mounted ? 'shadow-[inset_1px_1px_2px_rgb(43_33_24/0.3)]' : ''} ${c ? '' : 'border border-dashed border-cocoa/25 bg-paper-2'}`} style={{ left: pctX(r.x), top: pctY(r.y), width: pctX(r.size), height: pctY(r.size) }}>
               {url ? (
                 // the tile is the window + its bleed; the window shows its middle
                 <img src={url} alt="" className="absolute max-w-none object-cover" style={{ left: `${(-bleed / r.size) * 100}%`, top: `${(-bleed / r.size) * 100}%`, width: `${((r.size + 2 * bleed) / r.size) * 100}%`, height: `${((r.size + 2 * bleed) / r.size) * 100}%` }} />
@@ -569,7 +651,7 @@ function FramePreview({ grid, squares, own, imageFor, colour }: { grid: FrameGri
         })}
       </div>
       <span className="absolute -right-2 -top-3 z-20 rotate-6 rounded-pill border-2 border-cocoa bg-honey px-3 py-1 text-xs font-extrabold text-cocoa shadow-[0_2px_0_var(--color-cocoa)]">
-        {grid.n * grid.n} drawings
+        {grid.cols * grid.rows} drawings
       </span>
     </div>
   );

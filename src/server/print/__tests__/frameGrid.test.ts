@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
-import { FRAME_GRIDS, frameSlotRects, slotBleedPx, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
+import { FRAME_GRIDS, frameSlotRects, prodigiPx, slotBleedPx, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
 import { composeFrameGrid, renderFrameGridFacePixels, renderFrameTile } from '../frameGrid';
 import type { Transform } from '../geometry';
 
@@ -28,7 +28,7 @@ const WHITE = [255, 255, 255];
 
 async function tilesFor(grid: FrameGrid, drawing: (i: number) => Promise<Buffer>, transform: (i: number) => Transform = () => COVER): Promise<Buffer[]> {
   const out: Buffer[] = [];
-  for (let i = 0; i < grid.n * grid.n; i++) {
+  for (let i = 0; i < grid.cols * grid.rows; i++) {
     const buf = await drawing(i);
     const m = await sharp(buf).metadata();
     out.push((await renderFrameTile(buf, { width: m.width!, height: m.height! }, grid, transform(i))).png);
@@ -38,11 +38,14 @@ async function tilesFor(grid: FrameGrid, drawing: (i: number) => Promise<Buffer>
 
 describe('the frame print file — exact px, every square in place, each with its own drawing', () => {
   for (const grid of FRAME_GRIDS) {
-    it(`${grid.size}: ${grid.px}×${grid.px} px at 300 dpi, each square’s drawing filling exactly its window${grid.mounted ? ' + 3 mm bleed' : ''}, white between`, async () => {
+    const want = prodigiPx(grid);
+    it(`${grid.size} ${grid.orientation}: Prodigi’s ${want.w}×${want.h} px at 300 dpi${grid.turned ? ' (designed landscape, turned)' : ''}, each square’s drawing filling exactly its window${grid.mounted ? ' + 3 mm bleed' : ''}, white between`, async () => {
       const file = await composeFrameGrid(grid, await tilesFor(grid, (i) => solid(colourOf(i))));
       const meta = await sharp(file).metadata();
-      expect([meta.width, meta.height, meta.density]).toEqual([grid.px, grid.px, 300]);
-      const { at } = await pixels(file);
+      expect([meta.width, meta.height, meta.density]).toEqual([want.w, want.h, 300]);
+      // read it the way it hangs (a landscape frame's file is turned a quarter for Prodigi)
+      const { at, info } = await pixels(grid.turned ? await sharp(file).rotate(-90).png().toBuffer() : file);
+      expect([info.width, info.height]).toEqual([grid.pxW, grid.pxH]);
       const b = slotBleedPx(grid);
       for (const [i, r] of frameSlotRects(grid).entries()) {
         const c = colourOf(i);
@@ -65,7 +68,7 @@ describe('the frame print file — exact px, every square in place, each with it
       expect(near(at(5, 5), WHITE)).toBe(true);
       const [a, c] = frameSlotRects(grid);
       expect(near(at(Math.round((a!.x + a!.size + c!.x) / 2), a!.y + 10), WHITE)).toBe(true);
-    });
+    }, 60_000); // up to a 52-megapixel sheet of 40 tiles
   }
 
   it('each square keeps its OWN placement (a pan shows that part of its drawing; the default fills it whole)', async () => {
@@ -84,10 +87,12 @@ describe('the frame print file — exact px, every square in place, each with it
     expect(near(at(s3!.x + 40, row), red) && near(at(s3!.x + s3!.size - 40, row), red)).toBe(true);
   });
 
-  it('refuses a frame with a square missing, or a tile of the wrong size', async () => {
+  it('refuses a frame with a square missing, or a tile of the wrong size', { timeout: 30_000 }, async () => {
     const grid = FRAME_GRIDS[0]!;
     const tiles = await tilesFor(grid, (i) => solid(colourOf(i), 300, 300));
     await expect(composeFrameGrid(grid, tiles.slice(0, 8))).rejects.toThrow(/needs 9 squares/);
+    const big = FRAME_GRIDS.find((g) => g.size === '20×30″')!;
+    await expect(composeFrameGrid(big, tiles)).rejects.toThrow(/needs 40 squares/);
     const wrong = await sharp({ create: { width: slotPx(grid) + 2, height: slotPx(grid) + 2, channels: 3, background: '#fff' } }).png().toBuffer();
     await expect(composeFrameGrid(grid, [...tiles.slice(0, 8), wrong])).rejects.toThrow(/square 9.s tile/);
   });
@@ -106,7 +111,7 @@ describe('the catalogue tile’s printed face — the drawing in every square', 
     for (const grid of FRAME_GRIDS) {
       const scale = 0.1;
       const face = await renderFrameGridFacePixels(await solid([10, 120, 30]), grid, COVER, scale);
-      expect(face.width).toBe(Math.round(grid.px * scale));
+      expect([face.width, face.height]).toEqual([Math.round(grid.pxW * scale), Math.round(grid.pxH * scale)]);
       const at = (x: number, y: number) => [0, 1, 2].map((k) => face.data[(y * face.width + x) * 3 + k]!);
       for (const r of frameSlotRects(grid)) {
         expect(near(at(Math.round((r.x + r.size / 2) * scale), Math.round((r.y + r.size / 2) * scale)), [10, 120, 30])).toBe(true);

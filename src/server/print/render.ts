@@ -166,8 +166,8 @@ export async function renderPrintFile(
   // keepsake (so erasing a drawing erases its tile); fulfilment composes the frame's tiles into the
   // one print file Prodigi gets, at the template's exact positions (src/server/print/frameGrid.ts).
   if (variantRow?.key && isMultiPhotoFrameKey(variantRow.key)) {
-    const grid = frameGridForPx(tpl.printWidthPx);
-    if (!grid) throw new Error(`no multi photo frame grid for a ${tpl.printWidthPx} px print file`);
+    const grid = frameGridForPx(tpl.printWidthPx, tpl.printHeightPx);
+    if (!grid) throw new Error(`no multi photo frame grid for a ${tpl.printWidthPx}×${tpl.printHeightPx} px print`);
     const cell = frameSlotGeom(grid, geom);
     const tileAssess = assessResolution(cell, judged, transform);
     if (tileAssess.decision === 'BLOCK') {

@@ -123,18 +123,18 @@ export function printAreaAssets(printTo: string[] | null | undefined, rows: Arra
 
 /**
  * A MULTI PHOTO FRAME line's squares, in order (square 1 = top-left): one tile per square from its
- * artwork rows (print areas `slot-1`…`slot-N`), N from the FROZEN size. null = not a frame line (no
+ * artwork rows (print areas `slot-1`…`slot-N`), N from the FROZEN size + orientation. null = not a frame line (no
  * slot rows). Deny by default: a missing, doubled or unexpected square, or slot rows mixed with any
  * other kind, is refused — a frame with a hole must never reach the printer. The tiles are composed
  * into the ONE file for Prodigi's 'default' area at submit (composeFrameGrid).
  */
-export function frameSlotTiles(size: string | null | undefined, rows: Array<{ printArea: string | null; printObjectId: string }>): { grid: FrameGrid; tiles: string[] } | null {
+export function frameSlotTiles(attrs: { size?: string; orientation?: string } | null | undefined, rows: Array<{ printArea: string | null; printObjectId: string }>): { grid: FrameGrid; tiles: string[] } | null {
   const slotRows = rows.filter((r) => slotIndexOf(r.printArea) !== null);
   if (slotRows.length === 0) return null;
   if (slotRows.length !== rows.length) throw new Error('a frame line mixes its squares with other print files');
-  const grid = frameGridOf(size);
-  if (!grid) throw new Error(`a frame line of an unknown size (${size ?? 'none'})`);
-  const count = grid.n * grid.n;
+  const grid = frameGridOf(attrs?.size, attrs?.orientation);
+  if (!grid) throw new Error(`a frame line of an unknown size (${attrs?.size ?? 'none'})`);
+  const count = grid.cols * grid.rows;
   const tiles: Array<string | undefined> = Array.from({ length: count }, () => undefined);
   for (const r of slotRows) {
     const i = slotIndexOf(r.printArea)!;
@@ -460,7 +460,7 @@ async function submitOne(
       const spec = rows[0]!.spec as NonNullable<LineSpec>;
       const cfg = (spec.providerConfig ?? null) as { printTo?: string[] } | null;
       const flat = rows.map((r) => ({ printArea: r.printArea, printObjectId: r.printObjectId! }));
-      const frame = frameSlotTiles(spec.attributes?.size, flat);
+      const frame = frameSlotTiles(spec.attributes, flat);
       if (frame) {
         if (!isMultiPhotoFrameKey(rows[0]!.productKey)) throw new Error('square print files on a line that isn’t a multi photo frame');
         frameItems.set(itemId, { ...frame, printTo: cfg?.printTo?.length ? cfg.printTo : ['default'] });

@@ -18,7 +18,8 @@ export function frameGridLine(opts: {
   /** The shopper's picks, one per square (row by row); null = not chosen, filled with the main drawing. */
   slots: ReadonlyArray<PackCardLine | null>;
 }): Omit<BasketItem, 'qty'> {
-  const count = frameSlotCountOf(opts.variant.attributes?.size);
+  const a = opts.variant.attributes ?? {};
+  const count = frameSlotCountOf(a.size, a.orientation);
   if (!count) throw new Error('not a multi photo frame size');
   const slots = fillFrameSlots(opts.slots, count).map(({ printArea: _area, ...p }) => ({
     assetId: p.assetId,
@@ -33,7 +34,7 @@ export function frameGridLine(opts: {
     sku: opts.variant.sku,
     variantId: opts.variant.id,
     pricePence: opts.variant.pricePence,
-    sub: [opts.variant.attributes?.size, opts.variant.attributes?.colour ? `${opts.variant.attributes.colour} frame` : null, drawings === 1 ? 'one favourite drawing' : `${drawings} drawings`]
+    sub: [a.size, a.orientation ?? null, a.colour ? `${a.colour} frame` : null, drawings === 1 ? 'one favourite drawing' : `${drawings} drawings`]
       .filter(Boolean)
       .join(' · '),
     artwork: slots[0]!,

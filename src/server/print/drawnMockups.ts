@@ -1,6 +1,6 @@
 import 'server-only';
 import { Resvg } from '@resvg/resvg-js';
-import { FRAME_MOULDING_HEX, frameGridOf, frameSlotRects } from '@/lib/multi-photo-frame';
+import { FRAME_MOULDING_HEX, frameGridForPx, frameSlotRects } from '@/lib/multi-photo-frame';
 
 /**
  * DRAWN product mockups for the range-expansion products with no photo yet (height chart, bandana),
@@ -113,14 +113,14 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
       };
     }
     case 'multiPhotoFrame': {
-      // a square classic frame in its colour, hung straight on: the print sheet behind the glass is the
+      // the classic frame in its colour, hung straight on (square, or long side across / down): the print sheet behind the glass is the
       // print area; on the MOUNTED size a snow-white mount lies over it with a window over every square
       // (the windows at the print's own positions — frameSlotRects — so the mount sits where it prints)
-      const grid = frameGridOf(attrs.size);
-      const r = fit(1, 700, 700, W / 2, H / 2);
-      const face = Math.round(r.w * 0.075); // the moulding, ~20 mm on a 300–400 mm frame
+      const grid = frameGridForPx(print.w, print.h);
+      const r = fit(a, 760, 760, W / 2, H / 2);
+      const face = Math.round(Math.max(r.w, r.h) * 0.05); // the moulding, a touch of the frame's size
       const wood = FRAME_MOULDING_HEX[attrs.colour ?? ''] ?? FRAME_MOULDING_HEX.gold!;
-      const k = grid ? r.w / grid.px : 0;
+      const k = grid ? r.w / grid.pxW : 0;
       const windows = grid?.mounted
         ? frameSlotRects(grid).map((s) => `M${r.x + s.x * k} ${r.y + s.y * k} h${s.size * k} v${s.size * k} h${-s.size * k} Z`).join(' ')
         : '';

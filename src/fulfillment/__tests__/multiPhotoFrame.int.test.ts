@@ -14,7 +14,7 @@ import { placeOrder } from '@/server/orders';
 import { processFulfilment } from '@/fulfillment/worker';
 import { submitReadyOrders, syncSubmittedOrders } from '@/fulfillment/submit';
 import { frameGridKey } from '@/fulfillment/frameGridKey';
-import { frameGridOf, frameSlotRects, type FrameGrid } from '@/lib/multi-photo-frame';
+import { FRAME_GRIDS, frameGridOf, frameSlotRects, prodigiPx, type FrameGrid } from '@/lib/multi-photo-frame';
 import type { CreateOrderRequest, ProdigiOrderTransport } from '@/server/prodigi/orders';
 import { deleteObject, getObjectBytes } from '@/storage';
 import type { GateEnv } from '@/fulfillment/gate';
@@ -44,9 +44,9 @@ function fakeTransport(stage: 'InProgress' | 'Complete' = 'InProgress') {
   return transport;
 }
 
-/** The red channel at the centre of every square of a composed frame file. */
+/** The red channel at the centre of every square of a composed frame file (read the way it hangs). */
 async function squareShades(file: Buffer, grid: FrameGrid): Promise<number[]> {
-  const { data, info } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await (grid.turned ? sharp(file).rotate(-90) : sharp(file)).raw().toBuffer({ resolveWithObject: true });
   return frameSlotRects(grid).map((r) => data[(Math.round(r.y + r.size / 2) * info.width + Math.round(r.x + r.size / 2)) * info.channels]!);
 }
 
@@ -92,9 +92,10 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
     return ing.assetId;
   }
 
-  async function sku(size: string, colour: string) {
+  async function sku(size: string, colour: string, orientation?: string) {
     const rows = await db.select({ sku: productVariants.sku, attrs: productVariants.attributes }).from(productVariants);
-    return rows.find((r) => r.sku.startsWith('multiPhotoFrame') && (r.attrs as Record<string, string>).size === size && (r.attrs as Record<string, string>).colour === colour)!.sku;
+    const a = (r: (typeof rows)[number]) => r.attrs as Record<string, string>;
+    return rows.find((r) => r.sku.startsWith('multiPhotoFrame') && a(r).size === size && a(r).colour === colour && a(r).orientation === orientation)!.sku;
   }
 
   async function order(productKey: string, slots: Array<{ assetId: string; transform: typeof T } | null>, qty = 1) {
@@ -107,17 +108,18 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
     return { res, orderId: null };
   }
 
-  it('seeds both Prodigi SKUs, the frame colour as Prodigi’s `color` attribute, one print area to fill', async () => {
+  it('seeds every Prodigi SKU, size × way up × colour, the frame colour as Prodigi’s `color` attribute, one print area to fill', async () => {
     const rows = await db
       .select({ sku: productVariants.sku, attrs: productVariants.attributes, providerSku: productVariantProviders.providerSku, cfg: productVariantProviders.providerConfig, price: productVariants.pricePence })
       .from(productVariants)
       .innerJoin(productVariantProviders, eq(productVariantProviders.variantId, productVariants.id));
     const frames = rows.filter((r) => r.sku === 'multiPhotoFrame' || r.sku.startsWith('multiPhotoFrame-'));
-    expect(frames).toHaveLength(16);
+    expect(frames).toHaveLength(48);
+    const PRICE: Record<string, number> = { '12×12″': 6200, '16×16″': 8000, '16×24″': 8700, '20×30″': 10200 };
     for (const r of frames) {
       const a = r.attrs as Record<string, string>;
-      expect(r.providerSku).toBe(a.size === '12×12″' ? 'GLOBAL-MPF-12X12' : 'GLOBAL-MPFM-16X16');
-      expect(r.price).toBe(a.size === '12×12″' ? 6200 : 8000);
+      expect(r.providerSku).toBe(frameGridOf(a.size, a.orientation)!.sku);
+      expect(r.price).toBe(PRICE[a.size!]);
       expect((r.cfg as { prodigiAttrs: Record<string, string> }).prodigiAttrs).toEqual({ color: a.colour });
       expect((r.cfg as { printTo?: string[] }).printTo ?? ['default']).toEqual(['default']);
     }
@@ -196,6 +198,31 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
     expect(after.get(third)).toBeInstanceOf(Date);
     expect(after.get(main)).toBeNull(); // kept in the home: the clock never touches it
   });
+
+  it('a 20×30″ hung landscape: 40 squares, ONE file turned to Prodigi’s portrait 5905×8858, every square where it hangs', async () => {
+    const main = await drawing(40);
+    const other = await drawing(200);
+    const key = await sku('20×30″', 'white', 'landscape');
+    const slots = Array.from({ length: 40 }, (_, i) => (i === 0 ? { assetId: main, transform: T } : i === 9 ? { assetId: other, transform: T } : null));
+    const { res, orderId } = await order(key, slots);
+    expect(res.ok).toBe(true);
+    const [line] = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId!));
+    expect(line!.unitPricePence).toBe(10200);
+    expect(await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, line!.id))).toHaveLength(40);
+    const f = await processFulfilment(db, { env: SANDBOX, onlyOrderIds: [orderId!], limit: 60 });
+    expect(f.ready).toBe(40);
+    const transport = fakeTransport();
+    expect((await submitReadyOrders(db, { env: SANDBOX, transport, onlyOrderIds: [orderId!] })).submitted).toBe(1);
+    const item = transport.created[0]!.items[0]!;
+    expect([item.sku, item.attributes, item.assets.map((x) => x.printArea)]).toEqual(['GLOBAL-MPF-20X30', { color: 'white' }, ['default']]);
+    const file = await getObjectBytes(frameGridKey(orderId!, line!.id));
+    const meta = await sharp(file).metadata();
+    const grid = FRAME_GRIDS.find((g) => g.size === '20×30″' && g.orientation === 'landscape')!;
+    expect([meta.width, meta.height]).toEqual([prodigiPx(grid).w, prodigiPx(grid).h]); // 5905 × 8858
+    const shades = await squareShades(file, grid);
+    // square 10 = the second row's second square (8 across) holds its own drawing; the rest the main one
+    shades.forEach((r, i) => expect(Math.abs(r - (i === 9 ? 200 : 40)), `square ${i + 1}`).toBeLessThanOrEqual(3));
+  }, 180_000);
 
   it('a square holding a STRANGER’s keepsake is refused — authz on every square', async () => {
     const mine = await drawing();
