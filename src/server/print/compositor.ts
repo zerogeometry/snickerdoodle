@@ -21,7 +21,7 @@ import { composeLayoutTile, isLayoutProduct, layoutTileKey } from './bundleCompo
 import { isBundleKey } from '@/lib/christmas-bundle';
 import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { renderFrameGridFacePixels } from './frameGrid';
-import { isWatchStrap, strapBands, strapSizeForCanvas } from '@/lib/watch-strap';
+import { isWatchStrap, strapBands, strapPiecePaths, strapSizeForCanvas } from '@/lib/watch-strap';
 import { visibleLayerPart } from './visibleLayer';
 
 /** Mug wrap geometry (11oz): the visible front face spans ~ARC° of the mug; the printed wrap
@@ -597,8 +597,13 @@ export async function renderPrintedFace(
     const rect = computeLayerRect({ printWidthPx: W, printHeightPx: H, bleedMm: 0, requiredDpi: print.requiredDpi * scale }, src, transform);
     const { part, left, top } = await visibleLayerPart(srcBuf, src, rect);
     const bg = groundHex === '#ffffff' ? { r: 0, g: 0, b: 0, alpha: 0 } : groundHex;
-    const { data, info } = await sharp({ create: { width: W, height: H, channels: 4, background: bg } })
-      .composite([{ input: part, left, top }])
+    // ONLY what Prodigi prints: the file cut to its two printed halves (the template's outline), so the preview
+    // never shows drawing on a part of the strap Prodigi leaves blank — there the white leather shows
+    const printed = strapPiecePaths(strapSizeForCanvas(W, H), { x: 0, y: 0, w: W, h: H });
+    const cut = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">${printed.map((d) => `<path d="${d}" fill="#fff"/>`).join('')}</svg>`);
+    const placed = await sharp({ create: { width: W, height: H, channels: 4, background: bg } }).composite([{ input: part, left, top }]).png().toBuffer();
+    const { data, info } = await sharp(placed)
+      .composite([{ input: cut, blend: 'dest-in' }])
       .raw()
       .toBuffer({ resolveWithObject: true });
     return { data, width: info.width, height: info.height, channels: 4 };
