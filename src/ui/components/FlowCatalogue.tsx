@@ -25,7 +25,8 @@ import { uploadGuestImage } from '@/lib/guestUpload';
 import { keepUploadAction } from '@/app/actions/keep';
 import { savePendingKeep } from '@/lib/pending-keep';
 import { basketLineId } from '@/lib/basket-line';
-import { defaultPlacementFor, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { defaultPlacementFor, displayGround, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
+import { colourName, GROUND_NOUN, isPatternProduct } from '@/lib/patterns';
 import { isCardPackKey } from '@/lib/card-packs';
 import { isCalendarKey } from '@/lib/calendar';
 import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
@@ -174,10 +175,13 @@ export function FlowCatalogue({
   const quickAdd = async (p: CatalogueProduct, delta: number) => {
     // Add EXACTLY what the tile shows (the shared resolver): an explicit selection, else the
     // aspect-oriented variant, else the default — never a landscape tile that adds a portrait SKU.
-    const def = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: useSelection.getState().selections[p.key] });
+    const sel = useSelection.getState().selections[p.key];
+    const def = resolveDisplayVariant(p, { aspect: upload?.aspect, selection: sel, bg: upload?.bg });
+    // the base colour the tile shows (the drawing's own background, on the height chart + the repeats)
+    const ground = displayGround(p.key, sel?.ground, upload?.bg);
     // the line for THIS drawing at the default placement — another drawing's line is never touched
     const design = (assetId: string | null | undefined) =>
-      assetId ? { artwork: { assetId, transform: defaultPlacementFor(p.key, def.attributes, upload?.aspect), sourceObjectId: upload?.cutout?.sourceObjectId } } : {};
+      assetId ? { artwork: { assetId, transform: defaultPlacementFor(p.key, def.attributes, upload?.aspect), sourceObjectId: upload?.cutout?.sourceObjectId }, ...(ground ? { ground } : {}) } : {};
     let defId = basketLineId(def.sku, design(upload?.assetId));
     // Decrement is purely local — always allowed (never gated by an in-flight ingest).
     // Take one off the DEFAULT quick-add line first; otherwise the most-recently-added
@@ -219,7 +223,7 @@ export function FlowCatalogue({
         sku: def.sku,
         variantId: def.id,
         pricePence: def.pricePence,
-        sub: variantSub(def),
+        sub: [variantSub(def), ground ? (isPatternProduct(p.key) ? `${colourName(ground)} ${GROUND_NOUN[p.key] ?? 'background'}` : `on ${colourName(ground)}`) : null].filter(Boolean).join(' · ') || undefined,
         ...design(assetId),
       });
   };
@@ -264,10 +268,11 @@ export function FlowCatalogue({
     // set sits beside (so they're drawn with the rest and the tile can appear whole)
     const familyAfter = mode === 'sections' ? popular.find((p) => p.key === 'kidsTee' || p.key === 'adultTee')?.key ?? 'kidsTee' : null;
     const family = familyAfter ? familySetRequests(products, upload, usePlacements.getState().placements) : [];
-    const reqs: MockupRequest[] = rangeProducts.flatMap((p) => [
-      { ...tileInputs(p), assetId, size: 'thumb' as const },
-      ...(p.key === familyAfter ? family : []),
-    ]);
+    const reqs: MockupRequest[] = rangeProducts.flatMap((p) => {
+      // a tile still waiting on the drawing's background colour is asked for once it's measured (moments later)
+      const { pending, ...inputs } = tileInputs(p);
+      return [...(pending ? [] : [{ ...inputs, assetId, size: 'thumb' as const }]), ...(p.key === familyAfter ? family : [])];
+    });
     const { top, order } = revealPlan(reqs, (r) => !!instantContext(r.variantId));
     prefetchMockups(order);
     // the loader lifts when the TOP half's photos are ready (founder, 23 Oct); the rest were asked
@@ -459,8 +464,9 @@ export function FlowCatalogue({
                 assetId={upload?.assetId}
                 // Match the tile: the enlargement shows the same auto-oriented variant, not the
                 // fixed default (so a landscape tile doesn't open a portrait close-up).
-                variantId={resolveDisplayVariant(zoom, { aspect: upload?.aspect, selection: useSelection.getState().selections[zoom.key] }).id}
-                transform={defaultPlacementFor(zoom.key, resolveDisplayVariant(zoom, { aspect: upload?.aspect, selection: useSelection.getState().selections[zoom.key] }).attributes, upload?.aspect)}
+                variantId={resolveDisplayVariant(zoom, { aspect: upload?.aspect, selection: useSelection.getState().selections[zoom.key], bg: upload?.bg }).id}
+                transform={defaultPlacementFor(zoom.key, resolveDisplayVariant(zoom, { aspect: upload?.aspect, selection: useSelection.getState().selections[zoom.key], bg: upload?.bg }).attributes, upload?.aspect)}
+                ground={displayGround(zoom.key, useSelection.getState().selections[zoom.key]?.ground, upload?.bg)}
                 size="zoom"
                 sourceObjectId={upload?.cutout?.sourceObjectId}
                 px={720}

@@ -1,6 +1,7 @@
 import type { BasketItem } from '@/lib/store';
-import { groundTag } from '@/lib/patterns';
+import { defaultGroundFor, groundTag, isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { isWatchStrap } from '@/lib/watch-strap';
+import { isGarmentKey, nearestGarmentColour } from '@/lib/garments';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 
 /**
@@ -105,15 +106,17 @@ export function orientationForAspect(aspect: number | undefined | null): 'landsc
  */
 export function resolveDisplayVariant(
   p: CatalogueProduct,
-  opts?: { aspect?: number | null; selection?: { size?: string; colour?: string; orientation?: string } | null },
+  opts?: { aspect?: number | null; selection?: { size?: string; colour?: string; orientation?: string } | null; bg?: string | null },
 ): CatalogueVariant {
-  const def = p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
+  const def = garmentDefault(p, opts?.bg) ?? p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
   const sel = opts?.selection;
   if (sel) {
+    // a tee whose colour the parent hasn't picked takes the one nearest the drawing's background
+    const selColour = sel.colour ?? garmentColourFor(p, sel.size, opts?.bg) ?? def.attributes.colour;
     const chosen = p.variants.find(
       (v) =>
         (p.sizes.length === 0 || v.attributes.size === sel.size) &&
-        (p.colours.length === 0 || v.attributes.colour === sel.colour) &&
+        (p.colours.length === 0 || v.attributes.colour === selColour) &&
         (p.orientations.length === 0 || (v.attributes.orientation ?? 'portrait') === sel.orientation),
     );
     if (chosen) return chosen;
@@ -131,6 +134,41 @@ export function resolveDisplayVariant(
     }
   }
   return def;
+}
+
+/**
+ * A GARMENT's default for this drawing (founder, 5 Nov): the default size in the colour nearest the drawing's
+ * background (Upload.bg) — the tee the drawing looks most at home on. null = no background to match, or not a
+ * garment with colours (the plain default stands).
+ */
+export function garmentDefault(p: CatalogueProduct, bg: string | null | undefined): CatalogueVariant | null {
+  const def = p.variants.find((v) => v.isDefault) ?? p.variants[0]!;
+  const colour = garmentColourFor(p, def.attributes.size, bg);
+  return colour ? p.variants.find((v) => v.attributes.size === def.attributes.size && v.attributes.colour === colour) ?? null : null;
+}
+
+/** The colour (of those Prodigi makes in `size`) nearest the drawing's background — garments only; null otherwise. */
+export function garmentColourFor(p: CatalogueProduct, size: string | null | undefined, bg: string | null | undefined): string | null {
+  if (!bg || !isGarmentKey(p.key) || p.colours.length === 0) return null;
+  const names = p.variants.filter((v) => p.sizes.length === 0 || v.attributes.size === size).map((v) => v.attributes.colour!).filter(Boolean);
+  return nearestGarmentColour([...new Set(names)], bg);
+}
+
+/**
+ * The BASE COLOUR a range surface shows (and quick-add prints) for a product: the parent's own pick when there is
+ * one (white included), else the drawing's background on the auto-ground products (defaultGroundFor). undefined =
+ * white, no base colour.
+ */
+export function displayGround(productKey: string, selected: string | undefined, bg: string | null | undefined): string | undefined {
+  if (!isGroundProduct(productKey)) return undefined;
+  if (selected !== undefined) return normalizeGround(selected) ?? undefined;
+  return defaultGroundFor(productKey, bg);
+}
+
+/** Is a product's range preview still waiting on the drawing's background colour (it picks its base colour or
+ * tee colour from it)? A few milliseconds after upload — holding the request saves a render on the wrong colour. */
+export function awaitsBackground(productKey: string, upload: { bg?: string | null } | null | undefined): boolean {
+  return !!upload && upload.bg === undefined && (defaultGroundFor(productKey, '#000001') !== undefined || isGarmentKey(productKey));
 }
 
 /**
@@ -242,6 +280,31 @@ export const FLAT_PREFERRED_GAP = 3;
  * It looks ahead so it never spends the non-flat products early and bunches the last flat ones at
  * the end. If a list simply has too many flat products, it does its best rather than drop any.
  */
+/**
+ * Always LAST on the range, whatever sells (founder, 5 Nov): the height chart — its preview waits on the drawing's
+ * background colour and is the biggest to draw, so it's the last to load, where nobody's waiting on it.
+ */
+export const PINNED_LAST: readonly string[] = ['heightChart'];
+/** The order with the pinned-last products moved to the end (in their pinned order). */
+export const pinLast = (order: readonly string[], pinned: readonly string[] = PINNED_LAST): string[] => [...order.filter((k) => !pinned.includes(k)), ...pinned.filter((k) => order.includes(k))];
+
+/** {@link spaceOutFlat}, with the PINNED_LAST products kept at the very end — the flat ones still never side by
+ * side: when the spaced-out list ends on a flat product, the latest non-flat that can step down without bringing
+ * two flats together sits between it and the pinned tail. */
+export function spaceOutFlatPinned<T extends { key: string }>(list: readonly T[]): T[] {
+  const tail = PINNED_LAST.flatMap((k) => list.filter((p) => p.key === k));
+  const out = spaceOutFlat(list.filter((p) => !PINNED_LAST.includes(p.key)));
+  const isFlat = (p: T) => FLAT_PRODUCT_KEYS.has(p.key);
+  if (tail.length && isFlat(tail[0]!) && out.length && isFlat(out[out.length - 1]!)) {
+    for (let i = out.length - 2; i >= 0; i--) {
+      if (isFlat(out[i]!)) continue;
+      const moved = [...out.slice(0, i), ...out.slice(i + 1), out[i]!];
+      if (moved.every((p, j) => j === 0 || !(isFlat(p) && isFlat(moved[j - 1]!)))) return [...moved, ...tail];
+    }
+  }
+  return [...out, ...tail];
+}
+
 export function spaceOutFlat<T extends { key: string }>(list: readonly T[]): T[] {
   const isFlat = (p: T) => FLAT_PRODUCT_KEYS.has(p.key);
   const pending = [...list];
@@ -289,7 +352,7 @@ export function splitCatalogue(
   items: BasketItem[],
 ): { picks: CatalogueProduct[]; popular: CatalogueProduct[] } {
   const sellable = products.filter((p) => p.category !== 'ADDON');
-  const popular = spaceOutFlat(sellable.filter(isPopular).sort((a, b) => a.popularRank! - b.popularRank!));
+  const popular = spaceOutFlatPinned(sellable.filter(isPopular).sort((a, b) => a.popularRank! - b.popularRank!));
   const popularKeys = new Set(popular.map((p) => p.key));
   const picks = sellable.filter((p) => !popularKeys.has(p.key) && productQtyInBasket(items, p) > 0);
   return { picks, popular };

@@ -5,6 +5,7 @@ import { CATALOGUE, economicsOf, multiBuyTiers, parcelGroupOf, type PricedCatalo
 import { mmToPx, templateGeom, type TemplateGeom } from './print/geometry';
 import type { DbHandle } from './db';
 import { EXPECTED_POPULARITY, pinFirst, recomputePopularity } from './popularity';
+import { pinLast } from '@/lib/catalogue-view';
 import {
   ADULT_HOODIE_COLOURS, ADULT_HOODIE_SIZES, ADULT_TEE_COLOURS, ADULT_TEE_SIZES, KIDS_HOODIE_COLOURS, KIDS_HOODIE_SIZES,
   KIDS_TEE_COLOURS, KIDS_TEE_SIZES, type GarmentColour,
@@ -899,8 +900,8 @@ export async function loadCatalogue(db: DbHandle, opts?: { includeHidden?: boole
     if (attrs.finish && !p.finishes.includes(attrs.finish)) p.finishes.push(attrs.finish);
   }
   // the pinned lead (the Christmas family bundle — founder, 29 Oct) heads EVERY listing, the standalone
-  // /catalogue grid included, not only the popularity-ranked shelf
-  return pinFirst([...byKey.keys()]).map((k) => byKey.get(k)!);
+  // /catalogue grid included, not only the popularity-ranked shelf; the height chart closes every one (PINNED_LAST)
+  return pinLast(pinFirst([...byKey.keys()])).map((k) => byKey.get(k)!);
 }
 
 /**

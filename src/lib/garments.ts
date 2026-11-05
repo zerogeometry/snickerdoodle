@@ -109,6 +109,25 @@ const ALL = [...KIDS_TEE_COLOURS, ...ADULT_TEE_COLOURS, ...ADULT_HOODIE_COLOURS,
 export const garmentHex = (name: string): string | null => ALL.find((c) => c.name === name)?.hex ?? null;
 
 /**
+ * The garment colour (of `names`) nearest `hex` — a tee that matches the drawing's background (founder, 5 Nov:
+ * "pick the closest colour in the range"). A perceptual ("redmean") RGB distance; null when none has a known hex.
+ */
+export function nearestGarmentColour(names: readonly string[], hex: string): string | null {
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+  const [r1, g1, b1] = rgb(hex);
+  let best: string | null = null, bestD = Infinity;
+  for (const n of names) {
+    const h = garmentHex(n);
+    if (!h) continue;
+    const [r2, g2, b2] = rgb(h);
+    const rm = (r1 + r2) / 2;
+    const d = (2 + rm / 256) * (r1 - r2) ** 2 + 4 * (g1 - g2) ** 2 + (2 + (255 - rm) / 256) * (b1 - b2) ** 2;
+    if (d < bestD) { bestD = d; best = n; }
+  }
+  return best;
+}
+
+/**
  * Coloured garments print with a WHITE UNDERBASE (direct-to-garment): whatever isn't fully
  * see-through prints as solid ink, paper included. White garments print ink only.
  */

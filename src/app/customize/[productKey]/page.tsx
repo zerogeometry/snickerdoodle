@@ -6,7 +6,7 @@ import { IconAlertTriangle, IconHeartPlus, IconChevronLeft, IconChevronRight, Ic
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Modal } from '@/ui/primitives/Modal';
 import { Icon } from '@/ui/primitives/Icon';
@@ -21,10 +21,10 @@ import { gbp, shownSrc, toast, useBasket, usePlacements, useSelection, useUpload
 import { CARD_FONT_DEFAULT, cardFontCss, pickerFonts } from '@/lib/card-fonts';
 import { isChristmasSeason, seasonClock } from '@/lib/season';
 import { fitCardFontSize } from '@/lib/cardTextFit';
-import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, sizeDimsCm } from '@/lib/catalogue-view';
+import { CUSHION_BACK_COLOURS, CUSHION_BACK_MATCH, CUSHION_BACK_SWATCHES, CUSHION_BACK_WHITE, CUSHION_SUEDE_BACK_HEX, MUG_SWATCH, cushionBackHex, cushionSidesForBack, cushionSupportsBack, defaultTransformFor, garmentColourFor, sizeDimsCm } from '@/lib/catalogue-view';
 import { basketLineId, selectionForLine } from '@/lib/basket-line';
 import { forgetStudioReturn, noteStudioReturn } from '@/ui/components/usePickerEdits';
-import { colourName, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
+import { colourName, defaultGroundFor, GROUND_NOUN, isColouredGround, isGroundProduct, isPatternProduct, PATTERN_GROUND_WHITE } from '@/lib/patterns';
 import { BaseColourPicker } from '@/ui/components/BaseColourPicker';
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
@@ -62,13 +62,6 @@ function webglOk(): boolean {
     return false;
   }
 }
-
-/** What the base colour colours, in the shopper's words. A greetings card takes it on the front
- * (the whole outside when the drawing spans it — see groundNoun below); the inside stays white. */
-const GROUND_NOUN: Record<string, string> = {
-  socks: 'sock', teaTowel: 'towel', wrappingPaper: 'paper', phoneCase: 'case', cushion: 'cushion', blanket: 'blanket',
-  jigsaw: 'puzzle', framedPrint: 'print', playingCards: 'card back', petBandana: 'bandana', card: 'card front',
-};
 
 /** A card PACK gets its own builder (N drawings, one line); every other product the customizer. */
 export default function CustomizePage() {
@@ -132,6 +125,12 @@ function CustomizeProduct() {
   const [showBack, setShowBack] = useState(false);
   // REPEAT-PATTERN base colour (socks, wrapping paper, tea towel): the repeat sits on it. White default.
   const [ground, setGround] = useState<string>(PATTERN_GROUND_WHITE);
+  // Until the parent picks one, the base colour (height chart + the repeats) and a tee's colour FOLLOW the
+  // drawing's background (founder, 5 Nov) — and aren't saved as a choice, so the next drawing gets its own.
+  const groundTouchedRef = useRef(false);
+  const colourTouchedRef = useRef(false);
+  const pickGround = useCallback((g: string) => { groundTouchedRef.current = true; setGround(g); }, []);
+  const pickColour = useCallback((c: string) => { colourTouchedRef.current = true; setColour(c); }, []);
   const [lifting, setLifting] = useState(false); // the one-tap 'lift it off the paper' magic edit
   // MUG: three real-photo wrap views — the centred hero (design middle, handle hidden), the front
   // (right side of the image) and the back (left side). Centre leads.
@@ -206,12 +205,15 @@ function CustomizeProduct() {
     // orientation choice back) over the product default.
     const saved = useSelection.getState().selections[product.key];
     setSize(saved?.size ?? def.attributes.size ?? null);
-    setColour(saved?.colour ?? def.attributes.colour ?? null);
+    const bg = useUpload.getState().upload?.bg;
+    colourTouchedRef.current = saved?.colour !== undefined;
+    groundTouchedRef.current = saved?.ground !== undefined;
+    setColour(saved?.colour ?? garmentColourFor(product, saved?.size ?? def.attributes.size, bg) ?? def.attributes.colour ?? null);
     setOrientation(saved?.orientation ?? def.attributes.orientation ?? 'portrait');
     setGrade(saved?.grade ?? def.attributes.grade ?? null);
     setFinish(saved?.finish ?? def.attributes.finish ?? null);
     setBack(saved?.back ?? CUSHION_BACK_WHITE);
-    setGround(saved?.ground ?? PATTERN_GROUND_WHITE);
+    setGround(saved?.ground ?? defaultGroundFor(product.key, bg) ?? PATTERN_GROUND_WHITE);
     setCardMessage(saved?.message ?? null);
     setCardSpan(saved?.cardImageSpan ?? 'front');
     if (saved?.orientation) {
@@ -224,8 +226,22 @@ function CustomizeProduct() {
   // return) and the editor can read/reflect the chosen orientation.
   useEffect(() => {
     if (!product) return;
-    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: colour ?? undefined, orientation, grade: grade ?? undefined, finish: finish ?? undefined, back, ground, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
+    // a colour that's only FOLLOWING the drawing (a tee's, the base colour) isn't the parent's choice — not saved
+    const followsColour = isGarmentKey(product.key) && !colourTouchedRef.current;
+    useSelection.getState().setSelection(product.key, { size: size ?? undefined, colour: followsColour ? undefined : colour ?? undefined, orientation, grade: grade ?? undefined, finish: finish ?? undefined, back, ground: groundTouchedRef.current ? ground : undefined, message: cardMessage ?? undefined, cardImageSpan: cardSpan });
   }, [product, size, colour, orientation, grade, finish, back, ground, cardMessage, cardSpan]);
+
+  // The drawing's background colour lands (measured in the browser moments after upload, and again once the
+  // trim swaps the picture in): an un-picked base colour / tee colour follows it.
+  const uploadBg = upload?.bg;
+  useEffect(() => {
+    if (!product || uploadBg === undefined) return;
+    if (!groundTouchedRef.current) setGround(defaultGroundFor(product.key, uploadBg) ?? PATTERN_GROUND_WHITE);
+    if (!colourTouchedRef.current) {
+      const near = garmentColourFor(product, size, uploadBg);
+      if (near) setColour(near);
+    }
+  }, [product, uploadBg, size]);
 
   // Phone cases: some phones only come in one grade (Pixels are tough-only) — keep the chosen
   // grade one Prodigi actually makes for the chosen phone.
@@ -856,7 +872,7 @@ function CustomizeProduct() {
                       <button
                         key={c}
                         type="button"
-                        onClick={() => setColour(c)}
+                        onClick={() => pickColour(c)}
                         aria-label={`${c} ${product.label}`}
                         aria-pressed={colour === c}
                         className={`${THUMB} ${colour === c ? THUMB_ON : THUMB_OFF}`}
@@ -945,17 +961,19 @@ function CustomizeProduct() {
               }}
             />
           ) : null}
-          {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={setColour} swatch swatchFor={product.key} /> : null}
+          {product.colours.length > 0 ? <Picker label="Colour" options={coloursForSize} value={colour} onChange={pickColour} swatch swatchFor={product.key} /> : null}
 
           {/* BASE COLOUR (edge-to-edge products): any colour on a wheel, filling the whole printed face
               under the drawing — a repeat sits on it, a placed drawing sits in it. Off its paper the
               drawing floats on the colour; still on its paper, a friendly one-tap nudge lifts it off. */}
           {isGround ? (
-            <BaseColourPicker title={groundTitle} noun={groundNoun} pattern={isPattern} value={ground} onChange={setGround}>
+            <BaseColourPicker title={groundTitle} noun={groundNoun} pattern={isPattern} value={ground} onChange={pickGround}>
               {isColouredGround(ground) && upload?.opaqueBg && !activeSource ? (
                 <div role="status" className="mt-3 rounded-[16px] border-2 border-cocoa bg-honey-band p-3 text-[13px] text-cocoa shadow-[0_3px_0_var(--color-cocoa)]">
                   <p className="font-semibold">
-                    {isPattern
+                    {ground === defaultGroundFor(product.key, upload?.bg)
+                      ? <>we’ve matched the {groundNoun} to your paper — lift the drawing off it and the edges vanish completely.</>
+                      : isPattern
                       ? <>the paper prints too — you’d get paper squares on the {groundWord}. lift the drawing off it and it sits right on the colour.</>
                       : <>the paper prints too — you’d get a white box on the {groundWord}. lift the drawing off it and it sits right on the colour.</>}
                   </p>

@@ -92,7 +92,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     const shop = await loadCatalogue(db);
     // + the calendar (PR #15) and the bauble + sack (D24), on show for Christmas
     // the Christmas family bundle is pinned to the top of every listing (founder, 29 Oct); + the multi photo frame and the watch strap (5 Nov)
-    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'watchStrap', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'watchStrap', 'socks', 'wrappingPaper', 'teaTowel', 'playingCards', 'heightChart']); // the height chart always last (PINNED_LAST — founder, 5 Nov)
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });

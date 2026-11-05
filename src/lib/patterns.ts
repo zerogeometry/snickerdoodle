@@ -34,6 +34,25 @@ export const isGroundProduct = (key: string | null | undefined): boolean => !!ke
  * carry a palette WORD (`navy`) — still honoured, as the colour it always was.
  */
 export const PATTERN_GROUND_WHITE = '#ffffff';
+
+/**
+ * Products whose base colour DEFAULTS to the drawing's own background colour (founder, 5 Nov): the height chart
+ * and the repeats — so the printable area behind the drawing matches the paper it was drawn on (and, with the
+ * background removed, the drawing sits on that same colour). Still the parent's to change on the colour wheel.
+ */
+/** What the base colour colours, in the shopper's words. A greetings card takes it on the front (the whole outside
+ * when the drawing spans it); the inside stays white. Unlisted = "background". */
+export const GROUND_NOUN: Record<string, string> = {
+  socks: 'sock', teaTowel: 'towel', wrappingPaper: 'paper', phoneCase: 'case', cushion: 'cushion', blanket: 'blanket',
+  jigsaw: 'puzzle', framedPrint: 'print', playingCards: 'card back', petBandana: 'bandana', card: 'card front',
+};
+
+export const AUTO_GROUND_PRODUCT_KEYS = ['heightChart', 'socks', 'teaTowel', 'wrappingPaper'] as const;
+/** The default base colour for a product, given the drawing's background (Upload.bg): that colour on the
+ * auto-ground products, else undefined (white — no base colour). */
+export function defaultGroundFor(productKey: string | null | undefined, bg: string | null | undefined): string | undefined {
+  return productKey && (AUTO_GROUND_PRODUCT_KEYS as readonly string[]).includes(productKey) && bg && normalizeGround(bg) ? normalizeGround(bg)! : undefined;
+}
 const LEGACY_GROUND_WORDS: Record<string, string> = {
   white: '#ffffff', cream: '#f4ebda', sunshine: '#f6c445', tomato: '#c8402a', berry: '#e8786e',
   sky: '#8fb5d6', leaf: '#7fa65e', grey: '#9c9a96', navy: '#26334f', black: '#1f1c1a',
