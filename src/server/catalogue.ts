@@ -595,7 +595,7 @@ const DEFS: Record<string, ProductDef> = {
   // founder's photo set (applewatch.psd), or a drawn strap where it isn't staged (strapMockup.ts). ONE print file covers both halves end to end with
   // an unprinted gap behind the watch (src/lib/watch-strap.ts traces Prodigi's template). £45 ≈ 20% net.
   watchStrap: {
-    category: 'TECH', label: 'watch strap', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
+    category: 'TECH', label: 'apple watch strap', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
     description: "Their drawing printed along a faux-leather Apple Watch strap — a little masterpiece to glance at all day. In two sizes: small fits 38, 40 and 41 mm watches (and the 42 mm Series 10 and newer); large fits 44, 45, 46 and 49 mm (and the 42 mm Series 1–3). The size is on the back of the watch.",
     specs: { material: 'vegan faux leather, scratch-resistant finish', fittings: 'black', small: WATCH_STRAP_SIZES[0]!.fits, large: WATCH_STRAP_SIZES[1]!.fits, print: 'along both halves of the strap', made: 'in the UK' },
     // Prodigi's EXACT print files (sandbox GET /v4.0/products, 5 Nov: 305×2738 / 363×2932 px @300dpi), bleed 0
