@@ -41,6 +41,7 @@ import {
   KIDS_TEE_PRINT_MM, teePrintRegion, type GarmentPhoto,
 } from '@/lib/garments';
 import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawnMockups';
+import { drawWatchStrapMockup } from './strapMockup';
 
 /**
  * Mockup template seeder — authors FLAT photoreal mockup templates for the launch range from the
@@ -93,6 +94,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean; contain?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
+  | { file?: undefined; material: Material; register: 'drawn-strap' }
 );
 
 /** The first image in a staged blank folder whose name matches — Prodigi's zips are named
@@ -402,7 +404,7 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
     // Prodigi's own template (src/lib/watch-strap.ts) — the drawing shows only where it really prints.
     case 'watchStrap': {
       const dir = layeredFlatDir(`watchStrap/${size === 'large' ? 'large' : 'small'}`);
-      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'watchStrap' };
+      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn-strap' };
     }
     case 'mug': {
       // Founder's per-colour two-tone layers (background → shadow → real mug photo). One shared
@@ -1374,8 +1376,8 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     if (!p) { skipped.push(r.key); continue; }
     const printAspectEarly = r.printWmm / r.printHmm;
 
-    if (p.register === 'drawn') {
-      const d = drawProductMockup(p.key, (r.attrs as Record<string, string>) ?? {}, { w: r.printWpx, h: r.printHpx });
+    if (p.register === 'drawn' || p.register === 'drawn-strap') {
+      const d = p.register === 'drawn-strap' ? drawWatchStrapMockup({ w: r.printWpx, h: r.printHpx }) : drawProductMockup(p.key, (r.attrs as Record<string, string>) ?? {}, { w: r.printWpx, h: r.printHpx });
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: d.quad, materialClass: d.material, mask: d.mask, overlay: d.overlay });
       authored++;
       const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);

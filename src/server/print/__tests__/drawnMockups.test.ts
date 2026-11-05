@@ -40,7 +40,7 @@ describe('drawn mockups — the print area IS the print file’s shape (preview 
         expect([m.width, m.height], key).toEqual([d.W, d.H]);
       }
     }
-  }, 30_000); // renders every drawn product (blurred shadows) in turn — past the 5 s default since the strap joined
+  });
 });
 
 describe('shop art', () => {

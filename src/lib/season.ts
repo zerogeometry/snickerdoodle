@@ -105,9 +105,10 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
       uk15: '2026-12-11', // the calendar lab ("Mixed" carrier, no express)
       gb2: '2026-12-11', // Royal Mail RM24 (untracked): wrapping paper, Evri for some
       gb3: '2026-12-14', // Evri: framed prints, jigsaws, height chart
-      uk2: '2026-12-12', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date), the baby bodysuits, baby + toddler tees
+      uk2: '2026-12-12', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date)
       uk6: '2026-12-16', // phone cases go Express
       uk6std: '2026-12-12', // the phone-case lab on STANDARD (Royal Mail Standard Tracked): the watch strap — Tracked 48's date, like uk9
+      // (uk2 above also carries the baby bodysuits and the baby + toddler tees — 1st Class, 12 Dec)
       other: '2026-12-10', // anything we haven't mapped: the earliest date, to be safe
     },
   },
@@ -123,11 +124,13 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   calendar: 'uk15',
   wrappingPaper: 'gb2',
   framedPrint: 'gb3', jigsaw: 'gb3', heightChart: 'gb3',
-  christmasJumper: 'uk2', babyBodysuit: 'uk2', babyBodysuitShort: 'uk2', babyTee: 'uk2', toddlerTee: 'uk2', // sandbox 5 Nov: every size × colour we sell
-  watchStrap: 'uk6std', // uk6, Standard = Royal Mail Standard Tracked (sandbox 5 Nov) — no Express needed
+  christmasJumper: 'uk2', babyBodysuit: 'uk2',
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
   christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24
   phoneCase: 'uk6',
+  // made in the UK since Prodigi's "global" change (sandbox 5 Nov, every size × colour we sell)
+  babyBodysuitShort: 'uk2', babyTee: 'uk2', toddlerTee: 'uk2',
+  watchStrap: 'uk6std', // uk6, Standard = Royal Mail Standard Tracked — no Express needed
 };
 /** The route for a product (a variant can refine it — none do today: the two ornaments are separate products). */
 /** The route for a product, optionally refined by the chosen variant's attributes. */

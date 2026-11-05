@@ -15,6 +15,8 @@ import { defaultTransformFor } from '@/lib/catalogue-view';
 import { strapSizeOf, strapShadeSvg, WATCH_STRAP_SIZES } from '@/lib/watch-strap';
 import { assessResolution, canvasSizePx, computeLayerRect, type Transform } from '@/server/print/geometry';
 import { plan } from '@/server/print/seedMockups';
+import { drawWatchStrapMockup } from '@/server/print/strapMockup';
+import sharp from 'sharp';
 
 /**
  * Made in the UK since Prodigi's "global" change (5 Nov 2026 — project-office/briefs/PRODUCT-RANGE-global-uk-nov.md):
@@ -239,9 +241,22 @@ describe('the mockup pipeline — lights up when the founder’s layers are drop
   it('the strap: the founder’s set per size, else the drawn strap traced from Prodigi’s template', () => {
     for (const r of rows('watchStrap')) {
       const p = plan('watchStrap', r.attributes)!;
-      expect(['layered-flat', 'drawn']).toContain(p.register);
+      expect(['layered-flat', 'drawn-strap']).toContain(p.register);
     }
   });
+
+  it('the drawn strap: its print area IS the file’s shape, and blank, mask + overlay share one canvas', async () => {
+    for (const s of WATCH_STRAP_SIZES) {
+      const d = drawWatchStrapMockup(s.px);
+      const qa = ((d.quad[1]![0] - d.quad[0]![0]) * d.W) / ((d.quad[3]![1] - d.quad[0]![1]) * d.H);
+      expect(Math.abs(qa / (s.px.w / s.px.h) - 1), s.size).toBeLessThan(0.005);
+      for (const [x, y] of d.quad) for (const v of [x, y]) expect(v >= 0 && v <= 1, s.size).toBe(true);
+      for (const buf of [d.blank, d.mask, d.overlay].filter(Boolean) as Buffer[]) {
+        const m = await sharp(buf).metadata();
+        expect([m.width, m.height], s.size).toEqual([d.W, d.H]);
+      }
+    }
+  }, 20_000);
 });
 
 describe('the watch strap’s long, thin print file', () => {
