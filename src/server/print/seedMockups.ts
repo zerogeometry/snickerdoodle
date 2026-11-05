@@ -168,7 +168,7 @@ async function storeLayout(db: DbHandle, sku: string, layout: string, built: Awa
  * were stored. */
 /** The multi photo frames' pictures (frameLayout.ts): the founder's layers for each size, the frame in
  * each colour, stored on that variant. A size whose layers aren't staged keeps its drawn frame. */
-async function seedFrameLayouts(db: DbHandle): Promise<number> {
+export async function seedFrameLayouts(db: DbHandle): Promise<number> {
   if (!existsSync(BUNDLE_BACKDROP)) return 0;
   const rows = await db
     .select({ sku: productVariants.sku, attrs: productVariants.attributes })

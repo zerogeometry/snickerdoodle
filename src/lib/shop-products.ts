@@ -83,7 +83,7 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   multiPhotoFrame: {
     slug: 'multi-photo-frame', name: 'multi photo frame', title: 'Multi photo frame of your child’s drawings — 9, 24 or 60 in one frame',
     googleCategory: CAT.artwork, productType: 'Home > Framed prints',
-    // no brand-safe marketing photo yet (the page shows the drawn product art; the feed leaves it out)
+    image: demo('multiPhotoFrame', 'A gold frame holding 24 small squares of a child’s painting of a yellow house, a family and a dog'),
   },
   mug: {
     slug: 'mug', name: 'mug', title: 'Personalised mug with your child’s drawing',

@@ -19,6 +19,11 @@
     "width": 1024,
     "height": 1024
   },
+  "multiPhotoFrame": {
+    "src": "/products/multi-photo-frame.webp",
+    "width": 1000,
+    "height": 1000
+  },
   "placemat": {
     "src": "/products/placemats.webp",
     "width": 1024,

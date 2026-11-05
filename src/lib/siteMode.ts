@@ -142,6 +142,7 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/products/adult-t-shirt.webp',
   '/products/apple-watch-strap.webp',
   '/products/christmas-family-bundle.webp',
+  '/products/multi-photo-frame.webp',
   '/products/coasters.webp',
   '/products/placemats.webp',
   '/products/wall-calendar.webp',

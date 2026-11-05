@@ -24,6 +24,8 @@ import { renderTemplatePreview } from '@/server/print/compositor';
 import type { Transform } from '@/server/print/geometry';
 import { authorCtx, authorTemplate, BUNDLE_BACKDROP, bundleLayoutDir, TILE_LAYERS } from '@/server/print/seedMockups';
 import { assertQuadFitsBlank } from '@/server/print/templates';
+import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
+import { buildFrameLayout, frameLayoutDir } from '@/server/print/frameLayout';
 
 const EDGE = 1200;
 const MANIFEST = path.join('src', 'lib', 'product-photos.json');
@@ -69,7 +71,19 @@ async function main() {
     let webp: Buffer | null = null;
     let how = '';
 
-    if (key === BUNDLE_KEY || key in TILE_LAYERS) {
+    if (key === MULTI_PHOTO_FRAME_KEY) {
+      // the frame's flattened layout (frameLayout.ts, the founder's PSD layers): the default size + colour,
+      // the demo drawing in every square — exactly the shop's range tile
+      const a = (v.attributes ?? {}) as Record<string, string>;
+      const grid = frameGridOf(a.size, a.orientation);
+      const dir = grid ? frameLayoutDir(grid) : null;
+      if (!dir || !a.colour || !existsSync(BUNDLE_BACKDROP)) { notes.push(`${key}: frame layers not staged — skipped`); continue; }
+      const built = await buildFrameLayout(dir, a.colour, BUNDLE_BACKDROP);
+      const layout = await decodeBundleLayout(built.base, built.regions, 2048);
+      const drawing = await decodeDrawing(await sharp(design).resize(2000, 2000, { fit: 'inside', withoutEnlargement: true }).png().toBuffer());
+      webp = (await encodeBundle(await renderBundleLayers(layout, () => drawing))).buffer;
+      how = 'frame layout';
+    } else if (key === BUNDLE_KEY || key in TILE_LAYERS) {
       // the flattened layouts (bundleCompose.ts): the family bundle's tile, the placemat / coaster tiles
       const built = key === BUNDLE_KEY
         ? (bundleLayoutDir('thumb') ? await buildBundleLayout(bundleLayoutDir('thumb')!, BUNDLE_BACKDROP) : null)

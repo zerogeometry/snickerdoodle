@@ -14,7 +14,7 @@ import { loadCatalogue, seedCatalogue } from '@/server/catalogue';
 import { resolveAssetViewer } from '@/server/assets';
 import { BundlePreviewDenied, renderBundlePreview } from '@/server/print/bundleCompose';
 import { composeMockup } from '@/server/print/compositor';
-import { seedBundleLayouts } from '@/server/print/seedMockups';
+import { seedBundleLayouts, seedFrameLayouts } from '@/server/print/seedMockups';
 import type { DbHandle } from '@/server/db';
 
 const URL = process.env.DATABASE_URL;
@@ -35,8 +35,10 @@ describe.skipIf(!URL || !LAYERS)('christmas family bundle pictures — integrati
     db = drizzle(client, { schema });
     ids = await seedDemoFamilies(db);
     await seedCatalogue(db);
-    // print areas: the bundle's four layouts + the placemat tile (1) + the coaster tile (2)
-    expect(await seedBundleLayouts(db)).toBe(2 + 2 + 2 + (1 + 1 + 2) + (1 + 1 + 4) + (1 + 1 + 8) + 1 + 2);
+    // print areas: the bundle's four layouts + the placemat tile (1) + the coaster tile (2) — plus the multi
+    // photo frames' layouts, which only exist where the founder's frame layers are staged (not in CI)
+    const frames = await seedFrameLayouts(db);
+    expect((await seedBundleLayouts(db)) - frames).toBe(2 + 2 + 2 + (1 + 1 + 2) + (1 + 1 + 4) + (1 + 1 + 8) + 1 + 2);
   }, 120_000);
   afterAll(async () => {
     if (assetIds.length) await db.delete(assets).where(inArray(assets.id, assetIds));
