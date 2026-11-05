@@ -24,6 +24,7 @@ import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 import { UploadSession } from '@/ui/components/UploadSession';
+import { FreshBuild } from '@/ui/components/FreshBuild';
 
 export const metadata: Metadata = {
   // the canonical public origin — canonical links, sitemaps and share cards resolve against it
@@ -58,6 +59,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
           Skip to content
         </a>
         <UploadSession />
+        {/* a tab left open across an update moves onto the new build when the parent comes back to it */}
+        <FreshBuild build={process.env.APP_BUILD ?? ''} />
         <TestSiteBanner />
         {children}
         <Toaster />
