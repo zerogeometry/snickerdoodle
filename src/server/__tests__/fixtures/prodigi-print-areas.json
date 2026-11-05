@@ -42,6 +42,7 @@
    "printAreas": ["back","front"],
    "variants": [
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":1500,"h":2010},"front":{"w":1500,"h":2010}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
@@ -58,6 +59,7 @@
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":1500,"h":2010},"front":{"w":1500,"h":2010}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
@@ -66,6 +68,61 @@
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}},
     {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4411"},"printAreaSizes":{"back":{"w":2130,"h":2130},"front":{"w":2130,"h":2130}}}
+   ]
+  },
+  "GLOBAL-BB-RS-4424": {
+   "printAreas": ["front","back"],
+   "variants": [
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"ballerina","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"ballerina","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"grass","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"grass","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"yellow","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"yellow","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"front":{"w":2130,"h":2130}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"fuschia","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"fuschia","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"fuschia","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"fuschia","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Lap shoulder","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"4424"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}}
    ]
   },
   "GLOBAL-CFP-11X14": {
@@ -252,6 +309,18 @@
     {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"m","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
     {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"s","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}},
     {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}}
+   ]
+  },
+  "GLOBAL-TECH-AP-WS-FL-38MM": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"satin","color":"black fitting","size":"38mm","style":"Watch"},"printAreaSizes":{"default":{"w":305,"h":2738}}}
+   ]
+  },
+  "GLOBAL-TECH-AP-WS-FL-42MM": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"satin","color":"black fitting","size":"42mm","style":"Watch"},"printAreaSizes":{"default":{"w":363,"h":2932}}}
    ]
   },
   "GLOBAL-TECH-GP8-TCB-CS-G": {
@@ -1164,6 +1233,86 @@
    "printAreas": ["default"],
    "variants": [
     {"attributes":{"brand":"Samsung","finish":"matte","size":"galaxy s26 ultra","style":"Tough"},"printAreaSizes":{"default":{"w":1344,"h":2285}}}
+   ]
+  },
+  "GLOBAL-TEE-RS-3321": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"ballerina","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"ballerina","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"grass","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"grass","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"orange","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"orange","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":2100,"h":2790},"front":{"w":2100,"h":2790}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":2100,"h":2790},"front":{"w":2100,"h":2790}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"silver","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"silver","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"slate","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"slate","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"yellow","gender":"Kids","paperType":"100% ringspun cotton","size":"1-2 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"yellow","gender":"Kids","paperType":"100% ringspun cotton","size":"3-4 years","style":"3321"},"printAreaSizes":{"back":{"w":3060,"h":3780},"front":{"w":3060,"h":3780}}}
+   ]
+  },
+  "GLOBAL-TEE-RS-3322": {
+   "printAreas": ["back","front"],
+   "variants": [
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"apple","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"black","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"butter","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"charcoal","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"heather","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"light blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":2490,"h":3510},"front":{"w":2490,"h":3510}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"navy blue","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"pink","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"red","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"12-18 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"18-24 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"6-12 months","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}},
+    {"attributes":{"brand":"Rabbit Skins","edge":"Crew neck","color":"white","gender":"Baby","paperType":"100% ringspun cotton","size":"newborn","style":"3322"},"printAreaSizes":{"back":{"w":1770,"h":1770},"front":{"w":1770,"h":1770}}}
    ]
   },
   "GLOBAL-TUBE-SOCKS": {

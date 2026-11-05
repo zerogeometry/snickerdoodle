@@ -7,6 +7,14 @@
 // Inputs (cut-outs, no background or shadow) live in .prodigi-assets/blanks/founder-raw/ — the whole
 // tree is gitignored, like every product photo. Re-run whenever a photo changes:
 //   node scripts/compose-founder-layers.mjs
+// A set whose photos aren't in founder-raw yet is skipped (and says so) — drop them in and re-run.
+// (FOUNDER_LAYERS_ROOT=<dir> composes from <dir>/founder-raw into <dir>/layered instead — for tests.)
+//
+// GARMENTS (the baby + toddler tees and the bodysuits, 5 Nov 2026) are composed PER COLOUR into
+// layered/<product>/<colour>/ — the seeder picks the variant's own colour. Supply ONE cut-out of the garment
+// (ideally WHITE, laid flat, front-on) + its print area on the same canvas; every colour is made from it by
+// tinting (the folds and texture kept, like the tee photos). A real photo of a colour, <product>-<colour>.png
+// (e.g. baby-tee-light-blue.png, same canvas), is used instead of the tint whenever it's there.
 //
 // Per product folder it writes:
 //   background.png  the shared brand backdrop (copied from the blanket set, so every tile matches)
@@ -17,12 +25,13 @@
 //   overlay.png     optional detail laid OVER the art (heel / folded corner / roll curl)
 import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import sharp from 'sharp';
 
-const ROOT = path.join(process.cwd(), '.prodigi-assets', 'blanks');
+const ROOT = process.env.FOUNDER_LAYERS_ROOT ? path.resolve(process.env.FOUNDER_LAYERS_ROOT) : path.join(process.cwd(), '.prodigi-assets', 'blanks');
 const RAW = path.join(ROOT, 'founder-raw');
 const OUT = path.join(ROOT, 'layered');
-const BACKGROUND = path.join(OUT, 'blanket', 'white', 'background.png');
+const BACKGROUND = process.env.FOUNDER_LAYERS_ROOT ? path.join(ROOT, 'background.png') : path.join(OUT, 'blanket', 'white', 'background.png');
 const CANVAS = 2000;
 
 /**
@@ -48,6 +57,20 @@ const SETS = [
   { out: 'bauble/ceramic', productFromPrintmap: true, printmap: 'ceramic-print.png', overlays: ['ceramic-edgeblur.png', 'ceramic-string.png'], fill: 0.72 },
   // plastic ball: the print area is the ball; the glass highlights + chrome cap + string go on top
   { out: 'bauble/ball', productFromPrintmap: true, printmap: 'bauble-print.png', overlays: ['bauble-overlay.png'], fill: 0.8 },
+  // ── the Apple Watch strap (5 Nov 2026), one set per size: laid out straight and flat, the buckle half on top,
+  // the watch face-up between the halves. print = the two leather halves only (what Prodigi prints); the watch,
+  // buckle and keeper loop ride on top as the overlay. The seeder spreads the print file over both halves, the
+  // middle of it hidden behind the watch — as on the real strap (src/lib/watch-strap.ts).
+  { out: 'watchStrap/small', product: 'watch-strap-small.png', printmap: 'watch-strap-small-print.png', overlay: 'watch-strap-small-watch.png', fill: 0.86 },
+  { out: 'watchStrap/large', product: 'watch-strap-large.png', printmap: 'watch-strap-large-print.png', overlay: 'watch-strap-large-watch.png', fill: 0.86 },
+];
+
+/** The garments, composed once per colour (see the note at the top). `colours` come from src/lib/garments.ts. */
+const GARMENT_SETS = [
+  { out: 'babyTee', product: 'baby-tee.png', printmap: 'baby-tee-print.png', fill: 0.8 },
+  { out: 'toddlerTee', product: 'toddler-tee.png', printmap: 'toddler-tee-print.png', fill: 0.82 },
+  { out: 'babyBodysuit', product: 'baby-bodysuit.png', printmap: 'baby-bodysuit-print.png', fill: 0.82 },
+  { out: 'babyBodysuitShort', product: 'baby-bodysuit-short.png', printmap: 'baby-bodysuit-short-print.png', fill: 0.82 },
 ];
 
 /** Load as RGBA raw, turned if asked. */
@@ -140,7 +163,6 @@ async function whiteFrom(png) {
     .toBuffer();
 }
 
-if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
 /** Layers stacked in order onto one (an edge blur, then a string on top of it). */
 async function stack(files, rotate) {
   const layers = await Promise.all(files.map((f) => load(f, rotate)));
@@ -183,9 +205,52 @@ async function sackPanel(productPng, spec) {
   return sharp({ create: { width: CANVAS, height: CANVAS, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: rect, left, top }]).png().toBuffer();
 }
 
+/** A garment photo turned to `hex`: its brightness (against its own bright fabric) multiplies the colour, so
+ * folds and texture survive; transparency is kept. On a white photo, white is a no-op. */
+function tint({ data, W, H }, hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const lum = (i) => 0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2];
+  const ls = [];
+  for (let i = 0; i < W * H; i++) if (data[i * 4 + 3] > 200) ls.push(lum(i * 4));
+  ls.sort((x, y) => x - y);
+  const ref = Math.max(1, ls[Math.floor(ls.length * 0.9)] ?? 255); // the fabric's own bright, not a stray highlight
+  const out = Buffer.from(data);
+  for (let i = 0; i < W * H; i++) {
+    const k = Math.min(1.08, lum(i * 4) / ref);
+    out[i * 4] = Math.min(255, Math.round(r * k));
+    out[i * 4 + 1] = Math.min(255, Math.round(g * k));
+    out[i * 4 + 2] = Math.min(255, Math.round(b * k));
+  }
+  return { data: out, W, H };
+}
+
+const has = (f) => existsSync(path.join(RAW, f));
+/** The raw files a set needs (all must be there, or it's skipped). */
+const needs = (set) => [set.product, set.printmap, set.overlay, ...(set.overlays ?? [])].filter((f) => f && !(set.productFromPrintmap && f === set.product));
+
+if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
 for (const set of SETS) {
+  const missing = needs(set).filter((f) => !has(f));
+  if (missing.length) { console.log(`${set.out.padEnd(14)} skipped — waiting for ${missing.join(', ')} in ${RAW}`); continue; }
+  await compose(set, set.out);
+}
+
+const { GARMENT_COLOURS_BY_PRODUCT, colourSlug } = await import(pathToFileURL(path.join(process.cwd(), 'src', 'lib', 'garments.ts')).href);
+for (const set of GARMENT_SETS) {
+  const missing = needs(set).filter((f) => !has(f));
+  if (missing.length) { console.log(`${set.out.padEnd(14)} skipped — waiting for ${missing.join(', ')} in ${RAW}`); continue; }
+  const base = despeckle(await load(set.product, set.rotate));
+  for (const c of GARMENT_COLOURS_BY_PRODUCT[set.out]) {
+    // a real photo of this colour wins; otherwise the one photo, tinted
+    const own = set.product.replace(/\.png$/, `-${colourSlug(c.name)}.png`);
+    const product = has(own) ? despeckle(await load(own, set.rotate)) : tint(base, c.hex);
+    await compose(set, path.join(set.out, colourSlug(c.name)), product);
+  }
+}
+
+async function compose(set, out, preloaded) {
   const printmap = set.printmap ? despeckle(await load(set.printmap, set.rotate)) : null;
-  const product = set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate));
+  const product = preloaded ?? (set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate)));
   const overlay = set.overlays ? await stack(set.overlays, set.rotate) : set.overlay ? despeckle(await load(set.overlay, set.rotate)) : null;
   for (const l of [overlay, printmap]) {
     if (l && (l.W !== product.W || l.H !== product.H)) throw new Error(`${set.out}: layers must share one canvas`);
@@ -213,12 +278,12 @@ for (const set of SETS) {
   }
   const shadowPng = await shadowFrom(pa);
 
-  const dir = path.join(OUT, set.out);
+  const dir = path.join(OUT, out);
   mkdirSync(dir, { recursive: true });
   copyFileSync(BACKGROUND, path.join(dir, 'background.png'));
   await sharp(productPng).toFile(path.join(dir, 'product.png'));
   await sharp(printmapPng).toFile(path.join(dir, 'printmap.png'));
   await sharp(shadowPng).toFile(path.join(dir, 'shadow.png'));
   if (overlayPng) await sharp(overlayPng).toFile(path.join(dir, 'overlay.png'));
-  console.log(`${set.out.padEnd(14)} product ${Math.round(bw * scale)}×${Math.round(bh * scale)} at (${left}, ${top})${set.rotate ? ` · turned ${set.rotate}°` : ''}${overlay ? ' · overlay' : ''}${printmap ? ' · own print area' : ''}`);
+  console.log(`${out.padEnd(14)} product ${Math.round(bw * scale)}×${Math.round(bh * scale)} at (${left}, ${top})${set.rotate ? ` · turned ${set.rotate}°` : ''}${overlay ? ' · overlay' : ''}${printmap ? ' · own print area' : ''}`);
 }

@@ -9,7 +9,9 @@ import { routeOf, type Route } from './season';
  */
 // D24 (2026-10-25): + the plastic ball (uk5, Royal Mail RM24) and the AWDis christmas jumper (Prodigi may
 // route it to uk2, Royal Mail 1st Class) — both untracked on Standard.
-export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper'];
+// 5 Nov 2026: + the baby bodysuits and the baby + toddler tees — Prodigi's uk2 sends them Royal Mail 1st Class,
+// untracked (sandbox quotes). (The long-sleeve bodysuit was always uk2; it wasn't on show, so it was never said.)
+export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper', 'babyBodysuit', 'babyBodysuitShort', 'babyTee', 'toddlerTee'];
 
 /** A product key OR a variant sku (`wrappingPaper-2mroll`). */
 export const shipsTracked = (key: string): boolean => !UNTRACKED_STANDARD_KEYS.some((k) => key === k || key.startsWith(`${k}-`));
@@ -31,6 +33,7 @@ export const DELIVERY_DAYS: Record<Route, { handling: [number, number]; transit:
   gb3: { handling: [1, 3], transit: [2, 4] }, // Evri
   uk2: { handling: [1, 3], transit: [1, 2] }, // Royal Mail 1st Class
   uk6: { handling: [1, 3], transit: [1, 2] }, // Express (phone cases)
+  uk6std: { handling: [1, 3], transit: [2, 3] }, // Royal Mail Standard Tracked (the watch strap)
   other: { handling: [1, 3], transit: [2, 5] }, // unmapped: the widest range, to be safe
 };
 

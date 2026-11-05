@@ -42,7 +42,12 @@ export type ProductKey =
   // the christmas table + the family bundle (founder, 27 Oct)
   | 'placemat'
   | 'coaster'
-  | 'christmasBundle';
+  | 'christmasBundle'
+  // made in the UK since Prodigi's "global" change (5 Nov 2026)
+  | 'babyTee'
+  | 'toddlerTee'
+  | 'babyBodysuitShort'
+  | 'watchStrap';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -372,6 +377,55 @@ const ART: Record<ProductKey, ReactNode> = {
       <rect x="22" y="40" width="52" height="13" fill="var(--color-berry-pale)" stroke="var(--color-tomato)" strokeWidth="3.5" />
       <line x1="48" y1="40" x2="48" y2="80" stroke="var(--color-tomato)" strokeWidth="3" />
       <path d="M48 40 C40 26 28 30 38 40 M48 40 C56 26 68 30 58 40" fill="none" stroke="var(--color-berry)" strokeWidth="3" strokeLinecap="round" />
+    </>
+  ),
+  babyTee: (
+    <>
+      <path
+        d="M24 36 L38 26 Q48 21 58 26 L72 36 L65 47 L59 43 L59 76 L37 76 L37 43 L31 47 Z"
+        fill="var(--color-paper)"
+        stroke="var(--color-berry)"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <House transform="translate(37,49) scale(0.5)" />
+    </>
+  ),
+  toddlerTee: (
+    <>
+      <path
+        d="M19 33 L35 22 Q48 16 61 22 L77 33 L68 47 L60 42 L60 82 L36 82 L36 42 L28 47 Z"
+        fill="var(--color-paper)"
+        stroke="var(--color-sky)"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <House transform="translate(33,46) scale(0.56)" />
+    </>
+  ),
+  babyBodysuitShort: (
+    <>
+      <path
+        d="M27 28 L38 21 Q48 16 58 21 L69 28 L64 38 L60 36 L60 66 Q60 78 48 78 Q36 78 36 66 L36 36 L32 38 Z"
+        fill="var(--color-paper)"
+        stroke="var(--color-berry)"
+        strokeWidth="4"
+        strokeLinejoin="round"
+      />
+      <circle cx="44" cy="72" r="1.6" fill="var(--color-berry)" />
+      <circle cx="52" cy="72" r="1.6" fill="var(--color-berry)" />
+      <House transform="translate(37,40) scale(0.58)" />
+    </>
+  ),
+  watchStrap: (
+    <>
+      <rect x="40" y="6" width="16" height="30" rx="3" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3" />
+      <rect x="40" y="60" width="16" height="30" rx="8" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3" />
+      <rect x="33" y="34" width="30" height="28" rx="8" fill="var(--color-cocoa)" />
+      <rect x="37" y="38" width="22" height="20" rx="5" fill="var(--color-sky)" />
+      <House transform="translate(42,11) scale(0.33)" />
+      <circle cx="48" cy="72" r="1.5" fill="var(--color-cocoa)" />
+      <circle cx="48" cy="79" r="1.5" fill="var(--color-cocoa)" />
     </>
   ),
 };

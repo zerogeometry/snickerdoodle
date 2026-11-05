@@ -16,9 +16,8 @@ const KNOWN: Record<string, string> = {
   // TODO(before it's on show): Prodigi's GB front area differs by colour and size (3070², 4724²,
   // 3307×4606) — see the TODO on adultHoodie in catalogue.ts.
   adultHoodie: 'GB print area differs by colour + size',
-  // 18–24 months white lists two GB routes (2130² and 1500×2010); we design to the smaller one —
-  // flagged in the founder's Prodigi email (catalogue.ts babyVariants).
-  babyBodysuit: '18–24 months has two GB routes with different print areas',
+  // (the baby bodysuit came off on 5 Nov 2026: it's sold only in the sizes + colours with ONE GB print area —
+  // src/lib/garments.ts babyBodysuitMade)
 };
 
 const specs = definedPrintSpecs();
@@ -48,7 +47,11 @@ describe('print files match Prodigi’s print areas', () => {
   it('…and the same shape, within 0.5%, on every product (garments included — full size since 29 Oct)', () => {
     for (const s of specs.filter((x) => !KNOWN[x.productKey])) {
       const file = printFileSize(s.productKey, s.attributes, s.template);
-      const area = (prodigi[s.prodigiSku]?.variants ?? []).find((v) => v.printAreaSizes[s.printTo[0]!])?.printAreaSizes[s.printTo[0]!];
+      // THIS variant's route (its size + colour) — a SKU's other colours can be another shape made elsewhere
+      // (the short-sleeve bodysuit's ballerina is an Australian 2130² route; ours are 2490×3510)
+      const want = Object.entries(s.prodigiAttrs ?? {}).map(([k, v]) => [k.toLowerCase(), v.toLowerCase()] as const);
+      const mine = (prodigi[s.prodigiSku]?.variants ?? []).filter((v) => want.every(([k, val]) => !(k in v.attributes) || String(v.attributes[k]).toLowerCase() === val));
+      const area = mine.find((v) => v.printAreaSizes[s.printTo[0]!])?.printAreaSizes[s.printTo[0]!];
       expect(area, s.sku).toBeTruthy();
       expect(Math.abs(file.w / file.h / (area!.w / area!.h) - 1), s.sku).toBeLessThanOrEqual(ASPECT_TOLERANCE);
     }

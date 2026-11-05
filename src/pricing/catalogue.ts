@@ -68,6 +68,11 @@ export const CATALOGUE = {
   // Christmas jumpers (D24, 2026-10-25) — seeded hidden until a sweatshirt packshot is in.
   kidsJumper: { pricePence: 3800, label: 'kids jumper' },
   christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
+  // The little ones + the watch strap (5 Nov 2026, Prodigi's "global" change) — seeded hidden until their photos are in.
+  babyTee: { pricePence: 2000, label: 'baby tee' },
+  toddlerTee: { pricePence: 2000, label: 'toddler tee' },
+  babyBodysuitShort: { pricePence: 2000, label: 'short-sleeve baby bodysuit' },
+  watchStrap: { pricePence: 4500, label: 'watch strap' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
   // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.

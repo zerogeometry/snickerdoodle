@@ -27,3 +27,38 @@ table; gb3 (frames) 14 Dec in our table (Prodigi: framed prints 17 Dec). Books t
 
 Every new product also needs the founder's layered product photos (packshots) before it goes on show —
 the same reason the baby bodysuit and hoodies are hidden today.
+
+## Built (5 Nov 2026): baby tee, toddler tee, both bodysuits, the watch strap — hidden until the photos are in
+
+Re-checked in the sandbox the same day, every size × colour (POST /quotes to GB, Standard). What changed from the table above:
+- **Watch strap 42 mm** is 363×2932 px (only the 38 mm is 305×2738). Both go Royal Mail **Standard Tracked** from uk6
+  (£4.00; a second strap +£0.50) — tracked, so no Express. Shown as **small** (38, 40, 41 mm and the 42 mm Series 10+)
+  and **large** (44, 45, 46, 49 mm and the 42 mm Series 1–3). One print file covers both halves; the middle fifth sits
+  behind the watch and doesn't print — the placement screen shades it, and the drawing starts just below the watch.
+- **Toddler tee**: Prodigi's UK lab makes only 1–2 and 3–4 years. Pink, light blue (Canada) and yellow, grass, slate
+  (Australia) are left out. It's its own product, not extra sizes on the kids tee (different tee, print shape, colours,
+  price, lab and post).
+- **Baby tee**: navy left out (two sizes list a different print area). 8 colours, newborn to 18–24 months.
+- **Long-sleeve bodysuit**: now 6 colours (£9 white / £10 colours). No heather in newborn; 18–24 months only in light
+  pink and navy until Prodigi says which print file its UK lab uses for the others (two are listed).
+- **Short-sleeve bodysuit**: added — made in the UK in 8 colours, but **not white** (Prodigi makes white in Canada).
+- All the baby/toddler clothes go Royal Mail 1st Class (untracked) from uk2: the shop says "free delivery", not "tracked".
+  Last order for Christmas: 12 Dec (strap too).
+
+Prices: baby tee, toddler tee, short-sleeve bodysuit £20; long-sleeve bodysuit £22; strap £45 (each ~19–20% net; the
+multi-buy tiers they get are 10% for two, 15% for three or more, all ≥15% net).
+
+### What the founder sends, to switch each one on
+Drop these into `.prodigi-assets/blanks/founder-raw/`, run `node scripts/compose-founder-layers.mjs`, then seed the
+mockups. Cut-outs on a transparent background, straight-on, the print-area file on the SAME canvas as its photo.
+- `baby-tee.png` + `baby-tee-print.png` (a white rectangle where the 15 × 15 cm print sits)
+- `toddler-tee.png` + `toddler-tee-print.png` (26 × 32 cm print)
+- `baby-bodysuit.png` + `baby-bodysuit-print.png` (long sleeves; 18 × 18 cm print)
+- `baby-bodysuit-short.png` + `baby-bodysuit-short-print.png` (short sleeves; 21 × 30 cm print)
+- One WHITE garment each is enough — every colour is made from it. A real photo of a colour, named like
+  `baby-tee-light-blue.png`, is used instead whenever it's there.
+- Strap, per size (`small`, `large`): `watch-strap-small.png` (strap laid straight, buckle half on top, the watch
+  face-up in the middle), `watch-strap-small-print.png` (just the two leather halves), `watch-strap-small-watch.png`
+  (the watch + buckle, laid over the drawing). Until then the strap shows a drawn strap that's true to Prodigi's template.
+Then flip `visibleInShop` in src/server/catalogue.ts, move its page copy from `WAITING_FOR_PHOTOS` into
+`SHOP_PRODUCTS` (src/lib/shop-products.ts), add it to the /christmas/delivery-dates list, and reseed.

@@ -26,6 +26,9 @@ export const EXPECTED_POPULARITY = [
   'calendar',
   // the Christmas table set (founder, 27–28 Oct)
   'placemat', 'coaster',
+  // made in the UK since Prodigi's "global" change (5 Nov 2026) — appended, so no live rank moves; hidden until
+  // their photos are in. The toddler tee first (it fills the gap below the kids tee), then the strap.
+  'toddlerTee', 'watchStrap', 'babyTee', 'babyBodysuitShort',
 ];
 
 /** Always first, whatever sells (founder, 29 Oct: the family bundle "appears at the top of the catalogue"). */

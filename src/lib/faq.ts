@@ -64,6 +64,11 @@ export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   christmasBundle: 'Christmas family bundle (a set for 2, 4 or 8, from £78)',
   kidsJumper: 'Kids’ organic jumper',
   christmasJumper: 'Christmas jumper (adult)',
+  babyTee: 'Baby T-shirt (newborn to 2)',
+  toddlerTee: 'Toddler T-shirt (1 to 4)',
+  babyBodysuit: 'Baby bodysuit, long sleeves',
+  babyBodysuitShort: 'Baby bodysuit, short sleeves',
+  watchStrap: 'Apple Watch strap',
 };
 
 export const FAQ: FaqSection[] = [

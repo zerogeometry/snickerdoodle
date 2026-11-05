@@ -37,7 +37,7 @@ async function caseTrace(model: string, grade: CaseGrade): Promise<{ traced: Tra
   return { traced: caseTraces.get(key) ?? null, source: manifest[model]?.[grade] ? 'prodigi template' : 'prodigi template (other grade)' };
 }
 import {
-  ADULT_HOODIE_CHEST_MM, ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, garmentPrintRegion, HOODIE_PRINT_MM, isDarkGarment, KIDS_HOODIE_CHEST_MM, KIDS_TEE_CHEST_MM,
+  ADULT_HOODIE_CHEST_MM, ADULT_TEE_CHEST_MM, ADULT_TEE_PRINT_MM, colourSlug, garmentPrintRegion, HOODIE_PRINT_MM, isDarkGarment, KIDS_HOODIE_CHEST_MM, KIDS_TEE_CHEST_MM,
   KIDS_TEE_PRINT_MM, teePrintRegion, type GarmentPhoto,
 } from '@/lib/garments';
 import { drawProductMockup, isDrawnProduct, type DrawnProductKey } from './drawnMockups';
@@ -91,7 +91,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
-  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean; contain?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
 );
 
@@ -382,8 +382,28 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
         region: teePrintRegion(kids ? KIDS_TEE_PRINT_MM : ADULT_TEE_PRINT_MM, chest),
       };
     }
+    // The little ones (5 Nov 2026): the founder's layered photo set PER COLOUR, composed by
+    // scripts/compose-founder-layers.mjs into layered/<product>/<colour>/ (a real photo of that colour, or the
+    // one white photo tinted to it). The print area is the founder's printmap; the print file sits INSIDE it at
+    // its own shape (contain), so the whole print shows — nothing the preview hides gets printed, or vice versa.
+    // Not staged ⇒ the long-sleeve bodysuit keeps its white derived photo (white only — a coloured variant
+    // never shows a white one); the others keep the plain tile.
     case 'babyBodysuit':
-      return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
+    case 'babyBodysuitShort':
+    case 'babyTee':
+    case 'toddlerTee': {
+      const dir = colour ? layeredFlatDir(`${key}/${colourSlug(colour)}`) : null;
+      if (dir) return { material: isDarkGarment(colour) ? 'DARK_FABRIC' : 'LIGHT_FABRIC', register: 'layered-flat', dir, contain: true };
+      if (key === 'babyBodysuit' && colour === 'white') return { file: 'derived/bodysuit-photo.png', material: 'LIGHT_FABRIC', register: 'panel-contain', mask: false, frame: 'canvas', region: { x0: 0.316, y0: 0.264, x1: 0.683, y1: 0.762 } };
+      return null;
+    }
+    // The watch strap (5 Nov 2026): the founder's layered set per size (layered/watchStrap/<small|large>/ — the
+    // printmap is the two leather halves, the watch + buckle the overlay), else the DRAWN strap, traced from
+    // Prodigi's own template (src/lib/watch-strap.ts) — the drawing shows only where it really prints.
+    case 'watchStrap': {
+      const dir = layeredFlatDir(`watchStrap/${size === 'large' ? 'large' : 'small'}`);
+      return dir ? { material: 'PAPER', register: 'layered-flat', dir } : { material: 'PAPER', register: 'drawn', key: 'watchStrap' };
+    }
     case 'mug': {
       // Founder's per-colour two-tone layers (background → shadow → real mug photo). One shared
       // band; the compositor CYLINDER tier wraps the art onto the real ceramic.
@@ -838,6 +858,8 @@ export async function layeredFlatTemplate(
   /** each separate piece of the print area (a pair of socks) shows the WHOLE print file — one
    * print area per piece (`quad` + `extraQuads`), each at its own angle, left to right */
   pieces = false,
+  /** the print file sits INSIDE the print map at its own shape (a garment's chest panel), rather than covering it */
+  contain = false,
 ): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; extraQuads?: Quad[]; W: number; H: number } | null> {
   const d = await layeredFlat(dir);
   if (window) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.window), W: d.W, H: d.H };
@@ -857,7 +879,7 @@ export async function layeredFlatTemplate(
     const corners = orientedCoverQuad(a, d.W, d.H, printAspect, tiltOf(a, d.W, d.H));
     return corners ? { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: corners, W: d.W, H: d.H } : null;
   }
-  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, 'cover')), W: d.W, H: d.H };
+  return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(aspectRect(d.window, d.W, d.H, printAspect, contain ? 'contain' : 'cover')), W: d.W, H: d.H };
 }
 
 /** Where scripts/compose-founder-layers.mjs writes a product's layered set (null if not staged). */
@@ -1445,7 +1467,7 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
     }
 
     if (p.register === 'layered-flat') {
-      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
+      const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces, !!p.contain);
       if (!d) { skipped.push(`${r.key} (no print area in ${p.dir})`); continue; }
       const quad = d.quad;
       await setMockupTemplate(db, { variantId: r.id, blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay });

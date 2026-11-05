@@ -27,6 +27,7 @@ import {
 } from '@/server/print/geometry';
 import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
+import { isWatchStrap, strapShadeSvg, strapSizeForCanvas } from '@/lib/watch-strap';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
 import { isZoomWheel, wheelZoomFactor } from './wheelZoom';
@@ -271,6 +272,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       : variant.productKey === 'blanket' ? 'on the blanket'
       : variant.productKey === 'card' || variant.productKey === 'playingCards' ? 'on the card'
       : variant.productKey === 'phoneCase' ? 'on the case'
+      : variant.productKey === 'watchStrap' ? 'on the strap'
       : isJigsaw ? 'on the board'
       : variant.productKey === 'framedPrint' ? 'in the frame'
       : 'on the product';
@@ -308,6 +310,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     // the band depends only on the canvas size + dpi
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chartLayout?.width, chartLayout?.height, chartLayout?.dpi],
+  );
+  // The watch strap: ONE file for both halves, but only the leather prints — the middle sits behind the watch
+  // and the edges are trimmed (Prodigi's template, src/lib/watch-strap.ts). Shade what doesn't print.
+  const isStrap = isWatchStrap(variant.productKey);
+  const strapShadeSrc = useMemo(
+    () => (isStrap ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(strapShadeSvg(strapSizeForCanvas(canvas.width, canvas.height), canvas.width, canvas.height))}` : null),
+    [isStrap, canvas.width, canvas.height],
   );
   const rect = natural ? computeLayerRect(placeT, { width: natural.w, height: natural.h }, tf) : null;
   const assess = natural ? assessPrintResolution(t, { width: natural.w, height: natural.h }, tf, variant.productKey) : null;
@@ -1103,6 +1112,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   style={{ width: chartLayout.bandPx * scale, height: previewH, maxWidth: 'none', maxHeight: 'none' }}
                 />
               ) : null}
+              {/* the watch strap: what doesn't print (behind the watch, the trimmed edges, the holes), shaded */}
+              {strapShadeSrc ? (
+                <img src={strapShadeSrc} alt="" aria-hidden draggable={false} className="pointer-events-none absolute left-0 top-0" style={{ width: previewW, height: previewH, maxWidth: 'none', maxHeight: 'none' }} />
+              ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 w-px bg-cinnamon/80" style={{ left: (artX + canvasSizePx(placeT).width / 2) * scale }} /> : null}
               {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
@@ -1121,6 +1134,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <>this is the pattern that prints · drag to shift it · drag a corner to make the drawings bigger or smaller</>
             ) : isChart ? (
               <>the ruler prints just like this · your drawing goes in the <b className="text-cinnamon">outlined box</b> beside it · drag a corner to resize</>
+            ) : isStrap ? (
+              <>only the <b className="text-cinnamon">light parts</b> print — the shaded middle sits behind the watch · keep faces &amp; words on the strap, away from the holes</>
             ) : (
               <>the <b className="text-cinnamon">outlined box</b> is what {variant.productKey === 'framedPrint' ? 'shows in the frame' : 'prints'} · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             )}
