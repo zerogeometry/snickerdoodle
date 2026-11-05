@@ -89,6 +89,21 @@ describe('revealRange — the server is asked by position', () => {
     expect(firstOf(12, 18)).toBeGreaterThanOrEqual(lastOf(6, 12));
   });
 
+  it('held groups (the create page, until the first six have painted and the range shows) are planned but not sent — then all follow, in order, with no scrolling', async () => {
+    const m = await import('@/lib/mockupPrefetch');
+    const range = m.revealRange(groupsOf(18), () => false, 0);
+    range.want(2); // tiles near the screen under the loader: their pictures are planned (they wait on them)…
+    expect(m.pendingMockup(m.mockupKey(req(13)))).toBeDefined();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(log.map((l) => l.v)).toEqual(['v0', 'v1', 'v2', 'v3', 'v4', 'v5']); // …but only the first six are sent
+    range.allow(Number.MAX_SAFE_INTEGER); // the first six painted, the range shows
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(log.map((l) => l.v)).toEqual(Array.from({ length: 18 }, (_, i) => `v${i}`));
+    const lastOf = (from: number, to: number) => Math.max(...log.slice(from, to).map((l) => l.done!));
+    const firstOf = (from: number, to: number) => Math.min(...log.slice(from, to).map((l) => l.at));
+    expect(firstOf(12, 18)).toBeGreaterThanOrEqual(lastOf(6, 12));
+  });
+
   it('the loader waits for the first six to PAINT — an instant preview counts, a stored photo alone does not', async () => {
     const m = await import('@/lib/mockupPrefetch');
     const groups = groupsOf(12);

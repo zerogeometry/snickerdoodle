@@ -7,8 +7,9 @@ import { artwork, quietCookies } from './helpers';
  *    drawing being stored (an INSTANT preview, drawn from the browser's own copy — nothing sent);
  *  - the "making your collection" loader never lifts before the FIRST SIX tiles have painted
  *    (instant preview or the server's photo);
- *  - the server's photos are asked for six at a time, by position, as the shopper scrolls near
- *    them — never the whole range at once — and every tile walked to gets its photo;
+ *  - the server's photos are asked for by position: the first six at once; the rest six at a time,
+ *    in order, ON THEIR OWN once the first six have painted and the range shows — nothing waits for a
+ *    scroll (founder, 5 Nov) — and every tile gets its photo;
  *  - a photo swaps in over its instant preview in exactly the same place: no layout shift.
  * Server photos are slowed, like the deployed site.
  */
@@ -44,7 +45,7 @@ for (const vp of [
   { w: 390, h: 844 },
   { w: 1280, h: 900 },
 ])
-  test(`the loader holds until the first six have painted; the rest come six at a time as they near (${vp.w}px)`, async ({ page }) => {
+  test(`the loader holds until the first six have painted; then every group follows on its own, no scrolling (${vp.w}px)`, async ({ page }) => {
     test.setTimeout(180_000);
     await page.setViewportSize({ width: vp.w, height: vp.h });
     await quietCookies(page);
@@ -59,43 +60,37 @@ for (const vp of [
     // the moment the loader goes, what the first six tiles show (snapshot in the same task as its removal)
     await page.addInitScript(() => {
       new MutationObserver(() => {
-        const w = window as unknown as { __atReveal?: unknown; __loaderSeen?: boolean; __tiles: () => unknown };
+        const w = window as unknown as { __atReveal?: unknown; __revealAt?: number; __loaderSeen?: boolean; __tiles: () => unknown };
         const up = [...document.querySelectorAll('[role=status]')].some((e) => /making your collection/.test(e.textContent ?? ''));
         if (up) w.__loaderSeen = true;
-        else if (w.__loaderSeen && !w.__atReveal) w.__atReveal = w.__tiles();
+        else if (w.__loaderSeen && !w.__atReveal) {
+          w.__atReveal = w.__tiles();
+          w.__revealAt = Date.now();
+        }
       }).observe(document, { childList: true, subtree: true });
     });
     await upload(page);
     await expect(loader(page)).toBeVisible({ timeout: 30_000 });
     await expect(loader(page)).toHaveCount(0, { timeout: 90_000 });
 
-    const atReveal = (await page.evaluate(() => (window as unknown as { __atReveal: Tile[] }).__atReveal)) as Tile[];
+    const { atReveal, revealAt } = await page.evaluate(() => {
+      const w = window as unknown as { __atReveal: Tile[]; __revealAt: number };
+      return { atReveal: w.__atReveal, revealAt: w.__revealAt };
+    });
     expect(atReveal.length).toBeGreaterThan(6);
     for (const t of atReveal.slice(0, 6)) expect(t.instant || t.photo, `${t.name} had painted nothing when the loader lifted`).toBe(true);
+    // before the reveal only the first six were asked for — later groups never compete with them
+    expect(asked.filter((t) => t < revealAt).length, 'asked for more than the first six before the range showed').toBeLessThanOrEqual(6);
 
-    // only the first six (and, on a tall screen, the six after) have been asked for — not the whole range
-    await page.waitForTimeout(2500);
-    const before = asked.length;
-    expect(before).toBeLessThanOrEqual(12);
-    expect(before).toBeLessThan(atReveal.length);
-
-    // walk the range: each tile reached shows the drawing (instant or photo) or its product photo, never
-    // nothing for long — and gets its photo within moments; more is asked for only as we go
-    const scroller = page.locator('.brand-scroll').filter({ has: page.locator('.polaroid') }).first();
+    // then, WITHOUT ANY SCROLLING, every group is asked for in turn and every tile gets its photo
     const total = atReveal.length;
-    for (let step = 0; step < 40; step++) {
-      const atEnd = await scroller.evaluate((el) => {
-        const own = el.scrollHeight > el.clientHeight + 2;
-        if (own) el.scrollBy(0, el.clientHeight * 0.8);
-        else window.scrollBy(0, window.innerHeight * 0.8);
-        return own ? el.scrollTop + el.clientHeight >= el.scrollHeight - 2 : window.innerHeight + window.scrollY >= document.body.scrollHeight - 2;
-      });
-      await page.waitForTimeout(400);
-      if (atEnd) break;
-    }
-    expect(asked.length, 'the rest were asked for as the range was walked').toBeGreaterThan(before);
+    await expect.poll(() => asked.length, { timeout: 90_000, message: 'not every group was asked for' }).toBeGreaterThanOrEqual(total - 1); // the family set's four tees are two pictures
     await expect.poll(async () => (await tilesNow(page)).filter((t) => !t.photo).map((t) => t.name), { timeout: 60_000 }).toEqual([]);
-    expect(asked.length).toBeGreaterThanOrEqual(total - 1); // every tile's picture (the family set's tees share two)
+    const scrolled = await page.evaluate(() => {
+      const sc = [...document.querySelectorAll('.brand-scroll')].sort((a, b) => b.querySelectorAll('.polaroid').length - a.querySelectorAll('.polaroid').length)[0]!;
+      return sc.scrollTop + window.scrollY;
+    });
+    expect(scrolled, 'the test never scrolled').toBe(0);
   });
 
 test('instant previews: the drawing on every product the browser can draw within a second of the drawing being stored', async ({ page }) => {

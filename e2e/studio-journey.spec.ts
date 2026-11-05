@@ -12,9 +12,6 @@ test('studio journey: upload → studio edit → done → the range shows the ed
   await uploadAndOpenRange(page);
 
   const framePreview = page.locator('img[alt="your drawing on a framedPrint"]').first();
-  // the range's pictures come as their tiles near: go to the frame's (it's further down)
-  const frameTile = page.getByRole('button', { name: 'customize framed print', exact: true });
-  await frameTile.scrollIntoViewIfNeeded({ timeout: 45_000 });
   await expect(framePreview).toBeVisible({ timeout: 45_000 });
   const before = await framePreview.getAttribute('src');
 
@@ -39,7 +36,6 @@ test('studio journey: upload → studio edit → done → the range shows the ed
 
   // Back on the range, the previews are re-made from the edited design
   await expect(page).toHaveURL(/\/start-creating/);
-  await frameTile.scrollIntoViewIfNeeded({ timeout: 45_000 });
   await expect(framePreview).toBeVisible({ timeout: 45_000 });
   await expect.poll(() => framePreview.getAttribute('src'), { timeout: 45_000, message: 'the frame preview is re-made from the edit' }).not.toBe(before);
 

@@ -408,7 +408,7 @@ export default function StartCreatingPage() {
                     {products ? (
                       <div inert={!rangeReady} className={`transition-opacity duration-500 ${rangeReady ? 'opacity-100' : 'pointer-events-none opacity-0'}`}>
                         <ChosenProduct products={products} />
-                        <FlowCatalogue products={products} mode="sections" compact scrollable onRangeReady={() => setSettledKey(rangeKeyRef.current)} />
+                        <FlowCatalogue products={products} mode="sections" compact scrollable revealed={rangeReady} onRangeReady={() => setSettledKey(rangeKeyRef.current)} />
                       </div>
                     ) : (
                       <div className="h-[55dvh] md:h-[calc(100dvh-23rem)] md:max-h-[34rem]" />

@@ -182,15 +182,16 @@ interface Ticket {
   attempt: number;
   promise: Promise<Result>;
   resolve: (r: Result) => void;
-  /** the range that queued it (dropped tickets wait a beat to be adopted by the next one) */
-  owner: object | null;
+  /** the range that queued it (dropped tickets wait a beat to be adopted by the next one); a group
+   * beyond its `allowed` waits, queued, until the range lets it go */
+  owner: { allowed: number } | null;
 }
 const tickets = new Map<string, Ticket>(); // queued, in flight, or waiting to retry
 const queue: Ticket[] = [];
 const flying = new Set<Ticket>();
 let seq = 0;
 
-function newTicket(req: MockupRequest, key: string, group: number, owner: object | null): Ticket {
+function newTicket(req: MockupRequest, key: string, group: number, owner: Ticket['owner']): Ticket {
   let resolve!: (r: Result) => void;
   const promise = new Promise<Result>((ok) => (resolve = ok));
   const t: Ticket = { key, req, group, seq: ++seq, attempt: 1, promise, resolve, owner };
@@ -204,13 +205,14 @@ function unqueue(t: Ticket) {
 const wanted = (r: MockupRequest, k = mockupKey(r)) => !cachedMockup(k) && !failed.has(k);
 
 /** The next ticket allowed to go: the highest-priority one, unless an earlier group is still being made
- * (a group goes only once the one before has answered) — one-off asks fill any idle lane. */
+ * (a group goes only once the one before has answered) or its range is holding it — one-off asks fill
+ * any idle lane. */
 function nextTicket(): Ticket | undefined {
   queue.sort((a, b) => a.group - b.group || a.seq - b.seq);
   let earliestFlying = AD_HOC;
   for (const t of flying) if (t.group < earliestFlying) earliestFlying = t.group;
   const head = queue[0];
-  if (head && (head.group === AD_HOC || head.group <= earliestFlying)) return head;
+  if (head && (head.group === AD_HOC || (head.group <= earliestFlying && head.group <= (head.owner?.allowed ?? AD_HOC)))) return head;
   return queue.find((t) => t.group === AD_HOC);
 }
 
@@ -301,8 +303,11 @@ export function prefetchMockups(reqs: MockupRequest[]): void {
 }
 
 export interface RangeReveal {
-  /** Ask for groups 0…`group` (each only once the one before it has answered). */
+  /** Plan groups 0…`group`: queued at once (a tile finds its picture on the way), SENT only up to what
+   * {@link RangeReveal.allow} lets go — each once the group before has answered. */
   want(group: number): void;
+  /** Let groups 0…`group` be sent (group 0 always is). */
+  allow(group: number): void;
   /** This range is gone (a new drawing, a new edit, the page left): drop what it queued but hasn't sent. */
   stop(): void;
 }
@@ -320,12 +325,13 @@ function sweepOrphans() {
 
 /**
  * Plan a range's server photos by POSITION: `groups` are its tiles in groups of six, as shown (each
- * tile's requests — the family set tile has two). Group 0 is asked for at once; later groups when
- * {@link RangeReveal.want} says the shopper is near them. Within a group, tiles with no instant
- * preview go first. A group's requests go only after the group before has answered.
+ * tile's requests — the family set tile has two). Group 0 is asked for at once; later groups once
+ * planned ({@link RangeReveal.want}) AND let go ({@link RangeReveal.allow} — the create page: when the
+ * first six have painted and the range shows). Within a group, tiles with no instant preview go first.
+ * A group's requests go only after the group before has answered.
  */
-export function revealRange(groups: MockupRequest[][], hasInstant: (r: MockupRequest) => boolean): RangeReveal {
-  const owner = {};
+export function revealRange(groups: MockupRequest[][], hasInstant: (r: MockupRequest) => boolean, allowed = Number.MAX_SAFE_INTEGER): RangeReveal {
+  const owner = { allowed: Math.max(0, allowed) };
   let upTo = -1;
   let stopped = false;
   const mine = new Set<Ticket>();
@@ -356,6 +362,11 @@ export function revealRange(groups: MockupRequest[][], hasInstant: (r: MockupReq
         }
         upTo = g;
       }
+      pump();
+    },
+    allow(group) {
+      if (stopped || group <= owner.allowed) return;
+      owner.allowed = group;
       pump();
     },
     stop() {

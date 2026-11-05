@@ -1,7 +1,7 @@
 import sharp from 'sharp';
 import { test, expect, type Page, type Request } from './test';
 import { customizeReady, quietCookies, uploadAndOpenRange } from './helpers';
-import { basketLines, goClient, optionGroup, pressedIn, rangeReady, shopCatalogue, waitForAsset, walkRange } from './shop-db';
+import { basketLines, goClient, optionGroup, pressedIn, rangeReady, shopCatalogue, waitForAsset } from './shop-db';
 
 /**
  * The drawing's own background colour (founder, 5 Nov): on the height chart, socks, tea towel and wrapping paper
@@ -49,9 +49,7 @@ test('a drawing on honey paper: the height chart + the repeats default to honey,
   // the colour is measured in the browser and kept with the drawing
   await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_upload') ?? 'null')?.state?.upload?.bg)).toBe(HONEY);
 
-  // the RANGE (walked to its end — its pictures are asked for as the tiles come near): each of the four is
-  // asked for on honey — and never on white first (the tile waits a beat)
-  await walkRange(page);
+  // the RANGE: each of the four is asked for on honey — and never on white first (the tile waits a beat)
   const thumbs = () => bodies.filter((b) => b.size === 'thumb' && b.assetId === assetId);
   for (const k of AUTO.filter((k) => keyOf.size === 0 || [...keyOf.values()].includes(k))) {
     await expect.poll(() => thumbs().filter((b) => keyOf.get(b.variantId) === k && b.ground === HONEY).length, { message: `${k} on honey`, timeout: 60_000 }).toBeGreaterThan(0);
@@ -79,8 +77,6 @@ test('a drawing on honey paper: the height chart + the repeats default to honey,
   await expect(page).toHaveURL(/\/start-creating/);
   expect((await basketLines(page)).find((l) => l.product === 'socks')?.ground).toBe(NAVY);
   // the parent's pick sticks: the socks tile is now drawn on navy
-  await rangeReady(page);
-  await walkRange(page);
   await expect.poll(() => thumbs().filter((b) => keyOf.get(b.variantId) === 'socks' && b.ground === NAVY).length, { timeout: 60_000 }).toBeGreaterThan(0);
 
   // the tee's customise page opens on ochre; picking another colour is the parent's own

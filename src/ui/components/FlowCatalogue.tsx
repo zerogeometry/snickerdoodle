@@ -65,6 +65,7 @@ export function FlowCatalogue({
   scrollable = false,
   className,
   onRangeReady,
+  revealed = true,
 }: {
   products: CatalogueProduct[];
   mode?: 'sections' | 'flat';
@@ -75,6 +76,8 @@ export function FlowCatalogue({
   /** Called once the FIRST SIX tiles have painted the drawing on their products (the instant preview
    * or the server's photo — or definitely have none) — the create page holds its loader until then. */
   onRangeReady?: () => void;
+  /** The range is showing (the create page's loader has lifted): the rest of its pictures follow. */
+  revealed?: boolean;
 }) {
   const router = useRouter();
   const onRangeReadyRef = useRef(onRangeReady);
@@ -296,22 +299,37 @@ export function FlowCatalogue({
     ]);
   }, [aspect, rangeProducts, tileInputs, familySetAvailable, products]);
   // 2) the server's photos BY POSITION, the moment the drawing is stored (founder, 5 Nov): the first
-  //    six at once — the loader waits for those to PAINT, instant preview or photo — then six at a
-  //    time as the shopper scrolls near them, each group only after the one before has answered.
-  //    Within a group, the tiles with no instant preview go first.
+  //    six at once — the loader waits for those to PAINT, instant preview or photo. Once they have and
+  //    the range is showing, the rest follow ON THEIR OWN, six at a time in order, each group only
+  //    after the one before has answered — nothing waits for a scroll. A parent who scrolls ahead pulls
+  //    the groups up to that tile forward (still in order). Within a group, the tiles with no instant
+  //    preview go first.
   const assetId = upload?.assetId;
   const cutoutId = upload?.cutout?.sourceObjectId;
+  const art = assetId ? `${assetId}|${cutoutId ?? ''}` : '';
   const rangeRef = useRef<RangeReveal | null>(null);
-  // the furthest group the shopper has come near — their scroll position, kept across edits of the drawing
-  const wantedRef = useRef(0);
+  // for this drawing: the groups planned (a tile near the screen waits on the plan, never asks alone) and
+  // the groups let go — only group 0 until the first six have painted and the range shows
+  const planRef = useRef({ art: '', group: 0, allowed: 0 });
+  if (planRef.current.art !== art) planRef.current = { art, group: 0, allowed: 0 };
+  const want = useCallback((group: number, allow: boolean) => {
+    const p = planRef.current;
+    p.group = Math.max(p.group, group);
+    rangeRef.current?.want(group);
+    if (!allow) return;
+    p.allowed = Math.max(p.allowed, group);
+    rangeRef.current?.allow(group);
+  }, []);
+  const [paintedArt, setPaintedArt] = useState('');
+  const showingRef = useRef(false);
+  showingRef.current = !!art && paintedArt === art && revealed;
+  // a parent who scrolls ahead (once the range shows) pulls the groups up to that tile forward
   const wantNear = useCallback(
     (id: string) => {
       const g = tileGroup.get(id);
-      if (g === undefined) return;
-      wantedRef.current = Math.max(wantedRef.current, g);
-      rangeRef.current?.want(g);
+      if (g !== undefined) want(g, showingRef.current);
     },
-    [tileGroup],
+    [tileGroup, want],
   );
   useEffect(() => {
     if (!assetId) return;
@@ -326,18 +344,29 @@ export function FlowCatalogue({
     const range = revealRange(
       groups.map((g) => g.flatMap((t) => t.reqs)),
       (r) => !r.view && !r.fill && !!instantContext(r.variantId),
+      planRef.current.allowed,
     );
-    range.want(wantedRef.current);
+    range.want(planRef.current.group);
     rangeRef.current = range;
     // the loader lifts once the FIRST SIX have painted the drawing on their products
     const first = groups[0] ?? [];
-    const stopLoader = first.some((t) => t.pending) ? undefined : whenPainted(first.flatMap((t) => t.reqs.map(mockupKey)), () => onRangeReadyRef.current?.());
+    const planFor = `${assetId}|${cutoutId ?? ''}`;
+    const stopLoader = first.some((t) => t.pending)
+      ? undefined
+      : whenPainted(first.flatMap((t) => t.reqs.map(mockupKey)), () => {
+          setPaintedArt(planFor);
+          onRangeReadyRef.current?.();
+        });
     return () => {
       stopLoader?.();
       range.stop();
       if (rangeRef.current === range) rangeRef.current = null;
     };
   }, [assetId, cutoutId, rangeTiles, rangeProducts, tileInputs, products, upload]);
+  // the first six are on screen and the range is showing: the rest follow, group after group
+  useEffect(() => {
+    if (art && paintedArt === art && revealed) want(Number.MAX_SAFE_INTEGER, true);
+  }, [art, paintedArt, revealed, want]);
 
   // "Full catalogue" earns its place only when it holds something beyond the sections
   // already on screen — a one-product storefront must not open a modal of the same tile.
