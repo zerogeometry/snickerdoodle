@@ -42,7 +42,9 @@ export type ProductKey =
   // the christmas table + the family bundle (founder, 27 Oct)
   | 'placemat'
   | 'coaster'
-  | 'christmasBundle';
+  | 'christmasBundle'
+  // made in the UK since Prodigi's "global" change (5 Nov 2026)
+  | 'watchStrap';
 
 function House({ transform }: { transform: string }) {
   return (
@@ -372,6 +374,17 @@ const ART: Record<ProductKey, ReactNode> = {
       <rect x="22" y="40" width="52" height="13" fill="var(--color-berry-pale)" stroke="var(--color-tomato)" strokeWidth="3.5" />
       <line x1="48" y1="40" x2="48" y2="80" stroke="var(--color-tomato)" strokeWidth="3" />
       <path d="M48 40 C40 26 28 30 38 40 M48 40 C56 26 68 30 58 40" fill="none" stroke="var(--color-berry)" strokeWidth="3" strokeLinecap="round" />
+    </>
+  ),
+  watchStrap: (
+    <>
+      <rect x="40" y="6" width="16" height="30" rx="3" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3" />
+      <rect x="40" y="60" width="16" height="30" rx="8" fill="var(--color-paper)" stroke="var(--color-tomato)" strokeWidth="3" />
+      <rect x="33" y="34" width="30" height="28" rx="8" fill="var(--color-cocoa)" />
+      <rect x="37" y="38" width="22" height="20" rx="5" fill="var(--color-sky)" />
+      <House transform="translate(42,11) scale(0.33)" />
+      <circle cx="48" cy="72" r="1.5" fill="var(--color-cocoa)" />
+      <circle cx="48" cy="79" r="1.5" fill="var(--color-cocoa)" />
     </>
   ),
 };

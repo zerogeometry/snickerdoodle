@@ -255,7 +255,7 @@ describe.skipIf(!DB || !S3)('print-file render — integration', () => {
     keys.push(l.key);
     expect(l).toMatchObject({ widthPx: 5905, heightPx: 3838 }); // native landscape file
     expect(p).toMatchObject({ widthPx: 5905, heightPx: 3838 }); // portrait variant rotated 90° back → the same file
-  });
+  }, 30_000); // two full blanket files (5905×3838) — past the 5 s default on a CI runner
 
   it('a PHONE CASE renders at Prodigi’s exact print-file pixels for that phone + grade (no trim, no rounding)', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);

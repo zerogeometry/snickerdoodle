@@ -71,6 +71,7 @@ const CAT = {
   wrap: { id: 2816, path: 'Arts & Entertainment > Party & Celebration > Gift Giving > Gift Wrapping > Wrapping Paper' },
   teaTowels: { id: 4257, path: 'Home & Garden > Linens & Bedding > Towels > Kitchen Towels' },
   cardGames: { id: 1247, path: 'Toys & Games > Games > Card Games' },
+  watchBands: { id: 5123, path: 'Clothing & Accessories > Jewellery & Watches > Watch Accessories > Watch Bands' },
 } as const;
 
 export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
@@ -193,6 +194,11 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     slug: 'playing-cards', name: 'playing cards', title: 'Playing cards with your child’s drawing on the back',
     googleCategory: CAT.cardGames, productType: 'Games > Playing cards',
     image: ex('flowerplayingcards', 1200, 1200, 'A deck of playing cards with a child’s painting of sunflowers in a blue vase on the back'),
+  },
+  // (no brand-safe photo of the strap yet — its page shows the product art; the Merchant feed leaves it out)
+  watchStrap: {
+    slug: 'apple-watch-strap', name: 'watch strap', title: 'Apple Watch strap printed with your child’s drawing',
+    googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',
   },
 };
 

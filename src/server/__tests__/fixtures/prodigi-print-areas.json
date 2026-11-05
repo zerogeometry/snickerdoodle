@@ -254,6 +254,18 @@
     {"attributes":{"brand":"AWDis","edge":"Crew neck","color":"vanilla milkshake","gender":"Unisex","paperType":"80% cotton, 20% polyester","size":"xl","style":"JH030"},"printAreaSizes":{"back":{"w":4606,"h":5787},"front":{"w":4606,"h":5787}}}
    ]
   },
+  "GLOBAL-TECH-AP-WS-FL-38MM": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"satin","color":"black fitting","size":"38mm","style":"Watch"},"printAreaSizes":{"default":{"w":305,"h":2738}}}
+   ]
+  },
+  "GLOBAL-TECH-AP-WS-FL-42MM": {
+   "printAreas": ["default"],
+   "variants": [
+    {"attributes":{"brand":"Apple","finish":"satin","color":"black fitting","size":"42mm","style":"Watch"},"printAreaSizes":{"default":{"w":363,"h":2932}}}
+   ]
+  },
   "GLOBAL-TECH-GP8-TCB-CS-G": {
    "printAreas": ["default"],
    "variants": [

@@ -217,3 +217,6 @@ export function drawProductMockup(key: DrawnProductKey, attrs: Record<string, st
     }
   }
 }
+
+/** The drawing kit, for drawn mockups that live in their own module (the watch strap: strapMockup.ts). */
+export const drawnKit = { W, H, OAT, INK, SHADOW_DEFS, fit, svg, png, quadOf };

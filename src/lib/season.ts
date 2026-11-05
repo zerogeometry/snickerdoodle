@@ -78,7 +78,7 @@ export function seasonalExpected(expected: readonly string[], now: Date): string
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** A Prodigi lab + its standard carrier — what decides how late an order can be. */
-export type Route = 'uk9' | 'uk3' | 'uk5' | 'uk7' | 'uk15' | 'gb2' | 'gb3' | 'uk2' | 'uk6' | 'other';
+export type Route = 'uk9' | 'uk3' | 'uk5' | 'uk7' | 'uk15' | 'gb2' | 'gb3' | 'uk2' | 'uk6' | 'uk6std' | 'other';
 
 /**
  * Our LAST ORDER DATE per route for Christmas (UK dates, orders until 23:59 that day).
@@ -107,6 +107,7 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
       gb3: '2026-12-14', // Evri: framed prints, jigsaws, height chart
       uk2: '2026-12-12', // Royal Mail 1st Class: the christmas jumper (Prodigi may route it to uk9 — same date)
       uk6: '2026-12-16', // phone cases go Express
+      uk6std: '2026-12-12', // the phone-case lab on STANDARD (Royal Mail Standard Tracked): the watch strap — Tracked 48's date, like uk9
       other: '2026-12-10', // anything we haven't mapped: the earliest date, to be safe
     },
   },
@@ -126,6 +127,8 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
   christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24
   phoneCase: 'uk6',
+  // made in the UK since Prodigi's "global" change (sandbox 5 Nov)
+  watchStrap: 'uk6std', // uk6, Standard = Royal Mail Standard Tracked — no Express needed
 };
 /** The route for a product (a variant can refine it — none do today: the two ornaments are separate products). */
 /** The route for a product, optionally refined by the chosen variant's attributes. */

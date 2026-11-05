@@ -92,7 +92,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     const shop = await loadCatalogue(db);
     // + the calendar (PR #15) and the bauble + sack (D24), on show for Christmas
     // the Christmas family bundle is pinned to the top of every listing (founder, 29 Oct)
-    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'watchStrap', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -105,7 +105,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.babyBodysuit!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']);
+    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'watchStrap', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']); // + the watch strap (founder, 5 Nov)
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));

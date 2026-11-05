@@ -7,6 +7,9 @@
 // Inputs (cut-outs, no background or shadow) live in .prodigi-assets/blanks/founder-raw/ — the whole
 // tree is gitignored, like every product photo. Re-run whenever a photo changes:
 //   node scripts/compose-founder-layers.mjs
+// A set whose photos aren't in founder-raw yet is skipped (and says so) — drop them in and re-run.
+// `node scripts/compose-founder-layers.mjs watchStrap` composes only the sets whose folder starts with that.
+// (FOUNDER_LAYERS_ROOT=<dir> composes from <dir>/founder-raw into <dir>/layered instead — for tests.)
 //
 // Per product folder it writes:
 //   background.png  the shared brand backdrop (copied from the blanket set, so every tile matches)
@@ -19,10 +22,10 @@ import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
-const ROOT = path.join(process.cwd(), '.prodigi-assets', 'blanks');
+const ROOT = process.env.FOUNDER_LAYERS_ROOT ? path.resolve(process.env.FOUNDER_LAYERS_ROOT) : path.join(process.cwd(), '.prodigi-assets', 'blanks');
 const RAW = path.join(ROOT, 'founder-raw');
 const OUT = path.join(ROOT, 'layered');
-const BACKGROUND = path.join(OUT, 'blanket', 'white', 'background.png');
+const BACKGROUND = process.env.FOUNDER_LAYERS_ROOT ? path.join(ROOT, 'background.png') : path.join(OUT, 'blanket', 'white', 'background.png');
 const CANVAS = 2000;
 
 /**
@@ -48,6 +51,13 @@ const SETS = [
   { out: 'bauble/ceramic', productFromPrintmap: true, printmap: 'ceramic-print.png', overlays: ['ceramic-edgeblur.png', 'ceramic-string.png'], fill: 0.72 },
   // plastic ball: the print area is the ball; the glass highlights + chrome cap + string go on top
   { out: 'bauble/ball', productFromPrintmap: true, printmap: 'bauble-print.png', overlays: ['bauble-overlay.png'], fill: 0.8 },
+  // ── the Apple Watch strap (founder's PSD, 5 Nov 2026 — applewatch.psd): the two halves laid out straight, buckle
+  // half on top. product = 'blackoutlinebacking' (the strap's black outline, under the art), print = 'Printmap' (the
+  // two leather halves — what Prodigi prints), overlay = 'Overlay' (buckle, lugs, holes). Both sizes share it; the
+  // seeder registers each size's print file onto the two halves from Prodigi's template (src/lib/watch-strap.ts).
+  // whiteUnderPrint: the backing is solid black (it only gives the outline) — the leather itself is white where the
+  // drawing doesn't cover, so the print area is laid in white over it, leaving the black edge showing round it.
+  { out: 'watchStrap', product: 'watch-strap.png', printmap: 'watch-strap-print.png', overlay: 'watch-strap-overlay.png', fill: 0.85, whiteUnderPrint: true },
 ];
 
 /** Load as RGBA raw, turned if asked. */
@@ -140,7 +150,6 @@ async function whiteFrom(png) {
     .toBuffer();
 }
 
-if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
 /** Layers stacked in order onto one (an edge blur, then a string on top of it). */
 async function stack(files, rotate) {
   const layers = await Promise.all(files.map((f) => load(f, rotate)));
@@ -183,7 +192,20 @@ async function sackPanel(productPng, spec) {
   return sharp({ create: { width: CANVAS, height: CANVAS, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: rect, left, top }]).png().toBuffer();
 }
 
+const has = (f) => existsSync(path.join(RAW, f));
+/** The raw files a set needs (all must be there, or it's skipped). */
+const needs = (set) => [set.product, set.printmap, set.overlay, ...(set.overlays ?? [])].filter((f) => f && !(set.productFromPrintmap && f === set.product));
+
+if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
+const only = process.argv[2];
 for (const set of SETS) {
+  if (only && !set.out.startsWith(only)) continue;
+  const missing = needs(set).filter((f) => !has(f));
+  if (missing.length) { console.log(`${set.out.padEnd(14)} skipped — waiting for ${missing.join(', ')} in ${RAW}`); continue; }
+  await compose(set, set.out);
+}
+
+async function compose(set, out) {
   const printmap = set.printmap ? despeckle(await load(set.printmap, set.rotate)) : null;
   const product = set.productFromPrintmap ? whiteShape(printmap) : despeckle(await load(set.product, set.rotate));
   const overlay = set.overlays ? await stack(set.overlays, set.rotate) : set.overlay ? despeckle(await load(set.overlay, set.rotate)) : null;
@@ -199,11 +221,12 @@ for (const set of SETS) {
   const left = Math.round((CANVAS - bw * scale) / 2);
   const top = Math.round((CANVAS - bh * scale) / 2 - CANVAS * 0.01); // a hair above centre, room for the shadow
 
-  const productPng = await place(product, box, scale, left, top);
+  let productPng = await place(product, box, scale, left, top);
   const overlayPng = overlay ? await place(overlay, box, scale, left, top) : null;
   const printmapPng = set.sackPanel
     ? await sackPanel(productPng, set.sackPanel)
     : printmap ? await whiteFrom(await place(printmap, box, scale, left, top)) : await whiteFrom(productPng);
+  if (set.whiteUnderPrint) productPng = await sharp(productPng).composite([{ input: printmapPng }]).png().toBuffer();
 
   // Shadow from everything that sits on the table: the product, plus the overlay where it overhangs.
   const pa = await alphaOf(productPng);
@@ -213,12 +236,12 @@ for (const set of SETS) {
   }
   const shadowPng = await shadowFrom(pa);
 
-  const dir = path.join(OUT, set.out);
+  const dir = path.join(OUT, out);
   mkdirSync(dir, { recursive: true });
   copyFileSync(BACKGROUND, path.join(dir, 'background.png'));
   await sharp(productPng).toFile(path.join(dir, 'product.png'));
   await sharp(printmapPng).toFile(path.join(dir, 'printmap.png'));
   await sharp(shadowPng).toFile(path.join(dir, 'shadow.png'));
   if (overlayPng) await sharp(overlayPng).toFile(path.join(dir, 'overlay.png'));
-  console.log(`${set.out.padEnd(14)} product ${Math.round(bw * scale)}×${Math.round(bh * scale)} at (${left}, ${top})${set.rotate ? ` · turned ${set.rotate}°` : ''}${overlay ? ' · overlay' : ''}${printmap ? ' · own print area' : ''}`);
+  console.log(`${out.padEnd(14)} product ${Math.round(bw * scale)}×${Math.round(bh * scale)} at (${left}, ${top})${set.rotate ? ` · turned ${set.rotate}°` : ''}${overlay ? ' · overlay' : ''}${printmap ? ' · own print area' : ''}`);
 }

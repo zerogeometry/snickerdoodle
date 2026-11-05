@@ -11,8 +11,31 @@ import { routeOf, type Route } from './season';
 // route it to uk2, Royal Mail 1st Class) — both untracked on Standard.
 export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper'];
 
+/**
+ * Products that go EXPRESS so they're tracked — Prodigi takes ONE shipping method per order, so an order with one
+ * goes Express as a whole: phone cases (founder, 21 Oct: "definitely tracked" — their Standard is often untracked
+ * Royal Mail 24, uk8). What that adds to the OTHER items' post (sandbox, 5 Nov): mug, ornament, jigsaw, wrapping
+ * paper +£1.05 · watch strap +£1.95 · cushion +£2.15 · framed print +£2.90 · kids or adult tee +£6.45 · greetings
+ * card +£7.65 · socks +£8.05 — which is why the baby + toddler clothes (uk2: tracked only on Express, DPD £10.75)
+ * were NOT added (founder, 5 Nov).
+ */
+export const EXPRESS_FOR_TRACKING_KEYS: readonly string[] = ['phoneCase'];
+/** Products Prodigi has NO Express service for — the dated calendar (lab uk15). An order with one can't go Express. */
+export const NO_EXPRESS_KEYS: readonly string[] = ['calendar'];
+
+const isOf = (keys: readonly string[], key: string) => keys.some((k) => key === k || key.startsWith(`${k}-`));
+
+/**
+ * The ONE shipping method an order goes by: Express when it carries anything that needs it to be tracked — unless it
+ * also carries something with no Express at all (the calendar), when Prodigi would refuse the whole order: then
+ * Standard, and those items go by their untracked Standard post in that order (the basket says so: {@link deliveryLine}).
+ */
+export function shippingMethodFor(keys: readonly string[]): 'Standard' | 'Express' {
+  return keys.some((k) => isOf(EXPRESS_FOR_TRACKING_KEYS, k)) && !keys.some((k) => isOf(NO_EXPRESS_KEYS, k)) ? 'Express' : 'Standard';
+}
+
 /** A product key OR a variant sku (`wrappingPaper-2mroll`). */
-export const shipsTracked = (key: string): boolean => !UNTRACKED_STANDARD_KEYS.some((k) => key === k || key.startsWith(`${k}-`));
+export const shipsTracked = (key: string): boolean => !isOf(UNTRACKED_STANDARD_KEYS, key);
 
 /**
  * How long an order takes, in UK WORKING days, per lab + carrier route (src/lib/season.ts): HANDLING
@@ -31,6 +54,7 @@ export const DELIVERY_DAYS: Record<Route, { handling: [number, number]; transit:
   gb3: { handling: [1, 3], transit: [2, 4] }, // Evri
   uk2: { handling: [1, 3], transit: [1, 2] }, // Royal Mail 1st Class
   uk6: { handling: [1, 3], transit: [1, 2] }, // Express (phone cases)
+  uk6std: { handling: [1, 3], transit: [2, 3] }, // Royal Mail Standard Tracked (the watch strap)
   other: { handling: [1, 3], transit: [2, 5] }, // unmapped: the widest range, to be safe
 };
 
@@ -40,5 +64,7 @@ export const deliveryDays = (productKey: string) => DELIVERY_DAYS[routeOf(produc
 /** The delivery line for one product, or for a basket of them (tracked only if EVERY line is). */
 export function deliveryLine(keys: string | readonly string[]): string {
   const list = typeof keys === 'string' ? [keys] : keys;
-  return list.every(shipsTracked) ? 'free tracked delivery' : 'free delivery';
+  // an Express-for-tracking product in an order that can't go Express goes by its untracked Standard post
+  const expressDenied = list.some((k) => isOf(EXPRESS_FOR_TRACKING_KEYS, k)) && shippingMethodFor(list) === 'Standard';
+  return list.every(shipsTracked) && !expressDenied ? 'free tracked delivery' : 'free delivery';
 }
