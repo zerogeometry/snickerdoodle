@@ -202,7 +202,7 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   },
   // the photo fills the strap with the drawing (founder, 5 Nov) — the shop's own default sits small, below the watch
   watchStrap: {
-    slug: 'apple-watch-strap', name: 'watch strap', title: 'Apple Watch strap printed with your child’s drawing',
+    slug: 'apple-watch-strap', name: 'apple watch strap', title: 'Apple Watch strap printed with your child’s drawing',
     googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',
     image: demo('watchStrap', 'A white leather Apple Watch strap with black buckle, printed end to end with a child’s painting — blue sky, a brown dog and a little green figure'),
   },

@@ -71,7 +71,7 @@ export const CATALOGUE = {
   kidsJumper: { pricePence: 3800, label: 'kids jumper' },
   christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
   // The Apple Watch strap (5 Nov 2026, Prodigi's "global" change) — seeded hidden until its photos are in.
-  watchStrap: { pricePence: 4500, label: 'watch strap' },
+  watchStrap: { pricePence: 4500, label: 'apple watch strap' },
   playingCards: { pricePence: 2400, label: 'playing cards' },
   cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
   // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.
