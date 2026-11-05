@@ -75,4 +75,16 @@ describe('instant previews — the same placement as the photoreal mockup', () =
     );
     expect(mockupKey({ assetId: 'a', variantId: 'v', transform: tf })).not.toBe(mockupKey({ assetId: 'a', variantId: 'v', transform: { ...tf, scale: 1 } }));
   });
+
+  it('a white base colour is the same picture as none — the range tile stands in for customize (white by default)', () => {
+    const tf = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 };
+    const none = mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb' });
+    expect(mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb', ground: '#ffffff' })).toBe(none);
+    expect(mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb', ground: '#FFFFFF' })).toBe(none);
+    expect(mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb', ground: 'white' })).toBe(none);
+    // a real colour is still its own picture (any case)
+    const navy = mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb', ground: '#26334f' });
+    expect(navy).not.toBe(none);
+    expect(mockupKey({ assetId: 'a', variantId: 'v', transform: tf, size: 'thumb', ground: '#26334F' })).toBe(navy);
+  });
 });

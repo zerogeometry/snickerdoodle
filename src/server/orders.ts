@@ -604,7 +604,7 @@ export async function getOrdersForAccount(db: DbHandle, accountId: string): Prom
     // A checkout left at Stripe (they came back to the basket, or closed the tab) isn't an order the
     // family made: past the hold it's never shown as "awaiting payment" — it simply appears if paid.
     if (o.status === 'PENDING' && o.createdAt.getTime() < stale) continue;
-    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, o.id));
+    const items = await db.select().from(orderItems).where(eq(orderItems.orderId, o.id)).orderBy(orderItems.seq); // as placed
     result.push({
       ref: o.ref,
       status: o.status,

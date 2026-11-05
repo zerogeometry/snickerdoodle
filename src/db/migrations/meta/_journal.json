@@ -365,6 +365,13 @@
       "when": 1793567100737,
       "tag": "0051_order_gift_note_insert",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1793916952754,
+      "tag": "0052_order_items_seq",
+      "breakpoints": true
     }
   ]
 }
