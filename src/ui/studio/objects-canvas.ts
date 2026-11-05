@@ -1,6 +1,6 @@
 import { cardFontCss } from '@/lib/card-fonts';
 import { MAX_SHAPE_SIZE, MAX_STICKER_SIZE, SHAPE_PATHS, TEXT_LINE_HEIGHT, type ShapeObject, type StickerObject, type StrokeObject, type StudioObject, type TextObject } from '@/lib/studio-objects';
-import { stickerDataUrl, type StickerId } from '@/lib/stickers';
+import { stickerUrl, type StickerId } from '@/lib/stickers';
 import { TEXTURE_TILE_FRAC, textureTiles, type TextureKind } from '@/lib/textures';
 import { normAngle } from '@/lib/studio-geometry';
 
@@ -32,7 +32,7 @@ export function stickerImage(id: StickerId): HTMLImageElement | null {
   if (!img) {
     img = new Image();
     img.onload = () => stickerListeners.forEach((f) => f());
-    img.src = stickerDataUrl(id);
+    img.src = stickerUrl(id);
     stickerImgs.set(id, img);
   }
   return img.complete && img.naturalWidth > 0 ? img : null;

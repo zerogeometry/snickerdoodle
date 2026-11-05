@@ -1,9 +1,11 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import sharp from 'sharp';
 import { Resvg } from '@resvg/resvg-js';
 import { festiveObjects } from '@/lib/studio-festive';
 import { cleanObjects, SHAPE_PATHS, type ShapeObject, type StickerObject } from '@/lib/studio-objects';
-import { stickerSvg, type StickerId } from '@/lib/stickers';
+import { stickerUrl, type StickerId } from '@/lib/stickers';
 import { renderStudioObjects } from '@/server/print/studioOverlay';
 import { boxOf } from '@/ui/studio/objects-canvas';
 
@@ -74,11 +76,13 @@ const shape = (kind: ShapeObject['shape'], rotation = 0): ShapeObject => ({
 
 /**
  * The BROWSER's drawing of a sticker, as objects-canvas drawObject does it — translate to the
- * centre, turn, mirror if flipped, then the sticker's own SVG drawn into its square box.
+ * centre, turn, mirror if flipped, then the sticker's own SVG — the very file the browser loads
+ * (stickerUrl, out of public/) — drawn into its square box.
  */
 function browserSticker(o: StickerObject): Buffer {
   const b = boxOf(o, { gw: W, gh: H });
-  const art = stickerSvg(o.sticker).replace(/^<svg[^>]*>/, `<svg x="${-b.w / 2}" y="${-b.w / 2}" width="${b.w}" height="${b.w}" viewBox="0 0 200 200">`);
+  const file = readFileSync(path.join(__dirname, '../../../public', stickerUrl(o.sticker)), 'utf8').trim();
+  const art = file.replace(/^<svg[^>]*>/, `<svg x="${-b.w / 2}" y="${-b.w / 2}" width="${b.w}" height="${b.w}" viewBox="0 0 200 200">`);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"><rect width="${W}" height="${H}" fill="#ffffff"/>
     <g transform="translate(${b.cx} ${b.cy}) rotate(${b.rotation}) scale(${o.flip ? -1 : 1} 1)">${art}</g></svg>`;
   return Buffer.from(new Resvg(svg).render().asPng());

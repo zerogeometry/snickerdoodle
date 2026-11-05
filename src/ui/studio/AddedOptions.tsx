@@ -4,7 +4,7 @@ import { IconArrowsHorizontal, IconCopy, IconLock, IconLockOpen, IconPencil, Ico
 import { useEffect, useRef, useState } from 'react';
 import { cardFontCss, pickerFonts, type CardFontToken } from '@/lib/card-fonts';
 import { PLAIN_SHAPES, SHAPE_LABELS, SHAPE_PATHS, MAX_SHAPE_STROKE, MAX_STICKER_SIZE, MAX_TEXT_LENGTH, type ShapeKind, type StudioObject } from '@/lib/studio-objects';
-import { stickerDataUrl, stickerLabel } from '@/lib/stickers';
+import { stickerLabel, stickerUrl } from '@/lib/stickers';
 import { TEXTURES, type TextureKind } from '@/lib/textures';
 import type { Placement } from '@/lib/studio-geometry';
 import { Icon } from '@/ui/primitives/Icon';
@@ -332,7 +332,7 @@ function LayersList({
               >
                 <span aria-hidden className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-cocoa/20 bg-paper-2">
                   {o.type === 'sticker' ? (
-                    <img src={stickerDataUrl(o.sticker)} alt="" className="h-6 w-6" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
+                    <img src={stickerUrl(o.sticker)} alt="" className="h-6 w-6" style={{ transform: o.flip ? 'scaleX(-1)' : undefined }} />
                   ) : o.type === 'shape' ? (
                     <svg viewBox="-10 -10 120 120" className="h-5 w-5">
                       <path d={SHAPE_PATHS[o.shape]} fill={o.fill} fillRule="evenodd" stroke={o.strokeWidth > 0 ? o.stroke : 'none'} strokeWidth={Math.max(4, o.strokeWidth * 100)} />
