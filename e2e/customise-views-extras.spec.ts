@@ -146,7 +146,7 @@ test('extras reach the basket: cushion back, base colour, card span + message â€
 
   // socks: a base colour typed as a code â†’ the compose and the line carry it
   await open(page, 'socks', 'socks');
-  await page.getByRole('button', { name: /sock colour: white/i }).click();
+  await page.getByRole('button', { name: /sock colour: /i }).click(); // (starts on the paper's own colour)
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox').fill('#2f5da8');
   await dialog.getByRole('button', { name: 'use this colour' }).click();

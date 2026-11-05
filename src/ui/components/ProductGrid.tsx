@@ -6,7 +6,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { MockupPreview } from './MockupPreview';
 import { type ProductKey } from './ProductArt';
 import { gbp, usePlacements, useSelection, type Upload } from '@/lib/store';
-import { MUG_SWATCH, defaultPlacementFor, resolveDisplayVariant } from '@/lib/catalogue-view';
+import { MUG_SWATCH, awaitsBackground, defaultPlacementFor, displayGround, resolveDisplayVariant } from '@/lib/catalogue-view';
 import { garmentHex, isGarmentKey } from '@/lib/garments';
 import type { CatalogueProduct } from '@/server/catalogue';
 import type { MockupRequest } from '@/lib/mockupPrefetch';
@@ -21,11 +21,15 @@ import { withArticle } from '@/lib/articles';
 export function tileMockupInputs(
   p: CatalogueProduct,
   upload: Upload,
-  selection: { size?: string; colour?: string; orientation?: string } | undefined,
+  selection: { size?: string; colour?: string; orientation?: string; ground?: string } | undefined,
   savedTf: MockupRequest['transform'] | undefined,
-): { variantId: string; transform: MockupRequest['transform']; view: string | undefined; sourceObjectId: string | undefined } {
-  const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection });
+): { variantId: string; transform: MockupRequest['transform']; view: string | undefined; sourceObjectId: string | undefined; ground: string | undefined; pending: boolean } {
+  const shownVariant = resolveDisplayVariant(p, { aspect: upload?.aspect, selection, bg: upload?.bg });
   return {
+    // the base colour: the parent's pick, else the drawing's own background (height chart + the repeats)
+    ground: displayGround(p.key, selection?.ground, upload?.bg),
+    // still measuring the drawing's background — the preview waits a beat rather than draw the wrong colour
+    pending: awaitsBackground(p.key, upload),
     variantId: shownVariant.id,
     transform: savedTf ?? defaultPlacementFor(p.key, shownVariant.attributes, upload?.aspect),
     // The mug's hero is its centred wrap (design middle, handle hidden), not the handle-right front.
@@ -113,8 +117,9 @@ export function ProductTile({
       <div className="relative aspect-square w-full overflow-hidden bg-paper-2 p-2">
         <MockupPreview
           productKey={p.key as ProductKey}
-          assetId={upload?.assetId}
+          assetId={shown.pending ? undefined : upload?.assetId}
           variantId={shown.variantId}
+          ground={shown.ground}
           transform={shown.transform as Parameters<typeof MockupPreview>[0]['transform']}
           size="thumb"
           sourceObjectId={shown.sourceObjectId}

@@ -24,8 +24,9 @@ test('a drawing on its paper, on a coloured base: one tap lifts it off, and the 
   const assetId = await ready(page);
   await goClient(page, '/customize/socks');
   await expect(page.getByRole('heading', { level: 1, name: 'socks' })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(/the paper prints too/)).toHaveCount(0); // on white: no nudge
-  await page.getByRole('button', { name: /sock colour: white/i }).click();
+  // the e2e paper is cream, so the socks start matched to it (founder, 5 Nov) — lifting it off still helps
+  await expect(page.getByText(/we’ve matched the sock to your paper/)).toBeVisible();
+  await page.getByRole('button', { name: /sock colour: /i }).click();
   await page.getByRole('dialog').getByRole('textbox').fill('#3f6e29');
   await page.getByRole('dialog').getByRole('button', { name: 'use this colour' }).click();
   await expect(page.getByText(/the paper prints too — you’d get paper squares on the/)).toBeVisible();

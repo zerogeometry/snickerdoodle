@@ -42,7 +42,10 @@ export const gbp = formatPence;
 // `dataUrl` is then the trimmed drawing, and the cut-out starts as the trimmed copy (`cutout.trim`) so every
 // product is made from it. "undo" brings the whole photo back.
 // `key` = this drawing's identity (stays put when the trim swaps the picture in).
-export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean;
+// `bg` = the colour of the paper round the drawing (#rrggbb), measured in the browser (detectBackground) — the
+// edge-to-edge products' default base colour, and the tees' nearest colour (founder, 5 Nov). null = nothing to
+// match (white paper, a cut-out, a busy edge); absent = not measured yet.
+export type Upload = { dataUrl: string; name: string; key?: string; assetId?: string; opaqueBg?: boolean; aspect?: number; bg?: string | null; cutout?: Cutout; trim?: { url: string; sourceObjectId: string }; scratch?: boolean; kept?: boolean;
   /** picked from the keepsake box to make real again — its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts) */
   fromKeepsake?: boolean;
   /** a copy made for an edit (this visit's) — the keepsake it came from */
@@ -66,6 +69,7 @@ export function applyIngested(assetId: string, trimmed?: { sourceObjectId: strin
         key: s.upload.key ?? s.upload.dataUrl.slice(-64),
         dataUrl: trimmed.dataUrl,
         aspect: trimmed.aspect,
+        bg: undefined, // the trimmed picture's own edge is measured afresh (the table is gone)
         trim,
         cutout: s.upload.cutout ?? { ...trim, trim: true },
       },
@@ -117,6 +121,26 @@ export const useUpload = create<UploadStore>()(
   ),
 );
 
+// Measure each drawing's background colour once it's in (and again when the trim swaps the picture in) — in the
+// browser, instantly, so the range can ask for its previews on it straight away.
+if (typeof window !== 'undefined') {
+  let measuring: string | null = null;
+  const measure = () => {
+    const u = useUpload.getState().upload;
+    if (!u || u.bg !== undefined || measuring === u.dataUrl) return;
+    if (u.scratch) { useUpload.setState({ upload: { ...u, bg: null } }); return; }
+    const src = u.dataUrl;
+    measuring = src;
+    void detectBackground(src).then((bg) => {
+      measuring = null;
+      const now = useUpload.getState().upload;
+      if (now && now.dataUrl === src && now.bg === undefined) useUpload.setState({ upload: { ...now, bg } });
+    });
+  };
+  useUpload.subscribe(measure);
+  measure();
+}
+
 /** Has this tab's kept drawing been read yet? Always false on the server and the first client render. */
 export function useUploadHydrated(): boolean {
   return useSyncExternalStore(
@@ -138,6 +162,56 @@ export function detectAspect(dataUrl: string): Promise<number | undefined> {
     img.onerror = () => resolve(undefined);
     img.src = dataUrl;
   });
+}
+
+/**
+ * The colour of the PAPER round a drawing (#rrggbb) — the edge-to-edge products' default base colour, so the
+ * printable area behind the drawing matches its background (founder, 5 Nov). A ring round the edge of a ≤160 px
+ * copy: the median colour of its opaque pixels, if most of the ring is close to it. null when there's nothing to
+ * match: a cut-out (a see-through edge), white paper (white is already the default), or a busy edge (the drawing
+ * runs off the page). Cheap enough to run on every upload; resolves null on any decode failure.
+ */
+export function detectBackground(dataUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, 160 / Math.max(img.width, img.height));
+        const w = Math.max(1, Math.round(img.width * scale)), h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(null);
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(backgroundOf(ctx.getImageData(0, 0, w, h).data, w, h));
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = dataUrl;
+  });
+}
+
+/** The pure half of {@link detectBackground}: RGBA pixels → the paper colour, or null. */
+export function backgroundOf(data: Uint8ClampedArray | Uint8Array, w: number, h: number): string | null {
+  const ring = Math.max(2, Math.round(Math.min(w, h) * 0.04));
+  const px: Array<[number, number, number]> = [];
+  let total = 0;
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      if (x >= ring && x < w - ring && y >= ring && y < h - ring) continue;
+      total++;
+      const i = (y * w + x) * 4;
+      if (data[i + 3]! >= 250) px.push([data[i]!, data[i + 1]!, data[i + 2]!]);
+    }
+  if (px.length < total * 0.6) return null; // a see-through edge: a cut-out
+  const med = [0, 1, 2].map((c) => { const v = px.map((p) => p[c]!).sort((a, b) => a - b); return v[v.length >> 1]!; }) as [number, number, number];
+  const close = px.filter((p) => Math.abs(p[0] - med[0]) + Math.abs(p[1] - med[1]) + Math.abs(p[2] - med[2]) <= 54).length;
+  if (close < px.length * 0.55) return null; // a busy edge — no single background to match
+  if (med.every((v) => v >= 246)) return null; // white paper: white is the default already
+  return `#${med.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /**

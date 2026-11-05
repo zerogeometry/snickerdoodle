@@ -2,6 +2,7 @@ import { and, gte, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm'
 import { orderItems, orders, products } from '@/db/schema';
 import type { DbHandle } from './db';
 import { seasonalExpected, seasonClock } from '@/lib/season';
+import { pinLast } from '@/lib/catalogue-view';
 
 /**
  * The order products appear in on the range — "most popular" first.
@@ -73,8 +74,8 @@ export async function recomputePopularity(db: DbHandle, now = new Date()): Promi
   const sold = await unitsSold(db, now);
   // Christmas (D24): while the season is on, the festive range leads in a fixed order, the rest
   // follows by popularity; outside it this is just the popularity order (src/lib/season.ts).
-  // The family bundle is pinned to the very top either way (PINNED_FIRST).
-  const order = pinFirst(seasonalExpected(rankByPopularity(sold), seasonClock(now)));
+  // The family bundle is pinned to the very top either way (PINNED_FIRST), the height chart to the bottom (PINNED_LAST).
+  const order = pinLast(pinFirst(seasonalExpected(rankByPopularity(sold), seasonClock(now))));
   for (const [i, key] of order.entries()) {
     await db.update(products).set({ popularRank: i + 1 }).where(sql`${products.key} = ${key}`);
   }
