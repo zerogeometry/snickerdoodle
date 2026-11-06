@@ -20,6 +20,7 @@ import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { isBundleKey } from '@/lib/christmas-bundle';
 import { appUrl, sendMail } from './mail';
 import { assetRefOf, isHeldForReport } from './assetRef';
+import { itemName } from '@/lib/product-names';
 
 /** How long a gift link works (founder, 2026-10-21: 14 days, down from 30 — a forwarded bearer link
  * shows a child's drawing for less time; Children's Code). A parent can always share a fresh one. */
@@ -140,7 +141,7 @@ export async function createGiftLink(
       items.push({
         assetId: a.id,
         productKey: v.sku,
-        label: detail ? `${p.label} · ${detail}` : p.label,
+        label: detail ? `${itemName(p.key, p.label)} · ${detail}` : itemName(p.key, p.label),
         unitPricePence: prices[v.sku]!.pricePence,
         designId: d.id,
         transform: d.transform,
@@ -186,7 +187,7 @@ export async function createGiftLink(
       items.push({
         assetId: a.id,
         productKey: v.sku,
-        label: detail ? `${p.label} · ${detail}` : p.label,
+        label: detail ? `${itemName(p.key, p.label)} · ${detail}` : itemName(p.key, p.label),
         unitPricePence: prices[v.sku]!.pricePence,
         transform: clampTransform((l.transform ?? {}) as RawTransform),
         sourceObjectId,

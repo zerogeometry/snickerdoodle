@@ -17,7 +17,7 @@ describe('cardPackLine — the basket line shape', () => {
   it('is one card-pack line carrying exactly its cards, in pack order (repeats allowed)', () => {
     const cards = [cardOf('a'), cardOf('b'), cardOf('a'), cardOf('c', { sourceObjectId: 'cut-c' }), cardOf('a')];
     const line = cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards, previewVariantId: 'card-var' });
-    expect(line).toMatchObject({ id: 'pack-1', name: 'doodle card packs', product: 'cardPack', sku: 'cardPack', variantId: 'var-5', pricePence: 1200, sub: '5 cards · blank inside', previewVariantId: 'card-var' });
+    expect(line).toMatchObject({ id: 'pack-1', name: 'doodle card pack', product: 'cardPack', sku: 'cardPack', variantId: 'var-5', pricePence: 1200, sub: '5 cards · blank inside', previewVariantId: 'card-var' });
     expect(line.cards).toEqual(cards);
     expect(line).not.toHaveProperty('artwork'); // a pack is never a single-artwork line
     expect(line).not.toHaveProperty('message'); // blank inside — no printed message

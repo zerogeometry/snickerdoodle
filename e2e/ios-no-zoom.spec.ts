@@ -53,7 +53,7 @@ test('narrow phone (320px — an SE, or an iPhone with Display Zoom): the basket
   await quietCookies(page);
   await uploadAndOpenRange(page);
   await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
-  for (const product of ['mug', 'framed print']) {
+  for (const product of ['doodle mug', 'framed doodles']) {
     await page.getByRole('button', { name: `customize ${product}`, exact: true }).click();
     await page.getByRole('button', { name: /add to basket/ }).click();
     await expect(page).toHaveURL(/\/start-creating/, { timeout: 30_000 });

@@ -45,6 +45,7 @@ import { has3D } from '@/ui/three/spinnable';
 import type { CatalogueProduct } from '@/server/catalogue';
 import { clampTransform, type ResolutionAssessment } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
+import { itemName } from '@/lib/product-names';
 
 // Tier-C 3D spin view — lazy, so three.js never loads unless someone opens it.
 // (The framed print deliberately has NO 3D/wall views — founder call 2026-07-07:
@@ -545,7 +546,7 @@ function CustomizeProduct() {
     const groundLabel = isGround && isColouredGround(ground) ? (isPattern ? `${groundWord} ${groundNoun}` : `on ${groundWord}`) : null;
     const sub = [variant.attributes.size, variant.attributes.colour, variant.attributes.orientation === 'landscape' ? 'landscape' : null, backLabel, groundLabel, cardSpanLabel, cardMsg ? 'with a message' : null].filter(Boolean).join(' · ') || undefined;
     const fields = {
-      name: product.label,
+      name: itemName(product.key, product.label),
       product: product.key as ProductKey,
       sku: variant.sku,
       variantId: variant.id,

@@ -34,12 +34,16 @@ for (const vp of [
     await uploadAndOpenRange(page);
     await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
 
-    // the full catalogue pop-up
-    await page.getByRole('button', { name: /see the full catalogue/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await check('full catalogue pop-up');
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toHaveCount(0);
+    // the full catalogue pop-up — only offered when the catalogue holds more than the range shows
+    // (since 5 Nov every product on show is in the range, so there's nothing extra to open)
+    const fullCatalogue = page.getByRole('button', { name: /see the full catalogue/i });
+    if (await fullCatalogue.count()) {
+      await fullCatalogue.click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await check('full catalogue pop-up');
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+    }
 
     // the studio
     await page.getByRole('button', { name: /edit in studio/i }).first().click();

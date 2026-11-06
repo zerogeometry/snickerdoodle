@@ -21,15 +21,15 @@ test('family set: build a set → 3 pieces earns the saving → basket → serve
   // add a second kids tee → 3 pieces
   await sheet.getByRole('button', { name: 'kids doodle tees', exact: true }).click();
   await expect(sheet.getByText('3 pieces')).toBeVisible();
-  await expect(sheet.getByRole('button', { name: 'remove this kids tee' })).toHaveCount(2);
+  await expect(sheet.getByRole('button', { name: 'remove this kids doodle tee' })).toHaveCount(2);
 
   await sheet.getByRole('button', { name: /add the set to basket/ }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText(/kids doodle tees/).first()).toBeVisible();
-  await expect(page.getByText(/adults doodle tees/).first()).toBeVisible();
+  await expect(page.getByText(/kids doodle tee/).first()).toBeVisible();
+  await expect(page.getByText(/adults doodle tee/).first()).toBeVisible();
 
   // the server re-prices: subtotal 2 × £25 + £32 = £82, and ONE saving applies — the 5% set saving
   // (£4.10), or buy-more-&-save on the two kids tees when that's bigger (it is once the product costs

@@ -59,9 +59,9 @@ test('card pack: pack of 5 → one drawing on all five → basket → server-pri
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('doodle card packs', { exact: true })).toBeVisible();
+  await expect(page.getByText('doodle card pack', { exact: true })).toBeVisible();
   await expect(page.getByText('5 cards · on navy · blank inside')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'edit the cards in your card pack' })).toBeVisible(); // visible text 'edit cards', named for its line
+  await expect(page.getByRole('button', { name: 'edit the cards in your doodle card pack' })).toBeVisible(); // visible text 'edit cards', named for its line
   await expect(page.getByRole('button', { name: /^one more/ })).toHaveCount(0); // a pack has no quantity
 
   // the SERVER prices it: one pack of five = £12

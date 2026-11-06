@@ -1,6 +1,7 @@
 import { productOfKey, quote, type RequestedLine } from '@/pricing';
 import { suggestComplements } from '@/lib/complements';
 import type { CatalogueProduct } from './catalogue';
+import { itemName } from '@/lib/product-names';
 
 /**
  * CHECKOUT ADD-ONS (founder, 29 Oct): up to three products NOT in the basket that go with what is,
@@ -38,6 +39,6 @@ export function pickAddOns(onShow: readonly CatalogueProduct[], requested: reado
     const withIt = quote([...requested, { productKey: v.sku, qty: 1 }], opts);
     const added = withIt.lines.find((l) => l.productKey === v.sku);
     if (!added) return []; // not priceable here — never offer what can't be bought
-    return [{ productKey: k, label: p.label, sku: v.sku, variantId: v.id, attributes: v.attributes, pricePence: added.unitPricePence, savingPence: Math.max(0, withIt.parcelSavingPence - base.parcelSavingPence) }];
+    return [{ productKey: k, label: itemName(k, p.label), sku: v.sku, variantId: v.id, attributes: v.attributes, pricePence: added.unitPricePence, savingPence: Math.max(0, withIt.parcelSavingPence - base.parcelSavingPence) }];
   });
 }

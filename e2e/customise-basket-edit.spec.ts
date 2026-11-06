@@ -19,18 +19,18 @@ test('pack labels say how many the price buys (placemats, coasters 2 / 4 / 6)', 
   test.setTimeout(180_000);
   await ready(page);
   await goClient(page, '/customize/placemat');
-  await expect(page.getByText('a set of 4 placemats, one drawing on all 4', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('a set of 4 doodle placemats, one drawing on all 4', { exact: true })).toBeVisible({ timeout: 30_000 });
   // the bundle-only placemat packs (1 / 2 / 6) are never offered on their own
   await expect(optionGroup(page, 'Size')).toHaveCount(0);
   await goClient(page, '/customize/coaster');
-  await expect(page.getByText('a set of 6 coasters, one drawing on all 6', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('a set of 6 doodle coasters, one drawing on all 6', { exact: true })).toBeVisible({ timeout: 30_000 });
   const sizes = optionGroup(page, 'Size').getByRole('button');
   await expect(sizes).toHaveText(['pack of 2', 'pack of 4', 'pack of 6']); // no single coaster
   await sizes.nth(0).click();
-  await expect(page.getByText('a set of 2 coasters, one drawing on both', { exact: true })).toBeVisible();
+  await expect(page.getByText('a set of 2 doodle coasters, one drawing on both', { exact: true })).toBeVisible();
   await expect(addBtn(page)).toHaveText(/· £18$/);
   await sizes.nth(1).click();
-  await expect(page.getByText('a set of 4 coasters, one drawing on all 4', { exact: true })).toBeVisible();
+  await expect(page.getByText('a set of 4 doodle coasters, one drawing on all 4', { exact: true })).toBeVisible();
   await expect(addBtn(page)).toHaveText(/· £26$/);
 });
 
@@ -40,14 +40,14 @@ test('buy more & save: the dropdown shows each quantity’s saving and adds that
   await goClient(page, '/customize/mug');
   await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('buy more & save', { exact: true })).toBeVisible();
-  await qtySelect(page, 'mug').click();
+  await qtySelect(page, 'doodle mug').click();
   const opts = page.getByRole('option');
   await expect(opts).toHaveCount(10);
   const texts = await opts.allInnerTexts();
   expect(texts[0]!.replace(/\s+/g, ' ').trim(), 'one mug: no saving note').toBe('1');
   expect(texts.some((t) => /\d+% off/.test(t)), `some quantity earns a saving: ${texts.join(' / ')}`).toBe(true);
   await opts.nth(2).click(); // 3
-  await expect(qtySelect(page, 'mug')).toHaveText(/^3/);
+  await expect(qtySelect(page, 'doodle mug')).toHaveText(/^3/);
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
   const lines = await basketLines(page);
@@ -71,7 +71,7 @@ test('editing a basket line into another line’s variant keeps BOTH quantities 
   const [c0, c1] = [(await colours.nth(0).innerText()).trim(), (await colours.nth(1).innerText()).trim()];
   // line A: colour 0, qty 2
   await colours.nth(0).click();
-  await qtySelect(page, 'mug').click();
+  await qtySelect(page, 'doodle mug').click();
   await page.getByRole('option').nth(1).click();
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
@@ -107,7 +107,7 @@ test('the basket sidebar’s edit reopens THAT line (drawing, variant, placement
   await expect(page).toHaveURL(/\/start-creating/);
   const [line] = await basketLines(page);
   const basket = page.getByRole('complementary', { name: 'your basket' }).first();
-  await basket.getByRole('button', { name: /^edit mug/ }).first().click();
+  await basket.getByRole('button', { name: /^edit doodle mug/ }).first().click();
   await expect(page).toHaveURL((u) => u.pathname === '/customize/mug' && u.searchParams.get('edit') === line!.id);
   await expect(addBtn(page)).toHaveText(/update basket · /, { timeout: 30_000 });
   await expect(optionGroup(page, 'Colour').getByRole('button').last()).toHaveAttribute('aria-pressed', 'true');
@@ -128,7 +128,7 @@ test('02-B4: checkout’s "customize your …" reopens that line in update mode'
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
   await page.goto('/checkout');
-  await page.getByRole('button', { name: 'customize your mug' }).click();
+  await page.getByRole('button', { name: 'customize your doodle mug' }).click();
   await expect(page).toHaveURL(/\/customize\/mug/);
   const url = page.url();
   const button = (await addBtn(page).innerText()).trim();

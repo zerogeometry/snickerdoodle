@@ -61,7 +61,7 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
       log.push(`${key}: front + back composed`);
     }
     // the placemat's back is the founder's photo of the cork underside, as authored
-    await open(page, 'placemat', 'placemats');
+    await open(page, 'placemat', 'doodle placemats');
     const still = page.waitForResponse((r) => r.url().includes('/api/mockup/still') && r.url().includes('view=back'));
     await page.getByRole('button', { name: 'show the back' }).click();
     const sr = await still;
@@ -71,22 +71,22 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
     await page.screenshot({ path: `${SHOTS}/view-${vp.name}-placemat-back.jpg`, type: 'jpeg', quality: 55 });
 
     // the mug's three sides
-    await open(page, 'mug', 'mug');
+    await open(page, 'mug', 'doodle mug');
     for (const side of ['front', 'back', 'centre'] as const) {
-      await page.getByRole('group', { name: 'doodle mug view' }).getByRole('button', { name: `the ${side}` }).click();
+      await page.getByRole('group', { name: 'mug view' }).getByRole('button', { name: `the ${side}` }).click();
       await composed(seen, (c) => c.view === side, `mug ${side}`);
     }
     log.push('mug: centre / front / back composed');
 
     // the jigsaw: the puzzle + the keepsake tin
-    await open(page, 'jigsaw', 'jigsaw');
+    await open(page, 'jigsaw', 'doodle jigsaws');
     await page.getByRole('button', { name: 'the tin', exact: true }).click();
     await composed(seen, (c) => c.view === 'tin', 'jigsaw tin');
     await page.getByRole('button', { name: 'the puzzle', exact: true }).click();
     log.push('jigsaw: puzzle + tin composed');
 
     // the card: single, the outside (front only / full width)
-    await open(page, 'card', 'greetings card');
+    await open(page, 'card', 'greetings cards');
     await page.getByRole('button', { name: 'outside of the card' }).click();
     await composed(seen, (c) => c.view === 'outside-front', 'card outside (front only)');
     await page.getByRole('button', { name: 'full width', exact: true }).click();
@@ -98,7 +98,7 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
 
     // the cushion: each shape, and on a square, every back (white = single-sided; a colour or both sides = double)
     const cushion = (await shopCatalogue()).find((p) => p.key === 'cushion')!;
-    await open(page, 'cushion', 'cushion');
+    await open(page, 'cushion', 'doodle cushions');
     for (const shape of ['heart', 'round', 'square'] as const) {
       await page.getByRole('button', { name: `${shape} cushion` }).click();
       await page.getByRole('button', { name: 'show the back' }).click();
@@ -134,7 +134,7 @@ test('extras reach the basket: cushion back, base colour, card span + message â€
   await ready(page);
 
   // cushion: a 12â€³ square, image on both sides â†’ the DUAL sku, back 'both'
-  await open(page, 'cushion', 'cushion');
+  await open(page, 'cushion', 'doodle cushions');
   await optionGroup(page, 'Size').getByRole('button', { name: '12â€³ square' }).click();
   await page.getByRole('button', { name: 'image both sides' }).click();
   await addBtn(page).click();
@@ -145,7 +145,7 @@ test('extras reach the basket: cushion back, base colour, card span + message â€
   expect(line.sub).toContain('both sides');
 
   // socks: a base colour typed as a code â†’ the compose and the line carry it
-  await open(page, 'socks', 'socks');
+  await open(page, 'socks', 'doodle socks');
   await page.getByRole('button', { name: /sock colour: /i }).click(); // (starts on the paper's own colour)
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('textbox').fill('#2f5da8');
@@ -161,7 +161,7 @@ test('extras reach the basket: cushion back, base colour, card span + message â€
   await composed(seen, (c) => c.ground === '#2f5da8', 'reopened socks on #2f5da8');
 
   // card: full width + a message
-  await open(page, 'card', 'greetings card');
+  await open(page, 'card', 'greetings cards');
   await page.getByRole('button', { name: 'full width', exact: true }).click();
   await page.getByRole('button', { name: 'add a message', exact: true }).click();
   await page.getByPlaceholder('Happy Birthday!').fill('Merry Christmas Gran');
@@ -186,14 +186,14 @@ test('02-B3: reopening a card from the basket brings back ITS message and span',
   await page.setViewportSize({ width: 1280, height: 800 });
   await ready(page);
   // card 1: full width + "for Gran"
-  await open(page, 'card', 'greetings card');
+  await open(page, 'card', 'greetings cards');
   await page.getByRole('button', { name: 'full width', exact: true }).click();
   await page.getByRole('button', { name: 'add a message', exact: true }).click();
   await page.getByPlaceholder('Happy Birthday!').fill('for Gran');
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
   // card 2 (same drawing): front only, left blank
-  await open(page, 'card', 'greetings card');
+  await open(page, 'card', 'greetings cards');
   await page.getByRole('button', { name: 'front only', exact: true }).click();
   await page.getByRole('button', { name: 'leave it blank', exact: true }).click();
   await addBtn(page).click();

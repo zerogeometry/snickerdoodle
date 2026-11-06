@@ -2,6 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { printTemplates, productVariants, products } from '@/db/schema';
 import type { DbHandle } from './db';
 import { templateGeom } from './print/geometry';
+import { itemName } from '@/lib/product-names';
 
 /**
  * Pure DB loading of the printable product variants for the placement editor — kept
@@ -36,7 +37,7 @@ type VariantRow = { v: typeof productVariants.$inferSelect; p: typeof products.$
 function variantLabel(p: typeof products.$inferSelect, v: typeof productVariants.$inferSelect): string {
   const a = (v.attributes ?? {}) as Record<string, string>;
   const bits = [a.size, a.colour, a.orientation === 'landscape' ? 'landscape' : null].filter(Boolean);
-  return bits.length ? `${p.label} · ${bits.join(' · ')}` : p.label;
+  return bits.length ? `${itemName(p.key, p.label)} · ${bits.join(' · ')}` : itemName(p.key, p.label);
 }
 
 function toStudioVariant({ v, p, t }: VariantRow): StudioVariant {

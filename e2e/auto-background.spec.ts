@@ -82,7 +82,7 @@ for (const size of SIZES) test.describe(size.name, () => {
     await expect(tiles.last()).toHaveAccessibleName('customize doodle height chart');
 
     // the tea towel and the wrapping paper, straight into the basket from their customise pages: on honey
-    for (const [key, name] of [['teaTowel', 'tea towel'], ['wrappingPaper', 'wrapping paper']] as const) {
+    for (const [key, name] of [['teaTowel', 'doodle tea towel'], ['wrappingPaper', 'doodle wrapping paper']] as const) {
       await goClient(page, `/customize/${key}`);
       await expect(page.getByRole('heading', { level: 1, name })).toBeVisible({ timeout: 30_000 });
       await customizeReady(page);

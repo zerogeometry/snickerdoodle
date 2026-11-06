@@ -15,6 +15,7 @@ import { WATCH_STRAP_SIZES } from '@/lib/watch-strap';
 import { CASE_FINISHES, CASE_GRADES, CASE_PRICE_PENCE, PHONE_MODELS, prodigiCaseSku } from '@/lib/phone-cases';
 import { BUNDLE_ONLY_SKUS, BUNDLE_SIZES, isBundleKey } from '@/lib/christmas-bundle';
 import { FRAME_GRIDS, MULTI_FRAME_COLOURS, type FrameSize } from '@/lib/multi-photo-frame';
+import { itemName } from '@/lib/product-names';
 
 export { mmToPx };
 
@@ -946,7 +947,7 @@ export async function seedCatalogue(db: DbHandle): Promise<{ products: number; v
       }
       const isDefault = i === defaultIndex;
       const attributes = variantAttributes(v);
-      const label = [def.label, v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
+      const label = [itemName(key, def.label), v.size, v.colour, v.orientation === 'landscape' ? 'landscape' : null, v.sides === 'double' ? 'double-sided' : null, v.grade, v.finish].filter(Boolean).join(' · ');
       return { v, values: { productId: product!.id, sku: currentSkus[i]!, label, attributes, pricePence: v.pricePence, isDefault, sortOrder: i, active: true } };
     });
     variantCount += rows.length;

@@ -144,13 +144,13 @@ test.describe('public pages', () => {
   };
   // product page slug → the tile's name on /catalogue
   const TILE: Record<string, string> = {
-    'framed-print': 'framed print', mug: 'mug', cushion: 'cushion', 'kids-t-shirt': 'kids tee', 'adult-t-shirt': 'adult tee', jigsaw: 'jigsaw',
-    'fleece-blanket': 'fleece blanket', 'greetings-card': 'greetings card', 'card-pack': 'card pack', 'wall-calendar': 'calendar',
+    'framed-print': 'framed doodles', mug: 'doodle mug', cushion: 'doodle cushions', 'kids-t-shirt': 'kids doodle tees', 'adult-t-shirt': 'adults doodle tees', jigsaw: 'doodle jigsaws',
+    'fleece-blanket': 'doodle blanket', 'greetings-card': 'greetings cards', 'card-pack': 'doodle card packs', 'wall-calendar': 'doodle calendar',
     'ceramic-christmas-ornament': 'ceramic christmas ornament', 'christmas-bauble': 'christmas bauble', 'christmas-sack': 'christmas sack',
-    'christmas-family-bundle': 'christmas family bundle', 'phone-case': 'phone case', socks: 'socks', 'height-chart': 'height chart',
-    'wrapping-paper': 'wrapping paper', 'tea-towel': 'tea towel', 'playing-cards': 'playing cards', placemats: 'placemats', coasters: 'coasters',
-    'multi-photo-frame': 'multi photo frame',
-    'apple-watch-strap': 'apple watch strap',
+    'christmas-family-bundle': 'christmas family bundles', 'phone-case': 'doodle phone cases', socks: 'doodle socks', 'height-chart': 'doodle height chart',
+    'wrapping-paper': 'doodle wrapping paper', 'tea-towel': 'doodle tea towel', 'playing-cards': 'doodle playing cards', placemats: 'doodle placemats', coasters: 'doodle coasters',
+    'multi-photo-frame': 'framed multi doodles',
+    'apple-watch-strap': 'apple watch straps',
   };
   // 09-B1: the public pages for placemats + coasters list the bundle-only packs (BUNDLE_ONLY_SKUS) and lead with them
   const BUNDLE_PACKS = ['placemats', 'coasters'];
@@ -177,7 +177,7 @@ test.describe('public pages', () => {
     await quietCookies(page);
     const tiles = await cataloguePrices(page);
     for (const slug of BUNDLE_PACKS) {
-      expect(await pagePrice(page, `/products/${slug}`), slug).toBe(tiles.get(slug));
+      expect(await pagePrice(page, `/products/${slug}`), slug).toBe(tiles.get(TILE[slug] ?? slug));
       await expect(page.getByText('pack of 1', { exact: true })).toHaveCount(0);
     }
   });
@@ -274,7 +274,7 @@ test.describe('states', () => {
     await expect(chips).toHaveText(['all', 'festive', 'cards & prints', 'home', 'wear', 'gifts']);
     const shown = () => page.getByRole('button', { name: /^Enlarge .* preview$/ }).evaluateAll((els) => els.map((e) => e.getAttribute('aria-label')!.replace(/^Enlarge | preview$/g, '')));
     const all = await shown();
-    expect(all[0]).toBe('christmas family bundle');
+    expect(all[0]).toBe('christmas family bundles');
     const seen = new Set<string>();
     for (const c of ['festive', 'cards & prints', 'home', 'wear', 'gifts']) {
       await chips.filter({ hasText: c }).click();
@@ -284,7 +284,7 @@ test.describe('states', () => {
       for (const t of these) seen.add(t);
     }
     expect([...seen].sort(), 'the groups between them hold the whole range').toEqual([...all].sort());
-    expect((await (async () => { await chips.filter({ hasText: 'festive' }).click(); return shown(); })())[0]).toBe('christmas family bundle');
+    expect((await (async () => { await chips.filter({ hasText: 'festive' }).click(); return shown(); })())[0]).toBe('christmas family bundles');
   });
 
   test('09-B5: an unknown address shows a branded "not found" page with a way back (not the bare framework 404)', async ({ page }) => {
@@ -307,7 +307,7 @@ test.describe('states', () => {
     expect(named.length).toBeGreaterThan(5);
     expect(named.filter((b) => b.name === b.text), 'named only "customize"').toEqual([]);
     expect(named.filter((b) => !b.name.startsWith(b.text)), 'name starts with the visible words').toEqual([]);
-    expect(named.map((b) => b.name)).toContain(`${named[0]!.text} mug`);
+    expect(named.map((b) => b.name)).toContain(`${named[0]!.text} doodle mug`);
   });
 });
 

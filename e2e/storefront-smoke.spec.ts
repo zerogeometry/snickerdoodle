@@ -22,18 +22,18 @@ import sharp from 'sharp';
  */
 
 const LIVE = [
-  { key: 'framedPrint', label: 'framed print', pence: 6500 },
-  { key: 'cushion', label: 'cushion', pence: 2200 },
-  { key: 'mug', label: 'mug', pence: 1800 },
-  { key: 'jigsaw', label: 'jigsaw', pence: 2600 },
-  { key: 'blanket', label: 'fleece blanket', pence: 6000 },
-  { key: 'card', label: 'greetings card', pence: 550 },
+  { key: 'framedPrint', label: 'framed doodles', pence: 6500 },
+  { key: 'cushion', label: 'doodle cushions', pence: 2200 },
+  { key: 'mug', label: 'doodle mug', pence: 1800 },
+  { key: 'jigsaw', label: 'doodle jigsaws', pence: 2600 },
+  { key: 'blanket', label: 'doodle blanket', pence: 6000 },
+  { key: 'card', label: 'greetings cards', pence: 550 },
   // the range expansion, live 2026-10-21 (card packs have their own builder spec)
-  { key: 'socks', label: 'socks', pence: 2000 },
-  { key: 'heightChart', label: 'height chart', pence: 3100 },
-  { key: 'wrappingPaper', label: 'wrapping paper', pence: 2300 },
-  { key: 'teaTowel', label: 'tea towel', pence: 2700 },
-  { key: 'playingCards', label: 'playing cards', pence: 2400 },
+  { key: 'socks', label: 'doodle socks', pence: 2000 },
+  { key: 'heightChart', label: 'doodle height chart', pence: 3100 },
+  { key: 'wrappingPaper', label: 'doodle wrapping paper', pence: 2300 },
+  { key: 'teaTowel', label: 'doodle tea towel', pence: 2700 },
+  { key: 'playingCards', label: 'doodle playing cards', pence: 2400 },
 ] as const;
 
 const SUBTOTAL = LIVE.reduce((s, p) => s + p.pence, 0); // 34550

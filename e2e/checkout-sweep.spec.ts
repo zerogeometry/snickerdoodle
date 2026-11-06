@@ -163,7 +163,7 @@ test.describe('checkout sweep 05', () => {
     const actions = recordActions(page);
     await parentWithMug(page);
     const price = await mugPrice(page);
-    await page.getByRole('button', { name: /how many mug/ }).click();
+    await page.getByRole('button', { name: /how many doodle mug/ }).click();
     const two = page.getByRole('option', { name: /^2/ });
     await expect(two).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/multibuy-dropdown.png` });

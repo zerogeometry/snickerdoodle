@@ -9,6 +9,7 @@ import type { DbHandle } from './db';
 import { resolveViewerContext } from './assets';
 import { keepAndFileCreations } from './keepsakes';
 import { assetRefOf } from './assetRef';
+import { itemName } from '@/lib/product-names';
 
 /** Products that can be saved/gifted as a design (a card needs its buyer's own inside message; a card
  * pack is built from N drawings at the basket, a calendar from its 13 pages, a multi photo frame from a
@@ -110,7 +111,7 @@ export async function listSavedDesigns(db: DbHandle, accountId: string, familyId
       assetId: a.id,
       variantSku: v.sku,
       productKey: p.key,
-      label: detail ? `${p.label} · ${detail}` : p.label,
+      label: detail ? `${itemName(p.key, p.label)} · ${detail}` : itemName(p.key, p.label),
       pricePence: v.pricePence,
       imageUrl: key ? await presignDownload(key, 300) : null,
       createdAtISO: d.createdAt.toISOString(),

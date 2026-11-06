@@ -46,7 +46,7 @@ test('phone case: type to find the phone → tough + matte → basket → server
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText(/doodle phone cases/).first()).toBeVisible();
+  await expect(page.getByText(/doodle phone case/).first()).toBeVisible();
   const summary = page.locator('dl').first();
   await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText('£30');
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);

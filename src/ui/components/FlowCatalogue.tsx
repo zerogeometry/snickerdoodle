@@ -32,6 +32,7 @@ import { isCalendarKey } from '@/lib/calendar';
 import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { isBundleKey } from '@/lib/christmas-bundle';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
+import { itemName } from '@/lib/product-names';
 
 function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour, v.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean);
@@ -224,7 +225,7 @@ export function FlowCatalogue({
     else
       add({
         id: defId,
-        name: p.label,
+        name: itemName(p.key, p.label),
         product: p.key as ProductKey,
         sku: def.sku,
         variantId: def.id,

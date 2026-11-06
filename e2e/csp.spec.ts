@@ -98,7 +98,7 @@ async function shopJourney(page: Page) {
   // checkout (the Stripe hand-off is a full-page redirect, so nothing of Stripe's runs here)
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed doodles').first()).toBeVisible();
+  await expect(page.getByText('framed doodle').first()).toBeVisible();
 }
 
 test('the watcher really catches a refusal (so a silent pass above means something)', async ({ page }) => {

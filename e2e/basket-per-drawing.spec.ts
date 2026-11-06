@@ -40,7 +40,7 @@ test('two drawings on the same product are two basket lines, each with its own q
   expect(a).not.toBe(b); // each line shows its own drawing
 
   // + on the second line counts up that line only
-  await basket.getByRole('button', { name: 'one more socks' }).nth(1).click();
+  await basket.getByRole('button', { name: 'one more doodle socks' }).nth(1).click();
   const lines = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{}').state.items.map((i: { qty: number; artwork: { assetId: string } }) => [i.artwork.assetId, i.qty]));
   expect(lines).toHaveLength(2);
   expect(lines.map((l: [string, number]) => l[1])).toEqual([1, 2]);

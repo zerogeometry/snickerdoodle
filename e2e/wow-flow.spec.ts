@@ -36,7 +36,7 @@ test('wow flow: upload → personalised range → add → checkout → personali
   // Checkout — the basket persists across navigation (sessionStorage).
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed doodles').first()).toBeVisible();
+  await expect(page.getByText('framed doodle').first()).toBeVisible();
   // A personalised line asks a guest to sign up (the controlling-parent gate).
   await expect(page.getByText(/magic-link sign-up/i)).toBeVisible();
 

@@ -14,6 +14,7 @@ import { basketLineId } from '@/lib/basket-line';
 import { FAMILY_SET_MIN_QTY, isFamilySetKey } from '@/pricing';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { FAMILY_SET_COLOURS, garmentHex } from '@/lib/garments';
+import { itemName } from '@/lib/product-names';
 
 const DEFAULT_TF = { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 }; // scale 0 = fit the WHOLE image
 
@@ -249,7 +250,7 @@ export function FamilySetModal({
                 type="button"
                 data-remove
                 onClick={() => removeMember(m.uid)}
-                aria-label={`remove this ${product.label}`}
+                aria-label={`remove this ${itemName(product.key, product.label)}`}
                 className="relative shrink-0 rounded-full p-1.5 text-ink-faint before:absolute before:-inset-[8px] before:content-[''] hover:text-berry"
               >
                 <Icon icon={IconX} size={16} />

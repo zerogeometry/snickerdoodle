@@ -31,7 +31,7 @@ for (const vp of [{ w: 390, h: 844 }, { w: 1280, h: 900 }]) {
 
     await expect(loader).toBeVisible({ timeout: 5_000 });
     expect(await photo.getAttribute('src')).toBe(before); // the old photo stays underneath
-    await expect(page.getByRole('button', { name: /enlarge socks preview/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /enlarge doodle socks preview/i })).toBeVisible();
 
     await expect(loader).toHaveCount(0, { timeout: 60_000 });
     expect(await photo.getAttribute('src')).not.toBe(before);

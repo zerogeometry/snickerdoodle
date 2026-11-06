@@ -1,5 +1,6 @@
 import { CATALOGUE, isCatalogueKey, productOfKey } from '@/pricing';
 import { bundleSizeOf } from '@/lib/christmas-bundle';
+import { itemName } from '@/lib/product-names';
 
 /**
  * How an order reads to the family who paid for it — the confirmation email and the orders page
@@ -32,7 +33,7 @@ export interface ReceiptLine {
 
 const productLabel = (key: string): string => {
   const product = productOfKey(key);
-  return isCatalogueKey(product) ? CATALOGUE[product].label : 'keepsake';
+  return isCatalogueKey(product) ? itemName(product, CATALOGUE[product].label) : 'keepsake';
 };
 
 /** What sets this variant apart, from its frozen attributes ("pack of 4", "11oz, blue"). */

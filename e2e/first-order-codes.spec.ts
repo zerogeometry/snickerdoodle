@@ -17,7 +17,7 @@ test.use({ contextOptions: { reducedMotion: 'reduce' } });
 const SHOTS = 'reports/c10-first-order-codes';
 
 /** Add the shopper's drawing on `product` to the basket from the range (uploading once if needed). */
-async function addToBasket(page: Page, product: 'mug' | 'greetings card', key: string) {
+async function addToBasket(page: Page, product: 'doodle mug' | 'greetings cards', key: string) {
   const tile = page.getByRole('button', { name: `customize ${product}`, exact: true });
   // a returning shopper's drawing comes back with its range (once it's made); a new one uploads first
   const upload = page.getByRole('button', { name: /upload a drawing/i });
@@ -77,7 +77,7 @@ test('a creator code on a first order: 10% off at checkout, charged exactly, the
     const parent = testEmail('c10follower');
     await quietCookies(page);
     await signInByEmailLink(page, parent, '/start-creating');
-    await addToBasket(page, 'mug', 'mug');
+    await addToBasket(page, 'doodle mug', 'mug');
     await toCheckout(page, parent);
     const price = await priceOf((await basketSkus(page))[0]!);
     await applyCode(page, code);
@@ -97,7 +97,7 @@ test('a creator code on a first order: 10% off at checkout, charged exactly, the
 
     // the same parent, a second basket: the code is for a first order — full price, nothing to the creator
     await page.goto('/start-creating');
-    await addToBasket(page, 'mug', 'mug');
+    await addToBasket(page, 'doodle mug', 'mug');
     await toCheckout(page, parent);
     await applyCode(page, code);
     await expect(aside.getByRole('status')).toHaveText(/that code is for a first order/);
@@ -121,8 +121,8 @@ test('a free-card code on a first order: one greetings card comes off, delivery 
     const parent = testEmail('c10card');
     await quietCookies(page);
     await signInByEmailLink(page, parent, '/start-creating');
-    await addToBasket(page, 'greetings card', 'card');
-    await addToBasket(page, 'mug', 'mug');
+    await addToBasket(page, 'greetings cards', 'card');
+    await addToBasket(page, 'doodle mug', 'mug');
     await toCheckout(page, parent);
     const skus = await basketSkus(page);
     const card = await priceOf(skus.find((s) => s.startsWith('card'))!);

@@ -48,6 +48,6 @@ test('studio journey: upload → studio edit → done → the range shows the ed
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed doodles').first()).toBeVisible();
+  await expect(page.getByText('framed doodle').first()).toBeVisible();
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);
 });

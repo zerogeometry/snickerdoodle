@@ -16,7 +16,7 @@ describe('05-B5: how an order reads on the receipt and the orders page', () => {
     ];
     expect(parts.length).toBeGreaterThan(1);
     expect(receiptLines(lines)).toEqual([
-      { productKey: 'christmasBundle', label: 'christmas family bundles · a set for 4', qty: 1, linePence: 14500 },
+      { productKey: 'christmasBundle', label: 'christmas family bundle · a set for 4', qty: 1, linePence: 14500 },
       { productKey: 'mug', label: 'doodle mug · 11oz, blue', qty: 2, linePence: 3600 },
       { productKey: 'coaster', label: 'doodle coasters · pack of 4', qty: 1, linePence: 2600 },
     ]);
@@ -31,8 +31,8 @@ describe('05-B5: how an order reads on the receipt and the orders page', () => {
     ];
     const out = receiptLines(two);
     expect(out.map((l) => [l.label, l.linePence])).toEqual([
-      ['christmas family bundles · a set for 2', 7800],
-      ['christmas family bundles · a set for 4', 9000],
+      ['christmas family bundle · a set for 2', 7800],
+      ['christmas family bundle · a set for 4', 9000],
       ['keepsake', 100],
     ]);
     for (const l of out) expect(l.label).not.toMatch(/-|packof/);

@@ -318,7 +318,7 @@ export function ChristmasBundleBuilder() {
 
         {/* Right: title → the three steps → what it adds up to → add to basket (bottom-right) */}
         <div className="flex flex-col">
-          <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">christmas family bundle</h1>
+          <h1 className="font-display text-[32px] leading-tight text-cocoa md:text-4xl">christmas family bundles</h1>
           <p className="mt-1 text-sm text-ink-soft">their drawings on the christmas table and on the tree — placemats, coasters and an ornament for everyone, in one parcel.</p>
           <div className="mt-2 flex flex-wrap items-center gap-2.5">
             <span className="sticker inline-flex rotate-[-2deg] rounded-[12px] bg-honey px-3 py-1 font-display text-2xl text-cocoa" aria-live="polite">

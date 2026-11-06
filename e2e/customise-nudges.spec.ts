@@ -70,7 +70,7 @@ test('the add button with 3 chosen (records what it says)', async ({ page }) => 
   await goClient(page, '/customize/mug');
   await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   const one = (await addBtn(page).innerText()).trim();
-  await page.getByRole('button', { name: /^how many mug/ }).click();
+  await page.getByRole('button', { name: /^how many doodle mug/ }).click();
   await page.getByRole('option').nth(2).click();
   const three = (await addBtn(page).innerText()).trim();
   test.info().annotations.push({ type: 'add button', description: JSON.stringify({ one, three }) });

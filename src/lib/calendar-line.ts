@@ -26,7 +26,7 @@ export function calendarLine(opts: {
   const drawings = new Set(pages.map((p) => p.assetId)).size;
   return {
     id: opts.id,
-    name: 'calendar',
+    name: 'doodle calendar',
     product: CALENDAR_KEY,
     sku: opts.variant.sku,
     variantId: opts.variant.id,
