@@ -28,7 +28,7 @@ test.fixme('customize opens with the range tile, then sharpens', async ({ page }
     await r.continue();
   });
 
-  await page.getByRole('button', { name: /^customize mug/i }).first().click();
+  await page.getByRole('button', { name: /^customize doodle mug/i }).first().click();
   await expect(page).toHaveURL(/\/customize\/mug/);
 
   const big = page.locator('img[alt="your drawing on a mug"]').first();

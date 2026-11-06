@@ -25,7 +25,7 @@ test('wow flow: upload → personalised range → add → checkout → personali
   // The Start-Creating range adds via "+ customize" (basket-sidebar model — there is no
   // direct per-tile add). Open the framed print, then add to basket; this ingests the
   // upload server-side and the basket line carries the artwork.
-  await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+  await page.getByRole('button', { name: 'customize framed doodles', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/framedPrint(\?|$)/);
   await page.getByRole('button', { name: /add to basket/ }).click();
 
@@ -36,7 +36,7 @@ test('wow flow: upload → personalised range → add → checkout → personali
   // Checkout — the basket persists across navigation (sessionStorage).
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed print').first()).toBeVisible();
+  await expect(page.getByText('framed doodles').first()).toBeVisible();
   // A personalised line asks a guest to sign up (the controlling-parent gate).
   await expect(page.getByText(/magic-link sign-up/i)).toBeVisible();
 

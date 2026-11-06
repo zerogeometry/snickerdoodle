@@ -12,7 +12,7 @@ for (const vp of [{ w: 390, h: 844 }, { w: 1280, h: 900 }]) {
     await page.setViewportSize({ width: vp.w, height: vp.h });
     await quietCookies(page);
     await uploadAndOpenRange(page);
-    await page.getByRole('button', { name: 'customize socks', exact: true }).click();
+    await page.getByRole('button', { name: 'customize doodle socks', exact: true }).click();
     await expect(page).toHaveURL(/\/customize\/socks/);
 
     const loader = page.getByRole('status').filter({ hasText: 'updating your preview' });

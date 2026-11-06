@@ -40,7 +40,7 @@ export function cardPackLine(opts: {
   const ground = normalizeGround(opts.ground);
   return {
     id: packLineId(id, ground),
-    name: 'card pack',
+    name: 'doodle card packs',
     product: CARD_PACK_KEY,
     sku: variant.sku,
     variantId: variant.id,

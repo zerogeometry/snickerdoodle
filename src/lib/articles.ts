@@ -3,7 +3,7 @@
  * (sweep 09-B12: "add a adult tee", "add a placemats"). Plural names (they end in -s) and the stuff
  * you buy by the roll take no article; vowel sounds take "an".
  */
-const NO_ARTICLE = new Set(['wrapping paper', 'gift wrap', 'washi tape']);
+const NO_ARTICLE = new Set(['wrapping paper', 'doodle wrapping paper', 'gift wrap', 'washi tape']);
 
 export function withArticle(noun: string): string {
   const n = noun.trim();

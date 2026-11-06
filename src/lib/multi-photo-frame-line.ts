@@ -29,7 +29,7 @@ export function frameGridLine(opts: {
   const drawings = new Set(slots.map((p) => p.assetId)).size;
   return {
     id: opts.id,
-    name: 'multi photo frame',
+    name: 'framed multi doodles',
     product: MULTI_PHOTO_FRAME_KEY,
     sku: opts.variant.sku,
     variantId: opts.variant.id,

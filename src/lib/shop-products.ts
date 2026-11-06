@@ -76,27 +76,27 @@ const CAT = {
 
 export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   framedPrint: {
-    slug: 'framed-print', name: 'framed print', title: 'Framed print of your child’s drawing',
+    slug: 'framed-print', name: 'framed doodles', title: 'Framed print of your child’s drawing',
     googleCategory: CAT.artwork, productType: 'Home > Framed prints',
     image: ex('framefamily', 1200, 1200, 'A child’s crayon drawing of a family holding hands by a little blue house, in a light wooden frame'),
   },
   multiPhotoFrame: {
-    slug: 'multi-photo-frame', name: 'multi photo frame', title: 'Multi photo frame of your child’s drawings — 9, 24 or 60 in one frame',
+    slug: 'multi-photo-frame', name: 'framed multi doodles', title: 'Multi photo frame of your child’s drawings — 9, 24 or 60 in one frame',
     googleCategory: CAT.artwork, productType: 'Home > Framed prints',
     image: demo('multiPhotoFrame', 'A gold frame holding 24 small squares of a child’s painting of a yellow house, a family and a dog'),
   },
   mug: {
-    slug: 'mug', name: 'mug', title: 'Personalised mug with your child’s drawing',
+    slug: 'mug', name: 'doodle mug', title: 'Personalised mug with your child’s drawing',
     googleCategory: CAT.mugs, productType: 'Home > Mugs',
     image: ex('mugtruck', 1000, 1000, 'A blue-handled mug printed with a child’s painting of a green truck'),
   },
   cushion: {
-    slug: 'cushion', name: 'cushion', title: 'Personalised cushion with your child’s drawing',
+    slug: 'cushion', name: 'doodle cushions', title: 'Personalised cushion with your child’s drawing',
     googleCategory: CAT.pillows, productType: 'Home > Cushions',
     image: ex('cushionsunflower', 1200, 1200, 'A white cushion printed with a child’s thick-painted yellow sunflower'),
   },
   kidsTee: {
-    slug: 'kids-t-shirt', name: 'kids tee', title: 'Kids’ organic T-shirt with their own drawing',
+    slug: 'kids-t-shirt', name: 'kids doodle tees', title: 'Kids’ organic T-shirt with their own drawing',
     googleCategory: CAT.tops, productType: 'Clothing > Kids T-shirts',
     image: ex('christmastee', 983, 968, 'A burgundy t-shirt printed with a child’s drawing of a snowman in falling snow'),
     groupLabel: { 2700: 'colours' },
@@ -104,29 +104,29 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     feed: { exclude: 'clothing needs one item per size and colour' },
   },
   adultTee: {
-    slug: 'adult-t-shirt', name: 'adult tee', title: 'Adult organic T-shirt with your child’s drawing',
+    slug: 'adult-t-shirt', name: 'adults doodle tees', title: 'Adult organic T-shirt with your child’s drawing',
     googleCategory: CAT.tops, productType: 'Clothing > Adult T-shirts',
     image: demo('adultTee', 'A white adult T-shirt printed with a child’s painting of their family holding hands by a yellow house, with the dog'),
     // like the kids tee: clothing needs ONE size + colour per feed item (6 sizes × 5 colours) — left out until that's worth doing
     feed: { exclude: 'clothing needs one item per size and colour' },
   },
   jigsaw: {
-    slug: 'jigsaw', name: 'jigsaw', title: 'Jigsaw puzzle made from your child’s drawing',
+    slug: 'jigsaw', name: 'doodle jigsaws', title: 'Jigsaw puzzle made from your child’s drawing',
     googleCategory: CAT.jigsaws, productType: 'Games > Jigsaws',
     image: ex('puzzledigger', 1200, 1200, 'A jigsaw puzzle printed with a child’s painting of a yellow digger'),
   },
   blanket: {
-    slug: 'fleece-blanket', name: 'fleece blanket', title: 'Personalised fleece blanket with your child’s drawing',
+    slug: 'fleece-blanket', name: 'doodle blanket', title: 'Personalised fleece blanket with your child’s drawing',
     googleCategory: CAT.blankets, productType: 'Home > Blankets',
     image: ex('blankettiger', 1200, 1200, 'A pink fleece blanket printed with a child’s crayon drawing of an orange tiger'),
   },
   card: {
-    slug: 'greetings-card', name: 'greetings card', title: 'Greetings card with your child’s drawing on the front',
+    slug: 'greetings-card', name: 'greetings cards', title: 'Greetings card with your child’s drawing on the front',
     googleCategory: CAT.cards, productType: 'Cards > Greetings cards',
     image: ex('penguincard', 1200, 1200, 'A greetings card with a child’s drawing of two penguins and an igloo under a starry sky, beside a kraft envelope'),
   },
   cardPack: {
-    slug: 'card-pack', name: 'card pack', title: 'Christmas cards from your child’s drawings — packs of 5 or 10',
+    slug: 'card-pack', name: 'doodle card packs', title: 'Christmas cards from your child’s drawings — packs of 5 or 10',
     googleCategory: CAT.cards, productType: 'Cards > Card packs',
     image: ex('christmascard', 1200, 1200, 'A red greetings card with a child’s painting of a Christmas tree, presents and a snowman, beside a kraft envelope'),
   },
@@ -155,54 +155,54 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
   // until the samples are photographed. Category: the seasonal-decorations node already checked
   // above, until a precise placemat/coaster taxonomy id is verified against the en-GB list.
   placemat: {
-    slug: 'placemats', name: 'placemats', title: 'Personalised placemats with your child’s drawing (set of 4)',
+    slug: 'placemats', name: 'doodle placemats', title: 'Personalised placemats with your child’s drawing (set of 4)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
     image: demo('placemat', 'A placemat printed with a child’s painting of their family holding hands by a yellow house, with flowers and the dog'),
   },
   coaster: {
-    slug: 'coasters', name: 'coasters', title: 'Personalised coasters with your child’s drawing (packs of 2, 4 or 6)',
+    slug: 'coasters', name: 'doodle coasters', title: 'Personalised coasters with your child’s drawing (packs of 2, 4 or 6)',
     googleCategory: CAT.holiday, productType: 'Christmas > Table',
     image: demo('coaster', 'Two square coasters, one on the other, printed with a child’s painting of their family by a yellow house'),
   },
   christmasBundle: {
-    slug: 'christmas-family-bundle', name: 'christmas family bundle', title: 'Christmas family bundle: placemats, coasters and ornaments with your children’s drawings',
+    slug: 'christmas-family-bundle', name: 'christmas family bundles', title: 'Christmas family bundle: placemats, coasters and ornaments with your children’s drawings',
     googleCategory: CAT.holiday, productType: 'Christmas > Bundles',
     image: demo('christmasBundle', 'Two placemats, two coasters and two round ceramic ornaments, all printed with the same child’s painting of their family by a yellow house'),
   },
   phoneCase: {
-    slug: 'phone-case', name: 'phone case', title: 'Phone case with your child’s drawing',
+    slug: 'phone-case', name: 'doodle phone cases', title: 'Phone case with your child’s drawing',
     googleCategory: CAT.phoneCases, productType: 'Tech > Phone cases',
     image: ex('owlphone', 960, 1200, 'A purple phone case printed with a child’s drawing of an owl on a branch under an orange moon'),
   },
   socks: {
-    slug: 'socks', name: 'socks', title: 'Socks printed with your child’s drawing',
+    slug: 'socks', name: 'doodle socks', title: 'Socks printed with your child’s drawing',
     googleCategory: CAT.socks, productType: 'Clothing > Socks',
     image: ex('lionanklesocks', 1200, 1200, 'A pair of yellow ankle socks printed all over with a child’s drawing of a smiling lion'),
     feed: { color: 'Multicolour', size: 'UK 6–10', ageGroup: 'adult', gender: 'unisex' },
   },
   heightChart: {
-    slug: 'height-chart', name: 'height chart', title: 'Canvas height chart with your child’s drawing',
+    slug: 'height-chart', name: 'doodle height chart', title: 'Canvas height chart with your child’s drawing',
     googleCategory: CAT.growthCharts, productType: 'Home > Height charts',
     image: ex('giraffeheightchart', 960, 1200, 'A canvas height chart on wooden hangers with a child’s drawing of a tall giraffe beside the ruler'),
   },
   wrappingPaper: {
-    slug: 'wrapping-paper', name: 'wrapping paper', title: 'Wrapping paper made from your child’s drawing',
+    slug: 'wrapping-paper', name: 'doodle wrapping paper', title: 'Wrapping paper made from your child’s drawing',
     googleCategory: CAT.wrap, productType: 'Christmas > Wrapping paper',
     image: ex('robotwrappaper', 1200, 1200, 'Wrapping paper printed with a repeating pattern of a child’s drawing of a robot on pale blue'),
   },
   teaTowel: {
-    slug: 'tea-towel', name: 'tea towel', title: 'Tea towel printed with your child’s drawing',
+    slug: 'tea-towel', name: 'doodle tea towel', title: 'Tea towel printed with your child’s drawing',
     googleCategory: CAT.teaTowels, productType: 'Home > Tea towels',
     image: ex('monsterteatowel', 1200, 1200, 'A lilac tea towel printed with a repeating pattern of a child’s drawing of a purple monster'),
   },
   playingCards: {
-    slug: 'playing-cards', name: 'playing cards', title: 'Playing cards with your child’s drawing on the back',
+    slug: 'playing-cards', name: 'doodle playing cards', title: 'Playing cards with your child’s drawing on the back',
     googleCategory: CAT.cardGames, productType: 'Games > Playing cards',
     image: ex('flowerplayingcards', 1200, 1200, 'A deck of playing cards with a child’s painting of sunflowers in a blue vase on the back'),
   },
   // the photo fills the strap with the drawing (founder, 5 Nov) — the shop's own default sits small, below the watch
   watchStrap: {
-    slug: 'apple-watch-strap', name: 'apple watch strap', title: 'Apple Watch strap printed with your child’s drawing',
+    slug: 'apple-watch-strap', name: 'apple watch straps', title: 'Apple Watch strap printed with your child’s drawing',
     googleCategory: CAT.watchBands, productType: 'Tech > Watch straps',
     image: demo('watchStrap', 'A white leather Apple Watch strap with black buckle, printed end to end with a child’s painting — blue sky, a brown dog and a little green figure'),
   },

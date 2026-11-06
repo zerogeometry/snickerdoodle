@@ -47,7 +47,7 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
     const a = await waitForAsset(page);
 
     await goClient(page, '/customize/christmasBundle');
-    await expect(page.getByRole('heading', { level: 1, name: 'christmas family bundle' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'christmas family bundles' })).toBeVisible({ timeout: 30_000 });
 
     // 1 · how many: 2 / 4 / 8 at the catalogue's prices; the steps follow the size
     const sizes = page.getByRole('radiogroup', { name: 'how many of each' }).getByRole('radio');

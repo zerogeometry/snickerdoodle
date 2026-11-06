@@ -41,44 +41,44 @@ export interface CatalogueEntry {
 // getCatalogue() loads the full per-variant list from the DB; this constant is the pre-seed
 // fallback AND the sellable-key allowlist (isCatalogueKey). Prices are VAT-inc, free delivery.
 export const CATALOGUE = {
-  framedPrint: { pricePence: 6500, label: 'framed print' },
-  mug: { pricePence: 1800, label: 'mug' },
-  cushion: { pricePence: 2200, label: 'cushion' },
+  framedPrint: { pricePence: 6500, label: 'framed doodles' },
+  mug: { pricePence: 1800, label: 'doodle mug' },
+  cushion: { pricePence: 2200, label: 'doodle cushions' },
   storybook: { pricePence: 2600, label: 'storybook' },
-  kidsTee: { pricePence: 2500, label: 'kids tee' },
-  jigsaw: { pricePence: 2600, label: 'jigsaw' },
-  blanket: { pricePence: 6000, label: 'fleece blanket' },
+  kidsTee: { pricePence: 2500, label: 'kids doodle tees' },
+  jigsaw: { pricePence: 2600, label: 'doodle jigsaws' },
+  blanket: { pricePence: 6000, label: 'doodle blanket' },
   babyBodysuit: { pricePence: 2200, label: 'baby bodysuit' },
-  card: { pricePence: 550, label: 'greetings card' },
-  calendar: { pricePence: 2200, label: 'calendar' }, // A5 (A4 £24 — DB per variant)
+  card: { pricePence: 550, label: 'greetings cards' },
+  calendar: { pricePence: 2200, label: 'doodle calendar' }, // A5 (A4 £24 — DB per variant)
   // The multi photo frame (5 Nov 2026): 3 × 3 £62 · 6 × 4 £87 (the default) · 10 × 6 £125 — DB per variant.
-  multiPhotoFrame: { pricePence: 8700, label: 'multi photo frame' },
-  adultTee: { pricePence: 3200, label: 'adult tee' },
+  multiPhotoFrame: { pricePence: 8700, label: 'framed multi doodles' },
+  adultTee: { pricePence: 3200, label: 'adults doodle tees' },
   apron: { pricePence: 2500, label: 'apron' },
   ceramicOrnament: { pricePence: 2100, label: 'ceramic christmas ornament' },
   christmasBauble: { pricePence: 1900, label: 'christmas bauble' },
   sack: { pricePence: 3500, label: 'christmas sack' },
-  phoneCase: { pricePence: 2500, label: 'phone case' }, // the default: snap (tough £30 — DB per variant)
+  phoneCase: { pricePence: 2500, label: 'doodle phone cases' }, // the default: snap (tough £30 — DB per variant)
   // Range expansion (D21, 2026-10-21) — seeded hidden until samples + mockups are in.
-  socks: { pricePence: 2000, label: 'socks' },
-  heightChart: { pricePence: 3100, label: 'height chart' },
+  socks: { pricePence: 2000, label: 'doodle socks' },
+  heightChart: { pricePence: 3100, label: 'doodle height chart' },
   kidsHoodie: { pricePence: 4300, label: 'kids hoodie' },
   adultHoodie: { pricePence: 4200, label: 'adult hoodie' },
-  wrappingPaper: { pricePence: 2300, label: 'wrapping paper' }, // the default: the 2 m roll (rolls only)
-  teaTowel: { pricePence: 2700, label: 'tea towel' },
+  wrappingPaper: { pricePence: 2300, label: 'doodle wrapping paper' }, // the default: the 2 m roll (rolls only)
+  teaTowel: { pricePence: 2700, label: 'doodle tea towel' },
   petBandana: { pricePence: 1800, label: 'pet bandana' },
   // Christmas jumpers (D24, 2026-10-25) — seeded hidden until a sweatshirt packshot is in.
   kidsJumper: { pricePence: 3800, label: 'kids jumper' },
   christmasJumper: { pricePence: 3200, label: 'christmas jumper' },
   // The Apple Watch strap (5 Nov 2026, Prodigi's "global" change) — seeded hidden until its photos are in.
-  watchStrap: { pricePence: 4500, label: 'apple watch strap' },
-  playingCards: { pricePence: 2400, label: 'playing cards' },
-  cardPack: { pricePence: 1200, label: 'card pack' }, // pack of 5 (pack of 10 £21 — DB per variant)
+  watchStrap: { pricePence: 4500, label: 'apple watch straps' },
+  playingCards: { pricePence: 2400, label: 'doodle playing cards' },
+  cardPack: { pricePence: 1200, label: 'doodle card packs' }, // pack of 5 (pack of 10 £21 — DB per variant)
   // The Christmas table (founder, 27 Oct): cork placemats ×4 + coasters ×6, on their own or in the bundle.
-  placemat: { pricePence: 6000, label: 'placemats' }, // a pack of 4 (founder, 27 Oct: £60)
-  coaster: { pricePence: 3400, label: 'coasters' }, // a pack of 6 (2 £18, 4 £26 — DB per variant)
+  placemat: { pricePence: 6000, label: 'doodle placemats' }, // a pack of 4 (founder, 27 Oct: £60)
+  coaster: { pricePence: 3400, label: 'doodle coasters' }, // a pack of 6 (2 £18, 4 £26 — DB per variant)
   // The CHRISTMAS FAMILY BUNDLE: a set for 2 (a set for 4 £145, for 8 £279 — DB per variant; src/lib/christmas-bundle.ts).
-  christmasBundle: { pricePence: 7800, label: 'christmas family bundle' },
+  christmasBundle: { pricePence: 7800, label: 'christmas family bundles' },
   giftWrap: { pricePence: 300, label: 'gift wrap' },
 } as const satisfies Record<string, CatalogueEntry>;
 

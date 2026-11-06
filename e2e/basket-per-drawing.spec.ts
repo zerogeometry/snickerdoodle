@@ -16,7 +16,7 @@ async function drawing(fill: string): Promise<Buffer> {
 }
 
 async function addSocks(page: Page) {
-  await page.getByRole('button', { name: 'customize socks', exact: true }).click();
+  await page.getByRole('button', { name: 'customize doodle socks', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/socks/);
   await expect(page.locator('img[alt="your drawing on a socks"]').first()).toBeVisible({ timeout: 60_000 });
   await page.getByRole('button', { name: /add to basket/i }).click();

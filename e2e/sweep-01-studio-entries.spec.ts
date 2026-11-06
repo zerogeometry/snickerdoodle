@@ -46,7 +46,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
       test.setTimeout(240_000);
       await uploadArt(page);
       await rangeReady(page);
-      await page.getByRole('button', { name: 'customize card pack', exact: true }).click();
+      await page.getByRole('button', { name: 'customize doodle card packs', exact: true }).click();
       await page.getByRole('button', { name: 'pick a drawing for card 2' }).click();
       const sheet = page.getByRole('dialog', { name: 'pick a drawing for card 2' });
       await expect(sheet).toBeVisible();
@@ -67,7 +67,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
       test.setTimeout(240_000);
       await uploadArt(page);
       await rangeReady(page);
-      await page.getByRole('button', { name: 'customize calendar', exact: true }).click();
+      await page.getByRole('button', { name: 'customize doodle calendar', exact: true }).click();
       // the cover is the drawing; every month repeats it until it gets its own — give February its own
       await page.getByRole('button', { name: / — pick its own drawing$/ }).nth(1).click();
       const sheet = page.getByRole('dialog');
@@ -89,7 +89,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
       test.setTimeout(240_000);
       await uploadArt(page);
       await rangeReady(page);
-      await page.getByRole('button', { name: 'customize card pack', exact: true }).click();
+      await page.getByRole('button', { name: 'customize doodle card packs', exact: true }).click();
       await page.getByRole('button', { name: 'pick a drawing for card 2' }).click();
       const item = page.getByRole('dialog').getByRole('listitem').filter({ has: page.getByRole('button', { name: 'this drawing' }) });
       await item.getByRole('button', { name: 'edit in studio' }).click();
@@ -107,7 +107,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
       test.setTimeout(240_000);
       await uploadArt(page);
       await rangeReady(page);
-      await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+      await page.getByRole('button', { name: 'customize framed doodles', exact: true }).click();
       await expect(page).toHaveURL(/\/customize\/framedPrint/);
       await page.getByRole('button', { name: 'edit placement' }).click();
       await expect(page).toHaveURL(/\/studio\/position\?draft=.*&variant=.*&return=%2Fcustomize%2FframedPrint/);

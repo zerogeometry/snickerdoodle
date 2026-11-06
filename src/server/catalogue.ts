@@ -341,19 +341,19 @@ export { PATTERN_PRODUCT_KEYS } from '@/lib/patterns';
 // SKU is GB-fulfilled by Prodigi. See project-office/briefs/PRICING.md + the pricing Sheet.
 const DEFS: Record<string, ProductDef> = {
   framedPrint: {
-    category: 'PRINT', label: 'framed print', blurb: 'their masterpiece, ready to hang', print: true, visibleInShop: true,
+    category: 'PRINT', label: 'framed doodles', blurb: 'their masterpiece, ready to hang', print: true, visibleInShop: true,
     description: 'A gallery-quality print of the original in a hand-finished frame, ready to hang — every wonky bit treasured. Eight frames to suit any wall (gold is our signature).',
     specs: { material: 'fine-art paper', glazing: 'shatterproof' },
     variants: frameVariants(),
   },
   mug: {
-    category: 'MUG', label: 'mug', blurb: 'a morning cuppa, made magic', print: true, visibleInShop: true,
+    category: 'MUG', label: 'doodle mug', blurb: 'a morning cuppa, made magic', print: true, visibleInShop: true,
     description: "Their masterpiece wrapped around a sturdy two-tone mug — for the grown-up who'll treasure every sip.",
     specs: { material: 'ceramic', care: 'dishwasher safe · microwave safe' },
     variants: mugVariants(),
   },
   cushion: {
-    category: 'CUSHION', label: 'cushion', blurb: 'a squishy keepsake for the sofa', print: true, visibleInShop: true,
+    category: 'CUSHION', label: 'doodle cushions', blurb: 'a squishy keepsake for the sofa', print: true, visibleInShop: true,
     description: 'A plump cushion with their artwork on it — heart, round or square, a keepsake you can actually hug.',
     specs: { material: 'faux suede / linen', filling: 'fibre fill included' },
     variants: [
@@ -388,19 +388,19 @@ const DEFS: Record<string, ProductDef> = {
     ],
   },
   kidsTee: {
-    category: 'APPAREL', label: 'kids tee', blurb: 'their masterpiece, worn with pride', print: true, visibleInShop: true,
+    category: 'APPAREL', label: 'kids doodle tees', blurb: 'their masterpiece, worn with pride', print: true, visibleInShop: true,
     description: 'A soft organic-cotton tee with their own drawing printed on the front — made to be worn (and washed) again and again.',
     specs: { material: '100% organic cotton', print: 'up to 26 × 26 cm on the front', care: 'wash at 30°, inside out' },
     variants: kidsTeeVariants(),
   },
   jigsaw: {
-    category: 'PUZZLE', label: 'jigsaw', blurb: 'piece their masterpiece together', print: true, visibleInShop: true,
+    category: 'PUZZLE', label: 'doodle jigsaws', blurb: 'piece their masterpiece together', print: true, visibleInShop: true,
     description: 'Their drawing turned into a jigsaw in a keepsake tin — rainy-afternoon magic, piece by piece.',
     specs: { material: 'board, in a keepsake tin', delivery: 'tracked' },
     variants: jigsawVariants(),
   },
   blanket: {
-    category: 'BLANKET', label: 'fleece blanket', blurb: 'cuddles, with their art woven in', print: true, visibleInShop: true,
+    category: 'BLANKET', label: 'doodle blanket', blurb: 'cuddles, with their art woven in', print: true, visibleInShop: true,
     description: 'A cosy fleece blanket carrying their drawing — for snuggles that last long after they grow.',
     specs: { material: 'fleece', care: 'machine washable' },
     variants: blanketVariants(),
@@ -416,7 +416,7 @@ const DEFS: Record<string, ProductDef> = {
   // [outer rear | outer front | inside-left | inside-right]; wMm/hMm here are the FRONT panel
   // (the design + mockup geometry) — fulfilment assembles the full spread, like the DUAL cushion.
   card: {
-    category: 'CARD', label: 'greetings card', blurb: 'a little card, a big smile', print: true, visibleInShop: true,
+    category: 'CARD', label: 'greetings cards', blurb: 'a little card, a big smile', print: true, visibleInShop: true,
     description: "A folded 7×5 card with your little one's artwork on the front, on premium Fedrigoni stock. Add a printed message inside, or leave it blank to write in yourself.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, or a printed message', envelope: 'included' },
     variants: [
@@ -432,7 +432,7 @@ const DEFS: Record<string, ProductDef> = {
   // 2026-10-21: £1.10 a card + a FLAT £0.95 Guernsey Post (untracked, uk7) for 1–15 cards.
   // Prices must divide evenly by the pack size (£12 / 5 = £2.40, £21 / 10 = £2.10). LIVE 2026-10-21.
   cardPack: {
-    category: 'CARD', label: 'card pack', blurb: 'a stack of little masterpieces, ready to send', print: true, visibleInShop: true,
+    category: 'CARD', label: 'doodle card packs', blurb: 'a stack of little masterpieces, ready to send', print: true, visibleInShop: true,
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same', envelopes: 'one with every card' },
     variants: [
@@ -448,7 +448,7 @@ const DEFS: Record<string, ProductDef> = {
   // A4 3507×2480 px / A5 2480×1748 px; cost as undated (A4 £10 / A5 £9 + £4.35, lab uk15, no Express).
   // Re-priced A5 £22 · A4 £24 (founder, 2026-10-25). Swap to the 2028 SKUs when Prodigi lists them.
   calendar: {
-    category: 'PRINT', label: 'calendar', blurb: 'a year of their masterpieces', print: true, visibleInShop: true,
+    category: 'PRINT', label: 'doodle calendar', blurb: 'a year of their masterpieces', print: true, visibleInShop: true,
     description: 'A 2027 wall calendar carrying a year of their drawings — a new little masterpiece to smile at every month, and one on the cover.',
     specs: { material: 'silk 300gsm', format: 'landscape wall calendar', dates: 'includes 2027 calendar dates', pages: 'a cover + 12 months' },
     variants: (
@@ -469,7 +469,7 @@ const DEFS: Record<string, ProductDef> = {
   // exact printAreaSizes (sandbox GET /v4.0/products, 5 Nov), 'default' only, bleed 0 — the grid and
   // margins are drawn INTO it (frameGrid.ts). The 6 × 4 in gold is the catalogue's picture (the default).
   multiPhotoFrame: {
-    category: 'PRINT', label: 'multi photo frame', blurb: 'a whole gallery of their art, in one frame', print: true, visibleInShop: true,
+    category: 'PRINT', label: 'framed multi doodles', blurb: 'a whole gallery of their art, in one frame', print: true, visibleInShop: true,
     description: 'A whole gallery wall of wonky masterpieces in one frame — 9, 24 or 60 of their drawings, each in its own little square, ready to hang. Pick a drawing for every square, or let your favourite fill the gaps.',
     specs: { drawings: '9 (3 × 3, 12×12″), 24 (6 × 4, 16×24″) or 60 (10 × 6, 24×36″)', squares: '6 × 6 cm, 2 cm apart', hangs: 'landscape (the 3 × 3 is square)', frame: 'classic wooden frame, eight colours', glazing: 'shatterproof', made: 'in the UK' },
     // one variant per size × how it hangs × colour; a landscape rectangle's canvas is its landscape
@@ -485,7 +485,7 @@ const DEFS: Record<string, ProductDef> = {
     ),
   },
   adultTee: {
-    category: 'APPAREL', label: 'adult tee', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,
+    category: 'APPAREL', label: 'adults doodle tees', blurb: 'worn by their biggest fan', print: true, visibleInShop: true,
     description: "The grown-up version of the kids tee — the same organic cotton, sized up, with your little one's artwork on the front. A relaxed unisex fit for mums, dads and anyone in their fan club.",
     specs: { material: '100% organic cotton, heavyweight', fit: 'unisex, XS–2XL', print: 'up to 40 × 50 cm on the front', care: 'wash at 30°, inside out' },
     variants: adultTeeVariants(),
@@ -538,7 +538,7 @@ const DEFS: Record<string, ProductDef> = {
   // ON SHOW (founder, 28 Oct). TODO(founder samples): no Prodigi blank for either in .prodigi-assets yet,
   // so they show the plain tile until the founder's sample photos give them a mockup.
   placemat: {
-    category: 'FESTIVE', label: 'placemats', blurb: 'their masterpiece at every place', print: true, visibleInShop: true,
+    category: 'FESTIVE', label: 'doodle placemats', blurb: 'their masterpiece at every place', print: true, visibleInShop: true,
     description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
     specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
     variants: (
@@ -554,7 +554,7 @@ const DEFS: Record<string, ProductDef> = {
   // each still clears 10% net with a 10% creator code + 5% commission (pinned by a test). The 6-pack stays
   // the default (it keeps the product key as its sku); the single coaster is bundle-only, never sold.
   coaster: {
-    category: 'FESTIVE', label: 'coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
+    category: 'FESTIVE', label: 'doodle coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
     description: 'Cork-backed coasters, each printed with the same drawing — in packs of 2, 4 or 6. For the mince pies and the cocoa, and long after.',
     specs: { material: 'cork-backed', size: '10.6 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
     variants: (
@@ -571,7 +571,7 @@ const DEFS: Record<string, ProductDef> = {
   // (£279), ≈ 20% net after every cost. Not printed itself: the order splits it into its pieces' own
   // variants (src/lib/christmas-bundle.ts → orders.ts). Builder: /customize/christmasBundle.
   christmasBundle: {
-    category: 'FESTIVE', label: 'christmas family bundle', blurb: 'the whole family’s christmas, in one parcel', print: false, visibleInShop: true,
+    category: 'FESTIVE', label: 'christmas family bundles', blurb: 'the whole family’s christmas, in one parcel', print: false, visibleInShop: true,
     description: 'Their drawings on the Christmas table and on the tree: placemats and coasters wearing a drawing, and a ceramic ornament for everyone with its own. A set for 2, 4 or 8 — made in the UK and sent together in one tracked parcel.',
     specs: { 'in the set': 'placemats, coasters and ceramic ornaments — 2, 4 or 8 of each', drawings: 'one on the placemats, one on the coasters, one on each ornament', delivery: 'one tracked parcel' },
     variants: BUNDLE_SIZES.map((s) => ({ size: s.size, pricePence: s.pricePence, wMm: 0, hMm: 0 })),
@@ -586,7 +586,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: [{ pricePence: 6200, wMm: 0, hMm: 0 }],
   },
   phoneCase: {
-    category: 'TECH', label: 'phone case', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
+    category: 'TECH', label: 'doodle phone cases', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
     description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
     specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
@@ -596,7 +596,7 @@ const DEFS: Record<string, ProductDef> = {
   // founder's photo set (applewatch.psd), or a drawn strap where it isn't staged (strapMockup.ts). ONE print file covers both halves end to end with
   // an unprinted gap behind the watch (src/lib/watch-strap.ts traces Prodigi's template). £45 ≈ 20% net.
   watchStrap: {
-    category: 'TECH', label: 'apple watch strap', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
+    category: 'TECH', label: 'apple watch straps', blurb: 'their masterpiece, on your wrist', print: true, visibleInShop: true,
     description: "Their drawing printed along a faux-leather Apple Watch strap — a little masterpiece to glance at all day. In two sizes: small fits 38, 40 and 41 mm watches (and the 42 mm Series 10 and newer); large fits 44, 45, 46 and 49 mm (and the 42 mm Series 1–3). The size is on the back of the watch.",
     specs: { material: 'vegan faux leather, scratch-resistant finish', fittings: 'black', small: WATCH_STRAP_SIZES[0]!.fits, large: WATCH_STRAP_SIZES[1]!.fits, print: 'along both halves of the strap', made: 'in the UK' },
     // Prodigi's EXACT print files (sandbox GET /v4.0/products, 5 Nov: 305×2738 / 363×2932 px @300dpi), bleed 0
@@ -610,13 +610,13 @@ const DEFS: Record<string, ProductDef> = {
   // height chart → cards & prints, wrapping paper → festive, tea towel → home,
   // playing cards → gifts.
   socks: {
-    category: 'APPAREL', label: 'socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
+    category: 'APPAREL', label: 'doodle socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
     description: "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10).",
     specs: { material: 'polyester, printed all over', size: 'one size, UK 6–10', styles: 'ankle or tube', care: 'machine wash at 30°', made: 'in the UK' },
     variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, printTo: [...s.printTo] })),
   },
   heightChart: {
-    category: 'PRINT', label: 'height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
+    category: 'PRINT', label: 'doodle height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
     description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
     specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
@@ -640,7 +640,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: garmentVariants({ sku: 'HOOD-SS-STSU812', sizes: ADULT_HOODIE_SIZES, colours: ADULT_HOODIE_COLOURS, printPx: { w: 3070, h: 3070 }, pricePence: 4200, defaultSize: 'M', attrSize: (s) => s.toLowerCase() }),
   },
   wrappingPaper: {
-    category: 'FESTIVE', label: 'wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
+    category: 'FESTIVE', label: 'doodle wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
     description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres, in white or brown kraft (on kraft the colours come out a little earthier, and the paper shows through where the drawing is white).',
     specs: { material: 'FSC-certified 95gsm paper', formats: 'a 70cm-wide roll — 2, 3 or 5 m', made: 'in the UK' },
     // Two papers (D24): white, and brown KRAFT (the scrapbook look). Kraft is a 300dpi file at the same
@@ -651,7 +651,7 @@ const DEFS: Record<string, ProductDef> = {
     ]),
   },
   teaTowel: {
-    category: 'BLANKET', label: 'tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,
+    category: 'BLANKET', label: 'doodle tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,
     description: "A cotton tea towel printed all over with a pattern of their drawing — for gran's kitchen, or yours.",
     specs: { material: 'cotton', care: 'machine washable', made: 'in the UK' },
     // H-TEATOWEL-SUB ONLY: the cotton-twill / poly-twill tea towels are made in the US (£72 postage).
@@ -681,7 +681,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: BANDANAS.map((b) => ({ size: b.size, pricePence: b.pricePence, ...exactPx(b.px, 300), prodigiSku: b.sku })),
   },
   playingCards: {
-    category: 'PUZZLE', label: 'playing cards', blurb: 'deal in their masterpiece', print: true, visibleInShop: true,
+    category: 'PUZZLE', label: 'doodle playing cards', blurb: 'deal in their masterpiece', print: true, visibleInShop: true,
     description: 'A full 54-card deck with their drawing on the back of every card, in a white presentation box — for family card nights.',
     specs: { cards: '54, one design on every back', size: '6 × 9 cm', box: 'white presentation box', made: 'in the UK' },
     // Standard post is Royal Mail RM24 (UNTRACKED), £6.45. Budget (RM48, £3.20) would allow ~£19 —

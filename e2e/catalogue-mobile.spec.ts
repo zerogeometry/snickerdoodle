@@ -20,8 +20,8 @@ for (const vp of [{ w: 360, h: 780 }, { w: 390, h: 844 }]) {
     for (const b of boxes) expect(b.h, '+ customize on one line').toBeLessThan(56);
 
     // the name and the price: separate lines
-    const tile = page.getByRole('button', { name: 'customize socks', exact: true }).first().locator('xpath=ancestor::div[contains(@class,"polaroid")][1]');
-    const name = tile.getByText('socks', { exact: true });
+    const tile = page.getByRole('button', { name: 'customize doodle socks', exact: true }).first().locator('xpath=ancestor::div[contains(@class,"polaroid")][1]');
+    const name = tile.getByText('doodle socks', { exact: true });
     const price = tile.getByText(/^from £/);
     const [nb, pb] = [await name.boundingBox(), await price.boundingBox()];
     expect(pb!.y + pb!.height / 2, 'price on the line below the name').toBeGreaterThan(nb!.y + nb!.height * 0.9);

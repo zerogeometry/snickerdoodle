@@ -38,7 +38,7 @@ test('buy more & save: the dropdown shows each quantity’s saving and adds that
   test.setTimeout(180_000);
   const assetId = await ready(page);
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('buy more & save', { exact: true })).toBeVisible();
   await qtySelect(page, 'mug').click();
   const opts = page.getByRole('option');
@@ -65,7 +65,7 @@ test('editing a basket line into another line’s variant keeps BOTH quantities 
   await ready(page);
   const mug = (await shopCatalogue()).find((p) => p.key === 'mug')!;
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   const colours = optionGroup(page, 'Colour').getByRole('button');
   expect(await colours.count(), 'the mug has more than one colour').toBeGreaterThan(1);
   const [c0, c1] = [(await colours.nth(0).innerText()).trim(), (await colours.nth(1).innerText()).trim()];
@@ -77,7 +77,7 @@ test('editing a basket line into another line’s variant keeps BOTH quantities 
   await expect(page).toHaveURL(/\/start-creating/);
   // line B: colour 1, qty 1
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await optionGroup(page, 'Colour').getByRole('button', { name: c1 }).click();
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
@@ -101,7 +101,7 @@ test('the basket sidebar’s edit reopens THAT line (drawing, variant, placement
   await page.setViewportSize({ width: 1280, height: 800 });
   await ready(page);
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await optionGroup(page, 'Colour').getByRole('button').last().click();
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);
@@ -123,7 +123,7 @@ test('02-B4: checkout’s "customize your …" reopens that line in update mode'
   await page.setViewportSize({ width: 1280, height: 800 });
   await ready(page);
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await optionGroup(page, 'Colour').getByRole('button').last().click();
   await addBtn(page).click();
   await expect(page).toHaveURL(/\/start-creating/);

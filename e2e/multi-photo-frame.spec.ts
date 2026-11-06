@@ -29,11 +29,11 @@ test('multi photo frame: the 6 × 4 from the range → the real frame photo → 
   const main = await waitForAsset(page);
 
   // on show, high in the range; its tile opens the builder (never a quick-add of a blank frame)
-  const tile = page.getByRole('button', { name: 'customize multi photo frame', exact: true });
+  const tile = page.getByRole('button', { name: 'customize framed multi doodles', exact: true });
   await tile.scrollIntoViewIfNeeded();
   await tile.click();
   await expect(page).toHaveURL(/\/customize\/multiPhotoFrame/);
-  await expect(page.getByRole('heading', { level: 1, name: 'multi photo frame' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'framed multi doodles' })).toBeVisible({ timeout: 30_000 });
   const sizes = page.getByRole('group', { name: 'frame size' });
   await expect(sizes.getByRole('button')).toHaveCount(3);
   await expect(sizes.getByRole('button', { pressed: true })).toContainText('24 drawings · £87'); // the 6 × 4 leads
@@ -100,7 +100,7 @@ test('multi photo frame: the 6 × 4 from the range → the real frame photo → 
   // checkout: priced by the SERVER, not the basket's display figure
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('multi photo frame', { exact: true })).toBeVisible();
+  await expect(page.getByText('framed multi doodles', { exact: true })).toBeVisible();
   const summary = page.locator('dl').first();
   await expect(summary.locator('xpath=.//dt[normalize-space()="Subtotal"]/following-sibling::dd[1]')).toHaveText('£62');
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);

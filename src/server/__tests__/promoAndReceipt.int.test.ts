@@ -184,8 +184,8 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
     expect(lines.filter((l) => l.bundleKey === 'christmasBundle-for4').length).toBeGreaterThan(1); // still its Prodigi pieces
 
     const confirmed = mail.sent.find((m) => m.kind === 'order-confirmed');
-    expect(confirmed?.text).toContain('· christmas family bundle · a set for 4 — £145');
-    expect(confirmed?.text).toMatch(/· mug[^\n]* × 2 — £36/);
+    expect(confirmed?.text).toContain('· christmas family bundles · a set for 4 — £145');
+    expect(confirmed?.text).toMatch(/· doodle mug[^\n]* × 2 — £36/);
     expect(confirmed?.text).not.toMatch(/packof|placemats —|ornament ×/);
     // the lines, less the savings listed, are the total
     const amounts = [...confirmed!.text.matchAll(/^· .* — (−?)£([\d.]+)$/gm)].map((m) => (m[1] ? -1 : 1) * Math.round(Number(m[2]) * 100));
@@ -194,9 +194,9 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
     const history = await getOrdersForAccount(db, ids.samId);
     const shown = history.find((h) => h.ref === o.ref)!;
     // (line ORDER isn't pinned: getOrdersForAccount reads order_items with no ORDER BY — reported 30 Oct)
-    expect(shown.items.map((i) => i.label)).toEqual(expect.arrayContaining(['christmas family bundle · a set for 4', expect.stringMatching(/^mug/)]));
+    expect(shown.items.map((i) => i.label)).toEqual(expect.arrayContaining(['christmas family bundles · a set for 4', expect.stringMatching(/^doodle mug/)]));
     expect(shown.items).toHaveLength(2);
-    expect(shown.items.find((i) => i.label.startsWith('christmas family bundle'))!.linePence).toBe(14500);
+    expect(shown.items.find((i) => i.label.startsWith('christmas family bundles'))!.linePence).toBe(14500);
     expect(shown.items.reduce((n, i) => n + i.linePence, 0) - shown.savings.reduce((n, sv) => n + sv.pence, 0) + shown.deliveryPence).toBe(o.totalPence);
   });
 

@@ -88,7 +88,7 @@ async function shopJourney(page: Page) {
   await expect(page).toHaveURL(/\/start-creating/);
 
   // a customize page, then into the basket
-  await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+  await page.getByRole('button', { name: 'customize framed doodles', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/framedPrint/);
   await expect(page.getByRole('button', { name: /add to basket/ })).toBeVisible({ timeout: 45_000 });
   await page.getByRole('button', { name: /add to basket/ }).click();
@@ -98,7 +98,7 @@ async function shopJourney(page: Page) {
   // checkout (the Stripe hand-off is a full-page redirect, so nothing of Stripe's runs here)
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed print').first()).toBeVisible();
+  await expect(page.getByText('framed doodles').first()).toBeVisible();
 }
 
 test('the watcher really catches a refusal (so a silent pass above means something)', async ({ page }) => {

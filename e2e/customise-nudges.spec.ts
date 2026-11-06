@@ -23,7 +23,7 @@ test('a drawing on its paper, on a coloured base: one tap lifts it off, and the 
   await page.setViewportSize({ width: 390, height: 844 });
   const assetId = await ready(page);
   await goClient(page, '/customize/socks');
-  await expect(page.getByRole('heading', { level: 1, name: 'socks' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle socks' })).toBeVisible({ timeout: 30_000 });
   // the e2e paper is cream, so the socks start matched to it (founder, 5 Nov) — lifting it off still helps
   await expect(page.getByText(/we’ve matched the sock to your paper/)).toBeVisible();
   await page.getByRole('button', { name: /sock colour: /i }).click();
@@ -45,7 +45,7 @@ test('a drawing on its paper, on a dark tee: the nudge points to the studio', as
   test.setTimeout(180_000);
   await ready(page);
   await goClient(page, '/customize/kidsTee');
-  await expect(page.getByRole('heading', { level: 1, name: 'kids tee' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'kids doodle tees' })).toBeVisible({ timeout: 30_000 });
   const colours = optionGroup(page, 'Colour').getByRole('button');
   await colours.filter({ hasText: /^white$/ }).first().click().catch(() => {});
   await expect(page.getByText(/on a coloured tee, the paper prints too/)).toHaveCount(0);
@@ -59,7 +59,7 @@ test('+ keepsake as a guest: a quick sign-up, then back to this product', async 
   test.setTimeout(180_000);
   await ready(page);
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: '+ keepsake' }).click();
   await expect(page).toHaveURL((u) => u.pathname === '/login' && u.searchParams.get('next') === '/customize/mug', { timeout: 30_000 });
 });
@@ -68,7 +68,7 @@ test('the add button with 3 chosen (records what it says)', async ({ page }) => 
   test.setTimeout(180_000);
   await ready(page);
   await goClient(page, '/customize/mug');
-  await expect(page.getByRole('heading', { level: 1, name: 'mug' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'doodle mug' })).toBeVisible({ timeout: 30_000 });
   const one = (await addBtn(page).innerText()).trim();
   await page.getByRole('button', { name: /^how many mug/ }).click();
   await page.getByRole('option').nth(2).click();

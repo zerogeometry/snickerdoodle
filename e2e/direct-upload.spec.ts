@@ -12,7 +12,7 @@ test('direct upload: the drawing goes straight to quarantine, then becomes a wor
   const put = page.waitForResponse((r) => r.request().method() === 'PUT' && /\/quarantine\/[0-9a-f-]{36}(\?|$)/.test(r.url()), { timeout: 60_000 });
 
   await uploadAndOpenRange(page);
-  await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+  await page.getByRole('button', { name: 'customize framed doodles', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/framedPrint(\?|$)/);
   await page.getByRole('button', { name: /add to basket/ }).click();
 

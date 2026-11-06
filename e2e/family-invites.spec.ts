@@ -435,7 +435,7 @@ test('04-B2: a VIEW-only relative cannot order a family keepsake', async ({ brow
   await G.page.goto('/start-creating');
   await G.page.getByRole('button', { name: /real$/ }).first().click();
   await expect(G.page.getByRole('heading', { name: /masterpiece, made real/i })).toBeVisible({ timeout: 60_000 });
-  await G.page.getByRole('button', { name: 'customize socks', exact: true }).click();
+  await G.page.getByRole('button', { name: 'customize doodle socks', exact: true }).click();
   await G.page.getByRole('button', { name: /add to basket/i }).click();
   await G.page.goto('/checkout');
   await G.page.locator('aside').getByRole('button', { name: /^checkout$/i }).first().click();

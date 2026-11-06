@@ -73,7 +73,7 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
     // the mug's three sides
     await open(page, 'mug', 'mug');
     for (const side of ['front', 'back', 'centre'] as const) {
-      await page.getByRole('group', { name: 'mug view' }).getByRole('button', { name: `the ${side}` }).click();
+      await page.getByRole('group', { name: 'doodle mug view' }).getByRole('button', { name: `the ${side}` }).click();
       await composed(seen, (c) => c.view === side, `mug ${side}`);
     }
     log.push('mug: centre / front / back composed');

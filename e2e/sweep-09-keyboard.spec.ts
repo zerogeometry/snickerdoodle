@@ -63,7 +63,7 @@ test('keyboard only: upload → customize → basket → checkout, with a visibl
 
   // customize the mug — by keyboard it's the tile's "+ customize" button (the picture's "customize mug"
   // button is mouse/touch only, tabIndex -1). 09-B4 (fixed): it is named "+ customize mug".
-  const mugTile = page.getByRole('button', { name: 'Enlarge mug preview' }).locator('xpath=ancestor::div[.//button[normalize-space()="+ customize"]][1]');
+  const mugTile = page.getByRole('button', { name: 'Enlarge doodle mug preview' }).locator('xpath=ancestor::div[.//button[normalize-space()="+ customize"]][1]');
   await tabTo(page, mugTile.getByRole('button', { name: '+ customize' }), 200);
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(/\/customize\/mug/);

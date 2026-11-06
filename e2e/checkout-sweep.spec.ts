@@ -22,7 +22,7 @@ async function parentWithMug(page: Page, opts: { clear?: boolean } = {}) {
   await quietCookies(page);
   await signInByEmailLink(page, parent, '/start-creating');
   await uploadAndOpenRange(page);
-  await page.getByRole('button', { name: 'customize mug', exact: true }).click();
+  await page.getByRole('button', { name: 'customize doodle mug', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/mug/);
   await page.getByRole('button', { name: /add to basket/i }).click();
   await expect(page).toHaveURL(/\/start-creating/);
@@ -254,7 +254,7 @@ test.describe('checkout sweep 05', () => {
       await signInByEmailLink(page, parent, '/start-creating');
       await uploadAndOpenRange(page);
       // the real way in: the bundle tile on the range (the drawing in progress goes on the table)
-      await page.getByRole('button', { name: /customize christmas family bundle/i }).first().click();
+      await page.getByRole('button', { name: /customize christmas family bundles/i }).first().click();
       await page.waitForURL(/\/customize\/christmasBundle/);
       const size = page.getByRole('radio', { name: new RegExp(`a set for ${n}`) });
       await size.click();
@@ -284,7 +284,7 @@ test.describe('checkout sweep 05', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await quietCookies(page);
     await uploadAndOpenRange(page);
-    await page.getByRole('button', { name: /customize christmas family bundle/i }).first().click();
+    await page.getByRole('button', { name: /customize christmas family bundles/i }).first().click();
     await page.getByRole('button', { name: /add to basket · £78/ }).click();
     await expect.poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{"state":{"items":[]}}').state.items.length), { timeout: 30_000 }).toBe(1);
     await page.goto('/checkout');

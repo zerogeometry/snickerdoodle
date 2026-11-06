@@ -117,7 +117,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const item = view.items[0]!;
     expect(item.assetId).toBe(a.assetId);
     expect(item.productKey).toBe(sku); // never the default framed print
-    expect(item.label).toMatch(/^mug/);
+    expect(item.label).toMatch(/^doodle mug/);
     if (mugVariant) expect(item.unitPricePence).toBe(mugVariant.price);
     expect(item.transform).toMatchObject({ scale: 0.8, offsetX: 0.1 });
   });

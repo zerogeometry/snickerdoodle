@@ -406,7 +406,7 @@ test('06: a saved design ("+ keepsake" on a mug) shared as a link sells EXACTLY 
   await quietCookies(page);
   await signInByEmailLink(page, parent, '/start-creating');
   const assetId = await keepADrawing(page);
-  await page.getByRole('button', { name: 'customize mug', exact: true }).click();
+  await page.getByRole('button', { name: 'customize doodle mug', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/mug/);
   await page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(page.getByText('saved to your keepsakes ♥')).toBeVisible({ timeout: 30_000 });
@@ -519,7 +519,7 @@ test('06: Share a Wish — basket → who is it for → signed-out parent signs 
   await page.setViewportSize(PHONE);
   await quietCookies(page);
   await uploadAndOpenRange(page);
-  await page.getByRole('button', { name: 'customize socks', exact: true }).click();
+  await page.getByRole('button', { name: 'customize doodle socks', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/socks/);
   await expect(page.locator('img[alt="your drawing on a socks"]').first()).toBeVisible({ timeout: 60_000 });
   await page.getByRole('button', { name: /add to basket/i }).click();

@@ -132,9 +132,9 @@ test('create page, signed in: lift → put back → keep → studio from the car
 /** The bundle builder for the drawing in progress (client-side, from the range). */
 async function openBundle(page: Page) {
   await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
-  await page.getByRole('button', { name: 'customize christmas family bundle', exact: true }).click();
+  await page.getByRole('button', { name: 'customize christmas family bundles', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/christmasBundle/);
-  await expect(page.getByRole('heading', { name: 'christmas family bundle' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'christmas family bundles' })).toBeVisible();
 }
 const bundleDraft = (page: Page) =>
   page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_bundle_draft_v2') ?? 'null')) as Promise<{

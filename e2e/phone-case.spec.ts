@@ -11,7 +11,7 @@ test('phone case: type to find the phone → tough + matte → basket → server
   await quietCookies(page);
   await uploadAndOpenRange(page);
 
-  await page.getByRole('button', { name: 'customize phone case', exact: true }).click();
+  await page.getByRole('button', { name: 'customize doodle phone cases', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/phoneCase/);
   const box = page.getByRole('combobox', { name: /your phone/i });
 
@@ -46,7 +46,7 @@ test('phone case: type to find the phone → tough + matte → basket → server
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText(/phone case/).first()).toBeVisible();
+  await expect(page.getByText(/doodle phone cases/).first()).toBeVisible();
   const summary = page.locator('dl').first();
   await expect(summary.locator('xpath=.//dt[normalize-space()="Total"]/following-sibling::dd[1]')).toHaveText('£30');
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);

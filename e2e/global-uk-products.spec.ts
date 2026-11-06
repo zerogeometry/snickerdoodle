@@ -30,7 +30,7 @@ test('watch strap: large → the drawing fills the strap → the placement edito
   await waitForAsset(page);
 
   await goClient(page, '/customize/watchStrap');
-  await expect(page.getByRole('heading', { level: 1, name: 'apple watch strap', exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'apple watch straps', exact: true })).toBeVisible({ timeout: 30_000 });
   await customizeReady(page);
   // sizes in parent words; the details say which watches each fits
   await expect(optionGroup(page, 'Size').getByRole('button')).toHaveCount(2);

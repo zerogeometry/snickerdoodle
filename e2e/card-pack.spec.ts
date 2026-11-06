@@ -14,12 +14,12 @@ test('card pack: pack of 5 → one drawing on all five → basket → server-pri
   await uploadAndOpenRange(page);
 
   // The pack sits in the range with the rest of the collection.
-  const tile = page.getByRole('button', { name: 'customize card pack', exact: true });
+  const tile = page.getByRole('button', { name: 'customize doodle card packs', exact: true });
   await tile.scrollIntoViewIfNeeded();
   await tile.click();
 
   await expect(page).toHaveURL(/\/customize\/cardPack/);
-  await expect(page.getByRole('heading', { name: 'card pack' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'doodle card packs' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'pack of 5 · £12' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByText('blank inside, for your own words')).toBeVisible();
   // the drawing you came from is already on card 1 (6a2f3cc, founder 26 Oct); the other four wait
@@ -59,7 +59,7 @@ test('card pack: pack of 5 → one drawing on all five → basket → server-pri
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('card pack', { exact: true })).toBeVisible();
+  await expect(page.getByText('doodle card packs', { exact: true })).toBeVisible();
   await expect(page.getByText('5 cards · on navy · blank inside')).toBeVisible();
   await expect(page.getByRole('button', { name: 'edit the cards in your card pack' })).toBeVisible(); // visible text 'edit cards', named for its line
   await expect(page.getByRole('button', { name: /^one more/ })).toHaveCount(0); // a pack has no quantity

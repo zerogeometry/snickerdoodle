@@ -12,7 +12,7 @@ test('calendar: one drawing fills all 13 pages → flip through → A4 → baske
   await quietCookies(page);
   await uploadAndOpenRange(page);
 
-  const tile = page.getByRole('button', { name: 'customize calendar', exact: true });
+  const tile = page.getByRole('button', { name: 'customize doodle calendar', exact: true });
   await tile.scrollIntoViewIfNeeded();
   await tile.click();
 
@@ -51,7 +51,7 @@ test('calendar: one drawing fills all 13 pages → flip through → A4 → baske
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('calendar', { exact: true })).toBeVisible();
+  await expect(page.getByText('doodle calendar', { exact: true })).toBeVisible();
   await expect(page.getByText('A4 · 2027 · one favourite drawing')).toBeVisible();
   // the total comes from the server's quote of the A4 calendar, not the basket's display price
   await expect(page.getByText('£24').first()).toBeVisible();

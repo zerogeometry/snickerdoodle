@@ -40,7 +40,7 @@ test('studio journey: upload → studio edit → done → the range shows the ed
   await expect.poll(() => framePreview.getAttribute('src'), { timeout: 45_000, message: 'the frame preview is re-made from the edit' }).not.toBe(before);
 
   // …and it goes in the basket
-  await page.getByRole('button', { name: 'customize framed print', exact: true }).click();
+  await page.getByRole('button', { name: 'customize framed doodles', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/framedPrint/);
   await page.getByRole('button', { name: /add to basket/ }).click();
   await expect(page).toHaveURL(/\/start-creating/);
@@ -48,6 +48,6 @@ test('studio journey: upload → studio edit → done → the range shows the ed
 
   await page.goto('/checkout');
   await expect(page.getByRole('heading', { name: /your basket/i })).toBeVisible();
-  await expect(page.getByText('framed print').first()).toBeVisible();
+  await expect(page.getByText('framed doodles').first()).toBeVisible();
   expect(pageErrors, pageErrors.join(' | ')).toEqual([]);
 });

@@ -79,7 +79,7 @@ for (const size of SIZES) test.describe(size.name, () => {
 
     // the height chart is the LAST tile on the range
     const tiles = page.getByRole('button', { name: /^customize / });
-    await expect(tiles.last()).toHaveAccessibleName('customize height chart');
+    await expect(tiles.last()).toHaveAccessibleName('customize doodle height chart');
 
     // the tea towel and the wrapping paper, straight into the basket from their customise pages: on honey
     for (const [key, name] of [['teaTowel', 'tea towel'], ['wrappingPaper', 'wrapping paper']] as const) {
@@ -93,7 +93,7 @@ for (const size of SIZES) test.describe(size.name, () => {
 
     // the socks open on honey, say so, and the wheel still changes it
     await goClient(page, '/customize/socks');
-    await expect(page.getByRole('heading', { level: 1, name: 'socks' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'doodle socks' })).toBeVisible({ timeout: 30_000 });
     await customizeReady(page);
     await expect(page.getByText(/we’ve matched the sock to your paper/)).toBeVisible();
     await page.getByRole('button', { name: /sock colour: /i }).click();
@@ -108,7 +108,7 @@ for (const size of SIZES) test.describe(size.name, () => {
 
     // the tee's customise page opens on ochre, and that's the tee that goes in the basket…
     await goClient(page, '/customize/kidsTee');
-    await expect(page.getByRole('heading', { level: 1, name: 'kids tee' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'kids doodle tees' })).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => pressedIn(page, 'Colour'), { timeout: 30_000 }).toBe('ochre');
     await customizeReady(page);
     await page.getByRole('button', { name: /^(add to basket|update basket) · / }).click();
@@ -117,14 +117,14 @@ for (const size of SIZES) test.describe(size.name, () => {
     expect(tee?.variantId && colourOf.get(tee.variantId)).toBe('ochre');
     // …and picking another colour is the parent's own
     await goClient(page, '/customize/kidsTee');
-    await expect(page.getByRole('heading', { level: 1, name: 'kids tee' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'kids doodle tees' })).toBeVisible({ timeout: 30_000 });
     await expect.poll(() => pressedIn(page, 'Colour'), { timeout: 30_000 }).toBe('ochre');
     await optionGroup(page, 'Colour').getByRole('button').filter({ hasText: /^white$/ }).first().click();
     await expect.poll(() => pressedIn(page, 'Colour')).toBe('white');
 
     // the height chart's customise page: honey, into the basket
     await goClient(page, '/customize/heightChart');
-    await expect(page.getByRole('heading', { level: 1, name: 'height chart' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'doodle height chart' })).toBeVisible({ timeout: 30_000 });
     await customizeReady(page);
     await page.getByRole('button', { name: /^(add to basket|update basket) · / }).click();
     await expect(page).toHaveURL(/\/start-creating/);
