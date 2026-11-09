@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { assets, auditRecords, profileImages, storageObjects } from '@/db/schema';
-import { AuthzError, canReview, hashCheckSkipped, type Reviewer, type ReviewSubject } from '@/authz';
+import { AuthzError, canReview, reviewRemoveOnly, type Reviewer, type ReviewSubject } from '@/authz';
 import { derivativeKey, getObjectBytes } from '@/storage';
 import { eraseAsset } from '../assets';
 import { eraseProfileImage } from '../profile';
@@ -52,7 +52,7 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
     ...flagged.map((r) => {
       const d = (r.detail ?? {}) as Detail;
       const fromDesign = d.design?.status === 'FLAGGED';
-      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at, hashUnchecked: hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail }) };
+      return { kind: 'keepsake' as const, id: r.id, labels: (fromDesign ? d.design?.labels : d.labels) ?? [], source: fromDesign ? ('studio design' as const) : ('upload' as const), flaggedAt: r.at, hashUnchecked: reviewRemoveOnly({ moderationStatus: r.status, moderationDetail: r.detail }) };
     }),
     ...profiles.map((r) => ({
       kind: 'profile' as const,
@@ -60,7 +60,7 @@ export async function reviewQueue(db: DbHandle, reviewer: Reviewer): Promise<{ i
       labels: ((r.detail ?? {}) as Detail).labels ?? [],
       source: r.kind === 'AVATAR' ? ('profile picture' as const) : r.kind === 'ACCOUNT_HEADER' ? ('profile header' as const) : ('family banner' as const),
       flaggedAt: r.at,
-      hashUnchecked: hashCheckSkipped({ moderationStatus: r.status, moderationDetail: r.detail }),
+      hashUnchecked: reviewRemoveOnly({ moderationStatus: r.status, moderationDetail: r.detail }),
     })),
   ];
   items.sort((a, b) => (b.flaggedAt?.getTime() ?? 0) - (a.flaggedAt?.getTime() ?? 0));

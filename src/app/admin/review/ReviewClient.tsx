@@ -90,7 +90,7 @@ export interface ClientItem {
   labels: string[];
   source: string;
   flaggedAt: string | null;
-  /** The safety hash check never ran: it can only be removed, never looked at or cleared. */
+  /** Remove-only: the hash check never ran, or (D25, hash check deferred) it was flagged as possibly sexual or unreadable. */
   hashUnchecked: boolean;
 }
 
@@ -139,7 +139,7 @@ export function ReviewList({ items }: { items: ClientItem[] }) {
               </p>
               <div className="mt-3 flex aspect-[4/3] max-h-80 w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-paper-2">
                 {it.hashUnchecked ? (
-                  <p className="px-6 text-center text-xs text-ink-soft">the safety hash check couldn’t run on this one, so it can’t be looked at or cleared — only removed. The family can upload it again.</p>
+                  <p className="px-6 text-center text-xs text-ink-soft">for safety this one can’t be looked at or cleared, only removed: it was held for possible nudity (or couldn’t be read) without the hash check, or the hash check couldn’t run.</p>
                 ) : open ? (
                   <img src={`/api/admin/review/${it.kind}/${it.id}`} alt="the flagged picture" className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
                 ) : (

@@ -5,6 +5,7 @@ import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
 import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz/review';
+import { VIEWABLE_WITHOUT_HASH_CHECK } from './config';
 
 const sha256Hex = (b: Buffer) => createHash('sha256').update(b).digest('hex');
 
@@ -12,11 +13,44 @@ export type ModerationState = 'CLEAR' | 'FLAGGED' | 'BLOCKED';
 export interface ModerationVerdict {
   status: ModerationState;
   labels: string[];
+  /** Set only when the known-CSAM hash check was skipped by founder decision D25. */
+  hashCheck?: 'deferred';
+  /** With a deferred hash check: may a reviewer look at it? true = remove-only (src/authz/review.ts). */
+  sensitive?: boolean;
 }
 
 /** Labels for a check that couldn't give an answer — the item is held for review, never CLEARed. */
 export const CLASSIFIER_ERROR_LABEL = 'classifier-error';
+/** Words written in the picture matched the abuse list. */
+export const DRAWN_WORDS_LABEL = 'drawn-words';
+/** The words-in-the-picture check failed — not a clean read, so held for review. */
+export const TEXT_UNREADABLE_LABEL = 'text-unreadable';
 export { HASH_UNCHECKED_LABEL };
+
+/** Read the words in a picture and screen them. null = nothing to flag. */
+async function screenWords(providers: ModerationProviders, buffer: Buffer): Promise<string | null> {
+  if (!providers.textReader) return null;
+  let words: string[];
+  try {
+    words = await providers.textReader.read(buffer);
+  } catch (e) {
+    providerFailed('text reader', e);
+    return TEXT_UNREADABLE_LABEL;
+  }
+  if (!Array.isArray(words)) return TEXT_UNREADABLE_LABEL;
+  return words.length && containsAbusiveText(words.join(' ')) ? DRAWN_WORDS_LABEL : null;
+}
+
+/**
+ * With the hash check deferred (D25), could a reviewer be looking at abuse material if they opened
+ * this? Anything but a definite, known, non-sexual category says yes (fail-safe).
+ */
+function isSensitive(c: { flagged?: unknown; categories?: unknown } | null): boolean {
+  if (!c) return true; // the classifier failed: we don't know what it is
+  if (c.flagged !== true) return c.flagged !== false; // clean = not sensitive; unreadable = sensitive
+  if (!Array.isArray(c.categories) || c.categories.length === 0) return true;
+  return c.categories.some((cat) => !VIEWABLE_WITHOUT_HASH_CHECK.includes(String(cat)));
+}
 
 /** Log that a provider failed — the error's name only: never its details, an image or a credential. */
 const providerFailed = (which: string, e: unknown) => console.warn(`[moderation] ${which} failed (${e instanceof Error ? e.name : typeof e}) — held for review`);
@@ -44,29 +78,41 @@ export async function moderateImage(
   },
   providers: ModerationProviders = defaultProviders(),
 ): Promise<ModerationVerdict> {
-  const hashInput = input.originalBuffer
-    ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
-    : { buffer: input.buffer, sha256: input.sha256 };
-  let known: unknown;
-  try {
-    known = await providers.hash.isKnownIllegal(hashInput);
-  } catch (e) {
-    providerFailed('hash check', e);
-    known = undefined;
+  const deferred = providers.hash === null;
+  if (!deferred) {
+    const hashInput = input.originalBuffer
+      ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
+      : { buffer: input.buffer, sha256: input.sha256 };
+    let known: unknown;
+    try {
+      known = await providers.hash!.isKnownIllegal(hashInput);
+    } catch (e) {
+      providerFailed('hash check', e);
+      known = undefined;
+    }
+    if (known === true) return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+    if (known !== false) return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
   }
-  if (known === true) return { status: 'BLOCKED', labels: ['csam-hash-match'] };
-  if (known !== false) return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
 
-  let c: { flagged?: unknown; labels?: unknown } | null;
-  try {
-    c = await providers.classifier.classify(input.buffer);
-  } catch (e) {
-    providerFailed('classifier', e);
-    return { status: 'FLAGGED', labels: [CLASSIFIER_ERROR_LABEL] };
-  }
-  if (c?.flagged === false) return { status: 'CLEAR', labels: [] };
-  const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
-  return { status: 'FLAGGED', labels: c?.flagged === true ? labels : [...labels, CLASSIFIER_ERROR_LABEL] };
+  // The classifier (nudity, violence, hate symbols, rude gestures) and the words written in the
+  // picture, side by side. Either one failing holds the item; neither can CLEAR on its own.
+  const [c, wordsLabel] = await Promise.all([
+    providers.classifier.classify(input.buffer).then(
+      // an answer that isn't even an object is a failed check, never a clean one
+      (r) => (r && typeof r === 'object' ? (r as { flagged?: unknown; labels?: unknown; categories?: unknown }) : null),
+      (e) => (providerFailed('classifier', e), null),
+    ),
+    screenWords(providers, input.buffer),
+  ]);
+  const extra = (v: Omit<ModerationVerdict, 'hashCheck' | 'sensitive'>): ModerationVerdict =>
+    deferred ? { ...v, hashCheck: 'deferred', sensitive: v.status === 'CLEAR' ? false : isSensitive(c) } : v;
+
+  if (c === null) return extra({ status: 'FLAGGED', labels: wordsLabel ? [CLASSIFIER_ERROR_LABEL, wordsLabel] : [CLASSIFIER_ERROR_LABEL] });
+  if (c.flagged === false && !wordsLabel) return extra({ status: 'CLEAR', labels: [] });
+  const labels = Array.isArray(c.labels) ? c.labels.map((l) => String(l)) : [];
+  if (c.flagged !== true && c.flagged !== false) labels.push(CLASSIFIER_ERROR_LABEL);
+  if (wordsLabel) labels.push(wordsLabel);
+  return extra({ status: 'FLAGGED', labels });
 }
 
 /**
@@ -91,10 +137,12 @@ export async function moderateAndRecord(
   // silently CLEAR. Defends the gate against a future provider returning garbage.
   const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
   const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
+  // D25: remember that the hash check was deferred, and whether a reviewer may look (fail-safe: sensitive)
+  const deferral = raw.hashCheck === 'deferred' ? { hashCheck: 'deferred' as const, sensitive: raw.sensitive !== false } : {};
 
   await db
     .update(assets)
-    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels, original: { status, labels } } })
+    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels, original: { status, labels, ...deferral } } })
     .where(eq(assets.id, input.assetId));
   if (status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -106,7 +154,7 @@ export async function moderateAndRecord(
       metadata: { labels },
     });
   }
-  return { status, labels };
+  return { status, labels, ...deferral };
 }
 
 // ── Studio designs ───────────────────────────────────────────────────────────
@@ -118,7 +166,7 @@ export async function moderateAndRecord(
 // can never clear a flagged upload (and a flagged design holds a clean upload back).
 
 const RANK: Record<ModerationState | 'PENDING', number> = { CLEAR: 0, PENDING: 1, FLAGGED: 2, BLOCKED: 3 };
-type Stored = { status: ModerationState | 'PENDING'; labels: string[] };
+type Stored = { status: ModerationState | 'PENDING'; labels: string[]; hashCheck?: 'deferred'; sensitive?: boolean };
 const worse = (a: Stored, b: Stored): Stored => (RANK[b.status] > RANK[a.status] ? b : a);
 
 async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {
@@ -160,9 +208,11 @@ export async function moderateDesignAndRecord(
     const labels = Array.isArray(c?.labels) ? c.labels.map((l) => String(l)) : [];
     if (c === null) labels.push(CLASSIFIER_ERROR_LABEL);
     // a reader that FAILED is not a clean read — route to review rather than wave it through
-    if (words === null) labels.push('text-unreadable');
-    else if (words.length && containsAbusiveText(words.join(' '))) labels.push('drawn-words');
+    if (words === null) labels.push(TEXT_UNREADABLE_LABEL);
+    else if (words.length && containsAbusiveText(words.join(' '))) labels.push(DRAWN_WORDS_LABEL);
     design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
+    // the design shows the upload too: with the hash check deferred, a sexual/unknown flag is remove-only
+    if (p.hash === null && design.status !== 'CLEAR') design.sensitive = isSensitive(c);
   }
   const original = await originalVerdict(db, input.assetId);
   const combined = worse(original, design);

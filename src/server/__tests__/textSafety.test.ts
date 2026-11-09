@@ -42,4 +42,9 @@ describe('screenChildFirstName — child FIRST NAME ONLY, abuse-screened', () =>
     expect(containsAbusiveText('Cunningham')).toBe(false); // legit name — no abuse token inside
     expect(containsAbusiveText('a Shit message')).toBe(true);
   });
+
+  it('D25 additions catch more profanity, still not ordinary words', () => {
+    for (const bad of ['BOLLOCKS', 'you arsehole', 'asshole', 'paedo', 'nonce']) expect(containsAbusiveText(bad)).toBe(true);
+    for (const fine of ['encyclopaedia', 'announce', 'pronounce', 'paediatric nurse', 'Arsenal', 'Bollinger']) expect(containsAbusiveText(fine)).toBe(false);
+  });
 });

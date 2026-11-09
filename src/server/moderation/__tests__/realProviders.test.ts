@@ -17,7 +17,8 @@ const REAL = { MODERATION_PROVIDER: 'real' };
 function mockRekognition(reply: unknown = { ModerationLabels: [] }, extra: Record<string, unknown> = {}) {
   const send = vi.fn(async () => {
     if (reply instanceof Error) throw reply;
-    return reply;
+    // the same reply answers the words-in-the-picture check (DetectText): no words, unless the test says so
+    return reply && typeof reply === 'object' && !('TextDetections' in reply) ? { ...reply, TextDetections: [] } : reply;
   });
   const client = { config: { region: REKOGNITION_REGION, ...extra }, send } as RekognitionPort;
   return { client, send };
@@ -44,7 +45,7 @@ describe('the default stays the stub', () => {
   it('unset or "stub" → the pass-everything stub; nothing is sent anywhere', async () => {
     for (const env of [{}, { MODERATION_PROVIDER: 'stub' }, { MODERATION_PROVIDER: '' }]) {
       const p = defaultProviders(env);
-      expect(await p.hash.isKnownIllegal({ sha256: 'x', buffer: Buffer.from('x') })).toBe(false);
+      expect(await p.hash!.isKnownIllegal({ sha256: 'x', buffer: Buffer.from('x') })).toBe(false);
       expect(await p.classifier.classify(Buffer.from('x'))).toEqual({ flagged: false, labels: [] });
       expect(isModerationConfigured(env)).toBe(false);
     }
@@ -64,7 +65,7 @@ describe('MODERATION_PROVIDER=real', () => {
   it('builds the real providers (Rekognition classifier + text reader, IWF hash gate)', async () => {
     const { client, send } = mockRekognition({ ModerationLabels: [{ Name: 'Violence', Confidence: 95, ParentName: '' }] });
     const p = realProviders(REAL, { rekognition: client, iwf: noMatch });
-    expect(await p.classifier.classify(await png())).toEqual({ flagged: true, labels: ['Violence'] });
+    expect(await p.classifier.classify(await png())).toEqual({ flagged: true, labels: ['Violence'], categories: ['Violence'] });
     expect(send).toHaveBeenCalledTimes(1);
     expect(p.textReader).toBeDefined();
   });
@@ -151,7 +152,8 @@ describe('a provider error routes to review — never CLEAR', () => {
     quiet();
     const { client } = mockRekognition(Object.assign(new Error('service unavailable'), { name: 'ServiceUnavailableException' }));
     const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { rekognition: client, iwf: noMatch }));
-    expect(v).toEqual({ status: 'FLAGGED', labels: [CLASSIFIER_ERROR_LABEL] });
+    // the same client fails for the words-in-the-picture check too: both are held, neither clears
+    expect(v).toEqual({ status: 'FLAGGED', labels: [CLASSIFIER_ERROR_LABEL, 'text-unreadable'] });
   });
 
   it('a garbage Rekognition response → FLAGGED, not CLEAR', async () => {

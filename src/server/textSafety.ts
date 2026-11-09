@@ -15,6 +15,8 @@ import { GIFT_NOTE_MAX } from '@/lib/gift-note';
 const ABUSE = [
   'fuck', 'shit', 'cunt', 'bitch', 'bastard', 'dick', 'piss',
   'nigger', 'faggot', 'whore', 'slut', 'rape', 'wank', 'twat',
+  // added for D25 (founder, 9 Nov: "no profane language"); each is rare inside a real word
+  'bollock', 'arsehole', 'asshole', 'paedo', 'nonce',
 ];
 
 /** True if the text contains obvious abusive language. */

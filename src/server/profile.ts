@@ -96,7 +96,8 @@ export async function setProfileImage(
     byteSize: encoded.data.byteLength,
     moderationStatus: verdict.status,
     moderatedAt: new Date(),
-    moderationDetail: { labels: verdict.labels },
+    // D25: with the hash check deferred, record whether a reviewer may look (fail-safe: sensitive)
+    moderationDetail: 'hashCheck' in verdict && verdict.hashCheck === 'deferred' ? { labels: verdict.labels, hashCheck: 'deferred', sensitive: verdict.sensitive !== false } : { labels: verdict.labels },
   });
   await db.insert(auditRecords).values({
     familyId,

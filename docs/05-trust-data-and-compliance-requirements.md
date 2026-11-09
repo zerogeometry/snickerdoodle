@@ -41,6 +41,7 @@ Posture: **automated-first, human only on flagged exceptions** — because a sta
 
 Must-haves (P0, before any real upload path):
 - **Known-CSAM blocking at upload, by hash** via **IWF Image Intercept** (free; hash-match means no human views the image to match; hashes are not reversible). On a match: preserve, **do not view/redistribute/investigate**, and report to IWF / NCA-CEOP per the illegal-content runbook. A US processor would also trigger NCMEC — another reason to keep moderation in-region. 🧑‍⚖️ (reporting workflow needs DP sign-off).
+  - **D25 (founder, 9 Nov 2026):** IWF onboarding hadn't completed, so launch runs with the hash check **deferred**: every upload still passes the in-region classifier (nudity, violence, disturbing imagery, hate symbols, rude gestures) and a words-in-the-picture check before it can print, and a deferred item flagged as possibly sexual, unknown or unreadable is remove-only (never viewed). IWF is connected the day it's onboarded. See DECISIONS.md D25.
 - **Report + takedown path** wired to the real cascading-deletion job.
 
 Screening (P1):

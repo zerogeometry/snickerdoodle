@@ -113,8 +113,13 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - AUTOMATED-FIRST, human only on flagged exceptions. A human viewing a child's image is itself a
   privacy event — any human review is rare, minimal, ACCESS-CONTROLLED, LOGGED, and disclosed.
 - EVERY upload is HASH-CHECKED for known CSAM (IWF Image Intercept) AND passed through the
-  moderation classifier (AWS Rekognition Content Moderation, in-region eu-west-2) BEFORE it can
-  reach a print order. CSAM match → preserve, DO NOT view/redistribute, report per the runbook.
+  moderation classifier (AWS Rekognition Content Moderation, in-region eu-west-2) AND the
+  words-in-the-picture check BEFORE it can reach a print order. CSAM match → preserve, DO NOT
+  view/redistribute, report per the runbook.
+  - D25 (founder, 9 Nov 2026): until IWF is onboarded the hash check is DEFERRED
+    (`CSAM_HASH_CHECK=deferred`); the classifier + words check still gate every upload, and a
+    deferred item flagged as possibly sexual/unknown/unreadable is REMOVE-ONLY in review. Connect
+    IWF the day it arrives (it takes over automatically). Photos stay sellable.
 - The classifier FLAGS into a review queue — it NEVER auto-rejects a child's drawing. No silent bin.
 - A one-tap REPORT/TAKEDOWN path exists wherever a creation/gift link is viewed, wired to the real
   cascading-deletion job.

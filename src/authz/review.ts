@@ -45,6 +45,26 @@ export function hashCheckSkipped(item: ReviewSubject): boolean {
   return labels.some((l) => HASH_NEVER_RAN.has(l));
 }
 
+/**
+ * Founder decision D25: until IWF is connected the hash check is DEFERRED, and uploads are screened
+ * by the classifier + drawn-words check alone. A deferred item flagged for anything sexual, unknown
+ * or unreadable is "sensitive": opening it could mean a person viewing abuse material, so — like an
+ * item whose hash check never ran — it can be removed, never viewed or cleared. A deferred item
+ * flagged only for violence, hate symbols, rude gestures or drawn words may be looked at.
+ * Fail-safe: a deferred verdict with no `sensitive: false` counts as sensitive.
+ */
+export function hashDeferredSensitive(item: ReviewSubject): boolean {
+  const d = (item.moderationDetail ?? {}) as { hashCheck?: unknown; sensitive?: unknown; original?: { hashCheck?: unknown; sensitive?: unknown }; design?: { sensitive?: unknown } };
+  const upload = d.original ?? d;
+  if (upload.hashCheck !== 'deferred') return false;
+  return upload.sensitive !== false || d.design?.sensitive === true;
+}
+
+/** May a reviewer only REMOVE this (never view or clear it)? */
+export function reviewRemoveOnly(item: ReviewSubject): boolean {
+  return hashCheckSkipped(item) || hashDeferredSensitive(item);
+}
+
 export function canReview(reviewer: Reviewer, action: ReviewAction, item?: ReviewSubject): Decision {
   if (!reviewer.accountId) return { allowed: false, reason: 'not signed in' };
   if (!reviewer.isAdmin) return { allowed: false, reason: 'not an admin' };
@@ -54,5 +74,6 @@ export function canReview(reviewer: Reviewer, action: ReviewAction, item?: Revie
   if (item.moderationStatus === 'BLOCKED') return { allowed: false, reason: 'blocked content is never viewed or redistributed' };
   if (item.moderationStatus !== 'FLAGGED') return { allowed: false, reason: 'only flagged items are reviewed' };
   if (action !== 'remove' && hashCheckSkipped(item)) return { allowed: false, reason: 'the known-CSAM hash check never ran on this picture — it can be removed, never viewed or cleared' };
+  if (action !== 'remove' && hashDeferredSensitive(item)) return { allowed: false, reason: 'flagged as possibly sexual (or unreadable) with the known-CSAM hash check deferred — it can be removed, never viewed or cleared' };
   return { allowed: true, reason: 'admin with two-step login, flagged item' };
 }

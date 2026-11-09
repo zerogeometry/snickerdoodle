@@ -116,7 +116,7 @@ interface Label {
  * Turn a DetectModerationLabels response into a flag decision (see config.ts for the rules).
  * A response we can't read THROWS — it is never read as "nothing found".
  */
-export function mapModerationLabels(output: unknown, config: ClassifierConfig = CLASSIFIER_CONFIG): { flagged: boolean; labels: string[] } {
+export function mapModerationLabels(output: unknown, config: ClassifierConfig = CLASSIFIER_CONFIG): { flagged: boolean; labels: string[]; categories: string[] } {
   const raw = (output as { ModerationLabels?: unknown } | null)?.ModerationLabels;
   if (!Array.isArray(raw)) throw new RekognitionResponseError('DetectModerationLabels returned no ModerationLabels list');
   const flagSet = new Set(config.flagLabels);
@@ -133,24 +133,32 @@ export function mapModerationLabels(output: unknown, config: ClassifierConfig = 
   const leaves = labels.filter((l) => !name(l) || !parents.has(name(l)!));
 
   const flagged: string[] = [];
+  /** The flag-list entry that decided each flagged label ('unknown' when none did). */
+  const categories: string[] = [];
   for (const leaf of leaves) {
+    let decidedBy: string | null = null;
     let decision: 'flag' | 'ignore' | null = null;
     let cur: Label | undefined = leaf;
     let curName = name(leaf);
     const seen = new Set<string>();
     while (curName && !seen.has(curName) && !decision) {
       seen.add(curName);
-      if (flagSet.has(curName)) decision = 'flag';
-      else if (ignoreSet.has(curName)) decision = 'ignore';
+      if (flagSet.has(curName)) {
+        decision = 'flag';
+        decidedBy = curName;
+      } else if (ignoreSet.has(curName)) decision = 'ignore';
       else {
         const p: string | null = cur ? parent(cur) : null;
         cur = p ? byName.get(p) : undefined;
         curName = p;
       }
     }
-    if (decision !== 'ignore') flagged.push(name(leaf) ?? 'unnamed-label'); // flag-listed OR unknown → flag
+    if (decision !== 'ignore') {
+      flagged.push(name(leaf) ?? 'unnamed-label'); // flag-listed OR unknown → flag
+      categories.push(decidedBy ?? 'unknown');
+    }
   }
-  return flagged.length ? { flagged: true, labels: [...new Set(flagged)] } : { flagged: false, labels: [] };
+  return flagged.length ? { flagged: true, labels: [...new Set(flagged)], categories: [...new Set(categories)] } : { flagged: false, labels: [], categories: [] };
 }
 
 /** Lines of drawn text from a DetectText response. Unreadable response → throws. */

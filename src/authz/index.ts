@@ -25,7 +25,7 @@ export {
 
 export { canViewProfileImage, type ProfileImageRef, type ProfileViewer } from './profileImages';
 
-export { canReview, hashCheckSkipped, HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL, type Reviewer, type ReviewAction, type ReviewSubject } from './review';
+export { canReview, hashCheckSkipped, hashDeferredSensitive, reviewRemoveOnly, HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL, type Reviewer, type ReviewAction, type ReviewSubject } from './review';
 
 export {
   canAddOccasion,

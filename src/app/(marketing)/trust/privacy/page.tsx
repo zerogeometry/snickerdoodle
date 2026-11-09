@@ -84,7 +84,7 @@ export default function PrivacyNoticePage() {
           only sees what it needs to do its job:
         </p>
         <ul>
-          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. When we switch on automatic image safety checks, those run with Amazon in London too.</li>
+          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery and bad language before it can be printed. Amazon doesn’t keep the pictures or use them to train anything.</li>
           <li><strong>Stripe</strong> — takes your payment. Your card details go straight to Stripe; we never see or store them.</li>
           <li><strong>Prodigi</strong> — prints your order and delivers it. They get the print file for what you ordered and the delivery address.</li>
           <li><strong>Resend</strong> (Ireland, EU) — sends the site&apos;s emails, like your sign-in links, order updates and gift requests.</li>

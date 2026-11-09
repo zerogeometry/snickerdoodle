@@ -18,6 +18,13 @@ import { assertRekognitionRegion, createRekognitionClient, rekognitionClassifier
  *     (DPIA A-08). Bad config is a startup error (src/instrumentation.ts), never a quiet stub.
  *     IWF isn't onboarded yet, so in "real" mode the hash gate is CLOSED: every upload is held
  *     for review, and `isModerationConfigured()` stays false.
+ *
+ * CSAM_HASH_CHECK=deferred (founder decision D25, 9 Nov 2026): launch on Rekognition alone until
+ * IWF is connected. With no IWF adapter, the hash step is SKIPPED (not faked as "no match"), every
+ * upload still goes through the classifier AND the drawn-words screen, and the verdict records
+ * `hashCheck: 'deferred'`. A deferred item flagged for anything sexual, unknown or unreadable is
+ * remove-only in review (never viewed or cleared). The moment an IWF adapter exists it is used
+ * and this setting no longer matters.
  */
 
 export interface HashMatchProvider {
@@ -26,8 +33,9 @@ export interface HashMatchProvider {
 }
 
 export interface ClassifierProvider {
-  /** Automated moderation classifier. `flagged` routes to the human review queue. */
-  classify(buffer: Buffer): Promise<{ flagged: boolean; labels: string[] }>;
+  /** Automated moderation classifier. `flagged` routes to the human review queue. `categories`
+   * names the flag-list entries that decided (see config.ts); missing = treated as sensitive. */
+  classify(buffer: Buffer): Promise<{ flagged: boolean; labels: string[]; categories?: string[] }>;
 }
 
 /**
@@ -39,7 +47,8 @@ export interface TextReaderProvider {
 }
 
 export interface ModerationProviders {
-  hash: HashMatchProvider;
+  /** null = the hash check is DEFERRED by founder decision D25 (CSAM_HASH_CHECK=deferred, no IWF yet). */
+  hash: HashMatchProvider | null;
   classifier: ClassifierProvider;
   /** Optional until the real providers land; designs fall back to the classifier alone. */
   textReader?: TextReaderProvider;
@@ -80,8 +89,15 @@ export function realProviderConfigErrors(env: Env = process.env): string[] {
   // The client pins its own endpoint, so this would be ignored — but someone meant to send
   // children's pictures somewhere else. Say no, loudly.
   if (env.AWS_ENDPOINT_URL_REKOGNITION) errors.push('AWS_ENDPOINT_URL_REKOGNITION is set — Rekognition is pinned to eu-west-2 and cannot be redirected');
+  // Only one other value is meaningful; a typo must not quietly close (or open) the gate.
+  if (env.CSAM_HASH_CHECK !== undefined && env.CSAM_HASH_CHECK !== '' && env.CSAM_HASH_CHECK !== 'deferred') {
+    errors.push(`CSAM_HASH_CHECK must be unset or "deferred", not "${env.CSAM_HASH_CHECK}"`);
+  }
   return errors;
 }
+
+/** Founder decision D25: run on the classifier alone until IWF is connected. */
+export const isHashCheckDeferred = (env: Env = process.env): boolean => env.CSAM_HASH_CHECK === 'deferred';
 
 let sharedRekognition: RekognitionClient | null = null;
 const rekognitionClient = (): RekognitionClient => (sharedRekognition ??= createRekognitionClient());
@@ -97,9 +113,11 @@ export function realProviders(env: Env = process.env, deps: RealProviderDeps = {
   const errors = realProviderConfigErrors(env);
   if (errors.length) throw new ModerationConfigError(`MODERATION_PROVIDER=real is misconfigured: ${errors.join('; ')}`);
   const client = deps.rekognition ?? rekognitionClient();
+  const iwf = deps.iwf !== undefined ? deps.iwf : resolveIwfAdapter(env);
   return {
-    // no IWF adapter → the hash gate is CLOSED (throws on every check → held for review)
-    hash: iwfHashProvider(deps.iwf !== undefined ? deps.iwf : resolveIwfAdapter(env)),
+    // IWF connected → it runs. No IWF + D25 deferral → skipped (null). Otherwise the gate is
+    // CLOSED (throws on every check → held for review).
+    hash: iwf ? iwfHashProvider(iwf) : isHashCheckDeferred(env) ? null : iwfHashProvider(null),
     classifier: rekognitionClassifier(client),
     textReader: rekognitionTextReader(client),
   };
@@ -117,12 +135,13 @@ export function defaultProviders(env: Env = process.env, deps: RealProviderDeps 
 }
 
 /**
- * Go-live guard: true only when the REAL providers are configured — Rekognition AND the IWF
- * hash check. Until IWF is onboarded this is false even with MODERATION_PROVIDER=real, so
- * production keeps holding every upload for review (and sends nothing to Rekognition).
+ * Go-live guard: true only when the REAL providers are configured — Rekognition AND either the
+ * IWF hash check or the founder's explicit D25 deferral of it. Otherwise false even with
+ * MODERATION_PROVIDER=real, so production keeps holding every upload for review (and sends
+ * nothing to Rekognition).
  */
 export function isModerationConfigured(env: Env = process.env): boolean {
-  return env.MODERATION_PROVIDER === 'real' && realProviderConfigErrors(env).length === 0 && isIwfConfigured(env);
+  return env.MODERATION_PROVIDER === 'real' && realProviderConfigErrors(env).length === 0 && (isIwfConfigured(env) || isHashCheckDeferred(env));
 }
 
 /**
@@ -130,7 +149,7 @@ export function isModerationConfigured(env: Env = process.env): boolean {
  * bad config, a client outside eu-west-2, or no AWS credentials in the provider chain. The
  * credentials are resolved to prove they exist, then dropped — never logged. No image is sent.
  */
-export async function assertModerationReady(env: Env = process.env, deps: RealProviderDeps = {}): Promise<{ mode: 'stub' | 'real'; hashGate: 'stub' | 'configured' | 'closed' }> {
+export async function assertModerationReady(env: Env = process.env, deps: RealProviderDeps = {}): Promise<{ mode: 'stub' | 'real'; hashGate: 'stub' | 'configured' | 'deferred' | 'closed' }> {
   defaultProviders(env, deps); // throws on an unknown mode or bad real config
   if (env.MODERATION_PROVIDER !== 'real') return { mode: 'stub', hashGate: 'stub' };
   const client = deps.rekognition ?? rekognitionClient();
@@ -144,6 +163,10 @@ export async function assertModerationReady(env: Env = process.env, deps: RealPr
     }
   }
   const iwf = deps.iwf !== undefined ? deps.iwf !== null : isIwfConfigured(env);
+  if (!iwf && isHashCheckDeferred(env)) {
+    console.warn('[moderation] IWF Image Intercept is not configured — the CSAM hash check is DEFERRED (founder decision D25): uploads are screened by the classifier + drawn-words check only. Connect IWF as soon as it is onboarded: project-office/ops/IWF-ONBOARDING.md');
+    return { mode: 'real', hashGate: 'deferred' };
+  }
   if (!iwf) {
     console.warn('[moderation] IWF Image Intercept is not configured — the CSAM hash gate is CLOSED: every upload is held for review and none can be printed. See project-office/ops/IWF-ONBOARDING.md');
   }

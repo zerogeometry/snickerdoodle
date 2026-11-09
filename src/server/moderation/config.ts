@@ -41,12 +41,24 @@ export interface TextReaderConfig {
   minConfidence: number;
 }
 
-/** Rekognition Content Moderation taxonomy v7 top-level categories. */
+/**
+ * Rekognition Content Moderation taxonomy v7 top-level categories.
+ * "Rude Gestures" flags (founder, 9 Nov, D25: "no profane imagery"), e.g. a raised middle finger.
+ */
 export const CLASSIFIER_CONFIG: ClassifierConfig = {
   minConfidence: 60,
-  flagLabels: ['Explicit', 'Non-Explicit Nudity of Intimate parts and Kissing', 'Violence', 'Visually Disturbing', 'Hate Symbols'],
-  ignoreLabels: ['Swimwear or Underwear', 'Alcohol', 'Drugs & Tobacco', 'Rude Gestures', 'Gambling'],
+  flagLabels: ['Explicit', 'Non-Explicit Nudity of Intimate parts and Kissing', 'Violence', 'Visually Disturbing', 'Hate Symbols', 'Rude Gestures'],
+  ignoreLabels: ['Swimwear or Underwear', 'Alcohol', 'Drugs & Tobacco', 'Gambling'],
 };
+
+/**
+ * Flag categories a reviewer may LOOK at when the known-CSAM hash check was deferred (D25).
+ * Anything else — a sexual category, an unknown or renamed one, a classifier that failed — is
+ * "sensitive": with no hash check, opening it could mean a person viewing abuse material, so it
+ * can only be removed, never viewed or cleared (src/authz/review.ts). Fail-safe: a category
+ * missing from this list can only make an item stricter.
+ */
+export const VIEWABLE_WITHOUT_HASH_CHECK: readonly string[] = ['Violence', 'Visually Disturbing', 'Hate Symbols', 'Rude Gestures'];
 
 export const TEXT_READER_CONFIG: TextReaderConfig = {
   minConfidence: 50,

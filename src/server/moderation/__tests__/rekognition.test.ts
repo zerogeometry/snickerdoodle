@@ -164,32 +164,42 @@ describe('Rekognition — threshold + label mapping (config.ts)', () => {
   });
 
   it('nothing found → not flagged', () => {
-    expect(mapModerationLabels({ ModerationLabels: [] })).toEqual({ flagged: false, labels: [] });
+    expect(mapModerationLabels({ ModerationLabels: [] })).toEqual({ flagged: false, labels: [], categories: [] });
   });
 
   it('a flag-listed category at/above the threshold FLAGS, with the label', () => {
     const t = CLASSIFIER_CONFIG.minConfidence;
-    expect(mapModerationLabels({ ModerationLabels: [label('Violence', t)] })).toEqual({ flagged: true, labels: ['Violence'] });
+    expect(mapModerationLabels({ ModerationLabels: [label('Violence', t)] })).toEqual({ flagged: true, labels: ['Violence'], categories: ['Violence'] });
     expect(mapModerationLabels({ ModerationLabels: [label('Explicit', 99)] }).flagged).toBe(true);
     expect(mapModerationLabels({ ModerationLabels: [label('Hate Symbols', 80)] }).flagged).toBe(true);
   });
 
   it('below the threshold never flags', () => {
-    expect(mapModerationLabels({ ModerationLabels: [label('Violence', CLASSIFIER_CONFIG.minConfidence - 0.1)] })).toEqual({ flagged: false, labels: [] });
+    expect(mapModerationLabels({ ModerationLabels: [label('Violence', CLASSIFIER_CONFIG.minConfidence - 0.1)] })).toEqual({ flagged: false, labels: [], categories: [] });
   });
 
   it('a child label flags through its flag-listed parent', () => {
     const v = mapModerationLabels({ ModerationLabels: [label('Violence', 90), label('Graphic Violence', 88, 'Violence'), label('Blood & Gore', 85, 'Graphic Violence')] });
-    expect(v).toEqual({ flagged: true, labels: ['Blood & Gore'] });
+    expect(v).toEqual({ flagged: true, labels: ['Blood & Gore'], categories: ['Violence'] });
   });
 
   it('ignore-listed categories (e.g. swimwear at the beach) don\'t send a child\'s picture to a person', () => {
-    expect(mapModerationLabels({ ModerationLabels: [label('Swimwear or Underwear', 97), label('Female Swimwear or Underwear', 95, 'Swimwear or Underwear')] })).toEqual({ flagged: false, labels: [] });
+    expect(mapModerationLabels({ ModerationLabels: [label('Swimwear or Underwear', 97), label('Female Swimwear or Underwear', 95, 'Swimwear or Underwear')] })).toEqual({ flagged: false, labels: [], categories: [] });
     expect(mapModerationLabels({ ModerationLabels: [label('Alcohol', 90)] }).flagged).toBe(false);
   });
 
+  it('rude gestures FLAG (D25: no profane imagery), e.g. a raised middle finger', () => {
+    const v = mapModerationLabels({ ModerationLabels: [label('Rude Gestures', 88), label('Middle Finger', 86, 'Rude Gestures')] });
+    expect(v).toEqual({ flagged: true, labels: ['Middle Finger'], categories: ['Rude Gestures'] });
+  });
+
+  it('names the category that decided each flag (feeds the D25 "may a reviewer look?" rule)', () => {
+    const v = mapModerationLabels({ ModerationLabels: [label('Explicit', 95), label('Exposed Male Genitalia', 93, 'Explicit'), label('Hate Symbols', 80), label('Nazi Party', 79, 'Hate Symbols')] });
+    expect(v.categories.sort()).toEqual(['Explicit', 'Hate Symbols']);
+  });
+
   it('an UNKNOWN category flags (fail-safe — a renamed category is never waved through)', () => {
-    expect(mapModerationLabels({ ModerationLabels: [label('Some New Category', 90)] })).toEqual({ flagged: true, labels: ['Some New Category'] });
+    expect(mapModerationLabels({ ModerationLabels: [label('Some New Category', 90)] })).toEqual({ flagged: true, labels: ['Some New Category'], categories: ['unknown'] });
     expect(mapModerationLabels({ ModerationLabels: [{ Confidence: 90 }] }).flagged).toBe(true);
   });
 
@@ -197,7 +207,7 @@ describe('Rekognition — threshold + label mapping (config.ts)', () => {
     const cfg: ClassifierConfig = { ...CLASSIFIER_CONFIG, ignoreLabels: [...CLASSIFIER_CONFIG.ignoreLabels, 'Weapons'] };
     const sword = { ModerationLabels: [label('Violence', 80), label('Weapons', 80, 'Violence')] };
     expect(mapModerationLabels(sword, CLASSIFIER_CONFIG).flagged).toBe(true);
-    expect(mapModerationLabels(sword, cfg)).toEqual({ flagged: false, labels: [] });
+    expect(mapModerationLabels(sword, cfg)).toEqual({ flagged: false, labels: [], categories: [] });
     // …but a flagged sibling still flags
     expect(mapModerationLabels({ ModerationLabels: [...sword.ModerationLabels, label('Graphic Violence', 80, 'Violence')] }, cfg).labels).toEqual(['Graphic Violence']);
   });

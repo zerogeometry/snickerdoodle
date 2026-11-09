@@ -224,8 +224,10 @@ done
 - **Until the launch gates are green**, also set `put SITE_MODE test` and
   `sput TEST_SITE_PASSWORD "<a long passphrase>"` — the box then runs exactly like the test site
   (banner, password, never indexed, refuses live keys). Delete both parameters on launch day.
-- **Do NOT create** `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF` or `MODERATION_PROVIDER` yet, and never
-  create `S3_ENDPOINT` / `S3_FORCE_PATH_STYLE` (the box refuses to start with them).
+- **Do NOT create** `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF` yet, and never create `S3_ENDPOINT` /
+  `S3_FORCE_PATH_STYLE` (the box refuses to start with them). `MODERATION_PROVIDER=real` +
+  `CSAM_HASH_CHECK=deferred` (D25) may be switched on while still in test mode, to see the image checks
+  work on sample drawings before private live mode (§4.9).
 - `S3_DIRECT_UPLOADS`: create it as `true` after the CORS rule (3.3) is in and you've done the
   check in ops/DIRECT-UPLOADS.md step 5.
 - *On-box database only:* `sput LOCAL_DB_PASSWORD "$(openssl rand -hex 24)"` and
@@ -363,10 +365,12 @@ On the box (adds the mockup-render check): `sudo /opt/snickerdoodle/kit/bin/smok
 `SITE_MODE=private` keeps the password lock and noindex but runs the REAL shop (src/lib/siteMode.ts).
 It's **switched off until all four are true**, in this order:
 
-1. ☐ **IWF Image Intercept is connected** and `MODERATION_PROVIDER=real` is set (until then every upload
-   is held, so nothing can be printed anyway).
-2. ☐ **The DP professional's LG3 sign-off** is in hand (only then create `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF=true`),
-   and Prodigi's DPA is recorded in the sub-processor register.
+1. ☐ **The image checks are on:** `MODERATION_PROVIDER=real` **and**, until IWF Image Intercept is connected,
+   `CSAM_HASH_CHECK=deferred` (founder decision D25, 9 Nov 2026). Without one of the two, every upload is
+   held and nothing can be printed. Check the app's startup log says `hash check is DEFERRED (founder decision
+   D25)`. When IWF is connected, delete `CSAM_HASH_CHECK`.
+2. ☐ **LG3 sign-off** (signed by the founder as controller, 29 Oct 2026 — LAUNCH-GATES.md): only then create
+   `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF=true`, and Prodigi's DPA is recorded in the sub-processor register.
 3. ☐ The three live keys are in your password manager: Stripe secret key (Snickerdoodle account in the
    Launch Mode Ltd organisation), its webhook signing secret (endpoint `https://snickerdoodle.co.uk/api/webhooks/stripe`,
    event `checkout.session.completed`), and the Prodigi LIVE API key; and Prodigi has a payment card.
@@ -377,6 +381,9 @@ Then, in SSM (console: Systems Manager → Parameter Store → `/snickerdoodle/p
 | Parameter | Value |
 |---|---|
 | `SITE_MODE` | `private` |
+| `MODERATION_PROVIDER` | `real` |
+| `CSAM_HASH_CHECK` | `deferred` (D25; delete once IWF is connected) |
+| `LG3_TRANSFER_ASSESSMENT_SIGNED_OFF` | `true` |
 | `STRIPE_SECRET_KEY` (SecureString) | the live `sk_live_…` / `rk_live_…` key |
 | `STRIPE_WEBHOOK_SECRET` (SecureString) | the live `whsec_…` |
 | `PRODIGI_API_KEY` (SecureString) | the Prodigi LIVE key |
