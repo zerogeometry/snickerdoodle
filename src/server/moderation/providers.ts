@@ -1,6 +1,8 @@
 import type { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { iwfHashProvider, isIwfConfigured, resolveIwfAdapter, type IwfImageInterceptAdapter } from './iwf';
 import { assertRekognitionRegion, createRekognitionClient, rekognitionClassifier, rekognitionTextReader, type RekognitionPort } from './rekognition';
+import { assertTextractRegion, combinedTextReader, createTextractClient, textractTextReader, type TextractPort } from './textract';
+import type { TextractClient } from '@aws-sdk/client-textract';
 
 /**
  * Content-safety providers (decision D8). Two automated checks gate every
@@ -39,8 +41,9 @@ export interface ClassifierProvider {
 }
 
 /**
- * Reads words written IN an image (OCR — AWS Rekognition DetectText, eu-west-2, when real), so
- * words drawn by hand in the Studio get the same abuse screen as typed words.
+ * Reads words written IN an image, so words on an upload or drawn in the Studio get the same abuse
+ * screen as typed words. When real: Rekognition DetectText (printed text) AND Textract
+ * DetectDocumentText (handwriting), both eu-west-2, words pooled.
  */
 export interface TextReaderProvider {
   read(buffer: Buffer): Promise<string[]>;
@@ -89,6 +92,7 @@ export function realProviderConfigErrors(env: Env = process.env): string[] {
   // The client pins its own endpoint, so this would be ignored — but someone meant to send
   // children's pictures somewhere else. Say no, loudly.
   if (env.AWS_ENDPOINT_URL_REKOGNITION) errors.push('AWS_ENDPOINT_URL_REKOGNITION is set — Rekognition is pinned to eu-west-2 and cannot be redirected');
+  if (env.AWS_ENDPOINT_URL_TEXTRACT) errors.push('AWS_ENDPOINT_URL_TEXTRACT is set — Textract is pinned to eu-west-2 and cannot be redirected');
   // Only one other value is meaningful; a typo must not quietly close (or open) the gate.
   if (env.CSAM_HASH_CHECK !== undefined && env.CSAM_HASH_CHECK !== '' && env.CSAM_HASH_CHECK !== 'deferred') {
     errors.push(`CSAM_HASH_CHECK must be unset or "deferred", not "${env.CSAM_HASH_CHECK}"`);
@@ -101,10 +105,13 @@ export const isHashCheckDeferred = (env: Env = process.env): boolean => env.CSAM
 
 let sharedRekognition: RekognitionClient | null = null;
 const rekognitionClient = (): RekognitionClient => (sharedRekognition ??= createRekognitionClient());
+let sharedTextract: TextractClient | null = null;
+const textractClient = (): TextractClient => (sharedTextract ??= createTextractClient());
 
 /** Test seams: a mocked Rekognition client and/or IWF adapter. Production passes nothing. */
 export interface RealProviderDeps {
   rekognition?: RekognitionPort;
+  textract?: TextractPort;
   iwf?: IwfImageInterceptAdapter | null;
 }
 
@@ -119,7 +126,8 @@ export function realProviders(env: Env = process.env, deps: RealProviderDeps = {
     // CLOSED (throws on every check → held for review).
     hash: iwf ? iwfHashProvider(iwf) : isHashCheckDeferred(env) ? null : iwfHashProvider(null),
     classifier: rekognitionClassifier(client),
-    textReader: rekognitionTextReader(client),
+    // printed text (Rekognition) + handwriting (Textract): the founder's handwritten test word slipped past Rekognition alone
+    textReader: combinedTextReader([rekognitionTextReader(client), textractTextReader(deps.textract ?? textractClient())]),
   };
 }
 
@@ -154,6 +162,7 @@ export async function assertModerationReady(env: Env = process.env, deps: RealPr
   if (env.MODERATION_PROVIDER !== 'real') return { mode: 'stub', hashGate: 'stub' };
   const client = deps.rekognition ?? rekognitionClient();
   await assertRekognitionRegion(client);
+  await assertTextractRegion(deps.textract ?? textractClient());
   const creds = (client.config as { credentials?: unknown }).credentials;
   if (typeof creds === 'function') {
     try {

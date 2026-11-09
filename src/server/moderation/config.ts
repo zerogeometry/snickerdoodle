@@ -63,3 +63,8 @@ export const VIEWABLE_WITHOUT_HASH_CHECK: readonly string[] = ['Violence', 'Visu
 export const TEXT_READER_CONFIG: TextReaderConfig = {
   minConfidence: 50,
 };
+
+/** Textract (handwriting): lower still — a child's or a scrawled word reads with low confidence. */
+export const TEXTRACT_READER_CONFIG: TextReaderConfig = {
+  minConfidence: 30,
+};

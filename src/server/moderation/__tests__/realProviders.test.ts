@@ -5,6 +5,7 @@ import { CLASSIFIER_ERROR_LABEL, moderateAndRecord, moderateDesignAndRecord, mod
 import { HashGateUnavailableError, iwfHashProvider, isIwfConfigured, resolveIwfAdapter, type IwfImageInterceptAdapter } from '../iwf';
 import { ModerationConfigError, assertModerationReady, defaultProviders, isModerationConfigured, realProviders } from '../providers';
 import { REKOGNITION_REGION, type RekognitionPort } from '../rekognition';
+import type { TextractPort } from '../textract';
 
 /**
  * MODERATION_PROVIDER=real wiring + the fail-safes, with a MOCKED Rekognition client only.
@@ -13,6 +14,8 @@ import { REKOGNITION_REGION, type RekognitionPort } from '../rekognition';
 
 const png = () => sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer();
 const REAL = { MODERATION_PROVIDER: 'real' };
+/** The handwriting reader (Textract), mocked: reads no words unless a test says otherwise. */
+const noHandwriting = { config: { region: 'eu-west-2' }, send: vi.fn(async () => ({ Blocks: [] })) } as TextractPort;
 
 function mockRekognition(reply: unknown = { ModerationLabels: [] }, extra: Record<string, unknown> = {}) {
   const send = vi.fn(async () => {
@@ -64,7 +67,7 @@ describe('the default stays the stub', () => {
 describe('MODERATION_PROVIDER=real', () => {
   it('builds the real providers (Rekognition classifier + text reader, IWF hash gate)', async () => {
     const { client, send } = mockRekognition({ ModerationLabels: [{ Name: 'Violence', Confidence: 95, ParentName: '' }] });
-    const p = realProviders(REAL, { rekognition: client, iwf: noMatch });
+    const p = realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch });
     expect(await p.classifier.classify(await png())).toEqual({ flagged: true, labels: ['Violence'], categories: ['Violence'] });
     expect(send).toHaveBeenCalledTimes(1);
     expect(p.textReader).toBeDefined();
@@ -74,12 +77,12 @@ describe('MODERATION_PROVIDER=real', () => {
     const env = { ...REAL, AWS_ENDPOINT_URL_REKOGNITION: 'https://elsewhere.example.com' };
     expect(() => defaultProviders(env)).toThrow(/cannot be redirected/);
     expect(isModerationConfigured(env)).toBe(false);
-    await expect(assertModerationReady(env, { rekognition: mockRekognition().client })).rejects.toThrow(ModerationConfigError);
+    await expect(assertModerationReady(env, { textract: noHandwriting, rekognition: mockRekognition().client })).rejects.toThrow(ModerationConfigError);
   });
 
   it('startup refuses a client outside eu-west-2', async () => {
     const client = { config: { region: 'us-east-1' }, send: vi.fn() } as RekognitionPort;
-    await expect(assertModerationReady(REAL, { rekognition: client })).rejects.toThrow(/eu-west-2/);
+    await expect(assertModerationReady(REAL, { textract: noHandwriting, rekognition: client })).rejects.toThrow(/eu-west-2/);
     expect(client.send).not.toHaveBeenCalled();
   });
 
@@ -88,7 +91,7 @@ describe('MODERATION_PROVIDER=real', () => {
       throw new Error('Could not load credentials (AKIA-SHOULD-NOT-LEAK)');
     });
     const { client, send } = mockRekognition(undefined, { credentials });
-    const err = await assertModerationReady(REAL, { rekognition: client }).catch((e: Error) => e);
+    const err = await assertModerationReady(REAL, { textract: noHandwriting, rekognition: client }).catch((e: Error) => e);
     expect(err).toBeInstanceOf(ModerationConfigError);
     expect(String((err as Error).message)).not.toContain('AKIA');
     expect(send).not.toHaveBeenCalled(); // the startup check never sends an image
@@ -97,7 +100,7 @@ describe('MODERATION_PROVIDER=real', () => {
   it('startup with credentials resolved: real mode, hash gate reported CLOSED (IWF not onboarded)', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { client, send } = mockRekognition(undefined, { credentials: async () => ({ accessKeyId: 'x', secretAccessKey: 'y' }) });
-    expect(await assertModerationReady(REAL, { rekognition: client })).toEqual({ mode: 'real', hashGate: 'closed' });
+    expect(await assertModerationReady(REAL, { textract: noHandwriting, rekognition: client })).toEqual({ mode: 'real', hashGate: 'closed' });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('hash gate is CLOSED'));
     expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secretAccessKey|"y"/);
     expect(send).not.toHaveBeenCalled();
@@ -118,7 +121,7 @@ describe('IWF not configured → the hash gate FAILS CLOSED', () => {
   it('an upload can\'t pass: held for review as hash-unchecked, and the picture is NOT sent on to Rekognition', async () => {
     const { client, send } = mockRekognition();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const v = await moderateImage({ buffer: await png(), sha256: 'x', originalBuffer: await png() }, realProviders(REAL, { rekognition: client }));
+    const v = await moderateImage({ buffer: await png(), sha256: 'x', originalBuffer: await png() }, realProviders(REAL, { textract: noHandwriting, rekognition: client }));
     expect(v).toEqual({ status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] });
     expect(send).not.toHaveBeenCalled();
   });
@@ -151,7 +154,7 @@ describe('a provider error routes to review — never CLEAR', () => {
   it('Rekognition down (real providers, mocked client) → FLAGGED classifier-error', async () => {
     quiet();
     const { client } = mockRekognition(Object.assign(new Error('service unavailable'), { name: 'ServiceUnavailableException' }));
-    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { rekognition: client, iwf: noMatch }));
+    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch }));
     // the same client fails for the words-in-the-picture check too: both are held, neither clears
     expect(v).toEqual({ status: 'FLAGGED', labels: [CLASSIFIER_ERROR_LABEL, 'text-unreadable'] });
   });
@@ -159,7 +162,7 @@ describe('a provider error routes to review — never CLEAR', () => {
   it('a garbage Rekognition response → FLAGGED, not CLEAR', async () => {
     quiet();
     const { client } = mockRekognition({ unexpected: true });
-    expect((await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { rekognition: client, iwf: noMatch }))).status).toBe('FLAGGED');
+    expect((await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch }))).status).toBe('FLAGGED');
   });
 
   it('a hash check that throws → held as hash-unchecked (not BLOCKED: no false CSAM report), classifier skipped', async () => {
@@ -184,13 +187,13 @@ describe('a provider error routes to review — never CLEAR', () => {
 
   it('the classifier never auto-rejects: a Rekognition hit is FLAGGED (review), never BLOCKED', async () => {
     const { client } = mockRekognition({ ModerationLabels: [{ Name: 'Explicit', Confidence: 99, ParentName: '' }] });
-    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { rekognition: client, iwf: noMatch }));
+    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch }));
     expect(v).toEqual({ status: 'FLAGGED', labels: ['Explicit'] });
   });
 
   it('a CSAM match still preserves + blocks, ahead of the classifier', async () => {
     const { client, send } = mockRekognition();
-    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { rekognition: client, iwf: { check: async () => ({ match: true }) } }));
+    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: { check: async () => ({ match: true }) } }));
     expect(v).toEqual({ status: 'BLOCKED', labels: ['csam-hash-match'] });
     expect(send).not.toHaveBeenCalled();
   });
@@ -199,7 +202,7 @@ describe('a provider error routes to review — never CLEAR', () => {
     quiet();
     const { db, writes } = fakeDb();
     const { client } = mockRekognition(new Error('boom'));
-    const v = await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(REAL, { rekognition: client, iwf: noMatch }));
+    const v = await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch }));
     expect(v.status).toBe('FLAGGED');
     expect(v.labels).toContain(CLASSIFIER_ERROR_LABEL);
     expect(v.labels).toContain('text-unreadable'); // the same client failed for OCR too
@@ -212,7 +215,7 @@ describe('a provider error routes to review — never CLEAR', () => {
     );
     const client = { config: { region: REKOGNITION_REGION }, send } as unknown as RekognitionPort;
     const { db } = fakeDb();
-    const v = await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(REAL, { rekognition: client, iwf: noMatch }));
+    const v = await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(REAL, { textract: noHandwriting, rekognition: client, iwf: noMatch }));
     expect(v).toEqual({ status: 'CLEAR', labels: [] });
     expect(send).toHaveBeenCalledTimes(2); // one image to the classifier, the same one image to the reader
   });
