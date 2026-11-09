@@ -25,6 +25,45 @@ export function containsAbusiveText(raw: string): boolean {
   return ABUSE.some((w) => s.includes(w));
 }
 
+// ── Words READ from a picture (handwriting / printed OCR) ────────────────────
+// A reader misreads handwriting in two ways the founder's live test showed (9 Nov 2026): a gap
+// inside a word ("WAN KER") and a letter read as its look-alike ("VANKER" for WANKER). So drawn
+// words are matched more loosely than typed ones. A match only sends the picture to review —
+// it never rejects — so a rare innocent flag costs a look, while a miss lets abuse onto a print.
+
+/** Letters a reader confuses in handwriting (and the obvious number/symbol swaps), folded together. */
+const LOOKALIKE: Readonly<Record<string, string>> = {
+  w: 'v', u: 'v', // W / V / U
+  '1': 'i', l: 'i', '!': 'i', '|': 'i', // 1 / I / L
+  '0': 'o',
+  '5': 's', $: 's',
+  '3': 'e',
+  '4': 'a', '@': 'a',
+  '7': 't',
+};
+const fold = (s: string): string => [...s.toLowerCase().replace(/vv/g, 'w')].map((c) => LOOKALIKE[c] ?? c).join(''); // "vv" is a written w
+/** Words that are only abuse on their own, not inside a common word kids write ("grapes", "drape"). */
+const WHOLE_WORD_ONLY = new Set(['rape']);
+const DRAWN_ABUSE = ABUSE.filter((w) => !WHOLE_WORD_ONLY.has(w)).map(fold);
+const WHOLE_WORD_RE = new RegExp(`(^|[^a-z])(${[...WHOLE_WORD_ONLY].map(fold).join('|')})($|[^a-z])`);
+
+/**
+ * True if any line of words read from a picture contains abusive language — matched as written,
+ * with the gaps inside the line squashed out ("WAN KER" → "wanker", "f u c k"), and with look-alike
+ * letters folded together ("VANKER", "sh1t", "fvck"). Each line is checked on its own (never glued
+ * to the next), which keeps innocent cross-line joins out.
+ */
+export function containsAbusiveDrawnText(lines: readonly string[]): boolean {
+  for (const raw of lines) {
+    const line = String(raw);
+    const asWritten = fold(line);
+    const squashed = fold(line.replace(/[\s\-_.·,'’"]+/g, ''));
+    if (DRAWN_ABUSE.some((w) => asWritten.includes(w) || squashed.includes(w))) return true;
+    if (WHOLE_WORD_RE.test(asWritten)) return true;
+  }
+  return false;
+}
+
 export type NameScreen =
   | { ok: true; value: string | null }
   | { ok: false; reason: 'surname' | 'invalid' | 'length' | 'abuse' };

@@ -6,7 +6,7 @@ import type { Scheduler } from '../background';
 import { createHash } from 'node:crypto';
 import sharp from 'sharp';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
-import { containsAbusiveText } from '../textSafety';
+import { containsAbusiveDrawnText } from '../textSafety';
 import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz/review';
 import { VIEWABLE_WITHOUT_HASH_CHECK } from './config';
 
@@ -71,7 +71,7 @@ async function screenWords(providers: ModerationProviders, buffer: Buffer, diag?
     return TEXT_UNREADABLE_LABEL;
   }
   if (!Array.isArray(words)) return TEXT_UNREADABLE_LABEL;
-  return words.length && containsAbusiveText(words.join(' ')) ? DRAWN_WORDS_LABEL : null;
+  return words.length && containsAbusiveDrawnText(words) ? DRAWN_WORDS_LABEL : null;
 }
 
 /**
@@ -378,7 +378,7 @@ export async function moderateDesignAndRecord(
     if (c === null) labels.push(CLASSIFIER_ERROR_LABEL);
     // a reader that FAILED is not a clean read — route to review rather than wave it through
     if (words === null) labels.push(TEXT_UNREADABLE_LABEL);
-    else if (words.length && containsAbusiveText(words.join(' '))) labels.push(DRAWN_WORDS_LABEL);
+    else if (words.length && containsAbusiveDrawnText(words)) labels.push(DRAWN_WORDS_LABEL);
     design = { status: c?.flagged === true || labels.length ? 'FLAGGED' : c?.flagged === false ? 'CLEAR' : 'FLAGGED', labels };
     // the design shows the upload too: with the hash check deferred, a sexual/unknown flag is remove-only
     if (p.hash === null && design.status !== 'CLEAR') design.sensitive = isSensitive(c);

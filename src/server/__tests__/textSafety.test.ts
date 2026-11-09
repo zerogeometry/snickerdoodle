@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { containsAbusiveText, screenChildFirstName } from '@/server/textSafety';
+import { containsAbusiveDrawnText, containsAbusiveText, screenChildFirstName } from '@/server/textSafety';
 
 describe('screenChildFirstName — child FIRST NAME ONLY, abuse-screened', () => {
   it('accepts a plain first name and trims it', () => {
@@ -48,3 +48,32 @@ describe('screenChildFirstName — child FIRST NAME ONLY, abuse-screened', () =>
     for (const fine of ['encyclopaedia', 'announce', 'pronounce', 'paediatric nurse', 'Arsenal', 'Bollinger']) expect(containsAbusiveText(fine)).toBe(false);
   });
 });
+
+describe('containsAbusiveDrawnText — words READ from a picture (loose on purpose: a match only sends it to review)', () => {
+  it('the founder’s live test reads, 9 Nov 2026: a gap inside the word, and W read as V', () => {
+    expect(containsAbusiveDrawnText(['WAN KER'])).toBe(true);
+    expect(containsAbusiveDrawnText(['-', 'W', 'VANKER'])).toBe(true);
+    expect(containsAbusiveDrawnText(['W VANKER'])).toBe(true);
+    expect(containsAbusiveDrawnText(['WANKER', 'ER'])).toBe(true);
+  });
+
+  it('spaced-out letters and look-alike swaps', () => {
+    for (const bad of ['f u c k', 'F-U-C-K', 'fvck', 'sh1t', 'SH!T', 'b1tch', 'c u n t', 'bo11ocks', 'tvvat']) expect(containsAbusiveDrawnText([bad]), bad).toBe(true);
+  });
+
+  it('kind words and ordinary drawings pass', () => {
+    for (const fine of ['love you nana', 'Happy Christmas', 'Olivia age 6', 'thank you', 'witch', 'bigger', 'vanilla ice cream', 'Wanda', 'banker', 'grapes', 'drape', 'Mississippi', 'Grandma xx', 'TO MUMMY', 'Max 4']) {
+      expect(containsAbusiveDrawnText([fine]), fine).toBe(false);
+    }
+  });
+
+  it('lines are never glued to each other', () => {
+    expect(containsAbusiveDrawnText(['Wan', 'Ker'])).toBe(false); // two separate lines — not one word
+  });
+
+  it('"rape" counts only as a word of its own in drawings (kids draw grapes)', () => {
+    expect(containsAbusiveDrawnText(['rape'])).toBe(true);
+    expect(containsAbusiveDrawnText(['grapes and pears'])).toBe(false);
+  });
+});
+
