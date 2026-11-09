@@ -34,7 +34,7 @@ export async function keepCreation(formData: FormData): Promise<{ ok: boolean; n
 
   let assetId: string;
   try {
-    ({ assetId } = await ingestOriginalAsset(db, viewer, { familyId, kind: 'DRAWING', buffer, keptInHome: true }));
+    ({ assetId } = await ingestOriginalAsset(db, viewer, { familyId, kind: 'DRAWING', buffer, keptInHome: true }, { background: true }));
   } catch (e) {
     if (e instanceof ImageTooLargeError) return { ok: false }; // a decompression bomb, or not an image
     throw e;

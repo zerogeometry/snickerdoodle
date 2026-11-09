@@ -34,10 +34,10 @@ export interface AssetRef {
    */
   ephemeralClaimId?: string | null;
   /**
-   * An OPEN viewer report is holding this keepsake for review (D8; founder, 26 Oct). While held,
-   * only its uploader/controller (and the access-controlled review queue) can see it — relatives
-   * can't, until a reviewer clears it. Required, so every caller has to decide it
-   * (src/server/assetRef.ts assetRefOf).
+   * The safety checks haven't cleared this keepsake: held by the automatic screening or by a viewer's
+   * report, or not screened yet (D8; founder, 26 Oct and 9 Nov). While held, only its
+   * uploader/controller (and the access-controlled review queue) can see it — relatives can't, until
+   * a reviewer clears it. Required, so every caller has to decide it (src/server/assetRef.ts assetRefOf).
    */
   heldForReview: boolean;
 }
@@ -143,9 +143,9 @@ export function canViewAsset(asset: AssetRef, viewer: ViewerContext): Decision {
     return allow('viewer is the uploader/controller');
   }
 
-  // STEP 3b — reported and held for review: hidden from everyone but the uploader/controller.
+  // STEP 3b — not cleared by the safety checks (screening or a report): hidden from everyone but the uploader/controller.
   if (asset.heldForReview) {
-    return deny('held for review after a report');
+    return deny('held for a safety check');
   }
 
   // STEP 4 — tier x circle (an active membership is guaranteed past step 1).

@@ -2,9 +2,12 @@ import { getDb } from '@/db/client';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { processFulfilment } from '@/fulfillment/worker';
 import { isProdigiConfigured, releaseBlockedArtwork, submitReadyOrders, syncSubmittedOrders } from '@/fulfillment/submit';
+import { screenStalePending } from '@/server/moderation';
 
 /**
  * Fulfilment tick (proposal/04 §6) — ONE scheduler ping drives the whole pipeline:
+ *   0. screening catch-up: any upload whose background safety check never finished (a restart
+ *      mid-check) is screened now, from the stored copy (founder, 9 Nov 2026).
  *   1. render: put back any line a stopped app left RENDERING, claim PENDING artwork of
  *      PAID orders, render in-VPC, run the egress gate (READY / BLOCKED_GATE /
  *      RENDER_FAILED). Overlapping ticks safe.
@@ -22,6 +25,10 @@ export async function POST(req: Request): Promise<Response> {
   const errors: string[] = [];
 
   // Stages are isolated: one stage failing must not silently skip the others.
+  const screening = await screenStalePending(db).catch((e) => {
+    errors.push(`screening: ${(e as Error).message}`);
+    return null;
+  });
   const render = await processFulfilment(db).catch((e) => {
     errors.push(`render: ${(e as Error).message}`);
     return null;
@@ -59,5 +66,5 @@ export async function POST(req: Request): Promise<Response> {
       }),
     );
   }
-  return Response.json({ render, released, submit, sync, errors }, { status: errors.length > 0 ? 500 : 200 });
+  return Response.json({ screening, render, released, submit, sync, errors }, { status: errors.length > 0 ? 500 : 200 });
 }

@@ -67,9 +67,17 @@ describe.skipIf(!DB || !S3)('sweep 08 — a flagged keepsake and the print pipel
       joinProvenance: null,
     });
 
-  it('a FLAGGED or still-PENDING (unscreened) keepsake cannot be ordered at all', async () => {
+  it('a FLAGGED keepsake cannot be ordered at all; a still-PENDING one is screened first, never ordered unchecked', async () => {
     await expect(order(await keepsake('FLAGGED'))).rejects.toThrow(/not cleared for printing/);
-    await expect(order(await keepsake('PENDING'))).rejects.toThrow(/not cleared for printing/);
+    // background screening (founder, 9 Nov 2026): checkout finishes the check on the spot. The stub
+    // classifier in tests clears it, and the verdict is recorded — it was screened, not waved through.
+    const pending = await keepsake('PENDING');
+    const res = await order(pending);
+    const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
+    orderIds.push(o!.id);
+    const [a] = await db.select().from(assets).where(eq(assets.id, pending));
+    expect(a!.moderationStatus).toBe('CLEAR');
+    expect((a!.moderationDetail as { original?: unknown }).original).toMatchObject({ status: 'CLEAR' });
   });
 
   // 08-B3: flagged AFTER payment (e.g. reported from a gift link while the order waits) → it is

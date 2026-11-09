@@ -86,7 +86,8 @@ describe('finishGuestUpload', () => {
   it('without this browser’s ticket → refused, no claim granted', async () => {
     finalise.mockResolvedValueOnce({ status: 'denied' });
     expect(await finishGuestUpload(ID)).toEqual({ ok: false });
-    expect(finalise).toHaveBeenCalledWith(expect.anything(), { uploadId: ID, tickets: [], kind: 'DRAWING' });
+    // the slower checks run after the response (founder, 9 Nov 2026)
+    expect(finalise).toHaveBeenCalledWith(expect.anything(), { uploadId: ID, tickets: [], kind: 'DRAWING', screening: { background: true } });
     expect(jar.store.has(UPLOAD_CLAIM_COOKIE)).toBe(false);
   });
 

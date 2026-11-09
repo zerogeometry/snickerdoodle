@@ -30,6 +30,7 @@ describe('content-safety hardening', () => {
     const db = {
       update: () => ({ set: (v: unknown) => ({ where: async () => void writes.push(v) }) }),
       insert: () => ({ values: async (v: unknown) => void writes.push(v) }),
+      select: () => ({ from: () => ({ where: async () => [{ status: 'PENDING', detail: null }] }) }), // a fresh upload
     } as never;
     const v = await moderateAndRecord(db, { assetId: 'a1', familyId: null, buffer: Buffer.from('x'), sha256: 'x' }, undefined, { NODE_ENV: 'production' });
     expect(v).toEqual({ status: 'FLAGGED', labels: ['screening-not-configured'] });

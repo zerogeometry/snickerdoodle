@@ -85,15 +85,17 @@ export async function seedDemoFamilies(db: DbHandle): Promise<SeededIds> {
     { id: id.max, familyId: id.hartley, firstName: 'Max', controllerAccountId: id.sam },
   ]);
 
+  // Brand-safe demo keepsakes with no picture behind them: marked cleared, so the visibility tiers
+  // below are what decides who sees them (an un-cleared keepsake is hidden from the family).
   await db.insert(assets).values([
     // Sam is the controller (Olivia's controlling parent) for these.
-    { id: id.aFamily, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'FAMILY' },
-    { id: id.aExtended, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'EXTENDED' },
-    { id: id.aOnlyMe, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'ONLY_ME' },
+    { id: id.aFamily, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'FAMILY', moderationStatus: 'CLEAR' },
+    { id: id.aExtended, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'EXTENDED', moderationStatus: 'CLEAR' },
+    { id: id.aOnlyMe, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.sam, childSubjectId: id.olivia, controllerAccountId: id.sam, visibility: 'ONLY_ME', moderationStatus: 'CLEAR' },
     // Uploaded by Jo, who is therefore its controller.
-    { id: id.aJoFamily, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.jo, childSubjectId: id.max, controllerAccountId: id.jo, visibility: 'FAMILY' },
+    { id: id.aJoFamily, familyId: id.hartley, kind: 'DRAWING', uploaderAccountId: id.jo, childSubjectId: id.max, controllerAccountId: id.jo, visibility: 'FAMILY', moderationStatus: 'CLEAR' },
     // A different family entirely.
-    { id: id.aBloom, familyId: id.bloom, kind: 'DRAWING', uploaderAccountId: id.blake, controllerAccountId: id.blake, visibility: 'FAMILY' },
+    { id: id.aBloom, familyId: id.bloom, kind: 'DRAWING', uploaderAccountId: id.blake, controllerAccountId: id.blake, visibility: 'FAMILY', moderationStatus: 'CLEAR' },
   ]);
 
   return {

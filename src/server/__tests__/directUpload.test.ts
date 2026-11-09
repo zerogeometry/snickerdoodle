@@ -134,7 +134,7 @@ describe('finaliseGuestUpload — denied without this browser’s live ticket', 
     ingest.ingestEphemeralUpload.mockResolvedValueOnce({ assetId: 'a', claimId: 'c', key: 'k', moderationStatus: 'CLEAR' });
     const r = await finaliseGuestUpload(db, { uploadId: ID, tickets: [ticket({ terms: 'terms-2026' })], now: NOW });
     expect(r).toMatchObject({ status: 'ingested', assetId: 'a', moderationStatus: 'CLEAR' });
-    expect(ingest.ingestEphemeralUpload).toHaveBeenCalledWith(db, { buffer: Buffer.alloc(100, 7), kind: 'DRAWING', termsVersion: 'terms-2026', now: NOW });
+    expect(ingest.ingestEphemeralUpload).toHaveBeenCalledWith(db, { buffer: Buffer.alloc(100, 7), kind: 'DRAWING', termsVersion: 'terms-2026', now: NOW }, undefined);
   });
 });
 

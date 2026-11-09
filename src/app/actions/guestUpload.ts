@@ -109,7 +109,8 @@ export async function startGuestUpload(formData: FormData): Promise<GuestUploadR
   const buffer = Buffer.from(await file.arrayBuffer());
   let ingested: Awaited<ReturnType<typeof ingestEphemeralUpload>>;
   try {
-    ingested = await ingestEphemeralUpload(db, { buffer, kind: 'DRAWING', termsVersion: TERMS_VERSION });
+    // the slower safety checks run after the response, so the catalogue loads at full speed (founder, 9 Nov)
+    ingested = await ingestEphemeralUpload(db, { buffer, kind: 'DRAWING', termsVersion: TERMS_VERSION }, { background: true });
   } catch (e) {
     if (e instanceof ImageTooLargeError) return { ok: false }; // a decompression bomb, or not an image
     throw e;
@@ -156,7 +157,7 @@ export async function beginGuestUpload(input: { byteSize: number; termsAccepted:
 export async function finishGuestUpload(uploadId: string): Promise<GuestUploadResult> {
   const jar = await cookies();
   const tickets = verifyTickets(jar.get(UPLOAD_TICKET_COOKIE)?.value);
-  const res = await finaliseGuestUpload(getDb(), { uploadId, tickets, kind: 'DRAWING' });
+  const res = await finaliseGuestUpload(getDb(), { uploadId, tickets, kind: 'DRAWING', screening: { background: true } });
   if (res.status === 'denied') return { ok: false };
   await setTickets(signTickets(withoutTicket(tickets, uploadId))); // single-use
   if (res.status === 'failed') return { ok: false };

@@ -268,12 +268,12 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
     await expect(getObjectBytes(frameGridKey(orderId!, line!.id))).rejects.toThrow(); // never composed
   });
 
-  it('a square whose drawing isn’t cleared yet can’t be ordered at all', async () => {
+  it('a square whose drawing the checks held can’t be ordered at all', async () => {
     const ok = await drawing();
-    const pending = await drawing(150);
-    await db.update(assets).set({ moderationStatus: 'PENDING' }).where(eq(assets.id, pending));
+    const held = await drawing(150);
+    await db.update(assets).set({ moderationStatus: 'FLAGGED' }).where(eq(assets.id, held));
     const key = await sku('12×12″', 'brown');
-    await expect(order(key, [{ assetId: ok, transform: T }, { assetId: pending, transform: T }])).rejects.toThrow(/not cleared/);
+    await expect(order(key, [{ assetId: ok, transform: T }, { assetId: held, transform: T }])).rejects.toThrow(/not cleared/);
   });
 
   it('the DPI gate runs per square: a too-small drawing in any square refuses the order before money moves', async () => {

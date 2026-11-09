@@ -12,7 +12,7 @@ import {
   type PresignedUpload,
 } from '@/storage';
 import type { DbHandle } from './db';
-import { ingestEphemeralUpload, type AssetKind, type EphemeralIngestResult } from './ingest';
+import { ingestEphemeralUpload, type AssetKind, type EphemeralIngestResult, type ScreeningOptions } from './ingest';
 import { claimSecret } from './uploadClaims';
 
 /**
@@ -146,7 +146,7 @@ export type FinaliseResult =
  */
 export async function finaliseGuestUpload(
   db: DbHandle,
-  input: { uploadId: unknown; tickets: UploadTicket[]; kind?: AssetKind; now?: Date },
+  input: { uploadId: unknown; tickets: UploadTicket[]; kind?: AssetKind; now?: Date; screening?: ScreeningOptions },
 ): Promise<FinaliseResult> {
   const now = input.now ?? new Date();
   const nowS = Math.floor(now.getTime() / 1000);
@@ -160,7 +160,7 @@ export async function finaliseGuestUpload(
     if (!head || head.byteSize !== ticket.bytes || head.byteSize > MAX_UPLOAD_BYTES) return { status: 'failed' };
     const buffer = await getObjectBytes(key);
     if (buffer.byteLength !== ticket.bytes) return { status: 'failed' };
-    const ingested = await ingestEphemeralUpload(db, { buffer, kind: input.kind ?? 'DRAWING', termsVersion: ticket.terms, now });
+    const ingested = await ingestEphemeralUpload(db, { buffer, kind: input.kind ?? 'DRAWING', termsVersion: ticket.terms, now }, input.screening);
     return { status: 'ingested', ...ingested };
   } catch (e) {
     if (e instanceof ImageTooLargeError) return { status: 'failed' }; // a decompression bomb, or not an image

@@ -234,12 +234,15 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     }
   });
 
-  it('an un-cleared (screening PENDING / FLAGGED) keepsake cannot be ordered even by its controller', async () => {
+  it('an un-cleared keepsake cannot be ordered even by its controller: FLAGGED is refused, PENDING is screened first', async () => {
     actor.current = acct(ids.samId);
-    for (const status of ['PENDING', 'FLAGGED'] as const) {
-      await db.update(assets).set({ moderationStatus: status }).where(eq(assets.id, famNoChild));
-      expect(await placeOrderAction({ items: [{ productKey: 'mug', qty: 1, artwork: { assetId: famNoChild, transform: TRANSFORM as never } }] })).toMatchObject({ ok: false });
-    }
+    await db.update(assets).set({ moderationStatus: 'FLAGGED' }).where(eq(assets.id, famNoChild));
+    expect(await placeOrderAction({ items: [{ productKey: 'mug', qty: 1, artwork: { assetId: famNoChild, transform: TRANSFORM as never } }] })).toMatchObject({ ok: false });
+    // background screening (founder, 9 Nov 2026): checkout finishes a still-running check on the spot — never skips it
+    await db.update(assets).set({ moderationStatus: 'PENDING' }).where(eq(assets.id, famNoChild));
+    await placeOrderAction({ items: [{ productKey: 'mug', qty: 1, artwork: { assetId: famNoChild, transform: TRANSFORM as never } }] });
+    const [screened] = await db.select({ status: assets.moderationStatus }).from(assets).where(eq(assets.id, famNoChild));
+    expect(screened!.status).not.toBe('PENDING');
     await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(and(eq(assets.id, famNoChild)));
   });
   it('a child is first name only: a surname (any space, incl. no-break / tab / newline) and markup are refused when adding or renaming', async () => {

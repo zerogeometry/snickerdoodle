@@ -4,6 +4,7 @@ import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } f
 import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
+import { screenPendingNow } from './moderation';
 import { receiptLines, receiptSavings, type ReceiptLine } from '@/lib/order-lines';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
@@ -198,8 +199,14 @@ export async function placeOrder(
   };
   const prepareArtwork = async (art: NonNullable<PlaceLine['artwork']>, productKey: string, variantId: string, opts: { blankCard?: boolean } = {}): Promise<PreparedArt | 'too-small' | null> => {
     if (!account && !input.giftLink) throw new Error('must be signed in to order a personalised item');
-    const [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
+    let [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
     if (!asset) throw new Error('keepsake not found');
+    // Its safety check may still be running in the background: finish it now, never skip it.
+    if (asset.moderationStatus === 'PENDING') {
+      await screenPendingNow(db, [asset.id]);
+      [asset] = await db.select().from(assets).where(eq(assets.id, art.assetId));
+      if (!asset) throw new Error('keepsake not found');
+    }
     if (input.giftLink) {
       // Capability path: the parent's link names this keepsake (and is live) — the buyer's
       // membership is irrelevant. Content-safety is part of the capability check (D8).

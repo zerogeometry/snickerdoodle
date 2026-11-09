@@ -1,6 +1,8 @@
-import { eq } from 'drizzle-orm';
-import { assets, auditRecords } from '@/db/schema';
+import { and, eq, inArray, lt } from 'drizzle-orm';
+import { assets, auditRecords, storageObjects } from '@/db/schema';
+import { getObjectBytes } from '@/storage';
 import type { DbHandle } from '../db';
+import type { Scheduler } from '../background';
 import { createHash } from 'node:crypto';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
@@ -55,6 +57,28 @@ function isSensitive(c: { flagged?: unknown; categories?: unknown } | null): boo
 /** Log that a provider failed — the error's name only: never its details, an image or a credential. */
 const providerFailed = (which: string, e: unknown) => console.warn(`[moderation] ${which} failed (${e instanceof Error ? e.name : typeof e}) — held for review`);
 
+/** The known-CSAM hash step: a match, a definite no-match, skipped by D25, or couldn't run. */
+export type HashOutcome = 'match' | 'passed' | 'deferred' | 'unchecked';
+
+/** Run ONLY the hash step. It's quick (a fingerprint lookup), so it always runs at upload time. */
+export async function checkHash(
+  input: { buffer: Buffer; sha256: string; originalBuffer?: Buffer; originalSha256?: string },
+  providers: ModerationProviders,
+): Promise<HashOutcome> {
+  if (providers.hash === null) return 'deferred';
+  const hashInput = input.originalBuffer
+    ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
+    : { buffer: input.buffer, sha256: input.sha256 };
+  let known: unknown;
+  try {
+    known = await providers.hash.isKnownIllegal(hashInput);
+  } catch (e) {
+    providerFailed('hash check', e);
+    known = undefined;
+  }
+  return known === true ? 'match' : known === false ? 'passed' : 'unchecked';
+}
+
 /**
  * The automated content-safety decision (D8). The CSAM hash-check runs FIRST and
  * takes precedence: a match is BLOCKED — preserve, never view/redistribute,
@@ -77,22 +101,15 @@ export async function moderateImage(
     originalSha256?: string;
   },
   providers: ModerationProviders = defaultProviders(),
+  opts: {
+    /** The hash step already ran for this upload (background screening): don't run it again. */
+    hashAlreadyChecked?: HashOutcome;
+  } = {},
 ): Promise<ModerationVerdict> {
-  const deferred = providers.hash === null;
-  if (!deferred) {
-    const hashInput = input.originalBuffer
-      ? { buffer: input.originalBuffer, sha256: input.originalSha256 ?? sha256Hex(input.originalBuffer) }
-      : { buffer: input.buffer, sha256: input.sha256 };
-    let known: unknown;
-    try {
-      known = await providers.hash!.isKnownIllegal(hashInput);
-    } catch (e) {
-      providerFailed('hash check', e);
-      known = undefined;
-    }
-    if (known === true) return { status: 'BLOCKED', labels: ['csam-hash-match'] };
-    if (known !== false) return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
-  }
+  const hash = opts.hashAlreadyChecked ?? (await checkHash(input, providers));
+  if (hash === 'match') return { status: 'BLOCKED', labels: ['csam-hash-match'] };
+  if (hash === 'unchecked') return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
+  const deferred = hash === 'deferred';
 
   // The classifier (nudity, violence, hate symbols, rude gestures) and the words written in the
   // picture, side by side. Either one failing holds the item; neither can CLEAR on its own.
@@ -115,34 +132,37 @@ export async function moderateImage(
   return extra({ status: 'FLAGGED', labels });
 }
 
+/** The upload's status as the caller sees it: PENDING while the background check runs. */
+export type UploadModerationStatus = ModerationState | 'PENDING';
+
 /**
- * Run the gate on a freshly-ingested asset and persist the verdict. FLAGGED and
- * BLOCKED outcomes are audited (BLOCKED is the CSAM runbook trigger). The asset is
- * never deleted here — BLOCKED content is preserved for the report; FLAGGED waits
- * for human review. Never auto-rejects, never silently bins.
+ * Persist an UPLOAD's verdict, MERGED with whatever happened while it was being checked (background
+ * screening: founder, 9 Nov 2026). A Studio design screened in the meantime and an open viewer report
+ * both still count — the stored status is the worst of the three — and BLOCKED is never undone.
+ * FLAGGED and BLOCKED outcomes are audited (BLOCKED is the CSAM runbook trigger).
  */
-export async function moderateAndRecord(
-  db: DbHandle,
-  input: { assetId: string; familyId: string | null; buffer: Buffer; sha256: string; originalBuffer?: Buffer; now?: Date },
-  providers?: ModerationProviders,
-  env: Record<string, string | undefined> = process.env,
-): Promise<ModerationVerdict> {
-  // FAIL CLOSED in production: with no real screening wired (LG6), every upload is held for
-  // review — it can never reach a print order, and it is never auto-rejected or binned.
-  const unscreened = !providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
-  const raw: ModerationVerdict = unscreened
-    ? { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] }
-    : await moderateImage({ buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer }, providers);
+async function recordUploadVerdict(db: DbHandle, input: { assetId: string; familyId: string | null; now?: Date }, raw: ModerationVerdict): Promise<ModerationVerdict> {
   // Fail-safe (D8): a malformed/unrecognised verdict routes to human review — NEVER
   // silently CLEAR. Defends the gate against a future provider returning garbage.
   const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
   const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
   // D25: remember that the hash check was deferred, and whether a reviewer may look (fail-safe: sensitive)
   const deferral = raw.hashCheck === 'deferred' ? { hashCheck: 'deferred' as const, sensitive: raw.sensitive !== false } : {};
+  const original: Stored = { status, labels, ...deferral };
+
+  const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, input.assetId));
+  const d = (row?.detail ?? {}) as { labels?: string[]; design?: Stored; reports?: unknown[] };
+  const reported = Array.isArray(d.reports) && d.reports.length > 0;
+  let combined: ModerationState | 'PENDING' = d.design ? worse(original, d.design).status : status;
+  if (combined === 'PENDING') combined = 'FLAGGED'; // never leave it half-decided once the upload is screened
+  if (reported && RANK[combined] < RANK.FLAGGED) combined = 'FLAGGED';
+  if (row?.status === 'BLOCKED') combined = 'BLOCKED';
+  const reportLabels = reported ? (d.labels ?? []).filter((l) => l.startsWith('reported')) : [];
+  const allLabels = [...new Set([...reportLabels, ...labels, ...(d.design?.labels ?? [])])];
 
   await db
     .update(assets)
-    .set({ moderationStatus: status, moderatedAt: input.now ?? new Date(), moderationDetail: { labels, original: { status, labels, ...deferral } } })
+    .set({ moderationStatus: combined, moderatedAt: input.now ?? new Date(), moderationDetail: { ...d, labels: allLabels, original } })
     .where(eq(assets.id, input.assetId));
   if (status !== 'CLEAR') {
     await db.insert(auditRecords).values({
@@ -155,6 +175,113 @@ export async function moderateAndRecord(
     });
   }
   return { status, labels, ...deferral };
+}
+
+/**
+ * Run the gate on a freshly-ingested asset and persist the verdict. The asset is never deleted
+ * here — BLOCKED content is preserved for the report; FLAGGED waits for human review. Never
+ * auto-rejects, never silently bins.
+ *
+ * `opts.background` (founder, 9 Nov 2026: the checks must never slow the catalogue down): the quick
+ * hash step still runs NOW — a known-CSAM match is BLOCKED before the parent sees anything — and the
+ * slower classifier + words check runs after the response, through the given scheduler. Until it
+ * lands the asset stays PENDING: it can't be ordered or shared, and the family can't see it
+ * (src/server/assetRef.ts). Checkout and gift links screen a still-PENDING keepsake on the spot
+ * ({@link screenPendingNow}), and the fulfilment job sweeps up any check that never finished.
+ */
+export async function moderateAndRecord(
+  db: DbHandle,
+  input: { assetId: string; familyId: string | null; buffer: Buffer; sha256: string; originalBuffer?: Buffer; now?: Date },
+  providers?: ModerationProviders,
+  env: Record<string, string | undefined> = process.env,
+  opts: { background?: Scheduler } = {},
+): Promise<{ status: UploadModerationStatus; labels: string[]; hashCheck?: 'deferred'; sensitive?: boolean }> {
+  // FAIL CLOSED in production: with no real screening wired (LG6), every upload is held for
+  // review — it can never reach a print order, and it is never auto-rejected or binned.
+  const unscreened = !providers && env.NODE_ENV === 'production' && !isModerationConfigured(env);
+  if (unscreened) return recordUploadVerdict(db, input, { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] });
+  const p = providers ?? defaultProviders(env);
+  const image = { buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer };
+  if (!opts.background) return recordUploadVerdict(db, input, await moderateImage(image, p));
+
+  const hash = await checkHash(image, p);
+  if (hash === 'match') return recordUploadVerdict(db, input, { status: 'BLOCKED', labels: ['csam-hash-match'] });
+  if (hash === 'unchecked') return recordUploadVerdict(db, input, { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] });
+  // Remember how the hash step went, so a catch-up screen never has to re-hash our re-encoded copy.
+  const [row] = await db.select({ detail: assets.moderationDetail }).from(assets).where(eq(assets.id, input.assetId));
+  await db
+    .update(assets)
+    .set({ moderationDetail: { ...((row?.detail ?? {}) as object), screening: { hashCheck: hash } } })
+    .where(and(eq(assets.id, input.assetId), eq(assets.moderationStatus, 'PENDING')));
+  opts.background(async () => {
+    try {
+      await recordUploadVerdict(db, input, await moderateImage(image, p, { hashAlreadyChecked: hash }));
+    } catch (e) {
+      providerFailed('background screening', e); // stays PENDING: the sweep will screen it
+    }
+  });
+  return { status: 'PENDING', labels: [] };
+}
+
+/**
+ * Screen any of these keepsakes that are still PENDING, right now, from the stored copy — for the
+ * moments that can't wait for the background check: placing an order, creating a gift link, and the
+ * fulfilment job's sweep. A keepsake that's already decided is left alone. A failure leaves it
+ * PENDING (never CLEAR), so it simply can't be ordered yet.
+ */
+export async function screenPendingNow(
+  db: DbHandle,
+  assetIds: readonly string[],
+  providers?: ModerationProviders,
+  env: Record<string, string | undefined> = process.env,
+): Promise<void> {
+  const ids = [...new Set(assetIds)].filter(Boolean);
+  if (!ids.length) return;
+  const pending = await db
+    .select({ id: assets.id, familyId: assets.familyId, detail: assets.moderationDetail })
+    .from(assets)
+    .where(and(inArray(assets.id, ids), eq(assets.moderationStatus, 'PENDING')));
+  for (const a of pending) {
+    try {
+      if (!providers && env.NODE_ENV === 'production' && !isModerationConfigured(env)) {
+        await recordUploadVerdict(db, { assetId: a.id, familyId: a.familyId }, { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] });
+        continue;
+      }
+      const [obj] = await db
+        .select({ key: storageObjects.key })
+        .from(storageObjects)
+        .where(and(eq(storageObjects.assetId, a.id), eq(storageObjects.objectClass, 'ORIGINAL')));
+      if (!obj) continue;
+      const buffer = await getObjectBytes(obj.key);
+      const hashCheck = ((a.detail ?? {}) as { screening?: { hashCheck?: HashOutcome } }).screening?.hashCheck;
+      const p = providers ?? defaultProviders(env);
+      // Normally the hash step ran at upload (recorded above). If it didn't, it runs now on the
+      // stored copy — weaker for IWF (it matches original files), but never skipped.
+      const verdict = await moderateImage(
+        { buffer, sha256: createHash('sha256').update(buffer).digest('hex') },
+        p,
+        hashCheck === 'passed' || hashCheck === 'deferred' ? { hashAlreadyChecked: hashCheck } : {},
+      );
+      await recordUploadVerdict(db, { assetId: a.id, familyId: a.familyId }, verdict);
+    } catch (e) {
+      providerFailed('catch-up screening', e);
+    }
+  }
+}
+
+/** The fulfilment job's sweep: screen uploads still PENDING after `olderThanMs` (a lost background check). */
+export async function screenStalePending(
+  db: DbHandle,
+  opts: { olderThanMs?: number; limit?: number; now?: Date; providers?: ModerationProviders; env?: Record<string, string | undefined> } = {},
+): Promise<{ screened: number }> {
+  const cutoff = new Date((opts.now ?? new Date()).getTime() - (opts.olderThanMs ?? 60_000));
+  const rows = await db
+    .select({ id: assets.id })
+    .from(assets)
+    .where(and(eq(assets.moderationStatus, 'PENDING'), lt(assets.createdAt, cutoff)))
+    .limit(opts.limit ?? 50);
+  await screenPendingNow(db, rows.map((r) => r.id), opts.providers, opts.env);
+  return { screened: rows.length };
 }
 
 // ── Studio designs ───────────────────────────────────────────────────────────

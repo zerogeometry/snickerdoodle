@@ -4,6 +4,7 @@ import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type
 import { products, productVariants, savedDesigns } from '@/db/schema';
 import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { containsAbusiveText } from './textSafety';
+import { screenPendingNow } from './moderation';
 import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
 import { composeMockup } from './print/compositor';
@@ -102,6 +103,8 @@ export async function createGiftLink(
   const priced = (await getCatalogue(db))[productKey];
   if (!priced) throw new AuthzError({ allowed: false, reason: 'that product isn’t priced' });
 
+  // A keepsake whose safety check is still running in the background: finish it now (never skip it).
+  await screenPendingNow(db, [...input.assetIds, ...(input.lines ?? []).map((l) => l.assetId)]);
   // Freeze a snapshot from the chosen keepsakes the creator can actually see + has kept.
   const rows = await db.select().from(assets).where(inArray(assets.id, input.assetIds));
   const items: GiftItem[] = [];
