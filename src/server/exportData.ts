@@ -4,6 +4,7 @@ import {
   accounts,
   assets,
   children,
+  appTokens,
   consentRecords,
   families,
   giftLinks,
@@ -124,6 +125,12 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     .from(supportRequests)
     .where(account?.email ? or(eq(supportRequests.accountId, accountId), eq(supportRequests.email, account.email.toLowerCase())) : eq(supportRequests.accountId, accountId));
 
+  // Snickerdoodle Draw phones linked to this account (a label and dates, never a device id)
+  const drawAppPhones = await db
+    .select({ device: appTokens.deviceLabel, familyId: appTokens.familyId, linkedAt: appTokens.createdAt, lastUsedAt: appTokens.lastUsedAt, unlinkedAt: appTokens.revokedAt })
+    .from(appTokens)
+    .where(eq(appTokens.accountId, accountId));
+
   const profile = await profileDataFor(db, accountId);
 
   return {
@@ -142,5 +149,6 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     birthdayNudgesSent,
     yourRequestsToUs: requests,
     yourHelpMessages: helpMessages,
+    drawAppPhones,
   };
 }

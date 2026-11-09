@@ -26,6 +26,8 @@ import { appUrl, sendMail } from './mail';
 import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { recordErasure } from './erasureLedger';
 import { eraseProfileImage } from './profile';
+import { revokeAppTokens } from './app/link';
+import { appAuthCodes, appCheckoutGrants } from '@/db/schema';
 import type { DbHandle } from './db';
 
 /** Orders still being made — closing waits for these (their source art is needed to print). */
@@ -147,6 +149,10 @@ export async function closeAccount(
   const ownImages = await db.select().from(profileImages).where(and(eq(profileImages.accountId, accountId), inArray(profileImages.kind, ['AVATAR', 'ACCOUNT_HEADER'])));
   for (const img of ownImages) await eraseProfileImage(db, img, ledger); // picture + header
   await db.delete(sessions).where(eq(sessions.userId, accountId));
+  // …and every Snickerdoodle Draw phone linked to it stops working, at once
+  await revokeAppTokens(db, { accountId }, 'account-closed', { accountId, actorType: 'MEMBER' }, now);
+  await db.delete(appAuthCodes).where(eq(appAuthCodes.accountId, accountId));
+  await db.delete(appCheckoutGrants).where(eq(appCheckoutGrants.accountId, accountId));
   await db.delete(savedDesigns).where(eq(savedDesigns.createdByAccountId, accountId));
   await db.delete(accountCredits).where(eq(accountCredits.accountId, accountId));
   await db.delete(reminderSends).where(eq(reminderSends.accountId, accountId));
@@ -233,6 +239,9 @@ export async function handOverFamily(
   }
   for (const row of privateRows) await eraseAsset(db, row, { accountId: outgoingAccountId, actorType: 'MEMBER' }, { reason: 'account-closed-private' }, ledger);
 
+  // the outgoing parent's Snickerdoodle Draw phones were linked as the family's owner: they stop now
+  // (the new owner links their own)
+  await revokeAppTokens(db, { accountId: outgoingAccountId, familyId: family.id }, 'family-handed-over', { accountId: outgoingAccountId, actorType: 'MEMBER' }, now);
   await db.update(families).set({ ownerAccountId: input.newOwnerAccountId }).where(eq(families.id, family.id));
   await db
     .update(memberships)

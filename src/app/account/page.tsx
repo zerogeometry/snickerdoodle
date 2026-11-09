@@ -13,6 +13,8 @@ import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { AccountActions } from './AccountActions';
 import { ReferralCard } from './ReferralCard';
+import { DrawAppCard } from './DrawAppCard';
+import { listLinkedDevices } from '@/server/app/link';
 import { ProfileCard } from './ProfileCard';
 import { profileImagesFor } from '@/server/profile';
 import { getDb } from '@/db/client';
@@ -25,10 +27,11 @@ export default async function AccountPage() {
 
   const displayName = account.name ?? account.email.split('@')[0] ?? account.email;
   const db = getDb();
-  const [referralCode, creditPence, pictures] = await Promise.all([
+  const [referralCode, creditPence, pictures, drawDevices] = await Promise.all([
     getOrCreateReferralCode(db, account),
     getCreditBalance(db, account.id),
     profileImagesFor(db, account.id, [account.id]),
+    listLinkedDevices(db, account.id),
   ]);
   const mine = pictures.get(account.id);
   const initial = (account.name ?? account.email).charAt(0).toUpperCase();
@@ -52,6 +55,8 @@ export default async function AccountPage() {
         <ProfileCard profile={{ name: displayName, email: account.email, initial, avatarUrl: mine?.avatarUrl ?? null, headerUrl: mine?.headerUrl ?? null }} />
 
         <ReferralCard code={referralCode} creditPence={creditPence} />
+
+        <DrawAppCard devices={drawDevices} />
 
         {/* Your data — see / download / delete (trust-critical; one-tap per CLAUDE.md) */}
         <section className="mt-4">

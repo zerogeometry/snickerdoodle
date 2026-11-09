@@ -120,7 +120,13 @@ export const auditEvent = pgEnum('audit_event', [
   'ADMIN_MFA_ENROLLED',
   'CONTENT_REVIEW_VIEWED',
   'CONTENT_REVIEWED',
+  // Snickerdoodle Draw (the companion app): a grown-up linked / unlinked a phone.
+  'APP_LINKED',
+  'APP_UNLINKED',
 ]);
+
+/** Where a keepsake came from: the website, or Snickerdoodle Draw (drawn on the screen / snapped from paper). */
+export const assetSource = pgEnum('asset_source', ['web', 'app-screen', 'app-paper']);
 
 const createdAt = timestamp('created_at', { withTimezone: true }).defaultNow().notNull();
 
@@ -276,6 +282,10 @@ export const assets = pgTable(
     studioDoc: jsonb('studio_doc'),
     fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
+    /** Where it came from (web, or Snickerdoodle Draw). The app's key may only delete what the app sent. */
+    source: assetSource('source').notNull().default('web'),
+    /** The day the child made it, when known (Draw sends it). A date only, never a time. */
+    madeOn: date('made_on'),
     createdAt,
   },
   (t) => [
@@ -1099,4 +1109,72 @@ export const rateLimits = pgTable('rate_limits', {
   key: text('key').primaryKey(), // `${bucket}:${hmac(caller)}`
   windowStart: timestamp('window_start', { withTimezone: true }).notNull(),
   count: integer('count').notNull(),
+});
+
+// ── Snickerdoodle Draw (the companion app) ↔ the website ─────────────────────────────────────────
+// A grown-up links the app from its gated grown-ups' corner: PKCE in the phone's browser, then a
+// narrow key held in the phone's secure store (project-office/briefs/COMPANION-APP-api-plan.md M6).
+// Only the family's OWNER can link. Every secret is stored as a SHA-256 hash, never the raw value.
+
+/** A one-time code from "connect snickerdoodle draw?", swapped for a key within two minutes. */
+export const appAuthCodes = pgTable('app_auth_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  codeHash: text('code_hash').notNull().unique(),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  /** The family the key will be for. NULL = the grown-up runs no family (the swap answers "not-owner"). */
+  familyId: uuid('family_id').references(() => families.id, { onDelete: 'cascade' }),
+  /** Which little ones the phone is for (the grown-up's ticks). NULL = all of them, now and later. */
+  childIds: jsonb('child_ids').$type<string[]>(),
+  /** BASE64URL(SHA-256(verifier)) — S256 only. */
+  codeChallenge: text('code_challenge').notNull(),
+  redirectUri: text('redirect_uri').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt,
+});
+
+/** A linked phone's key. Scoped to one family (and optionally some of its children); revocable. */
+export const appTokens = pgTable(
+  'app_tokens',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    tokenHash: text('token_hash').notNull().unique(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    familyId: uuid('family_id')
+      .notNull()
+      .references(() => families.id, { onDelete: 'cascade' }),
+    /** NULL = every child in the family (including ones added later). */
+    childIds: jsonb('child_ids').$type<string[]>(),
+    /** What the account page calls it ("an android phone", "an iphone or ipad"). Never a device id. */
+    deviceLabel: text('device_label').notNull(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }).defaultNow().notNull(),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt,
+  },
+  (t) => [index('app_token_account_family_idx').on(t.accountId, t.familyId)],
+);
+
+/** "Make it real" from the app: a single-use, 15-minute pass that opens the website's maker for ONE
+ * keepsake × ONE product. It is not a sign-in: the grown-up still signs in to the website to use it. */
+export const appCheckoutGrants = pgTable('app_checkout_grants', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  tokenHash: text('token_hash').notNull().unique(),
+  appTokenId: uuid('app_token_id').references(() => appTokens.id, { onDelete: 'set null' }),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  assetId: uuid('asset_id')
+    .notNull()
+    .references(() => assets.id, { onDelete: 'cascade' }),
+  productKey: text('product_key').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt,
 });

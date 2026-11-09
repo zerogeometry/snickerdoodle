@@ -5,6 +5,7 @@ import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import type { AccessLevel, Circle } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
+import { revokeAppTokens } from './app/link';
 import { sendMail, type MailMessage } from './mail';
 import { memberAccessChangedEmail, memberRemovedEmail } from './mail/familyNotices';
 
@@ -75,6 +76,9 @@ export async function removeMember(
   if (!updated[0]) return { ok: false };
   // "Removal invalidates sessions immediately" (CLAUDE.md): sign them out everywhere.
   await db.delete(sessions).where(eq(sessions.userId, input.memberAccountId));
+  // and any Snickerdoodle Draw phone of theirs linked to this family (only owners can link, so this
+  // is belt and braces — the key also re-checks the membership on every call)
+  await revokeAppTokens(db, { accountId: input.memberAccountId, familyId: input.familyId }, 'member-removed', { accountId: ownerId, actorType: 'MEMBER' });
   await recordErasure({ kind: 'membership', familyId: input.familyId, accountId: input.memberAccountId, status: 'REMOVED' });
   await db.insert(auditRecords).values({
     familyId: input.familyId,

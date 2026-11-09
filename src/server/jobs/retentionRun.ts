@@ -4,6 +4,7 @@ import { purgeExpiredPendingKeeps } from '@/server/keepsakes';
 import { purgeExpiredRateLimits } from '@/server/rateLimit';
 import { sweepQuarantine } from '@/server/directUpload';
 import { purgeExpiredSupportRequests } from '@/server/support';
+import { purgeAppLinkLeftovers } from '@/server/app/link';
 
 /**
  * One retention run (POST /api/jobs/retention — hourly on the AWS box). Retention is a legal
@@ -28,6 +29,8 @@ export interface RetentionSteps {
   rateLimits: (db: DbHandle) => Promise<number>;
   quarantine: () => Promise<{ deleted: number; failed: number }>;
   support: (db: DbHandle) => Promise<number>;
+  /** Snickerdoodle Draw: link codes + make-it-real passes a day past expiry, keys revoked a month ago. */
+  appLinks?: (db: DbHandle) => Promise<number>;
 }
 
 export const DEFAULT_STEPS: RetentionSteps = {
@@ -38,6 +41,7 @@ export const DEFAULT_STEPS: RetentionSteps = {
   rateLimits: purgeExpiredRateLimits,
   quarantine: () => sweepQuarantine(),
   support: (db) => purgeExpiredSupportRequests(db),
+  appLinks: (db) => purgeAppLinkLeftovers(db),
 };
 
 export interface RetentionReport {
@@ -53,6 +57,7 @@ export interface RetentionReport {
   quarantineSwept: number | null;
   quarantineFailed: number;
   supportPurged: number | null;
+  appLinksPurged: number | null;
 }
 
 export async function runRetention(db: DbHandle, steps: RetentionSteps = DEFAULT_STEPS): Promise<RetentionReport> {
@@ -88,6 +93,7 @@ export async function runRetention(db: DbHandle, steps: RetentionSteps = DEFAULT
   const rateLimitsPurged = await step('rate-limits', () => steps.rateLimits(db)); // finished windows, a day on
   const quarantine = await step('quarantine', () => steps.quarantine()); // direct uploads never finished, an hour on
   const supportPurged = await step('support', () => steps.support(db)); // help messages, two years on
+  const appLinksPurged = steps.appLinks ? await step('app-links', () => steps.appLinks!(db)) : 0;
 
   const quarantineFailed = quarantine?.failed ?? 0;
   const report: RetentionReport = {
@@ -103,6 +109,7 @@ export async function runRetention(db: DbHandle, steps: RetentionSteps = DEFAULT
     quarantineSwept: quarantine?.deleted ?? null,
     quarantineFailed,
     supportPurged,
+    appLinksPurged,
   };
   if (!report.ok) {
     // ids and counts only — the per-upload reasons were logged by the purge itself

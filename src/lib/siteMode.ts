@@ -176,6 +176,12 @@ export function isGateExempt(pathname: string): boolean {
     pathname.startsWith('/api/test-gate') ||
     pathname.startsWith('/api/webhooks/') ||
     pathname.startsWith('/api/jobs/') ||
+    // Snickerdoodle Draw: the app can't type the test password. Every call that touches a family
+    // needs the phone's key (src/server/app/appAuth.ts); the product list holds no family data.
+    pathname.startsWith('/api/app/v1/') ||
+    // the files Android and iOS fetch to trust our "back to the app" links (no data in them)
+    pathname === '/.well-known/assetlinks.json' ||
+    pathname === '/.well-known/apple-app-site-association' ||
     pathname === '/api/health' ||
     pathname.startsWith('/api/health/') ||
     pathname.startsWith('/_next/') ||
