@@ -6,6 +6,14 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 
 /**
+ * The rear camera at its FULL resolution (founder's test, 9 Nov 2026). With no size asked for,
+ * browsers hand over a small default frame (often 640×480): too soft to read a word written in biro,
+ * and far too small to print well. `ideal` = the camera's best up to 4K; it never fails if the phone
+ * can't do it, it just gives its best.
+ */
+const CAMERA_VIDEO: MediaTrackConstraints = { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } };
+
+/**
  * A real camera capture (getUserMedia) — not a file picker. Prefers the rear
  * camera on mobile, falls back to any camera, and degrades gracefully to "upload
  * instead" when there's no camera or permission is denied. The stream is stopped
@@ -39,10 +47,7 @@ export function CameraCapture({
     let cancelled = false;
     (async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
-          audio: false,
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: CAMERA_VIDEO, audio: false });
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop());
           return;
@@ -80,7 +85,7 @@ export function CameraCapture({
     // re-open the stream
     setError(null);
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
+      .getUserMedia({ video: CAMERA_VIDEO, audio: false })
       .then((stream) => {
         streamRef.current = stream;
         if (videoRef.current) {

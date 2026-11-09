@@ -4,6 +4,7 @@ import { getObjectBytes } from '@/storage';
 import type { DbHandle } from '../db';
 import type { Scheduler } from '../background';
 import { createHash } from 'node:crypto';
+import sharp from 'sharp';
 import { defaultProviders, isModerationConfigured, type ModerationProviders } from './providers';
 import { containsAbusiveText } from '../textSafety';
 import { HASH_UNCHECKED_LABEL, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz/review';
@@ -29,12 +30,30 @@ export const DRAWN_WORDS_LABEL = 'drawn-words';
 export const TEXT_UNREADABLE_LABEL = 'text-unreadable';
 export { HASH_UNCHECKED_LABEL };
 
+/**
+ * Numbers only, kept with the verdict so a missed flag can be explained without anyone looking at the
+ * picture: its size, and how many words each reader found. Never the words themselves (they may
+ * include a child's name).
+ */
+export interface ScreeningDiagnostics {
+  image?: string;
+  words?: Record<string, number>;
+}
+
 /** Read the words in a picture and screen them. null = nothing to flag. */
-async function screenWords(providers: ModerationProviders, buffer: Buffer): Promise<string | null> {
+async function screenWords(providers: ModerationProviders, buffer: Buffer, diag?: ScreeningDiagnostics): Promise<string | null> {
   if (!providers.textReader) return null;
   let words: string[];
   try {
-    words = await providers.textReader.read(buffer);
+    const r = providers.textReader;
+    if (r.readEach) {
+      const each = await r.readEach(buffer);
+      if (diag) diag.words = Object.fromEntries(each.map((e) => [e.reader, Array.isArray(e.words) ? e.words.length : 0]));
+      words = each.flatMap((e) => (Array.isArray(e.words) ? e.words : []));
+    } else {
+      words = await r.read(buffer);
+      if (diag && Array.isArray(words)) diag.words = { [r.name ?? 'reader']: words.length };
+    }
   } catch (e) {
     providerFailed('text reader', e);
     return TEXT_UNREADABLE_LABEL;
@@ -104,12 +123,18 @@ export async function moderateImage(
   opts: {
     /** The hash step already ran for this upload (background screening): don't run it again. */
     hashAlreadyChecked?: HashOutcome;
+    /** Filled with numbers-only diagnostics (picture size, words found per reader). */
+    diagnostics?: ScreeningDiagnostics;
   } = {},
 ): Promise<ModerationVerdict> {
   const hash = opts.hashAlreadyChecked ?? (await checkHash(input, providers));
   if (hash === 'match') return { status: 'BLOCKED', labels: ['csam-hash-match'] };
   if (hash === 'unchecked') return { status: 'FLAGGED', labels: [HASH_UNCHECKED_LABEL] };
   const deferred = hash === 'deferred';
+  if (opts.diagnostics) {
+    const meta = await sharp(input.buffer, { failOn: 'none' }).metadata().catch(() => null);
+    if (meta?.width && meta.height) opts.diagnostics.image = `${meta.width}x${meta.height}`;
+  }
 
   // The classifier (nudity, violence, hate symbols, rude gestures) and the words written in the
   // picture, side by side. Either one failing holds the item; neither can CLEAR on its own.
@@ -119,7 +144,7 @@ export async function moderateImage(
       (r) => (r && typeof r === 'object' ? (r as { flagged?: unknown; labels?: unknown; categories?: unknown }) : null),
       (e) => (providerFailed('classifier', e), null),
     ),
-    screenWords(providers, input.buffer),
+    screenWords(providers, input.buffer, opts.diagnostics),
   ]);
   const extra = (v: Omit<ModerationVerdict, 'hashCheck' | 'sensitive'>): ModerationVerdict =>
     deferred ? { ...v, hashCheck: 'deferred', sensitive: v.status === 'CLEAR' ? false : isSensitive(c) } : v;
@@ -141,14 +166,14 @@ export type UploadModerationStatus = ModerationState | 'PENDING';
  * both still count — the stored status is the worst of the three — and BLOCKED is never undone.
  * FLAGGED and BLOCKED outcomes are audited (BLOCKED is the CSAM runbook trigger).
  */
-async function recordUploadVerdict(db: DbHandle, input: { assetId: string; familyId: string | null; now?: Date }, raw: ModerationVerdict): Promise<ModerationVerdict> {
+async function recordUploadVerdict(db: DbHandle, input: { assetId: string; familyId: string | null; now?: Date }, raw: ModerationVerdict, diag?: ScreeningDiagnostics): Promise<ModerationVerdict> {
   // Fail-safe (D8): a malformed/unrecognised verdict routes to human review — NEVER
   // silently CLEAR. Defends the gate against a future provider returning garbage.
   const status: ModerationState = raw.status === 'CLEAR' || raw.status === 'FLAGGED' || raw.status === 'BLOCKED' ? raw.status : 'FLAGGED';
   const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
   // D25: remember that the hash check was deferred, and whether a reviewer may look (fail-safe: sensitive)
   const deferral = raw.hashCheck === 'deferred' ? { hashCheck: 'deferred' as const, sensitive: raw.sensitive !== false } : {};
-  const original: Stored = { status, labels, ...deferral };
+  const original: Stored = { status, labels, ...deferral, ...(diag && (diag.image || diag.words) ? { diag } : {}) };
 
   const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, input.assetId));
   const d = (row?.detail ?? {}) as { labels?: string[]; design?: Stored; reports?: unknown[] };
@@ -202,7 +227,10 @@ export async function moderateAndRecord(
   if (unscreened) return recordUploadVerdict(db, input, { status: 'FLAGGED', labels: [SCREENING_NOT_CONFIGURED_LABEL] });
   const p = providers ?? defaultProviders(env);
   const image = { buffer: input.buffer, sha256: input.sha256, originalBuffer: input.originalBuffer };
-  if (!opts.background) return recordUploadVerdict(db, input, await moderateImage(image, p));
+  if (!opts.background) {
+    const diag: ScreeningDiagnostics = {};
+    return recordUploadVerdict(db, input, await moderateImage(image, p, { diagnostics: diag }), diag);
+  }
 
   const hash = await checkHash(image, p);
   if (hash === 'match') return recordUploadVerdict(db, input, { status: 'BLOCKED', labels: ['csam-hash-match'] });
@@ -215,7 +243,8 @@ export async function moderateAndRecord(
     .where(and(eq(assets.id, input.assetId), eq(assets.moderationStatus, 'PENDING')));
   opts.background(async () => {
     try {
-      await recordUploadVerdict(db, input, await moderateImage(image, p, { hashAlreadyChecked: hash }));
+      const diag: ScreeningDiagnostics = {};
+      await recordUploadVerdict(db, input, await moderateImage(image, p, { hashAlreadyChecked: hash, diagnostics: diag }), diag);
     } catch (e) {
       providerFailed('background screening', e); // stays PENDING: the sweep will screen it
     }
@@ -257,12 +286,13 @@ export async function screenPendingNow(
       const p = providers ?? defaultProviders(env);
       // Normally the hash step ran at upload (recorded above). If it didn't, it runs now on the
       // stored copy — weaker for IWF (it matches original files), but never skipped.
+      const diag: ScreeningDiagnostics = {};
       const verdict = await moderateImage(
         { buffer, sha256: createHash('sha256').update(buffer).digest('hex') },
         p,
-        hashCheck === 'passed' || hashCheck === 'deferred' ? { hashAlreadyChecked: hashCheck } : {},
+        hashCheck === 'passed' || hashCheck === 'deferred' ? { hashAlreadyChecked: hashCheck, diagnostics: diag } : { diagnostics: diag },
       );
-      await recordUploadVerdict(db, { assetId: a.id, familyId: a.familyId }, verdict);
+      await recordUploadVerdict(db, { assetId: a.id, familyId: a.familyId }, verdict, diag);
     } catch (e) {
       providerFailed('catch-up screening', e);
     }
@@ -293,7 +323,7 @@ export async function screenStalePending(
 // can never clear a flagged upload (and a flagged design holds a clean upload back).
 
 const RANK: Record<ModerationState | 'PENDING', number> = { CLEAR: 0, PENDING: 1, FLAGGED: 2, BLOCKED: 3 };
-type Stored = { status: ModerationState | 'PENDING'; labels: string[]; hashCheck?: 'deferred'; sensitive?: boolean };
+type Stored = { status: ModerationState | 'PENDING'; labels: string[]; hashCheck?: 'deferred'; sensitive?: boolean; diag?: ScreeningDiagnostics };
 const worse = (a: Stored, b: Stored): Stored => (RANK[b.status] > RANK[a.status] ? b : a);
 
 async function originalVerdict(db: DbHandle, assetId: string): Promise<Stored> {

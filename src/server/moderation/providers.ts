@@ -47,6 +47,10 @@ export interface ClassifierProvider {
  */
 export interface TextReaderProvider {
   read(buffer: Buffer): Promise<string[]>;
+  /** A short name for diagnostics ("printed", "handwriting"). */
+  name?: string;
+  /** Pooled readers: each reader's words separately (word COUNTS are kept as diagnostics, never the words). */
+  readEach?(buffer: Buffer): Promise<{ reader: string; words: string[] }[]>;
 }
 
 export interface ModerationProviders {

@@ -108,3 +108,14 @@ describe('both readers together', () => {
     await expect(r.read(Buffer.from('x'))).rejects.toThrow('down');
   });
 });
+
+describe('numbers-only diagnostics (why a word was or wasn’t caught)', () => {
+  it('records the picture size and how many words each reader found — never the words', async () => {
+    const { client } = textract(handwritten('love you nana'));
+    const diagnostics: { image?: string; words?: Record<string, number> } = {};
+    await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { rekognition: rekognitionSeesNothing(), textract: client }), { diagnostics });
+    expect(diagnostics.image).toBe('64x64');
+    expect(diagnostics.words).toEqual({ printed: 0, handwriting: 4 }); // 1 line + 3 words
+    expect(JSON.stringify(diagnostics)).not.toMatch(/love|nana/);
+  });
+});

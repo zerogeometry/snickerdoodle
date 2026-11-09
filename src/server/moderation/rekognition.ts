@@ -185,6 +185,7 @@ export function rekognitionClassifier(client: RekognitionPort, config: Classifie
 /** TextReaderProvider over Rekognition DetectText — one image per call. */
 export function rekognitionTextReader(client: RekognitionPort, config: TextReaderConfig = TEXT_READER_CONFIG): TextReaderProvider {
   return {
+    name: 'printed',
     async read(buffer) {
       await assertRekognitionRegion(client);
       const bytes = await prepareImageBytes(buffer);

@@ -86,6 +86,7 @@ export function mapDocumentText(output: unknown, config: TextReaderConfig = TEXT
 /** TextReaderProvider over Textract DetectDocumentText — one image per call. */
 export function textractTextReader(client: TextractPort, config: TextReaderConfig = TEXTRACT_READER_CONFIG): TextReaderProvider {
   return {
+    name: 'handwriting',
     async read(buffer) {
       await assertTextractRegion(client);
       const bytes = await prepareImageBytes(buffer); // JPEG/PNG, ≤ 5 MB, ≤ 4096 px: inside Textract's limits too
@@ -101,10 +102,11 @@ export function textractTextReader(client: TextractPort, config: TextReaderConfi
  * "text-unreadable", never waved through on half a read.
  */
 export function combinedTextReader(readers: readonly TextReaderProvider[]): TextReaderProvider {
+  const readEach = async (buffer: Buffer) => Promise.all(readers.map(async (r, i) => ({ reader: r.name ?? `reader-${i + 1}`, words: await r.read(buffer) })));
   return {
+    readEach,
     async read(buffer) {
-      const all = await Promise.all(readers.map((r) => r.read(buffer)));
-      return all.flat();
+      return (await readEach(buffer)).flatMap((r) => r.words);
     },
   };
 }
