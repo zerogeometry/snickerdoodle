@@ -38,6 +38,17 @@ export { HASH_UNCHECKED_LABEL };
 export interface ScreeningDiagnostics {
   image?: string;
   words?: Record<string, number>;
+  /** TEST SITE ONLY (see {@link debugWordsAllowed}): the words read, to tune the matching. */
+  readWords?: string[];
+}
+
+/**
+ * Record the words a reader found? Only while tuning the words check on the password-locked TEST
+ * site (SITE_MODE=test — sample drawings only, by rule) AND with SCREENING_DEBUG_WORDS=true set on
+ * purpose. Never on the private-live or public site, so a real family's words are never kept.
+ */
+export function debugWordsAllowed(env: Record<string, string | undefined> = process.env): boolean {
+  return env.SITE_MODE === 'test' && env.SCREENING_DEBUG_WORDS === 'true';
 }
 
 /** Read the words in a picture and screen them. null = nothing to flag. */
@@ -54,6 +65,7 @@ async function screenWords(providers: ModerationProviders, buffer: Buffer, diag?
       words = await r.read(buffer);
       if (diag && Array.isArray(words)) diag.words = { [r.name ?? 'reader']: words.length };
     }
+    if (diag && debugWordsAllowed() && Array.isArray(words)) diag.readWords = words.slice(0, 40).map((w) => String(w).slice(0, 60));
   } catch (e) {
     providerFailed('text reader', e);
     return TEXT_UNREADABLE_LABEL;
@@ -173,7 +185,7 @@ async function recordUploadVerdict(db: DbHandle, input: { assetId: string; famil
   const labels = Array.isArray(raw.labels) ? raw.labels.map((l) => String(l)) : [];
   // D25: remember that the hash check was deferred, and whether a reviewer may look (fail-safe: sensitive)
   const deferral = raw.hashCheck === 'deferred' ? { hashCheck: 'deferred' as const, sensitive: raw.sensitive !== false } : {};
-  const original: Stored = { status, labels, ...deferral, ...(diag && (diag.image || diag.words) ? { diag } : {}) };
+  const original: Stored = { status, labels, ...deferral, ...(diag && (diag.image || diag.words || diag.readWords) ? { diag } : {}) };
 
   const [row] = await db.select({ status: assets.moderationStatus, detail: assets.moderationDetail }).from(assets).where(eq(assets.id, input.assetId));
   const d = (row?.detail ?? {}) as { labels?: string[]; design?: Stored; reports?: unknown[] };

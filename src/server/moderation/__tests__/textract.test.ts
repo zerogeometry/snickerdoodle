@@ -119,3 +119,34 @@ describe('numbers-only diagnostics (why a word was or wasn’t caught)', () => {
     expect(JSON.stringify(diagnostics)).not.toMatch(/love|nana/);
   });
 });
+
+describe('test-site-only word debugging (to tune the matching)', () => {
+  const run = async () => {
+    const { client } = textract(handwritten('wauker'));
+    const diagnostics: { readWords?: string[] } = {};
+    await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { rekognition: rekognitionSeesNothing(), textract: client }), { diagnostics });
+    return diagnostics;
+  };
+  const withEnv = async (env: Record<string, string | undefined>, fn: () => Promise<unknown>) => {
+    const keep = { SITE_MODE: process.env.SITE_MODE, SCREENING_DEBUG_WORDS: process.env.SCREENING_DEBUG_WORDS };
+    Object.assign(process.env, env);
+    for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k];
+    try {
+      return await fn();
+    } finally {
+      for (const [k, v] of Object.entries(keep)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  };
+
+  it('records the words read only on the TEST site with the switch on', async () => {
+    const d = (await withEnv({ SITE_MODE: 'test', SCREENING_DEBUG_WORDS: 'true' }, run)) as { readWords?: string[] };
+    expect(d.readWords).toContain('wauker');
+  });
+
+  it('never on the private-live or public site, or with the switch off', async () => {
+    for (const env of [{ SITE_MODE: 'private', SCREENING_DEBUG_WORDS: 'true' }, { SITE_MODE: undefined, SCREENING_DEBUG_WORDS: 'true' }, { SITE_MODE: 'test', SCREENING_DEBUG_WORDS: undefined }]) {
+      const d = (await withEnv(env, run)) as { readWords?: string[] };
+      expect(d.readWords).toBeUndefined();
+    }
+  });
+});
