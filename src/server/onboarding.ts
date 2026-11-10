@@ -1,6 +1,6 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { accounts, assets, children, families, memberships } from '@/db/schema';
-import type { DbHandle } from './db';
+import type { DbHandle, Tx } from './db';
 
 /**
  * Every account is the controller of its own family workspace. On first use we
@@ -26,24 +26,45 @@ export async function ensureHomeFamily(
   accountId: string,
   displayName: string | null,
 ): Promise<string> {
-  const existing = await db
+  const existing = await ownedFamilyId(db, accountId);
+  if (existing) return existing;
+
+  // A new parent's first visit fires several server actions and loaders at once (keep, keepsake
+  // picker, home), and each lands here finding no family yet. Unguarded, each made its own: two
+  // "Sam's family" boxes, the keepsake filed in one while the page looked in the other. So first
+  // creation is serialised per account: take the account's lock, look again, then create the
+  // family + owner membership together. The lock is released at commit, so a waiting call's second
+  // look sees the family the first one made. (An account CAN own two families — a hand-over in
+  // accountClosure gives the heir a second one — so this is a lock, not a one-owner constraint.)
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`home-family:${accountId}`}))`);
+    const made = await ownedFamilyId(tx, accountId);
+    if (made) return made;
+
+    const name = displayName?.trim() ? `${displayName.trim()}'s family` : DEFAULT_FAMILY_NAME;
+    const [family] = await tx.insert(families).values({ displayName: name, ownerAccountId: accountId }).returning();
+    await tx.insert(memberships).values({
+      familyId: family!.id,
+      accountId,
+      relationship: 'PARENT',
+      circle: 'FAMILY',
+      accessLevel: 'CONTRIBUTE',
+      status: 'ACTIVE',
+      isOwner: true,
+    });
+    return family!.id;
+  });
+}
+
+/** The family this account owns (ACTIVE owner membership) — the oldest, if a hand-over gave it two. */
+async function ownedFamilyId(db: DbHandle | Tx, accountId: string): Promise<string | null> {
+  const [row] = await db
     .select({ familyId: memberships.familyId })
     .from(memberships)
-    .where(and(eq(memberships.accountId, accountId), eq(memberships.isOwner, true), eq(memberships.status, 'ACTIVE')));
-  if (existing[0]) return existing[0].familyId;
-
-  const name = displayName?.trim() ? `${displayName.trim()}'s family` : DEFAULT_FAMILY_NAME;
-  const [family] = await db.insert(families).values({ displayName: name, ownerAccountId: accountId }).returning();
-  await db.insert(memberships).values({
-    familyId: family!.id,
-    accountId,
-    relationship: 'PARENT',
-    circle: 'FAMILY',
-    accessLevel: 'CONTRIBUTE',
-    status: 'ACTIVE',
-    isOwner: true,
-  });
-  return family!.id;
+    .where(and(eq(memberships.accountId, accountId), eq(memberships.isOwner, true), eq(memberships.status, 'ACTIVE')))
+    .orderBy(asc(memberships.createdAt))
+    .limit(1);
+  return row?.familyId ?? null;
 }
 
 export interface FamilyChoice {
