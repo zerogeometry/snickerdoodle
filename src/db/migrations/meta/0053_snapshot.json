@@ -1,5 +1,5 @@
 {
-  "id": "3f018053-b0a8-4367-b4b3-fbd389d878a1",
+  "id": "a7007692-a314-4398-b5ee-7e0d0965b210",
   "prevId": "c5b926df-2378-496d-9b54-344098dadc5a",
   "version": "7",
   "dialect": "postgresql",
@@ -5214,7 +5214,8 @@
         "CONTENT_REVIEWED",
         "APP_LINKED",
         "APP_UNLINKED",
-        "APP_PROGRESS_DELETED"
+        "APP_PROGRESS_DELETED",
+        "OCCASION_CHANGED"
       ]
     },
     "public.family_circle": {

@@ -27,12 +27,22 @@ export const CAN = [
   'show your orders, in the grown-ups’ corner',
 ];
 export const CANT = [
-  'see the rest of your keepsake box, or your family',
+  'see the rest of your keepsake box',
   'bring pictures from here back into the app',
   'see your email address',
   'show prices or a shop to your child',
   'take a payment — that only ever happens here',
 ];
+
+/**
+ * What it can't see of your family — honest about the one exception (B10): with "family birthdays"
+ * ticked it sees the names and dates on your family calendar (a name, a relation, the day and month).
+ */
+export function familyCant(birthdays: boolean): string {
+  return birthdays
+    ? 'see your family members’ details — only the names and dates on your family calendar (a name, what they are to you, the day and month), because you ticked “family birthdays”'
+    : 'see your family members’ details — if you tick “family birthdays”, it sees the names and dates on your family calendar, nothing more';
+}
 
 /**
  * The consent card. What syncs is the grown-up's choice (one slate, nothing picked until they pick —
@@ -172,7 +182,7 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-cinnamon">it can’t</p>
           <ul className="mt-1.5 flex flex-col gap-1.5">
-            {CANT.map((t) => (
+            {[CANT[0]!, familyCant(sync.birthdays), ...CANT.slice(1)].map((t) => (
               <li key={t} className="flex items-start gap-1.5 text-[13px] leading-snug text-cocoa">
                 <Icon icon={IconX} size={15} className="mt-0.5 shrink-0 text-cinnamon" /> {t}
               </li>

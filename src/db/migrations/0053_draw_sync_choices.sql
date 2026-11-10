@@ -1,5 +1,6 @@
 CREATE TYPE "public"."app_sync_keepsakes" AS ENUM('none', 'proud', 'all');--> statement-breakpoint
 ALTER TYPE "public"."audit_event" ADD VALUE 'APP_PROGRESS_DELETED';--> statement-breakpoint
+ALTER TYPE "public"."audit_event" ADD VALUE 'OCCASION_CHANGED';--> statement-breakpoint
 CREATE TABLE "app_artist_progress" (
 	"child_id" uuid PRIMARY KEY NOT NULL,
 	"family_id" uuid NOT NULL,

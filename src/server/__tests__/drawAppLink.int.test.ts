@@ -714,6 +714,24 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect((await listAppOccasions(db, av)).some((o) => max.ok && o.id === max.id)).toBe(true);
     });
 
+    it('every change from the app is in the audit trail (created / updated / deleted) — never the name or date', async () => {
+      const made = await addAppOccasion(db, av, { name: 'Tam', relation: 'auntie', kind: 'birthday', month: 9, day: 9 });
+      await updateAppOccasion(db, av, made.id, { day: 10, relation: 'aunt' });
+      await deleteAppOccasion(db, av, made.id);
+      const rows = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'OCCASION_CHANGED'), eq(auditRecords.targetId, made.id)));
+      expect(rows.map((r) => (r.metadata as { action: string }).action).sort()).toEqual(['created', 'deleted', 'updated']);
+      for (const r of rows) {
+        expect(r).toMatchObject({ familyId: ids.hartleyId, actorAccountId: ids.samId, actorType: 'MEMBER', targetType: 'occasion' });
+        expect(r.metadata).toMatchObject({ via: 'draw-app', appLink: av.tokenId });
+        expect(JSON.stringify(r.metadata)).not.toMatch(/Tam|aunt/);
+      }
+      expect((rows.find((r) => (r.metadata as { action: string }).action === 'updated')!.metadata as { fields: string[] }).fields.sort()).toEqual(['day', 'relation']);
+      // a refused change writes nothing
+      const before = (await db.select().from(auditRecords).where(eq(auditRecords.event, 'OCCASION_CHANGED'))).length;
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo Bloggs', kind: 'birthday', month: 1, day: 1 }), 422, 'name');
+      expect((await db.select().from(auditRecords).where(eq(auditRecords.event, 'OCCASION_CHANGED'))).length).toBe(before);
+    });
+
     it('turning "family birthdays" off stops it and deletes nothing', async () => {
       const token = await link({ sync: BDAYS });
       const made = await addAppOccasion(db, await viewerFor(token), { name: 'Kit', kind: 'birthday', month: 8, day: 8 });

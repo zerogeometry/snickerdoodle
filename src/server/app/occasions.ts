@@ -1,5 +1,5 @@
 import { and, asc, eq, isNull } from 'drizzle-orm';
-import { occasions } from '@/db/schema';
+import { auditRecords, occasions } from '@/db/schema';
 import { addOccasion, deleteOccasion, updateOccasion, type OccasionInput } from '@/server/occasions';
 import { containsAbusiveText, screenChildFirstName } from '@/server/textSafety';
 import type { DbHandle } from '@/server/db';
@@ -74,6 +74,19 @@ function cleanDay(month: unknown, day: unknown): { month: number; day: number } 
 }
 const mmdd = (year: number | null, month: number, day: number) => `${year ?? '-'}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
+/** The audit trail for a family-calendar change made from the app — what happened, never the name or date. */
+async function audit(db: DbHandle, av: AppViewer, occasionId: string, action: 'created' | 'updated' | 'deleted', fields?: string[]) {
+  await db.insert(auditRecords).values({
+    familyId: av.familyId,
+    actorAccountId: av.accountId,
+    actorType: 'MEMBER',
+    event: 'OCCASION_CHANGED',
+    targetType: 'occasion',
+    targetId: occasionId,
+    metadata: { action, via: 'draw-app', appLink: av.tokenId, ...(fields ? { fields } : {}) },
+  });
+}
+
 function failed(reason: string): never {
   if (reason === 'not-allowed') throw new AppApiError(403, 'not-owner');
   if (reason === 'words') throw new AppApiError(422, 'name');
@@ -104,6 +117,7 @@ export async function addAppOccasion(db: DbHandle, av: AppViewer, body: Record<s
   const { month, day } = cleanDay(body.month, body.day);
   const res = await addOccasion(db, av.accountId, av.familyId, { title: name, kind, date: mmdd(null, month, day), relation, shareCircle: 'FAMILY' });
   if (!res.ok) failed(res.reason);
+  await audit(db, av, res.id, 'created');
   return toApp((await db.select().from(occasions).where(eq(occasions.id, res.id)))[0]!);
 }
 
@@ -127,6 +141,7 @@ export async function updateAppOccasion(db: DbHandle, av: AppViewer, id: string,
     ...(relation !== undefined ? { relation } : {}),
   });
   if (!res.ok) failed(res.reason);
+  await audit(db, av, o.id, 'updated', ['name', 'relation', 'kind', 'month', 'day'].filter((f) => body[f] !== undefined));
   return toApp((await db.select().from(occasions).where(eq(occasions.id, o.id)))[0]!);
 }
 
@@ -135,4 +150,5 @@ export async function deleteAppOccasion(db: DbHandle, av: AppViewer, id: string)
   requireBirthdays(av);
   const o = await appOccasion(db, av, id);
   if (!(await deleteOccasion(db, av.accountId, o.id))) throw new AppApiError(404, 'not-found');
+  await audit(db, av, o.id, 'deleted');
 }

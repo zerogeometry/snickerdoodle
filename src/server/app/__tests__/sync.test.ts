@@ -15,7 +15,7 @@ vi.mock('@/app/actions/appLink', () => ({
   removeEverythingDrawSentAction: vi.fn(),
 }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-const { ConnectCard, CAN, CANT } = await import('@/app/app/connect/ConnectCard');
+const { ConnectCard, CAN, CANT, familyCant } = await import('@/app/app/connect/ConnectCard');
 const { DrawAppCard, syncSummary } = await import('@/app/account/DrawAppCard');
 
 /**
@@ -70,6 +70,21 @@ describe('the connect page’s choices', () => {
     for (const want of ['first names', 'birthdays', 'change a little one’s name or birthday', 'ready-to-buy link for a drawing it sent', 'delete drawings it sent', 'drawing days', 'birthdays and special days', 'proud pile or every drawing'])
       expect(can).toContain(want);
     expect(CANT.join(' | ')).toContain('bring pictures from here back into the app');
+  });
+
+  it('is honest about the family: no "can’t see your family" while family birthdays would show its names (B10)', () => {
+    expect(CANT.join(' | ')).not.toMatch(/or your family/);
+    expect(familyCant(false)).toMatch(/if you tick “family birthdays”, it sees the names and dates on your family calendar/);
+    expect(familyCant(true)).toMatch(/only the names and dates on your family calendar/);
+    const html = renderToStaticMarkup(
+      createElement(ConnectCard, {
+        params: { response_type: 'code', client_id: 'snickerdoodle-draw', code_challenge: 'x', code_challenge_method: 'S256', state: 's', redirect_uri: 'https://snickerdoodle.co.uk/app/callback' },
+        email: 'sam@example.test',
+        families: [],
+        notOwner: false,
+      }),
+    );
+    expect(html).toContain('family members’ details');
   });
 });
 

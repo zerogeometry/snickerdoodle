@@ -172,8 +172,9 @@ export default function DrawPrivacyNoticePage() {
           <li>show your orders (a reference, the date and where it&apos;s got to) in the grown-ups&apos; corner.</li>
         </ul>
         <p>
-          It can&apos;t see the rest of your keepsake box or your family, it can&apos;t see your email address, it never
-          shows prices, and it can&apos;t take a payment. Pictures from the website never come back into the app.
+          It can&apos;t see the rest of your keepsake box, or your family members&apos; details (except, if you share
+          family birthdays, the names and dates on your family calendar). It can&apos;t see your email address, it
+          never shows prices, and it can&apos;t take a payment. Pictures from the website never come back into the app.
         </p>
         <p>
           <em>Legal basis: [to confirm — e.g. our contract with you to keep your family&apos;s keepsakes, with the

@@ -125,6 +125,8 @@ export const auditEvent = pgEnum('audit_event', [
   'APP_UNLINKED',
   // …and deleted a child's backed-up drawing days (the sync choices — DRAW-APP-sync-choices.md).
   'APP_PROGRESS_DELETED',
+  // a family-calendar date added / changed / removed (today: from Snickerdoodle Draw's shared list)
+  'OCCASION_CHANGED',
 ]);
 
 /** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
