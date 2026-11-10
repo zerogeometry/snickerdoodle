@@ -5,13 +5,14 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { accounts, auditRecords, invites, memberships, storageObjects } from '@/db/schema';
+import { accounts, auditRecords, giftLinks, invites, memberships, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, canDeleteAsset, canSetAssetVisibility, canViewAsset } from '@/authz';
 import { changeAssetVisibility, listViewableAssets, resolveViewerContext } from '@/server/assets';
-import { acceptInvite, AlreadyInFamilyError, createInvite, getInviteForDisplay, setMemberSeesOccasions } from '@/server/invites';
+import { acceptInvite, AlreadyInFamilyError, createInvite, getInviteForDisplay, InvalidInviteError, setMemberSeesOccasions } from '@/server/invites';
 import { removeMember, resendInvite, revokeInvite, setMemberAccess } from '@/server/members';
 import { assetRefOf } from '@/server/assetRef';
+import { revokeGiftLink } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { copyKeepsake } from '@/server/keepsakeCopy';
 import { deleteObject } from '@/storage';
@@ -251,6 +252,50 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     expect(await acceptInvite(db, who, second.token)).toMatchObject({ ok: false, reason: 'used' });
     const m = await resolveViewerContext(db, who.id, ids.hartleyId);
     expect(m.membership).toMatchObject({ circle: 'EXTENDED', accessLevel: 'VIEW' });
+    // the spent one is in the audit log, with why
+    const [spent] = await audits('INVITE_REVOKED', second.inviteId);
+    expect(spent?.metadata).toMatchObject({ reason: 'superseded', by: first.inviteId });
+  });
+
+  it('the server checks the invite form: never a child, only the three levels, only a real address', async () => {
+    const sam = await owner();
+    const base = { familyId: ids.hartleyId, email: `checked-${nonce}@example.test`, relationship: 'GRANDPARENT' as const, accessLevel: 'VIEW' as const };
+    await expect(createInvite(db, sam, { ...base, relationship: 'CHILD' })).rejects.toBeInstanceOf(InvalidInviteError);
+    await expect(createInvite(db, sam, { ...base, accessLevel: 'ADMIN' as never })).rejects.toBeInstanceOf(InvalidInviteError);
+    for (const email of ['granny', 'granny@', '@example.test', 'gran ny@example.test']) {
+      await expect(createInvite(db, sam, { ...base, email })).rejects.toBeInstanceOf(InvalidInviteError);
+    }
+    const none = await db.select().from(invites).where(eq(invites.email, base.email));
+    expect(none).toEqual([]); // nothing written
+    expect((await createInvite(db, sam, base)).token).toBeTruthy(); // and a good one still goes
+  });
+
+  it('an invite cancelled before it is accepted never makes a membership — even if the join page was already open', async () => {
+    const who = await newAccount('cancelled');
+    const sam = await owner();
+    const inv = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'AUNT_UNCLE', accessLevel: 'VIEW' });
+    expect((await revokeInvite(db, sam, { familyId: ids.hartleyId, inviteId: inv.inviteId })).ok).toBe(true);
+    expect(await acceptInvite(db, who, inv.token)).toMatchObject({ ok: false });
+    expect((await resolveViewerContext(db, who.id, ids.hartleyId)).membership).toBeNull();
+  });
+
+  it('turning a gift link off cancels the invite inside it too (logged) — it was shown on the link', async () => {
+    const who = await newAccount('giftinvite');
+    const sam = await owner();
+    const inv = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' });
+    const [link] = await db
+      .insert(giftLinks)
+      .values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: `gl-${nonce}`, items: [], inviteId: inv.inviteId, expiresAt: new Date(Date.now() + 86_400_000) })
+      .returning();
+    try {
+      expect((await revokeGiftLink(db, sam, link!.id)).ok).toBe(true);
+      const [after] = await db.select({ status: invites.status }).from(invites).where(eq(invites.id, inv.inviteId));
+      expect(after!.status).toBe('REVOKED');
+      expect((await audits('INVITE_REVOKED', inv.inviteId))[0]?.metadata).toMatchObject({ reason: 'gift-link-revoked' });
+      expect(await acceptInvite(db, who, inv.token)).toMatchObject({ ok: false, reason: 'used' });
+    } finally {
+      await db.delete(giftLinks).where(eq(giftLinks.id, link!.id));
+    }
   });
 });
 

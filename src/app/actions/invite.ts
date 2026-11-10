@@ -3,7 +3,7 @@
 import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
 import { signIn } from '@/auth';
-import { AlreadyInFamilyError, createInvite, sendInviteSignInLink } from '@/server/invites';
+import { AlreadyInFamilyError, createInvite, InvalidInviteError, sendInviteSignInLink } from '@/server/invites';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
@@ -23,7 +23,7 @@ export async function createInviteAction(input: {
   accessLevel: AccessLevel;
   shareOccasions?: boolean;
   name?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'already-member' }> {
+}): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'already-member' | 'invalid' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
   if (!input.email.trim()) return { ok: false };
@@ -45,6 +45,7 @@ export async function createInviteAction(input: {
   } catch (e) {
     // already in the family: say so plainly (the parent changes their level from their card instead)
     if (e instanceof AlreadyInFamilyError) return { ok: false, reason: 'already-member' };
+    if (e instanceof InvalidInviteError) return { ok: false, reason: 'invalid' };
     return { ok: false };
   }
 }

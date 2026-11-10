@@ -3,6 +3,7 @@
 import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
 import { createGiftLink, placeGiftLinkOrder, sendGiftRequest } from '@/server/giftLinks';
+import { InvalidInviteError } from '@/server/invites';
 import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
@@ -17,7 +18,7 @@ export async function createGiftLinkAction(input: {
   title?: string;
   productKey?: string;
   invite?: { email: string; relationship: Relationship; accessLevel: AccessLevel; shareOccasions?: boolean } | null;
-}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string; linkId?: string }> {
+}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string; linkId?: string; reason?: 'invite-email' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
   if (!input.assetIds?.length && !input.designIds?.length) return { ok: false };
@@ -36,7 +37,8 @@ export async function createGiftLinkAction(input: {
       invite: input.invite ?? null,
     });
     return { ok: true, url: `/g/${token}`, linkId: id };
-  } catch {
+  } catch (e) {
+    if (e instanceof InvalidInviteError) return { ok: false, reason: 'invite-email' };
     return { ok: false };
   }
 }

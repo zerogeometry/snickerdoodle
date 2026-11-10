@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, ne, sql } from 'drizzle-orm';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import { accounts, auditRecords, families, invites, memberships } from '@/db/schema';
 import { defaultCircleFor } from '@/domain/relationships';
@@ -44,6 +44,17 @@ export interface CreateInviteInput {
   shareOccasions?: boolean;
 }
 
+/** The invite form sent something the server won't accept (a bad address, a child, an unknown level). */
+export class InvalidInviteError extends Error {
+  constructor() {
+    super('invalid invite');
+  }
+}
+/** Children are keepsake subjects, never account holders (NN3) — so never invited. */
+const INVITABLE_RELATIONSHIPS = new Set<Relationship>(['PARENT', 'GRANDPARENT', 'AUNT_UNCLE', 'CLOSE_FRIEND', 'OTHER']);
+const ACCESS_LEVELS = new Set<AccessLevel>(['VIEW', 'VIEW_BUY', 'CONTRIBUTE']);
+const isInvitableEmail = (e: string) => e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+
 /**
  * A parent-initiated invite (NN3: only a parent initiates invites and sets
  * access; no self-join). The circle is derived server-side from the relationship
@@ -64,6 +75,10 @@ export async function createInvite(
   }
 
   const email = input.email.trim().toLowerCase();
+  // never trust the client's form: a real address, a grown-up's relationship, one of the three levels
+  if (!isInvitableEmail(email) || !INVITABLE_RELATIONSHIPS.has(input.relationship) || !ACCESS_LEVELS.has(input.accessLevel)) {
+    throw new InvalidInviteError();
+  }
   if (await isActiveMemberEmail(db, input.familyId, email)) throw new AlreadyInFamilyError();
   const circle = defaultCircleFor(input.relationship); // server-authoritative
   const token = randomBytes(24).toString('base64url'); // unguessable
@@ -175,45 +190,55 @@ export async function acceptInvite(
     return { ok: false, reason: 'wrong-account' }; // identity check
   }
 
-  const existing = await db
-    .select({ id: memberships.id })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.familyId, invite.familyId),
-        eq(memberships.accountId, account.id),
-        eq(memberships.status, 'ACTIVE'),
-      ),
-    );
+  // All or nothing, and the invite is CLAIMED first: only one accept can flip it from PENDING, so a
+  // parent cancelling (or a fresh resend) at the same moment never leaves a membership behind.
+  const joined = await db.transaction(async (tx) => {
+    const [claimed] = await tx
+      .update(invites)
+      .set({ status: 'VERIFIED', verifiedAt: new Date() })
+      .where(and(eq(invites.id, invite.id), eq(invites.token, token), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date())))
+      .returning({ id: invites.id });
+    if (!claimed) return null;
 
-  const joined = !existing[0];
-  if (joined) {
-    await db.insert(memberships).values({
-      familyId: invite.familyId,
-      accountId: account.id,
-      relationship: invite.relationship,
-      circle: invite.circle,
-      accessLevel: invite.accessLevel,
-      seesOccasions: invite.shareOccasions,
-      status: 'ACTIVE',
-      isOwner: false,
-      inviteId: invite.id,
-      joinedAt: new Date(),
-    });
-    await db.insert(auditRecords).values([
-      { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'INVITE_ACCEPTED', targetType: 'invite', targetId: invite.id },
-      { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'MEMBERSHIP_CREATED', targetType: 'account', targetId: account.id },
-    ]);
-  }
-
-  await db.update(invites).set({ status: 'VERIFIED', verifiedAt: new Date() }).where(eq(invites.id, invite.id));
-  // any OTHER invite still waiting for this address is spent too — they're in now, and an old link
-  // must never quietly change the level the parent has since set for them (04-B4)
-  await db
-    .update(invites)
-    .set({ status: 'REVOKED' })
-    .where(and(eq(invites.familyId, invite.familyId), eq(invites.status, 'PENDING'), ne(invites.id, invite.id), sql`lower(${invites.email}) = ${invite.email.toLowerCase()}`));
-  if (joined) await tellParentTheyJoined(db, invite, account);
+    const existing = await tx
+      .select({ id: memberships.id })
+      .from(memberships)
+      .where(and(eq(memberships.familyId, invite.familyId), eq(memberships.accountId, account.id), eq(memberships.status, 'ACTIVE')));
+    const isNew = !existing[0];
+    if (isNew) {
+      await tx.insert(memberships).values({
+        familyId: invite.familyId,
+        accountId: account.id,
+        relationship: invite.relationship,
+        circle: invite.circle,
+        accessLevel: invite.accessLevel,
+        seesOccasions: invite.shareOccasions,
+        status: 'ACTIVE',
+        isOwner: false,
+        inviteId: invite.id,
+        joinedAt: new Date(),
+      });
+      await tx.insert(auditRecords).values([
+        { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'INVITE_ACCEPTED', targetType: 'invite', targetId: invite.id },
+        { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'MEMBERSHIP_CREATED', targetType: 'account', targetId: account.id },
+      ]);
+    }
+    // any OTHER invite still waiting for this address is spent too — they're in now, and an old link
+    // must never quietly change the level the parent has since set for them (04-B4). Logged.
+    const spent = await tx
+      .update(invites)
+      .set({ status: 'REVOKED' })
+      .where(and(eq(invites.familyId, invite.familyId), eq(invites.status, 'PENDING'), ne(invites.id, invite.id), sql`lower(${invites.email}) = ${invite.email.toLowerCase()}`))
+      .returning({ id: invites.id });
+    if (spent.length) {
+      await tx.insert(auditRecords).values(
+        spent.map((x) => ({ familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER' as const, event: 'INVITE_REVOKED' as const, targetType: 'invite', targetId: x.id, metadata: { reason: 'superseded', by: invite.id } })),
+      );
+    }
+    return { isNew };
+  });
+  if (!joined) return { ok: false, reason: 'used' };
+  if (joined.isNew) await tellParentTheyJoined(db, invite, account);
   return { ok: true, familyId: invite.familyId };
 }
 

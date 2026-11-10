@@ -113,7 +113,8 @@ export default async function JoinPage({
 
   // Identity confirmed → accept and land in the app.
   const result = await acceptInvite(db, account, token);
-  if (result.ok) redirect(next ?? '/home?joined=1');
+  // land in the family they just joined (not their own box, if they already have one)
+  if (result.ok) redirect(next ?? `/home?family=${result.familyId}&joined=1`);
 
   return (
     <Shell>

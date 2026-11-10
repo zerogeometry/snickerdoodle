@@ -248,7 +248,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     } else {
       await signInByEmailLink(page, email, `/join/${token}`);
     }
-    await expect(page).toHaveURL(/\/home\?joined=1/);
+    await expect(page).toHaveURL(/\/home\?family=[0-9a-f-]+&joined=1/);
   }
 
   const S = await person(browser);
