@@ -66,7 +66,8 @@ function monthLabel(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 }
 
-export function HomeView({ data }: { data: HomeData }) {
+/** `joined`: they've just joined this family from an invite (/join → /home?family=…&joined=1). */
+export function HomeView({ data, joined = false }: { data: HomeData; joined?: boolean }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -244,7 +245,7 @@ export function HomeView({ data }: { data: HomeData }) {
         {/* Family header — the family's banner (if any) above the welcome */}
         {data.bannerUrl ? <FamilyBanner url={data.bannerUrl} canEdit={data.isOwner} familyName={data.familyName} /> : null}
         <div className="bg-honey-band px-6 py-6 text-center">
-          <CaveatNote className="text-lg">welcome back, {greetingName}</CaveatNote>
+          <CaveatNote className="text-lg">{joined && !data.isOwner ? `welcome to the family, ${greetingName}` : `welcome back, ${greetingName}`}</CaveatNote>
           {renaming ? (
             <form
               className="mx-auto mt-1 flex max-w-xs items-center gap-2"
@@ -590,11 +591,14 @@ export function HomeView({ data }: { data: HomeData }) {
           </div>
         ) : null}
 
-        <div className="flex items-center justify-center gap-2 bg-paper-2 px-6 py-3.5 text-center text-xs text-green-save">
-          <Icon icon={IconLock} size={15} />
-          Private to your family. You choose who&apos;s in your circle and what they can see — change or remove anyone, any
-          time.
-        </div>
+        {/* the parent's reassurance — only they control the circle (NN3), so relatives don't get it */}
+        {data.isOwner ? (
+          <div className="flex items-center justify-center gap-2 bg-paper-2 px-6 py-3.5 text-center text-xs text-green-save">
+            <Icon icon={IconLock} size={15} />
+            Private to your family. You choose who&apos;s in your circle and what they can see — change or remove anyone, any
+            time.
+          </div>
+        ) : null}
       </main>
 
       <BottomTabBar tabs={APP_TABS} active="Home" />

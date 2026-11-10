@@ -147,7 +147,7 @@ export function FamilyPinboard({
     { n: data.stats.people, l: 'people', i: IconUsers },
     { n: data.stats.generations, l: data.stats.generations === 1 ? 'generation' : 'generations', i: IconTree },
     { n: data.stats.keepsakes, l: 'keepsakes kept', i: IconHeart },
-    { n: data.stats.occasions, l: 'occasions', i: IconCalendarHeart },
+    { n: data.stats.occasions, l: data.stats.occasions === 1 ? 'occasion' : 'occasions', i: IconCalendarHeart },
   ];
   return (
     <section aria-labelledby="circles" className="kraft rounded-[28px] border-2 border-cocoa/10 p-4 shadow-[0_6px_18px_rgb(43_33_24/0.08)] sm:p-6">

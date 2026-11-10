@@ -1,6 +1,6 @@
 'use client';
 
-import { IconShieldCheck, IconUsersPlus } from '@tabler/icons-react';
+import { IconMail, IconShieldCheck, IconUsersPlus } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -150,13 +150,18 @@ export function GiftCheckout({
 
         {!allBought && inviteToken ? (
           <div className="mt-3 rounded-xl border border-sunshine bg-honey-band p-3 text-center">
-            <span className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-ink-soft">
-              <Icon icon={IconUsersPlus} size={14} className="text-cinnamon" /> Invited to join the family
+            <span className="flex items-start justify-between gap-2 text-left">
+              <span className="flex items-start gap-1.5 text-[12px] font-bold leading-snug text-ink-soft">
+                <Icon icon={IconUsersPlus} size={15} className="mt-px shrink-0 text-cinnamon" /> you’re invited to join {familyName ?? 'the family'}
+              </span>
+              <span className="shrink-0 whitespace-nowrap rounded-pill bg-green-save px-2.5 py-1 text-[11px] font-extrabold text-paper">save 5%</span>
             </span>
-            <Button href={`/join/${inviteToken}?next=${encodeURIComponent(`/g/${token}`)}`} size="md" className="mt-2 w-full">
-              join the family · 5% off
+            <Button href={`/join/${inviteToken}?next=${encodeURIComponent(`/g/${token}`)}`} size="md" className="mt-2.5 w-full">
+              join family &amp; checkout
             </Button>
-            <p className="mt-1.5 text-[11px] text-ink-faint">then check out with your saving applied</p>
+            <p className="mt-1.5 flex items-center justify-center gap-1 text-[11px] text-ink-soft">
+              <Icon icon={IconMail} size={13} className="shrink-0" /> we’ll email a quick link to check it’s you
+            </p>
             <p className="my-2.5 text-[11px] text-ink-faint">— or —</p>
           </div>
         ) : null}

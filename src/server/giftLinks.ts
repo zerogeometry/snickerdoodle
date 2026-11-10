@@ -443,6 +443,18 @@ export async function revokeGiftLink(db: DbHandle, owner: ViewerContext, giftLin
     targetType: 'gift_link',
     targetId: giftLinkId,
   });
+  // the invite inside it stops too — "turn it off" means for everyone at once (its token was shown
+  // on the link). An invite already accepted is a membership now: that's changed from /family.
+  if (link.inviteId) {
+    const [spent] = await db
+      .update(invites)
+      .set({ status: 'REVOKED' })
+      .where(and(eq(invites.id, link.inviteId), eq(invites.status, 'PENDING')))
+      .returning({ id: invites.id });
+    if (spent) {
+      await db.insert(auditRecords).values({ familyId: link.familyId, actorAccountId: owner.accountId, actorType: 'MEMBER', event: 'INVITE_REVOKED', targetType: 'invite', targetId: spent.id, metadata: { reason: 'gift-link-revoked', giftLinkId } });
+    }
+  }
   return { ok: true };
 }
 

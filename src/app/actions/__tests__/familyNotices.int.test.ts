@@ -124,6 +124,28 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
     clean(sent[0]!);
   });
 
+  it('resending is rate limited like sending (no inbox flooding) — over the limit: no email, the link unchanged', async () => {
+    asSam();
+    const auntie = `auntie-${nonce}@example.test`;
+    expect(await createInviteAction({ email: auntie, relationship: 'AUNT_UNCLE', accessLevel: 'VIEW', name: 'Auntie' })).toEqual({ ok: true });
+    sent.splice(0);
+    const [inv] = await db.select({ id: invites.id, token: invites.token }).from(invites).where(and(eq(invites.familyId, ids.hartleyId), eq(invites.email, auntie)));
+    const { rateLimit, LIMITS } = await import('@/server/rateLimit');
+    vi.mocked(rateLimit).mockResolvedValueOnce({ ok: false, retryAfterSec: 600 });
+    expect(await resendInviteAction(inv!.id)).toEqual({ ok: false });
+    expect(vi.mocked(rateLimit)).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({ bucket: LIMITS.invitesPerAccount.bucket, caller: ids.samId }));
+    expect(sent).toHaveLength(0);
+    const [still] = await db.select({ token: invites.token }).from(invites).where(eq(invites.id, inv!.id));
+    expect(still!.token).toBe(inv!.token);
+  });
+
+  it('an invite to an address that isn’t one is refused with a reason — no invite, no email', async () => {
+    asSam();
+    expect(await createInviteAction({ email: 'granny@', relationship: 'GRANDPARENT', accessLevel: 'VIEW', name: 'Granny' })).toEqual({ ok: false, reason: 'invalid' });
+    expect(await createInviteAction({ email: `kid-${nonce}@example.test`, relationship: 'CHILD', accessLevel: 'VIEW', name: 'Kid' })).toEqual({ ok: false, reason: 'child' }); // G10: added by first name, never invited
+    expect(sent).toHaveLength(0);
+  });
+
   it('04-B4: inviting someone already in the family is refused with a reason — no invite, no email', async () => {
     asSam();
     expect(await createInviteAction({ email: email.rosie!, relationship: 'PARENT', accessLevel: 'CONTRIBUTE', name: 'Rosie' })).toEqual({ ok: false, reason: 'already-member' });

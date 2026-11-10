@@ -18,6 +18,7 @@ import { setReminderConsent } from '@/server/reminders';
 import { addOccasion, deleteOccasion, setCelebrate, updateOccasion, type OccasionInput, type OccasionResult } from '@/server/occasions';
 import { resendInvite } from '@/server/members';
 import { sendMail } from '@/server/mail';
+import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { familyInviteEmail } from '@/server/mail/familyInvite';
 
 /** The family the owner is managing: their OWNED family (only owners add children / rename). */
@@ -204,6 +205,8 @@ export async function setCelebrateAction(groups: string[]): Promise<{ ok: boolea
 /** Send a pending invite again — a fresh link and a fresh fortnight (the old link stops working). */
 export async function resendInviteAction(inviteId: string): Promise<{ ok: boolean }> {
   return asOwner(async (ctx) => {
+    // shares the new-invite limit: resending is still sending an email to someone
+    if (!(await rateLimit(ctx.db, { ...LIMITS.invitesPerAccount, caller: ctx.viewer.accountId! })).ok) return { ok: false };
     const res = await resendInvite(ctx.db, ctx.viewer, { familyId: ctx.familyId, inviteId: String(inviteId) });
     if (!res.ok) return { ok: false };
     const [me] = await ctx.db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, ctx.viewer.accountId!));

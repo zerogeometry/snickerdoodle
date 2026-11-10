@@ -114,7 +114,7 @@ export async function familyEvents(db: DbHandle, fam: FamilyRow, from: YMD, to: 
       }
     }
     // the shop's own date: the last day to order for Christmas (from the season's cut-offs)
-    if (opts.shop && celebrate.has('christmas')) {
+    if (opts.shop && celebrate.has('christian')) {
       for (const y of years(from, to)) {
         const cut = CHRISTMAS_LAST_ORDER[y];
         if (!cut) continue;

@@ -153,6 +153,7 @@ export function CreateGiftLinkModal({
         invite: invite && email.trim() ? { email: email.trim(), relationship: rel, accessLevel: access, shareOccasions: shareCalendar } : null,
       });
       if (res.needsAuth) return toast('log in to create a gift request');
+      if (res.reason === 'invite-email') return toast('that email doesn’t look quite right — check it and try again');
       if (!res.ok || !res.url) return toast('couldn’t create that — try again');
       setUrl(res.url);
       setLinkId(res.linkId ?? null);
