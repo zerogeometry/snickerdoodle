@@ -1,11 +1,15 @@
 import type { MetadataRoute } from 'next';
+import { brandFiles, brandSeason } from '@/lib/brand';
 
 /**
  * Installable-app manifest (PWA): opens full-screen like a native app, kraft-coloured chrome.
- * Icons: the founder's smiley face, cut from the high-res logo master (scripts/brand/build-brand-assets.mjs)
- * so the 512px install icons are crisp; the maskable one keeps the face inside Android's safe circle.
+ * Icons: the smiley face from the shared brand-assets folder (scripts/brand/sync-brand-assets.mjs); the maskable
+ * one keeps the face inside Android's safe circle. In the Christmas season the face wears its Santa hat.
  */
+export const dynamic = 'force-dynamic';
+
 export default function manifest(): MetadataRoute.Manifest {
+  const b = brandFiles(brandSeason());
   return {
     name: 'snickerdoodle — keep the magic',
     short_name: 'snickerdoodle',
@@ -17,9 +21,9 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: '#F8F5E9',
     theme_color: '#F8F5E9',
     icons: [
-      { src: '/brand/favicon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-      { src: '/brand/favicon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-      { src: '/brand/favicon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+      { src: b.favicon192, sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: b.favicon512, sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: b.maskable, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     ],
   };
 }

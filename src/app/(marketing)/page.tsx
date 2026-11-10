@@ -164,7 +164,7 @@ export default function LandingPage() {
             {RANGE.map((item, i) => (
               <li
                 key={item.label}
-                className={`polaroid tape lift pop-in text-center ${i >= 4 ? 'max-md:hidden' : ''}`}
+                className={`polaroid tape lift pop-in-view text-center ${i >= 4 ? 'max-md:hidden' : ''}`}
                 style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg', ['--i' as string]: i }}
               >
                 <div className="mb-2 flex aspect-square items-center justify-center bg-paper-2 p-2">

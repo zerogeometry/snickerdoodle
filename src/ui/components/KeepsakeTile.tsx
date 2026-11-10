@@ -6,6 +6,7 @@ const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 11
  * A saved keepsake (a kept drawing/creation) in the Keepsake Home: a taped polaroid with a
  * small resting tilt that straightens + lifts on hover/focus (.lift). `index` varies the tilt
  * and tape colour so a grid feels hand-stuck, deterministically (no layout shift, no random).
+ * Tapping the picture makes it come alive (Draw's squash and hop; globals.css .alive-art).
  */
 export function KeepsakeTile({
   name,
@@ -27,10 +28,11 @@ export function KeepsakeTile({
   const tilt = index % 2 === 0 ? '-2deg' : '1.6deg';
   return (
     <article
-      className="polaroid tape lift"
+      className="polaroid tape lift alive-art"
       style={{ ['--tilt' as string]: tilt, ['--tape' as string]: TAPES[index % TAPES.length], ['--tape-rot' as string]: index % 2 ? '4deg' : '-3deg' }}
     >
-      <div className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-paper-2">
+      {/* tapping the picture (not the buttons around it) brings the drawing to life */}
+      <div data-alive className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-paper-2">
         {image ? <img src={image} alt="" className="h-full w-full object-contain" /> : art}
       </div>
       <div className="mt-2 flex items-center justify-between gap-2 text-xs">

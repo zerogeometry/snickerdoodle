@@ -876,7 +876,7 @@ function CustomizeProduct() {
                         onClick={() => pickColour(c)}
                         aria-label={`${c} ${product.label}`}
                         aria-pressed={colour === c}
-                        className={`${THUMB} ${colour === c ? THUMB_ON : THUMB_OFF}`}
+                        className={`pick ${THUMB} ${colour === c ? THUMB_ON : THUMB_OFF}`}
                       >
                         <MockupPreview
                           productKey={product.key as ProductKey}
@@ -1001,7 +1001,7 @@ function CustomizeProduct() {
                     aria-pressed={back === c.token}
                     aria-label={`${c.label} back`}
                     title={c.label}
-                    className={`press relative h-9 w-9 rounded-full border-2 before:absolute before:-inset-[4px] before:content-[''] ${back === c.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/30'}`}
+                    className={`press pick relative h-9 w-9 rounded-full border-2 before:absolute before:-inset-[4px] before:content-[''] ${back === c.token ? 'border-cocoa ring-2 ring-cocoa ring-offset-2 ring-offset-paper' : 'border-cocoa/30'}`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -1352,7 +1352,7 @@ function Picker({
               aria-pressed={value === o}
               className={`${OPT} gap-1.5 ${value === o ? OPT_ON : OPT_OFF}`}
             >
-              {swatch ? <span className="h-4 w-4 rounded-full border-2 border-paper outline outline-1 outline-cocoa/30" style={{ backgroundColor: swatchColour(o, swatchFor) }} /> : null}
+              {swatch ? <span className="pick h-4 w-4 rounded-full border-2 border-paper outline outline-1 outline-cocoa/30" style={{ backgroundColor: swatchColour(o, swatchFor) }} /> : null}
               {sub ? (
                 <span className="flex flex-col items-start leading-tight">
                   <span>{o}</span>

@@ -14,7 +14,8 @@ export function ExampleWall({ items = EXAMPLES, limit, className = '' }: { items
       {list.map((e, i) => (
         <li
           key={e.slug}
-          className="polaroid tape lift pop-in"
+          data-alive
+          className="polaroid tape lift pop-in-view alive-art"
           style={{
             ['--tilt' as string]: i % 3 === 0 ? '-2.5deg' : i % 3 === 1 ? '1.8deg' : '-1deg',
             ['--tape' as string]: TAPES[i % TAPES.length],
