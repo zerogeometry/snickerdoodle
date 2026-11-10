@@ -171,7 +171,8 @@ export function CreateGiftLinkModal({
   }, [open]);
 
   const fullUrl = url ? `${typeof window !== 'undefined' ? window.location.origin : ''}${url}` : '';
-  const toggleIn = (list: string[], set: (v: string[]) => void, id: string) => set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  // functional update: two quick taps never undo each other
+  const toggleIn = (_list: string[], set: (fn: (prev: string[]) => string[]) => void, id: string) => set((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   // the tiers of what's picked — to say, before sending, what each person's link will show
   const pickedTiers = useMemo(

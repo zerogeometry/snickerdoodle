@@ -854,7 +854,11 @@ export async function sendGiftLinks(db: DbHandle, owner: ViewerContext, input: S
         skipped.push(label);
         continue;
       }
-      if (e instanceof AuthzError) continue; // not a member any more, a bad address: nothing sent
+      if (e instanceof AuthzError) {
+        // not a member any more, a bad address, nothing sendable: nothing sent (the reason only — never the address)
+        console.warn('[gift] a link wasn’t made:', e.decision.reason);
+        continue;
+      }
       throw e;
     }
     await sendMail({
