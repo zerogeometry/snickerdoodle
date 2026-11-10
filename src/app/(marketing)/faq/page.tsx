@@ -3,9 +3,8 @@ import Link from 'next/link';
 import { headers } from 'next/headers';
 import { Fragment, type ReactNode } from 'react';
 import { IconChevronDown } from '@tabler/icons-react';
-import { definedPriceList } from '@/server/catalogue';
-import { BUNDLE_ONLY_SKUS } from '@/lib/christmas-bundle';
-import { FAQ, FAQ_PRODUCT_NAMES, FAQ_UPDATED, plainAnswer, type FaqItem } from '@/lib/faq';
+import { faqFromPrices, faqPriceSentence, gbp } from '@/server/faqPrices';
+import { FAQ, FAQ_UPDATED, plainAnswer, type FaqItem } from '@/lib/faq';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
@@ -20,18 +19,6 @@ export const metadata: Metadata = {
   openGraph: { title: 'Snickerdoodle FAQs', description: 'Everything families ask about turning children’s drawings into keepsakes and gifts.', url: '/faq', type: 'website' },
 };
 
-/** Lowest live price per product in the shop (the catalogue is the one source of truth). */
-function fromPrices(): { key: string; name: string; pence: number }[] {
-  const lowest = new Map<string, number>();
-  for (const r of definedPriceList()) {
-    if (!r.visibleInShop || r.paused || BUNDLE_ONLY_SKUS.has(r.sku)) continue; // a bundle's extra packs aren't sold alone
-    lowest.set(r.productKey, Math.min(lowest.get(r.productKey) ?? Infinity, r.pricePence));
-  }
-  return Object.entries(FAQ_PRODUCT_NAMES)
-    .filter(([key]) => lowest.has(key))
-    .map(([key, name]) => ({ key, name, pence: lowest.get(key)! }));
-}
-const gbp = (p: number) => `£${p % 100 ? (p / 100).toFixed(2) : p / 100}`;
 
 /** Plain text with `[label](/path)` internal links. */
 function Answer({ text }: { text: string }) {
@@ -58,10 +45,10 @@ function Answer({ text }: { text: string }) {
  * generated from the same list — so what engines read is exactly what's on screen.
  */
 export default async function FaqPage() {
-  const prices = fromPrices();
+  const prices = faqFromPrices();
   const site = (process.env.APP_URL || 'https://snickerdoodle.co.uk').replace(/\/+$/, '');
   const nonce = (await headers()).get('x-nonce') ?? undefined;
-  const priceSentence = prices.map((p) => `${p.name} from ${gbp(p.pence)}`).join('; ');
+  const priceSentence = faqPriceSentence(prices);
   const answerText = (it: FaqItem) => plainAnswer(it.a) + (it.table === 'products' ? ` ${priceSentence}.` : '');
 
   const jsonLd = {

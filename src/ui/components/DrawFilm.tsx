@@ -8,7 +8,7 @@ import { Icon } from '../primitives/Icon';
  * the poster with a play sticker and "film coming soon", nothing to press. Once `src` is set it becomes a
  * native player: nothing loads until a parent presses play (preload="none"), never autoplays, self-hosted.
  */
-export function DrawFilm({ className }: { className?: string }) {
+export function DrawFilm({ className, captionClassName = 'text-ink-soft' }: { className?: string; captionClassName?: string }) {
   const { src, poster, width, height, title } = DRAW_VIDEO;
   return (
     <figure className={cn('mx-auto w-full max-w-[560px]', className)}>
@@ -31,7 +31,7 @@ export function DrawFilm({ className }: { className?: string }) {
           )}
         </div>
       </div>
-      <figcaption className="mt-3 text-center text-[13px] text-ink-soft">
+      <figcaption className={cn('mt-3 text-center text-[13px]', captionClassName)}>
         {title}
         {src ? '' : ' (coming soon)'}
       </figcaption>

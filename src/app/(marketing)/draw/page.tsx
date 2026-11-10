@@ -12,7 +12,12 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { brandSeason, DRAW_LOGO_RATIO, drawBrandFiles } from '@/lib/brand';
-import { DRAW_SCREENSHOTS } from '@/lib/drawApp';
+import { COMPANY } from '@/lib/company';
+import { DRAW_SCREENSHOTS, storeHref } from '@/lib/drawApp';
+import { DRAW_FAQ, FAQ_UPDATED } from '@/lib/faq';
+import { siteOrigin } from '@/lib/seo';
+import { FaqList, faqPageJsonLd } from '@/ui/components/FaqList';
+import { JsonLd } from '@/ui/components/JsonLd';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { cn } from '@/ui/cn';
@@ -26,8 +31,9 @@ import { StoreBadges } from '@/ui/components/StoreBadge';
  * no invented features or ratings. Talks to parents. Nothing here tracks anyone: self-hosted pictures, the
  * film loads only on play, store links carry nothing extra.
  */
+// Screen or paper, side by side (founder, 10 Nov): we value real, physical art, and the app is there to support it, never to replace it.
 const DESCRIPTION =
-  'Step-by-step drawing for children aged 3 to 12, on screen or on real paper with crayons. Read aloud, framed at the end, and no ads.';
+  'An educational drawing app for children aged 3 to 12, made by designers and artists: step-by-step lessons on screen or with real crayons and paper. No ads.';
 
 export function generateMetadata(): Metadata {
   const d = drawBrandFiles(brandSeason());
@@ -55,13 +61,13 @@ const FACTS: { label: string; strong?: boolean }[] = [
 
 const HOW: { icon: TablerIcon; title: string; body: string }[] = [
   { icon: IconStairsUp, title: 'a few friendly steps', body: 'A round body, two ears, a smile. Never marked right or wrong.' },
-  { icon: IconBrush, title: 'real paper, real crayons', body: 'Draw on screen, or on paper and snap a photo at the end.' },
+  { icon: IconBrush, title: 'screen or paper', body: 'Draw on screen, or with crayons and paint, then snap a photo.' },
   { icon: IconPlant2, title: 'grows with them', body: 'From tracing at 3 to shading and faces at 12.' },
   { icon: IconCalendarHeart, title: 'weekly, not daily', body: 'No streaks to lose. A week off is just a rest.' },
 ];
 
 const TOGETHER: { icon: TablerIcon; title: string; body: string; tape: string }[] = [
-  { icon: IconPencil, title: 'draw in the app', body: 'Step by step, framed with their name and the date.', tape: 'var(--color-sky)' },
+  { icon: IconPencil, title: 'draw in the app', body: 'Step by step, on screen or on paper.', tape: 'var(--color-sky)' },
   { icon: IconHomeHeart, title: 'keep it here', body: 'Snap it into your private keepsake box.', tape: 'var(--color-berry)' },
   { icon: IconGift, title: 'make it real', body: 'A print, a mug or a cushion for Grandma.', tape: 'var(--color-leaf)' },
 ];
@@ -70,6 +76,31 @@ export default function DrawPage() {
   const season = brandSeason();
   const d = drawBrandFiles(season);
   const logoW = 400;
+  const site = siteOrigin();
+  const pageUrl = `${site}/draw`;
+  const links = [storeHref('appStore'), storeHref('googlePlay')].filter((l): l is string => l !== null);
+  // For search + answer engines: the app itself (only facts from its store listing; no ratings), and the questions.
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'MobileApplication',
+        '@id': `${pageUrl}#app`,
+        name: 'Snickerdoodle Draw',
+        url: pageUrl,
+        description: DESCRIPTION,
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'iOS, iPadOS, Android',
+        inLanguage: 'en-GB',
+        image: `${site}${d.icon}`,
+        audience: { '@type': 'PeopleAudience', suggestedMinAge: 3, suggestedMaxAge: 12 },
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'GBP' },
+        publisher: { '@type': 'Organization', name: 'Snickerdoodle', legalName: COMPANY.legalName, url: site },
+        ...(links.length ? { sameAs: links } : {}),
+      },
+      faqPageJsonLd(DRAW_FAQ, pageUrl, 'Snickerdoodle Draw questions', FAQ_UPDATED),
+    ],
+  };
   return (
     <>
       {/* ── Hero: the logo, then the app at a glance (store style) and the download buttons ── */}
@@ -110,7 +141,7 @@ export default function DrawPage() {
               </div>
             </div>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
-              Step-by-step drawing lessons for little artists, on screen or on real paper.
+              Step-by-step drawing lessons for little artists, made by designers and artists. On screen or on real paper.
             </p>
             {/* one line, phone to desktop */}
             <ul aria-label="at a glance" className="mt-5 flex flex-nowrap gap-1 min-[400px]:gap-1.5 sm:gap-2">
@@ -132,15 +163,16 @@ export default function DrawPage() {
       </section>
 
       {/* ── Why it works: step by step, with real crayons — and the film ── */}
-      <section aria-labelledby="learn-title" className="bg-sky-pale px-6 py-14 md:py-20">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_1fr] md:gap-14">
+      {/* on the cobalt doodle paper, as the homepage's "from fridge door to forever" band */}
+      <section aria-labelledby="learn-title" className="doodle-paper doodle-paper-everyday px-6 py-14 md:py-20">
+        <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 md:grid-cols-[1.05fr_1fr] md:gap-14">
           <div>
-            <CaveatNote className="-rotate-2 text-[26px] leading-none">crayons at the ready</CaveatNote>
-            <h2 id="learn-title" className="mt-2 font-display text-[32px] leading-[1.05] text-cocoa md:text-[42px]">
+            <CaveatNote className="-rotate-2 text-[26px] leading-none !text-honey">crayons at the ready</CaveatNote>
+            <h2 id="learn-title" className="mt-2 font-display text-[32px] leading-[1.05] text-white md:text-[42px]">
               Learning to draw, one little step at a time
             </h2>
-            <p className="mt-4 max-w-md text-[16px] leading-relaxed text-ink-soft">
-              A gentle, structured way in that works with real crayons, not just a screen.
+            <p className="mt-4 max-w-md text-[16px] leading-relaxed text-sky-pale">
+              Real drawing skills, learned one step at a time. On screen or on paper, it’s here to help real art along, never to replace it.
             </p>
             <ul className="mt-7 space-y-4">
               {HOW.map((h, i) => (
@@ -149,14 +181,14 @@ export default function DrawPage() {
                     <Icon icon={h.icon} size={22} />
                   </span>
                   <div>
-                    <h3 className="font-display text-[18px] text-cocoa">{h.title}</h3>
-                    <p className="mt-0.5 text-[15px] leading-snug text-ink-soft">{h.body}</p>
+                    <h3 className="font-display text-[18px] text-white">{h.title}</h3>
+                    <p className="mt-0.5 text-[15px] leading-snug text-sky-pale">{h.body}</p>
                   </div>
                 </li>
               ))}
             </ul>
           </div>
-          <DrawFilm className="pop-in-view" />
+          <DrawFilm className="pop-in-view" captionClassName="text-sky-pale" />
         </div>
       </section>
 
@@ -190,7 +222,11 @@ export default function DrawPage() {
       </section>
 
       {/* ── Better together: draw in the app, keep it here — and the download buttons again ── */}
-      <section aria-labelledby="together-title" className="relative overflow-hidden bg-honey-band px-6 py-14 md:py-20">
+      {/* on the honey doodle paper (the christmas doodles in season, as the homepage's christmas shelf) */}
+      <section
+        aria-labelledby="together-title"
+        className={cn('doodle-paper px-6 py-14 md:py-20', season === 'christmas' ? 'doodle-paper-christmas' : 'doodle-paper-honey')}
+      >
         <div className="relative z-10 mx-auto max-w-5xl">
           <div className="text-center">
             <h2 id="together-title" className="font-display text-[32px] leading-[1.05] text-cocoa md:text-[42px]">
@@ -245,6 +281,26 @@ export default function DrawPage() {
               or keep a drawing on snickerdoodle now
             </Link>
           </div>
+        </div>
+      </section>
+
+      {/* ── Questions parents ask: collapsible, each a real heading, with matching FAQPage structured data ── */}
+      <section aria-labelledby="draw-faq-title" className="px-4 py-14 sm:px-6 md:py-20">
+        <JsonLd data={jsonLd} />
+        <div className="mx-auto max-w-3xl">
+          <h2 id="draw-faq-title" className="text-center font-display text-[32px] leading-[1.05] text-cocoa md:text-[42px]">
+            Questions parents ask
+          </h2>
+          <div className="mt-8">
+            <FaqList items={DRAW_FAQ} />
+          </div>
+          <p className="mt-6 text-center text-[14px] text-ink-soft">
+            More about keepsakes in our{' '}
+            <Link href="/faq" className="font-bold text-cinnamon underline underline-offset-2">
+              FAQs
+            </Link>
+            .
+          </p>
         </div>
       </section>
     </>
