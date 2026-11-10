@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { getDb } from '@/db/client';
 import { callbackUrl, connectChoices, createAuthCode, parseConnectRequest, revokeAppTokens } from '@/server/app/link';
+import { deleteProgressBackups, parseConnectSync, removeEverythingDrawSent, updateSyncFromWebsite, type SyncChoices } from '@/server/app/sync';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 
@@ -21,11 +22,17 @@ export interface ConnectParams {
   redirect_uri: string;
 }
 
-type Answer = { ok: true; url: string } | { ok: false; reason: 'request' | 'signed-out' | 'family' };
+type Answer = { ok: true; url: string } | { ok: false; reason: 'request' | 'signed-out' | 'family' | 'sync' };
 
-export async function approveAppLinkAction(input: { params: ConnectParams; familyId: string | 'new'; childIds: string[] | null }): Promise<Answer> {
+/**
+ * "connect". The grown-up's sync choices are required: a keepsakes option (none / proud / all — never
+ * a default) and the two boxes (on only if ticked). Refused with `sync` otherwise.
+ */
+export async function approveAppLinkAction(input: { params: ConnectParams; familyId: string | 'new'; childIds: string[] | null; sync: unknown }): Promise<Answer> {
   const parsed = parseConnectRequest({ ...input.params });
   if (!parsed.ok) return { ok: false, reason: 'request' };
+  const sync = parseConnectSync(input.sync);
+  if (!sync) return { ok: false, reason: 'sync' };
   const account = await getCurrentAccount();
   if (!account) return { ok: false, reason: 'signed-out' };
   const db = getDb();
@@ -40,7 +47,7 @@ export async function approveAppLinkAction(input: { params: ConnectParams; famil
     familyId = input.familyId;
   }
   const childIds = Array.isArray(input.childIds) ? input.childIds.filter((x): x is string => typeof x === 'string').slice(0, 50) : null;
-  const code = await createAuthCode(db, { accountId: account.id, familyId, childIds, req: parsed.req });
+  const code = await createAuthCode(db, { accountId: account.id, familyId, childIds, req: parsed.req, sync });
   return { ok: true, url: callbackUrl(parsed.req, { code }) };
 }
 
@@ -62,7 +69,44 @@ export async function notOwnerAppLinkAction(input: { params: ConnectParams }): P
   return { ok: true, url: callbackUrl(parsed.req, { code }) };
 }
 
-/** The account page's "unlink" — this account's own phones only. */
+/** The account page's "what syncs" for one of this account's own phones (any subset of the three). */
+export async function updateAppSyncAction(input: { tokenId: string; patch: Record<string, unknown> }): Promise<{ ok: true; sync: SyncChoices } | { ok: false }> {
+  const account = await getCurrentAccount();
+  if (!account || typeof input.tokenId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.tokenId) || !input.patch || typeof input.patch !== 'object') return { ok: false };
+  const res = await updateSyncFromWebsite(getDb(), account.id, input.tokenId, input.patch);
+  if (!res.ok) return { ok: false };
+  revalidatePath('/account');
+  return { ok: true, sync: res.sync };
+}
+
+/** The account page's "delete the backed-up drawing days" — in the families this account runs. */
+export async function deleteDrawingDaysAction(): Promise<{ ok: boolean; deleted: number }> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, deleted: 0 };
+  const db = getDb();
+  const { owned } = await connectChoices(db, account.id);
+  const deleted = await deleteProgressBackups(db, account.id, owned.map((f) => f.id));
+  revalidatePath('/account');
+  return { ok: true, deleted };
+}
+
+/**
+ * The account page's "remove everything snickerdoodle draw sent" (A-48), after its confirm step: the
+ * literal `confirm` is required so nothing can trigger it by accident. Deletes for good, through the
+ * website's own cascading delete, in the families this account runs.
+ */
+export async function removeEverythingDrawSentAction(input: { confirm: string }): Promise<{ ok: true; removed: number; kept: number } | { ok: false }> {
+  const account = await getCurrentAccount();
+  if (!account || input?.confirm !== 'remove-everything') return { ok: false };
+  const db = getDb();
+  const { owned } = await connectChoices(db, account.id);
+  const res = await removeEverythingDrawSent(db, account.id, owned.map((f) => f.id));
+  revalidatePath('/account');
+  revalidatePath('/home');
+  return { ok: true, ...res };
+}
+
+/** The account page's "disconnect" — this account's own phones only. */
 export async function unlinkAppDeviceAction(input: { tokenId: string }): Promise<{ ok: boolean }> {
   const account = await getCurrentAccount();
   if (!account || typeof input.tokenId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.tokenId)) return { ok: false };

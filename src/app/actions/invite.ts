@@ -3,7 +3,7 @@
 import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
 import { signIn } from '@/auth';
-import { AlreadyInFamilyError, createInvite, sendInviteSignInLink } from '@/server/invites';
+import { AlreadyInFamilyError, createInvite, NotInvitableError, sendInviteSignInLink } from '@/server/invites';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
@@ -23,10 +23,12 @@ export async function createInviteAction(input: {
   accessLevel: AccessLevel;
   shareOccasions?: boolean;
   name?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'already-member' }> {
+}): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'already-member' | 'child' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
-  if (!input.email.trim()) return { ok: false };
+  // children are subjects, never invitees (NN3): refused before anything is looked up or sent
+  if (input.relationship === 'CHILD') return { ok: false, reason: 'child' };
+  if (typeof input.email !== 'string' || !input.email.trim()) return { ok: false };
   if (!(await rateLimit(getDb(), { ...LIMITS.invitesPerAccount, caller: account.id })).ok) return { ok: false };
 
   const db = getDb();
@@ -45,6 +47,7 @@ export async function createInviteAction(input: {
   } catch (e) {
     // already in the family: say so plainly (the parent changes their level from their card instead)
     if (e instanceof AlreadyInFamilyError) return { ok: false, reason: 'already-member' };
+    if (e instanceof NotInvitableError && e.why === 'child') return { ok: false, reason: 'child' };
     return { ok: false };
   }
 }

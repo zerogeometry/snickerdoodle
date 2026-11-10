@@ -4,11 +4,11 @@ import { eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { accounts, invites, memberships } from '@/db/schema';
+import { accounts, auditRecords, invites, memberships } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { listViewableAssets, resolveViewerContext } from '@/server/assets';
-import { acceptInvite, createInvite } from '@/server/invites';
+import { acceptInvite, createInvite, NotInvitableError } from '@/server/invites';
 import type { DbHandle } from '@/server/db';
 
 /**
@@ -48,6 +48,26 @@ describe.skipIf(!URL)('invites → join — integration', () => {
     await expect(
       createInvite(db, rosie, { familyId: ids.hartleyId, email: inviteeEmail, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' }),
     ).rejects.toBeInstanceOf(AuthzError);
+  });
+
+  it('a little one can’t be invited — children are subjects, not account holders (G10): nothing stored, nothing logged', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const kidEmail = `kid-${nonce}@example.com`;
+    const e = await createInvite(db, sam, { familyId: ids.hartleyId, email: kidEmail, relationship: 'CHILD', accessLevel: 'VIEW' }).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(NotInvitableError);
+    expect((e as NotInvitableError).why).toBe('child');
+    expect(await db.select().from(invites).where(eq(invites.email, kidEmail))).toHaveLength(0);
+    const sent = await db.select().from(auditRecords).where(eq(auditRecords.event, 'INVITE_SENT'));
+    expect(sent.some((r) => JSON.stringify(r.metadata).includes(kidEmail))).toBe(false);
+  });
+
+  it('a relationship or access level that isn’t ours is refused (never trusted from the form)', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    await expect(createInvite(db, sam, { familyId: ids.hartleyId, email: `odd-${nonce}@example.com`, relationship: 'BOSS' as never, accessLevel: 'VIEW' })).rejects.toBeInstanceOf(NotInvitableError);
+    await expect(createInvite(db, sam, { familyId: ids.hartleyId, email: `odd-${nonce}@example.com`, relationship: 'OTHER', accessLevel: 'ADMIN' as never })).rejects.toBeInstanceOf(NotInvitableError);
   });
 
   it('owner invites; wrong account cannot accept; the right account joins at the invited circle', async () => {

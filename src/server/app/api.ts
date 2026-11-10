@@ -1,6 +1,7 @@
 import { and, asc, eq, isNull, gt, sql } from 'drizzle-orm';
 import { AuthzError, canViewAsset } from '@/authz';
-import { appCheckoutGrants, appTokens, assets, children, families } from '@/db/schema';
+import { appArtistProgress, appCheckoutGrants, appTokens, assets, children, families, type AppProgressData } from '@/db/schema';
+import { autoKeepsakesOn, parseProgress, parseSyncPatch, widens, type SyncChoices } from '@/lib/drawSync';
 import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
 import { assetRefOf } from '@/server/assetRef';
 import { loadCatalogue } from '@/server/catalogue';
@@ -13,6 +14,7 @@ import { LIMITS, rateLimit } from '@/server/rateLimit';
 import type { DbHandle } from '@/server/db';
 import { childInScope, type AppViewer } from './appAuth';
 import { hashSecret, newSecret } from './secrets';
+import { updateTokenSync } from './sync';
 
 /**
  * What a linked Snickerdoodle Draw phone may do — and nothing more (COMPANION-APP-api-plan.md M6).
@@ -37,7 +39,15 @@ export interface AppChild {
   firstName: string;
   birthday?: string;
 }
-const toChild = (c: { id: string; firstName: string; birthday: string | null }): AppChild => ({ id: c.id, firstName: c.firstName, ...(c.birthday ? { birthday: c.birthday } : {}) });
+/** A child as the app sees it. The birthday crosses only while the link's "first names and birthdays" is on. */
+const toChild = (c: { id: string; firstName: string; birthday: string | null }, sync: SyncChoices): AppChild => ({
+  id: c.id,
+  firstName: c.firstName,
+  ...(c.birthday && sync.children ? { birthday: c.birthday } : {}),
+});
+
+/** A sync choice is off for this link (DRAW-APP-sync-choices.md): 403 `{ reason: 'sync-off' }`. */
+const syncOff = () => new AppApiError(403, 'sync-off');
 
 // ── GET /products (no key) ────────────────────────────────────────────────────────────────────────
 
@@ -49,27 +59,50 @@ export async function listAppProducts(db: DbHandle): Promise<{ key: string; labe
 
 // ── GET /me ───────────────────────────────────────────────────────────────────────────────────────
 
-/** The family's name and the little ones this phone is for. No email, no members, no keepsakes. */
-export async function getAppMe(db: DbHandle, av: AppViewer): Promise<{ family: { name: string }; children: AppChild[] }> {
+/**
+ * The family's name, the little ones this phone is for (first names — for matching a Draw artist to a
+ * website child; birthdays only with "first names and birthdays" on) and the link's sync choices.
+ * No email, no members, no keepsakes.
+ */
+export async function getAppMe(db: DbHandle, av: AppViewer): Promise<{ family: { name: string }; children: AppChild[]; sync: SyncChoices }> {
   const [family] = await db.select({ name: families.displayName }).from(families).where(eq(families.id, av.familyId));
   const kids = await db
     .select({ id: children.id, firstName: children.firstName, birthday: children.birthday })
     .from(children)
     .where(eq(children.familyId, av.familyId))
     .orderBy(asc(children.createdAt));
-  return { family: { name: family?.name ?? 'your family' }, children: kids.filter((k) => childInScope(av, k.id)).map(toChild) };
+  return { family: { name: family?.name ?? 'your family' }, children: kids.filter((k) => childInScope(av, k.id)).map((k) => toChild(k, av.sync)), sync: av.sync };
+}
+
+// ── PATCH /me/sync ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The grown-ups' corner changed what syncs (any subset). Validated; audited as a consent change. The
+ * app may only NARROW or stop (keepsakes all → proud → none; a box on → off): widening happens on the
+ * website's account page (founder, 10 Nov) — 403 `{ reason: 'widen-on-website' }`.
+ */
+export async function updateAppSync(db: DbHandle, av: AppViewer, body: Record<string, unknown>): Promise<SyncChoices> {
+  const parsed = parseSyncPatch(body);
+  if (!parsed.ok) throw new AppApiError(422, 'invalid'); // contract: one reason for any bad value
+  if (widens(av.sync, parsed.patch)) throw new AppApiError(403, 'widen-on-website');
+  return updateTokenSync(db, { tokenId: av.tokenId, accountId: av.accountId, familyId: av.familyId }, parsed.patch, 'app');
 }
 
 // ── POST /children · PATCH /children/{id} ─────────────────────────────────────────────────────────
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
-/** Add a little one (first name + optional birthday), the same rules as the website: screened, no surname. */
+/**
+ * Add a little one (first name + optional birthday), the same rules as the website: screened, no
+ * surname. Allowed whatever the choices (a drawing needs a child to be filed under), but a birthday
+ * is only kept while "first names and birthdays" is on — otherwise it's dropped, not stored.
+ */
 export async function addAppChild(db: DbHandle, av: AppViewer, body: Record<string, unknown>): Promise<AppChild> {
   const firstName = str(body.firstName);
   if (!firstName) throw new AppApiError(422, 'name');
-  const birthday = body.birthday === undefined || body.birthday === null ? null : str(body.birthday);
+  let birthday = body.birthday === undefined || body.birthday === null ? null : str(body.birthday);
   if (birthday === undefined) throw new AppApiError(422, 'birthday');
+  if (!av.sync.children) birthday = null;
   const res = await addChild(db, av.viewer, { familyId: av.familyId, firstName, birthday });
   if (!res.ok) throw res.reason === 'not-owner' ? new AppApiError(403, 'not-owner') : new AppApiError(422, res.reason === 'birthday' ? 'birthday' : 'name');
   // a phone that's only for some of the children: the one it just added is one of them
@@ -80,10 +113,12 @@ export async function addAppChild(db: DbHandle, av: AppViewer, body: Record<stri
       .where(eq(appTokens.id, av.tokenId));
   }
   const [row] = await db.select({ id: children.id, firstName: children.firstName, birthday: children.birthday }).from(children).where(eq(children.id, res.child.id));
-  return toChild(row!);
+  return toChild(row!, av.sync);
 }
 
+/** A rename / birthday from the app — only while the link's "first names and birthdays" is on. */
 export async function updateAppChild(db: DbHandle, av: AppViewer, childId: string, body: Record<string, unknown>): Promise<AppChild> {
+  if (!av.sync.children) throw syncOff();
   if (!childInScope(av, childId)) throw new AppApiError(404, 'not-found');
   const patch: { firstName?: string; birthday?: string | null } = {};
   if (body.firstName !== undefined) {
@@ -102,7 +137,37 @@ export async function updateAppChild(db: DbHandle, av: AppViewer, childId: strin
     throw new AppApiError(422, res.reason === 'birthday' ? 'birthday' : 'name');
   }
   const [row] = await db.select({ id: children.id, firstName: children.firstName, birthday: children.birthday }).from(children).where(eq(children.id, childId));
-  return toChild(row!);
+  return toChild(row!, av.sync);
+}
+
+// ── GET / PUT /artists/{childId}/progress — the drawing-days backup ──────────────────────────────
+
+/** This phone's child, in the key's family — or 404 (another family's, an unticked one, or no such child). */
+async function progressChild(db: DbHandle, av: AppViewer, childId: string): Promise<string> {
+  if (!av.sync.progress) throw syncOff();
+  if (!/^[0-9a-f-]{36}$/i.test(childId) || !childInScope(av, childId)) throw new AppApiError(404, 'not-found');
+  const [child] = await db.select({ id: children.id }).from(children).where(and(eq(children.id, childId), eq(children.familyId, av.familyId)));
+  if (!child) throw new AppApiError(404, 'not-found');
+  return child.id;
+}
+
+/** The backup for a new phone to pick up. 404 `{ reason: 'none' }` when there isn't one. */
+export async function getAppProgress(db: DbHandle, av: AppViewer, childId: string): Promise<AppProgressData> {
+  const id = await progressChild(db, av, childId);
+  const [row] = await db.select({ data: appArtistProgress.data }).from(appArtistProgress).where(eq(appArtistProgress.childId, id));
+  if (!row) throw new AppApiError(404, 'none');
+  return row.data;
+}
+
+/** Replace the backup with the phone's (checked, trimmed to the five fields). */
+export async function putAppProgress(db: DbHandle, av: AppViewer, childId: string, body: Record<string, unknown>, now = new Date()): Promise<void> {
+  const id = await progressChild(db, av, childId);
+  const parsed = parseProgress(body);
+  if (!parsed.ok) throw new AppApiError(422, 'progress');
+  await db
+    .insert(appArtistProgress)
+    .values({ childId: id, familyId: av.familyId, data: parsed.data, updatedAt: now })
+    .onConflictDoUpdate({ target: appArtistProgress.childId, set: { data: parsed.data, updatedAt: now } });
 }
 
 // ── POST /assets — "keep it" / "make it real" ─────────────────────────────────────────────────────
@@ -136,10 +201,31 @@ export interface AppKeepInput {
   childId: unknown;
   madeOn: unknown;
   source: unknown;
+  /** 'manual' (a grown-up's one-off keep it / make it real / ready-to-buy link — the default, for older
+   * app versions) or 'auto' (the app's sync queue, allowed only while keepsakes is proud or all). */
+  trigger?: unknown;
+  /** The app's own id for the drawing (≤64, [A-Za-z0-9_-]): a repeat from the same family returns the
+   * keepsake already made from it (no duplicate after a retry). Optional. */
+  clientRef?: unknown;
+}
+
+const CLIENT_REF = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** absent → null; a valid ref → it; anything else → undefined (refused). */
+export function parseClientRef(raw: unknown): string | null | undefined {
+  if (raw === undefined || raw === null || raw === '') return null;
+  return typeof raw === 'string' && CLIENT_REF.test(raw) ? raw : undefined;
+}
+
+/** `manual` when absent (older app versions); anything but the two values is refused. */
+export function parseTrigger(raw: unknown): 'manual' | 'auto' | null {
+  if (raw === undefined || raw === null || raw === '') return 'manual';
+  return raw === 'manual' || raw === 'auto' ? raw : null;
 }
 
 /**
- * The grown-up tapped "keep it" (or "make it real") on one drawing. It goes through the SAME ingest
+ * The grown-up tapped "keep it" (or "make it real") on one drawing — or, with `trigger: 'auto'`, the
+ * app's sync queue sent it under the grown-up's keepsakes choice. Either way it goes through the SAME ingest
  * as a website upload: EXIF/GPS stripped, private bucket, FAMILY visibility, kept in the keepsake
  * home, and the safety checks (run after the response, as the website does — D26: until they clear,
  * only the grown-up can see it). The answer never says "flagged": a child might be looking.
@@ -150,8 +236,12 @@ export async function keepAppDrawing(
   av: AppViewer,
   input: AppKeepInput,
   opts: { env?: Record<string, string | undefined>; screening?: ScreeningOptions } = {},
-): Promise<{ assetId: string; kept: true }> {
+): Promise<{ assetId: string; kept: true; created: boolean }> {
   if (!appUploadsOpen(opts.env)) throw new AppApiError(403, 'not-yet');
+  const trigger = parseTrigger(input.trigger);
+  if (!trigger) throw new AppApiError(422, 'trigger');
+  // the app sending drawings by itself needs the grown-up's standing choice (proud pile / all drawings)
+  if (trigger === 'auto' && !autoKeepsakesOn(av.sync.keepsakes)) throw syncOff();
   const childId = str(input.childId);
   if (!childId || !childInScope(av, childId)) throw new AppApiError(422, 'child');
   const [child] = await db.select({ id: children.id }).from(children).where(and(eq(children.id, childId), eq(children.familyId, av.familyId)));
@@ -160,6 +250,15 @@ export async function keepAppDrawing(
   if (!source) throw new AppApiError(422, 'source');
   const madeOn = validMadeOn(input.madeOn);
   if (!madeOn) throw new AppApiError(422, 'made-on');
+  const clientRef = parseClientRef(input.clientRef);
+  if (clientRef === undefined) throw new AppApiError(422, 'clientRef');
+  // the phone is retrying something it already sent: hand back the same keepsake, make nothing new
+  const already = async () =>
+    clientRef
+      ? (await db.select({ id: assets.id }).from(assets).where(and(eq(assets.familyId, av.familyId), eq(assets.appClientRef, clientRef))))[0]
+      : undefined;
+  const existing = await already();
+  if (existing) return { assetId: existing.id, kept: true, created: false };
   if (!input.image || typeof input.image.arrayBuffer !== 'function') throw new AppApiError(422, 'image');
   if (input.image.size > APP_UPLOAD_MAX_BYTES) throw new AppApiError(413, 'too-big');
   const buffer = Buffer.from(await input.image.arrayBuffer());
@@ -175,8 +274,16 @@ export async function keepAppDrawing(
     if (e instanceof AuthzError) throw new AppApiError(403, 'not-owner');
     throw new AppApiError(422, 'image'); // not an image sharp can read
   }
-  await db.update(assets).set({ source, madeOn }).where(eq(assets.id, assetId));
-  return { assetId, kept: true };
+  try {
+    await db.update(assets).set({ source, madeOn, appClientRef: clientRef }).where(eq(assets.id, assetId));
+  } catch (e) {
+    // two copies of the same retry raced: keep the first, really delete this one
+    const first = await already();
+    if (!first) throw e;
+    await deleteAsset(db, assetId, av.viewer).catch(() => {});
+    return { assetId: first.id, kept: true, created: false };
+  }
+  return { assetId, kept: true, created: true };
 }
 
 /** A keepsake THIS app sent, in the key's family — the only kind the app may touch (M6). */

@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it, vi } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq, gte, isNull } from 'drizzle-orm';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -70,10 +70,13 @@ describe.skipIf(!DB || !S3)('break-in: hostile uploads (integration, real ingest
   });
 
   it('not an image (text with an image name + type) is refused and nothing is stored', async () => {
-    const before = (await db.select({ id: assets.id }).from(assets)).length;
+    // count only guest drafts made from now on — other test files add family keepsakes in parallel
+    const since = new Date(Date.now() - 1000);
+    const guestDrafts = async () => (await db.select({ id: assets.id }).from(assets).where(and(isNull(assets.familyId), gte(assets.createdAt, since)))).length;
+    const before = await guestDrafts();
     const res = await startGuestUpload(form(Buffer.from('hello, I am not a picture'), 'drawing.png', 'image/png'));
     expect(res).toMatchObject({ ok: false });
-    expect((await db.select({ id: assets.id }).from(assets)).length).toBe(before);
+    expect(await guestDrafts()).toBe(before);
   });
 
   it('an SVG with a <script> is never stored or served as SVG — it is flattened to pixels', async () => {

@@ -3,6 +3,7 @@ import { canManageFamily, type ViewerContext } from '@/authz';
 import { appTokens } from '@/db/schema';
 import { resolveViewerContext } from '@/server/assets';
 import type { DbHandle } from '@/server/db';
+import type { SyncChoices } from '@/lib/drawSync';
 import { APP_TOKEN_IDLE_MS, APP_TOKEN_PREFIX, revokeAppTokens } from './link';
 import { hashSecret } from './secrets';
 
@@ -15,6 +16,8 @@ export interface AppViewer {
   childIds: string[] | null;
   /** The normal authz context (the owner's ACTIVE membership in that family). */
   viewer: ViewerContext;
+  /** What a grown-up chose to sync on this link (read fresh from the key on every call). */
+  sync: SyncChoices;
 }
 
 /** The link has gone (or never was): the app forgets its key and keeps everything on the phone. */
@@ -54,7 +57,14 @@ export async function requireAppViewer(db: DbHandle, authorization: string | nul
   if (now.getTime() - row.lastUsedAt.getTime() > TOUCH_EVERY_MS) {
     await db.update(appTokens).set({ lastUsedAt: now }).where(eq(appTokens.id, row.id));
   }
-  return { tokenId: row.id, accountId: row.accountId, familyId: row.familyId, childIds: row.childIds ?? null, viewer };
+  return {
+    tokenId: row.id,
+    accountId: row.accountId,
+    familyId: row.familyId,
+    childIds: row.childIds ?? null,
+    viewer,
+    sync: { keepsakes: row.syncKeepsakes, children: row.syncChildren, progress: row.syncProgress, birthdays: row.syncBirthdays },
+  };
 }
 
 /** Is this child one the phone's key covers (and in its family — checked by the caller's query)? */

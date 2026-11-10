@@ -3,7 +3,7 @@ import { and, eq, ne, sql } from 'drizzle-orm';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import { accounts, auditRecords, families, invites, memberships } from '@/db/schema';
 import { defaultCircleFor } from '@/domain/relationships';
-import type { AccessLevel, Relationship } from '@/domain/types';
+import { ACCESS_LEVELS, RELATIONSHIPS, type AccessLevel, type Relationship } from '@/domain/types';
 import type { DbHandle } from './db';
 import { familyNameForRelatives } from './onboarding';
 import { sendMail } from './mail';
@@ -20,6 +20,18 @@ export class AlreadyInFamilyError extends Error {
   readonly reason = 'already-member' as const;
   constructor() {
     super('already in the family');
+  }
+}
+
+/**
+ * A little one can't be invited (NN3: children are subjects, not account holders — sign-off
+ * checklist G10). They're added to the family by first name instead, with no email and no account.
+ * Also thrown for a relationship or access level that isn't one of ours (never trusted from the form).
+ */
+export class NotInvitableError extends Error {
+  readonly reason = 'not-invitable' as const;
+  constructor(readonly why: 'child' | 'relationship' | 'access') {
+    super(why === 'child' ? 'children are added by first name, never invited' : `unknown ${why}`);
   }
 }
 
@@ -62,6 +74,9 @@ export async function createInvite(
   ) {
     throw new AuthzError({ allowed: false, reason: 'only the family owner can invite' });
   }
+  if (input.relationship === 'CHILD') throw new NotInvitableError('child');
+  if (!(RELATIONSHIPS as readonly string[]).includes(input.relationship)) throw new NotInvitableError('relationship');
+  if (!(ACCESS_LEVELS as readonly string[]).includes(input.accessLevel)) throw new NotInvitableError('access');
 
   const email = input.email.trim().toLowerCase();
   if (await isActiveMemberEmail(db, input.familyId, email)) throw new AlreadyInFamilyError();

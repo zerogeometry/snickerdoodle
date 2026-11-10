@@ -236,16 +236,14 @@ export default function LandingPage() {
       </section>
 
       {/* Mobile: primary action pinned to the thumb zone, app-style */}
-      <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-40 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_rgba(43,33,24,.12)] md:hidden">
+      {/* Kept slim (founder, 10 Nov): just the two actions, sitting low in the thumb zone */}
+      <div className="kraft fixed inset-x-0 bottom-0 z-40 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pb-[max(4px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_18px_rgba(43,33,24,.12)] md:hidden">
         <Button href="/start-creating" size="lg" className="w-full" attention>
           start creating
         </Button>
-        <DesignFromScratch variant="ghost" size="sm" className="mt-1 w-full" label="or design from scratch" />
-        <div className="mt-1 flex justify-center">
-          <TrustLine>everything you make is yours</TrustLine>
-        </div>
+        <DesignFromScratch variant="ghost" size="sm" className="mt-0.5 w-full" label="or design from scratch" />
       </div>
-      <div className="h-28 md:hidden" aria-hidden />
+      <div className="h-24 md:hidden" aria-hidden />
     </>
   );
 }

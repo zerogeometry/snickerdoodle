@@ -123,7 +123,14 @@ export const auditEvent = pgEnum('audit_event', [
   // Snickerdoodle Draw (the companion app): a grown-up linked / unlinked a phone.
   'APP_LINKED',
   'APP_UNLINKED',
+  // …and deleted a child's backed-up drawing days (the sync choices — DRAW-APP-sync-choices.md).
+  'APP_PROGRESS_DELETED',
+  // a family-calendar date added / changed / removed (today: from Snickerdoodle Draw's shared list)
+  'OCCASION_CHANGED',
 ]);
+
+/** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
+export const appSyncKeepsakes = pgEnum('app_sync_keepsakes', ['none', 'proud', 'all']);
 
 /** Where a keepsake came from: the website, or Snickerdoodle Draw (drawn on the screen / snapped from paper). */
 export const assetSource = pgEnum('asset_source', ['web', 'app-screen', 'app-paper']);
@@ -286,10 +293,14 @@ export const assets = pgTable(
     source: assetSource('source').notNull().default('web'),
     /** The day the child made it, when known (Draw sends it). A date only, never a time. */
     madeOn: date('made_on'),
+    /** Snickerdoodle Draw's own id for the drawing (`clientRef`), so a phone retrying after a crash
+     * gets the same keepsake back instead of a duplicate. Unique per family. Never shown. */
+    appClientRef: text('app_client_ref'),
     createdAt,
   },
   (t) => [
     index('asset_family_child_visibility_idx').on(t.familyId, t.childSubjectId, t.visibility),
+    uniqueIndex('asset_family_app_client_ref_unique').on(t.familyId, t.appClientRef).where(sql`${t.appClientRef} IS NOT NULL`),
     // Invariant: a real asset has a family + controller; an ephemeral draft has a claim.
     check(
       'asset_owned_or_ephemeral',
@@ -925,6 +936,8 @@ export const occasions = pgTable(
       .references(() => families.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
     kind: occasionKind('kind').notNull(),
+    /** what they are to the family ("grandma") — optional, screened; set from Snickerdoodle Draw's list */
+    relation: text('relation'),
     /** the Gregorian date it happened / happens (year optional unless it follows a lunar calendar) */
     month: integer('month').notNull(),
     day: integer('day').notNull(),
@@ -938,6 +951,8 @@ export const occasions = pgTable(
       .notNull()
       .references(() => accounts.id),
     createdAt,
+    /** last change (website or app) — Snickerdoodle Draw's two-way list uses it: the last change wins */
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
     index('occasions_family_idx').on(t.familyId),
@@ -1130,6 +1145,12 @@ export const appAuthCodes = pgTable('app_auth_codes', {
   /** BASE64URL(SHA-256(verifier)) — S256 only. */
   codeChallenge: text('code_challenge').notNull(),
   redirectUri: text('redirect_uri').notNull(),
+  /** The grown-up's sync choices on the connect page, copied onto the key. NULL only when there's no
+   * family (the "not-owner" code, which never becomes a key). */
+  syncKeepsakes: appSyncKeepsakes('sync_keepsakes'),
+  syncChildren: boolean('sync_children').notNull().default(false),
+  syncProgress: boolean('sync_progress').notNull().default(false),
+  syncBirthdays: boolean('sync_birthdays').notNull().default(false),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt,
@@ -1151,12 +1172,48 @@ export const appTokens = pgTable(
     childIds: jsonb('child_ids').$type<string[]>(),
     /** What the account page calls it ("an android phone", "an iphone or ipad"). Never a device id. */
     deviceLabel: text('device_label').notNull(),
+    /** What syncs on this link (DRAW-APP-sync-choices.md) — privacy by default: nothing until a
+     * grown-up chooses. Changed in the app's grown-ups' corner or on the account page; audited. */
+    syncKeepsakes: appSyncKeepsakes('sync_keepsakes').notNull().default('none'),
+    syncChildren: boolean('sync_children').notNull().default(false),
+    syncProgress: boolean('sync_progress').notNull().default(false),
+    /** Family birthdays & special days: the app's list and the website's family calendar are one list. */
+    syncBirthdays: boolean('sync_birthdays').notNull().default(false),
+    /** When a grown-up last chose. NULL = linked before the choices existed (nothing syncs). */
+    syncChosenAt: timestamp('sync_chosen_at', { withTimezone: true }),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).defaultNow().notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     createdAt,
   },
   (t) => [index('app_token_account_family_idx').on(t.accountId, t.familyId)],
 );
+
+/**
+ * A child's drawing days, backed up from Snickerdoodle Draw so a new phone can pick them up — only
+ * while a link's "drawing days" choice is on. One row per child; gone with the child (cascade), or
+ * when the parent deletes it on the account page, or after a year with no backup (retention job).
+ * Behavioural data about a child: days, rest weeks, best run, lesson ids — nothing else is kept.
+ */
+export const appArtistProgress = pgTable('app_artist_progress', {
+  childId: uuid('child_id')
+    .primaryKey()
+    .references(() => children.id, { onDelete: 'cascade' }),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  data: jsonb('data').$type<AppProgressData>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  createdAt,
+});
+
+/** The backup itself (the app's ProgressBackup), as checked and trimmed by src/server/app/sync.ts. */
+export interface AppProgressData {
+  drawingDays: string[];
+  restWeeks: string[];
+  bestRun: number;
+  lessons: { id: string; doneOn: string }[];
+  streaksOn: boolean;
+}
 
 /** "Make it real" from the app: a single-use, 15-minute pass that opens the website's maker for ONE
  * keepsake × ONE product. It is not a sign-in: the grown-up still signs in to the website to use it. */

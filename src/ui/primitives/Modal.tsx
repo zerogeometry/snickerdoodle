@@ -22,6 +22,7 @@ export function Modal({
   footer,
   size = 'sm',
   fill = false,
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,9 @@ export function Modal({
   /** Lock the dialog to a constant tall height (body scrolls inside) so its size doesn't
    * jump as content changes — e.g. the Full Catalogue while you search/filter. */
   fill?: boolean;
+  /** false = no close cross and no tap-outside-to-close: the footer's button is the way on (Escape
+   * still runs `onClose`, so a keyboard user is never stuck). For a notice that must be read. */
+  dismissible?: boolean;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -90,7 +94,7 @@ export function Modal({
   return createPortal(
     // Phones: an app-style bottom sheet that rises from the thumb zone. md+: a centred card.
     <div className="fixed inset-0 z-[70] flex items-end justify-center md:items-center md:p-4">
-      <div className="absolute inset-0 bg-cocoa/40 backdrop-blur-[2px]" onClick={onClose} aria-hidden />
+      <div className="absolute inset-0 bg-cocoa/40 backdrop-blur-[2px]" onClick={dismissible ? onClose : undefined} aria-hidden />
       <div
         ref={dialogRef}
         role="dialog"
@@ -108,14 +112,16 @@ export function Modal({
               {subtitle ? <p className="mt-0.5 text-xs text-ink-faint">{subtitle}</p> : null}
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 -mt-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-ink-faint hover:bg-line"
-          >
-            <Icon icon={IconX} size={18} />
-          </button>
+          {dismissible ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-mr-2 -mt-2 flex min-h-11 min-w-11 items-center justify-center rounded-full text-ink-faint hover:bg-line"
+            >
+              <Icon icon={IconX} size={18} />
+            </button>
+          ) : null}
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">{children}</div>
         {footer ? <div className="pb-safe border-t border-line px-5 pt-3 md:pb-5">{footer}</div> : null}

@@ -25,6 +25,7 @@ import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 import { designUrlAction, removeBackgroundAction } from '@/app/actions/magic';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { ChosenProduct } from '@/ui/components/ChosenProduct';
+import { SeeCollectionPill } from '@/ui/components/SeeCollectionPill';
 import { StartFromKeepsake } from '@/ui/components/StartFromKeepsake';
 import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
 
@@ -274,7 +275,7 @@ export default function StartCreatingPage() {
 
       {!upload ? (
         // ── Empty state ──
-        <main id="main" className="flex flex-1 flex-col items-center justify-center px-6 pb-40 pt-10 text-center md:pb-12">
+        <main id="main" className="flex flex-1 flex-col items-center justify-center px-6 pb-32 pt-10 text-center md:pb-12">
           {/* A drawing, and what a little drawing becomes — a real example keepsake beside it. */}
           <div className="flex items-end justify-center">
             <div className="pop-in polaroid tape relative z-10" style={{ ['--tilt' as string]: '-4deg', ['--pop-rot' as string]: '-6deg' }}>
@@ -294,14 +295,20 @@ export default function StartCreatingPage() {
             Snap it or pop it in, and watch it land on a whole family range in moments.
           </p>
           {/* Primary actions: a thumb-zone dock on phones (like the landing's), inline on desktop. */}
-          <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-30 flex flex-col gap-2.5 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-7 md:flex-row md:justify-center md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
-            <Button size="lg" className="w-full md:w-auto" attention onClick={() => fileRef.current?.click()}>
-              <Icon icon={IconUpload} size={18} /> upload a drawing
-            </Button>
-            <Button variant="secondary" size="lg" className="w-full md:w-auto" onClick={() => setCameraOpen(true)}>
-              <Icon icon={IconCamera} size={18} /> use camera
-            </Button>
-            <DesignFromScratch variant="ghost" size="md" className="w-full md:w-auto" label="or design from scratch" />
+          {/* Phones (founder, 10 Nov): a slim drawer, upload + camera side by side as big icons, then
+              "or design from scratch". The words stay for screen readers, and show from md up. */}
+          <div className="kraft fixed inset-x-0 bottom-0 z-30 flex flex-col gap-1 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pb-[max(4px,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-7 md:flex-row md:justify-center md:gap-3 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
+            <div className="flex gap-2.5 md:contents">
+              <Button size="lg" className="flex-1 md:flex-none" attention onClick={() => fileRef.current?.click()}>
+                <Icon icon={IconUpload} size={28} className="md:size-[18px]" />
+                <span className="sr-only md:not-sr-only">upload a drawing</span>
+              </Button>
+              <Button variant="secondary" size="lg" className="flex-1 md:flex-none" onClick={() => setCameraOpen(true)}>
+                <Icon icon={IconCamera} size={28} className="md:size-[18px]" />
+                <span className="sr-only md:not-sr-only">use camera</span>
+              </Button>
+            </div>
+            <DesignFromScratch variant="ghost" size="sm" className="w-full md:w-auto md:px-6 md:py-3 md:text-[15px]" label="or design from scratch" />
           </div>
           <p className="pop-in mt-6 max-w-sm text-xs leading-relaxed text-ink-soft" style={{ ['--i' as string]: 3 }}>
             <b className="text-cocoa">tip:</b> snap it in daylight, filling the frame — and pick the original photo, not one sent
@@ -423,6 +430,8 @@ export default function StartCreatingPage() {
           </div>
         </main>
       )}
+      {/* phones: the range is below the fold — a little pill points the way down to it */}
+      <SeeCollectionPill targetRef={rangeRef} active={!!upload && previewLoaded} resetKey={drawingKey} />
     </div>
   );
 }
