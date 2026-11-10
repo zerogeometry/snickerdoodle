@@ -83,7 +83,7 @@ test('gift loop: invite → verify by email link → joined at the set circle �
   await granny.goto(path);
   // the guest price first: no saving until they've joined
   await expect(granny.getByText('welcome to the family')).toHaveCount(0);
-  await granny.getByRole('link', { name: /join the family · 5% off/ }).click();
+  await granny.getByRole('link', { name: /join family & checkout/ }).click();
   await expect(granny).toHaveURL(/\/join\//);
   const joinUrl = new URL(granny.url());
 

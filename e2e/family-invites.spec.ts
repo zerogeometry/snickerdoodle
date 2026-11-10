@@ -249,6 +249,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
       await signInByEmailLink(page, email, `/join/${token}`);
     }
     await expect(page).toHaveURL(/\/home\?family=[0-9a-f-]+&joined=1/);
+    await expect(page.getByText(/^welcome to the family, /)).toBeVisible(); // not "welcome back" on day one
   }
 
   const S = await person(browser);

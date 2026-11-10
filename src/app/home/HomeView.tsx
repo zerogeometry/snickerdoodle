@@ -61,7 +61,8 @@ function monthLabel(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 }
 
-export function HomeView({ data }: { data: HomeData }) {
+/** `joined`: they've just joined this family from an invite (/join → /home?family=…&joined=1). */
+export function HomeView({ data, joined = false }: { data: HomeData; joined?: boolean }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -199,7 +200,7 @@ export function HomeView({ data }: { data: HomeData }) {
         {/* Family header — the family's banner (if any) above the welcome */}
         {data.bannerUrl ? <FamilyBanner url={data.bannerUrl} canEdit={data.isOwner} familyName={data.familyName} /> : null}
         <div className="bg-honey-band px-6 py-6 text-center">
-          <CaveatNote className="text-lg">welcome back, {greetingName}</CaveatNote>
+          <CaveatNote className="text-lg">{joined && !data.isOwner ? `welcome to the family, ${greetingName}` : `welcome back, ${greetingName}`}</CaveatNote>
           {renaming ? (
             <form
               className="mx-auto mt-1 flex max-w-xs items-center gap-2"

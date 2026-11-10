@@ -281,10 +281,10 @@ test('06: the join loop from a forwarded link — a stranger who is NOT the invi
   const grannyEmail = testEmail('granny');
   const g = await parentMakesGiftLink(page, { invite: { email: grannyEmail } });
 
-  // signed-out stranger taps "join the family · 5% off" on a forwarded link
+  // signed-out stranger taps "join family & checkout" on a forwarded link
   const s = await stranger(browser);
   await s.goto(g.path);
-  await s.getByRole('link', { name: /join the family · 5% off/ }).click();
+  await s.getByRole('link', { name: /join family & checkout/ }).click();
   await expect(s).toHaveURL(/\/join\//);
   await expect(s.getByRole('heading', { level: 1 })).toContainText(/Join/);
   // 06-B1 (fixed): whoever holds the gift link sees only a masked address — never the invitee's
@@ -462,7 +462,7 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   const granny = await stranger(browser, PHONE);
   await granny.goto(g.path);
   await granny.screenshot({ path: `${SHOTS}/gift-with-invite-phone.png`, fullPage: true });
-  await granny.getByRole('link', { name: /join the family · 5% off/ }).click();
+  await granny.getByRole('link', { name: /join family & checkout/ }).click();
   await expect(granny).toHaveURL(/\/join\//);
   const joinUrl = new URL(granny.url());
   await signInByEmailLink(granny, grannyEmail, joinUrl.pathname + joinUrl.search);
