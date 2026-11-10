@@ -639,11 +639,11 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect((await db.select().from(occasions).where(eq(occasions.familyId, ids.hartleyId))).length).toBe(before);
     });
 
-    it('POST from the app lands in the family calendar (FAMILY circle, no year) and GET gives the app’s shape', async () => {
+    it('POST from the app lands in the family calendar (someone else’s day, home only — D27; no year) and GET gives the app’s shape', async () => {
       const made = await addAppOccasion(db, av, { name: 'Jo', relation: 'Grandma', kind: 'birthday', month: 11, day: 3, year: 1956 });
       expect(made).toEqual({ id: expect.any(String), name: 'Jo', relation: 'Grandma', kind: 'birthday', month: 11, day: 3, updatedAt: expect.any(String) });
       const [row] = await db.select().from(occasions).where(eq(occasions.id, made.id));
-      expect(row).toMatchObject({ familyId: ids.hartleyId, title: 'Jo', relation: 'Grandma', kind: 'BIRTHDAY', year: null, shareCircle: 'FAMILY', createdByAccountId: ids.samId });
+      expect(row).toMatchObject({ familyId: ids.hartleyId, title: 'Jo', relation: 'Grandma', kind: 'BIRTHDAY', year: null, whose: 'SOMEONE_ELSE', shareCircle: 'HOME', createdByAccountId: ids.samId });
       // and the website's own calendar shows it
       expect((await occasionsFor(db, ids.samId, ids.hartleyId)).some((o) => o.id === made.id && o.date === '--11-03')).toBe(true);
       const list = await listAppOccasions(db, av);
@@ -822,6 +822,9 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     it('once the checks clear it, the same drawing can be shared (the gate is the check, not the app)', async () => {
       const id = await keepOne();
       screen.verdict = 'pass';
+      // D27 (founder answer C): a share-sheet link can't know who opens it — extended-level drawings only
+      await expectApiError(mintAppWish(db, av, { assetId: id, productKey: 'framedPrint' }), 409, 'family-only');
+      await db.update(assets).set({ visibility: 'EXTENDED' }).where(eq(assets.id, id));
       const { url } = await mintAppWish(db, av, { assetId: id, productKey: 'framedPrint' });
       expect(url).toMatch(/\/g\//);
       expect(await status(id)).toBe('CLEAR');

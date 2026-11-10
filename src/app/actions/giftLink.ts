@@ -121,7 +121,8 @@ export async function sendGiftLinksAction(input: {
       to: [...members.map((memberAccountId) => ({ memberAccountId })), ...people],
       invite: access && (ACCESS_LEVELS as readonly string[]).includes(access) ? { accessLevel: access, shareOccasions: input.invite?.shareOccasions === true } : null,
     });
-    return { ok: res.sent > 0, sent: res.sent, skipped: res.skipped, batchId: res.batchId };
+    // nothing sent → nothing to point at (and the same answer whatever was asked: no existence leak)
+    return res.sent > 0 ? { ok: true, sent: res.sent, skipped: res.skipped, batchId: res.batchId } : { ok: false, sent: 0, skipped: res.skipped };
   } catch {
     return { ok: false };
   }

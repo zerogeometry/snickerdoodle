@@ -71,7 +71,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const a = await draft('CLEAR');
     const b = await draft('CLEAR');
 
-    const res = await mintWish(db, sam(), [a.claimId, b.claimId], { assetIds: [a.assetId, b.assetId] });
+    const res = await mintWish(db, sam(), [a.claimId, b.claimId], { assetIds: [a.assetId, b.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
     expect(res.url).toMatch(/^\/g\//);
 
@@ -109,6 +109,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
         { assetId: card.assetId, variantSku: 'card' }, // a card needs the buyer's own inside message: not giftable
         { assetId: a.assetId, variantSku: 'not-a-real-sku' },
       ],
+      circle: 'FAMILY',
     });
     expect(res.ok).toBe(true);
     const view = await getGiftLink(db, tokenOf(res.url));
@@ -126,7 +127,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const clear = await draft('CLEAR');
     const flagged = await draft('FLAGGED');
 
-    const res = await mintWish(db, sam(), [clear.claimId, flagged.claimId], { assetIds: [clear.assetId, flagged.assetId] });
+    const res = await mintWish(db, sam(), [clear.claimId, flagged.claimId], { assetIds: [clear.assetId, flagged.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
 
     const view = await getGiftLink(db, tokenOf(res.url));
@@ -145,7 +146,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
   it('a BLOCKED creation is never kept nor shared; an all-blocked wish fails', async () => {
     const blocked = await draft('BLOCKED');
 
-    const res = await mintWish(db, sam(), [blocked.claimId], { assetIds: [blocked.assetId] });
+    const res = await mintWish(db, sam(), [blocked.claimId], { assetIds: [blocked.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(false); // nothing shareable → no link
 
     const [row] = await db.select().from(assets).where(eq(assets.id, blocked.assetId));
@@ -159,7 +160,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
     const notMine = await draft('CLEAR');
 
     // only hold `mine`'s claim — `notMine` belongs to some other guest session
-    const res = await mintWish(db, sam(), [mine.claimId], { assetIds: [mine.assetId, notMine.assetId] });
+    const res = await mintWish(db, sam(), [mine.claimId], { assetIds: [mine.assetId, notMine.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
 
     const view = await getGiftLink(db, tokenOf(res.url));
@@ -177,7 +178,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
   it('dedupes repeated asset ids into a single shared item', async () => {
     const a = await draft('CLEAR');
 
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId, a.assetId, a.assetId] });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId, a.assetId, a.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
 
     const view = await getGiftLink(db, tokenOf(res.url));
@@ -185,14 +186,14 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
   });
 
   it('an empty basket cannot mint a wish', async () => {
-    const res = await mintWish(db, sam(), [], { assetIds: [] });
+    const res = await mintWish(db, sam(), [], { assetIds: [], circle: 'FAMILY' });
     expect(res.ok).toBe(false);
     expect(res.url).toBeUndefined();
   });
 
   it('rejects a subject that contains a surname — and keeps nothing (child first name only)', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia Smith' });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia Smith', circle: 'FAMILY' });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('name');
     // screened BEFORE adoption — the creation is not kept
@@ -203,14 +204,14 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
 
   it('rejects an abusive subject', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'fuckface' });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'fuckface', circle: 'FAMILY' });
     expect(res.ok).toBe(false);
     expect(res.reason).toBe('name');
   });
 
   it('a valid first name becomes the gift title', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia' });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mia', circle: 'FAMILY' });
     expect(res.ok).toBe(true);
     const view = await getGiftLink(db, tokenOf(res.url));
     expect(view.state).toBe('active');
@@ -219,7 +220,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
 
   it('files the kept creations under the named child (grows with the child)', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mabel' });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], subject: 'Mabel', circle: 'FAMILY' });
     expect(res.ok).toBe(true);
 
     const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
@@ -234,7 +235,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
 
   it('a subject-less wish leaves the keepsake unfiled (no child)', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId] });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
     const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
     expect(row!.childSubjectId).toBeNull();
@@ -243,7 +244,7 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
   it('an all-FLAGGED wish keeps the creations for review but mints no link', async () => {
     const f1 = await draft('FLAGGED');
     const f2 = await draft('FLAGGED');
-    const res = await mintWish(db, sam(), [f1.claimId, f2.claimId], { assetIds: [f1.assetId, f2.assetId] });
+    const res = await mintWish(db, sam(), [f1.claimId, f2.claimId], { assetIds: [f1.assetId, f2.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(false); // nothing CLEAR to share
     for (const f of [f1, f2]) {
       const [row] = await db.select().from(assets).where(eq(assets.id, f.assetId));
@@ -254,12 +255,33 @@ describe.skipIf(!DB)('mint a wish — keep then share (integration)', () => {
 
   it('writes a GIFT_LINK_CREATED audit record', async () => {
     const a = await draft('CLEAR');
-    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId] });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], circle: 'FAMILY' });
     expect(res.ok).toBe(true);
     const audits = await db
       .select()
       .from(auditRecords)
       .where(and(eq(auditRecords.familyId, ids.hartleyId), eq(auditRecords.event, 'GIFT_LINK_CREATED')));
     expect(audits.length).toBeGreaterThan(0);
+  });
+
+  // D27 (founder answer C): we can't know who opens a shared wish link, so it shows only what the chosen circle may
+  // see — extended unless they say otherwise. New keepsakes start at family, so that needs their own "share wider".
+  it('D27: an extended wish of family-level drawings asks first; the parent’s “share wider” widens THEIR keepsakes and makes it', async () => {
+    const a = await draft('CLEAR');
+    expect(await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId] })).toEqual({ ok: false, reason: 'too-private' });
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], circle: 'EXTENDED', widen: true });
+    expect(res.ok).toBe(true);
+    const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+    expect(row!.visibility).toBe('EXTENDED');
+    const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, res.url!.slice(3)));
+    expect(link!.audienceCircle).toBe('EXTENDED');
+  });
+
+  it('D27: a home-only wish never widens anything', async () => {
+    const a = await draft('CLEAR');
+    const res = await mintWish(db, sam(), [a.claimId], { assetIds: [a.assetId], circle: 'HOME', widen: true });
+    expect(res.ok).toBe(true);
+    const [row] = await db.select().from(assets).where(eq(assets.id, a.assetId));
+    expect(row!.visibility).toBe('FAMILY'); // already visible to home: left as it was
   });
 });

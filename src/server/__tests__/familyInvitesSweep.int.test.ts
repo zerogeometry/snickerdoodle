@@ -135,8 +135,10 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
 
   it('each circle × access the parent can choose is joined EXACTLY (relationship sets the circle)', async () => {
     const cases = [
-      { rel: 'PARENT', access: 'CONTRIBUTE', circle: 'FAMILY' },
-      { rel: 'PARENT', access: 'VIEW', circle: 'FAMILY' },
+      // D27: a parent / co-parent starts in HOME (the leader can pick another circle at invite time)
+      { rel: 'PARENT', access: 'CONTRIBUTE', circle: 'HOME' },
+      { rel: 'PARENT', access: 'VIEW', circle: 'HOME' },
+      { rel: 'ADULT_CHILD', access: 'VIEW_BUY', circle: 'HOME' },
       { rel: 'GRANDPARENT', access: 'VIEW_BUY', circle: 'EXTENDED' },
       { rel: 'AUNT_UNCLE', access: 'CONTRIBUTE', circle: 'EXTENDED' },
       { rel: 'CLOSE_FRIEND', access: 'VIEW', circle: 'EXTENDED' },
@@ -148,9 +150,9 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
       expect((await acceptInvite(db, who, token, YES)).ok).toBe(true);
       const v = await resolveViewerContext(db, who.id, ids.hartleyId);
       expect(v.membership, `${c.rel}/${c.access}`).toMatchObject({ status: 'ACTIVE', circle: c.circle, accessLevel: c.access });
-      // what they then SEE: Family circle → FAMILY + EXTENDED (+ Jo's FAMILY one); Extended → EXTENDED only. Never ONLY_ME.
+      // what they then SEE: Home / Family circle → FAMILY + EXTENDED (+ Jo's FAMILY one); Extended → EXTENDED only. Never ONLY_ME.
       const seen = (await listViewableAssets(db, ids.hartleyId, v)).map((a) => a.id).sort();
-      const expected = c.circle === 'FAMILY' ? [ids.assetFamily, ids.assetExtended, ids.assetJoFamily].sort() : [ids.assetExtended];
+      const expected = c.circle !== 'EXTENDED' ? [ids.assetFamily, ids.assetExtended, ids.assetJoFamily].sort() : [ids.assetExtended];
       expect(seen, `${c.rel}/${c.access}`).toEqual(expected);
       expect(seen).not.toContain(ids.assetOnlyMe);
       expect(seen).not.toContain(ids.assetBloomFamily);
@@ -214,12 +216,12 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     await expect(setMemberSeesOccasions(db, jo, { familyId: ids.hartleyId, memberAccountId: ids.rosieId, on: true })).rejects.toBeInstanceOf(AuthzError);
   });
 
-  it('visibility: only the controlling parent changes it; each change is logged with from → to', async () => {
+  it('visibility: only whoever added it (or the child’s parent, narrower) changes it; each change is logged with from → to', async () => {
     const sam = await owner();
     await changeAssetVisibility(db, ids.assetExtended, sam, 'ONLY_ME');
     const rows = await audits('ASSET_VISIBILITY_CHANGED', ids.assetExtended);
-    expect(rows.at(-1)!.metadata).toEqual({ from: 'EXTENDED', to: 'ONLY_ME' });
-    // a FAMILY-circle co-parent can't flip the owner's child's keepsake
+    expect(rows.at(-1)!.metadata).toMatchObject({ from: 'EXTENDED', to: 'ONLY_ME', by: 'adder' });
+    // a FAMILY-circle co-parent can't flip a keepsake someone else added
     const jo = await resolveViewerContext(db, ids.joId, ids.hartleyId);
     await expect(changeAssetVisibility(db, ids.assetFamily, jo, 'EXTENDED')).rejects.toThrow();
     // an Extended member now sees nothing at all (the only EXTENDED one went private)

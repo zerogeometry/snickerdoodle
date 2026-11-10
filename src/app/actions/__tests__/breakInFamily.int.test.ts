@@ -122,7 +122,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     const [row] = await db.select().from(assets).where(eq(assets.id, copy.assetId));
     keys.push(`originals/${copy.assetId}`);
     expect(row!.controllerAccountId, 'the copy stays under the controlling parent').toBe(ids.samId);
-    expect(row!.uploaderAccountId, 'the relative is only its uploader').toBe(ids.joId);
+    expect(row!.uploaderAccountId, 'the copy stays the adder’s, never the copier’s (D27)').toBe(ids.samId);
     expect(row!.visibility, 'never wider than the source').toBe('FAMILY');
     expect(await setAssetVisibilityAction(copy.assetId, 'EXTENDED')).toEqual({ ok: false });
     expect(await setAssetVisibilityAction(copy.assetId, 'ONLY_ME')).toEqual({ ok: false });
@@ -346,7 +346,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
     const b = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await art(), keptInHome: true });
     keys.push(a.key, b.key);
     await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(inArray(assets.id, [a.assetId, b.assetId]));
-    const [link] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [a.assetId, b.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), expiresAt: new Date(Date.now() + 864e5) }).returning();
+    const [link] = await db.insert(giftLinks).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, token: randomBytes(24).toString('base64url'), items: [a.assetId, b.assetId].map((assetId) => ({ assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 })), audienceCircle: 'FAMILY', expiresAt: new Date(Date.now() + 864e5) }).returning();
     const statusOf = async () => (await listGiftListsForOwner(db, sam, ids.hartleyId)).find((l) => l.id === link!.id)?.status;
     expect(await statusOf()).toBe('ACTIVE');
     await db.delete(assets).where(eq(assets.id, b.assetId)); // one keepsake gone

@@ -23,10 +23,10 @@ const DISCARD_WINDOW_MS = 6 * 60 * 60 * 1000;
  * anything already in a basket or an order prints exactly what was chosen.
  *
  * Authz: the viewer must see the keepsake and be able to add creations to its family (ingest's own
- * CONTRIBUTE gate). The copy keeps the keepsake's child, CONTROLLER and visibility (never wider):
- * the relative who made it is its uploader, never its controller — so they can't widen it to the
- * Extended circle or hide it from the parent, and the parent can always see and delete it (07-B3 /
- * 04-B1: an unfiled drawing used to make the copier its controller). A CSAM-blocked keepsake is
+ * CONTRIBUTE gate). The copy keeps the keepsake's child, CONTROLLER, ADDER and visibility (never wider):
+ * the relative who made it is neither — so they can't widen it to the Extended circle or hide it from
+ * the parent, and the parent can always see and delete it (07-B3 / 04-B1: an unfiled drawing used to
+ * make the copier its controller; D27: whoever added the drawing still decides who sees its copies). A CSAM-blocked keepsake is
  * never copied.
  */
 export async function copyKeepsake(db: DbHandle, viewer: ViewerContext, sourceId: string): Promise<{ assetId: string }> {
@@ -63,10 +63,12 @@ export async function copyKeepsake(db: DbHandle, viewer: ViewerContext, sourceId
       .values({ assetId: copy.assetId, objectClass: 'DERIVATIVE', bucket, key, contentType: d.contentType, byteSize: d.byteSize, sha256: d.sha256, exifStripped: true, writeOnce: false })
       .onConflictDoNothing({ target: storageObjects.key });
   }
-  // the source's controller (the controlling parent), never the copier; the same tier, never wider
+  // the source's controller (the controlling parent), never the copier; the same tier and ceiling, never wider.
+  // D27: whoever ADDED a keepsake chooses who sees it — an edited copy is still THEIR drawing, so the copy keeps the
+  // source's adder too (the copier never gets a say over someone else's drawing by copying it).
   await db
     .update(assets)
-    .set({ controllerAccountId: src.controllerAccountId, visibility: src.visibility, studioDoc: src.studioDoc })
+    .set({ controllerAccountId: src.controllerAccountId, uploaderAccountId: src.uploaderAccountId, visibility: src.visibility, parentLimit: src.parentLimit, studioDoc: src.studioDoc })
     .where(eq(assets.id, copy.assetId));
   return { assetId: copy.assetId };
 }
