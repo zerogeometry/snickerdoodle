@@ -21,7 +21,7 @@ export const metadata: Metadata = {
  * The app's own notice (both app stores need a privacy URL; the app links here from its grown-ups'
  * corner). It describes the app with website LINKING and the sync choices
  * (project-office/briefs/DRAW-APP-sync-choices.md, incl. the founder's decisions of 10 Nov) as the
- * website builds them. Anything in [square brackets] is for the founder to fill. App behaviour:
+ * website builds them. Founder-approved text from the signing pack (§6.1, §6.3); the ICO number is the founder's. App behaviour:
  * snickerdoodle-draw/docs/store/data-safety.md and docs/RELIABILITY.md.
  */
 export default function DrawPrivacyNoticePage() {
@@ -30,7 +30,7 @@ export default function DrawPrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Snickerdoodle Draw: Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: [date] · A draft for review before publication.</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 10 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -92,13 +92,11 @@ export default function DrawPrivacyNoticePage() {
             <em>Legal basis: our legitimate interests in keeping the app working and safe.</em>
           </li>
           <li>
-            <strong>Crash reports (only if you switch them on).</strong> In the grown-ups&apos; corner you can choose to
-            send anonymous crash reports to help us fix bugs. A report says what went wrong and where in the app, plus
-            the app version, the operating system, on iPhone and iPad the device model, the app&apos;s language and the
-            age group (for example &ldquo;6–8&rdquo;). It <strong>never</strong> includes names, drawings, birthdays,
-            anything typed, or your IP address. Reports are kept for [number] days, and you can switch them off at any
-            time. The &ldquo;report a problem&rdquo; button sends the app&apos;s recent problem notes once, only when you
-            tap it. <em>Legal basis: your consent.</em>
+            <strong>Crash reports: we don&apos;t collect any yet.</strong> If we add them, they&apos;ll stay off unless a
+            grown-up switches them on in the grown-ups&apos; corner, they&apos;ll never include names, drawings,
+            birthdays, anything typed or your IP address, and we&apos;ll update this notice before they start. The
+            &ldquo;report a problem&rdquo; button lets you share the app&apos;s recent problem notes yourself, as text,
+            only when you tap it. <em>Legal basis: your consent.</em>
           </li>
         </ul>
         <p>No advertising, no analytics, no third-party tracking, no sign-in for children, no in-app purchases.</p>
@@ -120,10 +118,9 @@ export default function DrawPrivacyNoticePage() {
         </ul>
 
         <h2>5. Who helps us</h2>
-        <p>Two suppliers process data for the app, each under a contract that limits them to our instructions:</p>
+        <p>One supplier processes data for the app, under a contract that limits it to our instructions:</p>
         <ul>
           <li><strong>Expo</strong> (650 Industries, Inc., USA) runs the update service: the install number, app version and IP address of each check.</li>
-          <li><strong>Sentry</strong> (Functional Software, Inc.) receives crash reports, only if you&apos;ve switched them on. We&apos;ve turned off IP address storage.</li>
         </ul>
         <p>
           Where a supplier processes data outside the UK, we make sure it&apos;s protected by an approved safeguard (such
@@ -161,7 +158,8 @@ export default function DrawPrivacyNoticePage() {
           <li>
             <strong>Family birthdays and special days</strong> (unticked unless you tick it): the app&apos;s list and your
             family calendar on the website become one list: a name, what they are to you if you add it, birthday or
-            special day, and the day and month. Never a year.
+            special day, and the day and month. Never a year. Everyone you share your family calendar with can see
+            them.
           </li>
         </ul>
         <p>Once linked, whatever you choose, the app can also:</p>
@@ -177,8 +175,11 @@ export default function DrawPrivacyNoticePage() {
           never shows prices, and it can&apos;t take a payment. Pictures from the website never come back into the app.
         </p>
         <p>
-          <em>Legal basis: [to confirm — e.g. our contract with you to keep your family&apos;s keepsakes, with the
-          choices above as your instructions].</em>
+          <em>Legal basis: our contract with you. Linking and the choices you make are how you ask us to keep your
+          family&apos;s keepsakes and keep things in step. For the names and birthdays of relatives on your family
+          calendar (if you tick family birthdays): our legitimate interest, and yours, in keeping your family&apos;s
+          important days in one place. We use them only for your calendar and the reminders people have asked for,
+          never for anything else.</em>
         </p>
 
         <h2>7. On the website, and changing your mind</h2>

@@ -33,7 +33,7 @@ export const SYNC_BOXES: { key: 'children' | 'progress' | 'birthdays'; label: st
   {
     key: 'birthdays',
     label: 'family birthdays and special days',
-    hint: 'show the same list in draw and on snickerdoodle — a name, what they are to you if you like, and the day and month. never a year.',
+    hint: 'show the same list in draw and on snickerdoodle — a name, what they are to you if you like, and the day and month. never a year. everyone you share your family calendar with can see them.',
     icon: IconBalloon,
   },
 ];

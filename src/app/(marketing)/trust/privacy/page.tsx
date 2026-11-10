@@ -15,7 +15,7 @@ export default function PrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: [date] · A draft for review before publication.</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 10 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -45,6 +45,24 @@ export default function PrivacyNoticePage() {
           <li><strong>Messages you send us</strong> — what you tell us through our help page (and any order reference), plus the email address we reply to.</li>
           <li><strong>Basic technical data</strong> — device and cookie data, for security and to keep the site working.</li>
         </ul>
+        <p>
+          <strong>Snickerdoodle Draw (our drawing app).</strong> If you link Snickerdoodle Draw to your account, it sends
+          only what you choose when linking, which you can change on your account page: drawings for your keepsake box
+          (only the ones a grown-up picks, the proud pile — including drawings your little one stars — or every
+          drawing), each with the child&apos;s first name it&apos;s filed under, the day it was made and whether it was
+          drawn on screen or paper; and, only if you tick them, your little ones&apos; first names and birthdays, their
+          drawing days (so a new phone can pick them up), and your family calendar&apos;s birthdays and special days (a
+          name, an optional relation, and the day and month, never a year — seen by everyone you share your family
+          calendar with). App drawings get the same private storage and safety checks as uploads. Your account page
+          lists linked phones and their choices, lets you disconnect them, delete backed-up drawing days, and remove
+          everything the app sent. Your data download includes all of this. A phone unused for 90 days is disconnected;
+          drawing days nobody backs up for a year are deleted. Stopping a sync never deletes what&apos;s already here.
+          See <a href="/trust/privacy/draw">the app&apos;s own notice</a> for what stays on the phone.{' '}
+          <em>
+            Legal basis: our contract with you; for relatives&apos; names and birthdays, our legitimate interest in
+            keeping your family&apos;s days in one place.
+          </em>
+        </p>
 
         <h2>3. Why we use it, and our legal basis</h2>
         <ul>
