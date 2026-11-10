@@ -24,7 +24,16 @@ const CARD = 'pop-in tape rounded-[22px] border-2 border-cocoa bg-paper p-7 shad
 import { isBundleLine, isCalendarLine, isFrameGridLine, isPackLine, SUBJECT_KEY, toast, useBasket } from '@/lib/store';
 import { createWishAction } from '@/app/actions/wish';
 
-type State = 'minting' | 'needsAuth' | 'ready' | 'error' | 'empty' | 'badName';
+type State = 'minting' | 'needsAuth' | 'ready' | 'error' | 'empty' | 'badName' | 'who';
+type Circle = 'HOME' | 'FAMILY' | 'EXTENDED';
+type MintResult = { ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' | 'too-private' };
+/** "who's it for?" (D27, founder answer C): we can't know who opens a shared link, so the parent picks — extended
+ * unless they say otherwise — and the link shows only what that circle may see. */
+const WHO: { value: Circle; label: string }[] = [
+  { value: 'HOME', label: 'home' },
+  { value: 'FAMILY', label: 'family' },
+  { value: 'EXTENDED', label: 'extended family' },
+];
 
 const SHARE_MSG = 'A little gift list for you 🎁';
 const SHARE: { label: string; icon: TablerIconComponent; href: (u: string) => string | null }[] = [
@@ -42,11 +51,12 @@ export default function ShareWishPage() {
   const [sent, setSent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [circle, setCircle] = useState<Circle>('EXTENDED');
   const ran = useRef(false);
 
   const fullUrl = url ? `${typeof window !== 'undefined' ? window.location.origin : ''}${url}` : '';
 
-  const mint = useCallback(async () => {
+  const mint = useCallback(async (forCircle: Circle = 'EXTENDED', widen = false) => {
     // Read the basket fresh from the (persisted) store — the page may mount before
     // sessionStorage hydration completes, so the subscription value can lag.
     const items = useBasket.getState().items;
@@ -71,17 +81,19 @@ export default function ShareWishPage() {
     setState('minting');
     // Guard against a hung server — fall to the error state rather than spin forever.
     const res = await Promise.race([
-      createWishAction({ assetIds, lines, subject: who || undefined }),
-      new Promise<{ ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' }>((resolve) =>
-        setTimeout(() => resolve({ ok: false }), 15000),
-      ),
-    ]).catch(() => ({ ok: false }) as { ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' });
+      createWishAction({ assetIds, lines, subject: who || undefined, circle: forCircle, widen }),
+      new Promise<MintResult>((resolve) => setTimeout(() => resolve({ ok: false }), 15000)),
+    ]).catch(() => ({ ok: false }) as MintResult);
     if (res.needsAuth) {
       setState('needsAuth');
       return;
     }
     if (res.reason === 'name') {
       setState('badName'); // server rejected the child's name (surname / abuse)
+      return;
+    }
+    if (res.reason === 'too-private') {
+      setState('who'); // kept closer to home than that circle: let them pick who it's for
       return;
     }
     if (res.ok && res.url) {
@@ -180,7 +192,7 @@ export default function ShareWishPage() {
           <div role="alert" className={`${CARD} text-center`}>
             <h1 className="font-display text-2xl leading-tight text-cocoa">That didn’t work</h1>
             <p className="mt-2 text-sm text-ink-soft">We couldn’t make your wish link just now. Give it another go.</p>
-            <Button size="lg" className="mt-5 w-full" onClick={() => { ran.current = false; void mint(); }}>
+            <Button size="lg" className="mt-5 w-full" onClick={() => { ran.current = false; void mint(circle); }}>
               try again
             </Button>
           </div>
@@ -254,6 +266,37 @@ export default function ShareWishPage() {
           )
         ) : null}
 
+        {state === 'who' ? (
+          <div className={CARD}>
+            <h1 className="font-display text-[28px] leading-tight text-cocoa">Who’s it for?</h1>
+            <p className="mt-2 text-sm text-ink-soft">
+              We can’t know who’ll open a shared link, so pick who it’s for — it only ever shows what they can see.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="who the link is for">
+              {WHO.map((w) => (
+                <button
+                  key={w.value}
+                  type="button"
+                  aria-pressed={circle === w.value}
+                  onClick={() => setCircle(w.value)}
+                  className={`press min-h-11 rounded-pill border-2 px-4 text-sm font-bold ${circle === w.value ? 'border-cocoa bg-cocoa text-paper' : 'border-cocoa/25 bg-paper text-cocoa'}`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
+            {circle === 'EXTENDED' ? (
+              <p className="mt-3 rounded-[14px] border-2 border-dashed border-cocoa/25 bg-paper-2 px-3 py-2.5 text-[13px] text-cocoa">
+                new keepsakes start as family. sharing with extended family means they’ll see these in your keepsake box
+                too — you can change it any time.
+              </p>
+            ) : null}
+            <Button size="lg" className="mt-4 w-full" onClick={() => void mint(circle, true)}>
+              <Icon icon={IconSparkles} size={16} /> {circle === 'EXTENDED' ? 'share with extended family & make my link' : 'make my link'}
+            </Button>
+          </div>
+        ) : null}
+
         {state === 'ready' ? (
           <div role="status" className={`${CARD} text-center`}>
             <div className="sticker wiggle mx-auto flex h-16 w-16 -rotate-6 items-center justify-center rounded-full bg-honey">
@@ -262,7 +305,10 @@ export default function ShareWishPage() {
             <h1 className="mt-4 font-display text-[28px] leading-tight text-cocoa">
               {subject ? `${subject}’s wish is ready ✦` : 'Your wish is ready ✦'}
             </h1>
-            <p className="mt-2 text-sm text-ink-soft">Kept safe in your keepsake box. Share this link and family can buy it as a gift.</p>
+            <p className="mt-2 text-sm text-ink-soft">
+              Kept safe in your keepsake box. Share this link and they can buy it as a gift — it shows only what your{' '}
+              {circle === 'HOME' ? 'home' : circle === 'FAMILY' ? 'family' : 'extended family'} can see.
+            </p>
 
             <div className="mt-4 flex items-center gap-2 rounded-[14px] border-2 border-dashed border-cocoa/25 bg-paper-2 py-1 pl-3 pr-1 text-left">
               <Icon icon={IconLink} size={15} className="shrink-0 text-ink-soft" />

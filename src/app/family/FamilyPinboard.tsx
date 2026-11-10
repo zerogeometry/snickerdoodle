@@ -4,7 +4,7 @@ import { IconCalendarHeart, IconHeart, IconMailForward, IconPlus, IconTree, Icon
 import { useRouter } from 'next/navigation';
 import { useTransition, type ReactNode } from 'react';
 import { resendInviteAction, revokeInviteAction } from '@/app/actions/family';
-import type { AccessLevel, Relationship } from '@/domain/types';
+import type { AccessLevel, Circle, Relationship } from '@/domain/types';
 import { toast } from '@/lib/store';
 import type { FamilyChild, FamilyData, FamilyMember, FamilyPendingInvite } from '@/server/family';
 import { Icon } from '@/ui/primitives/Icon';
@@ -18,7 +18,7 @@ import type { Rel } from '@/ui/modals/AddFamilyMemberModal';
  */
 const TAPES = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .8)', 'rgb(232 120 110 / .75)', 'rgb(127 166 94 / .75)'];
 const FILLS = ['var(--color-honey)', 'var(--color-berry)', 'var(--color-sky)', 'var(--color-leaf)', 'var(--color-honey-band)', 'var(--color-berry-pale)', 'var(--color-sky-pale)', 'var(--color-leaf-pale)'];
-const REL: Record<Relationship, string> = { CHILD: 'little one', PARENT: 'parent', GRANDPARENT: 'grandparent', AUNT_UNCLE: 'aunt / uncle', CLOSE_FRIEND: 'close friend', OTHER: 'family friend' };
+const REL: Record<Relationship, string> = { CHILD: 'little one', PARENT: 'parent', ADULT_CHILD: 'grown-up child', GRANDPARENT: 'grandparent', AUNT_UNCLE: 'aunt / uncle', CLOSE_FRIEND: 'close friend', OTHER: 'family friend' };
 const ACCESS: Record<AccessLevel, string> = { VIEW: 'views', VIEW_BUY: 'views & buys', CONTRIBUTE: 'views, buys & adds' };
 
 function ageOf(iso: string | null): string | null {
@@ -123,10 +123,12 @@ export function FamilyPinboard({
   data: FamilyData;
   onManageMember: (m: FamilyMember) => void;
   onManageChild: (c: FamilyChild) => void;
-  onAdd: (rel: Rel) => void;
+  onAdd: (rel: Rel, circle?: Circle) => void;
 }) {
   const owner = data.viewerIsOwner;
   const me = data.members.find((m) => m.isOwner) ?? null;
+  // D27: home = the leader, a partner / co-parent and grown-up children (and the little ones, who aren't accounts)
+  const home = data.members.filter((m) => !m.isOwner && m.circle === 'HOME');
   const familyCircle = data.members.filter((m) => !m.isOwner && m.circle === 'FAMILY');
   const extended = data.members.filter((m) => !m.isOwner && m.circle === 'EXTENDED');
   let n = 0;
@@ -162,8 +164,10 @@ export function FamilyPinboard({
         ))}
       </div>
       <div className="mt-8 grid gap-8">
-        <Row label="home" tape={TAPES[0]!} sub="you and the little ones — every keepsake starts here">
+        <Row label="home" tape={TAPES[0]!} sub="you, the little ones and the grown-ups at home — every keepsake starts here">
           {me ? memberTile(me) : null}
+          {home.map(memberTile)}
+          {data.pendingInvites.filter((i) => i.circle === 'HOME').map((inv) => <Invited key={inv.id} inv={inv} owner={owner} />)}
           {data.children.map((c) => (
             <Polaroid
               key={c.id}
@@ -177,17 +181,18 @@ export function FamilyPinboard({
             />
           ))}
           {owner ? <AddTile label="add a little one" onClick={() => onAdd('Child')} /> : null}
+          {owner ? <AddTile label="invite to home" onClick={() => onAdd('Parent', 'HOME')} /> : null}
         </Row>
         <Row label="family circle" tape={TAPES[1]!} sub="sees everything you share with family">
           {familyCircle.map(memberTile)}
           {data.pendingInvites.filter((i) => i.circle === 'FAMILY').map((inv) => <Invited key={inv.id} inv={inv} owner={owner} />)}
-          {owner ? <AddTile label="invite" onClick={() => onAdd('Parent')} /> : null}
+          {owner ? <AddTile label="invite" onClick={() => onAdd('Grandparent', 'FAMILY')} /> : null}
           {!owner && familyCircle.length === 0 ? <p className="py-6 text-xs text-ink-faint">nobody here yet</p> : null}
         </Row>
         <Row label="extended family" tape={TAPES[3]!} sub="grandparents, aunts, uncles and close friends — sees what you share with them">
           {extended.map(memberTile)}
           {data.pendingInvites.filter((i) => i.circle === 'EXTENDED').map((inv) => <Invited key={inv.id} inv={inv} owner={owner} />)}
-          {owner ? <AddTile label="invite" onClick={() => onAdd('Grandparent')} /> : null}
+          {owner ? <AddTile label="invite" onClick={() => onAdd('Grandparent', 'EXTENDED')} /> : null}
           {!owner && extended.length === 0 ? <p className="py-6 text-xs text-ink-faint">nobody here yet</p> : null}
         </Row>
       </div>

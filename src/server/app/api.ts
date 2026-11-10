@@ -6,7 +6,7 @@ import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/
 import { assetRefOf } from '@/server/assetRef';
 import { loadCatalogue } from '@/server/catalogue';
 import { addChild, updateChild } from '@/server/children';
-import { createGiftLink } from '@/server/giftLinks';
+import { createGiftLink, NothingToShowError } from '@/server/giftLinks';
 import { ingestOriginalAsset, type ScreeningOptions } from '@/server/ingest';
 import { appUrl } from '@/server/mail';
 import { getOrdersForAccount } from '@/server/orders';
@@ -375,9 +375,12 @@ export async function mintAppWish(db: DbHandle, av: AppViewer, body: Record<stri
     if (c) title = `${c.firstName}’s wishlist`;
   }
   try {
-    const { token } = await createGiftLink(db, av.viewer, { familyId: av.familyId, assetIds: [row.id], productKey, title, invite: null });
+    // an app share-sheet link: we can't know who opens it, so it shows extended-level keepsakes only (D27, founder answer C)
+    const { token } = await createGiftLink(db, av.viewer, { familyId: av.familyId, assetIds: [row.id], productKey, title, recipient: { kind: 'open', circle: 'EXTENDED' } });
     return { url: appUrl(`/g/${token}`) };
   } catch (e) {
+    // a family-only (or narrower) drawing: an open link can't show it — widen it on the website first (D27)
+    if (e instanceof NothingToShowError) throw new AppApiError(409, 'family-only');
     // not cleared yet (or the product can't go on a gift link): the app says "not just yet"
     if (e instanceof AuthzError) throw new AppApiError(409, 'not-ready');
     throw e;

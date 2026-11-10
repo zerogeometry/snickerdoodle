@@ -75,7 +75,7 @@ export async function finishPendingKeepsAction(): Promise<{ ok: boolean; kept: s
   return { ok: true, kept };
 }
 
-/** Change a keepsake's visibility (controller-only; re-checked server-side). */
+/** Change who sees a keepsake (D27: whoever added it chooses; a little one’s parent may only narrow — re-checked server-side). */
 export async function setAssetVisibilityAction(
   assetId: string,
   tier: VisibilityTier,

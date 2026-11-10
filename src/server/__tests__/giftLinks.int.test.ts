@@ -49,7 +49,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
     const before = Date.now();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     // a gift link works for 14 days (founder, 2026-10-21), not a month
     const [row] = await db.select({ expiresAt: schema.giftLinks.expiresAt }).from(schema.giftLinks).where(eq(schema.giftLinks.token, token));
     expect(GIFT_LINK_TTL_DAYS).toBe(14);
@@ -69,7 +69,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('N7: when one keepsake on a link is held, no preview loads, not even for the one still fine', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const [fine, held] = [await keptAsset(), await keptAsset()];
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [fine, held] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [fine, held], recipient: { kind: 'open', circle: 'FAMILY' } });
     expect(await giftLinkPreview(db, token, fine)).not.toBeNull();
     await db.update(assets).set({ moderationStatus: 'FLAGGED' }).where(eq(assets.id, held));
     expect((await getGiftLink(db, token)).state).toBe('gone');
@@ -81,17 +81,17 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('a non-owner cannot create or revoke a link', async () => {
     const rosie = await resolveViewerContext(db, ids.rosieId, ids.hartleyId); // member, not owner
     const assetId = await keptAsset();
-    await expect(createGiftLink(db, rosie, { familyId: ids.hartleyId, assetIds: [assetId] })).rejects.toBeInstanceOf(AuthzError);
+    await expect(createGiftLink(db, rosie, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } })).rejects.toBeInstanceOf(AuthzError);
 
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const { id } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { id } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     await expect(revokeGiftLink(db, rosie, id)).rejects.toBeInstanceOf(AuthzError);
   });
 
   it('a deleted source keepsake makes the link "gone" (never serves missing bytes)', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
 
     await db.delete(assets).where(eq(assets.id, assetId)); // parent removed the keepsake
     const view = await getGiftLink(db, token);
@@ -101,7 +101,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('revoking turns the link off', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
 
     await revokeGiftLink(db, sam, id);
     const view = await getGiftLink(db, token);
@@ -111,7 +111,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('an expired link is no longer served', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
 
     await db.update(giftLinks).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(giftLinks.id, id));
     const view = await getGiftLink(db, token);
@@ -121,7 +121,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('a guest sees the gift list (no membership needed)', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     // getGiftLink takes no viewer — it's intentionally accessible to anyone with the token
     const view = await getGiftLink(db, token);
     expect(view.state).toBe('active');
@@ -132,13 +132,13 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const assetId = await keptAsset();
     await db.update(assets).set({ moderationStatus: 'BLOCKED' }).where(eq(assets.id, assetId));
     // the only chosen keepsake is blocked → nothing shareable
-    await expect(createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] })).rejects.toBeInstanceOf(AuthzError);
+    await expect(createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } })).rejects.toBeInstanceOf(AuthzError);
   });
 
   it('a link whose source becomes uncleared serves "gone" — never an URL to BLOCKED bytes', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] }); // CLEAR at creation
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } }); // CLEAR at creation
     expect((await getGiftLink(db, token)).state).toBe('active');
 
     await db.update(assets).set({ moderationStatus: 'BLOCKED' }).where(eq(assets.id, assetId));
@@ -149,7 +149,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
   it('the preview is small + re-encoded, never the original', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset(2000);
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     const img = await giftLinkPreview(db, token, assetId);
     expect(img).not.toBeNull();
     const meta = await sharp(img!).metadata();
@@ -163,7 +163,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset(64);
     const other = await keptAsset(64);
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     // start from "no mockup frozen" whatever this machine's mockup templates are (some envs compose one at sharing)
     const [fresh] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
     await db.update(giftLinks).set({ items: (fresh!.items as object[]).map((i) => ({ ...i, mockupObjectId: null })) }).where(eq(giftLinks.id, fresh!.id));
@@ -195,7 +195,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const inLink = await keptAsset();
     const other = await keptAsset();
-    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [inLink] });
+    const { id, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [inLink], recipient: { kind: 'open', circle: 'FAMILY' } });
     expect(await giftLinkPreview(db, token, other)).toBeNull(); // the token is never widened
     expect(await giftLinkPreview(db, 'no-such-token', inLink)).toBeNull();
     await revokeGiftLink(db, sam, id);
@@ -206,7 +206,7 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const kept = await keptAsset();
     const hidden = await keptAsset();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [kept, hidden] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [kept, hidden], recipient: { kind: 'open', circle: 'FAMILY' } });
     await db.update(assets).set({ visibility: 'ONLY_ME' }).where(eq(assets.id, hidden));
 
     const view = await getGiftLink(db, token);

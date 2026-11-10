@@ -324,7 +324,7 @@ describe.skipIf(!DB || !S3)('break-in: in-family escalation + forgery (integrati
       .returning();
     const [variant] = await db.select({ sku: schema.productVariants.sku }).from(schema.productVariants).innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId)).where(and(eq(schema.products.key, 'mug'), eq(schema.productVariants.isDefault, true)));
     const [design] = await db.insert(schema.savedDesigns).values({ familyId: ids.hartleyId, createdByAccountId: ids.samId, assetId: famNoChild, variantSku: variant!.sku, transform: TRANSFORM, sourceObjectId: cut!.id }).returning();
-    const { id: linkId } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [design!.id] });
+    const { id: linkId } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [design!.id], recipient: { kind: 'open', circle: 'FAMILY' } });
     const [link] = await db.select().from(giftLinks).where(eq(giftLinks.id, linkId));
     const item = (link!.items as { sourceObjectId?: string | null }[])[0]!;
     expect(item.sourceObjectId, 'the link holds its own copy, not the live cut-out').not.toBe(cut!.id);

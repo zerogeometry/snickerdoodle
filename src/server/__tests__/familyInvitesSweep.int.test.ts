@@ -17,6 +17,8 @@ import { ingestOriginalAsset } from '@/server/ingest';
 import { copyKeepsake } from '@/server/keepsakeCopy';
 import { deleteObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
+const YES = { version: JOIN_CONSENT_VERSION };
 
 /**
  * Test sweep 2026-10-29 (tester 04 — family, invites, notifications). Pins the invite edge cases the
@@ -87,7 +89,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' });
     expect(token.length).toBeGreaterThanOrEqual(32); // 24 random bytes, base64url
     for (const bad of [`${token}x`, token.slice(0, -1), token.toUpperCase() === token ? token.toLowerCase() : token.toUpperCase(), 'not-a-token', '']) {
-      expect(await acceptInvite(db, who, bad)).toMatchObject({ ok: false, reason: 'not-found' });
+      expect(await acceptInvite(db, who, bad, YES)).toMatchObject({ ok: false, reason: 'not-found' });
       expect(await getInviteForDisplay(db, bad)).toBeNull();
     }
     expect(await db.select().from(memberships).where(eq(memberships.accountId, who.id))).toHaveLength(0);
@@ -98,7 +100,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     const { inviteId, token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' });
     expect((await revokeInvite(db, await owner(), { familyId: ids.hartleyId, inviteId })).ok).toBe(true);
     expect((await getInviteForDisplay(db, token))?.status).toBe('REVOKED');
-    expect(await acceptInvite(db, who, token)).toMatchObject({ ok: false, reason: 'used' });
+    expect(await acceptInvite(db, who, token, YES)).toMatchObject({ ok: false, reason: 'used' });
     expect(await db.select().from(memberships).where(eq(memberships.accountId, who.id))).toHaveLength(0);
     expect(await audits('INVITE_REVOKED', inviteId)).toHaveLength(1);
   });
@@ -111,8 +113,8 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     if (!res.ok) return;
     expect(res.token).not.toBe(oldToken);
     expect(res.email).toBe(who.email);
-    expect(await acceptInvite(db, who, oldToken)).toMatchObject({ ok: false, reason: 'not-found' });
-    expect((await acceptInvite(db, who, res.token)).ok).toBe(true);
+    expect(await acceptInvite(db, who, oldToken, YES)).toMatchObject({ ok: false, reason: 'not-found' });
+    expect((await acceptInvite(db, who, res.token, YES)).ok).toBe(true);
     const sent = await audits('INVITE_SENT', inviteId);
     expect(sent.some((a) => (a.metadata as { resent?: boolean } | null)?.resent === true)).toBe(true);
     // a non-owner can't resend (or learn the new token)
@@ -123,7 +125,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
   it('accepting with the invited address in a different case works (identity is the address, not its case)', async () => {
     const who = await newAccount('casey');
     const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW' });
-    const res = await acceptInvite(db, { id: who.id, email: who.email.toUpperCase() }, token);
+    const res = await acceptInvite(db, { id: who.id, email: who.email.toUpperCase() }, token, YES);
     expect(res.ok).toBe(true);
     const v = await resolveViewerContext(db, who.id, ids.hartleyId);
     expect(v.membership).toMatchObject({ status: 'ACTIVE', circle: 'EXTENDED', accessLevel: 'VIEW', isOwner: false });
@@ -143,7 +145,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     for (const c of cases) {
       const who = await newAccount(`m-${c.rel}-${c.access}`.toLowerCase());
       const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: c.rel, accessLevel: c.access });
-      expect((await acceptInvite(db, who, token)).ok).toBe(true);
+      expect((await acceptInvite(db, who, token, YES)).ok).toBe(true);
       const v = await resolveViewerContext(db, who.id, ids.hartleyId);
       expect(v.membership, `${c.rel}/${c.access}`).toMatchObject({ status: 'ACTIVE', circle: c.circle, accessLevel: c.access });
       // what they then SEE: Family circle → FAMILY + EXTENDED (+ Jo's FAMILY one); Extended → EXTENDED only. Never ONLY_ME.
@@ -158,14 +160,14 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
   it('re-inviting after removal: a fresh invite joins again, at the NEW invite’s circle/access', async () => {
     const who = await newAccount('again');
     const first = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE' });
-    expect((await acceptInvite(db, who, first.token)).ok).toBe(true);
+    expect((await acceptInvite(db, who, first.token, YES)).ok).toBe(true);
     expect((await removeMember(db, await owner(), { familyId: ids.hartleyId, memberAccountId: who.id })).ok).toBe(true);
     expect((await resolveViewerContext(db, who.id, ids.hartleyId)).membership?.status).toBe('REMOVED');
     // the old (spent) link can't bring them back
-    expect(await acceptInvite(db, who, first.token)).toMatchObject({ ok: false, reason: 'used' });
+    expect(await acceptInvite(db, who, first.token, YES)).toMatchObject({ ok: false, reason: 'used' });
 
     const second = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW' });
-    expect((await acceptInvite(db, who, second.token)).ok).toBe(true);
+    expect((await acceptInvite(db, who, second.token, YES)).ok).toBe(true);
     const v = await resolveViewerContext(db, who.id, ids.hartleyId);
     expect(v.membership).toMatchObject({ status: 'ACTIVE', circle: 'EXTENDED', accessLevel: 'VIEW' });
     const rows = await db.select().from(memberships).where(and(eq(memberships.familyId, ids.hartleyId), eq(memberships.accountId, who.id)));
@@ -175,7 +177,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
   it('two accepts of one invite at once never make two memberships', async () => {
     const who = await newAccount('race');
     const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW_BUY' });
-    const results = await Promise.allSettled([acceptInvite(db, who, token), acceptInvite(db, who, token)]);
+    const results = await Promise.allSettled([acceptInvite(db, who, token, YES), acceptInvite(db, who, token, YES)]);
     const values = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
     // the loser's answer depends on the timing: told "used", told ok because it found the winner's
     // membership already there (it joins nobody — "you're already in"), or refused by the partial
@@ -190,7 +192,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
   it('changing a member’s circle and access bites on their very next read, each change audited', async () => {
     const who = await newAccount('promote');
     const { token } = await createInvite(db, await owner(), { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW' });
-    await acceptInvite(db, who, token);
+    await acceptInvite(db, who, token, YES);
     let v = await resolveViewerContext(db, who.id, ids.hartleyId);
     const familyRef = assetRefOf((await db.select().from(schema.assets).where(eq(schema.assets.id, ids.assetFamily)))[0]!);
     expect(canViewAsset(familyRef, v).allowed).toBe(false);
@@ -246,10 +248,10 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     const sam = await owner();
     const first = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'GRANDPARENT', accessLevel: 'VIEW' });
     const second = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE' });
-    expect((await acceptInvite(db, who, first.token)).ok).toBe(true);
+    expect((await acceptInvite(db, who, first.token, YES)).ok).toBe(true);
     const [left] = await db.select({ status: invites.status }).from(invites).where(eq(invites.id, second.inviteId));
     expect(left!.status).toBe('REVOKED');
-    expect(await acceptInvite(db, who, second.token)).toMatchObject({ ok: false, reason: 'used' });
+    expect(await acceptInvite(db, who, second.token, YES)).toMatchObject({ ok: false, reason: 'used' });
     const m = await resolveViewerContext(db, who.id, ids.hartleyId);
     expect(m.membership).toMatchObject({ circle: 'EXTENDED', accessLevel: 'VIEW' });
     // the spent one is in the audit log, with why
@@ -275,7 +277,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
     const sam = await owner();
     const inv = await createInvite(db, sam, { familyId: ids.hartleyId, email: who.email, relationship: 'AUNT_UNCLE', accessLevel: 'VIEW' });
     expect((await revokeInvite(db, sam, { familyId: ids.hartleyId, inviteId: inv.inviteId })).ok).toBe(true);
-    expect(await acceptInvite(db, who, inv.token)).toMatchObject({ ok: false });
+    expect(await acceptInvite(db, who, inv.token, YES)).toMatchObject({ ok: false });
     expect((await resolveViewerContext(db, who.id, ids.hartleyId)).membership).toBeNull();
   });
 
@@ -292,7 +294,7 @@ describe.skipIf(!URL)('test sweep 04 — invites, membership, audit (integration
       const [after] = await db.select({ status: invites.status }).from(invites).where(eq(invites.id, inv.inviteId));
       expect(after!.status).toBe('REVOKED');
       expect((await audits('INVITE_REVOKED', inv.inviteId))[0]?.metadata).toMatchObject({ reason: 'gift-link-revoked' });
-      expect(await acceptInvite(db, who, inv.token)).toMatchObject({ ok: false, reason: 'used' });
+      expect(await acceptInvite(db, who, inv.token, YES)).toMatchObject({ ok: false, reason: 'used' });
     } finally {
       await db.delete(giftLinks).where(eq(giftLinks.id, link!.id));
     }

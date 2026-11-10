@@ -1,8 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { assets } from '@/db/schema';
-import { adoptEphemeralDraft, resolveViewerContext } from '@/server/assets';
+import { adoptEphemeralDraft, changeAssetVisibility, resolveViewerContext } from '@/server/assets';
 import { resolveChildSubject } from '@/server/children';
-import { createGiftLink, type GiftLineInput } from '@/server/giftLinks';
+import { createGiftLink, NothingToShowError, type GiftLineInput } from '@/server/giftLinks';
+import { CIRCLES, type Circle } from '@/domain/types';
+import { effectiveVisibility, isNarrower, planVisibilityChange } from '@/authz';
+import { assetRefOf } from './assetRef';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { screenChildFirstName } from '@/server/textSafety';
 import type { DbHandle } from './db';
@@ -15,6 +18,11 @@ export interface MintWishInput {
   lines?: GiftLineInput[];
   /** The child this wish is FOR — first name only; screened + turned into the title here. */
   subject?: string | null;
+  /** "who's it for?" (D27, founder answer C): we can't know who opens a shared link, so the parent picks the circle
+   * it shows for. Extended unless they say otherwise. */
+  circle?: Circle;
+  /** The parent's explicit "share them with that circle too": widen THEIR OWN keepsakes on the wish to it first. */
+  widen?: boolean;
 }
 
 /**
@@ -37,7 +45,8 @@ export async function mintWish(
   account: { id: string; name: string | null },
   uploadClaims: string[],
   input: MintWishInput,
-): Promise<{ ok: boolean; url?: string; reason?: 'name' }> {
+): Promise<{ ok: boolean; url?: string; reason?: 'name' | 'too-private' }> {
+  const circle: Circle = input.circle && (CIRCLES as readonly string[]).includes(input.circle) ? input.circle : 'EXTENDED';
   const lines = (input.lines ?? []).filter((l) => l && typeof l.assetId === 'string' && typeof l.variantSku === 'string').slice(0, 50);
   const ids = [...new Set([...(input.assetIds ?? []), ...lines.map((l) => l.assetId)].filter(Boolean))];
   if (ids.length === 0) return { ok: false };
@@ -77,6 +86,15 @@ export async function mintWish(
   }
 
   const viewer = await resolveViewerContext(db, account.id, familyId);
+  // their explicit "share them with that circle too": only keepsakes THEY may widen (the adder's choice — D27)
+  if (input.widen) {
+    const rows = await db.select().from(assets).where(and(inArray(assets.id, adopted), eq(assets.familyId, familyId)));
+    for (const r of rows) {
+      const ref = assetRefOf(r);
+      if (!isNarrower(effectiveVisibility(ref), circle)) continue;
+      if (planVisibilityChange(ref, viewer, circle).allowed) await changeAssetVisibility(db, r.id, viewer, circle);
+    }
+  }
   try {
     // the wish sells what's in the basket (06-B2): its lines as made; bare keepsakes only for an old caller
     const { token } = await createGiftLink(db, viewer, {
@@ -84,10 +102,11 @@ export async function mintWish(
       assetIds: lines.length ? [] : ids,
       lines,
       title,
-      invite: null,
+      recipient: { kind: 'open', circle },
     });
     return { ok: true, url: `/g/${token}` };
-  } catch {
+  } catch (e) {
+    if (e instanceof NothingToShowError) return { ok: false, reason: 'too-private' };
     return { ok: false };
   }
 }

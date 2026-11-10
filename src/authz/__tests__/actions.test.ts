@@ -7,11 +7,14 @@ import {
   canDeleteAsset,
   canManageFamily,
   canSetAssetVisibility,
+  planVisibilityChange,
+  visibilityChoicesFor,
   type AssetRef,
   type Membership,
   type ViewerContext,
 } from '../index';
-import type { AccessLevel } from '../../domain/types';
+import { CIRCLES, VISIBILITY_TIERS, type AccessLevel, type VisibilityTier } from '../../domain/types';
+import { circleSees } from '../tiers';
 
 function mem(over: Partial<Membership> = {}): Membership {
   return {
@@ -57,65 +60,112 @@ describe('canManageFamily (owner only, for now)', () => {
     expect(canManageFamily(mem({ isOwner: true, status: 'REMOVED' }))).toBe(false));
 });
 
-describe('canSetAssetVisibility (the asset controller, while an active member)', () => {
-  const asset: AssetRef = {
+/**
+ * WHO SETS a keepsake's tier (D27, founder 10 Nov 2026): whoever added it chooses, any tier up to the little one's
+ * parent's ceiling; the child's parent may only narrow (their ceiling) or lift it back to the adder's choice
+ * (founder answer B) — never wider. Nobody else; only while ACTIVE.
+ */
+describe('setting who sees a keepsake — the adder vs the child’s parent', () => {
+  const RELATIVE = 'acct-uploader';
+  const PARENT = 'acct-controller';
+  const childAsset = (visibility: VisibilityTier, parentLimit: VisibilityTier | null = null): AssetRef => ({
     id: 'a1',
     familyId: 'fam-A',
-    uploaderAccountId: 'acct-uploader',
-    controllerAccountId: 'acct-controller',
-    visibility: 'FAMILY',
+    uploaderAccountId: RELATIVE,
+    controllerAccountId: PARENT,
+    visibility,
+    parentLimit,
     heldForReview: false,
-  };
-  const activeIn = (accountId: string): ViewerContext => ({
+  });
+  const ownAsset = (visibility: VisibilityTier): AssetRef => ({ ...childAsset(visibility), uploaderAccountId: PARENT });
+  const activeIn = (accountId: string, over: Partial<Membership> = {}): ViewerContext => ({
     accountId,
-    membership: mem({ accountId, familyId: 'fam-A' }),
+    membership: mem({ accountId, familyId: 'fam-A', ...over }),
   });
 
-  it('the controller (active member) can set visibility', () =>
-    expect(canSetAssetVisibility(asset, activeIn('acct-controller'))).toBe(true));
-  it('a REMOVED controller cannot set visibility', () =>
-    expect(
-      canSetAssetVisibility(asset, {
-        accountId: 'acct-controller',
-        membership: mem({ accountId: 'acct-controller', familyId: 'fam-A', status: 'REMOVED' }),
-      }),
-    ).toBe(false));
-  it('the non-controller uploader cannot set visibility', () =>
-    expect(canSetAssetVisibility(asset, activeIn('acct-uploader'))).toBe(false));
-  it('a stranger cannot set visibility', () =>
-    expect(canSetAssetVisibility(asset, activeIn('acct-other'))).toBe(false));
-  it('anonymous cannot set visibility', () =>
-    expect(canSetAssetVisibility(asset, { accountId: null, membership: null })).toBe(false));
+  it('the adder may pick ANY tier on their own keepsake (not just the family leader)', () => {
+    for (const next of VISIBILITY_TIERS) {
+      const plan = planVisibilityChange(ownAsset('FAMILY'), activeIn(PARENT, { circle: 'EXTENDED' }), next);
+      expect(plan).toEqual({ allowed: true, role: 'adder', patch: { visibility: next } });
+    }
+  });
+
+  it('a relative who added a little one’s keepsake chooses its tier (the originator keeps the choice)', () => {
+    expect(canSetAssetVisibility(childAsset('FAMILY'), activeIn(RELATIVE, { circle: 'EXTENDED' }))).toBe(true);
+    expect(planVisibilityChange(childAsset('FAMILY'), activeIn(RELATIVE), 'EXTENDED')).toMatchObject({ allowed: true, patch: { visibility: 'EXTENDED' } });
+  });
+
+  it('the child’s parent may make it more private (their ceiling), at every narrower tier', () => {
+    for (const next of ['ONLY_ME', 'HOME', 'FAMILY'] as const) {
+      expect(planVisibilityChange(childAsset('EXTENDED'), activeIn(PARENT), next)).toEqual({ allowed: true, role: 'childParent', patch: { parentLimit: next } });
+    }
+  });
+
+  it('the child’s parent can NEVER widen past the adder’s choice', () => {
+    for (const next of ['FAMILY', 'EXTENDED'] as const) {
+      expect(planVisibilityChange(childAsset('HOME'), activeIn(PARENT), next).allowed).toBe(false);
+    }
+  });
+
+  it('the child’s parent may lift their own ceiling back to the adder’s choice (answer B) — that clears it', () => {
+    expect(planVisibilityChange(childAsset('EXTENDED', 'HOME'), activeIn(PARENT), 'EXTENDED')).toEqual({ allowed: true, role: 'childParent', patch: { parentLimit: null } });
+    expect(planVisibilityChange(childAsset('EXTENDED', 'ONLY_ME'), activeIn(PARENT), 'FAMILY')).toEqual({ allowed: true, role: 'childParent', patch: { parentLimit: 'FAMILY' } });
+  });
+
+  it('the adder can only move it at or under the parent’s ceiling', () => {
+    const capped = childAsset('EXTENDED', 'HOME');
+    expect(planVisibilityChange(capped, activeIn(RELATIVE), 'ONLY_ME').allowed).toBe(true);
+    expect(planVisibilityChange(capped, activeIn(RELATIVE), 'HOME').allowed).toBe(true);
+    expect(planVisibilityChange(capped, activeIn(RELATIVE), 'FAMILY').allowed).toBe(false);
+    expect(planVisibilityChange(capped, activeIn(RELATIVE), 'EXTENDED').allowed).toBe(false);
+    expect(visibilityChoicesFor(capped, activeIn(RELATIVE))).toEqual({ role: 'adder', widest: 'HOME', current: 'HOME' });
+  });
+
+  it('nobody else may change it: the leader, a CONTRIBUTE home member, a stranger, anonymous', () => {
+    for (const v of [
+      activeIn('acct-lead', { isOwner: true, circle: 'HOME' }),
+      activeIn('acct-h', { circle: 'HOME', accessLevel: 'CONTRIBUTE' }),
+      activeIn('acct-other'),
+      { accountId: null, membership: null } as ViewerContext,
+    ]) {
+      expect(canSetAssetVisibility(childAsset('FAMILY'), v)).toBe(false);
+      expect(planVisibilityChange(childAsset('FAMILY'), v, 'ONLY_ME').allowed).toBe(false);
+    }
+  });
+
+  it('removed / left / other-family adders and parents can change nothing', () => {
+    for (const status of ['REMOVED', 'LEFT'] as const) {
+      expect(canSetAssetVisibility(childAsset('FAMILY'), activeIn(RELATIVE, { status }))).toBe(false);
+      expect(canSetAssetVisibility(childAsset('FAMILY'), activeIn(PARENT, { status }))).toBe(false);
+    }
+    expect(canSetAssetVisibility(childAsset('FAMILY'), { accountId: PARENT, membership: mem({ accountId: PARENT, familyId: 'fam-B' }) })).toBe(false);
+  });
+
+  it('an unknown tier is refused', () => {
+    expect(planVisibilityChange(ownAsset('FAMILY'), activeIn(PARENT), 'PUBLIC' as VisibilityTier).allowed).toBe(false);
+  });
 });
 
-describe('canDeleteAsset (controller-only, while an active member — NN8)', () => {
+describe('canDeleteAsset (whoever added it, or the little one’s parent, while active — NN8)', () => {
   const asset: AssetRef = {
     id: 'a1',
     familyId: 'fam-A',
     uploaderAccountId: 'acct-uploader',
     controllerAccountId: 'acct-controller',
     visibility: 'FAMILY',
+    parentLimit: null,
     heldForReview: false,
   };
-  const activeIn = (accountId: string): ViewerContext => ({ accountId, membership: mem({ accountId, familyId: 'fam-A' }) });
+  const activeIn = (accountId: string, over: Partial<Membership> = {}): ViewerContext => ({ accountId, membership: mem({ accountId, familyId: 'fam-A', ...over }) });
 
-  it('the controlling parent (active) can delete', () =>
-    expect(canDeleteAsset(asset, activeIn('acct-controller'))).toBe(true));
-  it('the non-controller uploader (e.g. a co-uploading relative) cannot delete', () =>
-    expect(canDeleteAsset(asset, activeIn('acct-uploader'))).toBe(false));
-  it('a removed controller cannot delete', () =>
-    expect(
-      canDeleteAsset(asset, {
-        accountId: 'acct-controller',
-        membership: mem({ accountId: 'acct-controller', familyId: 'fam-A', status: 'REMOVED' }),
-      }),
-    ).toBe(false));
-  it('an Extended-circle member (not controller) cannot delete', () =>
-    expect(canDeleteAsset(asset, { accountId: 'acct-x', membership: mem({ accountId: 'acct-x', familyId: 'fam-A', circle: 'EXTENDED' }) })).toBe(false));
+  it('the little one’s parent (active) can always take it off', () => expect(canDeleteAsset(asset, activeIn('acct-controller'))).toBe(true));
+  it('the relative who added it can delete their own upload', () => expect(canDeleteAsset(asset, activeIn('acct-uploader', { circle: 'EXTENDED' }))).toBe(true));
+  it('the family leader who neither added it nor is the child’s parent cannot', () => expect(canDeleteAsset(asset, activeIn('acct-lead', { isOwner: true }))).toBe(false));
+  it('a removed parent cannot delete', () => expect(canDeleteAsset(asset, activeIn('acct-controller', { status: 'REMOVED' }))).toBe(false));
+  it('a CONTRIBUTE home member who didn’t add it cannot delete', () => expect(canDeleteAsset(asset, activeIn('acct-x', { circle: 'HOME', accessLevel: 'CONTRIBUTE' }))).toBe(false));
   it('a member of ANOTHER family cannot delete (family-scope)', () =>
     expect(canDeleteAsset(asset, { accountId: 'acct-controller', membership: mem({ accountId: 'acct-controller', familyId: 'fam-B' }) })).toBe(false));
-  it('anonymous cannot delete', () =>
-    expect(canDeleteAsset(asset, { accountId: null, membership: null })).toBe(false));
+  it('anonymous cannot delete', () => expect(canDeleteAsset(asset, { accountId: null, membership: null })).toBe(false));
 });
 
 /**
@@ -124,8 +174,8 @@ describe('canDeleteAsset (controller-only, while an active member — NN8)', () 
  * family-scope / removed-member / held / ephemeral-draft cases.
  */
 describe('canEditAsset / canBuyAsset — tier × circle × access × actor', () => {
-  const tiers = ['ONLY_ME', 'FAMILY', 'EXTENDED'] as const;
-  const circles = ['FAMILY', 'EXTENDED'] as const;
+  const tiers = VISIBILITY_TIERS;
+  const circles = CIRCLES;
   const levels: AccessLevel[] = ['VIEW', 'VIEW_BUY', 'CONTRIBUTE'];
   const asset = (visibility: (typeof tiers)[number], over: Partial<AssetRef> = {}): AssetRef => ({
     id: 'a1',
@@ -133,6 +183,7 @@ describe('canEditAsset / canBuyAsset — tier × circle × access × actor', () 
     uploaderAccountId: 'acct-controller',
     controllerAccountId: 'acct-controller',
     visibility,
+    parentLimit: null,
     heldForReview: false,
     ...over,
   });
@@ -140,7 +191,7 @@ describe('canEditAsset / canBuyAsset — tier × circle × access × actor', () 
     accountId: 'acct-member',
     membership: mem({ accountId: 'acct-member', circle, accessLevel, ...over }),
   });
-  const sees = (tier: string, circle: string) => tier === 'EXTENDED' || (tier === 'FAMILY' && circle === 'FAMILY');
+  const sees = (tier: VisibilityTier, circle: (typeof circles)[number]) => circleSees(circle, tier);
 
   for (const tier of tiers) {
     for (const circle of circles) {

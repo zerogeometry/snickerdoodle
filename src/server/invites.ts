@@ -2,8 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { and, eq, gt, ne, sql } from 'drizzle-orm';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import { accounts, auditRecords, families, invites, memberships } from '@/db/schema';
-import { defaultCircleFor } from '@/domain/relationships';
-import { ACCESS_LEVELS, RELATIONSHIPS, type AccessLevel, type Relationship } from '@/domain/types';
+import { circleAllowedFor, defaultCircleFor } from '@/domain/relationships';
+import { ACCESS_LEVELS, RELATIONSHIPS, type AccessLevel, type Circle, type Relationship } from '@/domain/types';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
 import type { DbHandle } from './db';
 import { familyNameForRelatives } from './onboarding';
 import { sendMail } from './mail';
@@ -38,7 +39,7 @@ export class InvalidInviteError extends Error {
  */
 export class NotInvitableError extends InvalidInviteError {
   readonly reason = 'not-invitable' as const;
-  constructor(readonly why: 'child' | 'relationship' | 'access') {
+  constructor(readonly why: 'child' | 'relationship' | 'access' | 'circle') {
     super();
     this.message = why === 'child' ? 'children are added by first name, never invited' : `unknown ${why}`;
   }
@@ -63,17 +64,21 @@ export interface CreateInviteInput {
   /** Share the family calendar (children's birthdays) with them — the parent's explicit
    * choice (pre-ticked in the invite form). Absent ⇒ not shared. */
   shareOccasions?: boolean;
+  /** The leader's circle choice (D27: invite-time override). Absent ⇒ the relationship's default. Checked
+   * server-side: home only for a parent or grown-up child. */
+  circle?: Circle;
 }
 
 /** Children are keepsake subjects, never account holders (NN3) — so never invited. */
-const INVITABLE_RELATIONSHIPS = new Set<Relationship>(['PARENT', 'GRANDPARENT', 'AUNT_UNCLE', 'CLOSE_FRIEND', 'OTHER']);
+const INVITABLE_RELATIONSHIPS = new Set<Relationship>(['PARENT', 'ADULT_CHILD', 'GRANDPARENT', 'AUNT_UNCLE', 'CLOSE_FRIEND', 'OTHER']);
 const isInvitableEmail = (e: string) => e.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 /**
  * A parent-initiated invite (NN3: only a parent initiates invites and sets
- * access; no self-join). The circle is derived server-side from the relationship
- * — never trusted from the client. The invite confers nothing until it's accepted
- * by someone who proves they control the invited email (identity, not authority).
+ * access; no self-join). The circle is the leader's choice for that relationship, or its default — checked
+ * server-side, never trusted from the client (home only for a parent / grown-up child). The invite confers nothing
+ * until it's accepted — by someone who proves they control the invited email (identity, not authority) AND says yes
+ * on the join card (D27).
  */
 export async function createInvite(
   db: DbHandle,
@@ -97,7 +102,9 @@ export async function createInvite(
     throw new InvalidInviteError();
   }
   if (await isActiveMemberEmail(db, input.familyId, email)) throw new AlreadyInFamilyError();
-  const circle = defaultCircleFor(input.relationship); // server-authoritative
+  // server-authoritative: the leader's choice only where that relationship may have it (D27)
+  if (input.circle !== undefined && !circleAllowedFor(input.relationship, input.circle)) throw new NotInvitableError('circle');
+  const circle = input.circle ?? defaultCircleFor(input.relationship);
   const token = randomBytes(24).toString('base64url'); // unguessable
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
 
@@ -136,14 +143,21 @@ export interface InviteDisplay {
   familyName: string | null;
   status: string;
   expired: boolean;
+  /** the circle they'd join (the join card's words depend on it) */
+  circle: Circle;
+  /** the family leader's first name, for "Sam looks after the family's keepsakes" (null ⇒ "the family lead") */
+  leaderName: string | null;
+  /** an existing member being asked into home (D27), not a new join */
+  moving: boolean;
 }
 
 /** Public-safe details for the /join page (no token-derived secrets leaked). */
 export async function getInviteForDisplay(db: DbHandle, token: string): Promise<InviteDisplay | null> {
   const [row] = await db
-    .select({ invite: invites, familyName: families.displayName })
+    .select({ invite: invites, familyName: families.displayName, leader: accounts.displayName })
     .from(invites)
     .innerJoin(families, eq(invites.familyId, families.id))
+    .innerJoin(accounts, eq(accounts.id, families.ownerAccountId))
     .where(eq(invites.token, token));
   if (!row) return null;
   return {
@@ -151,6 +165,9 @@ export async function getInviteForDisplay(db: DbHandle, token: string): Promise<
     familyName: familyNameForRelatives(row.familyName),
     status: row.invite.status,
     expired: row.invite.expiresAt <= new Date(),
+    circle: row.invite.circle,
+    leaderName: row.leader?.trim().split(/\s+/)[0] || null,
+    moving: row.invite.membershipId !== null,
   };
 }
 
@@ -184,20 +201,22 @@ export async function sendInviteSignInLink(
 
 export interface AcceptResult {
   ok: boolean;
-  reason?: 'not-found' | 'used' | 'expired' | 'wrong-account';
+  reason?: 'not-found' | 'used' | 'expired' | 'wrong-account' | 'no-consent';
   familyId?: string;
 }
 
 /**
  * Accept an invite. Verification confirms IDENTITY: the signed-in account must
- * control the invited email. Creates an ACTIVE membership at the invite's circle
- * and access (the only membership path besides the owner). Single-use: the invite
- * flips to VERIFIED.
+ * control the invited email. And the joiner must have said YES on the join card (D27 — never a silent join): the
+ * consent version they saw is checked and stored on the membership with the moment. Creates an ACTIVE membership at
+ * the invite's circle and access (the only membership path besides the owner) — or, for a "move into home" invite,
+ * moves their existing membership. Single-use: the invite flips to VERIFIED.
  */
 export async function acceptInvite(
   db: DbHandle,
   account: { id: string; email: string },
   token: string,
+  consent: { version: string } | null,
 ): Promise<AcceptResult> {
   const [invite] = await db.select().from(invites).where(eq(invites.token, token));
   if (!invite) return { ok: false, reason: 'not-found' };
@@ -206,6 +225,8 @@ export async function acceptInvite(
   if (account.email.trim().toLowerCase() !== invite.email.toLowerCase()) {
     return { ok: false, reason: 'wrong-account' }; // identity check
   }
+  // …and their own yes on the join card, to the words we showed (D27)
+  if (!consent || consent.version !== JOIN_CONSENT_VERSION) return { ok: false, reason: 'no-consent' };
 
   // All or nothing, and the invite is CLAIMED first: only one accept can flip it from PENDING, so a
   // parent cancelling (or a fresh resend) at the same moment never leaves a membership behind.
@@ -218,11 +239,30 @@ export async function acceptInvite(
     if (!claimed) return null;
 
     const existing = await tx
-      .select({ id: memberships.id })
+      .select({ id: memberships.id, circle: memberships.circle })
       .from(memberships)
       .where(and(eq(memberships.familyId, invite.familyId), eq(memberships.accountId, account.id), eq(memberships.status, 'ACTIVE')));
     const isNew = !existing[0];
-    if (isNew) {
+    const consentedAt = new Date();
+    // a move-into-home link only ever moves the membership it was made for (they left / were removed since → spent)
+    if (invite.membershipId !== null && (isNew || invite.membershipId !== existing[0]!.id)) return null;
+    if (!isNew && invite.membershipId !== null) {
+      // a "move into home" invite (D27): THEIR yes moves them; nothing changed until now
+      await tx
+        .update(memberships)
+        .set({ circle: invite.circle, joinConsentVersion: consent.version, joinConsentedAt: consentedAt })
+        .where(eq(memberships.id, invite.membershipId));
+      await tx.insert(auditRecords).values({
+        familyId: invite.familyId,
+        actorAccountId: account.id,
+        actorType: 'MEMBER',
+        event: 'MEMBERSHIP_CIRCLE_CHANGED',
+        targetType: 'account',
+        targetId: account.id,
+        metadata: { from: existing[0]!.circle, to: invite.circle, consent: consent.version, via: 'their own yes' },
+      });
+    }
+    if (isNew && invite.membershipId === null) {
       await tx.insert(memberships).values({
         familyId: invite.familyId,
         accountId: account.id,
@@ -233,10 +273,12 @@ export async function acceptInvite(
         status: 'ACTIVE',
         isOwner: false,
         inviteId: invite.id,
-        joinedAt: new Date(),
+        joinedAt: consentedAt,
+        joinConsentVersion: consent.version,
+        joinConsentedAt: consentedAt,
       });
       await tx.insert(auditRecords).values([
-        { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'INVITE_ACCEPTED', targetType: 'invite', targetId: invite.id },
+        { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'INVITE_ACCEPTED', targetType: 'invite', targetId: invite.id, metadata: { consent: consent.version, circle: invite.circle } },
         { familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'MEMBERSHIP_CREATED', targetType: 'account', targetId: account.id },
       ]);
     }
@@ -252,7 +294,7 @@ export async function acceptInvite(
         spent.map((x) => ({ familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER' as const, event: 'INVITE_REVOKED' as const, targetType: 'invite', targetId: x.id, metadata: { reason: 'superseded', by: invite.id } })),
       );
     }
-    return { isNew };
+    return { isNew: isNew && invite.membershipId === null };
   });
   if (!joined) return { ok: false, reason: 'used' };
   if (joined.isNew) await tellParentTheyJoined(db, invite, account);

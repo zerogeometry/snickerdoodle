@@ -37,6 +37,8 @@ import { removeMemberAction, resendInviteAction, setMemberAccessAction } from '@
 import { closeMyAccountAction, deleteAllMyKeepsakesAction, exportMyDataAction } from '@/app/actions/data';
 import { POST as oneClickOff } from '@/app/api/reminders/off/[token]/route';
 import { exclusively } from '@/test/globalJobs';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
+const YES = { version: JOIN_CONSENT_VERSION };
 
 const DB = process.env.DATABASE_URL;
 
@@ -160,7 +162,7 @@ describe.skipIf(!DB)('sweep 04 — family emails: who, when, what (integration)'
     const [inv] = await db.select({ token: invites.token }).from(invites).where(eq(invites.email, aunt.email));
     sent.splice(0);
 
-    expect((await acceptInvite(db, aunt, inv!.token)).ok).toBe(true);
+    expect((await acceptInvite(db, aunt, inv!.token, YES)).ok).toBe(true);
     expect(sent.map((m) => [m.kind, m.to])).toEqual([['family-joined', email.sam]]);
     const m = sent[0]!;
     expect(m.subject).toBe('Bea joined your family keepsake box ✦');

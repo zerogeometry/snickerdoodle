@@ -18,7 +18,7 @@ import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
 import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
-import { leaveFamilyAction, renameFamilyAction, revokeGiftLinkAction } from '@/app/actions/family';
+import { leaveFamilyAction, renameFamilyAction, revokeGiftBatchAction, revokeGiftLinkAction } from '@/app/actions/family';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
 import { gbp } from '@/lib/store';
 import { exampleBySlug } from '@/lib/examples';
@@ -30,7 +30,7 @@ import { ReportKeepsake } from '@/ui/components/ReportKeepsake';
 import { openKeepsakeInFlow } from '@/lib/keepsakeFork';
 import { keepsakeTileActions, keepsakeTileName } from '@/lib/keepsakeTileActions';
 
-const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', FAMILY: 'Family', EXTENDED: 'Extended' };
+const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', HOME: 'Home', FAMILY: 'Family', EXTENDED: 'Extended' };
 /** The little sticker buttons on a keepsake: paper, cocoa ink + offset shadow, 36px with a 44px hit area. */
 const TILE_ACTION =
   "press relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon";
@@ -100,7 +100,8 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
   }, [highlightNew]);
 
   const greetingName = data.account.name ?? data.account.email.split('@')[0];
-  const others = data.members.filter((m) => !m.isYou).map((m) => ({ initial: m.initial, circle: m.circle }));
+  // the family leader counts as home (D27)
+  const others = data.members.filter((m) => !m.isYou).map((m) => ({ initial: m.initial, circle: m.isOwner ? ('HOME' as const) : m.circle }));
   const comingUp = nextBirthday(data.children);
   const removeDesign = async (id: string) => {
     const res = await deleteSavedDesignAction(id);
@@ -114,6 +115,13 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
     setConfirmRevoke(null);
     if (!res.ok) return toast('couldn’t switch that off — try again');
     toast('switched off — that link no longer works');
+    router.refresh();
+  };
+  const revokeBatch = async (batchId: string) => {
+    const res = await revokeGiftBatchAction(batchId);
+    setConfirmRevoke(null);
+    if (!res.ok) return toast('couldn’t switch those off — try again');
+    toast('switched off — none of those links work now');
     router.refresh();
   };
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -321,7 +329,7 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
                   <MemberAvatar
                     initial={m.initial}
                     name={m.isYou ? `${m.name} (you)` : m.name}
-                    sub={m.isOwner ? 'owner' : m.circle === 'FAMILY' ? 'family' : 'extended'}
+                    sub={m.isOwner ? 'owner' : m.circle === 'HOME' ? 'home' : m.circle === 'FAMILY' ? 'family' : 'extended'}
                     color={AVATAR_COLORS[i % AVATAR_COLORS.length]!}
                     imageUrl={m.avatarUrl}
                   />
@@ -503,8 +511,15 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
               return (
                 <div key={gl.id} className="pop-in mt-4 rounded-2xl border-2 border-cocoa bg-paper p-4" style={{ ['--i' as string]: li }}>
                   <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-extrabold text-cocoa">
-                      gift request · {new Date(gl.createdAtISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                    <p className="min-w-0 text-sm font-extrabold text-cocoa">
+                      {/* one link per person (D27): say whose link this is */}
+                      <span className="block truncate">
+                        {gl.sentTo ? `for ${gl.sentTo}` : gl.audience ? `open link · ${gl.audience === 'HOME' ? 'home' : gl.audience === 'FAMILY' ? 'family' : 'extended'}` : 'shared link'}
+                      </span>
+                      <span className="block text-[11px] font-semibold text-ink-faint">
+                        gift request · {new Date(gl.createdAtISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                        {!gl.audience ? ' · now shows extended-level keepsakes only' : ''}
+                      </span>
                     </p>
                     <p className="text-xs text-ink-soft">
                       {gl.status === 'ACTIVE'
@@ -541,14 +556,21 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
                   {gl.status === 'ACTIVE' || gl.status === 'HELD' || gl.status === 'GONE' ? (
                     confirmRevoke === gl.id ? (
                       <div role="alert" className="mt-4 flex flex-col gap-2 rounded-xl border-2 border-berry bg-berry-pale p-3 sm:flex-row sm:items-center">
-                        <p className="flex-1 text-xs text-cocoa">switch this link off? anyone holding it won&apos;t be able to open it any more.</p>
-                        <div className="flex gap-2">
+                        <p className="flex-1 text-xs text-cocoa">
+                          switch {gl.sentTo ? `${gl.sentTo}’s` : 'this'} link off? it won&apos;t open any more — everyone else&apos;s links keep working.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
                           <Button variant="secondary" size="sm" onClick={() => setConfirmRevoke(null)}>
                             keep it
                           </Button>
                           <Button size="sm" onClick={() => revokeList(gl.id)}>
                             switch off
                           </Button>
+                          {gl.batchId && data.giftLists.filter((x) => x.batchId === gl.batchId && (x.status === 'ACTIVE' || x.status === 'HELD' || x.status === 'GONE')).length > 1 ? (
+                            <Button variant="secondary" size="sm" onClick={() => revokeBatch(gl.batchId!)}>
+                              switch them all off
+                            </Button>
+                          ) : null}
                         </div>
                       </div>
                     ) : (
@@ -610,16 +632,20 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
         tier={active?.visibility ?? 'FAMILY'}
         onClose={() => setActive(null)}
         onSave={saveVisibility}
-        onDelete={deleteActive}
+        onDelete={active?.canDelete ? deleteActive : undefined}
         people={others}
+        role={active?.visibilityRole ?? 'adder'}
+        widest={active?.widestChoice ?? 'EXTENDED'}
+        addedByName={active?.addedByName ?? null}
+        childParentName={active?.childParentName ?? null}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <CreateGiftLinkModal
         open={giftOpen}
         onClose={() => setGiftOpen(false)}
-        keepsakes={data.keepsakes.map((k) => ({ id: k.id, imageUrl: k.thumbUrl ?? k.imageUrl }))}
-        designs={data.savedDesigns.map((d) => ({ id: d.id, label: d.label, pricePence: d.pricePence, imageUrl: d.imageUrl }))}
-        recipients={data.members.filter((m) => !m.isYou).map((m) => ({ accountId: m.accountId, name: m.name }))}
+        keepsakes={data.keepsakes.map((k) => ({ id: k.id, imageUrl: k.thumbUrl ?? k.imageUrl, visibility: k.visibility }))}
+        designs={data.savedDesigns.map((d) => ({ id: d.id, label: d.label, pricePence: d.pricePence, imageUrl: d.imageUrl, assetId: d.assetId, visibility: d.visibility }))}
+        recipients={data.members.filter((m) => !m.isYou).map((m) => ({ accountId: m.accountId, name: m.name, circle: m.isOwner ? ('HOME' as const) : m.circle }))}
       />
     </div>
   );

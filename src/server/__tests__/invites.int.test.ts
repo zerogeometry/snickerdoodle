@@ -10,6 +10,8 @@ import { AuthzError } from '@/authz';
 import { listViewableAssets, resolveViewerContext } from '@/server/assets';
 import { acceptInvite, createInvite, NotInvitableError } from '@/server/invites';
 import type { DbHandle } from '@/server/db';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
+const YES = { version: JOIN_CONSENT_VERSION };
 
 /**
  * Invites → verify → join, against a real Postgres. Proves NN3 (parent-initiated
@@ -80,11 +82,11 @@ describe.skipIf(!URL)('invites → join — integration', () => {
     });
 
     // identity: a different email can't accept
-    const wrong = await acceptInvite(db, { id: ids.blakeId, email: `someone-else-${nonce}@example.com` }, token);
+    const wrong = await acceptInvite(db, { id: ids.blakeId, email: `someone-else-${nonce}@example.com` }, token, YES);
     expect(wrong).toMatchObject({ ok: false, reason: 'wrong-account' });
 
     // the invited person joins
-    const ok = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token);
+    const ok = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token, YES);
     expect(ok.ok).toBe(true);
 
     const joiner = await resolveViewerContext(db, inviteeId, ids.hartleyId);
@@ -95,7 +97,7 @@ describe.skipIf(!URL)('invites → join — integration', () => {
     expect(seen.map((a) => a.id)).toEqual([ids.assetExtended]);
 
     // single-use: the invite is spent
-    const again = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token);
+    const again = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token, YES);
     expect(again).toMatchObject({ ok: false, reason: 'used' });
   });
 
@@ -112,7 +114,7 @@ describe.skipIf(!URL)('invites → join — integration', () => {
       status: 'PENDING',
       expiresAt: new Date(Date.now() - 1000),
     });
-    const res = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token);
+    const res = await acceptInvite(db, { id: inviteeId, email: inviteeEmail }, token, YES);
     expect(res).toMatchObject({ ok: false, reason: 'expired' });
   });
 });

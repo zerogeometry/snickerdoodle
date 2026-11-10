@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray } from 'drizzle-orm';
-import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, type GiftLinkGrant, type ViewerContext } from '@/authz';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { AuthzError, canManageFamily, canPurchaseViaGiftLink, canViewAsset, effectiveCircle, giftLinkAudience, giftLinkShows, narrowerCircle, type GiftLinkGrant, type ViewerContext } from '@/authz';
 import { products, productVariants, savedDesigns } from '@/db/schema';
 import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { containsAbusiveText } from './textSafety';
@@ -10,7 +10,9 @@ import { getCatalogue, loadCatalogue } from './catalogue';
 import { composeMockup } from './print/compositor';
 import sharp from 'sharp';
 import { derivativeKey, getObjectBytes, getS3, presignDownload, putObject } from '@/storage';
-import type { AccessLevel, Relationship } from '@/domain/types';
+import { CIRCLES, RELATIONSHIPS, type AccessLevel, type Circle, type Relationship, type VisibilityTier } from '@/domain/types';
+import { circleAllowedFor, defaultCircleFor } from '@/domain/relationships';
+import { memberName } from './memberName';
 import type { DbHandle } from './db';
 import { AlreadyInFamilyError, createInvite } from './invites';
 import { familyNameForRelatives } from './onboarding';
@@ -74,14 +76,39 @@ export interface CreateGiftLinkInput {
   title?: string | null;
   /** What the keepsakes are offered as (default framed print) — validated server-side. */
   productKey?: string | null;
-  /** Optionally embed a family invite so the recipient can join (and earn the 5%). */
-  invite?: { email: string; relationship: Relationship; accessLevel: AccessLevel; shareOccasions?: boolean } | null;
+  /**
+   * WHO the link is for (D27, founder 10 Nov 2026: ONE link per person). The link only ever shows what that person's
+   * circle may see, checked again every time it's opened:
+   *  - a family MEMBER: their circle in this family (resolved here, never from the client; it follows them live);
+   *  - someone NEW by email: the circle their embedded invite (bound to that address) would put them in, or extended
+   *    when they aren't invited;
+   *  - an OPEN link (copy / WhatsApp / text / the app's share sheet — we can't know who opens it): the circle the
+   *    parent picked for it ("who's it for?" — founder answer C; extended unless they say otherwise).
+   */
+  recipient: GiftRecipient;
+  /** Links made by one send share a batch (the parent's list groups them; "switch them all off"). */
+  batchId?: string | null;
 }
 
+export type GiftRecipient =
+  | { kind: 'member'; accountId: string }
+  | { kind: 'email'; email: string; invite?: { relationship: Relationship; accessLevel: AccessLevel; shareOccasions?: boolean; circle?: Circle } | null }
+  | { kind: 'open'; circle: Circle };
+
+/** Nobody on this link may see any of the chosen keepsakes (too private for their circle). */
+export class NothingToShowError extends AuthzError {
+  constructor() {
+    super({ allowed: false, reason: 'none of those keepsakes are shared with their circle' });
+    this.name = 'NothingToShowError';
+  }
+}
+
+const isEmail = (v: string) => v.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+
 /**
- * Create a shareable gift link. Owner-only. The item list is FROZEN here from the
- * chosen keepsakes (each as a framed print) and never changes afterwards. An
- * unguessable token is minted; an optional embedded invite enables the join path.
+ * Create ONE person's gift link (D27). Owner-only. The item list is FROZEN here from the chosen keepsakes — only
+ * those the recipient's circle may see — and never changes afterwards. An unguessable token is minted; for someone
+ * new, an optional embedded invite (bound to their address) enables the join path.
  */
 export async function createGiftLink(
   db: DbHandle,
@@ -94,6 +121,7 @@ export async function createGiftLink(
   if (input.assetIds.length === 0 && (input.designIds?.length ?? 0) === 0 && (input.lines?.length ?? 0) === 0) {
     throw new AuthzError({ allowed: false, reason: 'pick at least one keepsake to share' });
   }
+  const audience = await resolveRecipient(db, input.familyId, input.recipient);
 
   // The product is the parent's choice but never trusted: it must be live in the shop.
   const shop = await loadCatalogue(db);
@@ -202,21 +230,32 @@ export async function createGiftLink(
   if (items.length === 0) {
     throw new AuthzError({ allowed: false, reason: 'none of those keepsakes can be shared' });
   }
+  // only what THIS person's circle may see goes on their link (D27); the rest never reaches it
+  const tiers = new Map((await db.select().from(assets).where(inArray(assets.id, [...new Set(items.map((i) => i.assetId))]))).map((a) => [a.id, a]));
+  const forThem = items.filter((i) => {
+    const a = tiers.get(i.assetId);
+    return !!a && giftLinkShows(audience.circle, a);
+  });
+  if (forThem.length === 0) throw new NothingToShowError();
+  items.length = 0;
+  items.push(...forThem);
 
   // Each item's picture as the product it's offered as — composed NOW, as the parent (who may see it),
   // and frozen, so a gift-list visitor sees the mug, not just the drawing. Best effort: a product with
   // no mockup template (or any compose failure) just shows the drawing, as before.
   await freezeItemMockups(db, creator, items);
 
+  // the embedded invite is for THIS person only — bound to their own address
   let inviteId: string | null = null;
-  if (input.invite?.email.trim()) {
+  if (input.recipient.kind === 'email' && input.recipient.invite) {
     try {
       const inv = await createInvite(db, creator, {
         familyId: input.familyId,
-        email: input.invite.email,
-        relationship: input.invite.relationship,
-        accessLevel: input.invite.accessLevel,
-        shareOccasions: input.invite.shareOccasions === true,
+        email: audience.email!,
+        relationship: input.recipient.invite.relationship,
+        accessLevel: input.recipient.invite.accessLevel,
+        shareOccasions: input.recipient.invite.shareOccasions === true,
+        ...(input.recipient.invite.circle ? { circle: input.recipient.invite.circle } : {}),
       });
       inviteId = inv.inviteId;
     } catch (e) {
@@ -228,7 +267,20 @@ export async function createGiftLink(
   const expiresAt = new Date(Date.now() + GIFT_LINK_TTL_DAYS * 86_400_000);
   const [link] = await db
     .insert(giftLinks)
-    .values({ familyId: input.familyId, createdByAccountId: creator.accountId, token, title: input.title ?? null, items, inviteId, status: 'ACTIVE', expiresAt })
+    .values({
+      familyId: input.familyId,
+      createdByAccountId: creator.accountId,
+      token,
+      title: input.title ?? null,
+      items,
+      inviteId,
+      status: 'ACTIVE',
+      expiresAt,
+      recipientEmail: audience.email,
+      recipientAccountId: audience.accountId,
+      audienceCircle: audience.circle,
+      batchId: input.batchId ?? null,
+    })
     .returning();
 
   await db.insert(auditRecords).values({
@@ -238,10 +290,59 @@ export async function createGiftLink(
     event: 'GIFT_LINK_CREATED',
     targetType: 'gift_link',
     targetId: link!.id,
-    metadata: { items: items.length, hasInvite: inviteId !== null },
+    metadata: { items: items.length, hasInvite: inviteId !== null, recipient: input.recipient.kind, circle: audience.circle, batchId: input.batchId ?? null },
   });
 
   return { id: link!.id, token };
+}
+
+/**
+ * Whose eyes a new link shows (server-side, never the client's word for a member). A member's circle comes from
+ * their ACTIVE membership here; someone new gets the circle their invite would give them (extended when they
+ * aren't invited); an open link, the circle the parent picked.
+ */
+async function resolveRecipient(db: DbHandle, familyId: string, r: GiftRecipient): Promise<{ circle: Circle; email: string | null; accountId: string | null }> {
+  if (r.kind === 'member') {
+    const [m] = await db
+      .select({ circle: memberships.circle, isOwner: memberships.isOwner, email: accounts.email })
+      .from(memberships)
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(and(eq(memberships.familyId, familyId), eq(memberships.accountId, String(r.accountId)), eq(memberships.status, 'ACTIVE')));
+    if (!m) throw new AuthzError({ allowed: false, reason: 'not a member of this family' });
+    return { circle: effectiveCircle(m), email: m.email.toLowerCase(), accountId: String(r.accountId) };
+  }
+  if (r.kind === 'email') {
+    const email = String(r.email ?? '').trim().toLowerCase();
+    if (!isEmail(email)) throw new AuthzError({ allowed: false, reason: 'that address doesn’t look right' });
+    // already a member? then it's their own member link, at their circle
+    const [m] = await db
+      .select({ accountId: memberships.accountId, circle: memberships.circle, isOwner: memberships.isOwner })
+      .from(memberships)
+      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
+      .where(and(eq(memberships.familyId, familyId), eq(memberships.status, 'ACTIVE'), sql`lower(${accounts.email}) = ${email}`));
+    if (m) return { circle: effectiveCircle(m), email, accountId: m.accountId };
+    const inv = r.invite;
+    if (!inv) return { circle: 'EXTENDED', email, accountId: null };
+    if (inv.circle !== undefined && !circleAllowedFor(inv.relationship, inv.circle)) throw new AuthzError({ allowed: false, reason: 'that circle isn’t one for them' });
+    return { circle: inv.circle ?? defaultCircleFor(inv.relationship), email, accountId: null };
+  }
+  if (r.kind === 'open' && (CIRCLES as readonly string[]).includes(r.circle)) return { circle: r.circle, email: null, accountId: null };
+  throw new AuthzError({ allowed: false, reason: 'who is the link for?' });
+}
+
+/**
+ * Whose eyes a link shows NOW (null ⇒ it stops): a member's link follows their circle live (never wider than when it
+ * was sent; removed → it stops). A link made before D27 (shared with many): extended.
+ */
+export async function liveAudience(db: DbHandle, link: { familyId: string; recipientAccountId: string | null; audienceCircle: Circle | null }): Promise<Circle | null> {
+  const sent = giftLinkAudience(link);
+  if (!link.recipientAccountId) return sent;
+  const [m] = await db
+    .select({ circle: memberships.circle, isOwner: memberships.isOwner })
+    .from(memberships)
+    .where(and(eq(memberships.familyId, link.familyId), eq(memberships.accountId, link.recipientAccountId), eq(memberships.status, 'ACTIVE')));
+  if (!m) return null;
+  return narrowerCircle(sent, effectiveCircle(m));
 }
 
 export type GiftLinkView =
@@ -258,6 +359,8 @@ export type GiftLinkView =
       familyName: string | null;
       title: string | null;
       inviteToken: string | null;
+      /** whose eyes it shows (server-side only; the page never prints it) */
+      audience: Circle;
       /** `purchased` = already bought by someone (NEVER who — only the parent sees that). */
       items: (GiftItem & { imageUrl: string | null; purchased: boolean })[];
     };
@@ -289,16 +392,22 @@ async function freezeSourceObject(db: DbHandle, assetId: string, sourceObjectId:
 /**
  * Can a live (not revoked, not expired) link still be used, judged from its keepsakes as stored NOW?
  * ONE rule for the recipient's page and the parent's own list (06-B5), so the two never disagree:
- *  - 'gone': a keepsake on it was deleted or CSAM-blocked, or every one was pulled back to "only me";
+ *  - 'gone': a keepsake on it was deleted or CSAM-blocked, or none is shared with the link's person any more
+ *    (pulled back to "only me", or narrower than their circle — D27);
  *  - 'held': a keepsake on it isn't content-cleared (held after a report, or awaiting review) — the
  *    link is offline until review decides;
  *  - 'ok'.
  */
-export function linkAvailability(assetIds: readonly string[], present: { id: string; moderationStatus: string; visibility: string }[]): 'ok' | 'held' | 'gone' {
+export function linkAvailability(
+  assetIds: readonly string[],
+  present: { id: string; moderationStatus: string; visibility: VisibilityTier; parentLimit: VisibilityTier | null }[],
+  audience: Circle | null,
+): 'ok' | 'held' | 'gone' {
+  if (audience === null) return 'gone';
   if (present.length < new Set(assetIds).size) return 'gone';
   if (present.some((a) => a.moderationStatus === 'BLOCKED')) return 'gone';
   if (present.some((a) => a.moderationStatus !== 'CLEAR')) return 'held';
-  if (present.every((a) => a.visibility === 'ONLY_ME')) return 'gone';
+  if (!present.some((a) => giftLinkShows(audience, a))) return 'gone';
   return 'ok';
 }
 
@@ -316,15 +425,18 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
   const items = link.items as GiftItem[];
   const assetIds = items.map((i) => i.assetId);
   const present = await db.select().from(assets).where(inArray(assets.id, assetIds));
+  // a member's link follows them: removed from the family → it stops (looks like a switched-off link)
+  const audience = await liveAudience(db, link);
+  if (audience === null) return { state: 'revoked' };
   // "gone" if a source was deleted OR is no longer content-cleared — never serve
   // uncleared/CSAM-blocked bytes to a token holder outside the family (D8). (The recipient isn't told
   // WHY: "held" and "gone" look the same from outside.)
-  if (linkAvailability(assetIds, present) !== 'ok') return { state: 'gone' };
+  if (linkAvailability(assetIds, present, audience) !== 'ok') return { state: 'gone' };
 
-  // A keepsake the parent has since pulled back to "only me" drops off the list (and can't be
-  // bought or previewed — canPurchaseViaGiftLink denies it too).
-  const privateIds = new Set(present.filter((a) => a.visibility === 'ONLY_ME').map((a) => a.id));
-  const shown = items.filter((i) => !privateIds.has(i.assetId));
+  // Only what THIS link's person may see NOW (D27): a keepsake made narrower than their circle since —
+  // or pulled back to "only me" — drops off (and can't be bought or previewed: canPurchaseViaGiftLink).
+  const seen = new Set(present.filter((a) => giftLinkShows(audience, a)).map((a) => a.id));
+  const shown = items.filter((i) => seen.has(i.assetId));
 
   const bought = await purchasedItems(db, link.id);
   const withImages = shown.map((i) => ({
@@ -349,6 +461,7 @@ export async function getGiftLink(db: DbHandle, token: string): Promise<GiftLink
     familyName: familyNameForRelatives(family?.name),
     title: link.title,
     inviteToken,
+    audience,
     items: withImages,
   };
 }
@@ -396,16 +509,19 @@ export const GIFT_PREVIEW_MAX_PX = 720;
 export async function giftLinkPreview(db: DbHandle, token: string, assetId: string, productKey?: string | null): Promise<Buffer | null> {
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, token));
   if (!link) return null;
+  const audience = await liveAudience(db, link);
+  if (audience === null) return null;
   const grant: GiftLinkGrant = {
     familyId: link.familyId,
     status: link.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED',
     expiresAt: link.expiresAt,
     assetIds: (link.items as GiftItem[]).map((i) => i.assetId),
+    audienceCircle: audience,
   };
   // the whole link must still be usable (the same rule as the page, 06-B5): if any keepsake on it was
   // deleted or is held, no preview loads, not even for the ones still there (N7 / A-59)
   const present = await db.select().from(assets).where(inArray(assets.id, grant.assetIds));
-  if (linkAvailability(grant.assetIds, present) !== 'ok') return null;
+  if (linkAvailability(grant.assetIds, present, audience) !== 'ok') return null;
   const asset = present.find((a) => a.id === assetId);
   if (!asset || !canPurchaseViaGiftLink(grant, asset, new Date()).allowed) return null;
   // the product as designed, when the link froze one (a DERIVATIVE of this very asset), else the drawing
@@ -484,22 +600,23 @@ export async function placeGiftLinkOrder(
   const [link] = await db.select().from(giftLinks).where(eq(giftLinks.token, input.token));
   if (!link) return { ok: false, unavailable: true };
   const items = link.items as GiftItem[];
+  const audience = await liveAudience(db, link);
+  if (audience === null) return { ok: false, unavailable: true };
   const grant: GiftLinkGrant = {
     familyId: link.familyId,
     status: link.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED',
     expiresAt: link.expiresAt,
     assetIds: items.map((i) => i.assetId),
+    audienceCircle: audience,
   };
   if (grant.status !== 'ACTIVE' || grant.expiresAt <= new Date()) return { ok: false, unavailable: true };
 
-  // The list keeps tabs: anything already bought is ticked off and not sold again.
+  // The list keeps tabs: anything already bought is ticked off and not sold again. And only what this link's
+  // person may see now goes in the order (D27; placeOrder re-checks every line with canPurchaseViaGiftLink).
   const bought = await purchasedItems(db, link.id);
-  const privateRows = await db
-    .select({ id: assets.id })
-    .from(assets)
-    .where(and(inArray(assets.id, grant.assetIds as string[]), eq(assets.visibility, 'ONLY_ME')));
-  const privateIds = new Set(privateRows.map((r) => r.id));
-  const remaining = items.filter((i) => !bought.has(itemKey(i)) && !privateIds.has(i.assetId));
+  const rowsNow = await db.select().from(assets).where(inArray(assets.id, grant.assetIds as string[]));
+  const seen = new Set(rowsNow.filter((a) => giftLinkShows(audience, a)).map((r) => r.id));
+  const remaining = items.filter((i) => !bought.has(itemKey(i)) && seen.has(i.assetId));
   if (remaining.length === 0) return { ok: false, allBought: true };
 
   // Only honour a join saving earned in THIS link's family (not another family's invite).
@@ -580,6 +697,11 @@ export async function purchasedItems(
 export interface OwnerGiftList {
   id: string;
   token: string;
+  /** who it was sent to (D27: one link per person) — a member's name, an address, or null for an open link */
+  sentTo: string | null;
+  /** the circle it shows for (null = a link made before one-per-person) */
+  audience: Circle | null;
+  batchId: string | null;
   /** HELD = offline while a keepsake on it is checked (after a report); GONE = a keepsake on it was
    * deleted / blocked, or all were made "only me" — the same rule the recipient's page uses (06-B5). */
   status: 'ACTIVE' | 'HELD' | 'GONE' | 'REVOKED' | 'EXPIRED';
@@ -598,7 +720,7 @@ export interface OwnerGiftList {
  */
 export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, familyId: string): Promise<OwnerGiftList[]> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) return [];
-  const links = await db.select().from(giftLinks).where(eq(giftLinks.familyId, familyId)).orderBy(desc(giftLinks.createdAt)).limit(10);
+  const links = await db.select().from(giftLinks).where(eq(giftLinks.familyId, familyId)).orderBy(desc(giftLinks.createdAt)).limit(30);
   if (links.length === 0) return [];
   const allIds = [...new Set(links.flatMap((l) => (l.items as GiftItem[]).map((i) => i.assetId)))];
   const objs = await db
@@ -617,15 +739,30 @@ export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, 
     if (l.status === 'REVOKED') return 'REVOKED';
     if (l.expiresAt <= now) return 'EXPIRED';
     const ids = (l.items as GiftItem[]).map((i) => i.assetId);
-    const live = linkAvailability(ids, rows.filter((r) => ids.includes(r.id)));
+    const live = linkAvailability(ids, rows.filter((r) => ids.includes(r.id)), giftLinkAudience(l));
     return live === 'ok' ? 'ACTIVE' : live === 'held' ? 'HELD' : 'GONE';
   };
+  const memberIds = [...new Set(links.map((l) => l.recipientAccountId).filter((x): x is string => !!x))];
+  const names = new Map(
+    memberIds.length
+      ? (
+          await db
+            .select({ id: accounts.id, displayName: accounts.displayName, email: accounts.email, relationship: memberships.relationship })
+            .from(accounts)
+            .innerJoin(memberships, and(eq(memberships.accountId, accounts.id), eq(memberships.familyId, familyId)))
+            .where(inArray(accounts.id, memberIds))
+        ).map((a) => [a.id, memberName(a, a.relationship, { byThemself: false, byParent: true })])
+      : [],
+  );
   return Promise.all(
     links.map(async (l) => {
       const bought = await purchasedItems(db, l.id);
       return {
         id: l.id,
         token: l.token,
+        sentTo: l.recipientAccountId ? (names.get(l.recipientAccountId) ?? l.recipientEmail) : l.recipientEmail,
+        audience: l.audienceCircle,
+        batchId: l.batchId,
         status: ownerStatus(l),
         createdAtISO: l.createdAt.toISOString(),
         items: await Promise.all(
@@ -645,59 +782,104 @@ export async function listGiftListsForOwner(db: DbHandle, owner: ViewerContext, 
   );
 }
 
+/** One person a gift request goes to. */
+export type GiftSendTo = { memberAccountId: string } | { email: string; relationship?: Relationship | null };
+
+export interface SendGiftLinksInput {
+  familyId: string;
+  assetIds: string[];
+  designIds?: string[];
+  productKey?: string | null;
+  title?: string | null;
+  note?: string | null;
+  to: GiftSendTo[];
+  /** for someone new: also invite them to join (each to their own address) at this access */
+  invite?: { accessLevel: AccessLevel; shareOccasions?: boolean } | null;
+}
+
+export interface GiftSendResult {
+  batchId: string;
+  sent: number;
+  /** who got nothing because every pick is too private for their circle (named for the parent only) */
+  skipped: string[];
+}
+
+const MAX_GIFT_RECIPIENTS = 20;
+
 /**
- * Send a gift request: email the link to people the parent picks — family members (by account,
- * resolved to their email server-side, ACTIVE members of THIS family only) and/or any addresses
- * typed in. Owner-only. The link itself is the same private, revocable, tick-off-able list.
+ * Send a gift request (D27, founder 10 Nov 2026: ONE LINK PER PERSON). Each recipient gets their OWN link, emailed
+ * only to them, showing only what their circle may see, and switched off on its own. Family members are resolved
+ * server-side (ACTIVE members of THIS family only); someone new by email gets extended — or, if the parent invites
+ * them, an invite bound to their own address at the circle their relationship gives them. Owner-only.
  */
-export async function sendGiftRequest(
-  db: DbHandle,
-  owner: ViewerContext,
-  input: { familyId: string; linkId: string; memberAccountIds: string[]; emails: string[]; note?: string | null },
-): Promise<{ sent: number }> {
+export async function sendGiftLinks(db: DbHandle, owner: ViewerContext, input: SendGiftLinksInput): Promise<GiftSendResult> {
   if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== input.familyId) {
     throw new AuthzError({ allowed: false, reason: 'only the family owner can send a gift request' });
   }
-  const [link] = await db.select().from(giftLinks).where(and(eq(giftLinks.id, input.linkId), eq(giftLinks.familyId, input.familyId)));
-  if (!link || link.status !== 'ACTIVE') return { sent: 0 };
-
-  const to = new Set<string>();
-  if (input.memberAccountIds.length) {
-    const rows = await db
-      .select({ email: accounts.email })
-      .from(memberships)
-      .innerJoin(accounts, eq(accounts.id, memberships.accountId))
-      .where(and(eq(memberships.familyId, input.familyId), eq(memberships.status, 'ACTIVE'), inArray(memberships.accountId, input.memberAccountIds)));
-    for (const r of rows) to.add(r.email.toLowerCase());
+  const recipients: { r: GiftRecipient; label: string }[] = [];
+  const seen = new Set<string>();
+  for (const t of input.to.slice(0, MAX_GIFT_RECIPIENTS)) {
+    if ('memberAccountId' in t) {
+      const id = String(t.memberAccountId);
+      if (seen.has(`m:${id}`)) continue;
+      seen.add(`m:${id}`);
+      recipients.push({ r: { kind: 'member', accountId: id }, label: id });
+    } else {
+      const email = String(t.email ?? '').trim().toLowerCase();
+      if (!isEmail(email) || seen.has(`e:${email}`)) continue;
+      seen.add(`e:${email}`);
+      const rel = t.relationship && (RELATIONSHIPS as readonly string[]).includes(t.relationship) && t.relationship !== 'CHILD' ? t.relationship : null;
+      recipients.push({
+        r: { kind: 'email', email, invite: input.invite && rel ? { relationship: rel, accessLevel: input.invite.accessLevel, shareOccasions: input.invite.shareOccasions } : null },
+        label: email,
+      });
+    }
   }
-  for (const e of input.emails) {
-    const v = e.trim().toLowerCase();
-    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) && v.length <= 254) to.add(v);
-  }
+  const batchId = randomUUID();
   const [fam] = await db.select({ name: families.displayName }).from(families).where(eq(families.id, input.familyId));
   const from = familyNameForRelatives(fam?.name) ?? 'your family';
   const note = screenFromName(input.note ?? null); // ≤40 chars, abuse-screened — reused for the short note
   let sent = 0;
-  for (const email of [...to].slice(0, 20)) {
+  const skipped: string[] = [];
+  for (const { r, label } of recipients) {
+    let token: string;
+    let to: string;
+    try {
+      const made = await createGiftLink(db, owner, { familyId: input.familyId, assetIds: input.assetIds, designIds: input.designIds, productKey: input.productKey, title: input.title, recipient: r, batchId });
+      token = made.token;
+      const [row] = await db.select({ email: giftLinks.recipientEmail }).from(giftLinks).where(eq(giftLinks.id, made.id));
+      to = row!.email!;
+    } catch (e) {
+      if (e instanceof NothingToShowError) {
+        skipped.push(label);
+        continue;
+      }
+      if (e instanceof AuthzError) continue; // not a member any more, a bad address: nothing sent
+      throw e;
+    }
     await sendMail({
       kind: 'gift-list',
-      to: email,
+      to,
       subject: `a gift request from ${from} ✦`,
       text:
         `${from} has put together a little gift request — keepsakes made from the children's own drawings.` +
         (note ? `\n\n"${note}"` : '') +
-        `\n\nHave a look (it's private, and ticks itself off so nobody doubles up):\n${appUrl(`/g/${link.token}`)}`,
+        `\n\nHave a look (this link is just for you — it's private, and ticks itself off so nobody doubles up):\n${appUrl(`/g/${token}`)}`,
     });
     sent++;
   }
-  await db.insert(auditRecords).values({
-    familyId: input.familyId,
-    actorAccountId: owner.accountId,
-    actorType: 'MEMBER',
-    event: 'GIFT_LINK_CREATED',
-    targetType: 'gift_link',
-    targetId: link.id,
-    metadata: { sentTo: sent },
-  });
-  return { sent };
+  return { batchId, sent, skipped };
+}
+
+/** Switch off every link from one send ("switch them all off"). Owner-only; each is revoked and audited on its own. */
+export async function revokeGiftBatch(db: DbHandle, owner: ViewerContext, familyId: string, batchId: string): Promise<{ ok: boolean; revoked: number }> {
+  if (owner.accountId === null || !canManageFamily(owner.membership) || owner.membership!.familyId !== familyId) {
+    throw new AuthzError({ allowed: false, reason: 'only the family owner can revoke a gift link' });
+  }
+  const links = await db
+    .select({ id: giftLinks.id })
+    .from(giftLinks)
+    .where(and(eq(giftLinks.familyId, familyId), eq(giftLinks.batchId, String(batchId)), eq(giftLinks.status, 'ACTIVE')));
+  for (const l of links) await revokeGiftLink(db, owner, l.id);
+  return { ok: true, revoked: links.length };
 }

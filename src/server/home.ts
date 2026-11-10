@@ -1,6 +1,6 @@
-import { and, desc, eq, gt } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { birthdayView, type BirthdayView } from '@/lib/birthdayView';
-import { canBuyFromGiftList, canSetAssetVisibility, canViewAsset, type AssetRef } from '@/authz';
+import { canBuyFromGiftList, canDeleteAsset, canViewAsset, childParentOf, effectiveVisibility, originatorOf, visibilityChoicesFor, type AssetRef, type VisibilityRole } from '@/authz';
 import { accounts, assets, children, families, invites, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
@@ -31,7 +31,18 @@ export interface HomeMember {
 
 export interface HomeKeepsake {
   id: string;
+  /** Who sees it NOW (the adder's choice under the little one's parent's ceiling — D27). */
   visibility: VisibilityTier;
+  /** The viewer's say over who sees it (D27): the adder picks up to `widest`; the child's parent may only narrow it,
+   * up to the adder's own choice. null = the viewer can't change it. */
+  visibilityRole: VisibilityRole | null;
+  widestChoice: VisibilityTier | null;
+  /** Who added it, when that isn't the viewer ("Granny added this"). */
+  addedByName: string | null;
+  /** On a little one's keepsake someone else added: the child's parent's name (so "only me" reads "just you and Sam"). */
+  childParentName: string | null;
+  /** The viewer may take it off (whoever added it, or the child's parent). */
+  canDelete: boolean;
   createdAtISO: string;
   imageUrl: string | null;
   /** a small copy for the grid (the full picture is only for the open keepsake) */
@@ -122,6 +133,18 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
   for (const m of members) m.avatarUrl = pictures.get(m.accountId)?.avatarUrl ?? null;
 
   const viewer = await resolveViewerContext(db, account.id, familyId);
+  const nameOf = (id: string | null) => (id ? (members.find((m) => m.accountId === id)?.name ?? null) : null);
+  const visibilityFields = (ref: AssetRef) => {
+    const choices = visibilityChoicesFor(ref, viewer);
+    const adder = originatorOf(ref);
+    const parent = childParentOf(ref);
+    return {
+      visibilityRole: choices?.role ?? null,
+      widestChoice: choices?.widest ?? null,
+      addedByName: adder && adder !== account.id ? nameOf(adder) : null,
+      childParentName: parent && parent !== account.id ? nameOf(parent) : null,
+    };
+  };
 
   // Kept keepsakes (the home is the keepsake box), newest first, with their
   // preserved ORIGINAL's key for thumbnailing. Filtered through authz.
@@ -146,13 +169,15 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     visible.map(async (r) => ({
       thumbUrl: thumbs.get(r.asset.id) ?? null,
       id: r.asset.id,
-      visibility: r.asset.visibility,
+      visibility: effectiveVisibility(refOf(r.asset)),
+      ...visibilityFields(refOf(r.asset)),
+      canDelete: canDeleteAsset(refOf(r.asset), viewer),
       createdAtISO: r.asset.createdAt.toISOString(),
       imageUrl: looks.get(r.asset.id) ? await presignDownload(looks.get(r.asset.id)!.key, 300) : r.key ? await presignDownload(r.key, 300) : null,
       childSubjectId: r.asset.childSubjectId,
-      canManage: canSetAssetVisibility(refOf(r.asset), viewer),
+      canManage: visibilityChoicesFor(refOf(r.asset), viewer) !== null,
       held: isHeldForReport(r.asset),
-      canReport: !canSetAssetVisibility(refOf(r.asset), viewer) && r.asset.uploaderAccountId !== account.id,
+      canReport: visibilityChoicesFor(refOf(r.asset), viewer) === null && r.asset.uploaderAccountId !== account.id,
     })),
   );
 
@@ -170,7 +195,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
         await db
           .select({ id: invites.id, email: invites.email, circle: invites.circle })
           .from(invites)
-          .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date())))
+          .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date()), isNull(invites.membershipId)))
           .orderBy(desc(invites.createdAt))
       )
     : [];

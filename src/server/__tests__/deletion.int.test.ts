@@ -73,7 +73,7 @@ describe.skipIf(!DB || !S3)('deleteAsset — cascading on-demand deletion (NN8)'
   it('a gift link to a deleted keepsake serves "gone" (never missing bytes)', async () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const assetId = await keptAsset();
-    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId] });
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     expect((await getGiftLink(db, token)).state).toBe('active');
 
     await deleteAsset(db, assetId, sam);

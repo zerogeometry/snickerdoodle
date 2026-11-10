@@ -1,5 +1,6 @@
 'use client';
 
+import type { Circle } from '@/domain/types';
 import { IconLock } from '@tabler/icons-react';
 import { useState } from 'react';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
@@ -26,10 +27,12 @@ import { OccasionSheet } from './OccasionSheet';
  * look after the family — and be a little proud of it.
  */
 export function FamilyView({ data }: { data: FamilyData }) {
-  const [adding, setAdding] = useState<Rel | null>(null);
+  const [adding, setAdding] = useState<{ rel: Rel; circle?: Circle } | null>(null);
   const [managing, setManaging] = useState<ManagedMember | null>(null);
   const [managingChild, setManagingChild] = useState<ManagedChild | null>(null);
   const [occasion, setOccasion] = useState<{ open: boolean; editing: FamilyOccasion | null }>({ open: false, editing: null });
+  // a day in a family the viewer JOINED (D27): their own, or — a home member who can add — the household's
+  const [theirs, setTheirs] = useState<{ family: FamilyData['myFamilies'][number]; editing: FamilyOccasion | null } | null>(null);
   const owner = data.viewerIsOwner;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -62,9 +65,13 @@ export function FamilyView({ data }: { data: FamilyData }) {
               data={data}
               onManageMember={(m) => setManaging(m)}
               onManageChild={(c) => setManagingChild(c)}
-              onAdd={(rel) => setAdding(rel)}
+              onAdd={(rel, circle) => setAdding({ rel, circle })}
             />
-            <MyFamilies families={data.myFamilies} />
+            <MyFamilies
+              families={data.myFamilies}
+              onAddDay={(family) => setTheirs({ family, editing: null })}
+              onEditDay={(family, editing) => setTheirs({ family, editing })}
+            />
             <DaysWeCelebrate chosen={data.celebrate} canEdit={data.viewer.canSetCelebrate} />
           </div>
           <div className="min-w-0 space-y-8">
@@ -94,10 +101,21 @@ export function FamilyView({ data }: { data: FamilyData }) {
       </main>
 
       <BottomTabBar tabs={APP_TABS} active="Family" />
-      <AddFamilyMemberModal open={adding !== null} onClose={() => setAdding(null)} initialRel={adding ?? 'Grandparent'} />
+      <AddFamilyMemberModal open={adding !== null} onClose={() => setAdding(null)} initialRel={adding?.rel ?? 'Grandparent'} initialCircle={adding?.circle} />
       <ManageMemberModal member={managing} onClose={() => setManaging(null)} />
       <ManageChildModal child={managingChild} onClose={() => setManagingChild(null)} />
       <OccasionSheet open={occasion.open} editing={occasion.editing} onClose={() => setOccasion({ open: false, editing: null })} kids={data.children} members={data.members} />
+      <OccasionSheet
+        open={theirs !== null}
+        editing={theirs?.editing ?? null}
+        onClose={() => setTheirs(null)}
+        kids={[]}
+        members={[]}
+        familyId={theirs?.family.familyId ?? null}
+        familyName={theirs?.family.name ?? null}
+        mode={theirs?.family.canAddHousehold && !(theirs.editing && theirs.editing.memberAccountId === data.viewer.accountId) ? 'household' : 'own'}
+        selfAccountId={data.viewer.accountId}
+      />
     </div>
   );
 }

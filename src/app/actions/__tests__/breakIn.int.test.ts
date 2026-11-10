@@ -57,7 +57,7 @@ import { renderPreviewAction } from '@/app/actions/render';
 import { deleteSavedDesignAction, saveDesignAction } from '@/app/actions/designs';
 import { reportKeepsakeAction } from '@/app/actions/report';
 import { placeOrderAction } from '@/app/actions/order';
-import { createGiftLinkAction, sendGiftRequestAction } from '@/app/actions/giftLink';
+import { createOpenGiftLinkAction, sendGiftLinksAction } from '@/app/actions/giftLink';
 import {
   deleteChildAction,
   deleteOccasionAction,
@@ -235,8 +235,8 @@ describe.skipIf(!DB || !S3)('break-in: server actions refuse cross-family + in-f
     });
 
     it('gift links: make one from A’s keepsakes, send A’s link, revoke A’s link', async () => {
-      await refusedLikeGhost((id) => createGiftLinkAction({ assetIds: [id] }), A.famAsset);
-      await refusedLikeGhost((id) => sendGiftRequestAction({ linkId: id, memberAccountIds: [], emails: ['x@example.test'] }), A.gift);
+      await refusedLikeGhost((id) => createOpenGiftLinkAction({ assetIds: [id], circle: 'FAMILY' }), A.famAsset);
+      await refusedLikeGhost((id) => sendGiftLinksAction({ assetIds: [id], memberAccountIds: [], people: [{ email: 'x@example.test' }] }), A.famAsset);
       await refusedLikeGhost((id) => revokeGiftLinkAction(id), A.gift);
       expect((await db.select().from(giftLinks).where(eq(giftLinks.id, A.gift)))[0]!.status).toBe('ACTIVE');
     });

@@ -1,13 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { accounts, auditRecords, families, invites, memberships, sessions } from '@/db/schema';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import type { AccessLevel, Circle } from '@/domain/types';
+import { circleAllowedFor } from '@/domain/relationships';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
 import { revokeAppTokens } from './app/link';
 import { sendMail, type MailMessage } from './mail';
 import { memberAccessChangedEmail, memberRemovedEmail } from './mail/familyNotices';
+import { moveIntoHomeEmail } from './mail/familyInvite';
 
 /**
  * The parent's controls over who is in the family (parent-is-controller). Every change is
@@ -46,7 +48,8 @@ async function tellMember(
   }
 }
 
-const CIRCLES: Circle[] = ['FAMILY', 'EXTENDED'];
+const CIRCLES: Circle[] = ['HOME', 'FAMILY', 'EXTENDED'];
+const MOVE_INVITE_TTL_DAYS = 14;
 const ACCESS: AccessLevel[] = ['VIEW', 'VIEW_BUY', 'CONTRIBUTE'];
 
 /**
@@ -94,13 +97,18 @@ export async function removeMember(
 
 /**
  * Change what a member can SEE (circle) and/or DO (access) — orthogonal, each audited as its own
- * event. Only values from the closed sets are accepted.
+ * event. Only values from the closed sets are accepted, and a circle only where their relationship may
+ * have it (home: a parent or grown-up child — D27).
+ *
+ * Moving someone INTO home never happens on the leader's say alone (D27): joining home means accepting that the
+ * leader looks after the family's keepsakes and details, so they get a "move into the home" link and stay where
+ * they are until they say yes ({@link acceptInvite}). Anything narrower takes effect at once.
  */
 export async function setMemberAccess(
   db: DbHandle,
   owner: ViewerContext,
   input: { familyId: string; memberAccountId: string; circle?: Circle; accessLevel?: AccessLevel },
-): Promise<{ ok: boolean }> {
+): Promise<{ ok: boolean; homeAsked?: boolean }> {
   const ownerId = assertOwnerOf(owner, input.familyId, 'change a member’s access');
   if (input.circle !== undefined && !CIRCLES.includes(input.circle)) return { ok: false };
   if (input.accessLevel !== undefined && !ACCESS.includes(input.accessLevel)) return { ok: false };
@@ -112,8 +120,21 @@ export async function setMemberAccess(
     eq(memberships.status, 'ACTIVE'),
     eq(memberships.isOwner, false),
   );
-  const [before] = await db.select({ circle: memberships.circle, accessLevel: memberships.accessLevel }).from(memberships).where(where);
+  const [before] = await db
+    .select({ id: memberships.id, circle: memberships.circle, accessLevel: memberships.accessLevel, relationship: memberships.relationship })
+    .from(memberships)
+    .where(where);
   if (!before) return { ok: false };
+  if (input.circle !== undefined && !circleAllowedFor(before.relationship, input.circle)) return { ok: false };
+
+  // into home: ask them; their own yes moves them (nothing changes here yet)
+  let homeAsked = false;
+  if (input.circle === 'HOME' && before.circle !== 'HOME') {
+    await askIntoHome(db, ownerId, input.familyId, before.id, input.memberAccountId, input.accessLevel ?? before.accessLevel);
+    homeAsked = true;
+    input = { ...input, circle: undefined };
+    if (input.accessLevel === undefined) return { ok: true, homeAsked };
+  }
 
   await db
     .update(memberships)
@@ -149,7 +170,63 @@ export async function setMemberAccess(
       memberAccessChangedEmail({ ...who, circle: input.circle ?? before.circle, accessLevel: input.accessLevel ?? before.accessLevel }),
     );
   }
-  return { ok: true };
+  return { ok: true, ...(homeAsked ? { homeAsked } : {}) };
+}
+
+/**
+ * The "move into the home" link (D27): a single-use invite bound to the member's own address and membership, at the
+ * home circle. Any earlier one still waiting is replaced. Audited as an invite; the move itself is audited when they
+ * say yes.
+ */
+async function askIntoHome(db: DbHandle, ownerId: string, familyId: string, membershipId: string, memberAccountId: string, accessLevel: AccessLevel) {
+  const [member] = await db.select({ email: accounts.email, name: accounts.displayName }).from(accounts).where(eq(accounts.id, memberAccountId));
+  if (!member) return;
+  const [m] = await db.select({ relationship: memberships.relationship, seesOccasions: memberships.seesOccasions }).from(memberships).where(eq(memberships.id, membershipId));
+  await db
+    .update(invites)
+    .set({ status: 'REVOKED' })
+    .where(and(eq(invites.familyId, familyId), eq(invites.membershipId, membershipId), eq(invites.status, 'PENDING')));
+  const token = randomBytes(24).toString('base64url');
+  const [invite] = await db
+    .insert(invites)
+    .values({
+      familyId,
+      createdByAccountId: ownerId,
+      email: member.email.toLowerCase(),
+      relationship: m!.relationship,
+      circle: 'HOME',
+      accessLevel,
+      shareOccasions: m!.seesOccasions,
+      membershipId,
+      token,
+      status: 'PENDING',
+      expiresAt: new Date(Date.now() + MOVE_INVITE_TTL_DAYS * 86_400_000),
+    })
+    .returning({ id: invites.id });
+  await db.insert(auditRecords).values({
+    familyId,
+    actorAccountId: ownerId,
+    actorType: 'MEMBER',
+    event: 'INVITE_SENT',
+    targetType: 'invite',
+    targetId: invite!.id,
+    metadata: { kind: 'move-into-home', member: memberAccountId },
+  });
+  const [owner] = await db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, ownerId));
+  try {
+    await sendMail(moveIntoHomeEmail({ to: member.email, token, inviterName: owner?.name ?? null, memberName: member.name }));
+  } catch (e) {
+    console.error('[members] the move-into-home email failed', e instanceof Error ? e.message : e);
+  }
+}
+
+/** Is a "move into the home" ask still waiting for this member? (the member's card says so) */
+export async function pendingHomeAsks(db: DbHandle, familyId: string): Promise<Set<string>> {
+  const rows = await db
+    .select({ membershipId: invites.membershipId })
+    .from(invites)
+    .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), sql`${invites.membershipId} IS NOT NULL`, sql`${invites.expiresAt} > now()`));
+  return new Set(rows.map((r) => r.membershipId!));
 }
 
 /** Cancel a pending invite — its link stops working at once (only PENDING invites can be accepted). */

@@ -135,7 +135,7 @@ describe.skipIf(!DB || !S3)('a gift link shows the design exactly as the parent 
       expect(saved.ok).toBe(true);
       if (!saved.ok) return;
       const [design] = await db.select().from(savedDesigns).where(eq(savedDesigns.id, saved.id));
-      const link = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id] });
+      const link = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id], recipient: { kind: 'open', circle: 'FAMILY' } });
       const [row] = await db.select().from(giftLinks).where(eq(giftLinks.id, link.id));
       const item = (row!.items as GiftItem[])[0]!;
       expect(item).toMatchObject({ assetId, productKey: c.sku, designId: saved.id });

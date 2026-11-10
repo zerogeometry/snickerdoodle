@@ -1,8 +1,21 @@
 import 'server-only';
 import { and, eq, inArray } from 'drizzle-orm';
-import { canAddOccasion, canChangeOccasion, canSeeFamilyCalendar, canSetCelebrate, type CalendarMembership } from '@/authz';
+import {
+  canAddThisOccasion,
+  canChangeOccasion,
+  canMakeOccasionChange,
+  canSeeFamilyCalendar,
+  canSeeOccasion,
+  canSetCelebrate,
+  effectiveOccasionShare,
+  occasionEditRole,
+  seesOccasionDetail,
+  type CalendarMembership,
+  type OccasionEditRole,
+  type OccasionRef,
+} from '@/authz';
 import { accounts, auditRecords, children, families, memberships, occasions } from '@/db/schema';
-import type { Circle } from '@/domain/types';
+import type { Circle, OccasionWhose } from '@/domain/types';
 import { CHRISTMAS_LAST_ORDER } from '@/lib/season';
 import { cleanCelebrate, EXPECTED_FESTIVALS, FESTIVAL_GROUPS, FESTIVAL_NAMES, type FestivalKey } from '@/lib/occasions/catalogue';
 import type { DbHandle } from '../db';
@@ -13,6 +26,8 @@ import { addDays, daysBetween, festivalDates, occurrencesIn, type LunarCal, type
  * The family calendar (founder, 27 Oct). One family's dated events — its little ones' birthdays (and
  * baby milestones when the family marks them), its own occasions, the festivals it celebrates — with
  * WHO may see each (`audience`), so the page and the reminders run the same rules (src/authz/occasions).
+ * An occasion carries its own authz ref: whose day it is decides how far it may go (D27 — someone else's day
+ * never leaves home), and only home and whoever added it get the year or lines that give it away.
  */
 export type EventKind = 'birthday' | 'anniversary' | 'milestone' | 'festival' | 'other' | 'shop';
 export interface CalendarEvent {
@@ -35,7 +50,8 @@ export interface CalendarEvent {
   /** the occasion row, when it is one (for editing) */
   occasionId: string | null;
 }
-type Audience = 'calendar' | Circle; // 'calendar' = everyone who sees the calendar
+/** 'calendar' = everyone who sees the calendar; an occasion is decided by its own ref (whose day + share). */
+type Audience = 'calendar' | { occasion: OccasionRef };
 interface FamilyEvent extends Omit<CalendarEvent, 'own'> {
   audience: Audience;
 }
@@ -94,7 +110,7 @@ export async function familyEvents(db: DbHandle, fam: FamilyRow, from: YMD, to: 
           giftable: true,
           lunar: !!o.lunar,
           occasionId: o.id,
-          audience: o.shareCircle,
+          audience: { occasion: occasionRefOf(o) },
         });
       }
     }
@@ -126,11 +142,26 @@ export async function familyEvents(db: DbHandle, fam: FamilyRow, from: YMD, to: 
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+type OccasionRow = typeof occasions.$inferSelect;
+/** The one way an occasion row becomes its authz ref. */
+export const occasionRefOf = (o: Pick<OccasionRow, 'familyId' | 'shareCircle' | 'whose' | 'createdByAccountId' | 'memberAccountId'>): OccasionRef => ({
+  familyId: o.familyId,
+  shareCircle: o.shareCircle,
+  whose: o.whose,
+  createdByAccountId: o.createdByAccountId,
+  memberAccountId: o.memberAccountId,
+});
+
 /** May this member see this event? (the calendar's own rules — src/authz/occasions) */
 export function canSeeEvent(e: { audience: Audience; familyId: string }, m: CalendarMembership | null | undefined): boolean {
-  if (!canSeeFamilyCalendar(m, e.familyId)) return false;
-  if (e.audience === 'calendar' || m!.isOwner) return true;
-  return e.audience === 'EXTENDED' || m!.circle === 'FAMILY';
+  if (e.audience !== 'calendar') return canSeeOccasion(e.audience.occasion, m);
+  return canSeeFamilyCalendar(m, e.familyId);
+}
+
+/** The event as THIS member gets it: beyond home (and whoever added it), no line that gives a year away. */
+function shownTo<E extends FamilyEvent>(e: E, m: CalendarMembership): E {
+  if (e.audience === 'calendar' || seesOccasionDetail(e.audience.occasion, m)) return e;
+  return { ...e, note: e.lunar ? 'lunar' : null };
 }
 
 /** The viewer's ACTIVE memberships, as the calendar rules need them, with their families. */
@@ -154,11 +185,12 @@ export async function calendarMemberships(db: DbHandle, accountId: string): Prom
 export async function loadCalendar(db: DbHandle, accountId: string, homeFamilyId: string, from: YMD, to: YMD): Promise<CalendarEvent[]> {
   const out: CalendarEvent[] = [];
   for (const { m, fam } of await calendarMemberships(db, accountId)) {
-    if (!canSeeFamilyCalendar(m, fam.id)) continue;
+    // without the calendar a member still sees the days they added themselves (canSeeEvent decides)
     const own = fam.id === homeFamilyId;
-    for (const e of await familyEvents(db, fam, from, to, { festivals: own, shop: own })) {
+    const sees = canSeeFamilyCalendar(m, fam.id);
+    for (const e of await familyEvents(db, fam, from, to, { festivals: own && sees, shop: own && sees })) {
       if (!canSeeEvent(e, m)) continue;
-      const { audience: _a, ...ev } = e;
+      const { audience: _a, ...ev } = shownTo(e, m);
       out.push({ ...ev, own });
     }
   }
@@ -175,6 +207,8 @@ export interface OccasionInput {
   childId?: string | null;
   memberAccountId?: string | null;
   shareCircle?: Circle;
+  /** whose day it is (D27). Absent on a new one = someone else's (the private side); on a change = as it was. */
+  whose?: OccasionWhose;
   /** what they are to the family ("grandma"), from Snickerdoodle Draw's list. Absent = leave as is. */
   relation?: string | null;
 }
@@ -185,7 +219,7 @@ async function membershipIn(db: DbHandle, accountId: string, familyId: string): 
   return m ? { familyId: m.familyId, accountId: m.accountId, circle: m.circle, accessLevel: m.accessLevel, status: m.status, isOwner: m.isOwner, seesOccasions: m.seesOccasions } : null;
 }
 
-async function clean(db: DbHandle, familyId: string, input: OccasionInput) {
+async function clean(db: DbHandle, familyId: string, input: OccasionInput, before?: OccasionRow) {
   const title = String(input.title ?? '').replace(/\s+/g, ' ').trim().slice(0, 60);
   if (!title) return { error: 'invalid' as const };
   if (containsAbusiveText(title)) return { error: 'words' as const };
@@ -212,7 +246,10 @@ async function clean(db: DbHandle, familyId: string, input: OccasionInput) {
     if (!mm) return { error: 'invalid' as const };
     memberAccountId = mm.a;
   }
-  const shareCircle: Circle = input.shareCircle === 'EXTENDED' ? 'EXTENDED' : 'FAMILY'; // FAMILY by default (founder, 27 Oct)
+  // whose day (D27): someone else's is home only — no other share is ever stored for it
+  const whose: OccasionWhose = input.whose === 'OURS' || input.whose === 'SOMEONE_ELSE' ? input.whose : (before?.whose ?? 'SOMEONE_ELSE');
+  const asked: Circle = input.shareCircle === 'HOME' || input.shareCircle === 'EXTENDED' || input.shareCircle === 'FAMILY' ? input.shareCircle : (before?.shareCircle ?? 'FAMILY'); // FAMILY by default (founder, 27 Oct)
+  const shareCircle: Circle = effectiveOccasionShare({ whose, shareCircle: asked });
   // what they are to the family — optional, screened like the title; only touched when it's given
   let relation: { relation: string | null } | Record<string, never> = {};
   if (input.relation !== undefined) {
@@ -220,51 +257,85 @@ async function clean(db: DbHandle, familyId: string, input: OccasionInput) {
     if (r && containsAbusiveText(r)) return { error: 'words' as const };
     relation = { relation: r || null };
   }
-  return { row: { title, kind: input.kind, month: mo, day: d, year: y, lunar, childId, memberAccountId, shareCircle, ...relation } };
+  return { row: { title, kind: input.kind, month: mo, day: d, year: y, lunar, childId, memberAccountId, shareCircle, whose, ...relation } };
 }
 
 export async function addOccasion(db: DbHandle, accountId: string, familyId: string, input: OccasionInput): Promise<OccasionResult> {
-  if (!canAddOccasion(await membershipIn(db, accountId, familyId), familyId)) return { ok: false, reason: 'not-allowed' };
+  const m = await membershipIn(db, accountId, familyId);
   const c = await clean(db, familyId, input);
   if ('error' in c) return { ok: false, reason: c.error! };
+  // their own day: anyone in the family; anything else: the household (src/authz/occasions)
+  if (!canAddThisOccasion({ familyId, whose: c.row.whose, memberAccountId: c.row.memberAccountId }, m)) return { ok: false, reason: 'not-allowed' };
   const [row] = await db.insert(occasions).values({ ...c.row, familyId, createdByAccountId: accountId }).returning({ id: occasions.id });
   return { ok: true, id: row!.id };
 }
 
+const sameDetails = (o: OccasionRow, n: { title: string; kind: string; month: number; day: number; year: number | null; lunar: string | null; childId: string | null; memberAccountId: string | null; relation?: string | null }) =>
+  o.title === n.title && o.kind === n.kind && o.month === n.month && o.day === n.day && o.year === n.year && o.lunar === n.lunar && o.childId === n.childId && o.memberAccountId === n.memberAccountId && (n.relation === undefined || n.relation === o.relation);
+
 export async function updateOccasion(db: DbHandle, accountId: string, occasionId: string, input: OccasionInput): Promise<OccasionResult> {
   const [o] = await db.select().from(occasions).where(eq(occasions.id, occasionId));
-  if (!o || !canChangeOccasion(o, await membershipIn(db, accountId, o.familyId))) return { ok: false, reason: 'not-allowed' };
-  const c = await clean(db, o.familyId, input);
+  if (!o) return { ok: false, reason: 'not-allowed' };
+  const m = await membershipIn(db, accountId, o.familyId);
+  if (!canChangeOccasion(occasionRefOf(o), m)) return { ok: false, reason: 'not-allowed' };
+  const c = await clean(db, o.familyId, input, o);
   if ('error' in c) return { ok: false, reason: c.error! };
+  // whoever added it changes it; the family leader may only make someone else's addition more private
+  if (!canMakeOccasionChange(occasionRefOf(o), { ...c.row, sameDetails: sameDetails(o, c.row) }, m)) return { ok: false, reason: 'not-allowed' };
   await db.update(occasions).set({ ...c.row, updatedAt: new Date() }).where(eq(occasions.id, occasionId)); // updatedAt: Draw's list syncs by last change
   return { ok: true, id: occasionId };
 }
 
+/** Take a day off the calendar: whoever added it, or the family leader (src/authz/occasions). */
 export async function deleteOccasion(db: DbHandle, accountId: string, occasionId: string): Promise<boolean> {
   const [o] = await db.select().from(occasions).where(eq(occasions.id, occasionId));
-  if (!o || !canChangeOccasion(o, await membershipIn(db, accountId, o.familyId))) return false;
+  if (!o || !canChangeOccasion(occasionRefOf(o), await membershipIn(db, accountId, o.familyId))) return false;
   await db.delete(occasions).where(eq(occasions.id, occasionId));
   return true;
 }
 
+export interface OccasionForSheet {
+  id: string;
+  title: string;
+  kind: OccasionRow['kind'];
+  /** YYYY-MM-DD, or --MM-DD when the year isn't known — or isn't the viewer's to see (D27) */
+  date: string;
+  lunar: OccasionRow['lunar'];
+  childId: string | null;
+  memberAccountId: string | null;
+  /** who sees it now (someone else's: always home) */
+  shareCircle: Circle;
+  whose: OccasionWhose;
+  canChange: boolean;
+  /** 'creator' changes anything; 'leader' may only narrow it or take it off */
+  editRole: OccasionEditRole | null;
+}
+
 /** The family's own occasions the viewer may see — for the "add / edit an occasion" sheet. */
-export async function occasionsFor(db: DbHandle, accountId: string, familyId: string) {
+export async function occasionsFor(db: DbHandle, accountId: string, familyId: string): Promise<OccasionForSheet[]> {
   const m = await membershipIn(db, accountId, familyId);
-  if (!canSeeFamilyCalendar(m, familyId)) return [];
+  if (!m) return [];
   const rows = await db.select().from(occasions).where(eq(occasions.familyId, familyId));
   return rows
-    .filter((o) => canSeeEvent({ audience: o.shareCircle, familyId }, m))
-    .map((o) => ({
-      id: o.id,
-      title: o.title,
-      kind: o.kind,
-      date: `${o.year ?? '-'}-${String(o.month).padStart(2, '0')}-${String(o.day).padStart(2, '0')}`, // --MM-DD when the year isn't known
-      lunar: o.lunar,
-      childId: o.childId,
-      memberAccountId: o.memberAccountId,
-      shareCircle: o.shareCircle,
-      canChange: canChangeOccasion(o, m),
-    }));
+    .filter((o) => canSeeOccasion(occasionRefOf(o), m))
+    .map((o) => {
+      const ref = occasionRefOf(o);
+      const detail = seesOccasionDetail(ref, m);
+      const role = occasionEditRole(ref, m);
+      return {
+        id: o.id,
+        title: o.title,
+        kind: o.kind,
+        date: `${(detail ? o.year : null) ?? '-'}-${String(o.month).padStart(2, '0')}-${String(o.day).padStart(2, '0')}`, // --MM-DD when the year isn't known
+        lunar: o.lunar,
+        childId: o.childId,
+        memberAccountId: o.memberAccountId,
+        shareCircle: effectiveOccasionShare(o),
+        whose: o.whose,
+        canChange: role !== null,
+        editRole: role,
+      };
+    });
 }
 
 /** "The days we celebrate" — the owner's choice (cleaned to known groups). */
@@ -310,7 +381,8 @@ export async function reminderCandidates(db: DbHandle, today: YMD, horizonDays: 
       for (const { m, email } of seers) {
         const cm: CalendarMembership = { familyId: m.familyId, accountId: m.accountId, circle: m.circle, accessLevel: m.accessLevel, status: m.status, isOwner: m.isOwner, seesOccasions: m.seesOccasions };
         if (!canSeeEvent(e, cm)) continue;
-        out.push({ accountId: m.accountId, email, key: e.key, year: year(e.date), date: e.date, title: e.title, note: e.note });
+        const shown = shownTo(e, cm);
+        out.push({ accountId: m.accountId, email, key: e.key, year: year(e.date), date: e.date, title: shown.title, note: shown.note });
       }
     }
   }

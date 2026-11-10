@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { resolveViewerContext } from '@/server/assets';
 import { addChild, deleteChild, updateChild } from '@/server/children';
 import { leaveFamily, removeMember, revokeInvite, setMemberAccess } from '@/server/members';
-import { revokeGiftLink } from '@/server/giftLinks';
+import { revokeGiftBatch, revokeGiftLink } from '@/server/giftLinks';
 import { revalidatePath } from 'next/cache';
 import type { AccessLevel, Circle } from '@/domain/types';
 import { setMemberSeesOccasions } from '@/server/invites';
@@ -108,7 +108,7 @@ export async function removeMemberAction(memberAccountId: string): Promise<{ ok:
 }
 
 /** Change what a member sees (circle) and/or can do (access). */
-export async function setMemberAccessAction(memberAccountId: string, change: { circle?: Circle; accessLevel?: AccessLevel }): Promise<{ ok: boolean }> {
+export async function setMemberAccessAction(memberAccountId: string, change: { circle?: Circle; accessLevel?: AccessLevel }): Promise<{ ok: boolean; homeAsked?: boolean }> {
   return asOwner(
     (ctx) =>
       setMemberAccess(ctx.db, ctx.viewer, {
@@ -157,6 +157,11 @@ export async function revokeGiftLinkAction(giftLinkId: string): Promise<{ ok: bo
   return asOwner((ctx) => revokeGiftLink(ctx.db, ctx.viewer, String(giftLinkId)), { ok: false });
 }
 
+/** Switch off every link from one send (D27: one link per person — "switch them all off"). */
+export async function revokeGiftBatchAction(batchId: string): Promise<{ ok: boolean }> {
+  return asOwner(async (ctx) => ({ ok: (await revokeGiftBatch(ctx.db, ctx.viewer, ctx.familyId, String(batchId))).ok }), { ok: false });
+}
+
 /** A member leaves a family they were invited into (never their own). */
 export async function leaveFamilyAction(familyId: string): Promise<{ ok: boolean }> {
   const account = await getCurrentAccount();
@@ -179,7 +184,18 @@ export async function addOccasionAction(input: OccasionInput): Promise<OccasionR
   return addOccasion(db, account.id, familyId, input);
 }
 
-/** Change an occasion (its owner, or whoever added it). */
+/**
+ * A day added to ANOTHER family's calendar (D27): your own day — your birthday — in a family you've joined, at the
+ * circle you choose (sharing your own day is your own consent); or, for a home member who can add, the household's.
+ * The family is checked server-side: you must be ACTIVE in it (src/authz/occasions decides the rest).
+ */
+export async function addOccasionToFamilyAction(familyId: string, input: OccasionInput): Promise<OccasionResult> {
+  const account = await getCurrentAccount();
+  if (!account) return { ok: false, reason: 'not-allowed' };
+  return addOccasion(getDb(), account.id, String(familyId), input);
+}
+
+/** Change an occasion (whoever added it; the leader may only make it more private). */
 export async function updateOccasionAction(occasionId: string, input: OccasionInput): Promise<OccasionResult> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, reason: 'not-allowed' };

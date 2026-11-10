@@ -55,7 +55,7 @@ describe.skipIf(!DB || !S3)('closeAccount — right to erasure', () => {
   it('erases the owned family and everything in it; the order keeps only the money', async () => {
     const blake = await resolveViewerContext(db, ids.blakeId, ids.bloomId);
     const art = await ingestOriginalAsset(db, blake, { familyId: ids.bloomId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
-    await createGiftLink(db, blake, { familyId: ids.bloomId, assetIds: [art.assetId] });
+    await createGiftLink(db, blake, { familyId: ids.bloomId, assetIds: [art.assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     await db.insert(children).values({ familyId: ids.bloomId, firstName: 'Wren', controllerAccountId: ids.blakeId });
     await db.insert(sessions).values({ sessionToken: `close-${ids.nonce}`, userId: ids.blakeId, expires: new Date(Date.now() + 86_400_000) });
     const familyAssets = (await db.select({ id: assets.id }).from(assets).where(eq(assets.familyId, ids.bloomId))).map((a) => a.id);

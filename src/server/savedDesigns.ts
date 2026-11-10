@@ -1,5 +1,6 @@
+import type { VisibilityTier } from '@/domain/types';
 import { and, desc, eq } from 'drizzle-orm';
-import { canViewAsset } from '@/authz';
+import { canViewAsset, effectiveVisibility } from '@/authz';
 import { assets, products, productVariants, savedDesigns, storageObjects } from '@/db/schema';
 import { presignDownload } from '@/storage';
 import { clampTransform, type RawTransform } from '@/server/print/geometry';
@@ -86,6 +87,8 @@ export interface SavedDesignView {
   pricePence: number;
   imageUrl: string | null;
   createdAtISO: string;
+  /** who sees its drawing now (D27) — so a gift request can say who it's too private for (the server decides) */
+  visibility: VisibilityTier;
 }
 
 /** The account's saved designs in a family — only those whose drawing they can still see. */
@@ -115,6 +118,7 @@ export async function listSavedDesigns(db: DbHandle, accountId: string, familyId
       pricePence: v.pricePence,
       imageUrl: key ? await presignDownload(key, 300) : null,
       createdAtISO: d.createdAt.toISOString(),
+      visibility: effectiveVisibility(ref),
     });
   }
   return out;

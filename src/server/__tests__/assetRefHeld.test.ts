@@ -17,6 +17,7 @@ const row = (moderationStatus: string, over: Partial<AssetRefRow> = {}): AssetRe
   uploaderAccountId: PARENT,
   controllerAccountId: PARENT,
   visibility: 'FAMILY',
+  parentLimit: null,
   moderationStatus,
   moderationDetail: { labels: [] },
   ...over,

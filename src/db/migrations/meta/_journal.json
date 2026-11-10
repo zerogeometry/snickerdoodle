@@ -386,6 +386,13 @@
       "when": 1794342947195,
       "tag": "0054_order_items_seq",
       "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1794349698063,
+      "tag": "0055_sharing_rules",
+      "breakpoints": true
     }
   ]
 }
