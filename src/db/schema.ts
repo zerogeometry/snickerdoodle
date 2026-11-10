@@ -529,6 +529,9 @@ export const orders = pgTable(
 
 export const orderItems = pgTable('order_items', {
   id: uuid('id').defaultRandom().primaryKey(),
+  // The order the lines were placed in (each line is inserted in basket order): receipts and "your
+  // orders" list them by it, so the lines never shuffle between reads.
+  seq: bigint('seq', { mode: 'number' }).generatedByDefaultAsIdentity().notNull(),
   orderId: uuid('order_id')
     .notNull()
     .references(() => orders.id, { onDelete: 'cascade' }),

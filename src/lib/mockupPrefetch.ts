@@ -17,6 +17,7 @@
  * Module-level caches, per tab. Signed URLs live 10 minutes on the server; we reuse them for 8.
  */
 import type { InstantContext, ProductPhoto } from './instantMockup';
+import { normalizeGround } from './patterns';
 
 export interface MockupRequest {
   assetId: string;
@@ -32,9 +33,11 @@ export interface MockupRequest {
 }
 type Result = { ok: true; url: string } | { ok: false; fallback: true; needsAuth?: boolean; transient?: boolean };
 
-/** The SAME key MockupPreview builds for its inputs — one place, so a prefetch always matches. */
+/** The SAME key MockupPreview builds for its inputs — one place, so a prefetch always matches. The base
+ * colour goes in as the server reads it (normalizeGround): white and "none" are the same picture, so the
+ * range's tile (no base colour) is the stand-in for customize's close-up (white by default) — founder, 23 Oct. */
 export function mockupKey(r: { assetId?: string | null; sourceObjectId?: string | null; variantId?: string | null; transform?: unknown; size?: string | null; view?: string | null; fill?: string | null; spanHalf?: string | null; ground?: string | null }): string {
-  return `${r.assetId ?? ''}|${r.sourceObjectId ?? ''}|${r.variantId ?? ''}|${JSON.stringify(r.transform ?? null)}|${r.size ?? ''}|${r.view ?? ''}|${r.fill ?? ''}|${r.spanHalf ?? ''}|${r.ground ?? ''}`;
+  return `${r.assetId ?? ''}|${r.sourceObjectId ?? ''}|${r.variantId ?? ''}|${JSON.stringify(r.transform ?? null)}|${r.size ?? ''}|${r.view ?? ''}|${r.fill ?? ''}|${r.spanHalf ?? ''}|${normalizeGround(r.ground) ?? ''}`;
 }
 
 const URL_REUSE_MS = 8 * 60_000;

@@ -6,9 +6,7 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
  * copy (no skeleton wait), and the big preview starts as the very tile you clicked — the same
  * picture — then swaps to the sharp close-up as soon as that's drawn.
  */
-// FIXME (product bug, 30 Oct): the range tile is composed with no base colour but customize asks for
-// ground '#ffffff', so the exact-match stand-in never applies — customize opens on "updating your preview…".
-test.fixme('customize opens with the range tile, then sharpens', async ({ page }) => {
+test('customize opens with the range tile, then sharpens', async ({ page }) => {
   test.setTimeout(150_000);
   await page.setViewportSize({ width: 1280, height: 900 });
   await quietCookies(page);
