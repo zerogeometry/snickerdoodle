@@ -111,6 +111,7 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
       if (!res.ok) {
         // already in the family (04-B4): say so plainly — their level is changed from their card
         if (res.reason === 'already-member') setError(`${first} is already in your family — change what they can see from their card on this page`);
+        else if (res.reason === 'child') setError('little ones are added by first name, never invited — pick “child” above to add them');
         else toast('couldn’t send that invite — try again');
         return;
       }
