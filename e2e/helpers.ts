@@ -17,13 +17,15 @@ export async function artwork(): Promise<Buffer> {
     .toBuffer();
 }
 
-/** Answer the cookie banner up front ("essential only") so it never covers the thumb-zone buttons. */
-export async function quietCookies(page: Page) {
-  await page.addInitScript(() => {
+/** Answer the cookie banner up front ("essential only") so it never covers the thumb-zone buttons, and
+ * close the floating "get the app" bubble (tests/visual checks it on its own, with `appBubble`). */
+export async function quietCookies(page: Page, { appBubble = false }: { appBubble?: boolean } = {}) {
+  await page.addInitScript((keepBubble) => {
     try {
       localStorage.setItem('snickerdoodle.cookie-choice', 'essential');
+      if (!keepBubble) localStorage.setItem('snickerdoodle.draw-bubble-hidden', '1');
     } catch {}
-  });
+  }, appBubble);
 }
 
 /** Upload through the real "upload a drawing" control and wait for the personalised range.

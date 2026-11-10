@@ -12,7 +12,13 @@
  * no corporate tone, no pushy upsell, no "AI" as a feature (it appears only where the privacy promise
  * talks about it — never training on children's pictures).
  */
+import { COMPANY } from './company';
+import { storeHref } from './drawApp';
 import { CHRISTMAS_LAST_ORDER } from './season';
+
+/** "coming to" until a store link is set in src/lib/drawApp.ts, then "on" — the FAQ never claims a download that isn't live. */
+const DRAW_STORES_LIVE = storeHref('appStore') !== null || storeHref('googlePlay') !== null;
+const DRAW_WHERE = DRAW_STORES_LIVE ? 'on the App Store and Google Play' : 'coming soon to the App Store and Google Play';
 
 /** "Monday 14 December" from the season's last-order table — the FAQ never types a date twice. */
 export function longDate(iso: string): string {
@@ -36,7 +42,7 @@ export interface FaqSection {
 }
 
 /** When the answers were last checked against the product + policies (shown, and in the schema). */
-export const FAQ_UPDATED = '2026-10-25';
+export const FAQ_UPDATED = '2026-11-10';
 
 /** Friendly names for the price table — every product in the shop needs one (unit-tested). */
 export const FAQ_PRODUCT_NAMES: Record<string, string> = {
@@ -94,6 +100,16 @@ export const FAQ: FaqSection[] = [
         a: 'Yes, Snickerdoodle is free to try: uploading, previewing and editing your child’s drawing costs nothing. You only pay for the products you order, and UK delivery is included in every price.',
       },
       {
+        id: 'keep-childrens-artwork',
+        q: 'What’s the best way to keep my child’s artwork?',
+        a: 'Snickerdoodle is a simple way to keep your child’s artwork: snap a photo of each drawing and keep it in your private Family Keepsake Home, so the paper can go without losing the memory. The original photo is always kept untouched, you can share it with family privately, and you can turn favourites into framed prints, multi photo frames or calendars.',
+      },
+      {
+        id: 'uk-company',
+        q: 'Is Snickerdoodle a UK company?',
+        a: `Yes — Snickerdoodle is run by ${COMPANY.legalName}, a company registered in ${COMPANY.registeredIn} (company number ${COMPANY.companyNumber}), based in ${COMPANY.city}. Everything is made to order in the UK, children’s pictures are held in private UK storage, and UK delivery is free on every order.`,
+      },
+      {
         id: 'who-is-it-for',
         q: 'Who is Snickerdoodle for?',
         a: 'Snickerdoodle is for parents and guardians who want to keep their children’s artwork, and for the grandparents, aunts, uncles and friends who love giving it back as a present. It’s for grown-ups to use: children never have accounts, and only a parent or guardian decides who sees what.',
@@ -112,8 +128,18 @@ export const FAQ: FaqSection[] = [
       {
         id: 'what-can-i-make',
         q: 'What can I turn my child’s drawing into, and how much does it cost?',
-        a: 'Snickerdoodle prints children’s drawings onto framed prints, mugs, cushions, jigsaws, fleece blankets, organic T-shirts, greetings cards, phone cases, socks, wrapping paper, tea towels, height charts and playing cards, with free UK delivery included in every price. Here’s what each starts from:',
+        a: 'Snickerdoodle prints children’s drawings onto framed prints, multi photo frames, mugs, cushions, jigsaws, fleece blankets, organic T-shirts and jumpers, greetings cards, 2027 calendars, phone cases, Apple Watch straps, socks, coasters, placemats, wrapping paper, tea towels, height charts, playing cards and Christmas baubles, with free UK delivery included in every price. Here’s what each starts from:',
         table: 'products',
+      },
+      {
+        id: 'multi-photo-frame',
+        q: 'Can I put lots of my child’s drawings in one frame?',
+        a: 'Yes — the Snickerdoodle multi photo frame holds a neat grid of 9, 24 or 60 of your child’s drawings in one frame, so a whole year of artwork can hang on the wall together. You pick drawings from your Keepsake Home or upload new ones, and any square you leave empty repeats your main drawing.',
+      },
+      {
+        id: 'calendar',
+        q: 'Can I make a calendar from my child’s drawings?',
+        a: 'Yes — the Snickerdoodle 2027 wall calendar puts a different one of your child’s drawings on every month, in A5 or A4. It makes a lovely present for grandparents, who get a new drawing to look at all year.',
       },
       {
         id: 'phone-case',
@@ -173,8 +199,8 @@ export const FAQ: FaqSection[] = [
       },
       {
         id: 'christmas-same-parcel',
-        q: 'Do I save anything if I order a few Christmas things together?',
-        a: 'Yes — when two or more things from your Snickerdoodle order are made and packed in the same parcel, we take £3 off each extra one, because posting them together costs us less. It happens automatically at checkout; for example a bauble and a mug, or two rolls of wrapping paper. We don’t run Black Friday discounts.',
+        q: 'Do I save anything if I order a few things together?',
+        a: 'Yes — Snickerdoodle takes £3 off each extra item that’s made and packed in the same parcel, because posting them together costs us less (a bauble and a mug, or two rolls of wrapping paper). Many products also say “buy more & save”: more of the same thing costs up to 15% less each. Both happen automatically at checkout. We don’t run Black Friday discounts.',
       },
     ],
   },
@@ -205,7 +231,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'from-scratch',
         q: 'Can I design something from scratch?',
-        a: 'Yes — Snickerdoodle has a blank canvas (square, tall or wide) where you or your child can draw, add words and shapes, and pick a background colour, then put it on any product.',
+        a: 'Yes — Snickerdoodle has a blank canvas (square, tall or wide) where you or your child can draw, add words and shapes, and pick a background colour, then put it on any product. And if they’d rather use crayons, paint and paper, snap the drawing and it works just the same.',
       },
     ],
   },
@@ -249,6 +275,11 @@ export const FAQ: FaqSection[] = [
     id: 'gifts',
     title: 'Gifts and family',
     items: [
+      {
+        id: 'gifts-from-drawing',
+        q: 'What personalised gifts can be made from a child’s drawing?',
+        a: 'Snickerdoodle turns a child’s drawing into personalised gifts like mugs, framed prints, cushions, fleece blankets, jigsaws, T-shirts, 2027 calendars and Christmas baubles, each made to order in the UK with free delivery. You see the drawing on every product before you buy, and grandparents can be sent a private ready-to-buy link. See [gifts](/gifts).',
+      },
       {
         id: 'grandparents-buy',
         q: 'How can grandparents buy something with my child’s drawing?',
@@ -305,7 +336,92 @@ export const FAQ: FaqSection[] = [
         q: 'Is Snickerdoodle designed around children’s privacy law?',
         a: 'Yes — Snickerdoodle is designed in line with the UK Information Commissioner’s Children’s Code, so everything about your child is handled to a higher standard than the law’s minimum. Every upload also goes through automated safety checks before anything can be printed.',
       },
+      {
+        id: 'paused-picture',
+        q: 'Why has Snickerdoodle paused my picture?',
+        a: 'Snickerdoodle pauses a picture when its automatic safety check spots something that might not be right for a keepsake, like rude words or grown-up content. A paused picture isn’t printed, shared or shown to your family. Sometimes the check gets it wrong, so we take a closer look; meanwhile you can carry on with another picture.',
+      },
     ],
+  },
+  {
+    id: 'draw-app',
+    title: 'Snickerdoodle Draw, our drawing app',
+    items: [
+      {
+        id: 'drawing-app',
+        q: 'What’s a good ad-free drawing app for children?',
+        a: `Snickerdoodle Draw is a free, ad-free educational app, made by Snickerdoodle’s designers and artists, that teaches children aged 3 to 12 to draw step by step, on screen or on real paper with crayons. It has no in-app purchases and no chat, reads every step aloud, works offline, and is ${DRAW_WHERE} for iPhone, iPad and Android. See [Snickerdoodle Draw](/draw).`,
+      },
+      {
+        id: 'draw-app-keepsakes',
+        q: 'Can drawings from Snickerdoodle Draw become keepsakes?',
+        a: 'Yes — a drawing your child makes on paper with Snickerdoodle Draw can come straight to Snickerdoodle: snap it, keep it in your private Keepsake Home, and turn it into a print, mug or card. Linking the app to your Snickerdoodle account is coming soon, so their proudest drawings can arrive in your keepsake box on their own.',
+      },
+      {
+        id: 'draw-app-data',
+        q: 'Does Snickerdoodle Draw collect my child’s data?',
+        a: 'No — Snickerdoodle Draw keeps your child’s drawings on the device, with no sign-up, no ads, no chat and no tracking. Nothing leaves the app unless a grown-up chooses to send it, and anything like that sits in a grown-ups’ corner, opened with the phone’s own lock or a PIN. Crash reports stay off unless you switch them on.',
+      },
+    ],
+  },
+];
+
+/**
+ * The /draw page's questions (founder, 10 Nov): the ones parents ask about a children's drawing app, in the
+ * same pattern as the FAQ (each answer opens with a self-contained sentence naming Snickerdoodle Draw), and
+ * true to the app's store listing (snickerdoodle-draw docs/store/google-play-listing.md). FAQPage structured
+ * data on /draw is generated from this list. Unit-tested with the FAQ's rules.
+ */
+export const DRAW_FAQ: FaqItem[] = [
+  {
+    id: 'what-is-snickerdoodle-draw',
+    q: 'What is Snickerdoodle Draw?',
+    a: 'Snickerdoodle Draw is a free, educational app that teaches children aged 3 to 12 to draw, one friendly step at a time, on screen or on real paper with crayons. It’s made in the UK by the designers and artists behind Snickerdoodle, for learning as much as for doodling. A warm voice reads every step aloud, and each finished drawing appears in a frame with your child’s name and the date.',
+  },
+  {
+    id: 'draw-age',
+    q: 'What age is Snickerdoodle Draw for?',
+    a: 'Snickerdoodle Draw is for children aged 3 to 12, and the lessons grow with them. Little ones get chunky shapes, a guide to trace and every step read aloud, and start on paper by default; older children get a faint guide they can switch off, and real skills like shading, faces and people in motion.',
+  },
+  {
+    id: 'draw-free-ads',
+    q: 'Is Snickerdoodle Draw free, and does it have ads?',
+    a: 'Snickerdoodle Draw is free, with no ads and no in-app purchases, so there’s nothing to buy and nothing selling to your child. If you’d like to turn a drawing into a keepsake, a grown-up does that on the Snickerdoodle website.',
+  },
+  {
+    id: 'draw-paper',
+    q: 'Can my child use Snickerdoodle Draw with real crayons and paper?',
+    a: 'Yes — every Snickerdoodle Draw lesson works on screen or on real paper, with crayons, pencils, pens or paint, and a quick photo at the end adds the drawing to their gallery. We value real, physical art, and the app is there to support it, never to replace it; the youngest start on paper by default, because it’s good for small hands.',
+  },
+  {
+    id: 'draw-offline',
+    q: 'Does Snickerdoodle Draw need an account or the internet?',
+    a: 'No — Snickerdoodle Draw needs no sign-up and works offline. Lessons, narration and drawings all live on the device, which makes it good for car journeys and holidays. The only time it goes online is a quiet check for app updates, and crash reports if a grown-up chooses to share them.',
+  },
+  {
+    id: 'draw-safe',
+    q: 'Is Snickerdoodle Draw safe and private for children?',
+    a: 'Yes — Snickerdoodle Draw has no chat, no social feed, no ads and no sign-up, and your child’s drawings stay on the device. Settings, reminders and anything that leaves the app sit in a grown-ups’ corner, opened with your phone’s own lock or a PIN, and crash reports stay off unless a grown-up switches them on.',
+  },
+  {
+    id: 'draw-streaks',
+    q: 'Does Snickerdoodle Draw use streaks or nag children to play?',
+    a: 'No — Snickerdoodle Draw counts drawing weeks, not daily streaks, so a week off is simply a rest week and nothing ever counts down to zero. There are no “don’t lose your streak” alerts, and reminders are off unless a grown-up turns them on.',
+  },
+  {
+    id: 'draw-lessons',
+    q: 'What will my child learn with Snickerdoodle Draw?',
+    a: 'Snickerdoodle Draw has 366 step-by-step lessons across six worlds: Doodle Garden, Shape Friends, Story Corner, Pattern & Colour Studio, Light & Space and Character Lab. Designed by artists and designers, they start with dots, circles and lines and build real skills up to characters, patterns, shading and faces, and every lesson ends with a step to make the drawing their own.',
+  },
+  {
+    id: 'draw-devices',
+    q: 'Which devices and languages does Snickerdoodle Draw work on?',
+    a: `Snickerdoodle Draw is ${DRAW_WHERE}, for iPhone, iPad and Android phones and tablets. It speaks 15 languages, including English, Spanish, French, German, Greek, Polish, Ukrainian, Chinese, Japanese and Korean; the narrator reads in English, and other languages use the phone’s own voice.`,
+  },
+  {
+    id: 'draw-keepsakes',
+    q: 'Can I turn Snickerdoodle Draw drawings into keepsakes?',
+    a: 'Yes — paper drawings from Snickerdoodle Draw can go straight onto Snickerdoodle: snap one, keep it in your private Keepsake Home, and make it into a framed print, mug, cushion or card. Linking the app to your Snickerdoodle account is coming soon, so their proudest drawings can reach your keepsake box on their own. See [how it works](/how-it-works).',
   },
 ];
 

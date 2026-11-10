@@ -3,6 +3,9 @@
  * AND Snickerdoodle Draw — logo/, icons/<season>/snickerdoodle/web/, backgrounds/):
  *   node scripts/brand/sync-brand-assets.mjs [path/to/brand-assets]   (default: ../brand-assets)
  *
+ * Snickerdoodle Draw's lockup, app icon and share card come too (draw-*.webp/png, for /draw and the "get the
+ * app" bubble), plus its store screenshots from the Draw repo (public/draw/screens) and the film poster.
+ *
  * Every file comes in twice — everyday and christmas (Santa hat). The everyday files keep their old names,
  * so nothing that links them changes; the christmas ones end in -christmas. src/lib/brand.ts picks between
  * them by season. Re-run whenever brand-assets changes. (The doodle textures and floating doodles come from
@@ -11,7 +14,7 @@
  * Supersedes build-brand-assets.mjs for the logo, icons and share card; that script still builds the
  * printed card-back badge, which stays the everyday mark (prints outlive the season).
  */
-import { copyFileSync, existsSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -88,4 +91,48 @@ for (const season of ['everyday', 'christmas']) {
   const og = path.join(SRC, 'logo', season, `og-share-image-1200x630${sfx}.png`);
   await sharp(og).png({ compressionLevel: 9, palette: true, quality: 95 }).toFile(out('og-default.png'));
   await say(out('og-default.png'));
+
+  // ── Snickerdoodle Draw (the /draw page and the "get the app" bubble) ──
+  // its lockup, trimmed to its ink: the page hero shows it up to ~440px wide, so 960 covers 2×
+  const drawLogo = await sharp(path.join(SRC, 'logo', season, `snickerdoodle-draw-logo${sfx}.png`)).trim({ threshold: 1 }).png().toBuffer();
+  const dm = await sharp(drawLogo).metadata();
+  await sharp(drawLogo).resize({ width: 960, kernel: 'lanczos3' }).webp({ quality: 86, alphaQuality: 88, effort: 6, smartSubsample: true }).toFile(out('draw-logo.webp'));
+  await say(out('draw-logo.webp'));
+  console.log(`  draw lockup ratio ${(dm.width / dm.height).toFixed(4)}  (src/lib/brand.ts DRAW_LOGO_RATIO)`);
+  // its app icon (sunshine), shown at up to 96px: 256 covers the bubble and the page at 2–3×
+  await sharp(path.join(SRC, 'icons', season, 'draw', 'web', 'icon-512.png')).resize(256, 256, { kernel: 'lanczos3' }).webp({ quality: 88, effort: 6 }).toFile(out('draw-icon.webp'));
+  await say(out('draw-icon.webp'));
+  // the share card for /draw
+  await sharp(path.join(SRC, 'logo', season, `draw-og-share-image-1200x630${sfx}.png`)).png({ compressionLevel: 9, palette: true, quality: 95 }).toFile(out('draw-og.png'));
+  await say(out('draw-og.png'));
+}
+
+// The /draw page's film placeholder poster (16:9): the everyday Draw lockup on paper. Swapped for a frame of
+// the real film when it arrives (src/lib/drawApp.ts DRAW_VIDEO).
+{
+  const DRAW = path.join(ROOT, 'public', 'draw');
+  mkdirSync(path.join(DRAW, 'screens'), { recursive: true });
+  // the lockup sits in the top half, leaving the bottom clear for the placeholder's play sticker (DrawFilm)
+  const lockup = await sharp(path.join(SRC, 'logo', 'everyday', 'snickerdoodle-draw-logo.png')).trim({ threshold: 1 }).resize({ width: 470, kernel: 'lanczos3' }).png().toBuffer();
+  const lm = await sharp(lockup).metadata();
+  const poster = path.join(DRAW, 'video-poster.webp');
+  await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#FFFBF2' } }) // paper
+    .composite([{ input: lockup, left: Math.round((1280 - lm.width) / 2), top: 84 }])
+    .webp({ quality: 84, effort: 6 })
+    .toFile(poster);
+  await say(poster);
+
+  // App screenshots: the Play Store phone set (1080×1920, a sample child "Ellie", no real child's data), from the
+  // Draw repo beside brand-assets (or DRAW_REPO=…). Halved and webp'd: the gallery shows them ≤ 260px wide.
+  const repo = path.resolve(process.env.DRAW_REPO ?? path.join(SRC, '..', 'snickerdoodle-draw'));
+  const shots = path.join(repo, 'docs', 'store', 'screenshots');
+  if (!existsSync(shots)) {
+    console.warn(`(no Draw screenshots at ${shots}: kept the ones in public/draw/screens)`);
+  } else {
+    for (const name of ['01-today', '02-lesson', '03-reveal', '04-learn', '05-rewards']) {
+      const to = path.join(DRAW, 'screens', `${name}.webp`);
+      await sharp(path.join(shots, `${name}.png`)).resize({ width: 540, kernel: 'lanczos3' }).webp({ quality: 84, effort: 6 }).toFile(to);
+      await say(to);
+    }
+  }
 }

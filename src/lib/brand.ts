@@ -28,3 +28,16 @@ export function brandFiles(season: BrandSeason) {
     og: f('og-default.png'),
   };
 }
+
+/** Width ÷ height of the Snickerdoodle Draw lockup (trimmed; the hat makes the christmas one taller). */
+export const DRAW_LOGO_RATIO: Record<BrandSeason, number> = { everyday: 2.3129, christmas: 2.1625 };
+
+/** Snickerdoodle Draw's brand files for the season (same brand-assets source and sync script as the site's). */
+export function drawBrandFiles(season: BrandSeason) {
+  const f = (name: string) => `/brand/${season === 'christmas' ? name.replace(/(\.\w+)$/, '-christmas$1') : name}`;
+  return {
+    logo: f('draw-logo.webp'),
+    icon: f('draw-icon.webp'),
+    og: f('draw-og.png'),
+  };
+}

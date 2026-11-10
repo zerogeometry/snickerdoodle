@@ -67,6 +67,24 @@ for (const vp of WIDTHS) {
       }
     });
 
+    // Snickerdoodle Draw (founder brief 10 Nov): the /draw page, and the "get the app" bubble on the landing,
+    // clear of the phone's pinned "start creating" bar (an element shot, so the page behind can change freely).
+    test('snickerdoodle draw: the page and the get-the-app bubble', async ({ page }) => {
+      await quietCookies(page, { appBubble: true });
+      await page.goto('/draw');
+      await shot(page, `${vp.name}-draw`);
+      await page.goto('/');
+      const bubble = page.getByRole('link', { name: 'get the Snickerdoodle Draw app' });
+      await expect(bubble).toBeVisible();
+      await page.waitForTimeout(700); // its pop-in
+      await expect(bubble).toHaveScreenshot(`${vp.name}-draw-bubble.png`);
+      if (vp.width < 768) {
+        const bar = await page.locator('div.kraft.fixed.bottom-0').boundingBox();
+        const b = await bubble.boundingBox();
+        expect(b!.y + b!.height).toBeLessThanOrEqual(bar!.y); // never over the primary action
+      }
+    });
+
     test('christmas last order dates (D24)', async ({ page }) => {
       await quietCookies(page);
       await page.goto('/christmas/delivery-dates');

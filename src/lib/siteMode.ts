@@ -83,6 +83,12 @@ export const TEST_GATE_DAYS = 30;
  * its Server Actions then ran without the password). src/lib/__tests__/breakInGate.test.ts fails when
  * this list and public/ disagree — add a new public file here when you add it there. */
 export const PUBLIC_FILES: ReadonlySet<string> = new Set([
+  '/brand/draw-icon-christmas.webp',
+  '/brand/draw-icon.webp',
+  '/brand/draw-logo-christmas.webp',
+  '/brand/draw-logo.webp',
+  '/brand/draw-og-christmas.png',
+  '/brand/draw-og.png',
   '/brand/favicon-180-christmas.png',
   '/brand/favicon-180.png',
   '/brand/favicon-192-christmas.png',
@@ -107,6 +113,12 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/christmas/bauble.webp',
   '/christmas/presents.webp',
   '/christmas/sack.webp',
+  '/draw/screens/01-today.webp',
+  '/draw/screens/02-lesson.webp',
+  '/draw/screens/03-reveal.webp',
+  '/draw/screens/04-learn.webp',
+  '/draw/screens/05-rewards.webp',
+  '/draw/video-poster.webp',
   '/examples/aeroplane-cushion.webp',
   '/examples/autumnphone.webp',
   '/examples/blankettiger.webp',

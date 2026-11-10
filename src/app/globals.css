@@ -655,6 +655,15 @@ body {
   --paper-ink: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine-deep) 19%);
   --paper-sheen: color-mix(in oklab, var(--color-honey-band), var(--color-paper) 50%);
 }
+/* The same honey band with the everyday doodles (/draw's "they're only little once" outside the season) */
+.doodle-paper-honey {
+  --paper-tile: url('/textures/everyday-doodles.webp');
+  --paper-base: var(--color-honey-band);
+  --paper-glow: color-mix(in oklab, var(--color-paper) 70%, transparent);
+  --paper-deep: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine) 16%);
+  --paper-ink: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine-deep) 19%);
+  --paper-sheen: color-mix(in oklab, var(--color-honey-band), var(--color-paper) 50%);
+}
 /* "From fridge door to forever" — on cobalt, with the Christmas band's glow and sheen (founder, 10 Nov):
    a soft light pooling at the top left, deepening to cobalt-deep at the bottom right, and the doodle lines
    a shade lighter than the band with a bright sheen sweeping across them. White text stays ≥4.5:1 even
@@ -664,8 +673,9 @@ body {
   --paper-base: var(--color-cobalt);
   --paper-glow: color-mix(in oklab, var(--color-sky) 28%, transparent);
   --paper-deep: color-mix(in oklab, var(--color-cobalt), var(--color-cobalt-deep) 45%);
-  --paper-ink: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 12%);
-  --paper-sheen: color-mix(in oklab, var(--color-cobalt), var(--color-paper) 26%);
+  /* kept faint so the white words on top read first (founder, 10 Nov: the doodles were clashing) */
+  --paper-ink: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 6%);
+  --paper-sheen: color-mix(in oklab, var(--color-cobalt), var(--color-paper) 11%);
 }
 
 /* Mobile menu / banner entrances. */
