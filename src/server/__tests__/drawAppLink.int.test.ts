@@ -507,7 +507,7 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       const n2 = await send(undefined);
       madeAssets.push(n1.assetId, n2.assetId);
       expect(n1.assetId).not.toBe(n2.assetId);
-      for (const bad of ['has space', 'x'.repeat(65), '<script>', 42]) await expectApiError(send(bad), 422, 'client-ref');
+      for (const bad of ['has space', 'x'.repeat(65), '<script>', 42]) await expectApiError(send(bad), 422, 'clientRef');
     });
 
     it.skipIf(!S3)('clientRef is per family: another family using the same ref gets its own keepsake', async () => {

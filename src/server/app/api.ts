@@ -251,7 +251,7 @@ export async function keepAppDrawing(
   const madeOn = validMadeOn(input.madeOn);
   if (!madeOn) throw new AppApiError(422, 'made-on');
   const clientRef = parseClientRef(input.clientRef);
-  if (clientRef === undefined) throw new AppApiError(422, 'client-ref');
+  if (clientRef === undefined) throw new AppApiError(422, 'clientRef');
   // the phone is retrying something it already sent: hand back the same keepsake, make nothing new
   const already = async () =>
     clientRef
