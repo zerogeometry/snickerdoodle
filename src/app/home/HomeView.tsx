@@ -553,8 +553,10 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
 
         <div className="flex items-center justify-center gap-2 bg-paper-2 px-6 py-3.5 text-center text-xs text-green-save">
           <Icon icon={IconLock} size={15} />
-          Private to your family. You choose who&apos;s in your circle and what they can see — change or remove anyone, any
-          time.
+          {/* only the parent controls the circle (NN3) — a relative is told who does, and that leaving is theirs */}
+          {data.isOwner
+            ? 'Private to your family. You choose who’s in your circle and what they can see — change or remove anyone, any time.'
+            : 'Private to the family. The family lead chooses who’s in it and what everyone can see — and you can leave any time.'}
         </div>
       </main>
 
