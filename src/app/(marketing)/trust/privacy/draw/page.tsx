@@ -188,7 +188,11 @@ export default function DrawPrivacyNoticePage() {
             A drawing sent from the app is treated exactly like one you upload on the website: it&apos;s kept in private,
             encrypted storage in the UK, with any hidden photo details (like location) removed, and it goes through the
             same automatic safety checks. Until they&apos;re done, only you can see it, and it can&apos;t be shared or
-            printed. After that, your family on Snickerdoodle can see it in your keepsake box.
+            printed. After that, your family on Snickerdoodle can see it in your keepsake box. If a check isn&apos;t
+            sure about a drawing, one of the Snickerdoodle team may look at it before it can be shared or printed.
+            That&apos;s rare, only a named person with two-step login can do it, they never see your name or your
+            child&apos;s, and every look is logged. See section 4 of <a href="/trust/privacy">our website&apos;s privacy
+            notice</a>.
           </li>
           <li>
             You can change what syncs at any time. In the app&apos;s grown-ups&apos; corner you can send less or stop; to

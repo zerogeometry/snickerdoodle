@@ -1,4 +1,5 @@
 import { and, desc, eq, gt } from 'drizzle-orm';
+import { birthdayView, type BirthdayView } from '@/lib/birthdayView';
 import { canBuyFromGiftList, canSetAssetVisibility, canViewAsset, type AssetRef } from '@/authz';
 import { accounts, assets, children, families, invites, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
@@ -53,8 +54,9 @@ export interface HomePendingInvite {
 export interface HomeChild {
   id: string;
   firstName: string;
-  /** ISO date (YYYY-MM-DD) or null — only ever used for the gentle "coming up" nudge. */
-  birthday: string | null;
+  /** Day, month and the age they turn next, or null: only for the gentle "coming up" nudge. Never the
+   * year (A-59): this goes to the browser, relatives included. */
+  birthday: BirthdayView | null;
 }
 
 export interface HomeData {
@@ -193,7 +195,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     children: childRows.map((c) => ({
       id: c.id,
       firstName: c.firstName,
-      birthday: (isOwner || seesCalendar) && c.birthday ? String(c.birthday).slice(0, 10) : null,
+      birthday: isOwner || seesCalendar ? birthdayView(c.birthday ? String(c.birthday) : null, new Date()) : null,
     })),
     keepsakes,
   };

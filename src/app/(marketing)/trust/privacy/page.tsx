@@ -81,6 +81,20 @@ export default function PrivacyNoticePage() {
           we collect as little as possible; we never profile children or use their data for behavioural advertising;
           and you can see and delete anything about your child, any time, in one place.
         </p>
+        <p>
+          <strong>When a person looks at a picture.</strong> Our safety checks are automatic, so nearly every picture
+          is only ever seen by a computer. If a check isn&apos;t sure about one, or someone you&apos;ve shared it with
+          reports it, it can&apos;t be printed or shared until it&apos;s checked, and one of the Snickerdoodle team
+          (Launch Mode Ltd) may look at it to decide whether it&apos;s fine. That&apos;s rare. Only a named person with
+          two-step login can do it; they see just that picture and why it was flagged, never your name, your
+          child&apos;s name or the rest of your keepsake box; and every look and every decision is logged. If it&apos;s
+          fine, it goes straight back to normal; if not, we delete it properly. If a picture ever matches known
+          child-abuse material, nobody opens it: we keep it securely and report it, as the law requires.{' '}
+          <em>
+            Legal basis: our legitimate interest, and yours, in keeping a children&apos;s service safe; and our legal
+            obligations.
+          </em>
+        </p>
 
         <h2>5. Artificial intelligence, in plain terms</h2>
         <p>
@@ -102,7 +116,7 @@ export default function PrivacyNoticePage() {
           only sees what it needs to do its job:
         </p>
         <ul>
-          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery and bad language before it can be printed. Amazon doesn’t keep the pictures or use them to train anything.</li>
+          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery and bad language before it can be printed. If a check isn’t sure, a person may look (see section 4). Amazon doesn’t keep the pictures or use them to train anything.</li>
           <li><strong>Stripe</strong> — takes your payment. Your card details go straight to Stripe; we never see or store them.</li>
           <li><strong>Prodigi</strong> — prints your order and delivers it. They get the print file for what you ordered and the delivery address.</li>
           <li><strong>Resend</strong> (Ireland, EU) — sends the site&apos;s emails, like your sign-in links, order updates and gift requests.</li>

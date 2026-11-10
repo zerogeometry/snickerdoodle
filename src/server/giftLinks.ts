@@ -402,7 +402,11 @@ export async function giftLinkPreview(db: DbHandle, token: string, assetId: stri
     expiresAt: link.expiresAt,
     assetIds: (link.items as GiftItem[]).map((i) => i.assetId),
   };
-  const [asset] = await db.select().from(assets).where(eq(assets.id, assetId));
+  // the whole link must still be usable (the same rule as the page, 06-B5): if any keepsake on it was
+  // deleted or is held, no preview loads, not even for the ones still there (N7 / A-59)
+  const present = await db.select().from(assets).where(inArray(assets.id, grant.assetIds));
+  if (linkAvailability(grant.assetIds, present) !== 'ok') return null;
+  const asset = present.find((a) => a.id === assetId);
   if (!asset || !canPurchaseViaGiftLink(grant, asset, new Date()).allowed) return null;
   // the product as designed, when the link froze one (a DERIVATIVE of this very asset), else the drawing
   const item = (link.items as GiftItem[]).find((i) => i.assetId === assetId && (!productKey || i.productKey === productKey));

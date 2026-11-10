@@ -43,14 +43,14 @@ function nextBirthday(kids: HomeData['children'], now = new Date()): { name: str
   const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
   for (const c of kids) {
     if (!c.birthday) continue;
-    const [y, m, d] = c.birthday.split('-').map(Number) as [number, number, number];
-    let year = now.getFullYear();
-    let at = Date.UTC(year, m - 1, d);
-    if (at < today) at = Date.UTC(++year, m - 1, d);
+    // day, month and the age they turn next come from the server: never the year (A-59)
+    const { month: m, day: d, turns } = c.birthday;
+    let at = Date.UTC(now.getFullYear(), m - 1, d);
+    if (at < today) at = Date.UTC(now.getFullYear() + 1, m - 1, d);
     const inDays = Math.round((at - today) / 86_400_000);
     if (inDays > 60) continue;
     if (!best || inDays < best.inDays) {
-      best = { name: c.firstName, turns: year - y, inDays, label: new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }) };
+      best = { name: c.firstName, turns, inDays, label: new Date(at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }) };
     }
   }
   return best;

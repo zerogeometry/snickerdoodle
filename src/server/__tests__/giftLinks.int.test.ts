@@ -66,6 +66,18 @@ describe.skipIf(!DB || !S3)('gift links — integration', () => {
     expect(view.items[0]!.imageUrl).not.toMatch(/^http/);
   });
 
+  it('N7: when one keepsake on a link is held, no preview loads, not even for the one still fine', async () => {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const [fine, held] = [await keptAsset(), await keptAsset()];
+    const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [fine, held] });
+    expect(await giftLinkPreview(db, token, fine)).not.toBeNull();
+    await db.update(assets).set({ moderationStatus: 'FLAGGED' }).where(eq(assets.id, held));
+    expect((await getGiftLink(db, token)).state).toBe('gone');
+    expect(await giftLinkPreview(db, token, fine)).toBeNull();
+    await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(eq(assets.id, held));
+    expect(await giftLinkPreview(db, token, fine)).not.toBeNull(); // back once review clears it
+  });
+
   it('a non-owner cannot create or revoke a link', async () => {
     const rosie = await resolveViewerContext(db, ids.rosieId, ids.hartleyId); // member, not owner
     const assetId = await keptAsset();
