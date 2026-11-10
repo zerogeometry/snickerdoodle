@@ -5,7 +5,7 @@ import { exampleBySlug } from '@/lib/examples';
  * One real example keepsake (src/lib/examples), taped in as a polaroid — for marketing and
  * empty-state moments ("here's what little drawings become"). Cut-outs sit on paper-2 with their
  * own shadow; the cream photo (cutout: false) fills the frame. Always the example's own alt +
- * intrinsic size; lazy unless `eager` (above the fold).
+ * intrinsic size; lazy unless `eager` (above the fold). Tap it and it comes alive (globals.css .alive-art).
  */
 export function ExamplePolaroid({
   slug,
@@ -28,7 +28,8 @@ export function ExamplePolaroid({
   const e = exampleBySlug(slug);
   return (
     <figure
-      className={`polaroid tape ${className}`}
+      data-alive
+      className={`polaroid tape alive-art ${className}`}
       style={{ ['--tilt' as string]: tilt, ['--tape' as string]: `color-mix(in srgb, var(--color-${tape}) 80%, transparent)`, ...style }}
     >
       <div className={`flex aspect-square items-center justify-center overflow-hidden ${e.cutout ? 'bg-paper-2 p-2.5' : ''}`}>

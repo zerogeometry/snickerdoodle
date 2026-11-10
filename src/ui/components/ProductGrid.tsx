@@ -115,8 +115,10 @@ export function ProductTile({
     // straightens + rises on hover/focus (.lift). No overflow clip on the card itself so the tape
     // can sit proud of the top edge; the preview area clips its own contents.
     <div
-      className="polaroid tape lift group relative flex h-full flex-col @container"
+      className="polaroid tape lift pop-in-view group relative flex h-full flex-col @container"
       style={{
+        // pops in as its row scrolls into view, one after the other along the row (globals.css)
+        ['--i' as string]: index % 4,
         ['--tilt' as string]: index % 3 === 0 ? '-1.4deg' : index % 3 === 1 ? '1.1deg' : '-0.5deg',
         ['--tape' as string]: TAPES[index % TAPES.length],
         ['--tape-rot' as string]: index % 2 ? '4deg' : '-3deg',

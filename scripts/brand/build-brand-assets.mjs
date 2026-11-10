@@ -4,7 +4,7 @@
  * The lockup master (6336×2688, transparent) gives the header logo, the share card, the badges AND
  * the icon face (cropped from it, so install icons are crisp at 512px — the founder's favicon.png is
  * only 200px and is used for nothing bigger than its own size).
- * Writes into public/brand, src/app/favicon.ico and the print card-back badge. Re-run after a new master.
+ * Writes into public/brand, public/favicon.ico and the print card-back badge. Re-run after a new master.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -100,8 +100,8 @@ icoPngs.forEach((png, i) => {
   header.writeUInt32LE(offset, e + 12);
   offset += png.length;
 });
-writeFileSync(path.join(ROOT, 'src', 'app', 'favicon.ico'), Buffer.concat([header, ...icoPngs]));
-console.log('src/app/favicon.ico  16/32/48');
+writeFileSync(path.join(ROOT, 'public', 'favicon.ico'), Buffer.concat([header, ...icoPngs]));
+console.log('public/favicon.ico  16/32/48');
 
 // ── the badge: the lockup on a cream disc (site badge + the printed card's back mark) ─────────────
 async function badge(size) {

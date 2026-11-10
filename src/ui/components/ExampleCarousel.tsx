@@ -30,7 +30,8 @@ export function ExampleCarousel({ items = EXAMPLES, rows = 3, className = '' }: 
               return (
                 <li key={`${e.slug}-${i}`} aria-hidden={copy || undefined} className="w-[calc(100cqw/2.3)] shrink-0 pr-4 md:w-[calc(100cqw/4)] md:pr-5">
                   <div
-                    className="polaroid tape lift"
+                    data-alive
+                    className="polaroid tape lift alive-art"
                     style={{
                       ['--tilt' as string]: (k + r) % 3 === 0 ? '-2.5deg' : (k + r) % 3 === 1 ? '1.8deg' : '-1deg',
                       ['--tape' as string]: TAPES[(k + r) % TAPES.length],

@@ -83,16 +83,26 @@ export const TEST_GATE_DAYS = 30;
  * its Server Actions then ran without the password). src/lib/__tests__/breakInGate.test.ts fails when
  * this list and public/ disagree — add a new public file here when you add it there. */
 export const PUBLIC_FILES: ReadonlySet<string> = new Set([
+  '/brand/favicon-180-christmas.png',
   '/brand/favicon-180.png',
+  '/brand/favicon-192-christmas.png',
   '/brand/favicon-192.png',
+  '/brand/favicon-32-christmas.png',
   '/brand/favicon-32.png',
+  '/brand/favicon-512-christmas.png',
   '/brand/favicon-512.png',
+  '/brand/favicon-christmas.ico',
+  '/brand/favicon-maskable-512-christmas.png',
   '/brand/favicon-maskable-512.png',
+  '/brand/og-default-christmas.png',
   '/brand/og-default.png',
   '/brand/snickerdoodle-badge.png',
+  '/brand/snickerdoodle-logo-christmas.webp',
   '/brand/snickerdoodle-logo.webp',
   '/brand/snickerfavicon.png',
+  '/brand/snickerlogo-christmas.png',
   '/brand/snickerlogo.png',
+  '/favicon.ico',
   '/christmas/ball-and-present.webp',
   '/christmas/bauble.webp',
   '/christmas/presents.webp',
@@ -163,6 +173,8 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/stickers/christmas/tinsel.svg',
   '/textures/christmas-doodles.webp',
   '/textures/everyday-doodles.webp',
+  '/textures/floaters-christmas.webp',
+  '/textures/floaters-everyday.webp',
 ]);
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the

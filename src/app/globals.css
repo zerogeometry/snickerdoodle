@@ -61,6 +61,9 @@
   /* The single motion vocabulary: a springy overshoot for "pop", a soft settle for moves. */
   --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  /* Snickerdoodle Draw's squash curve (its motion study): quick, a touch past, then settled. Every
+     squash-and-stretch keyframe set below runs on it between each pair of keyframes, as Draw's do. */
+  --ease-squash: cubic-bezier(0.3, 1.6, 0.5, 1);
 }
 
 body {
@@ -72,6 +75,9 @@ body {
   /* App feel on phones: no grey tap flash, no rubber-band reveal of a white page edge. */
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;
+  /* a full-width button squashes to 1.14× wide for a moment (.press): never a sideways scroll.
+     `clip`, not `hidden`, so sticky headers keep working. */
+  overflow-x: clip;
 }
 
 /* Display headings get the chunky, tight Scrapbook set. */
@@ -124,24 +130,44 @@ body {
 /* ── Motion system ───────────────────────────────────────────────────────────
    Character without cost: ONLY transform/opacity (compositor-only, no layout or paint),
    CSS-only (no JS animation library, no timers), short durations, and every one switched
-   off under prefers-reduced-motion by the global rule below. */
+   off under prefers-reduced-motion (the rules after :focus-visible below).
 
-/* Pop in: things arrive like a sticker slapped onto the page. Stagger with --i. */
+   The same motion as Snickerdoodle Draw (draw-app/src/ui/motion.ts): squash and stretch that keeps
+   its volume (wider means shorter: a squash is 1.14 x 0.82, a stretch 0.9 x 1.14) on --ease-squash.
+   The numbers below are Draw's, so a button, a card or a drawing moves the same on both. The only JS
+   is src/ui/components/MotionTaps.tsx, which adds a class on tap or on scroll (never a timer). */
+
+/* Pop in: tall and thin as it rises, overshooting wide and short, then settled (0.6s), each one 70ms
+   after the one before (--i). Draw's lesson pop. */
 @keyframes pop-in {
-  from {
+  0% {
     opacity: 0;
-    transform: translateY(10px) scale(0.94) rotate(var(--pop-rot, -2deg));
+    /* --pop-rot: a starting tilt some hero pieces swing in from (Draw's pop has none: 0deg) */
+    transform: translateY(28px) rotate(var(--pop-rot, 0deg)) scale(0.78, 1.28);
   }
-  to {
+  20% {
+    opacity: 1;
+  }
+  45% {
+    transform: translateY(-6px) scale(1.14, 0.82);
+  }
+  70% {
+    transform: translateY(0) scale(0.96, 1.04);
+  }
+  100% {
     opacity: 1;
     transform: none;
   }
 }
-.pop-in {
+/* .pop-in-view: the same pop, played when its section scrolls into view (once per visit). It is
+   VISIBLE until then, so with no JS, a fast scroll or reduced motion it simply shows. */
+.pop-in,
+.pop-in-view.is-seen {
+  transform-origin: 50% 100%;
   /* `backwards`, not `both`: hold the start frame during the stagger delay, then hand the
-     transform back — so .lift / .press on the same element still work after it lands. */
-  animation: pop-in 0.42s var(--ease-pop) backwards;
-  animation-delay: calc(var(--i, 0) * 55ms);
+     transform back, so .lift / .press on the same element still work after it lands. */
+  animation: pop-in 0.6s var(--ease-squash) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms);
 }
 
 /* Page enter: every route change fades in (app/template.tsx). OPACITY ONLY on purpose — a
@@ -159,14 +185,60 @@ body {
   animation: page-enter 0.28s var(--ease-settle) both;
 }
 
-/* Press: buttons squash down onto their shadow — tactile, like pressing a sticker. */
+/* Squishy buttons (Draw's): pressing squashes a button flat like a cushion and it sinks 4px onto its
+   shadow (80ms); letting go springs it past full size, stretching, then it wobbles back (.is-boing,
+   550ms, added on release by MotionTaps). Uses the individual `scale`/`translate` properties so it
+   stacks with anything animating `transform` (pop-in, wiggle). */
 .press {
   transition:
-    transform 0.12s var(--ease-settle),
-    box-shadow 0.12s var(--ease-settle);
+    translate 0.08s cubic-bezier(0.5, 1, 0.89, 1),
+    scale 0.08s cubic-bezier(0.5, 1, 0.89, 1),
+    box-shadow 0.08s cubic-bezier(0.5, 1, 0.89, 1);
 }
 .press:active {
-  transform: translateY(3px) scale(0.985);
+  translate: 0 4px;
+  scale: 1.14 0.82;
+}
+@keyframes boing {
+  0% {
+    translate: 0 4px;
+    scale: 1.14 0.82;
+  }
+  30% {
+    translate: 0 0;
+    scale: 0.9 1.14;
+  }
+  55% {
+    scale: 1.05 0.95;
+  }
+  75% {
+    scale: 0.98 1.02;
+  }
+  100% {
+    translate: 0 0;
+    scale: 1 1;
+  }
+}
+.press.is-boing {
+  animation: boing 0.55s var(--ease-squash);
+}
+/* keep the element's other animation running alongside (same name = not restarted) */
+.press.is-boing.cta-attention {
+  animation:
+    boing 0.55s var(--ease-squash),
+    cta-squish 3s var(--ease-squash) infinite;
+}
+.press.is-boing.pop-in {
+  animation:
+    boing 0.55s var(--ease-squash),
+    pop-in 0.6s var(--ease-squash) calc(var(--i, 0) * 70ms) backwards;
+}
+/* A softer press for the tab bar (Draw's tabs shrink to 0.94; the icon hops instead). */
+.press-soft {
+  transition: scale 0.08s cubic-bezier(0.5, 1, 0.89, 1);
+}
+.press-soft:active {
+  scale: 0.94;
 }
 
 /* Lift: photos and tiles straighten up and rise on hover/focus (their resting tilt undone). */
@@ -213,21 +285,122 @@ body {
   animation: wiggle 0.45s var(--ease-settle);
 }
 
-/* Bounce: the active tab icon hops once when selected. */
+/* Hop: the newly chosen tab's icon crouches, hops up, lands and settles (0.5s, from its feet). Draw's. */
 @keyframes hop {
-  0%,
+  0% {
+    transform: none;
+  }
+  25% {
+    transform: scale(1.25, 0.75);
+  }
+  55% {
+    transform: translateY(-10px) scale(0.85, 1.2);
+  }
+  80% {
+    transform: scale(1.1, 0.9);
+  }
   100% {
-    transform: translateY(0);
-  }
-  40% {
-    transform: translateY(-5px) scale(1.08);
-  }
-  70% {
-    transform: translateY(1px) scale(0.98);
+    transform: none;
   }
 }
-.hop {
-  animation: hop 0.5s var(--ease-pop);
+.hop,
+.tab-track[data-moving] [aria-current='page'] .tab-icon {
+  display: inline-block;
+  transform-origin: 50% 100%;
+  animation: hop 0.5s var(--ease-squash);
+}
+
+/* The tab bar's sunshine pill slides to the chosen tab: stretched across the way it came and a little
+   flattened, then it lands (0.45s). Draw's. --pill-to / --pill-from are tab indexes, --pill-k the stretch. */
+.tab-pill {
+  translate: calc(var(--pill-to, 0) * 100%) 0;
+  transform-origin: 0 50%;
+}
+.tab-pill.is-moving {
+  animation: tab-pill 0.45s var(--ease-squash);
+}
+@keyframes tab-pill {
+  from {
+    translate: calc(var(--pill-from, 0) * 100%) 0;
+    scale: var(--pill-k, 1) 0.82;
+  }
+  to {
+    translate: calc(var(--pill-to, 0) * 100%) 0;
+    scale: 1 1;
+  }
+}
+
+/* Comes alive: tap a child's drawing and it squashes, hops with a slight tilt, then wobbles back to
+   rest (1.5s, from its bottom edge). Draw's. On [data-alive] roots; MotionTaps adds .is-alive to the
+   .alive-art inside on every tap (it never blocks a link: the tap goes straight through). */
+@keyframes alive {
+  0% {
+    transform: none;
+  }
+  10% {
+    transform: scale(1.1, 0.88);
+  }
+  24% {
+    transform: translateY(-5%) rotate(3deg) scale(0.92, 1.1);
+  }
+  40% {
+    transform: rotate(-4deg) scale(1.08, 0.93);
+  }
+  55% {
+    transform: rotate(3deg);
+  }
+  70% {
+    transform: rotate(-2.5deg);
+  }
+  85% {
+    transform: rotate(1deg);
+  }
+  100% {
+    transform: none;
+  }
+}
+.alive-art {
+  transform-origin: 50% 100%;
+}
+[data-alive] {
+  cursor: pointer;
+}
+.alive-art.is-alive {
+  animation: alive 1.5s var(--ease-squash);
+}
+/* a card that also popped in keeps its (finished) pop, so coming alive never replays it */
+.alive-art.is-alive.pop-in,
+.alive-art.is-alive.pop-in-view.is-seen {
+  animation:
+    alive 1.5s var(--ease-squash),
+    pop-in 0.6s var(--ease-squash) calc(var(--i, 0) * 70ms) backwards;
+}
+
+/* Picked: a chosen colour swatch pops up with a stretch, lands with a squash and settles (Draw's crayon
+   box); the others just sit. Plays when aria-pressed turns true. */
+@keyframes pick {
+  0% {
+    transform: none;
+  }
+  35% {
+    transform: translateY(-6px) scale(0.9, 1.14);
+  }
+  65% {
+    transform: translateY(0) scale(1.1, 0.9);
+  }
+  85% {
+    transform: scale(0.98, 1.02);
+  }
+  100% {
+    transform: none;
+  }
+}
+.pick {
+  transform-origin: 50% 100%;
+}
+.pick[aria-pressed='true'],
+[aria-pressed='true'] > .pick {
+  animation: pick 0.5s var(--ease-squash);
 }
 
 /* Scribble: a hand-drawn underline that draws itself in (SVG stroke, once). */
@@ -297,6 +470,26 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  /* the squash-and-stretch set is OFF, not just fast: buttons keep a plain press, nothing bounces */
+  .pop-in,
+  .pop-in-view.is-seen,
+  .press.is-boing,
+  .cta-attention,
+  .hop,
+  .tab-track[data-moving] [aria-current='page'] .tab-icon,
+  .tab-pill.is-moving,
+  .alive-art.is-alive,
+  .pick[aria-pressed='true'],
+  [aria-pressed='true'] > .pick {
+    animation: none !important;
+  }
+  .press:active {
+    translate: 0 2px;
+    scale: none;
+  }
+  .press-soft:active {
+    scale: none;
+  }
 }
 
 /* "buy more & save" (founder, 29 Oct): a slow, soft honey highlight that breathes behind the words —
@@ -332,28 +525,31 @@ body {
   }
 }
 
-/* CTA wobble — a quick attention nudge roughly every 3s, still the rest of the time. */
-@keyframes cta-wobble {
+/* CTA attention: every ~3s the button gives a little squash-and-squeeze (Draw's squash, stretch, settle
+   from its bottom edge, like a pressed button springing back), still the rest of the time (founder, 10 Nov:
+   in line with the rest, instead of a wobble). On `transform`, so a real press (scale/translate) stacks. */
+@keyframes cta-squish {
   0%,
-  86%,
+  84%,
   100% {
-    transform: rotate(0deg);
+    transform: none;
   }
-  89% {
-    transform: rotate(-3deg);
+  88% {
+    transform: scale(1.1, 0.88);
   }
   92% {
-    transform: rotate(2.4deg);
+    transform: translateY(-3px) scale(0.92, 1.1);
   }
   95% {
-    transform: rotate(-1.4deg);
+    transform: scale(1.04, 0.96);
   }
   98% {
-    transform: rotate(0.6deg);
+    transform: scale(0.99, 1.01);
   }
 }
 .cta-attention {
-  animation: cta-wobble 3s ease-in-out infinite;
+  transform-origin: 50% 100%;
+  animation: cta-squish 3s var(--ease-squash) infinite;
 }
 .cta-attention:hover {
   animation-play-state: paused;
@@ -459,14 +655,17 @@ body {
   --paper-ink: color-mix(in oklab, var(--color-honey-band), var(--color-sunshine-deep) 19%);
   --paper-sheen: color-mix(in oklab, var(--color-honey-band), var(--color-paper) 50%);
 }
-/* "From fridge door to forever" — on cobalt */
+/* "From fridge door to forever" — on cobalt, with the Christmas band's glow and sheen (founder, 10 Nov):
+   a soft light pooling at the top left, deepening to cobalt-deep at the bottom right, and the doodle lines
+   a shade lighter than the band with a bright sheen sweeping across them. White text stays ≥4.5:1 even
+   under the brightest part of the glow. */
 .doodle-paper-everyday {
   --paper-tile: url('/textures/everyday-doodles.webp');
   --paper-base: var(--color-cobalt);
-  --paper-glow: color-mix(in oklab, var(--color-sky) 9%, transparent);
-  --paper-deep: color-mix(in oklab, var(--color-cobalt), var(--color-cobalt-deep) 30%);
-  --paper-ink: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 9%);
-  --paper-sheen: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 13%);
+  --paper-glow: color-mix(in oklab, var(--color-sky) 28%, transparent);
+  --paper-deep: color-mix(in oklab, var(--color-cobalt), var(--color-cobalt-deep) 45%);
+  --paper-ink: color-mix(in oklab, var(--color-cobalt), var(--color-sky) 12%);
+  --paper-sheen: color-mix(in oklab, var(--color-cobalt), var(--color-paper) 26%);
 }
 
 /* Mobile menu / banner entrances. */

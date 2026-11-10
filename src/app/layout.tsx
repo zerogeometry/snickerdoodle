@@ -20,26 +20,39 @@ import '@fontsource/berkshire-swash/latin-400.css';
 import '@fontsource/henny-penny/latin-400.css';
 import './globals.css';
 import { seasonPreviewDate } from '@/lib/season';
+import { brandFiles, brandSeason } from '@/lib/brand';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 import { UploadSession } from '@/ui/components/UploadSession';
 import { ScreeningNotice } from '@/ui/components/ScreeningNotice';
 import { FreshBuild } from '@/ui/components/FreshBuild';
+import { MotionTaps } from '@/ui/components/MotionTaps';
 
-export const metadata: Metadata = {
-  // the canonical public origin — canonical links, sitemaps and share cards resolve against it
-  metadataBase: new URL(siteOrigin()),
-  title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
-  description:
-    "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
-  // the share card for any page without its own picture: the lockup on paper (never a child's drawing)
-  openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website', images: [{ url: '/brand/og-default.png', width: 1200, height: 630, alt: 'snickerdoodle' }] },
-  manifest: '/manifest.webmanifest',
-  appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
-  // /favicon.ico comes from src/app/favicon.ico (16/32/48); these are the sharper PNGs
-  icons: { icon: [{ url: '/brand/favicon-32.png', sizes: '32x32', type: 'image/png' }, { url: '/brand/favicon-192.png', sizes: '192x192', type: 'image/png' }], apple: '/brand/favicon-180.png' },
-};
+/** Metadata per request, so the favicons and share card wear the Santa hat in the Christmas season. */
+export function generateMetadata(): Metadata {
+  const b = brandFiles(brandSeason());
+  return {
+    // the canonical public origin — canonical links, sitemaps and share cards resolve against it
+    metadataBase: new URL(siteOrigin()),
+    title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
+    description:
+      "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+    // the share card for any page without its own picture: the lockup on paper (never a child's drawing)
+    openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website', images: [{ url: b.og, width: 1200, height: 630, alt: 'snickerdoodle' }] },
+    manifest: '/manifest.webmanifest',
+    appleWebApp: { capable: true, title: 'snickerdoodle', statusBarStyle: 'default' },
+    // the brand-assets icons (16/32/48 .ico for old browsers, then the sharper PNGs)
+    icons: {
+      icon: [
+        { url: b.ico, sizes: '16x16 32x32 48x48' },
+        { url: b.favicon32, sizes: '32x32', type: 'image/png' },
+        { url: b.favicon192, sizes: '192x192', type: 'image/png' },
+      ],
+      apple: b.apple,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: '#F8F5E9',
@@ -67,6 +80,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <TestSiteBanner />
         {children}
         <Toaster />
+        <MotionTaps />
         {/* a picture the background safety check held: tell them, wherever they have got to */}
         <ScreeningNotice />
         <CookieBanner />
