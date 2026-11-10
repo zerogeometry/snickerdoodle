@@ -216,15 +216,15 @@ export async function resendInvite(
   db: DbHandle,
   owner: ViewerContext,
   input: { familyId: string; inviteId: string },
-): Promise<{ ok: true; email: string; token: string } | { ok: false }> {
+): Promise<{ ok: true; email: string; token: string; inviteeName: string | null } | { ok: false }> {
   const ownerId = assertOwnerOf(owner, input.familyId, 'resend an invite');
   const token = randomBytes(24).toString('base64url');
   const [inv] = await db
     .update(invites)
     .set({ token, expiresAt: new Date(Date.now() + 14 * 86_400_000) })
     .where(and(eq(invites.id, input.inviteId), eq(invites.familyId, input.familyId), eq(invites.status, 'PENDING')))
-    .returning({ email: invites.email });
+    .returning({ email: invites.email, inviteeName: invites.inviteeName });
   if (!inv) return { ok: false };
   await db.insert(auditRecords).values({ familyId: input.familyId, actorAccountId: ownerId, actorType: 'MEMBER', event: 'INVITE_SENT', targetType: 'invite', targetId: input.inviteId, metadata: { resent: true } });
-  return { ok: true, email: inv.email, token };
+  return { ok: true, email: inv.email, token, inviteeName: inv.inviteeName };
 }

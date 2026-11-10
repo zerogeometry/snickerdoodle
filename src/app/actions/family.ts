@@ -210,7 +210,7 @@ export async function resendInviteAction(inviteId: string): Promise<{ ok: boolea
     const res = await resendInvite(ctx.db, ctx.viewer, { familyId: ctx.familyId, inviteId: String(inviteId) });
     if (!res.ok) return { ok: false };
     const [me] = await ctx.db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, ctx.viewer.accountId!));
-    await sendMail(familyInviteEmail({ to: res.email, token: res.token, inviterName: me?.name ?? null, resend: true }));
+    await sendMail(familyInviteEmail({ to: res.email, token: res.token, inviterName: me?.name ?? null, inviteeName: res.inviteeName, resend: true }));
     return { ok: true };
   }, { ok: false });
 }

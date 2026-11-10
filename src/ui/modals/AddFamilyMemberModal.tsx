@@ -105,7 +105,7 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
         relationship: relOf(rel).enum,
         accessLevel: ACCESS_ENUM[access] ?? 'VIEW_BUY',
         shareOccasions: shareCalendar,
-        name: first, // only to say hello in the invite email — not kept
+        name: trimmed, // says hello in the invite email, and becomes their name when they join
       });
       if (res.needsAuth) {
         toast('log in to invite family');
