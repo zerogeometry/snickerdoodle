@@ -3,22 +3,59 @@
 import { IconCheck, IconLink, IconLock, IconX } from '@tabler/icons-react';
 import { useState } from 'react';
 import { approveAppLinkAction, declineAppLinkAction, notOwnerAppLinkAction, type ConnectParams } from '@/app/actions/appLink';
+import { canConnectWith, EMPTY_CONNECT_SYNC, type ConnectSyncDraft } from '@/lib/drawSync';
 import type { ConnectFamily } from '@/server/app/link';
+import { DrawSyncSlate } from '@/ui/components/DrawSyncSlate';
 import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 
-const CAN = ['send the drawings you choose to your keepsake box', 'add a little one (first name only)', 'open snickerdoodle here when you want to make one real', 'show your orders, in the grown-ups’ corner'];
-const CANT = ['see the rest of your keepsake box, or your family', 'see your email address', 'show prices or a shop to your child', 'take a payment — that only ever happens here'];
+/**
+ * Everything the app can do once linked — the honest list (sign-off checklist G5). The parts that
+ * depend on a choice below say so, because a grown-up can change those choices later in the app.
+ */
+export const CAN = [
+  'see your little ones’ first names, to file each drawing under the right one',
+  'add a little one (first name only)',
+  'send a drawing to your keepsake box when a grown-up taps keep it — and the proud pile or every drawing, if you pick that below',
+  'see their birthdays, and change a little one’s name or birthday — only with “first names and birthdays” ticked',
+  'back up their drawing days — only with “drawing days” ticked',
+  'see, add and change your family calendar’s birthdays and special days (a name and the day and month) — only with “family birthdays” ticked',
+  'make a ready-to-buy link for a drawing it sent',
+  'delete drawings it sent',
+  'open snickerdoodle here when you want to make one real',
+  'show your orders, in the grown-ups’ corner',
+];
+export const CANT = [
+  'see the rest of your keepsake box',
+  'bring pictures from here back into the app',
+  'see your email address',
+  'show prices or a shop to your child',
+  'take a payment — that only ever happens here',
+];
 
 /**
- * The consent card. What the app can and can't do is spelled out before the grown-up says yes
- * (trust shown through control). The main button sits in the thumb zone on a phone.
+ * What it can't see of your family — honest about the one exception (B10): with "family birthdays"
+ * ticked it sees the names and dates on your family calendar (a name, a relation, the day and month).
+ */
+export function familyCant(birthdays: boolean): string {
+  return birthdays
+    ? 'see your family members’ details — only the names and dates on your family calendar (a name, what they are to you, the day and month), because you ticked “family birthdays”'
+    : 'see your family members’ details — if you tick “family birthdays”, it sees the names and dates on your family calendar, nothing more';
+}
+
+/**
+ * The consent card. What syncs is the grown-up's choice (one slate, nothing picked until they pick —
+ * DRAW-APP-sync-choices.md), and what the app can and can't do is spelled out before they say yes
+ * (trust shown through control). "connect" stays disabled until a keepsakes option is chosen. The
+ * main button sits in the thumb zone on a phone.
  */
 export function ConnectCard({ params, email, families, notOwner }: { params: ConnectParams; email: string; families: ConnectFamily[]; notOwner: boolean }) {
   const [familyId, setFamilyId] = useState<string>(families[0]?.id ?? 'new');
   const family = families.find((f) => f.id === familyId);
   const [ticked, setTicked] = useState<Set<string>>(() => new Set(families[0]?.children.map((c) => c.id) ?? []));
+  const [sync, setSync] = useState<ConnectSyncDraft>({ ...EMPTY_CONNECT_SYNC });
+  const ready = canConnectWith(sync);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -44,14 +81,23 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         window.location.assign(res.url); // back to the app (an allow-listed address only)
         return;
       }
-      setProblem(res.reason === 'signed-out' ? 'you’ve been signed out — refresh the page to sign in again.' : 'that didn’t work — pop back to the app and tap link again.');
+      setProblem(
+        res.reason === 'signed-out'
+          ? 'you’ve been signed out — refresh the page to sign in again.'
+          : res.reason === 'sync'
+            ? 'pick what goes to your keepsake box first.'
+            : 'that didn’t work — pop back to the app and tap link again.',
+      );
     } catch {
       setProblem('that didn’t work — check your connection and try again.');
     }
     setBusy(false);
   };
 
-  const connect = () => go(() => approveAppLinkAction({ params, familyId, childIds: family ? [...ticked] : null }));
+  const connect = () => {
+    if (!ready) return;
+    void go(() => approveAppLinkAction({ params, familyId, childIds: family ? [...ticked] : null, sync }));
+  };
   const notNow = () => go(() => declineAppLinkAction({ params }));
 
   if (notOwner) {
@@ -77,7 +123,7 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         <Icon icon={IconLink} size={24} className="text-cinnamon" /> connect snickerdoodle draw?
       </h1>
       <p className="mt-2 text-sm text-ink-soft">
-        signed in as <b className="text-cocoa">{email}</b>. the drawings you choose in the app land in your keepsake box, so they’re kept safe — they’re only little once.
+        signed in as <b className="text-cocoa">{email}</b>. drawings from the app can land in your keepsake box, so they’re kept safe — they’re only little once. you choose what goes.
       </p>
 
       {families.length > 1 ? (
@@ -113,9 +159,18 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         </p>
       )}
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+      <section aria-labelledby="sync-title" className="mt-6 rounded-[18px] border-2 border-dashed border-cocoa/30 bg-paper-2 p-4">
+        <h2 id="sync-title" className="font-display text-lg leading-tight text-cocoa">
+          what syncs?
+        </h2>
+        <p className="mt-0.5 mb-3 text-xs leading-snug text-ink-soft">nothing’s picked until you pick. change any of it later, in the app’s grown-ups’ corner or on your account page.</p>
+        <DrawSyncSlate name="connect" value={sync} onChange={setSync} disabled={busy} />
+        <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">stopping a sync never deletes anything already in your keepsake box — deleting is always its own tap.</p>
+      </section>
+
+      <div className="mt-5 grid gap-4">
         <div>
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-green-save">the app can</p>
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-green-save">once linked, the app can</p>
           <ul className="mt-1.5 flex flex-col gap-1.5">
             {CAN.map((t) => (
               <li key={t} className="flex items-start gap-1.5 text-[13px] leading-snug text-cocoa">
@@ -127,7 +182,7 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         <div>
           <p className="text-[11px] font-extrabold uppercase tracking-wide text-cinnamon">it can’t</p>
           <ul className="mt-1.5 flex flex-col gap-1.5">
-            {CANT.map((t) => (
+            {[CANT[0]!, familyCant(sync.birthdays), ...CANT.slice(1)].map((t) => (
               <li key={t} className="flex items-start gap-1.5 text-[13px] leading-snug text-cocoa">
                 <Icon icon={IconX} size={15} className="mt-0.5 shrink-0 text-cinnamon" /> {t}
               </li>
@@ -138,13 +193,18 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
 
       <p className="mt-4 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-faint">
         <Icon icon={IconLock} size={14} className="mt-0.5 shrink-0 text-green-save" />
-        nothing leaves the phone until you choose it. unlink any time, in the app or on your account page.
+        only what you choose leaves the phone. disconnect any time, in the app or on your account page — it stops at once.
       </p>
       {problem ? <p role="alert" className="mt-3 text-center text-xs font-semibold text-cinnamon">{problem}</p> : null}
 
       {/* phone: the buttons sit in the thumb zone; desktop: under the card */}
       <div className="pb-safe kraft fixed inset-x-0 bottom-0 z-40 flex flex-col gap-2 rounded-t-[22px] border-t-2 border-cocoa/10 px-4 pt-3 shadow-[0_-6px_18px_color-mix(in_srgb,var(--color-cocoa)_12%,transparent)] md:static md:z-auto md:mt-6 md:rounded-none md:border-0 md:bg-transparent md:bg-none md:p-0 md:shadow-none">
-        <Button size="lg" className="w-full" disabled={busy} onClick={connect}>
+        {!ready ? (
+          <p id="connect-needs" className="text-center text-xs font-semibold text-ink-soft">
+            pick what goes to your keepsake box to connect
+          </p>
+        ) : null}
+        <Button size="lg" className="w-full" disabled={busy || !ready} aria-describedby={ready ? undefined : 'connect-needs'} onClick={connect}>
           {busy ? 'connecting…' : 'connect'}
         </Button>
         <Button variant="ghost" size="md" className="w-full" disabled={busy} onClick={notNow}>

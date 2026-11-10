@@ -3,8 +3,12 @@ import { appJson, withAppViewer } from '@/server/app/http';
 
 /**
  * POST /api/app/v1/assets — multipart: image (PNG/JPEG, ≤ 20 MB), childId, madeOn (YYYY-MM-DD),
- * source (app-screen | app-paper), title? (not stored). Only after a grown-up taps keep it / make it
- * real. Off until DRAW_APP_UPLOADS=on (the Children's Code sign-off) — 403 { reason: 'not-yet' }.
+ * source (app-screen | app-paper), title? (not stored), trigger? ('manual' — a grown-up's one-off
+ * keep it / make it real / ready-to-buy link, the default — or 'auto', the app's sync queue: allowed
+ * only while the link's keepsakes choice is proud or all, else 403 { reason: 'sync-off' }).
+ * clientRef? (the app's drawing id, ≤64 [A-Za-z0-9_-]; a repeat from the same family → 200 with the
+ * existing { assetId, kept }, never a duplicate; 422 { reason: 'clientRef' } if malformed).
+ * Off until DRAW_APP_UPLOADS=on (the Children's Code sign-off) — 403 { reason: 'not-yet' }.
  */
 export const POST = withAppViewer(async ({ req, db, av }) => {
   const length = Number(req.headers.get('content-length') ?? 0);
@@ -17,6 +21,9 @@ export const POST = withAppViewer(async ({ req, db, av }) => {
     childId: form.get('childId'),
     madeOn: form.get('madeOn'),
     source: form.get('source'),
+    trigger: form.get('trigger') ?? undefined,
+    clientRef: form.get('clientRef') ?? undefined,
   });
-  return appJson(res, 201);
+  // a repeat of a clientRef this family already sent: 200 with the same keepsake (nothing new made)
+  return appJson({ assetId: res.assetId, kept: res.kept }, res.created ? 201 : 200);
 });

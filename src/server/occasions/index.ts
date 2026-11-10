@@ -175,6 +175,8 @@ export interface OccasionInput {
   childId?: string | null;
   memberAccountId?: string | null;
   shareCircle?: Circle;
+  /** what they are to the family ("grandma"), from Snickerdoodle Draw's list. Absent = leave as is. */
+  relation?: string | null;
 }
 export type OccasionResult = { ok: true; id: string } | { ok: false; reason: 'not-allowed' | 'invalid' | 'words' | 'date' | 'lunar-needs-year' };
 
@@ -211,7 +213,14 @@ async function clean(db: DbHandle, familyId: string, input: OccasionInput) {
     memberAccountId = mm.a;
   }
   const shareCircle: Circle = input.shareCircle === 'EXTENDED' ? 'EXTENDED' : 'FAMILY'; // FAMILY by default (founder, 27 Oct)
-  return { row: { title, kind: input.kind, month: mo, day: d, year: y, lunar, childId, memberAccountId, shareCircle } };
+  // what they are to the family — optional, screened like the title; only touched when it's given
+  let relation: { relation: string | null } | Record<string, never> = {};
+  if (input.relation !== undefined) {
+    const r = String(input.relation ?? '').replace(/\s+/g, ' ').trim().slice(0, 30);
+    if (r && containsAbusiveText(r)) return { error: 'words' as const };
+    relation = { relation: r || null };
+  }
+  return { row: { title, kind: input.kind, month: mo, day: d, year: y, lunar, childId, memberAccountId, shareCircle, ...relation } };
 }
 
 export async function addOccasion(db: DbHandle, accountId: string, familyId: string, input: OccasionInput): Promise<OccasionResult> {
@@ -227,7 +236,7 @@ export async function updateOccasion(db: DbHandle, accountId: string, occasionId
   if (!o || !canChangeOccasion(o, await membershipIn(db, accountId, o.familyId))) return { ok: false, reason: 'not-allowed' };
   const c = await clean(db, o.familyId, input);
   if ('error' in c) return { ok: false, reason: c.error! };
-  await db.update(occasions).set(c.row).where(eq(occasions.id, occasionId));
+  await db.update(occasions).set({ ...c.row, updatedAt: new Date() }).where(eq(occasions.id, occasionId)); // updatedAt: Draw's list syncs by last change
   return { ok: true, id: occasionId };
 }
 

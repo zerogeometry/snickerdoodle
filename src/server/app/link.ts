@@ -4,7 +4,9 @@ import { appAuthCodes, appCheckoutGrants, appTokens, auditRecords, children, fam
 import { resolveViewerContext } from '@/server/assets';
 import { appUrl } from '@/server/mail';
 import type { DbHandle } from '@/server/db';
+import { isSyncKeepsakes, type SyncChoices } from '@/lib/drawSync';
 import { CHALLENGE, hashSecret, newSecret, pkceMatches } from './secrets';
+import { purgeStaleProgressBackups, syncAuditRow, syncOf } from './sync';
 
 /**
  * Linking Snickerdoodle Draw (the kids' drawing app) to a family's account
@@ -118,16 +120,20 @@ export async function connectChoices(db: DbHandle, accountId: string): Promise<{
 /**
  * The grown-up said yes. Mint the one-time code. `familyId: null` is the "you don't run a family"
  * case: the app still gets a code, and the swap answers 403 not-owner so the app can say so kindly.
- * The family and children are re-checked here, never taken from the form on trust.
+ * The family and children are re-checked here, never taken from the form on trust. A code for a
+ * family MUST carry the grown-up's sync choices (DRAW-APP-sync-choices.md) — there is no default.
  */
 export async function createAuthCode(
   db: DbHandle,
-  input: { accountId: string; familyId: string | null; childIds: string[] | null; req: ConnectRequest },
+  input: { accountId: string; familyId: string | null; childIds: string[] | null; req: ConnectRequest; sync?: SyncChoices | null },
   now = new Date(),
 ): Promise<string> {
   let familyId: string | null = null;
   let childIds: string[] | null = null;
+  let sync: SyncChoices | null = null;
   if (input.familyId) {
+    if (!input.sync || !isSyncKeepsakes(input.sync.keepsakes)) throw new Error('a grown-up must choose what syncs');
+    sync = { keepsakes: input.sync.keepsakes, children: input.sync.children === true, progress: input.sync.progress === true, birthdays: input.sync.birthdays === true };
     const viewer = await resolveViewerContext(db, input.accountId, input.familyId);
     if (!canManageFamily(viewer.membership)) throw new Error('only the family’s owner can link the app');
     familyId = input.familyId;
@@ -147,6 +153,11 @@ export async function createAuthCode(
     childIds,
     codeChallenge: input.req.codeChallenge,
     redirectUri: input.req.redirectUri,
+    syncKeepsakes: sync?.keepsakes ?? null,
+    syncChildren: sync?.children ?? false,
+    syncProgress: sync?.progress ?? false,
+    syncBirthdays: sync?.birthdays ?? false,
+    createdAt: now,
     expiresAt: new Date(now.getTime() + AUTH_CODE_TTL_MS),
   });
   return code;
@@ -180,13 +191,28 @@ export async function exchangeAuthCode(
   if (!row.familyId) return { ok: false, status: 403, reason: 'not-owner' };
   const viewer = await resolveViewerContext(db, row.accountId, row.familyId);
   if (!canManageFamily(viewer.membership)) return { ok: false, status: 403, reason: 'not-owner' };
+  if (!row.syncKeepsakes) return { ok: false, status: 400, reason: 'invalid-grant' }; // never a key without the grown-up's choices
+  const sync = syncOf({ syncKeepsakes: row.syncKeepsakes, syncChildren: row.syncChildren, syncProgress: row.syncProgress, syncBirthdays: row.syncBirthdays });
 
   const token = newSecret(APP_TOKEN_PREFIX);
   const deviceLabel = deviceLabelFrom(input.userAgent);
   const [t] = await db
     .insert(appTokens)
-    .values({ tokenHash: hashSecret(token), accountId: row.accountId, familyId: row.familyId, childIds: row.childIds ?? null, deviceLabel, lastUsedAt: now })
+    .values({
+      tokenHash: hashSecret(token),
+      accountId: row.accountId,
+      familyId: row.familyId,
+      childIds: row.childIds ?? null,
+      deviceLabel,
+      syncKeepsakes: sync.keepsakes,
+      syncChildren: sync.children,
+      syncProgress: sync.progress,
+      syncBirthdays: sync.birthdays,
+      syncChosenAt: row.createdAt, // when the grown-up chose, on the connect page
+      lastUsedAt: now,
+    })
     .returning({ id: appTokens.id });
+  await db.insert(auditRecords).values(syncAuditRow({ familyId: row.familyId, accountId: row.accountId, tokenId: t!.id, by: 'connect', from: null, to: sync }));
   await db.insert(auditRecords).values({
     familyId: row.familyId,
     actorAccountId: row.accountId,
@@ -252,17 +278,40 @@ export interface LinkedDevice {
   familyName: string;
   linkedOn: string;
   lastUsedOn: string;
+  /** What syncs on this phone (editable on the account page). */
+  sync: SyncChoices;
+  /** false = linked before the choices existed: nothing syncs until a grown-up chooses. */
+  syncChosen: boolean;
 }
 
 /** The account page's "linked phones": this account's working keys (never anyone else's). */
 export async function listLinkedDevices(db: DbHandle, accountId: string, now = new Date()): Promise<LinkedDevice[]> {
   const rows = await db
-    .select({ id: appTokens.id, label: appTokens.deviceLabel, familyName: families.displayName, createdAt: appTokens.createdAt, lastUsedAt: appTokens.lastUsedAt })
+    .select({
+      id: appTokens.id,
+      label: appTokens.deviceLabel,
+      familyName: families.displayName,
+      createdAt: appTokens.createdAt,
+      lastUsedAt: appTokens.lastUsedAt,
+      syncKeepsakes: appTokens.syncKeepsakes,
+      syncChildren: appTokens.syncChildren,
+      syncProgress: appTokens.syncProgress,
+      syncBirthdays: appTokens.syncBirthdays,
+      syncChosenAt: appTokens.syncChosenAt,
+    })
     .from(appTokens)
     .innerJoin(families, eq(families.id, appTokens.familyId))
     .where(and(eq(appTokens.accountId, accountId), isNull(appTokens.revokedAt), gt(appTokens.lastUsedAt, new Date(now.getTime() - APP_TOKEN_IDLE_MS))))
     .orderBy(asc(appTokens.createdAt));
-  return rows.map((r) => ({ id: r.id, label: r.label, familyName: r.familyName, linkedOn: r.createdAt.toISOString().slice(0, 10), lastUsedOn: r.lastUsedAt.toISOString().slice(0, 10) }));
+  return rows.map((r) => ({
+    id: r.id,
+    label: r.label,
+    familyName: r.familyName,
+    linkedOn: r.createdAt.toISOString().slice(0, 10),
+    lastUsedOn: r.lastUsedAt.toISOString().slice(0, 10),
+    sync: syncOf(r),
+    syncChosen: r.syncChosenAt !== null,
+  }));
 }
 
 /** The retention job: used/expired link codes and checkout passes, and keys revoked or idle a while. */
@@ -276,5 +325,7 @@ export async function purgeAppLinkLeftovers(db: DbHandle, now = new Date()): Pro
     .delete(appTokens)
     .where(or(lt(appTokens.revokedAt, monthAgo), lt(appTokens.lastUsedAt, new Date(monthAgo.getTime() - APP_TOKEN_IDLE_MS))))
     .returning({ id: appTokens.id });
-  return codes.length + grants.length + keys.length;
+  // drawing days no phone has backed up for a year
+  const backups = await purgeStaleProgressBackups(db, now);
+  return codes.length + grants.length + keys.length + backups;
 }

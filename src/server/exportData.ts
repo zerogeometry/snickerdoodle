@@ -4,6 +4,7 @@ import {
   accounts,
   assets,
   children,
+  appArtistProgress,
   appTokens,
   consentRecords,
   families,
@@ -127,9 +128,27 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
 
   // Snickerdoodle Draw phones linked to this account (a label and dates, never a device id)
   const drawAppPhones = await db
-    .select({ device: appTokens.deviceLabel, familyId: appTokens.familyId, linkedAt: appTokens.createdAt, lastUsedAt: appTokens.lastUsedAt, unlinkedAt: appTokens.revokedAt })
+    .select({
+      device: appTokens.deviceLabel,
+      familyId: appTokens.familyId,
+      linkedAt: appTokens.createdAt,
+      lastUsedAt: appTokens.lastUsedAt,
+      unlinkedAt: appTokens.revokedAt,
+      syncKeepsakes: appTokens.syncKeepsakes,
+      syncNamesAndBirthdays: appTokens.syncChildren,
+      syncDrawingDays: appTokens.syncProgress,
+      syncFamilyBirthdays: appTokens.syncBirthdays,
+      syncChosenAt: appTokens.syncChosenAt,
+    })
     .from(appTokens)
     .where(eq(appTokens.accountId, accountId));
+  // drawing days backed up from Snickerdoodle Draw, for the little ones in families they run
+  const drawingDaysBackups = await inOwned((ids) =>
+    db
+      .select({ childId: appArtistProgress.childId, backup: appArtistProgress.data, updatedAt: appArtistProgress.updatedAt })
+      .from(appArtistProgress)
+      .where(inArray(appArtistProgress.familyId, ids)),
+  );
 
   const profile = await profileDataFor(db, accountId);
 
@@ -150,5 +169,6 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     yourRequestsToUs: requests,
     yourHelpMessages: helpMessages,
     drawAppPhones,
+    drawingDaysBackups,
   };
 }

@@ -27,7 +27,7 @@ export default function AppLinkPage() {
             <Icon icon={IconPencil} size={24} className="text-cinnamon" /> link snickerdoodle draw
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-            our little drawing app for 3–12s. it works on its own, no account needed. link it and the drawings you pick land straight in your keepsake box.
+            our little drawing app for 3–12s. it works on its own, no account needed. link it and you choose which drawings land in your keepsake box — and what else, if anything, syncs.
           </p>
           <ol className="mt-5 flex flex-col gap-3">
             {STEPS.map((s, i) => (
