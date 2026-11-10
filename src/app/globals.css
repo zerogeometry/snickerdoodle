@@ -259,6 +259,20 @@ body {
   animation: sheet-up 0.32s var(--ease-pop) both;
 }
 
+/* Nudge: an arrow that gently points down (the "see your collection" pill). Off under reduced motion. */
+@keyframes nudge-down {
+  0%,
+  100% {
+    transform: translateY(-1px);
+  }
+  50% {
+    transform: translateY(3px);
+  }
+}
+.nudge-down {
+  animation: nudge-down 1.2s ease-in-out infinite;
+}
+
 /* Safe-area padding for the installed (standalone) app on notched phones. */
 .pb-safe {
   padding-bottom: max(12px, env(safe-area-inset-bottom));

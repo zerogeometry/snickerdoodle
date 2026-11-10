@@ -77,6 +77,7 @@ export function ScreeningNotice() {
     <Modal
       open={open}
       onClose={backToUpload}
+      dismissible={false}
       title="we’ve paused this picture"
       headerLeading={
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-honey-band">

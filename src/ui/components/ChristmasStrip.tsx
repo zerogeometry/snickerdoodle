@@ -1,6 +1,6 @@
 'use client';
 
-import { IconMailHeart, IconPencil, IconTruckDelivery } from '@tabler/icons-react';
+import { IconInfoCircle, IconMailHeart, IconPencil, IconTruckDelivery } from '@tabler/icons-react';
 import Link from 'next/link';
 import { christmasYear, formatShortDate, headlinePromise, isChristmasSeason } from '@/lib/season';
 import { Icon } from '../primitives/Icon';
@@ -28,11 +28,13 @@ export function ChristmasStrip({ serverNowIso, compact = false }: { serverNowIso
     p.state === 'in-time' ? (
       <>
         <Icon icon={IconTruckDelivery} size={18} className="shrink-0 text-green-save" />
-        <span>
+        {/* one line on every phone: the words shrink with the screen (11px on the smallest, 13px from ~375px up) */}
+        <span className="min-w-0 truncate whitespace-nowrap text-[clamp(11px,3.5vw,13px)] md:text-[13px]">
           order by <b className="font-extrabold">{formatShortDate(p.lastOrderDate)}</b> for christmas
           {compact ? null : <span className="hidden sm:inline"> · draw it this weekend</span>}
         </span>
-        <span className="ml-auto whitespace-nowrap font-extrabold text-cinnamon">dates</span>
+        {/* (i) instead of the word "dates" (founder, 10 Nov): the whole strip opens the dates page */}
+        <Icon icon={IconInfoCircle} size={20} className="ml-auto shrink-0 text-cinnamon" />
       </>
     ) : afterChristmas ? (
       <>
@@ -54,7 +56,8 @@ export function ChristmasStrip({ serverNowIso, compact = false }: { serverNowIso
     <div className={compact ? 'px-3 pb-2' : 'mx-auto w-full max-w-6xl px-4 md:px-6'}>
       <Link
         href={p.state === 'in-time' ? '/christmas/delivery-dates' : '/start-creating'}
-        className={`flex min-h-11 items-center gap-2 rounded-[14px] border-2 border-cocoa px-3 py-1.5 text-[13px] font-semibold text-cocoa ${tone}`}
+        aria-label={p.state === 'in-time' ? `order by ${formatShortDate(p.lastOrderDate)} for christmas. see all the christmas delivery dates` : undefined}
+        className={`flex min-h-11 items-center gap-2 rounded-[14px] border-2 border-cocoa px-3 py-1 text-[13px] font-semibold text-cocoa ${tone}`}
       >
         {body}
       </Link>
