@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowRight, IconCake, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
+import { IconArrowRight, IconCake, IconEye, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconShoppingBag, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -27,8 +27,13 @@ import type { VisibilityTier } from '@/domain/types';
 import { isChristmasSeason } from '@/lib/season';
 import { useNow } from '@/ui/useNow';
 import { ReportKeepsake } from '@/ui/components/ReportKeepsake';
+import { openKeepsakeInFlow } from '@/lib/keepsakeFork';
+import { keepsakeTileActions, keepsakeTileName } from '@/lib/keepsakeTileActions';
 
 const VIS_LABEL: Record<VisibilityTier, string> = { ONLY_ME: 'Only me', FAMILY: 'Family', EXTENDED: 'Extended' };
+/** The little sticker buttons on a keepsake: paper, cocoa ink + offset shadow, 36px with a 44px hit area. */
+const TILE_ACTION =
+  "press relative flex h-9 w-9 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa shadow-[0_2px_0_var(--color-cocoa)] before:absolute before:-inset-[4px] before:content-[''] hover:text-cinnamon";
 const AVATAR_COLORS = ['#C8402A', '#2F5DA8', '#7FA65E', '#E8786E', '#8E2A1A']; // Scrapbook stickers (white initials ≥3:1 at this size)
 
 /** The next birthday among the little ones within ~2 months: the gentle "coming up"
@@ -165,14 +170,54 @@ export function HomeView({ data }: { data: HomeData }) {
   const filedIds = new Set(childGroups.flatMap((g) => g.items.map((k) => k.id)));
   const unfiled = data.keepsakes.filter((k) => !filedIds.has(k.id));
 
+  // The basket on a keepsake: its art into the usual create flow (already kept — its first edit makes a
+  // NEW keepsake). The server checks it's theirs to see before anything comes back.
+  const [opening, setOpening] = useState<string | null>(null);
+  const makeSomething = async (k: HomeKeepsake) => {
+    if (opening) return;
+    setOpening(k.id);
+    try {
+      if (await openKeepsakeInFlow(k.id)) return router.push('/start-creating');
+      toast('couldn’t open that one — try again');
+    } catch {
+      toast('couldn’t open that one — try again');
+    }
+    setOpening(null);
+  };
+  const childName = new Map(data.children.map((c) => [c.id, c.firstName]));
+
   const renderTile = (k: HomeKeepsake, i: number) => {
     const isNewest = k.id === newestId && highlightNew;
+    const actions = keepsakeTileActions(k, data.canBuy);
+    const name = keepsakeTileName(k.childSubjectId ? childName.get(k.childSubjectId) : null, monthLabel(k.createdAtISO));
     return (
       <div
         key={k.id}
         ref={isNewest ? newestRef : undefined}
-        className={isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : undefined}
+        className={`relative ${isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : ''}`}
       >
+        {/* eye + basket stickers, top-right — always shown (never hover-only), 44px hit areas */}
+        {actions.whoCanSee || actions.makeSomething ? (
+          <div className="absolute -right-1.5 -top-2 z-10 flex gap-2">
+            {actions.whoCanSee ? (
+              <button type="button" onClick={() => setActive(k)} aria-label={`who can see ${name}`} className={TILE_ACTION}>
+                <Icon icon={IconEye} size={17} />
+              </button>
+            ) : null}
+            {actions.makeSomething ? (
+              <button
+                type="button"
+                onClick={() => void makeSomething(k)}
+                disabled={!!opening}
+                aria-busy={opening === k.id}
+                aria-label={opening === k.id ? `opening ${name}…` : `make something with ${name}`}
+                className={`${TILE_ACTION} disabled:opacity-60`}
+              >
+                <Icon icon={IconShoppingBag} size={17} />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {k.canManage ? (
           // named by what's on it (keepsake · month · who sees it) and then what it does — never one
           // label for every tile (09-B8, WCAG 2.5.3)
@@ -370,13 +415,8 @@ export function HomeView({ data }: { data: HomeData }) {
               </div>
             ) : (
               <>
-                <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
+                <p className="mt-1 text-xs text-ink-faint">
                   {data.isOwner ? 'Tap a keepsake to choose who can see it.' : 'Shared with you by the family.'}
-                  {data.canBuy ? (
-                    <Link href="/studio/position" className="font-bold text-cinnamon hover:underline">
-                      place one on a product →
-                    </Link>
-                  ) : null}
                 </p>
                 {highlightNew ? (
                   <div className="mt-3 flex items-center gap-2 rounded-lg border border-sunshine bg-honey-band px-3 py-2 text-xs text-ink-faint">

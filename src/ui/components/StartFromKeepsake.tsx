@@ -2,8 +2,9 @@
 
 import { IconHeart } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
-import { keepsakeForStudioAction, keepsakePickerAction } from '@/app/actions/keepsakePicker';
-import { toast, useUpload } from '@/lib/store';
+import { keepsakePickerAction } from '@/app/actions/keepsakePicker';
+import { openKeepsakeInFlow } from '@/lib/keepsakeFork';
+import { toast } from '@/lib/store';
 import type { PickerKeepsake } from '@/server/keepsakePicker';
 import { Icon } from '@/ui/primitives/Icon';
 
@@ -36,19 +37,8 @@ export function StartFromKeepsake() {
     if (opening) return;
     setOpening(k.id);
     try {
-      const res = await keepsakeForStudioAction({ assetId: k.id });
-      if (!res.ok) return void toast('couldn’t open that one — try again');
-      const trim = res.trim;
-      useUpload.getState().setUpload({
-        dataUrl: res.dataUrl,
-        name: 'drawing.jpg',
-        key: `keepsake-${k.id}`,
-        assetId: k.id,
-        kept: true,
-        fromKeepsake: true, // its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts)
-        aspect: res.aspect,
-        ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
-      });
+      // its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts)
+      if (!(await openKeepsakeInFlow(k.id))) return void toast('couldn’t open that one — try again');
       window.scrollTo({ top: 0 });
     } finally {
       setOpening(null);
