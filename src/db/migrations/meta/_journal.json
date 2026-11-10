@@ -372,6 +372,13 @@
       "when": 1794265805597,
       "tag": "0052_draw_app_link",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1794322690016,
+      "tag": "0053_draw_sync_choices",
+      "breakpoints": true
     }
   ]
 }

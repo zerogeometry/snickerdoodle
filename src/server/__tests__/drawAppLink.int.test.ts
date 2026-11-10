@@ -1,10 +1,30 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+// The safety checks the website runs, made controllable here: by default they pass (like the dev
+// stub); a case can make the classifier flag, or fail, to prove a held app upload stays held.
+const screen = vi.hoisted(() => ({ verdict: 'pass' as 'pass' | 'flag' | 'fail' }));
+vi.mock('@/server/moderation/providers', async (orig) => {
+  const real = await orig<typeof import('@/server/moderation/providers')>();
+  return {
+    ...real,
+    defaultProviders: () => ({
+      hash: { isKnownIllegal: async () => false },
+      classifier: {
+        classify: async () => {
+          if (screen.verdict === 'fail') throw new Error('classifier down');
+          return screen.verdict === 'flag' ? { flagged: true, labels: ['Suggestive'], categories: ['Suggestive'] } : { flagged: false, labels: [] };
+        },
+      },
+      textReader: { read: async () => [] },
+    }),
+  };
+});
 import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { appAuthCodes, appCheckoutGrants, appTokens, assets, auditRecords, children, memberships, storageObjects } from '@/db/schema';
+import { appArtistProgress, appAuthCodes, appCheckoutGrants, appTokens, assets, auditRecords, children, giftLinks, memberships, occasions, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { seedCatalogue } from '@/server/catalogue';
 import { closeAccount, handOverFamily } from '@/server/accountClosure';
@@ -14,18 +34,27 @@ import { deleteObject } from '@/storage';
 import type { BackgroundTask } from '@/server/background';
 import type { DbHandle } from '@/server/db';
 import { AppAuthError, requireAppViewer, type AppViewer } from '@/server/app/appAuth';
-import { createAuthCode, exchangeAuthCode, listLinkedDevices, revokeAppTokens, type ConnectRequest } from '@/server/app/link';
+import { createAuthCode, exchangeAuthCode, listLinkedDevices, purgeAppLinkLeftovers, revokeAppTokens, type ConnectRequest } from '@/server/app/link';
+import { countDrawSent, deleteProgressBackups, listProgressBackups, removeEverythingDrawSent, updateSyncFromWebsite, type SyncChoices } from '@/server/app/sync';
+import { addAppOccasion, deleteAppOccasion, listAppOccasions, updateAppOccasion } from '@/server/app/occasions';
+import { addOccasion, occasionsFor, updateOccasion } from '@/server/occasions';
+import { reviewQueue } from '@/server/admin/review';
+import { placeOrder } from '@/server/orders';
 import {
   addAppChild,
   AppApiError,
   consumeAppCheckoutGrant,
   deleteAppAsset,
   getAppMe,
+  getAppProgress,
   keepAppDrawing,
   listAppOrders,
   listAppProducts,
   mintAppCheckoutGrant,
+  mintAppWish,
+  putAppProgress,
   updateAppChild,
+  updateAppSync,
 } from '@/server/app/api';
 import { s256 } from '@/server/app/secrets';
 
@@ -38,6 +67,10 @@ import { s256 } from '@/server/app/secrets';
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
 const ON = { DRAW_APP_UPLOADS: 'on' };
+/** The choices most cases link with: nothing automatic, names + birthdays kept in step. */
+const NAMES: SyncChoices = { keepsakes: 'none', children: true, progress: false, birthdays: false };
+const NOTHING: SyncChoices = { keepsakes: 'none', children: false, progress: false, birthdays: false };
+const EVERYTHING: SyncChoices = { keepsakes: 'all', children: true, progress: true, birthdays: true };
 
 const VERIFIER = 'a'.repeat(20) + 'B'.repeat(20) + '-._~xyz'; // 47 unreserved chars
 const REQ: ConnectRequest = { codeChallenge: s256(VERIFIER), state: 'st8', redirectUri: 'https://snickerdoodle.co.uk/app/callback' };
@@ -79,6 +112,9 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
   afterAll(async () => {
     if (madeAssets.length) for (const o of await db.select().from(storageObjects).where(inArray(storageObjects.assetId, madeAssets))) await deleteObject(o.key).catch(() => {});
     if (ids) {
+      await db.delete(appArtistProgress).where(inArray(appArtistProgress.familyId, [ids.hartleyId, ids.bloomId]));
+      await db.delete(giftLinks).where(inArray(giftLinks.familyId, [ids.hartleyId, ids.bloomId]));
+      await db.delete(occasions).where(inArray(occasions.familyId, [ids.hartleyId, ids.bloomId]));
       await db.delete(appTokens).where(inArray(appTokens.accountId, [ids.samId, ids.joId, ids.blakeId]));
       await db.delete(appAuthCodes).where(inArray(appAuthCodes.accountId, [ids.samId, ids.joId, ids.blakeId]));
       await cleanupDemoFamilies(db, ids);
@@ -87,8 +123,8 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
   });
 
   /** Sam (Hartley's owner) links a phone; returns the raw key. */
-  async function link(opts: { accountId?: string; familyId?: string | null; childIds?: string[] | null; ua?: string } = {}) {
-    const code = await createAuthCode(db, { accountId: opts.accountId ?? ids.samId, familyId: opts.familyId === undefined ? ids.hartleyId : opts.familyId, childIds: opts.childIds ?? null, req: REQ });
+  async function link(opts: { accountId?: string; familyId?: string | null; childIds?: string[] | null; ua?: string; sync?: SyncChoices } = {}) {
+    const code = await createAuthCode(db, { accountId: opts.accountId ?? ids.samId, familyId: opts.familyId === undefined ? ids.hartleyId : opts.familyId, childIds: opts.childIds ?? null, req: REQ, sync: opts.sync ?? NAMES });
     const res = await exchangeAuthCode(db, { grantType: 'authorization_code', code, codeVerifier: VERIFIER, redirectUri: REQ.redirectUri, clientId: 'snickerdoodle-draw', userAgent: opts.ua ?? 'okhttp/4.12.0' });
     if (!res.ok) throw new Error(`link failed: ${res.reason}`);
     return res.token;
@@ -108,36 +144,37 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       const audit = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'APP_LINKED'), eq(auditRecords.targetId, row!.id)));
       expect(audit).toHaveLength(1);
       const me = await getAppMe(db, await viewerFor(token));
-      expect(Object.keys(me).sort()).toEqual(['children', 'family']);
+      expect(Object.keys(me).sort()).toEqual(['children', 'family', 'sync']);
+      expect(me.sync).toEqual(NAMES);
       expect(me.children.map((c) => c.id).sort()).toEqual([ids.oliviaId, ids.maxId].sort());
       for (const c of me.children) expect(Object.keys(c).every((k) => ['id', 'firstName', 'birthday'].includes(k))).toBe(true);
       expect(JSON.stringify(me)).not.toMatch(/@/); // no email of anyone
     });
 
     it('a code works once — a second swap fails', async () => {
-      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ });
+      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES });
       expect((await swap(code)).ok).toBe(true);
       expect(await swap(code)).toEqual({ ok: false, status: 400, reason: 'invalid-grant' });
     });
 
     it('a wrong verifier fails, and burns the code (no second guess)', async () => {
-      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ });
+      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES });
       expect(await swap(code, { codeVerifier: `${VERIFIER.slice(0, -1)}Q` })).toEqual({ ok: false, status: 400, reason: 'invalid-grant' });
       expect((await swap(code)).ok).toBe(false);
     });
 
     it('an expired code fails', async () => {
-      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ }, new Date(Date.now() - 5 * 60_000));
+      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES }, new Date(Date.now() - 5 * 60_000));
       expect(await swap(code)).toEqual({ ok: false, status: 400, reason: 'invalid-grant' });
     });
 
     it('a different return address than the one the code was made for fails', async () => {
-      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ });
+      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES });
       expect(await swap(code, { redirectUri: 'snickerdoodle-draw://auth/callback' })).toEqual({ ok: false, status: 400, reason: 'invalid-grant' });
     });
 
     it('the wrong app, grant type or a missing field is refused before anything is looked up', async () => {
-      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ });
+      const code = await createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES });
       expect(await swap(code, { clientId: 'other' })).toEqual({ ok: false, status: 400, reason: 'invalid-request' });
       expect(await swap(code, { grantType: 'password' })).toEqual({ ok: false, status: 400, reason: 'invalid-request' });
       expect(await swap(code, { codeVerifier: undefined })).toEqual({ ok: false, status: 400, reason: 'invalid-request' });
@@ -145,8 +182,8 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     });
 
     it('only the family’s OWNER can link: a member is refused a code; "no family" swaps to 403 not-owner', async () => {
-      await expect(createAuthCode(db, { accountId: ids.joId, familyId: ids.hartleyId, childIds: null, req: REQ })).rejects.toThrow();
-      await expect(createAuthCode(db, { accountId: ids.samId, familyId: ids.bloomId, childIds: null, req: REQ })).rejects.toThrow(); // not Sam's family
+      await expect(createAuthCode(db, { accountId: ids.joId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: NAMES })).rejects.toThrow();
+      await expect(createAuthCode(db, { accountId: ids.samId, familyId: ids.bloomId, childIds: null, req: REQ, sync: NAMES })).rejects.toThrow(); // not Sam's family
       const code = await createAuthCode(db, { accountId: ids.joId, familyId: null, childIds: null, req: REQ });
       expect(await swap(code)).toEqual({ ok: false, status: 403, reason: 'not-owner' });
     });
@@ -312,6 +349,424 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect(await db.select().from(appCheckoutGrants).where(eq(appCheckoutGrants.assetId, kept))).toHaveLength(0);
       const audit = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'ASSET_DELETED'), eq(auditRecords.targetId, kept)));
       expect(audit).toHaveLength(1);
+    });
+  });
+
+  // ── the sync choices (DRAW-APP-sync-choices.md) ─────────────────────────────────────────────────
+
+  describe('sync choices: set at linking, changeable, audited', () => {
+    const consentFor = (tokenId: string) =>
+      db
+        .select()
+        .from(auditRecords)
+        .where(and(eq(auditRecords.event, 'CONSENT_CHANGED'), eq(auditRecords.targetType, 'app_sync'), eq(auditRecords.targetId, tokenId)));
+
+    it('a code for a family needs the grown-up’s choices — no default, no key without them', async () => {
+      await expect(createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ })).rejects.toThrow(/choose/);
+      await expect(createAuthCode(db, { accountId: ids.samId, familyId: ids.hartleyId, childIds: null, req: REQ, sync: { keepsakes: 'some' as never, children: false, progress: false, birthdays: false } })).rejects.toThrow(/choose/);
+    });
+
+    it('the choices made on the connect page land on the key, are logged as a consent change, and /me returns them', async () => {
+      const token = await link({ sync: { keepsakes: 'proud', children: false, progress: true, birthdays: false } });
+      const av = await viewerFor(token);
+      expect(av.sync).toEqual({ keepsakes: 'proud', children: false, progress: true, birthdays: false });
+      expect((await getAppMe(db, av)).sync).toEqual({ keepsakes: 'proud', children: false, progress: true, birthdays: false });
+      const [row] = await db.select().from(appTokens).where(eq(appTokens.id, av.tokenId));
+      expect(row!.syncChosenAt).not.toBeNull();
+      const audit = await consentFor(av.tokenId);
+      expect(audit).toHaveLength(1);
+      expect(audit[0]!.metadata).toEqual({ by: 'connect', from: null, to: { keepsakes: 'proud', children: false, progress: true, birthdays: false } });
+      expect(audit[0]!.actorAccountId).toBe(ids.samId);
+    });
+
+    it('PATCH /me/sync: any subset; returns the full object; a real change is audited, a no-op isn’t', async () => {
+      const token = await link({ sync: EVERYTHING });
+      const patch = async (body: Record<string, unknown>) => updateAppSync(db, await viewerFor(token), body);
+      expect(await patch({ keepsakes: 'proud' })).toEqual({ ...EVERYTHING, keepsakes: 'proud' });
+      expect(await patch({ progress: false, children: false })).toEqual({ keepsakes: 'proud', children: false, progress: false, birthdays: true });
+      expect(await patch({ progress: false })).toEqual({ keepsakes: 'proud', children: false, progress: false, birthdays: true }); // nothing new
+      expect(await patch({ keepsakes: 'none', birthdays: false })).toEqual(NOTHING);
+      const audit = await consentFor((await viewerFor(token)).tokenId);
+      expect(audit.map((a) => (a.metadata as { by: string }).by).sort()).toEqual(['app', 'app', 'app', 'connect']);
+      expect((await viewerFor(await link({ sync: EVERYTHING }))).sync).toEqual(EVERYTHING); // another phone keeps its own
+    });
+
+    it('PATCH /me/sync may only narrow or stop: widening is website-only (403 widen-on-website), and changes nothing', async () => {
+      const token = await link({ sync: { keepsakes: 'proud', children: false, progress: false, birthdays: false } });
+      const patch = async (body: Record<string, unknown>) => updateAppSync(db, await viewerFor(token), body);
+      await expectApiError(patch({ keepsakes: 'all' }), 403, 'widen-on-website');
+      await expectApiError(patch({ children: true }), 403, 'widen-on-website');
+      await expectApiError(patch({ progress: true }), 403, 'widen-on-website');
+      await expectApiError(patch({ birthdays: true }), 403, 'widen-on-website');
+      await expectApiError(patch({ keepsakes: 'none', birthdays: true }), 403, 'widen-on-website'); // one widening spoils the lot
+      expect((await viewerFor(token)).sync).toEqual({ keepsakes: 'proud', children: false, progress: false, birthdays: false });
+      expect(await patch({ keepsakes: 'proud', children: false })).toEqual({ keepsakes: 'proud', children: false, progress: false, birthdays: false }); // same is fine
+      expect(await patch({ keepsakes: 'none' })).toEqual(NOTHING);
+      await expectApiError(patch({ keepsakes: 'proud' }), 403, 'widen-on-website'); // none → proud is widening too
+      // the website's account page can widen
+      expect(await updateSyncFromWebsite(db, ids.samId, (await viewerFor(token)).tokenId, { keepsakes: 'all', children: true, progress: true, birthdays: true })).toEqual({ ok: true, sync: EVERYTHING });
+    });
+
+    it('PATCH /me/sync validates every value', async () => {
+      const av = await viewerFor(await link({ sync: NOTHING }));
+      await expectApiError(updateAppSync(db, av, { keepsakes: 'everything' }), 422, 'keepsakes');
+      await expectApiError(updateAppSync(db, av, { keepsakes: null }), 422, 'keepsakes');
+      await expectApiError(updateAppSync(db, av, { children: 'yes' }), 422, 'children');
+      await expectApiError(updateAppSync(db, av, { progress: 1 }), 422, 'progress');
+      expect(await updateAppSync(db, av, {})).toEqual(NOTHING);
+    });
+
+    it('the account page: only this account’s own, live phones; changes audited as "website"', async () => {
+      const token = await link({ sync: NOTHING });
+      const av = await viewerFor(token);
+      expect(await updateSyncFromWebsite(db, ids.joId, av.tokenId, { keepsakes: 'all' })).toEqual({ ok: false, reason: 'not-found' }); // Jo can't change Sam's phone
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'nope' })).toEqual({ ok: false, reason: 'invalid' });
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'proud', children: true })).toEqual({ ok: true, sync: { keepsakes: 'proud', children: true, progress: false, birthdays: false } });
+      expect((await viewerFor(token)).sync).toEqual({ keepsakes: 'proud', children: true, progress: false, birthdays: false }); // the phone follows on its next call
+      const listed = (await listLinkedDevices(db, ids.samId)).find((d) => d.id === av.tokenId)!;
+      expect(listed).toMatchObject({ sync: { keepsakes: 'proud', children: true, progress: false, birthdays: false }, syncChosen: true });
+      expect((await consentFor(av.tokenId)).some((a) => (a.metadata as { by: string }).by === 'website')).toBe(true);
+      await revokeAppTokens(db, { tokenId: av.tokenId }, 'unlinked-on-website', { accountId: ids.samId, actorType: 'MEMBER' });
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'all' })).toEqual({ ok: false, reason: 'not-found' }); // disconnected: nothing to change
+    });
+
+    it('a phone linked before the choices existed syncs nothing until a grown-up picks', async () => {
+      const [old] = await db.insert(appTokens).values({ tokenHash: `legacy-${Date.now()}`, accountId: ids.samId, familyId: ids.hartleyId, deviceLabel: 'a phone or tablet' }).returning();
+      const listed = (await listLinkedDevices(db, ids.samId)).find((d) => d.id === old!.id)!;
+      expect(listed).toMatchObject({ sync: NOTHING, syncChosen: false });
+      expect(await updateSyncFromWebsite(db, ids.samId, old!.id, { keepsakes: 'none' })).toEqual({ ok: true, sync: NOTHING });
+      expect((await listLinkedDevices(db, ids.samId)).find((d) => d.id === old!.id)!.syncChosen).toBe(true); // choosing "none" is still a choice
+      expect((await consentFor(old!.id))[0]!.metadata).toMatchObject({ by: 'website', from: null });
+    });
+  });
+
+  describe('sync off → 403 sync-off', () => {
+    it('names and birthdays: off → no rename or birthday from the app, and /me shows first names only', async () => {
+      const off = await viewerFor(await link({ sync: NOTHING }));
+      await expectApiError(updateAppChild(db, off, ids.oliviaId, { firstName: 'Liv' }), 403, 'sync-off');
+      await expectApiError(updateAppChild(db, off, ids.oliviaId, { birthday: '2020-01-01' }), 403, 'sync-off');
+      await db.update(children).set({ birthday: '2020-06-01' }).where(eq(children.id, ids.oliviaId));
+      const me = await getAppMe(db, off);
+      expect(me.children.length).toBeGreaterThan(0);
+      for (const c of me.children) expect(Object.keys(c).sort()).toEqual(['firstName', 'id']); // matching only
+      const on = await viewerFor(await link({ sync: NAMES }));
+      expect((await getAppMe(db, on)).children.find((c) => c.id === ids.oliviaId)).toMatchObject({ birthday: '2020-06-01' });
+      expect(await updateAppChild(db, on, ids.oliviaId, { birthday: '2020-06-02' })).toMatchObject({ birthday: '2020-06-02' });
+    });
+
+    it('adding a little one still works with names off (a drawing needs someone to file under), but the birthday isn’t kept', async () => {
+      const off = await viewerFor(await link({ sync: NOTHING }));
+      const kid = await addAppChild(db, off, { firstName: 'Nell', birthday: '2022-02-02' });
+      expect(kid).toEqual({ id: expect.any(String), firstName: 'Nell' });
+      const [row] = await db.select().from(children).where(eq(children.id, kid.id));
+      expect(row!.birthday).toBeNull();
+    });
+
+    it('drawing days: off → GET and PUT are refused, and nothing is stored', async () => {
+      const off = await viewerFor(await link({ sync: NOTHING }));
+      await expectApiError(putAppProgress(db, off, ids.maxId, { drawingDays: ['2026-11-01'] }), 403, 'sync-off');
+      await expectApiError(getAppProgress(db, off, ids.maxId), 403, 'sync-off');
+      expect(await db.select().from(appArtistProgress).where(eq(appArtistProgress.childId, ids.maxId))).toHaveLength(0);
+    });
+
+    it.skipIf(!S3)('keepsakes none → trigger:auto refused; manual (a grown-up’s one-off) still works', async () => {
+      const off = await viewerFor(await link({ sync: NOTHING }));
+      await expectApiError(keepAppDrawing(db, off, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'auto' }, { env: ON, screening: queued().screening }), 403, 'sync-off');
+      await expectApiError(keepAppDrawing(db, off, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'sometimes' }, { env: ON }), 422, 'trigger');
+      for (const trigger of ['manual', undefined]) {
+        const res = await keepAppDrawing(db, off, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger }, { env: ON, screening: queued().screening });
+        madeAssets.push(res.assetId);
+        expect(res.kept).toBe(true);
+      }
+      // the uploads switch still comes first
+      await expectApiError(keepAppDrawing(db, off, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'auto' }, { env: {} }), 403, 'not-yet');
+    });
+
+    it.skipIf(!S3)('keepsakes proud / all → trigger:auto goes through the same ingest (FAMILY, held until checked)', async () => {
+      for (const keepsakes of ['proud', 'all'] as const) {
+        const av = await viewerFor(await link({ sync: { keepsakes, children: false, progress: false, birthdays: false } }));
+        const res = await keepAppDrawing(db, av, { image: await blob(), childId: ids.maxId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'auto' }, { env: ON, screening: queued().screening });
+        madeAssets.push(res.assetId);
+        const [row] = await db.select().from(assets).where(eq(assets.id, res.assetId));
+        expect(row).toMatchObject({ visibility: 'FAMILY', keptInHome: true, moderationStatus: 'PENDING', controllerAccountId: ids.samId, source: 'app-screen' });
+      }
+    });
+
+    it('turning a choice off bites on the very next call', async () => {
+      const token = await link({ sync: { keepsakes: 'all', children: true, progress: true, birthdays: false } });
+      await putAppProgress(db, await viewerFor(token), ids.oliviaId, { drawingDays: ['2026-11-02'] });
+      await updateAppSync(db, await viewerFor(token), { progress: false, children: false });
+      await expectApiError(getAppProgress(db, await viewerFor(token), ids.oliviaId), 403, 'sync-off');
+      await expectApiError(updateAppChild(db, await viewerFor(token), ids.oliviaId, { firstName: 'Liv' }), 403, 'sync-off');
+      // stopping never deletes what already synced
+      expect(await db.select().from(appArtistProgress).where(eq(appArtistProgress.childId, ids.oliviaId))).toHaveLength(1);
+    });
+  });
+
+  describe('drawing days backup (progress on)', () => {
+    let av: AppViewer;
+    beforeAll(async () => {
+      av = await viewerFor(await link({ sync: { keepsakes: 'none', children: false, progress: true, birthdays: false } }));
+      await db.delete(appArtistProgress).where(eq(appArtistProgress.familyId, ids.hartleyId));
+    });
+
+    it('nothing yet → 404 none; PUT then GET gives it back, trimmed to the five fields', async () => {
+      await expectApiError(getAppProgress(db, av, ids.maxId), 404, 'none');
+      await putAppProgress(db, av, ids.maxId, {
+        drawingDays: ['2026-11-03', '2026-11-01', '2026-11-03'],
+        restWeeks: ['2026-W44'],
+        bestRun: 3,
+        lessons: [{ id: 'circles-1', doneOn: '2026-11-01', extra: 'dropped' }],
+        streaksOn: true,
+        childName: 'not kept',
+      });
+      const back = await getAppProgress(db, av, ids.maxId);
+      expect(back).toEqual({ drawingDays: ['2026-11-01', '2026-11-03'], restWeeks: ['2026-W44'], bestRun: 3, lessons: [{ id: 'circles-1', doneOn: '2026-11-01' }], streaksOn: true });
+      await putAppProgress(db, av, ids.maxId, { drawingDays: ['2026-11-04'], restWeeks: [], bestRun: 1, lessons: [], streaksOn: false });
+      expect((await getAppProgress(db, av, ids.maxId)).drawingDays).toEqual(['2026-11-04']); // replaced, one row per child
+      expect(await db.select().from(appArtistProgress).where(eq(appArtistProgress.childId, ids.maxId))).toHaveLength(1);
+    });
+
+    it('a new phone (another link with drawing days on) picks it up', async () => {
+      const fresh = await viewerFor(await link({ sync: { keepsakes: 'none', children: false, progress: true, birthdays: false } }));
+      expect((await getAppProgress(db, fresh, ids.maxId)).drawingDays).toEqual(['2026-11-04']);
+    });
+
+    it('a bad backup is refused', async () => {
+      await expectApiError(putAppProgress(db, av, ids.maxId, { drawingDays: ['yesterday'] }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { drawingDays: ['2026-02-30'] }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { restWeeks: ['2026-W60'] }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { bestRun: -1 }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { lessons: [{ id: '<script>', doneOn: '2026-11-01' }] }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { streaksOn: 'yes' }), 422, 'progress');
+      await expectApiError(putAppProgress(db, av, ids.maxId, { drawingDays: Array.from({ length: 6001 }, () => '2026-11-01') }), 422, 'progress');
+    });
+
+    it('only the key’s own family and ticked children: another family’s child, an unticked one, or junk → 404', async () => {
+      const [bloomKid] = await db.insert(children).values({ familyId: ids.bloomId, firstName: 'Ivy', controllerAccountId: ids.blakeId }).returning();
+      await expectApiError(putAppProgress(db, av, bloomKid!.id, { drawingDays: [] }), 404, 'not-found');
+      await expectApiError(getAppProgress(db, av, bloomKid!.id), 404, 'not-found');
+      await expectApiError(getAppProgress(db, av, 'not-a-uuid'), 404, 'not-found');
+      const scoped = await viewerFor(await link({ childIds: [ids.oliviaId], sync: { keepsakes: 'none', children: false, progress: true, birthdays: false } }));
+      await expectApiError(getAppProgress(db, scoped, ids.maxId), 404, 'not-found');
+      // and Blake's own phone can't read Max's days either
+      const blake = await viewerFor(await link({ accountId: ids.blakeId, familyId: ids.bloomId, sync: { keepsakes: 'none', children: false, progress: true, birthdays: false } }));
+      await expectApiError(getAppProgress(db, blake, ids.maxId), 404, 'not-found');
+    });
+
+    it('the account page lists the backups of families this grown-up runs, and deletes them in one tap (audited)', async () => {
+      expect((await listProgressBackups(db, [ids.hartleyId])).map((b) => b.childId)).toContain(ids.maxId);
+      expect(await deleteProgressBackups(db, ids.joId, [ids.hartleyId])).toBe(0); // Jo doesn't run Hartley
+      expect((await listProgressBackups(db, [ids.hartleyId])).length).toBeGreaterThan(0);
+      expect(await deleteProgressBackups(db, ids.samId, [ids.hartleyId])).toBeGreaterThan(0);
+      expect(await listProgressBackups(db, [ids.hartleyId])).toHaveLength(0);
+      const audit = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'APP_PROGRESS_DELETED'), eq(auditRecords.familyId, ids.hartleyId)));
+      expect(audit.some((a) => (a.metadata as { by: string }).by === 'website')).toBe(true);
+    });
+
+    it('retention: a backup no phone has refreshed for a year is deleted', async () => {
+      await putAppProgress(db, av, ids.maxId, { drawingDays: ['2026-11-05'] }, new Date(Date.now() - 400 * 86_400_000));
+      await putAppProgress(db, av, ids.oliviaId, { drawingDays: ['2026-11-05'] });
+      await purgeAppLinkLeftovers(db);
+      expect(await db.select().from(appArtistProgress).where(eq(appArtistProgress.childId, ids.maxId))).toHaveLength(0);
+      expect(await db.select().from(appArtistProgress).where(eq(appArtistProgress.childId, ids.oliviaId))).toHaveLength(1);
+    });
+
+    it('disconnecting stops the backup at once (the key is gone)', async () => {
+      const token = await link({ sync: { keepsakes: 'none', children: false, progress: true, birthdays: false } });
+      const v = await viewerFor(token);
+      await revokeAppTokens(db, { tokenId: v.tokenId }, 'unlinked-on-website', { accountId: ids.samId, actorType: 'MEMBER' });
+      await expectLinkGone(viewerFor(token));
+    });
+  });
+
+  // ── family birthdays & special days ↔ the family calendar (founder decisions 10 Nov, item 4) ─────
+
+  describe('occasions: one list with the family calendar, only with "family birthdays" on', () => {
+    const BDAYS: SyncChoices = { keepsakes: 'none', children: false, progress: false, birthdays: true };
+    let av: AppViewer;
+    beforeAll(async () => {
+      av = await viewerFor(await link({ sync: BDAYS }));
+    });
+
+    it('off → every occasions call is 403 sync-off, and nothing is written', async () => {
+      const off = await viewerFor(await link({ sync: NOTHING }));
+      const before = (await db.select().from(occasions).where(eq(occasions.familyId, ids.hartleyId))).length;
+      await expectApiError(listAppOccasions(db, off), 403, 'sync-off');
+      await expectApiError(addAppOccasion(db, off, { name: 'Jo', kind: 'birthday', month: 11, day: 3 }), 403, 'sync-off');
+      await expectApiError(updateAppOccasion(db, off, 'b4a3f7a0-0000-4000-8000-000000000000', { name: 'Jo' }), 403, 'sync-off');
+      await expectApiError(deleteAppOccasion(db, off, 'b4a3f7a0-0000-4000-8000-000000000000'), 403, 'sync-off');
+      expect((await db.select().from(occasions).where(eq(occasions.familyId, ids.hartleyId))).length).toBe(before);
+    });
+
+    it('POST from the app lands in the family calendar (FAMILY circle, no year) and GET gives the app’s shape', async () => {
+      const made = await addAppOccasion(db, av, { name: 'Jo', relation: 'Grandma', kind: 'birthday', month: 11, day: 3, year: 1956 });
+      expect(made).toEqual({ id: expect.any(String), name: 'Jo', relation: 'Grandma', kind: 'birthday', month: 11, day: 3, updatedAt: expect.any(String) });
+      const [row] = await db.select().from(occasions).where(eq(occasions.id, made.id));
+      expect(row).toMatchObject({ familyId: ids.hartleyId, title: 'Jo', relation: 'Grandma', kind: 'BIRTHDAY', year: null, shareCircle: 'FAMILY', createdByAccountId: ids.samId });
+      // and the website's own calendar shows it
+      expect((await occasionsFor(db, ids.samId, ids.hartleyId)).some((o) => o.id === made.id && o.date === '--11-03')).toBe(true);
+      const list = await listAppOccasions(db, av);
+      expect(list.find((o) => o.id === made.id)).toEqual(made);
+      for (const o of list) expect(Object.keys(o).every((k) => ['id', 'name', 'relation', 'kind', 'month', 'day', 'updatedAt'].includes(k))).toBe(true);
+    });
+
+    it('a website date shows in the app as month/day only — the year never crosses; lunar dates and anniversaries map sensibly', async () => {
+      const wedding = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'granny and grandad', kind: 'ANNIVERSARY', date: '1980-06-21' });
+      const lunar = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Nai Nai', kind: 'BIRTHDAY', date: '1950-02-10', lunar: 'CHINESE' });
+      expect(wedding.ok && lunar.ok).toBe(true);
+      const list = await listAppOccasions(db, av);
+      const w = list.find((o) => wedding.ok && o.id === wedding.id)!;
+      expect(w).toMatchObject({ name: 'granny and grandad', kind: 'other', month: 6, day: 21 });
+      expect(JSON.stringify(list)).not.toMatch(/1980|1950|year/);
+      expect(list.some((o) => lunar.ok && o.id === lunar.id)).toBe(false); // a lunar date moves each year: not sent as a fixed day
+      // the app says 'other' on an anniversary: the website keeps calling it an anniversary
+      await updateAppOccasion(db, av, w.id, { kind: 'other', day: 22 });
+      const [row] = await db.select().from(occasions).where(eq(occasions.id, w.id));
+      expect(row).toMatchObject({ kind: 'ANNIVERSARY', day: 22, year: 1980 }); // its year stays on the website
+    });
+
+    it('PATCH (any subset) and edits on the website both move updatedAt, so the last change wins', async () => {
+      const made = await addAppOccasion(db, av, { name: 'Pat', kind: 'other', month: 1, day: 5 });
+      await new Promise((r) => setTimeout(r, 15));
+      const changed = await updateAppOccasion(db, av, made.id, { relation: 'uncle' });
+      expect(changed).toMatchObject({ name: 'Pat', relation: 'uncle', kind: 'other', month: 1, day: 5 });
+      expect(changed.updatedAt > made.updatedAt).toBe(true);
+      await new Promise((r) => setTimeout(r, 15));
+      expect((await updateOccasion(db, ids.samId, made.id, { title: 'Pat', kind: 'OTHER', date: '--01-06' })).ok).toBe(true);
+      const after = (await listAppOccasions(db, av)).find((o) => o.id === made.id)!;
+      expect(after).toMatchObject({ day: 6, relation: 'uncle' }); // a website edit keeps the relation
+      expect(after.updatedAt > changed.updatedAt).toBe(true);
+      expect(await updateAppOccasion(db, av, made.id, { relation: null })).not.toHaveProperty('relation');
+    });
+
+    it('names are first names, screened like the website’s; relation, kind and date are checked', async () => {
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo Bloggs', kind: 'birthday', month: 1, day: 1 }), 422, 'name');
+      await expectApiError(addAppOccasion(db, av, { name: '', kind: 'birthday', month: 1, day: 1 }), 422, 'name');
+      await expectApiError(addAppOccasion(db, av, { name: 'fuck', kind: 'birthday', month: 1, day: 1 }), 422, 'name');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', relation: 'shit uncle', kind: 'birthday', month: 1, day: 1 }), 422, 'relation');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', relation: '<b>', kind: 'birthday', month: 1, day: 1 }), 422, 'relation');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', kind: 'anniversary', month: 1, day: 1 }), 422, 'kind');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', kind: 'birthday', month: 2, day: 30 }), 422, 'date');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', kind: 'birthday', month: 13, day: 1 }), 422, 'date');
+      await expectApiError(addAppOccasion(db, av, { name: 'Jo', kind: 'birthday', month: '11', day: 3 }), 422, 'date');
+      expect(await addAppOccasion(db, av, { name: 'Leap', kind: 'birthday', month: 2, day: 29 })).toMatchObject({ month: 2, day: 29 });
+    });
+
+    it('only the linked family: another family’s date is out of reach (404), and DELETE removes it from the calendar too', async () => {
+      const bloom = await addOccasion(db, ids.blakeId, ids.bloomId, { title: 'Ada', kind: 'BIRTHDAY', date: '--04-04' });
+      expect(bloom.ok).toBe(true);
+      const bloomId = bloom.ok ? bloom.id : '';
+      expect((await listAppOccasions(db, av)).some((o) => o.id === bloomId)).toBe(false);
+      await expectApiError(updateAppOccasion(db, av, bloomId, { name: 'Eve' }), 404, 'not-found');
+      await expectApiError(deleteAppOccasion(db, av, bloomId), 404, 'not-found');
+      await expectApiError(deleteAppOccasion(db, av, 'not-a-uuid'), 404, 'not-found');
+      expect(await db.select().from(occasions).where(eq(occasions.id, bloomId))).toHaveLength(1);
+      const mine = await addAppOccasion(db, av, { name: 'Bo', kind: 'other', month: 7, day: 7 });
+      await deleteAppOccasion(db, av, mine.id);
+      expect(await db.select().from(occasions).where(eq(occasions.id, mine.id))).toHaveLength(0);
+    });
+
+    it('a date for a child this phone isn’t for stays off the phone', async () => {
+      const max = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'first day at school', kind: 'MILESTONE', date: '2025-09-03', childId: ids.maxId });
+      const scoped = await viewerFor(await link({ childIds: [ids.oliviaId], sync: BDAYS }));
+      expect((await listAppOccasions(db, scoped)).some((o) => max.ok && o.id === max.id)).toBe(false);
+      expect((await listAppOccasions(db, av)).some((o) => max.ok && o.id === max.id)).toBe(true);
+    });
+
+    it('turning "family birthdays" off stops it and deletes nothing', async () => {
+      const token = await link({ sync: BDAYS });
+      const made = await addAppOccasion(db, await viewerFor(token), { name: 'Kit', kind: 'birthday', month: 8, day: 8 });
+      await updateAppSync(db, await viewerFor(token), { birthdays: false });
+      await expectApiError(listAppOccasions(db, await viewerFor(token)), 403, 'sync-off');
+      expect(await db.select().from(occasions).where(eq(occasions.id, made.id))).toHaveLength(1);
+    });
+  });
+
+  // ── "remove everything snickerdoodle draw sent" (A-48) ──────────────────────────────────────────
+
+  describe.skipIf(!S3)('remove everything Draw sent', () => {
+    it('deletes for good every keepsake the app sent in the families this grown-up runs — website uploads untouched, others can’t', async () => {
+      const av = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      const sent: string[] = [];
+      for (let i = 0; i < 2; i++) {
+        const r = await keepAppDrawing(db, av, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: i ? 'app-paper' : 'app-screen', trigger: 'auto' }, { env: ON, screening: queued().screening });
+        sent.push(r.assetId);
+        madeAssets.push(r.assetId);
+      }
+      const count = await countDrawSent(db, [ids.hartleyId]);
+      expect(count).toBeGreaterThanOrEqual(2);
+      expect(await removeEverythingDrawSent(db, ids.joId, [ids.hartleyId])).toEqual({ removed: 0, kept: 0 }); // Jo doesn't run Hartley
+      expect(await countDrawSent(db, [ids.hartleyId])).toBe(count);
+
+      const res = await removeEverythingDrawSent(db, ids.samId, [ids.hartleyId]);
+      expect(res.removed + res.kept).toBe(count);
+      expect(res.kept).toBe(0);
+      expect(await countDrawSent(db, [ids.hartleyId])).toBe(0);
+      // the real cascading delete: rows, bytes, and an ASSET_DELETED audit each
+      expect(await db.select().from(assets).where(inArray(assets.id, sent))).toHaveLength(0);
+      expect(await db.select().from(storageObjects).where(inArray(storageObjects.assetId, sent))).toHaveLength(0);
+      const audit = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'ASSET_DELETED'), inArray(auditRecords.targetId, sent)));
+      expect(audit).toHaveLength(2);
+      // the family's website keepsake is still there
+      expect(await db.select().from(assets).where(eq(assets.id, ids.assetFamily))).toHaveLength(1);
+    });
+  });
+
+  // ── content safety for app uploads (sign-off checklist G6) ──────────────────────────────────────
+
+  describe.skipIf(!S3)('a held app upload can’t be ordered or gift-linked', () => {
+    let av: AppViewer;
+    beforeAll(async () => {
+      av = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+    });
+    afterAll(() => {
+      screen.verdict = 'pass';
+    });
+    const keepOne = async () => {
+      const res = await keepAppDrawing(db, av, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-paper', trigger: 'auto' }, { env: ON, screening: queued().screening });
+      madeAssets.push(res.assetId);
+      return res.assetId;
+    };
+    const status = async (id: string) => (await db.select({ s: assets.moderationStatus }).from(assets).where(eq(assets.id, id)))[0]!.s;
+    const orderIt = (assetId: string, accountId = ids.samId) =>
+      placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }], account: { id: accountId }, joinProvenance: null });
+
+    it('not checked yet (PENDING): the rest of the family can’t see it, and the app’s answer never says why', async () => {
+      const id = await keepOne();
+      expect(await status(id)).toBe('PENDING');
+      const jo = await resolveViewerContext(db, ids.joId, ids.hartleyId);
+      const [row] = await db.select().from(assets).where(eq(assets.id, id));
+      const { canViewAsset } = await import('@/authz');
+      const { assetRefOf } = await import('@/server/assetRef');
+      expect(canViewAsset(assetRefOf(row!), jo).allowed).toBe(false);
+    });
+
+    it('the checks can’t finish: it’s held for review — no ready-to-buy link, no order, never cleared by default', async () => {
+      const id = await keepOne();
+      screen.verdict = 'fail';
+      await expectApiError(mintAppWish(db, av, { assetId: id, productKey: 'framedPrint' }), 409, 'not-ready');
+      await expect(orderIt(id)).rejects.toThrow();
+      expect(await status(id)).not.toBe('CLEAR');
+    });
+
+    it('flagged by the classifier: no ready-to-buy link, no order, and it lands in the review queue (never auto-rejected)', async () => {
+      const id = await keepOne();
+      screen.verdict = 'flag';
+      await expectApiError(mintAppWish(db, av, { assetId: id, productKey: 'framedPrint' }), 409, 'not-ready'); // screened on the spot → FLAGGED
+      expect(await status(id)).toBe('FLAGGED');
+      await expect(orderIt(id)).rejects.toThrow(/cleared for printing/);
+      const q = await reviewQueue(db, { accountId: ids.samId, isAdmin: true, mfaVerified: true });
+      expect(q.items.find((i) => i.id === id)).toMatchObject({ kind: 'keepsake', source: 'upload' });
+      expect((await db.select().from(assets).where(eq(assets.id, id))).length).toBe(1); // not binned
+    });
+
+    it('once the checks clear it, the same drawing can be shared (the gate is the check, not the app)', async () => {
+      const id = await keepOne();
+      screen.verdict = 'pass';
+      const { url } = await mintAppWish(db, av, { assetId: id, productKey: 'framedPrint' });
+      expect(url).toMatch(/\/g\//);
+      expect(await status(id)).toBe('CLEAR');
     });
   });
 

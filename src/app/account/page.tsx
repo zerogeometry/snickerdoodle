@@ -14,7 +14,8 @@ import { APP_TABS } from '@/ui/components/appTabs';
 import { AccountActions } from './AccountActions';
 import { ReferralCard } from './ReferralCard';
 import { DrawAppCard } from './DrawAppCard';
-import { listLinkedDevices } from '@/server/app/link';
+import { connectChoices, listLinkedDevices } from '@/server/app/link';
+import { countDrawSent, listProgressBackups } from '@/server/app/sync';
 import { ProfileCard } from './ProfileCard';
 import { profileImagesFor } from '@/server/profile';
 import { getDb } from '@/db/client';
@@ -27,11 +28,16 @@ export default async function AccountPage() {
 
   const displayName = account.name ?? account.email.split('@')[0] ?? account.email;
   const db = getDb();
-  const [referralCode, creditPence, pictures, drawDevices] = await Promise.all([
+  const ownedFamilyIds = connectChoices(db, account.id).then(({ owned }) => owned.map((f) => f.id));
+  const [referralCode, creditPence, pictures, drawDevices, drawBackups, drawSent] = await Promise.all([
     getOrCreateReferralCode(db, account),
     getCreditBalance(db, account.id),
     profileImagesFor(db, account.id, [account.id]),
     listLinkedDevices(db, account.id),
+    // backed-up drawing days in the families this grown-up runs (Snickerdoodle Draw's "drawing days")
+    ownedFamilyIds.then((ids) => listProgressBackups(db, ids)),
+    // keepsakes Snickerdoodle Draw sent (for "remove everything draw sent")
+    ownedFamilyIds.then((ids) => countDrawSent(db, ids)),
   ]);
   const mine = pictures.get(account.id);
   const initial = (account.name ?? account.email).charAt(0).toUpperCase();
@@ -56,7 +62,7 @@ export default async function AccountPage() {
 
         <ReferralCard code={referralCode} creditPence={creditPence} />
 
-        <DrawAppCard devices={drawDevices} />
+        <DrawAppCard devices={drawDevices} backups={drawBackups} sentCount={drawSent} />
 
         {/* Your data — see / download / delete (trust-critical; one-tap per CLAUDE.md) */}
         <section className="mt-4">
