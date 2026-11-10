@@ -29,6 +29,8 @@ export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: 'w
   // the public product pages (C7): our words, brand-safe photos and catalogue prices — no family data
   ...PRODUCT_PATHS.map((path) => ({ path, priority: 0.6, changeFrequency: 'monthly' as const })),
   { path: '/our-story', priority: 0.6, changeFrequency: 'yearly' },
+  // Snickerdoodle Draw, the companion drawing app (its store links and screenshots: no family data)
+  { path: '/draw', priority: 0.6, changeFrequency: 'monthly' },
   { path: '/trust/family-promise', priority: 0.6, changeFrequency: 'yearly' },
   { path: '/trust/privacy', priority: 0.5, changeFrequency: 'yearly' },
   { path: '/trust/terms', priority: 0.4, changeFrequency: 'yearly' },

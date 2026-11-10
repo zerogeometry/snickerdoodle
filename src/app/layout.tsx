@@ -20,7 +20,8 @@ import '@fontsource/berkshire-swash/latin-400.css';
 import '@fontsource/henny-penny/latin-400.css';
 import './globals.css';
 import { seasonPreviewDate } from '@/lib/season';
-import { brandFiles, brandSeason } from '@/lib/brand';
+import { brandFiles, brandSeason, drawBrandFiles } from '@/lib/brand';
+import { DrawAppBubble } from '@/ui/components/DrawAppBubble';
 import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
@@ -83,6 +84,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <MotionTaps />
         {/* a picture the background safety check held: tell them, wherever they have got to */}
         <ScreeningNotice />
+        {/* "get the app" (Snickerdoodle Draw): mounted once, shown only on the browsing pages + Keepsake Home */}
+        <DrawAppBubble iconSrc={drawBrandFiles(brandSeason()).icon} />
         <CookieBanner />
       </body>
     </html>
