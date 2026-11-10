@@ -24,6 +24,7 @@ import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 import { UploadSession } from '@/ui/components/UploadSession';
+import { ScreeningNotice } from '@/ui/components/ScreeningNotice';
 import { FreshBuild } from '@/ui/components/FreshBuild';
 
 export const metadata: Metadata = {
@@ -66,6 +67,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <TestSiteBanner />
         {children}
         <Toaster />
+        {/* a picture the background safety check held: tell them, wherever they have got to */}
+        <ScreeningNotice />
         <CookieBanner />
       </body>
     </html>
