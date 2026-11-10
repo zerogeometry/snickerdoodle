@@ -291,10 +291,14 @@ export const assets = pgTable(
     source: assetSource('source').notNull().default('web'),
     /** The day the child made it, when known (Draw sends it). A date only, never a time. */
     madeOn: date('made_on'),
+    /** Snickerdoodle Draw's own id for the drawing (`clientRef`), so a phone retrying after a crash
+     * gets the same keepsake back instead of a duplicate. Unique per family. Never shown. */
+    appClientRef: text('app_client_ref'),
     createdAt,
   },
   (t) => [
     index('asset_family_child_visibility_idx').on(t.familyId, t.childSubjectId, t.visibility),
+    uniqueIndex('asset_family_app_client_ref_unique').on(t.familyId, t.appClientRef).where(sql`${t.appClientRef} IS NOT NULL`),
     // Invariant: a real asset has a family + controller; an ephemeral draft has a claim.
     check(
       'asset_owned_or_ephemeral',

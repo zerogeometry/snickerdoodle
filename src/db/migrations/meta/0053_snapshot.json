@@ -1,5 +1,5 @@
 {
-  "id": "0b692b63-1690-4ccb-bcae-b91b445c67b9",
+  "id": "3f018053-b0a8-4367-b4b3-fbd389d878a1",
   "prevId": "c5b926df-2378-496d-9b54-344098dadc5a",
   "version": "7",
   "dialect": "postgresql",
@@ -861,6 +861,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "app_client_ref": {
+          "name": "app_client_ref",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -893,6 +899,28 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "asset_family_app_client_ref_unique": {
+          "name": "asset_family_app_client_ref_unique",
+          "columns": [
+            {
+              "expression": "family_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "app_client_ref",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"assets\".\"app_client_ref\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

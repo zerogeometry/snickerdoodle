@@ -295,7 +295,7 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       const res = await keepAppDrawing(db, av, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-08', source: 'app-paper' }, { env: ON, screening: q.screening });
       madeAssets.push(res.assetId);
       kept = res.assetId;
-      expect(res).toEqual({ assetId: expect.any(String), kept: true }); // never a moderation status
+      expect(res).toEqual({ assetId: expect.any(String), kept: true, created: true }); // never a moderation status
       const [row] = await db.select().from(assets).where(eq(assets.id, res.assetId));
       expect(row).toMatchObject({ familyId: ids.hartleyId, visibility: 'FAMILY', keptInHome: true, purgeAfter: null, source: 'app-paper', madeOn: '2026-11-08', childSubjectId: ids.oliviaId, controllerAccountId: ids.samId, moderationStatus: 'PENDING' });
       const [orig] = await db.select().from(storageObjects).where(and(eq(storageObjects.assetId, res.assetId), eq(storageObjects.objectClass, 'ORIGINAL')));
@@ -409,10 +409,10 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
 
     it('PATCH /me/sync validates every value', async () => {
       const av = await viewerFor(await link({ sync: NOTHING }));
-      await expectApiError(updateAppSync(db, av, { keepsakes: 'everything' }), 422, 'keepsakes');
-      await expectApiError(updateAppSync(db, av, { keepsakes: null }), 422, 'keepsakes');
-      await expectApiError(updateAppSync(db, av, { children: 'yes' }), 422, 'children');
-      await expectApiError(updateAppSync(db, av, { progress: 1 }), 422, 'progress');
+      await expectApiError(updateAppSync(db, av, { keepsakes: 'everything' }), 422, 'invalid');
+      await expectApiError(updateAppSync(db, av, { keepsakes: null }), 422, 'invalid');
+      await expectApiError(updateAppSync(db, av, { children: 'yes' }), 422, 'invalid');
+      await expectApiError(updateAppSync(db, av, { progress: 1 }), 422, 'invalid');
       expect(await updateAppSync(db, av, {})).toEqual(NOTHING);
     });
 
@@ -480,6 +480,46 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       }
       // the uploads switch still comes first
       await expectApiError(keepAppDrawing(db, off, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'auto' }, { env: {} }), 403, 'not-yet');
+    });
+
+    it.skipIf(!S3)('clientRef: a retry from the same family gets the same keepsake back (no duplicate); a bad ref is refused', async () => {
+      const av = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      const send = async (clientRef: unknown, viewer = av) =>
+        keepAppDrawing(db, viewer, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', trigger: 'auto', clientRef }, { env: ON, screening: queued().screening });
+      const ref = `drw_${Date.now()}`;
+      const first = await send(ref);
+      madeAssets.push(first.assetId);
+      expect(first).toEqual({ assetId: expect.any(String), kept: true, created: true });
+      const again = await send(ref);
+      expect(again).toEqual({ assetId: first.assetId, kept: true, created: false });
+      // another phone of the same family retrying the same drawing: still the same keepsake
+      const other = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      expect((await send(ref, other)).assetId).toBe(first.assetId);
+      expect(await db.select().from(assets).where(and(eq(assets.familyId, ids.hartleyId), eq(assets.appClientRef, ref)))).toHaveLength(1);
+      // two copies of a retry at once: still exactly one keepsake
+      const ref2 = `drw_race_${Date.now()}`;
+      const [a, b] = await Promise.all([send(ref2), send(ref2)]);
+      madeAssets.push(a.assetId, b.assetId);
+      expect(a.assetId).toBe(b.assetId);
+      expect(await db.select().from(assets).where(eq(assets.appClientRef, ref2))).toHaveLength(1);
+      // no ref: a new keepsake every time, as before
+      const n1 = await send(undefined);
+      const n2 = await send(undefined);
+      madeAssets.push(n1.assetId, n2.assetId);
+      expect(n1.assetId).not.toBe(n2.assetId);
+      for (const bad of ['has space', 'x'.repeat(65), '<script>', 42]) await expectApiError(send(bad), 422, 'client-ref');
+    });
+
+    it.skipIf(!S3)('clientRef is per family: another family using the same ref gets its own keepsake', async () => {
+      const ref = `shared_${Date.now()}`;
+      const sam = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      const blake = await viewerFor(await link({ accountId: ids.blakeId, familyId: ids.bloomId, sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      const [bloomKid] = await db.insert(children).values({ familyId: ids.bloomId, firstName: 'Wren', controllerAccountId: ids.blakeId }).returning();
+      const s = await keepAppDrawing(db, sam, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: 'app-screen', clientRef: ref }, { env: ON, screening: queued().screening });
+      const b = await keepAppDrawing(db, blake, { image: await blob(), childId: bloomKid!.id, madeOn: '2026-11-09', source: 'app-screen', clientRef: ref }, { env: ON, screening: queued().screening });
+      madeAssets.push(s.assetId, b.assetId);
+      expect(b.created).toBe(true);
+      expect(b.assetId).not.toBe(s.assetId);
     });
 
     it.skipIf(!S3)('keepsakes proud / all → trigger:auto goes through the same ingest (FAMILY, held until checked)', async () => {

@@ -83,7 +83,7 @@ export async function getAppMe(db: DbHandle, av: AppViewer): Promise<{ family: {
  */
 export async function updateAppSync(db: DbHandle, av: AppViewer, body: Record<string, unknown>): Promise<SyncChoices> {
   const parsed = parseSyncPatch(body);
-  if (!parsed.ok) throw new AppApiError(422, parsed.reason);
+  if (!parsed.ok) throw new AppApiError(422, 'invalid'); // contract: one reason for any bad value
   if (widens(av.sync, parsed.patch)) throw new AppApiError(403, 'widen-on-website');
   return updateTokenSync(db, { tokenId: av.tokenId, accountId: av.accountId, familyId: av.familyId }, parsed.patch, 'app');
 }
@@ -204,6 +204,17 @@ export interface AppKeepInput {
   /** 'manual' (a grown-up's one-off keep it / make it real / ready-to-buy link — the default, for older
    * app versions) or 'auto' (the app's sync queue, allowed only while keepsakes is proud or all). */
   trigger?: unknown;
+  /** The app's own id for the drawing (≤64, [A-Za-z0-9_-]): a repeat from the same family returns the
+   * keepsake already made from it (no duplicate after a retry). Optional. */
+  clientRef?: unknown;
+}
+
+const CLIENT_REF = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** absent → null; a valid ref → it; anything else → undefined (refused). */
+export function parseClientRef(raw: unknown): string | null | undefined {
+  if (raw === undefined || raw === null || raw === '') return null;
+  return typeof raw === 'string' && CLIENT_REF.test(raw) ? raw : undefined;
 }
 
 /** `manual` when absent (older app versions); anything but the two values is refused. */
@@ -225,7 +236,7 @@ export async function keepAppDrawing(
   av: AppViewer,
   input: AppKeepInput,
   opts: { env?: Record<string, string | undefined>; screening?: ScreeningOptions } = {},
-): Promise<{ assetId: string; kept: true }> {
+): Promise<{ assetId: string; kept: true; created: boolean }> {
   if (!appUploadsOpen(opts.env)) throw new AppApiError(403, 'not-yet');
   const trigger = parseTrigger(input.trigger);
   if (!trigger) throw new AppApiError(422, 'trigger');
@@ -239,6 +250,15 @@ export async function keepAppDrawing(
   if (!source) throw new AppApiError(422, 'source');
   const madeOn = validMadeOn(input.madeOn);
   if (!madeOn) throw new AppApiError(422, 'made-on');
+  const clientRef = parseClientRef(input.clientRef);
+  if (clientRef === undefined) throw new AppApiError(422, 'client-ref');
+  // the phone is retrying something it already sent: hand back the same keepsake, make nothing new
+  const already = async () =>
+    clientRef
+      ? (await db.select({ id: assets.id }).from(assets).where(and(eq(assets.familyId, av.familyId), eq(assets.appClientRef, clientRef))))[0]
+      : undefined;
+  const existing = await already();
+  if (existing) return { assetId: existing.id, kept: true, created: false };
   if (!input.image || typeof input.image.arrayBuffer !== 'function') throw new AppApiError(422, 'image');
   if (input.image.size > APP_UPLOAD_MAX_BYTES) throw new AppApiError(413, 'too-big');
   const buffer = Buffer.from(await input.image.arrayBuffer());
@@ -254,8 +274,16 @@ export async function keepAppDrawing(
     if (e instanceof AuthzError) throw new AppApiError(403, 'not-owner');
     throw new AppApiError(422, 'image'); // not an image sharp can read
   }
-  await db.update(assets).set({ source, madeOn }).where(eq(assets.id, assetId));
-  return { assetId, kept: true };
+  try {
+    await db.update(assets).set({ source, madeOn, appClientRef: clientRef }).where(eq(assets.id, assetId));
+  } catch (e) {
+    // two copies of the same retry raced: keep the first, really delete this one
+    const first = await already();
+    if (!first) throw e;
+    await deleteAsset(db, assetId, av.viewer).catch(() => {});
+    return { assetId: first.id, kept: true, created: false };
+  }
+  return { assetId, kept: true, created: true };
 }
 
 /** A keepsake THIS app sent, in the key's family — the only kind the app may touch (M6). */
