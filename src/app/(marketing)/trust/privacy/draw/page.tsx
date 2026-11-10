@@ -158,14 +158,16 @@ export default function DrawPrivacyNoticePage() {
           <li>
             <strong>Family birthdays and special days</strong> (unticked unless you tick it): the app&apos;s list and your
             family calendar on the website become one list: a name, what they are to you if you add it, birthday or
-            special day, and the day and month. Never a year. Everyone you share your family calendar with can see
-            them.
+            special day, and the day and month. Never a year. A date added in the app stays in your home (you, a
+            partner and grown-up children) — it&apos;s usually someone else&apos;s day, and it&apos;s theirs to share — until
+            you mark it as your own on the website and choose who else sees it. The app only gets the dates you can see,
+            and it can never share a date wider or change who sees it.
           </li>
         </ul>
         <p>Once linked, whatever you choose, the app can also:</p>
         <ul>
           <li>see your little ones&apos; first names, to file each drawing under the right one, and add a little one (first name only);</li>
-          <li>make a ready-to-buy link for a drawing it sent, or open our website when you want to make one real;</li>
+          <li>make a ready-to-buy link for a drawing it sent (we can&apos;t know who will open a link shared from your phone, so it only ever shows drawings you&apos;ve shared with your extended family), or open our website when you want to make one real;</li>
           <li>delete a drawing it sent;</li>
           <li>show your orders (a reference, the date and where it&apos;s got to) in the grown-ups&apos; corner.</li>
         </ul>
@@ -188,7 +190,8 @@ export default function DrawPrivacyNoticePage() {
             A drawing sent from the app is treated exactly like one you upload on the website: it&apos;s kept in private,
             encrypted storage in the UK, with any hidden photo details (like location) removed, and it goes through the
             same automatic safety checks. Until they&apos;re done, only you can see it, and it can&apos;t be shared or
-            printed. After that, your family on Snickerdoodle can see it in your keepsake box. If a check isn&apos;t
+            printed. After that, your family on Snickerdoodle can see it in your keepsake box, at the setting you choose
+            (it starts at family; you can keep it to your home, or to just you). If a check isn&apos;t
             sure about a drawing, one of the Snickerdoodle team may look at it before it can be shared or printed.
             That&apos;s rare, only a named person with two-step login can do it, they never see your name or your
             child&apos;s, and every look is logged. See section 4 of <a href="/trust/privacy">our website&apos;s privacy

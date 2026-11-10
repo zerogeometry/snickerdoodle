@@ -78,12 +78,24 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - NEVER TRUST THE CLIENT FOR VISIBILITY, PRICE, OR OWNERSHIP — resolve all three server-side.
 - Authz step 1 is the FAMILY-SCOPE check: deny unless the actor holds an ACTIVE membership in
   the resource's family (or is its uploader/controller). Only then evaluate tier × circle.
-- Tiers nest: ONLY_ME (controller) < FAMILY < EXTENDED; default FAMILY. A FAMILY-circle member
-  sees FAMILY and EXTENDED; an EXTENDED-circle member sees ONLY EXTENDED. Nothing public.
-- For a child's asset the CONTROLLING PARENT is the controller; "Only me" = that parent. Resolve
-  controllerAccountId on the asset; never key ONLY_ME on the uploader for a child's asset.
+- Tiers nest (D27): ONLY_ME < HOME < FAMILY < EXTENDED; default FAMILY. Circles HOME < FAMILY <
+  EXTENDED: a HOME member sees HOME, FAMILY and EXTENDED; FAMILY sees FAMILY and EXTENDED; EXTENDED
+  sees ONLY EXTENDED. HOME = the family leader (always home) + partner/co-parent + grown-up children
+  (ADULT_CHILD) — no other relationship may be home. Nothing public. One ladder: src/authz/tiers.ts.
+- Sharing is PERSON TO PERSON, never family to family: a grant is to one account; nobody in that
+  person's own family gets anything through them.
+- THE ORIGINATOR CONTROLS VISIBILITY (D27): whoever ADDED a keepsake chooses its tier, family leader
+  or not. For anything filed under a child, the child's CONTROLLING PARENT can always make it MORE
+  private or remove it — never wider (their narrowing is a ceiling, `parent_limit`, which they may lift
+  back up to the adder's choice). The adder and that parent always see it; "Only me" on a child's
+  keepsake someone else added = the adder + that parent. Resolve the adder (uploaderAccountId) and the
+  parent (controllerAccountId) on the asset; decide changes with planVisibilityChange().
+- Joining any circle (and moving into HOME) needs the joiner's own YES on the join card, stored on the
+  membership (src/lib/joinConsent.ts); never a silent join. Joining home = accepting that the family
+  leader is responsible for the family's keepsakes and data.
 - Circle = what you can see; Access (VIEW|VIEW_BUY|CONTRIBUTE) = what you can do. Orthogonal.
-- Invites are parent-initiated ONLY; a membership exists only from a VERIFIED invite. Verification
+- Invites are parent-initiated ONLY; a membership exists only from a VERIFIED invite the joiner said yes
+  to. The leader picks the circle at invite time (server-checked against the relationship). Verification
   confirms IDENTITY, not authorisation. Removal sets status and invalidates sessions immediately.
   Only ACTIVE memberships confer circle/access. Log invites/joins/access-changes/removals/
   visibility-changes/gift-link-create+revoke/deletions/consent-changes.
@@ -153,6 +165,8 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
   secret store only; .env never committed. Hashed passwords; least-privilege DB; ADMIN routes MFA.
   Webhooks verify signatures + are idempotent. Card data never stored (Stripe token only).
 - noindex on app/gift/checkout; gift-link tokens unguessable, non-indexed, revocable, expirable.
+  ONE gift link PER PERSON (D27): sent only to them, revocable on its own, showing only what that
+  person's circle may see (checked live); an open link carries the circle the parent picked.
 
 ## Accessibility
 - Semantic HTML + landmarks; every control labelled; keyboard operable; visible focus; ≥44px tap
