@@ -4,6 +4,29 @@ import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '
 import { toast, useUpload } from '@/lib/store';
 
 /**
+ * Make a keepsake the drawing in progress, so the usual create flow (the range, the basket) follows
+ * — from "start from a keepsake" or a keepsake's basket button at home. It's already kept, so the flow
+ * shows "kept ♥"; its first edit makes a NEW keepsake (forkPickedKeepsake below). The server gates the
+ * read (a member who can see it, short-lived links). False if it couldn't be opened.
+ */
+export async function openKeepsakeInFlow(assetId: string): Promise<boolean> {
+  const res = await keepsakeForStudioAction({ assetId });
+  if (!res.ok) return false;
+  const trim = res.trim;
+  useUpload.getState().setUpload({
+    dataUrl: res.dataUrl,
+    name: 'drawing.jpg',
+    key: `keepsake-${assetId}`,
+    assetId,
+    kept: true,
+    fromKeepsake: true,
+    aspect: res.aspect,
+    ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
+  });
+  return true;
+}
+
+/**
  * A keepsake picked from the box to make real again is edited as a NEW keepsake (founder, 27 Oct:
  * "save the edited variant … as a new keepsake, so we don't overwrite a keepsake previously saved").
  * Before its first edit (remove background on the create page, or opening the Studio) an exact copy
