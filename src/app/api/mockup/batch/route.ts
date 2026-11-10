@@ -52,7 +52,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<{ results: Mo
       const assetId = requestAssetId(b);
       if (!assetId) return { ok: false, fallback: true };
       const viewer = await viewerFor(assetId);
-      return composeForViewer(db, viewer, b, { needsAuth: account === null && viewer.uploadClaim == null, memo });
+      return composeForViewer(db, viewer, b, {
+        needsAuth: account === null && viewer.uploadClaim == null,
+        memo,
+        refreshViewer: () => resolveAssetViewer(db, assetId, account?.id ?? null, claims), // a draft kept mid-preview
+      });
     }),
   );
   return NextResponse.json({ results }, { headers: { 'cache-control': 'no-store' } });

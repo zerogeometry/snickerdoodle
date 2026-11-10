@@ -43,6 +43,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<MockupPreview
   ]);
   if (!gate.ok) return NextResponse.json({ ok: false, fallback: true }, { status: 429, headers: { 'retry-after': String(gate.retryAfterSec) } });
   const viewer = await resolveAssetViewer(db, assetId, account?.id ?? null, claims);
-  const res = await composeForViewer(db, viewer, body, { needsAuth: account === null && viewer.uploadClaim == null });
+  const res = await composeForViewer(db, viewer, body, {
+    needsAuth: account === null && viewer.uploadClaim == null,
+    refreshViewer: () => resolveAssetViewer(db, assetId, account?.id ?? null, claims), // a draft kept mid-preview
+  });
   return NextResponse.json(res, { headers: { 'cache-control': 'no-store' } });
 }
