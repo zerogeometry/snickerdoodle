@@ -156,9 +156,10 @@ export const families = pgTable('families', {
   ownerAccountId: uuid('owner_account_id')
     .notNull()
     .references(() => accounts.id),
-  /** "The days we celebrate": the festival groups this family marks (src/lib/occasions/festivals.ts).
+  /** "The days we celebrate": the festival groups this family marks (src/lib/occasions/catalogue.ts).
    * Private to the family; a calendar preference only — never used for marketing or segmentation
-   * (it can reveal religion / ethnicity: special-category data, DPIA). */
+   * (it can reveal religion / ethnicity: special-category data, DPIA). Old ids ("christmas", "easter")
+   * are mapped to today's groups on read — cleanCelebrate() in src/lib/occasions/catalogue.ts. */
   celebrate: jsonb('celebrate').$type<string[]>().notNull().default(sql`'["everyday","christmas"]'::jsonb`),
   createdAt,
 });

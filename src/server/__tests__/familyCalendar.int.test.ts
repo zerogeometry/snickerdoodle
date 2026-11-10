@@ -100,6 +100,22 @@ describe.skipIf(!DB)('the family calendar — who sees which dates', () => {
     expect(cal.some((e) => e.title === 'Christmas Day')).toBe(false); // no longer chosen
   });
 
+  it('a family that picked Easter (or Christmas) before the merge still gets every Christian holiday', async () => {
+    // written straight to the column, as an older version of the site stored it
+    await db.update(families).set({ celebrate: ['everyday', 'easter'] }).where(eq(families.id, ids.hartleyId));
+    const cal = await loadCalendar(db, ids.samId, ids.hartleyId, '2027-01-01', '2027-12-31');
+    const date = (t: string) => cal.find((e) => e.title === t)?.date;
+    expect(date('Easter Sunday')).toBe('2027-03-28');
+    expect(date('Shrove Tuesday')).toBe('2027-02-09');
+    expect(date('Christmas Day')).toBe('2027-12-25');
+    // the old default ('christmas') maps too — and saving writes the new id
+    await db.update(families).set({ celebrate: ['everyday', 'christmas'] }).where(eq(families.id, ids.hartleyId));
+    expect((await loadCalendar(db, ids.samId, ids.hartleyId, '2027-01-01', '2027-12-31')).some((e) => e.title === 'Easter Sunday')).toBe(true);
+    expect(await setCelebrate(db, ids.samId, ids.hartleyId, ['everyday', 'christmas'])).toBe(true);
+    const [f] = await db.select({ c: families.celebrate }).from(families).where(eq(families.id, ids.hartleyId));
+    expect(f!.c).toEqual(['everyday', 'christian']);
+  });
+
   it('reminders go to exactly who may see each date', async () => {
     const due = (await reminderCandidates(db, today, 31)).filter((c) => c.key.startsWith('occ:'));
     const who = (title: string) => due.filter((d) => d.title === title).map((d) => d.accountId).sort();
