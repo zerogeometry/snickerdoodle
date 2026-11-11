@@ -1,6 +1,6 @@
 import { test, expect, type Page } from './test';
 import { createHash } from 'node:crypto';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { allStudioTools, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * The Studio by finger AND by stylus (CLAUDE.md e2e list), on a phone: with the draw tool a finger
@@ -9,6 +9,7 @@ import { quietCookies, uploadAndOpenRange } from './helpers';
  */
 async function openStudio(page: Page) {
   await quietCookies(page);
+  await allStudioTools(page); // flip / draw are under "all tools"
   await uploadAndOpenRange(page);
   await expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
   await page.getByRole('button', { name: /edit in studio/i }).first().click();

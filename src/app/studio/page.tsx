@@ -39,7 +39,7 @@ import { AngleControl } from '@/ui/studio/AngleControl';
 import { CARD_FONTS, cardFontCss } from '@/lib/card-fonts';
 import { flipObjects, MAX_OBJECTS, MAX_TEXT_LENGTH, textureOf, TEXT_LINE_HEIGHT, type ShapeKind, type StudioObject, type TextObject } from '@/lib/studio-objects';
 import { IDENTITY_PLACE, normAngle, snapAngle, turnObjects, visualAngle, type Placement } from '@/lib/studio-geometry';
-import { toolById, type ToolId } from '@/ui/studio/tools';
+import { toolById, toolsInUse, type ToolId } from '@/ui/studio/tools';
 import { PanelHeader, Section, Segmented, SizeDot, SliderRow, Stack, ToggleRow } from '@/ui/studio/panel';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { forgetMockupsFor } from '@/lib/mockupPrefetch';
@@ -78,6 +78,8 @@ const ADDING: ToolId[] = ['draw', 'text', 'shapes', 'select'];
 const EDITING: ToolId[] = ['text', 'shapes', 'select'];
 /** The image tools — nothing to do on a blank canvas. */
 const IMAGE_ONLY: ToolId[] = ['removeBg', 'removeColour', 'erase', 'restore', 'compare'];
+/** Phones: these live off the tool bar (compare on the picture, start again by undo), so the bar fits one row. */
+const PHONE_ELSEWHERE: ToolId[] = ['compare', 'startAgain'];
 const newId = () => Math.random().toString(36).slice(2, 10);
 /** The drawing itself, as a selectable layer (once unlocked). */
 const DRAWING = '__drawing';
@@ -1260,6 +1262,11 @@ function StudioEditor() {
         <button type="button" onClick={redo} disabled={!redoStack.current.length} aria-label="redo" className="press flex h-11 w-11 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa disabled:opacity-40">
           <Icon icon={IconArrowForwardUp} size={18} />
         </button>
+        {/* phones: start again sits with undo + redo (up here, out of a stray thumb's way) — the bar keeps
+            its room for the tools; tablet/desktop keep it in the rail */}
+        <button type="button" onClick={() => onTool('startAgain')} aria-label="start again" className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-full border-2 border-cocoa bg-paper text-cocoa md:hidden">
+          <Icon icon={toolById('startAgain').icon} size={18} />
+        </button>
         <Button size="md" onClick={() => void save((saved) => backToRange(saved))} disabled={!!busy}>
           <Icon icon={IconCheck} size={16} /> done
         </Button>
@@ -1273,6 +1280,9 @@ function StudioEditor() {
           onTool={onTool}
           onHold={(id, down) => id === 'compare' && setComparing(down)}
           hidden={[...(scratch ? IMAGE_ONLY : []), ...(festive ? [] : ['christmas' as const])]}
+          scratch={scratch}
+          reach={toolsInUse(objects)}
+          phoneElsewhere={PHONE_ELSEWHERE}
           tray={tray}
           trayKey={tool ?? undefined}
         />
@@ -1364,6 +1374,24 @@ function StudioEditor() {
               <Icon icon={IconMinus} size={17} />
             </button>
           </div>
+          {/* phones: compare floats on the picture, under zoom — press and hold to see the original */}
+          {!scratch ? (
+            <button
+              type="button"
+              aria-label="compare — hold to see your original"
+              aria-pressed={comparing}
+              onPointerDown={() => setComparing(true)}
+              onPointerUp={() => setComparing(false)}
+              onPointerLeave={() => setComparing(false)}
+              onPointerCancel={() => setComparing(false)}
+              onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && setComparing(true)}
+              onKeyUp={() => setComparing(false)}
+              onContextMenu={(e) => e.preventDefault()}
+              className={`press absolute right-2.5 top-[176px] flex h-11 w-11 touch-none select-none items-center justify-center rounded-full md:hidden ${comparing ? 'bg-cocoa text-paper' : 'studio-glass text-cocoa'}`}
+            >
+              <Icon icon={toolById('compare').icon} size={18} />
+            </button>
+          ) : null}
         </div>
 
         {/* options: the frosted row over the picture on phones (tray, above); a side panel on bigger screens */}

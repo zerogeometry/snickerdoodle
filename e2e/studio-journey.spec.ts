@@ -1,5 +1,5 @@
 import { test, expect } from './test';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { allStudioTools, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * create → studio → basket: an edit made in the Studio is what the range previews and what
@@ -9,6 +9,7 @@ test('studio journey: upload → studio edit → done → the range shows the ed
   const pageErrors: string[] = [];
   page.on('pageerror', (e) => pageErrors.push(String(e)));
   await quietCookies(page);
+  await allStudioTools(page); // flip / draw are under "all tools"
   await uploadAndOpenRange(page);
 
   const framePreview = page.locator('img[alt="your drawing on a framedPrint"]').first();

@@ -208,3 +208,55 @@ export const TOOLS: ToolDef[] = [
 ];
 
 export const toolById = (id: ToolId) => TOOLS.find((t) => t.id === id)!;
+
+/**
+ * "fewer tools" / "all tools" (founder, 11 Nov). Fewer is the default: the everyday edits — lift it
+ * off the paper, take a colour away, rub a smudge out, add a name, a festive touch, a background
+ * colour — and they fit one row on a phone with no swiping. "all tools" adds the rest. Compare and
+ * start again are safety actions: never hidden by the choice. The choice is remembered per device.
+ */
+export type ToolSet = 'fewer' | 'all';
+export const TOOL_SET_KEY = 'snickerdoodle.studio.tool-set';
+
+/** A photo or drawing: the everyday edits. Bring back is one tap away inside eraser + remove background. */
+export const FEWER_TOOLS: readonly ToolId[] = ['removeBg', 'removeColour', 'erase', 'text', 'christmas', 'background'];
+/** A blank canvas has nothing to cut out — drawing and shapes are its everyday tools. */
+export const FEWER_TOOLS_BLANK: readonly ToolId[] = ['draw', 'text', 'shapes', 'christmas', 'background'];
+/** Shown whatever the choice. */
+export const SAFETY_TOOLS: readonly ToolId[] = ['compare', 'startAgain'];
+
+/** Tools a design already USES — so a design with drawing, shapes or stickers opens with them reachable. */
+export function toolsInUse(objects: readonly { type: string }[]): ToolId[] {
+  const out = new Set<ToolId>();
+  for (const o of objects) {
+    if (o.type === 'stroke') out.add('draw');
+    if (o.type === 'shape') out.add('shapes');
+    // anything but words is moved / sized / turned in layers (words are changed with add text)
+    if (o.type !== 'text') out.add('select');
+  }
+  return [...out];
+}
+
+/**
+ * Which tools the toolbar shows. `reach` = tools that must be on show even with fewer tools: the one
+ * in use, ones opened by a shortcut or a "switch to" button, and the ones the design already uses.
+ */
+export function shownTools(set: ToolSet, { scratch, reach = [] }: { scratch: boolean; reach?: readonly (ToolId | null | undefined)[] }): Set<ToolId> {
+  if (set === 'all') return new Set(TOOLS.map((t) => t.id));
+  return new Set<ToolId>([...(scratch ? FEWER_TOOLS_BLANK : FEWER_TOOLS), ...SAFETY_TOOLS, ...reach.filter((t): t is ToolId => !!t)]);
+}
+
+export function readToolSet(): ToolSet {
+  try {
+    return localStorage.getItem(TOOL_SET_KEY) === 'all' ? 'all' : 'fewer';
+  } catch {
+    return 'fewer'; // private mode / storage blocked
+  }
+}
+export function storeToolSet(set: ToolSet): void {
+  try {
+    localStorage.setItem(TOOL_SET_KEY, set);
+  } catch {
+    /* fine — it just isn't remembered */
+  }
+}

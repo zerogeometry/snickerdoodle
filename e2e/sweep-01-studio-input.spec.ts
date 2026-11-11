@@ -1,6 +1,7 @@
 import { test, expect, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { STAGE, derivatives, openStudioFromCreate, resetRateLimits, stageHash } from './sweep-01-helpers';
+import { allStudioTools } from './helpers';
 
 /**
  * Test sweep 29 Oct — tester 01: the Studio by finger on a phone (taps, the options row, a two-finger
@@ -27,6 +28,7 @@ async function pinchOut(page: Page) {
 }
 
 test.describe('phone, by finger', () => {
+  test.beforeEach(async ({ page }) => allStudioTools(page));
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   test('taps: flip and a quarter turn from the options row; a pinch zooms and is not an edit; a pinch mid-line drops the line', async ({ page }) => {
@@ -90,7 +92,7 @@ test.describe('phone, by finger', () => {
       const bb = await b.boundingBox();
       if (bb && bb.width > 0) expect(Math.min(bb.width, bb.height), `${await b.getAttribute('aria-label')} is a 44px target`).toBeGreaterThanOrEqual(44);
     }
-    for (const name of ['undo', 'redo', 'zoom in', 'zoom out', 'fit to screen', 'back to your collection']) {
+    for (const name of ['undo', 'redo', 'start again', 'compare — hold to see your original', 'zoom in', 'zoom out', 'fit to screen', 'back to your collection']) {
       const bb = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
       expect(Math.min(bb.width, bb.height), `${name} is a 44px target`).toBeGreaterThanOrEqual(44);
     }
@@ -106,7 +108,8 @@ test.describe('desktop, by keyboard', () => {
     await openStudioFromCreate(page);
     await page.mouse.move(2, 2);
 
-    // tool keys select their tool
+    // tool keys select their tool — on "fewer tools" (the default) too: a key opens a tool that's tucked
+    // away under "all tools", and its button comes onto the toolbar
     for (const [key, label] of [['f', 'flip'], ['x', 'crop'], ['r', 'rotate'], ['p', 'draw'], ['h', 'shapes'], ['l', 'layers'], ['e', 'eraser'], ['b', 'bring back'], ['c', 'remove colour']] as const) {
       await page.keyboard.press(key);
       await expect(tool(page, label), `${key} picks ${label}`).toHaveAttribute('aria-pressed', 'true');
@@ -159,6 +162,7 @@ test.describe('desktop, by keyboard', () => {
   });
 
   test('the Studio’s own remove background: runs on picking the tool, undo takes it away, and saving then leaves nothing see-through', async ({ page }) => {
+    await allStudioTools(page); // it flips the drawing too (an "all tools" tool)
     test.setTimeout(300_000);
     await openStudioFromCreate(page);
     const assetId = (await page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_upload') ?? 'null')?.state?.upload?.assetId)) as string;
@@ -179,6 +183,7 @@ test.describe('desktop, by keyboard', () => {
 });
 
 test.describe('bugs found in the sweep (fixed)', () => {
+  test.beforeEach(async ({ page }) => allStudioTools(page));
   test.use({ viewport: { width: 1280, height: 800 } });
 
   test('01-B5: axe — the Studio editor is the <main> landmark, so the skip link has a target (region, skip-link)', async ({ page }) => {
