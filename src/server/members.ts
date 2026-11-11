@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, sql } from 'drizzle-orm';
 import { accounts, auditRecords, families, invites, memberships, sessions } from '@/db/schema';
 import { AuthzError, canManageFamily, type ViewerContext } from '@/authz';
 import type { AccessLevel, Circle } from '@/domain/types';
@@ -130,7 +130,7 @@ export async function setMemberAccess(
   // into home: ask them; their own yes moves them (nothing changes here yet)
   let homeAsked = false;
   if (input.circle === 'HOME' && before.circle !== 'HOME') {
-    await askIntoHome(db, ownerId, input.familyId, before.id, input.memberAccountId, input.accessLevel ?? before.accessLevel);
+    await askIntoHome(db, { by: 'leader', ownerId }, input.familyId, before.id, input.memberAccountId, input.accessLevel ?? before.accessLevel);
     homeAsked = true;
     input = { ...input, circle: undefined };
     if (input.accessLevel === undefined) return { ok: true, homeAsked };
@@ -178,7 +178,15 @@ export async function setMemberAccess(
  * home circle. Any earlier one still waiting is replaced. Audited as an invite; the move itself is audited when they
  * say yes.
  */
-async function askIntoHome(db: DbHandle, ownerId: string, familyId: string, membershipId: string, memberAccountId: string, accessLevel: AccessLevel) {
+async function askIntoHome(
+  db: DbHandle,
+  asker: { by: 'leader' | 'go-live'; ownerId: string },
+  familyId: string,
+  membershipId: string,
+  memberAccountId: string,
+  accessLevel: AccessLevel,
+) {
+  const ownerId = asker.ownerId;
   const [member] = await db.select({ email: accounts.email, name: accounts.displayName }).from(accounts).where(eq(accounts.id, memberAccountId));
   if (!member) return;
   const [m] = await db.select({ relationship: memberships.relationship, seesOccasions: memberships.seesOccasions }).from(memberships).where(eq(memberships.id, membershipId));
@@ -205,19 +213,46 @@ async function askIntoHome(db: DbHandle, ownerId: string, familyId: string, memb
     .returning({ id: invites.id });
   await db.insert(auditRecords).values({
     familyId,
-    actorAccountId: ownerId,
-    actorType: 'MEMBER',
+    actorAccountId: asker.by === 'leader' ? ownerId : null,
+    actorType: asker.by === 'leader' ? 'MEMBER' : 'SYSTEM',
     event: 'INVITE_SENT',
     targetType: 'invite',
     targetId: invite!.id,
-    metadata: { kind: 'move-into-home', member: memberAccountId },
+    metadata: { kind: 'move-into-home', member: memberAccountId, ...(asker.by === 'go-live' ? { reason: 'D27: home circle launched — partners and grown-up children asked in' } : {}) },
   });
   const [owner] = await db.select({ name: accounts.displayName }).from(accounts).where(eq(accounts.id, ownerId));
   try {
-    await sendMail(moveIntoHomeEmail({ to: member.email, token, inviterName: owner?.name ?? null, memberName: member.name }));
+    await sendMail(moveIntoHomeEmail({ to: member.email, token, inviterName: owner?.name ?? null, memberName: member.name, newCircle: asker.by === 'go-live' }));
   } catch (e) {
     console.error('[members] the move-into-home email failed', e instanceof Error ? e.message : e);
   }
+}
+
+/**
+ * The home circle's go-live step (founder, 10 Nov 2026): partners / co-parents and grown-up children already in a
+ * family (they joined before home existed, so they sit in family or extended) are each ASKED into home — the same
+ * "move into the home" link and yes card as the leader's own ask; they move only when they say yes (joining home
+ * means agreeing that the leader looks after the family's keepsakes and details). Each membership is asked ONCE,
+ * ever: anyone already asked (answered, ignored or cancelled) is skipped, so this is safe to run on every deploy.
+ * Their move is audited when they say yes (MEMBERSHIP_CIRCLE_CHANGED); each ask is audited as a system INVITE_SENT.
+ */
+export async function askPartnersIntoHome(db: DbHandle, opts: { familyIds?: string[] } = {}): Promise<{ asked: number }> {
+  const rows = await db
+    .select({ id: memberships.id, familyId: memberships.familyId, accountId: memberships.accountId, accessLevel: memberships.accessLevel, ownerId: families.ownerAccountId })
+    .from(memberships)
+    .innerJoin(families, eq(families.id, memberships.familyId))
+    .where(
+      and(
+        eq(memberships.status, 'ACTIVE'),
+        eq(memberships.isOwner, false),
+        inArray(memberships.relationship, ['PARENT', 'ADULT_CHILD']),
+        ne(memberships.circle, 'HOME'),
+        sql`NOT EXISTS (SELECT 1 FROM ${invites} i WHERE i.membership_id = ${memberships.id})`,
+        opts.familyIds ? inArray(memberships.familyId, opts.familyIds) : undefined,
+      ),
+    );
+  for (const r of rows) await askIntoHome(db, { by: 'go-live', ownerId: r.ownerId }, r.familyId, r.id, r.accountId, r.accessLevel);
+  return { asked: rows.length };
 }
 
 /** Is a "move into the home" ask still waiting for this member? (the member's card says so) */

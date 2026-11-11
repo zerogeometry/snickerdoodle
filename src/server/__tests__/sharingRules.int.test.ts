@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { accounts, assets, giftLinks, invites, memberships, occasions } from '@/db/schema';
+import { accounts, assets, auditRecords, giftLinks, invites, memberships, occasions } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, canViewAsset } from '@/authz';
 import { changeAssetVisibility, resolveViewerContext } from '@/server/assets';
@@ -12,7 +12,7 @@ import { assetRefOf } from '@/server/assetRef';
 import { createGiftLink, getGiftLink, giftLinkPreview, revokeGiftLink, sendGiftLinks } from '@/server/giftLinks';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { acceptInvite, createInvite, NotInvitableError, setMemberSeesOccasions } from '@/server/invites';
-import { removeMember, setMemberAccess } from '@/server/members';
+import { askPartnersIntoHome, removeMember, setMemberAccess } from '@/server/members';
 import { addOccasion, loadCalendar, occasionsFor, reminderCandidates, updateOccasion } from '@/server/occasions';
 import { addAppOccasion, listAppOccasions, updateAppOccasion } from '@/server/app/occasions';
 import type { AppViewer } from '@/server/app/appAuth';
@@ -206,6 +206,32 @@ describe.skipIf(!DB || !S3)('D27 sharing rules — integration', () => {
       expect(row!.circle).toBe('FAMILY');
       const kid = await createInvite(db, sam, { familyId: ids.hartleyId, email: `ak-${ids.nonce}@example.test`, relationship: 'ADULT_CHILD', accessLevel: 'VIEW' });
       expect((await db.select().from(invites).where(eq(invites.id, kid.inviteId)))[0]!.circle).toBe('HOME');
+    });
+
+    it('go-live: a partner who joined before home existed is ASKED in once (never moved without their yes); grandparents aren’t', async () => {
+      const sam = await as(ids.samId);
+      const wife = await newAccount('wife');
+      const inv = await createInvite(db, sam, { familyId: ids.hartleyId, email: wife.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE', circle: 'FAMILY' });
+      expect((await acceptInvite(db, wife, inv.token, YES)).ok).toBe(true); // in the family circle, as before home
+      const mine = async () => (await db.select().from(memberships).where(and(eq(memberships.accountId, wife.id), eq(memberships.familyId, ids.hartleyId))))[0]!;
+
+      const first = await askPartnersIntoHome(db, { familyIds: [ids.hartleyId] });
+      expect(first.asked).toBeGreaterThanOrEqual(1);
+      expect((await mine()).circle).toBe('FAMILY'); // nothing moves until she says yes
+      const asks = await db.select().from(invites).where(eq(invites.membershipId, (await mine()).id));
+      expect(asks).toHaveLength(1);
+      expect(asks[0]).toMatchObject({ circle: 'HOME', status: 'PENDING', email: wife.email });
+      const [audit] = await db.select().from(auditRecords).where(and(eq(auditRecords.targetId, asks[0]!.id), eq(auditRecords.event, 'INVITE_SENT')));
+      expect(audit).toMatchObject({ actorType: 'SYSTEM', actorAccountId: null });
+      // Rosie (a grandparent) is never asked into home
+      const [rosieM] = await db.select().from(memberships).where(and(eq(memberships.accountId, ids.rosieId), eq(memberships.familyId, ids.hartleyId), eq(memberships.status, 'ACTIVE')));
+      expect(await db.select().from(invites).where(eq(invites.membershipId, rosieM!.id))).toHaveLength(0);
+
+      // once, ever: running it again (every deploy) asks nobody new
+      expect((await askPartnersIntoHome(db, { familyIds: [ids.hartleyId] })).asked).toBe(0);
+      // her yes moves her, with the wording she said yes to
+      expect((await acceptInvite(db, wife, asks[0]!.token, YES)).ok).toBe(true);
+      expect(await mine()).toMatchObject({ circle: 'HOME', joinConsentVersion: JOIN_CONSENT_VERSION });
     });
 
     it('moving Jo into home waits for Jo’s own yes; a grandparent can’t be moved into home', async () => {

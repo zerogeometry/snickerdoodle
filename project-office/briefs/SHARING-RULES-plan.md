@@ -127,7 +127,11 @@ The flow turns around: **pick the keepsakes → pick the people → we make a se
 
 ## 9. What changes for data already there (all on the private side)
 
-- **Partners already in the family circle** stay there. Nobody is moved into home without their own yes.
+- **Partners and grown-up children already in a family** (founder, 10–11 Nov: "when I'm adding my nuclear family, they
+  need to go into home so we're all together") are each **asked into home at go-live**: the deploy runs
+  `job.sh ask-partners-home`, which emails each one the "move into the home" link with the yes card. They move the moment
+  they say yes (audited), and each person is asked once, ever. Nobody is moved without their own yes (founder's choice,
+  11 Nov). New invites for a parent / partner or grown-up child already start in home.
 - **Little ones' keepsakes a relative added:** the parent's current setting becomes the ceiling. The relative can narrow it but never widen past what the parent chose.
   *One widening:* a relative who added a keepsake the parent set to "only me" will now see their own upload again. Probably zero
   of these exist on the live site; the founder can check with `select count(*) from assets where child_subject_id is not null and uploader_account_id <> controller_account_id and visibility = 'ONLY_ME';`.

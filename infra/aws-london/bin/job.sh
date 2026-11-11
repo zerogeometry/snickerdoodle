@@ -4,6 +4,7 @@
 #   sudo job.sh seed-mockups                 # after copying new Prodigi blanks (runbook §4.6)
 #   sudo job.sh seed-catalogue
 #   sudo job.sh retention
+#   sudo job.sh ask-partners-home            # D27: ask partners / grown-up children into home (deploy runs it)
 #   sudo job.sh 'reapply-erasures?since=2026-10-23T02:30:00Z'   # normally done by restore-db.sh
 source "$(dirname "$0")/lib.sh"
 need_root
