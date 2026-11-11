@@ -3,7 +3,7 @@ import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joi
 import { formatPence } from './format';
 import { evaluatePromo, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
-import { isBundleKey } from '@/lib/christmas-bundle';
+import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
 import { economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
 
@@ -198,12 +198,19 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   let finalParcel = parcelSavingPence;
   let finalMultiBuy = multiBuySavingPence;
   if (opts.promo && lines.length > 0) {
+    // A code that only tags the order for a partner (no discount, e.g. a school's code) never lowers
+    // a price, so it may count the bundle too (founder, 11 Nov 2026).
+    const commissionOnly = opts.promo.kind !== 'FREE_CARD' && opts.promo.value === 0;
     const outcome = evaluatePromo(
       opts.promo,
       lines.map((l) => {
-        // The bundle is already the founder's set price — it never takes a code on top (cost
-        // unknown ⇒ left out of the code; the rest of the basket still can).
-        if (isBundleKey(l.productKey)) return { linePence: l.linePence, lineCostPence: null };
+        if (isBundleKey(l.productKey)) {
+          // The bundle is already the founder's set price: no discount code ever comes off it (left
+          // out of the code; the rest of the basket still can). A commission-only code counts it at
+          // its real cost, so the partner earns its share and the margin guard still holds.
+          const size = bundleSizeOf(l.productKey);
+          return { linePence: l.linePence, lineCostPence: commissionOnly && size !== null ? bundleCostPence(size) * l.qty : null };
+        }
         const cost = catalogue[l.productKey]?.unitCostPence;
         return {
           linePence: l.linePence,

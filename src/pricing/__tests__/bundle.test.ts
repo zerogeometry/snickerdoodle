@@ -48,6 +48,37 @@ describe('pricing — the christmas family bundle', () => {
     expect(mixed.promoSavingPence).toBe(650); // 10% of the frame only
   });
 
+  // A school's code (founder, 11 Nov 2026): no discount, a share of every order — the bundle included.
+  const school = rule({ code: 'DOWNS', value: 0, commissionBps: 1000 });
+
+  it('a school code earns its 10% on a bundle-only order — the price never moves', () => {
+    const q = quote([{ productKey: 'christmasBundle', qty: 1, bundle: bundle() }], { catalogue: CAT, promo: school });
+    expect(q.promo).toMatchObject({ code: 'DOWNS', applied: true, capped: false });
+    expect(q.promoSavingPence).toBe(0);
+    expect(q.totalPence).toBe(7800);
+    expect(q.partnerCommissionPence).toBe(650); // 10% of £78 before VAT (£65)
+    const big = quote([{ productKey: 'christmasBundle-for8', qty: 1, bundle: bundle() }], { catalogue: CAT, promo: school });
+    expect(big.totalPence).toBe(27900);
+    expect(big.partnerCommissionPence).toBe(2325); // 10% of £232.50
+  });
+
+  it('a school code counts the bundle alongside the rest of the basket', () => {
+    const cat = { ...CAT, framedPrint: { pricePence: 6500, label: 'framed print', unitCostPence: 3785 } };
+    const q = quote([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }, { productKey: 'framedPrint', qty: 1 }], { catalogue: cat, promo: school });
+    expect(q.promoSavingPence).toBe(0);
+    expect(q.totalPence).toBe(14500 + 6500);
+    expect(q.partnerCommissionPence).toBe(1750); // 10% of £210 before VAT (£175)
+  });
+
+  it('a code that gives a discount still never touches the bundle, nor earns on it', () => {
+    const influencer = rule({ code: 'SARAHMAKES', value: 1000, commissionBps: 500 });
+    const q = quote([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }], { catalogue: CAT, promo: influencer });
+    expect(q.promo).toMatchObject({ applied: false, reason: 'nothing-eligible' });
+    expect(q.promoSavingPence).toBe(0);
+    expect(q.partnerCommissionPence).toBe(0);
+    expect(q.totalPence).toBe(14500);
+  });
+
   it('on its own: no same-parcel saving (its price counts its parcel) and never multi-buy', () => {
     const q = priceBasket([{ productKey: 'christmasBundle-for4', qty: 1, bundle: bundle() }], { catalogue: CAT });
     expect(q.parcelSavingPence).toBe(0);
