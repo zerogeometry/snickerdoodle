@@ -4,12 +4,16 @@ import sharp from 'sharp';
 import { test, expect, type Browser, type Page } from './test';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { artwork, quietCookies, uploadAndOpenRange } from './helpers';
+import { makeOpenGiftLink, openGiftSheetWho, sayYesToJoin, sendGiftLinkTo, shareNewestWithExtended } from './d27';
 
 /**
  * Test sweep 2026-10-29, tester 06 — gifts & sharing. Pins what a STRANGER holding a gift link can
  * and can't reach (only that link's own gift), the link's life-cycle (revoke / expiry / deleted
  * source / report → the real review-and-erase path), buying from it (guest, and the join loop),
  * the frozen snapshot, and Share-a-Wish. Builds on e2e/gift-loop.spec.ts.
+ * D27 (founder, 10 Nov 2026): one link PER PERSON, each showing only what that person's circle may see. A plain
+ * "forwarded" link here is an OPEN link the parent made for the family circle (founder answer C: the parent picks
+ * who an open link is for); an invite link is the invitee's OWN, bound to their address.
  * Report: reports/test-sweep-2026-10-29/06-gifts-sharing.md
  */
 test.skip(!hasDb, 'needs DATABASE_URL + AUTH_SECRET (the local test database) to sign people in');
@@ -40,7 +44,9 @@ async function keepADrawing(page: Page, art?: Buffer): Promise<string> {
 
 /**
  * A parent signs in, keeps a drawing (and optionally a second one that is NOT shared), and makes a
- * gift request on /home for the first. Returns the link path + ids for probing.
+ * gift request on /home for the first: an open link for the family circle, or — with `invite` — the
+ * invitee's own link (a grandparent: extended, so the drawing is shared with extended first). Returns
+ * the link path + ids for probing.
  */
 async function parentMakesGiftLink(page: Page, opts: { invite?: { email: string }; extraKept?: boolean } = {}) {
   const parent = testEmail('parent');
@@ -54,23 +60,16 @@ async function parentMakesGiftLink(page: Page, opts: { invite?: { email: string 
   const sharedAssetId = await keepADrawing(page);
   await clearForTest(parent);
 
-  await page.goto('/home');
-  await page.getByRole('button', { name: /create a gift request/ }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
+  let path: string;
   if (opts.invite) {
-    await dialog.getByRole('switch', { name: 'Also invite them to join the family' }).click();
-    await dialog.getByPlaceholder('their email').fill(opts.invite.email);
-    await dialog.getByRole('group', { name: 'their relationship' }).getByRole('button', { name: 'Grandparent' }).click();
+    await shareNewestWithExtended(page);
+    path = await sendGiftLinkTo(page, opts.invite.email, { invite: 'Grandparent' });
+  } else {
+    path = await makeOpenGiftLink(page, 'family');
   }
-  await dialog.getByRole('button', { name: 'create gift request' }).click();
-  const shown = dialog.getByText(/\/g\/[A-Za-z0-9_-]+/);
-  await expect(shown).toBeVisible({ timeout: 30_000 });
-  const path = /\/g\/[A-Za-z0-9_-]+/.exec((await shown.textContent()) ?? '')![0];
   const token = path.split('/').pop()!;
   const [link] = await sql()`select id, family_id, items, expires_at, created_at from gift_links where token = ${token}`;
   const items = link!.items as { assetId: string }[];
-  await page.keyboard.press('Escape');
   return { parent, path, token, linkId: link!.id as string, familyId: link!.family_id as string, items, sharedAssetId, otherAssetId, link: link! };
 }
 
@@ -359,7 +358,7 @@ test('06: report from a gift link → list offline at once → admin (two-step l
   // This server has no screening set up, so the upload was held as "screening-not-configured" (the
   // test then stood in for a reviewer and set it CLEAR). Its CSAM hash check never ran, so after the
   // report it can only be removed — never looked at or cleared (08-B7).
-  await expect(item).toContainText('can’t be looked at or cleared — only removed');
+  await expect(item).toContainText(/can’t be looked at or cleared[,—] only removed/);
   await expect(item.getByRole('button', { name: 'look' })).toHaveCount(0);
   await admin.screenshot({ path: `${SHOTS}/admin-review-reported-desktop.png`, fullPage: true });
   await item.getByRole('button', { name: 'remove' }).click();
@@ -414,19 +413,11 @@ test('06: a saved design ("+ keepsake" on a mug) shared as a link sells EXACTLY 
   const [design] = await sql()`select d.id, d.variant_sku, d.transform from saved_designs d join accounts a on a.id = d.created_by_account_id where a.email = ${parent}`;
   expect(design).toBeTruthy();
 
-  await page.goto('/home');
-  await page.getByRole('button', { name: /create a gift request/ }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'create gift request' }).click(); // saved designs come pre-ticked
-  const shown = dialog.getByText(/\/g\/[A-Za-z0-9_-]+/);
-  await expect(shown).toBeVisible({ timeout: 30_000 });
-  const path = /\/g\/[A-Za-z0-9_-]+/.exec((await shown.textContent()) ?? '')![0];
-
-  // step 2: send it by email — the console mailer prints it; only the link goes out, no picture
-  await dialog.getByPlaceholder('granny@example.com, uncle@example.com').fill('e2e-auntie@example.test');
-  await dialog.getByRole('button', { name: /send gift request/ }).click();
-  await expect(page.getByText(/sent to 1 person/)).toBeVisible({ timeout: 15_000 });
-  await page.keyboard.press('Escape');
+  // send it by email (saved designs come pre-ticked) — her OWN link (D27), emailed only to her; only the link goes
+  // out, no picture. Someone not in the family is extended, so the drawing is shared with extended first.
+  await shareNewestWithExtended(page);
+  const auntie = testEmail('auntie');
+  const path = await sendGiftLinkTo(page, auntie);
 
   const token = path.split('/').pop()!;
   const [link] = await sql()`select id, items from gift_links where token = ${token}`;
@@ -466,6 +457,7 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   await expect(granny).toHaveURL(/\/join\//);
   const joinUrl = new URL(granny.url());
   await signInByEmailLink(granny, grannyEmail, joinUrl.pathname + joinUrl.search);
+  await sayYesToJoin(granny); // D27: never a silent join
   await expect(granny).toHaveURL(new RegExp(`${g.path}$`));
   await expect(granny.getByText('welcome to the family — your 5% is applied')).toBeVisible();
   const [m] = await sql()`select m.status, m.circle, m.access_level from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail} and m.family_id = ${g.familyId}`;
@@ -483,13 +475,15 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   expect(o!.status).toBe('PAID'); // local "mark paid" (Stripe key blanked on this server)
 
   // a SECOND gift link from the same family: the one-time saving is spent
-  await page.goto('/home');
-  await page.getByRole('button', { name: /create a gift request/ }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'create gift request' }).click();
-  const shown = dialog.getByText(/\/g\/[A-Za-z0-9_-]+/);
-  await expect(shown).toBeVisible({ timeout: 30_000 });
-  const path2 = /\/g\/[A-Za-z0-9_-]+/.exec((await shown.textContent()) ?? '')![0];
+  const sheet = await openGiftSheetWho(page);
+  // she's family now (the only other member): her own member link
+  await sheet.getByRole('group', { name: 'family members to send it to' }).getByRole('button').first().click();
+  await sheet.getByRole('button', { name: /^send their link$/ }).click();
+  await expect(sheet.getByText('sent to 1 person')).toBeVisible({ timeout: 30_000 });
+  await sheet.getByRole('button', { name: 'done' }).click();
+  const [l2] = await sql()`select g.token, g.audience_circle from gift_links g join accounts a on a.id = g.recipient_account_id where a.email = ${grannyEmail} order by g.created_at desc limit 1`;
+  expect(l2!.audience_circle).toBe('EXTENDED'); // her circle
+  const path2 = `/g/${l2!.token as string}`;
   await granny.goto(path2);
   // 06-B: a signed-in family member is offered "checkout as guest" once their saving is spent (label keys on the saving, not on being signed in)
   await expect(granny.getByRole('button', { name: /^checkout( as guest)?$/ })).toBeVisible();
@@ -519,6 +513,13 @@ test('06: Share a Wish — basket → who is it for → signed-out parent signs 
   await page.setViewportSize(PHONE);
   await quietCookies(page);
   await uploadAndOpenRange(page);
+  // the stand-in reviewer clears THIS test drawing at once (no real screening on the e2e server) — before the
+  // "we've paused this picture" notice would come up for an unchecked upload
+  const uploaded = await expect
+    .poll(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_upload') ?? '{}').state?.upload?.assetId ?? null), { timeout: 15_000 })
+    .not.toBeNull()
+    .then(() => page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_upload') ?? '{}').state.upload.assetId as string));
+  await sql()`update assets set moderation_status = 'CLEAR' where id = ${uploaded}`;
   await page.getByRole('button', { name: 'customize doodle socks', exact: true }).click();
   await expect(page).toHaveURL(/\/customize\/socks/);
   await expect(page.locator('img[alt="your drawing on a socks"]').first()).toBeVisible({ timeout: 60_000 });
@@ -538,10 +539,16 @@ test('06: Share a Wish — basket → who is it for → signed-out parent signs 
   // sign up by the magic link, back to /share-wish (the basket survives the round-trip)
   const parent = testEmail('wisher');
   await signInByEmailLink(page, parent, '/share-wish');
+  // D27 (founder answer C): we can't know who opens a shared link — the parent picks who it's for. A new keepsake
+  // starts at family, so a wish for the family needs nothing widened.
+  await expect(page.getByRole('heading', { name: 'Who’s it for?' })).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('group', { name: 'who the link is for' }).getByRole('button', { name: 'family', exact: true }).click();
+  await page.getByRole('button', { name: /^make my link$/ }).click();
   await expect(page.getByRole('heading', { name: 'Mia’s wish is ready ✦' })).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}/wish-ready-phone.png`, fullPage: true });
-  const [link] = await sql()`select g.token, g.title, g.items from gift_links g join accounts a on a.id = g.created_by_account_id where a.email = ${parent}`;
+  const [link] = await sql()`select g.token, g.title, g.items, g.audience_circle from gift_links g join accounts a on a.id = g.created_by_account_id where a.email = ${parent}`;
   expect(link!.title).toBe('Mia’s wishlist');
+  expect(link!.audience_circle).toBe('FAMILY'); // the circle the parent picked
   const items = link!.items as { assetId: string; productKey: string; label: string }[];
   expect(items.map((i) => i.assetId)).toEqual([assetId]);
   test.info().annotations.push({ type: '06-B-wish-product', description: `basket held socks; the wish link sells: ${items.map((i) => `${i.productKey} (${i.label})`).join(', ')}` });

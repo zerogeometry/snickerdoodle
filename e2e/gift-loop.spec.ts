@@ -2,13 +2,16 @@ import { test, expect, type Browser, type Page } from './test';
 import { expectAccessible } from './a11y';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
+import { makeOpenGiftLink, sayYesToJoin, sendGiftLinkTo, shareNewestWithExtended } from './d27';
 
 /**
  * The gift loop (CLAUDE.md e2e list): a parent keeps a drawing and makes a ready-to-buy gift link;
- *  - a grandparent buys from it as a GUEST — no account, one tap;
- *  - or the link carries an INVITE: they join the family (verify by the email link → an ACTIVE
- *    membership at the circle/access the parent set) and check out with the 5% family saving,
- *    priced by the server.
+ *  - a grandparent buys from it as a GUEST — no account, one tap (an open link the parent made for the family circle:
+ *    D27, founder answer C — the parent picks who an open link is for);
+ *  - or the link is GRANNY'S OWN (D27: one link per person) and carries an INVITE bound to her address: she joins the
+ *    family (verify by the email link → says yes on the join card → an ACTIVE membership at the circle/access the
+ *    parent set) and checks out with the 5% family saving, priced by the server. Grandparents are extended family, so
+ *    the parent shares the drawing with the extended family first — her link shows only what her circle may see.
  * Signing in uses the real email-link callback (e2e/harness.ts); the one stand-in is the content
  * review, which holds every upload on a server without real screening (as production would).
  */
@@ -25,20 +28,10 @@ async function parentMakesGiftLink(page: Page, invite?: { email: string }) {
   await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   await clearForTest(parent);
 
-  await page.goto('/home');
-  await page.getByRole('button', { name: /create a gift request/ }).click();
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  if (invite) {
-    await dialog.getByRole('switch', { name: 'Also invite them to join the family' }).click();
-    await dialog.getByPlaceholder('their email').fill(invite.email);
-    await dialog.getByRole('group', { name: 'their relationship' }).getByRole('button', { name: 'Grandparent' }).click();
-  }
-  await dialog.getByRole('button', { name: 'create gift request' }).click();
-  const shown = dialog.getByText(/\/g\/[A-Za-z0-9_-]+/);
-  await expect(shown).toBeVisible({ timeout: 30_000 });
-  const path = /\/g\/[A-Za-z0-9_-]+/.exec((await shown.textContent()) ?? '')![0];
-  return { parent, path };
+  if (!invite) return { parent, path: await makeOpenGiftLink(page, 'family') };
+  // her own link, invite inside, at the extended circle a grandparent joins — so the drawing is shared with extended
+  await shareNewestWithExtended(page);
+  return { parent, path: await sendGiftLinkTo(page, invite.email, { invite: 'Grandparent' }) };
 }
 
 /** Buy what's on the link; the order is placed (local "mark paid") or handed to Stripe. */
@@ -89,13 +82,18 @@ test('gift loop: invite → verify by email link → joined at the set circle �
 
   // verify: the one-tap link to the INVITED address (identity, not authority)
   await signInByEmailLink(granny, grannyEmail, joinUrl.pathname + joinUrl.search);
+  // D27: never a silent join — she sees who looks after the family's keepsakes, and says yes
+  await expect(granny.getByRole('heading', { level: 1 })).toHaveText(/^join /);
+  expect(await sql()`select m.id from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail}`).toHaveLength(0);
+  await sayYesToJoin(granny);
   await expect(granny).toHaveURL(new RegExp(`${path}$`)); // joined, and straight back to the list
   await expect(granny.getByText('welcome to the family — your 5% is applied')).toBeVisible();
   await expect(granny.getByText('Family saving')).toBeVisible();
 
   // the membership is ACTIVE, at the circle the relationship sets (grandparent → extended) + the access chosen
-  const [m] = await sql()`select m.status, m.circle, m.access_level, m.is_owner from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail}`;
+  const [m] = await sql()`select m.status, m.circle, m.access_level, m.is_owner, m.join_consent_version from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail}`;
   expect(m).toMatchObject({ status: 'ACTIVE', circle: 'EXTENDED', access_level: 'VIEW_BUY', is_owner: false });
+  expect(m!.join_consent_version).toBeTruthy(); // her yes, and the wording she said yes to
 
   await checkOut(granny, /^checkout$/);
   const token = path.split('/').pop()!;
