@@ -1,5 +1,6 @@
 import { test, expect } from './test';
 import { quietCookies } from './helpers';
+import { testEmail } from './harness';
 
 /**
  * Help & contact (founder, 23 Oct): answers first — search, the most-asked — then a person. The
@@ -26,7 +27,8 @@ test('help: footer → search → no answer → topic → message sent with a re
 
   await page.getByRole('radio', { name: /Change or cancel an order/ }).check();
   await expect(page.getByText('These might help first')).toBeVisible();
-  await page.getByLabel(/Your email/).fill('e2e-help@example.test');
+  // a fresh address each run: one address may send 5 messages a day (SUPPORT_PER_EMAIL_PER_DAY), and the suite runs often
+  await page.getByLabel(/Your email/).fill(testEmail('help'));
   await page.getByLabel(/Order reference/).fill('snk-123456');
   await page.getByLabel('How can we help?').fill('Could I change the mug to the bigger size, please?');
   await page.getByRole('button', { name: 'send to our team' }).click();
