@@ -29,7 +29,7 @@ function pinnedBarHeight(self: HTMLElement | null): number {
 
 /**
  * The floating "get the app" bubble (Snickerdoodle Draw): its app icon in a round sticker with a small ink
- * "GET THE APP" pill over the top-left, bottom-right of the screen, linking to /draw. Mounted ONCE (root
+ * "LEARN TO DRAW" pill (founder, 11 Nov; was "GET THE APP") over the top-left, bottom-right of the screen, linking to /draw. Mounted ONCE (root
  * layout) and shown only on the browsing pages and the Keepsake Home (showsDrawBubble), never on a task
  * screen. On phones it floats just above whatever is pinned to the bottom, so it never covers a primary
  * action; on desktop it sits in the corner. A small × hides it for good in this browser (localStorage,
@@ -93,7 +93,7 @@ export function DrawAppBubble({ iconSrc }: { iconSrc: string }) {
       <div className="pop-in pointer-events-auto relative" style={{ ['--i' as string]: 4 }}>
         <Link
           href="/draw"
-          aria-label="get the Snickerdoodle Draw app"
+          aria-label="learn to draw with the Snickerdoodle Draw app"
           className="press sticker relative block size-[60px] rounded-full bg-sunshine focus-visible:outline-2 focus-visible:outline-offset-4 md:size-[68px]"
         >
           <img src={iconSrc} alt="" width={68} height={68} decoding="async" className="block size-full rounded-full" />
@@ -101,7 +101,7 @@ export function DrawAppBubble({ iconSrc }: { iconSrc: string }) {
             aria-hidden
             className="absolute -left-8 -top-2.5 -rotate-6 whitespace-nowrap rounded-pill bg-cocoa px-2 py-[3px] text-[9.5px] font-extrabold uppercase leading-none tracking-[0.06em] text-paper shadow-[0_2px_0_color-mix(in_srgb,var(--color-cocoa)_35%,transparent)]"
           >
-            get the app
+            learn to draw
           </span>
         </Link>
         {/* the ×: a 44px tap area around a small visible dot, tucked on the top-right edge */}

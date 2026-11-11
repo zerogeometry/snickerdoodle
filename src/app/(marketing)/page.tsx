@@ -46,11 +46,12 @@ const NO_FUSS = ['no posting originals', 'no templates', 'no waiting weeks'];
 const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)', 'rgb(246 196 69 / .8)'];
 
 /** The Christmas shelf under the hero, in season (D24): three placeholder photos, each straight into the
- * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough). */
-const XMAS_SHELF = [
-  { key: 'ceramicOrnament', src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s ornament', alt: 'A ceramic christmas ornament printed with a child’s crayon snowman' },
-  { key: 'wrappingPaper', src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
-  { key: 'sack', src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
+ * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough).
+ * Photos and titles: founder, 11 Nov (square crops of his images; "gifts" opens the whole range). */
+const XMAS_SHELF: { key?: string; src: string; w: number; h: number; label: string; alt: string }[] = [
+  { key: 'ceramicOrnament', src: '/christmas/shelf-ornament.webp', w: 1000, h: 1000, label: 'tree ornaments', alt: 'A ceramic tree ornament printed with a child’s crayon robin, hanging on the tree' },
+  { key: 'wrappingPaper', src: '/christmas/shelf-wrapping-paper.webp', w: 1000, h: 1000, label: 'wrapping paper', alt: 'Presents wrapped in paper printed with children’s drawings, beside a framed crayon Christmas tree' },
+  { src: '/christmas/shelf-gifts.webp', w: 1000, h: 1000, label: 'gifts', alt: 'A grandparent unwrapping a framed crayon drawing of the family by the Christmas tree' },
 ];
 
 export default function LandingPage() {
@@ -144,7 +145,7 @@ export default function LandingPage() {
               {XMAS_SHELF.map((it, i) => (
                 <li key={it.label}>
                   <Link
-                    href={`/start-creating?for=${it.key}`}
+                    href={it.key ? `/start-creating?for=${it.key}` : '/start-creating'}
                     className="polaroid tape lift block text-center"
                     style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
                   >

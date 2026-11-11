@@ -54,8 +54,8 @@ export function generateMetadata(): Metadata {
 /** The facts, app-store style. "No ads" first and in honey: the one parents look for. */
 const FACTS: { label: string; strong?: boolean }[] = [
   { label: 'no ads', strong: true },
+  { label: 'educational' },
   { label: 'ages 3 to 12' },
-  { label: '366 lessons' },
   { label: 'works offline' },
 ];
 
