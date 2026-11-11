@@ -197,7 +197,9 @@ test.describe('signed in', () => {
     expect((await derivatives(K)).some((d) => d.key.endsWith('/design'))).toBe(false);
   });
 
-  test('keepsake home → "place one on a product" opens the placement editor', async ({ page }) => {
+  // "place one on a product" left the keepsake home on 10 Nov (founder: it opened a broken placemat preview);
+  // each keepsake's basket button ("make something with …") took its place: the usual range, already kept.
+  test('keepsake home → "make something with" a keepsake opens the range with it, already kept', async ({ page }) => {
     test.setTimeout(240_000);
     const email = testEmail('t1-home');
     await signInByEmailLink(page, email, '/start-creating');
@@ -206,10 +208,10 @@ test.describe('signed in', () => {
     await page.getByRole('button', { name: /\+ keepsake/ }).click();
     await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
     await page.goto('/home');
-    await page.getByRole('link', { name: /place one on a product/ }).click();
-    await expect(page).toHaveURL(/\/studio\/position/);
-    await page.waitForLoadState('networkidle');
-    test.info().annotations.push({ type: 'home-position', description: `${new URL(page.url()).pathname}${new URL(page.url()).search} — ${(await page.locator('main').innerText()).slice(0, 160).replace(/\s+/g, ' ')}` });
-    await expect(page.getByRole('button', { name: /add to basket|keep it & check out/ })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('link', { name: /place one on a product/ })).toHaveCount(0);
+    await page.getByRole('button', { name: /^make something with / }).first().click();
+    await expect(page).toHaveURL(/\/start-creating/);
+    await rangeReady(page);
+    await expect(page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
   });
 });

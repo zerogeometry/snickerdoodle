@@ -3,13 +3,12 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Prose } from '@/ui/components/Prose';
 import { COMPANY } from '@/lib/company';
-import { isTestSite } from '@/lib/siteMode';
+import { drawNoticeShown } from '@/lib/siteMode';
 
 const COMPANY_ADDRESS = `${COMPANY.street}, ${COMPANY.city} ${COMPANY.postcode}`;
 
-/** A DRAFT until the founder approves it: shown on the (locked) test site, and on the live site only
- * once `DRAW_PRIVACY_NOTICE=live`. Never in navigation; not indexed while it's a draft. */
-const published = () => process.env.DRAW_PRIVACY_NOTICE === 'live';
+/* A DRAFT until the founder approves it: shown on the (locked) test site, and on the live site only
+ * once `DRAW_PRIVACY_NOTICE=live` (drawNoticeShown). Never in navigation; not indexed while it's a draft. */
 
 export const metadata: Metadata = {
   title: 'snickerdoodle draw privacy notice',
@@ -25,7 +24,7 @@ export const metadata: Metadata = {
  * snickerdoodle-draw/docs/store/data-safety.md and docs/RELIABILITY.md.
  */
 export default function DrawPrivacyNoticePage() {
-  if (!published() && !isTestSite()) notFound();
+  if (!drawNoticeShown()) notFound();
   return (
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">

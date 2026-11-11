@@ -3,6 +3,7 @@ import { test, expect, type Browser, type BrowserContext, type Page } from './te
 import sharp from 'sharp';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { quietCookies, uploadAndOpenRange } from './helpers';
+import { sayYesToJoin } from './d27';
 import { maskEmail } from '../src/lib/maskEmail';
 
 /**
@@ -142,12 +143,13 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     expect(kids.map((k) => k.first_name)).toEqual(['Olivia']);
   });
 
-  async function invite(rowIndex: 0 | 1, email: string, opts: { rel?: string; access: 'view only' | 'view & buy' | 'view, buy & add'; calendar?: boolean }) {
+  async function invite(row: 'home' | 'family' | 'extended', email: string, opts: { rel?: string; access: 'view only' | 'view & buy' | 'view, buy & add'; calendar?: boolean }) {
     await P.page.goto('/family');
     const sheet = P.page.getByRole('dialog');
-    // 0 = family-circle row (opens on Parent), 1 = extended row (opens on Grandparent); retried until hydrated
+    // home row (opens on Parent, circle home — D27), family row, extended row (opens on Grandparent); retried until hydrated
+    const button = row === 'home' ? P.page.getByRole('button', { name: 'invite to home', exact: true }) : P.page.getByRole('button', { name: 'invite', exact: true }).nth(row === 'family' ? 0 : 1);
     await expect(async () => {
-      await P.page.getByRole('button', { name: 'invite', exact: true }).nth(rowIndex).click();
+      await button.click();
       await expect(sheet).toBeVisible({ timeout: 2000 });
     }).toPass({ timeout: 30_000 });
     await sheet.getByPlaceholder('First name').fill(email.split('@')[0]!);
@@ -162,16 +164,16 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   }
 
   const inv = {
-    co: await invite(0, E.co, { access: 'view, buy & add' }),
-    granny: await invite(1, E.granny, { access: 'view only' }),
-    aunt: await invite(1, E.aunt, { rel: 'Aunt / uncle', access: 'view & buy', calendar: false }),
-    friend: await invite(1, E.friend, { rel: 'Close friend', access: 'view only' }),
-    resend: await invite(1, E.resend, { access: 'view only' }),
-    expired: await invite(1, E.expired, { access: 'view only' }),
+    co: await invite('home', E.co, { access: 'view, buy & add' }),
+    granny: await invite('extended', E.granny, { access: 'view only' }),
+    aunt: await invite('extended', E.aunt, { rel: 'Aunt / uncle', access: 'view & buy', calendar: false }),
+    friend: await invite('extended', E.friend, { rel: 'Close friend', access: 'view only' }),
+    resend: await invite('extended', E.resend, { access: 'view only' }),
+    expired: await invite('extended', E.expired, { access: 'view only' }),
   };
 
   await test.step('the invite rows hold exactly what the parent chose (circle from the relationship)', async () => {
-    expect(inv.co).toMatchObject({ circle: 'FAMILY', access_level: 'CONTRIBUTE', share_occasions: true });
+    expect(inv.co).toMatchObject({ circle: 'HOME', access_level: 'CONTRIBUTE', share_occasions: true }); // D27: the co-parent is home
     expect(inv.granny).toMatchObject({ circle: 'EXTENDED', access_level: 'VIEW', share_occasions: true });
     expect(inv.aunt).toMatchObject({ circle: 'EXTENDED', access_level: 'VIEW_BUY', share_occasions: false });
     await P.page.goto('/family');
@@ -229,7 +231,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   });
 
   // ── joining: the invitee proves the address by the one-tap email link ───────────────────────────
-  async function join(page: Page, email: string, token: string) {
+  async function join(page: Page, email: string, token: string, circle: 'home' | 'family' = 'family') {
     await page.goto(`/join/${token}`);
     await expect(page.getByRole('heading', { level: 1 })).toHaveText('Join The Sweepers');
     if (haveLog) {
@@ -249,6 +251,10 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     } else {
       await signInByEmailLink(page, email, `/join/${token}`);
     }
+    // D27: never a silent join — nothing exists until they say yes on the join card
+    const { n: before } = (await sql()`select count(*)::int n from memberships m join accounts a on a.id = m.account_id where a.email = ${email} and m.status = 'ACTIVE' and m.family_id = (select family_id from invites where token = ${token})`)[0]!;
+    expect(before).toBe(0);
+    await sayYesToJoin(page, circle);
     await expect(page).toHaveURL(/\/home\?family=[0-9a-f-]+&joined=1/);
     await expect(page.getByText(/^welcome to the family, /)).toBeVisible(); // not "welcome back" on day one
   }
@@ -270,12 +276,12 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   await test.step('three people join, each at exactly the circle + access chosen', async () => {
     await C.page.goto(`/join/${inv.co.token}`);
     await shot(C.page, 'join-invited-mobile');
-    await join(C.page, E.co, inv.co.token);
+    await join(C.page, E.co, inv.co.token, 'home');
     await join(Gr.page, E.granny, inv.granny.token);
     await join(A.page, E.aunt, inv.aunt.token);
     const rows = await sql()`select a.email, m.circle, m.access_level, m.status, m.is_owner, m.sees_occasions from memberships m join accounts a on a.id = m.account_id where m.family_id = ${familyId} and not m.is_owner`;
     const by = Object.fromEntries(rows.map((r) => [r.email, r]));
-    expect(by[E.co]).toMatchObject({ circle: 'FAMILY', access_level: 'CONTRIBUTE', status: 'ACTIVE', sees_occasions: true });
+    expect(by[E.co]).toMatchObject({ circle: 'HOME', access_level: 'CONTRIBUTE', status: 'ACTIVE', sees_occasions: true });
     expect(by[E.granny]).toMatchObject({ circle: 'EXTENDED', access_level: 'VIEW', status: 'ACTIVE', sees_occasions: true });
     expect(by[E.aunt]).toMatchObject({ circle: 'EXTENDED', access_level: 'VIEW_BUY', status: 'ACTIVE', sees_occasions: false });
     // single use: the co-parent's link, opened again, is spent
@@ -335,15 +341,37 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     expect(await pick(S.page)).toEqual([]);
   });
 
-  await test.step('birthdays: shared with the granny (calendar ticked), not with the aunt (unticked)', async () => {
-    await sql()`update children set birthday = '2021-03-14' where family_id = ${familyId}`;
-    await Gr.page.goto(`/home?family=${familyId}`);
-    const grannyHtml = await Gr.page.content();
+  // A child's birthday (Children's Code std 8, A-59 / 07baf74): the parent, and a relative the parent shared the
+  // family calendar with, get the day, the month and the age they turn next — never the date of birth, not even in
+  // the page's data. A relative the calendar wasn't shared with gets none of it: first names only.
+  await test.step('birthdays: the granny (calendar shared) sees the day, month and age, never the year; the aunt (not shared) sees none of it', async () => {
+    // a birthday 10 days away, so the home's "Coming up" line shows it; the little one turns 5
+    const now = new Date();
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 10));
+    const born = new Date(Date.UTC(next.getUTCFullYear() - 5, next.getUTCMonth(), next.getUTCDate()));
+    const iso = born.toISOString().slice(0, 10);
+    const label = next.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    await sql()`update children set birthday = ${iso} where family_id = ${familyId}`;
+    // the page's data, as the browser got it: a birthday is {month, day, turns} — any 4-digit number in it is a year
+    const birthdayData = /\\?"birthday\\?":\{[^}]*\}/g;
+
+    for (const [who, page] of Object.entries({ parent: P.page, granny: Gr.page })) {
+      await page.goto(`/home?family=${familyId}`);
+      await expect(page.getByText(`turns 5 on ${label}`).first(), `${who} sees the coming-up birthday`).toBeVisible();
+      const html = await page.content();
+      expect(html, `${who}: never the date of birth`).not.toContain(iso);
+      const shared = html.match(birthdayData) ?? [];
+      expect(shared.length, `${who} gets the day and month`).toBeGreaterThan(0);
+      for (const b of shared) expect(b, `${who}: no year in the birthday data`).not.toMatch(/\d{4}/);
+    }
+
     await A.page.goto(`/home?family=${familyId}`);
+    await expect(A.page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(A.page.getByText(/turns \d+ on/)).toHaveCount(0);
     const auntHtml = await A.page.content();
-    expect(grannyHtml).toContain('2021-03-14');
-    expect(auntHtml).not.toContain('2021-03-14');
     expect(auntHtml).toContain('Olivia'); // first names only
+    expect(auntHtml).not.toContain(iso);
+    expect(auntHtml.match(birthdayData) ?? [], 'the aunt gets no birthday at all').toEqual([]);
   });
 
   await test.step('the parent changes the granny’s circle + access; it bites on her next page', async () => {
@@ -379,7 +407,7 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
   });
 
   await test.step('re-inviting after removal: a fresh invite, a fresh join', async () => {
-    const again = await invite(1, E.aunt, { rel: 'Aunt / uncle', access: 'view only' });
+    const again = await invite('extended', E.aunt, { rel: 'Aunt / uncle', access: 'view only' });
     await join(A.page, E.aunt, again.token);
     const rows = await sql()`select m.status, m.circle, m.access_level from memberships m join accounts a on a.id = m.account_id where a.email = ${E.aunt} and m.family_id = ${familyId} order by m.created_at`;
     expect(rows.map((r) => r.status)).toEqual(['REMOVED', 'ACTIVE']);
@@ -434,6 +462,7 @@ test('04-B2: a VIEW-only relative cannot order a family keepsake', async ({ brow
   const G = await person(browser);
   await G.page.route(/checkout\.stripe\.com/, (r) => r.abort());
   await signInByEmailLink(G.page, granny, `/join/${token}`);
+  await sayYesToJoin(G.page); // D27: never a silent join
   await G.page.goto('/start-creating');
   await G.page.getByRole('button', { name: /real$/ }).first().click();
   await expect(G.page.getByRole('heading', { name: /masterpiece, made real/i })).toBeVisible({ timeout: 60_000 });
@@ -463,6 +492,7 @@ test('04-B3: a CONTRIBUTE member’s kept drawing lands in the family they joine
   await sql()`insert into invites (family_id, created_by_account_id, email, relationship, circle, access_level, token, status, expires_at) values (${familyId}, ${parentId}, ${co}, 'PARENT', 'FAMILY', 'CONTRIBUTE', ${token}, 'PENDING', now() + interval '1 day')`;
   const C = await person(browser);
   await signInByEmailLink(C.page, co, `/join/${token}`);
+  await sayYesToJoin(C.page); // D27: never a silent join
   await uploadAndOpenRange(C.page);
   await expect(C.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await C.page.getByRole('button', { name: /\+ keepsake/ }).click();
@@ -504,6 +534,7 @@ test('profile pictures + the family banner: family members only — a stranger, 
   await sql()`insert into invites (family_id, created_by_account_id, email, relationship, circle, access_level, token, status, expires_at) values (${familyId}, ${parentId}, ${granny}, 'GRANDPARENT', 'EXTENDED', 'VIEW', ${token}, 'PENDING', now() + interval '1 day')`;
   const G = await person(browser);
   await signInByEmailLink(G.page, granny, `/join/${token}`);
+  await sayYesToJoin(G.page); // D27: never a silent join
   await G.page.goto(`/home?family=${familyId}`);
   await expect(G.page.getByRole('img', { name: /banner$/ })).toBeVisible();
   expect((await G.page.request.get(src)).status()).toBe(200);
@@ -540,6 +571,7 @@ test('a relative leaves a family: gone from it at once, logged; the owner has no
   await expect(P.page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 90_000 });
   await P.page.getByRole('button', { name: /\+ keepsake/ }).click();
   await expect(P.page.getByRole('button', { name: /kept ♥/ })).toBeVisible({ timeout: 30_000 });
+  await clearForTest(parent); // stand in for the reviewer: a keepsake not yet cleared is hidden from relatives (D26)
   const { family_id: familyId, id: parentId } = (await sql()`select m.family_id, a.id from memberships m join accounts a on a.id = m.account_id where a.email = ${parent} and m.is_owner`)[0]!;
   const { id: assetId } = (await sql()`select id from assets where family_id = ${familyId}`)[0]!;
   await sql()`update assets set visibility = 'EXTENDED' where id = ${assetId}`;
@@ -549,6 +581,7 @@ test('a relative leaves a family: gone from it at once, logged; the owner has no
 
   const A = await person(browser, { width: 390, height: 844 });
   await signInByEmailLink(A.page, aunt, `/join/${token}`);
+  await sayYesToJoin(A.page); // D27: never a silent join
   await A.page.goto(`/home?family=${familyId}`);
   expect(await assetIdsOn(A.page, [assetId])).toEqual([assetId]);
   await expect(async () => {

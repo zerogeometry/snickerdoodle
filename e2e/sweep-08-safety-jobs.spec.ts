@@ -10,6 +10,9 @@ import { accountId, hasServerLog, jobsSecret, mailTo, objectKeys } from './sweep
  * the go-live posture until IWF + Rekognition are live). DB + bucket checked directly.
  */
 test.skip(!hasDb, 'needs DATABASE_URL + AUTH_SECRET (.env)');
+// this file is ABOUT held pictures: no stand-in "the classifier says it's clean" (e2e/test.ts), so every
+// upload here stays held exactly as the e2e server's screening leaves it
+test.use({ screenedClean: false });
 
 const JOBS = ['retention', 'reapply-erasures?since=2026-01-01T00:00:00Z', 'reminders', 'popularity', 'fulfilment', 'prodigi-sync', 'seed-catalogue', 'seed-mockups'];
 const auth = () => ({ authorization: `Bearer ${jobsSecret()}` });
@@ -190,6 +193,18 @@ test.describe('content safety', () => {
     expect((await objectKeys(`assets/${id}/`)).length).toBeGreaterThan(0); // the drawing is still there
     await expect(page.getByRole('heading', { name: /masterpiece, made real/i })).toBeVisible(); // and the parent carries on
   });
+
+  test('a held picture brings up the notice wherever the shopper is; "back to upload" takes it off the page', async ({ page }) => {
+    await guestUpload(page);
+    const notice = page.getByRole('dialog', { name: 'we’ve paused this picture' });
+    await expect(notice).toBeVisible({ timeout: 15_000 });
+    await expect(notice).toContainText('it won’t be printed, shared or shown to your family');
+    await expect(notice).not.toContainText(/violence|label|screening-not-configured/i); // never why
+    await notice.getByRole('button', { name: 'back to upload' }).click();
+    await expect(page).toHaveURL(/\/start-creating/);
+    await expect(page.getByRole('button', { name: /upload a drawing/i })).toBeVisible();
+    await expect(notice).toHaveCount(0);
+  });
 });
 
 test.describe('admin — review queue and support inbox', () => {
@@ -281,7 +296,7 @@ test.describe('admin — review queue and support inbox', () => {
     await top(unchecked);
     await page.reload();
     const uc = queue.getByRole('listitem').first();
-    await expect(uc).toContainText('the safety hash check couldn’t run');
+    await expect(uc).toContainText('the hash check couldn’t run'); // D25 wording (9 Nov)
     await expect(uc.getByRole('button', { name: 'look' })).toHaveCount(0);
     await expect(uc.getByRole('button', { name: 'it’s fine' })).toHaveCount(0);
     expect((await page.request.get(`/api/admin/review/keepsake/${unchecked}`)).status()).toBe(404);

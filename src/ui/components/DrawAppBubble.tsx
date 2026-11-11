@@ -93,7 +93,7 @@ export function DrawAppBubble({ iconSrc }: { iconSrc: string }) {
       <div className="pop-in pointer-events-auto relative" style={{ ['--i' as string]: 4 }}>
         <Link
           href="/draw"
-          aria-label="get the Snickerdoodle Draw app"
+          aria-label="get the app: Snickerdoodle Draw"
           className="press sticker relative block size-[60px] rounded-full bg-sunshine focus-visible:outline-2 focus-visible:outline-offset-4 md:size-[68px]"
         >
           <img src={iconSrc} alt="" width={68} height={68} decoding="async" className="block size-full rounded-full" />

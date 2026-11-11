@@ -131,9 +131,11 @@ test('02-B4: checkout’s "customize your …" reopens that line in update mode'
   await page.getByRole('button', { name: 'customize your doodle mug' }).click();
   await expect(page).toHaveURL(/\/customize\/mug/);
   const url = page.url();
+  expect.soft(url, 'opens the line in edit mode').toMatch(/\?edit=/);
+  // the page settles into edit mode one render after the catalogue arrives: wait for it, as a person would see it
+  // (reading the label once, the instant the address changed, sometimes caught the frame before)
+  await expect(addBtn(page), 'the button updates the line').toHaveText(/^\s*update basket/, { timeout: 15_000 });
   const button = (await addBtn(page).innerText()).trim();
   const colourKept = await optionGroup(page, 'Colour').getByRole('button').last().getAttribute('aria-pressed');
   test.info().annotations.push({ type: '02-B4', description: JSON.stringify({ url, button, colourKept }) });
-  expect.soft(url, 'opens the line in edit mode').toMatch(/\?edit=/);
-  expect(button, 'the button updates the line').toMatch(/^update basket/);
 });

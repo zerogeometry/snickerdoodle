@@ -123,6 +123,8 @@ test('instant previews: the drawing on every product the browser can draw within
 test('a photo swaps in over its instant preview in the same place — no layout shift, the same framing', async ({ page }) => {
   test.setTimeout(120_000);
   await page.setViewportSize({ width: 1280, height: 900 });
+  // measure the LAYOUT, not the motion: a tile's 0.6s squash-and-stretch pop-in (10 Nov) scales its box for a moment
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await quietCookies(page);
   await page.addInitScript(installTiles);
   // hold the photos until the instant previews are measured
