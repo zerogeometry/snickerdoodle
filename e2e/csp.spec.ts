@@ -1,5 +1,5 @@
 import { test, expect, type Page } from './test';
-import { quietCookies, uploadAndOpenRange } from './helpers';
+import { allStudioTools, quietCookies, uploadAndOpenRange } from './helpers';
 
 /**
  * The script Content-Security-Policy (src/lib/csp.ts, sent by src/proxy.ts) against the
@@ -67,6 +67,7 @@ test('the shop journey runs with no CSP violations: home → upload → studio �
 });
 
 async function shopJourney(page: Page) {
+  await allStudioTools(page); // the journey flips the drawing, which lives under "all tools" (11 Nov)
   await page.goto('/');
   await expect(page.getByRole('main')).toBeVisible();
   // client-side JS is really running (hydrated) — a page whose scripts were blocked can't do this
