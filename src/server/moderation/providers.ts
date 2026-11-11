@@ -1,8 +1,6 @@
 import type { RekognitionClient } from '@aws-sdk/client-rekognition';
 import { iwfHashProvider, isIwfConfigured, resolveIwfAdapter, type IwfImageInterceptAdapter } from './iwf';
 import { assertRekognitionRegion, createRekognitionClient, rekognitionClassifier, rekognitionTextReader, type RekognitionPort } from './rekognition';
-import { assertTextractRegion, combinedTextReader, createTextractClient, textractTextReader, type TextractPort } from './textract';
-import type { TextractClient } from '@aws-sdk/client-textract';
 
 /**
  * Content-safety providers (decision D8). Two automated checks gate every
@@ -23,7 +21,7 @@ import type { TextractClient } from '@aws-sdk/client-textract';
  *
  * CSAM_HASH_CHECK=deferred (founder decision D25, 9 Nov 2026): launch on Rekognition alone until
  * IWF is connected. With no IWF adapter, the hash step is SKIPPED (not faked as "no match"), every
- * upload still goes through the classifier AND the drawn-words screen, and the verdict records
+ * upload still goes through the classifier AND the printed-words screen, and the verdict records
  * `hashCheck: 'deferred'`. A deferred item flagged for anything sexual, unknown or unreadable is
  * remove-only in review (never viewed or cleared). The moment an IWF adapter exists it is used
  * and this setting no longer matters.
@@ -41,13 +39,14 @@ export interface ClassifierProvider {
 }
 
 /**
- * Reads words written IN an image, so words on an upload or drawn in the Studio get the same abuse
- * screen as typed words. When real: Rekognition DetectText (printed text) AND Textract
- * DetectDocumentText (handwriting), both eu-west-2, words pooled.
+ * Reads words printed IN an image (a slogan on a T-shirt, a sign, words typed onto a Studio design), so
+ * they get the same whole-word swear-word screen as typed words. When real: Rekognition DetectText,
+ * eu-west-2. Handwriting is NOT read (founder, 11 Nov 2026, D28): reading children's lettering and
+ * scribbles turned them into false swear words and held clean pictures.
  */
 export interface TextReaderProvider {
   read(buffer: Buffer): Promise<string[]>;
-  /** A short name for diagnostics ("printed", "handwriting"). */
+  /** A short name for diagnostics ("printed"). */
   name?: string;
   /** Pooled readers: each reader's words separately (word COUNTS are kept as diagnostics, never the words). */
   readEach?(buffer: Buffer): Promise<{ reader: string; words: string[] }[]>;
@@ -96,7 +95,6 @@ export function realProviderConfigErrors(env: Env = process.env): string[] {
   // The client pins its own endpoint, so this would be ignored — but someone meant to send
   // children's pictures somewhere else. Say no, loudly.
   if (env.AWS_ENDPOINT_URL_REKOGNITION) errors.push('AWS_ENDPOINT_URL_REKOGNITION is set — Rekognition is pinned to eu-west-2 and cannot be redirected');
-  if (env.AWS_ENDPOINT_URL_TEXTRACT) errors.push('AWS_ENDPOINT_URL_TEXTRACT is set — Textract is pinned to eu-west-2 and cannot be redirected');
   // Only one other value is meaningful; a typo must not quietly close (or open) the gate.
   if (env.CSAM_HASH_CHECK !== undefined && env.CSAM_HASH_CHECK !== '' && env.CSAM_HASH_CHECK !== 'deferred') {
     errors.push(`CSAM_HASH_CHECK must be unset or "deferred", not "${env.CSAM_HASH_CHECK}"`);
@@ -109,13 +107,10 @@ export const isHashCheckDeferred = (env: Env = process.env): boolean => env.CSAM
 
 let sharedRekognition: RekognitionClient | null = null;
 const rekognitionClient = (): RekognitionClient => (sharedRekognition ??= createRekognitionClient());
-let sharedTextract: TextractClient | null = null;
-const textractClient = (): TextractClient => (sharedTextract ??= createTextractClient());
 
 /** Test seams: a mocked Rekognition client and/or IWF adapter. Production passes nothing. */
 export interface RealProviderDeps {
   rekognition?: RekognitionPort;
-  textract?: TextractPort;
   iwf?: IwfImageInterceptAdapter | null;
 }
 
@@ -130,8 +125,8 @@ export function realProviders(env: Env = process.env, deps: RealProviderDeps = {
     // CLOSED (throws on every check → held for review).
     hash: iwf ? iwfHashProvider(iwf) : isHashCheckDeferred(env) ? null : iwfHashProvider(null),
     classifier: rekognitionClassifier(client),
-    // printed text (Rekognition) + handwriting (Textract): the founder's handwritten test word slipped past Rekognition alone
-    textReader: combinedTextReader([rekognitionTextReader(client), textractTextReader(deps.textract ?? textractClient())]),
+    // printed words only (D28): handwriting isn't read, so a child's lettering is never mistaken for a swear word
+    textReader: rekognitionTextReader(client),
   };
 }
 
@@ -166,7 +161,6 @@ export async function assertModerationReady(env: Env = process.env, deps: RealPr
   if (env.MODERATION_PROVIDER !== 'real') return { mode: 'stub', hashGate: 'stub' };
   const client = deps.rekognition ?? rekognitionClient();
   await assertRekognitionRegion(client);
-  await assertTextractRegion(deps.textract ?? textractClient());
   const creds = (client.config as { credentials?: unknown }).credentials;
   if (typeof creds === 'function') {
     try {
@@ -177,7 +171,7 @@ export async function assertModerationReady(env: Env = process.env, deps: RealPr
   }
   const iwf = deps.iwf !== undefined ? deps.iwf !== null : isIwfConfigured(env);
   if (!iwf && isHashCheckDeferred(env)) {
-    console.warn('[moderation] IWF Image Intercept is not configured — the CSAM hash check is DEFERRED (founder decision D25): uploads are screened by the classifier + drawn-words check only. Connect IWF as soon as it is onboarded: project-office/ops/IWF-ONBOARDING.md');
+    console.warn('[moderation] IWF Image Intercept is not configured — the CSAM hash check is DEFERRED (founder decision D25): uploads are screened by the classifier + printed-words check only. Connect IWF as soon as it is onboarded: project-office/ops/IWF-ONBOARDING.md');
     return { mode: 'real', hashGate: 'deferred' };
   }
   if (!iwf) {

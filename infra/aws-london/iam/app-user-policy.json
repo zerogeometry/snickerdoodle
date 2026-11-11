@@ -23,7 +23,7 @@
     {
       "Sid": "ContentSafetyInLondonOnly",
       "Effect": "Allow",
-      "Action": ["rekognition:DetectModerationLabels", "rekognition:DetectText", "textract:DetectDocumentText"],
+      "Action": ["rekognition:DetectModerationLabels", "rekognition:DetectText"],
       "Resource": "*",
       "Condition": { "StringEquals": { "aws:RequestedRegion": "eu-west-2" } }
     }

@@ -9,59 +9,53 @@
 import { normalizeCardFont, type CardFontToken } from '@/lib/card-fonts';
 import { GIFT_NOTE_MAX } from '@/lib/gift-note';
 
-// Unambiguous profanity / slurs that must never appear in a child's name field.
-// Kept short + strong and matched as a substring of a single name token, which
-// avoids the Scunthorpe problem on legitimate names.
-const ABUSE = [
-  'fuck', 'shit', 'cunt', 'bitch', 'bastard', 'dick', 'piss',
-  'nigger', 'faggot', 'whore', 'slut', 'rape', 'wank', 'twat',
-  // added for D25 (founder, 9 Nov: "no profane language"); each is rare inside a real word
-  'bollock', 'arsehole', 'asshole', 'paedo', 'nonce',
-];
+// The swear words and slurs we screen for (founder, 11 Nov 2026, D28). They count ONLY as a whole word
+// standing on its own — never as letters inside a longer word ("swanky", "Scunthorpe", "grapes",
+// "class", "Dickens" all pass) — and only spelt out, never pieced together from look-alike letters.
+// Words that are also names or everyday words are left OFF on purpose, so they're never stopped:
+// dick (a name — Dick Whittington, Grandad Dick), pussy (a cat), fanny (a name), cock (a rooster),
+// fag (a cigarette), knob (a door knob), willy, prick, tit (a bird), bum, arse.
+// Kept although they have a rare innocent sense — on a child's keepsake the rude one is the likely
+// one (child safety first; founder can drop any): bitch, bastard, faggot, nonce, rape.
+const SWEAR_WORDS: ReadonlySet<string> = new Set([
+  'fuck', 'fucks', 'fucked', 'fucker', 'fuckers', 'fucking', 'fuckin', 'fuckoff', 'fuckwit', 'fuckwits', 'fuckface',
+  'motherfucker', 'motherfuckers', 'motherfucking',
+  'shit', 'shits', 'shite', 'shitty', 'shitting', 'shithead', 'shitheads', 'bullshit', 'dipshit',
+  'cunt', 'cunts',
+  'wank', 'wanks', 'wanked', 'wanker', 'wankers', 'wanking',
+  'twat', 'twats',
+  'dickhead', 'dickheads',
+  'bitch', 'bitches', 'bitchy',
+  'bastard', 'bastards',
+  'slut', 'sluts', 'slutty',
+  'whore', 'whores',
+  'piss', 'pissed', 'pisses', 'pissing',
+  'bollocks', 'bollock',
+  'arsehole', 'arseholes', 'asshole', 'assholes',
+  'nigger', 'niggers', 'nigga', 'niggas',
+  'faggot', 'faggots',
+  'paedo', 'paedos', 'pedo', 'pedos', 'paedophile', 'paedophiles', 'pedophile', 'pedophiles',
+  'nonce', 'nonces',
+  'rape', 'raped', 'rapes', 'raping', 'rapist', 'rapists',
+]);
 
-/** True if the text contains obvious abusive language. */
+/** The words in a piece of text: runs of letters (any alphabet), lower-cased. Anything else separates. */
+const wordsOf = (raw: string): string[] => raw.toLowerCase().split(/[^\p{L}\p{M}]+/u).filter(Boolean);
+
+/** True if the text contains a swear word or slur from the list, as a whole word of its own. */
 export function containsAbusiveText(raw: string): boolean {
-  const s = raw.toLowerCase();
-  return ABUSE.some((w) => s.includes(w));
+  return wordsOf(String(raw)).some((w) => SWEAR_WORDS.has(w));
 }
 
-// ── Words READ from a picture (handwriting / printed OCR) ────────────────────
-// A reader misreads handwriting in two ways the founder's live test showed (9 Nov 2026): a gap
-// inside a word ("WAN KER") and a letter read as its look-alike ("VANKER" for WANKER). So drawn
-// words are matched more loosely than typed ones. A match only sends the picture to review —
-// it never rejects — so a rare innocent flag costs a look, while a miss lets abuse onto a print.
-
-/** Letters a reader confuses in handwriting (and the obvious number/symbol swaps), folded together. */
-const LOOKALIKE: Readonly<Record<string, string>> = {
-  w: 'v', u: 'v', // W / V / U
-  '1': 'i', l: 'i', '!': 'i', '|': 'i', // 1 / I / L
-  '0': 'o',
-  '5': 's', $: 's',
-  '3': 'e',
-  '4': 'a', '@': 'a',
-  '7': 't',
-};
-const fold = (s: string): string => [...s.toLowerCase().replace(/vv/g, 'w')].map((c) => LOOKALIKE[c] ?? c).join(''); // "vv" is a written w
-/** Words that are only abuse on their own, not inside a common word kids write ("grapes", "drape"). */
-const WHOLE_WORD_ONLY = new Set(['rape']);
-const DRAWN_ABUSE = ABUSE.filter((w) => !WHOLE_WORD_ONLY.has(w)).map(fold);
-const WHOLE_WORD_RE = new RegExp(`(^|[^a-z])(${[...WHOLE_WORD_ONLY].map(fold).join('|')})($|[^a-z])`);
-
+// ── Words READ from a picture (printed text: Rekognition DetectText) ─────────
 /**
- * True if any line of words read from a picture contains abusive language — matched as written,
- * with the gaps inside the line squashed out ("WAN KER" → "wanker", "f u c k"), and with look-alike
- * letters folded together ("VANKER", "sh1t", "fvck"). Each line is checked on its own (never glued
- * to the next), which keeps innocent cross-line joins out.
+ * True if any line of words read from a picture contains a swear word — the SAME whole-word check as
+ * typed text (D28): no squashing gaps, no look-alike letters. Lines are checked one by one, never glued
+ * together. (The looser matching of 9–10 Nov turned ordinary writing into swear words — "wish it" →
+ * "wishit", "hot water" → "hotvater" — and held clean pictures.)
  */
 export function containsAbusiveDrawnText(lines: readonly string[]): boolean {
-  for (const raw of lines) {
-    const line = String(raw);
-    const asWritten = fold(line);
-    const squashed = fold(line.replace(/[\s\-_.·,'’"]+/g, ''));
-    if (DRAWN_ABUSE.some((w) => asWritten.includes(w) || squashed.includes(w))) return true;
-    if (WHOLE_WORD_RE.test(asWritten)) return true;
-  }
-  return false;
+  return lines.some((line) => containsAbusiveText(String(line)));
 }
 
 export type NameScreen =
