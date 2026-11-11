@@ -292,7 +292,7 @@ export default function StartCreatingPage() {
             Upload your little one&apos;s drawing
           </h1>
           <p className="pop-in mt-3 max-w-sm text-[15px] text-ink-soft" style={{ ['--i' as string]: 2 }}>
-            Snap it or pop it in, and watch it land on a whole family range in moments.
+            Snap it or pop it in. We&apos;ll transform it into a whole family collection in moments.
           </p>
           {/* Primary actions: a thumb-zone dock on phones (like the landing's), inline on desktop. */}
           {/* Phones (founder, 10 Nov): a slim drawer, upload + camera side by side as big icons, then

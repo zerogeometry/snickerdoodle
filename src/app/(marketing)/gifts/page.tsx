@@ -29,8 +29,8 @@ export default function GiftsPage() {
             Gifts the whole family can give
           </h1>
           <p className="pop-in mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
-            Turn a drawing into a present, then share a ready-to-buy link. Grandparents tap it, the cart&apos;s already
-            filled, and something lovely is on its way.
+            The present they&apos;ll actually keep: one their grandchild made. Share a ready-to-buy link, Granny taps
+            it, the basket&apos;s already filled, and something lovely is on its way.
           </p>
         </div>
 
