@@ -18,6 +18,7 @@ const row = (id: string, over: Partial<PickerRow['asset']> = {}): PickerRow => (
     uploaderAccountId: PARENT,
     controllerAccountId: PARENT,
     visibility: 'FAMILY',
+    parentLimit: null,
     keptInHome: true,
     moderationStatus: 'CLEAR',
     createdAt: new Date('2026-10-01'),

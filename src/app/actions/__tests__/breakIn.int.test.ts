@@ -57,7 +57,7 @@ import { renderPreviewAction } from '@/app/actions/render';
 import { deleteSavedDesignAction, saveDesignAction } from '@/app/actions/designs';
 import { reportKeepsakeAction } from '@/app/actions/report';
 import { placeOrderAction } from '@/app/actions/order';
-import { createGiftLinkAction, sendGiftRequestAction } from '@/app/actions/giftLink';
+import { createOpenGiftLinkAction, sendGiftLinksAction } from '@/app/actions/giftLink';
 import {
   deleteChildAction,
   deleteOccasionAction,
@@ -235,8 +235,8 @@ describe.skipIf(!DB || !S3)('break-in: server actions refuse cross-family + in-f
     });
 
     it('gift links: make one from A’s keepsakes, send A’s link, revoke A’s link', async () => {
-      await refusedLikeGhost((id) => createGiftLinkAction({ assetIds: [id] }), A.famAsset);
-      await refusedLikeGhost((id) => sendGiftRequestAction({ linkId: id, memberAccountIds: [], emails: ['x@example.test'] }), A.gift);
+      await refusedLikeGhost((id) => createOpenGiftLinkAction({ assetIds: [id], circle: 'FAMILY' }), A.famAsset);
+      await refusedLikeGhost((id) => sendGiftLinksAction({ assetIds: [id], memberAccountIds: [], people: [{ email: 'x@example.test' }] }), A.famAsset);
       await refusedLikeGhost((id) => revokeGiftLinkAction(id), A.gift);
       expect((await db.select().from(giftLinks).where(eq(giftLinks.id, A.gift)))[0]!.status).toBe('ACTIVE');
     });
@@ -274,15 +274,17 @@ describe.skipIf(!DB || !S3)('break-in: server actions refuse cross-family + in-f
       expect(await keepsakeForStudioAction({ assetId: A.extAsset })).toMatchObject({ ok: true }); // control
     });
 
-    it('the second parent who UPLOADED the child’s drawing cannot see / change / delete it once the controlling parent made it ONLY_ME', async () => {
+    // D27 (founder, 10 Nov 2026): whoever added it keeps seeing their own upload; the child's parent's "only me" is a
+    // ceiling — it hides it from everyone else, and nobody (the adder included) can widen it past that
+    it('the second parent who UPLOADED the child’s drawing still sees it once the controlling parent made it “only me” — but can’t widen it', async () => {
       as(ids.joId);
-      expect(await keepsakeForStudioAction({ assetId: A.childOnlyMe })).toEqual({ ok: false });
-      expect(await studioStateAction({ assetId: A.childOnlyMe })).toEqual({ ok: false });
+      expect(await keepsakeForStudioAction({ assetId: A.childOnlyMe })).toMatchObject({ ok: true });
       expect(await setAssetVisibilityAction(A.childOnlyMe, 'FAMILY')).toEqual({ ok: false });
-      expect(await deleteKeepsakeAction(A.childOnlyMe)).toEqual({ ok: false });
-      expect(await copyKeepsakeAction({ assetId: A.childOnlyMe })).toEqual({ ok: false });
+      expect(await setAssetVisibilityAction(A.childOnlyMe, 'HOME')).toEqual({ ok: false });
       const [row] = await db.select().from(assets).where(eq(assets.id, A.childOnlyMe));
-      expect(row).toMatchObject({ visibility: 'ONLY_ME', controllerAccountId: ids.samId, uploaderAccountId: ids.joId });
+      expect(row).toMatchObject({ visibility: 'FAMILY', parentLimit: 'ONLY_ME', controllerAccountId: ids.samId, uploaderAccountId: ids.joId });
+      as(ids.rosieId); // nobody else
+      expect(await keepsakeForStudioAction({ assetId: A.childOnlyMe })).toEqual({ ok: false });
       as(ids.samId); // the controlling parent can
       expect(await keepsakeForStudioAction({ assetId: A.childOnlyMe })).toMatchObject({ ok: true });
     });

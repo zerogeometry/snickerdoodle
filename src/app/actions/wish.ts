@@ -3,6 +3,7 @@
 import { getDb } from '@/db/client';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import { mintWish } from '@/server/wish';
+import type { Circle } from '@/domain/types';
 
 /**
  * Share a Wish from the basket. KEEPS each basket creation into the family (adopts
@@ -20,7 +21,11 @@ export async function createWishAction(input: {
   /** The basket lines (product + placement) — re-checked server-side before anything is shared. */
   lines?: { assetId: string; variantSku: string; transform?: unknown; sourceObjectId?: string; back?: string; ground?: string }[];
   subject?: string;
-}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' }> {
+  /** who the link is for — checked server-side (D27) */
+  circle?: Circle;
+  /** their explicit "share them with that circle too" */
+  widen?: boolean;
+}): Promise<{ ok: boolean; needsAuth?: boolean; url?: string; reason?: 'name' | 'too-private' }> {
   const account = await getCurrentAccount();
   if (!account) return { ok: false, needsAuth: true };
 
@@ -36,5 +41,11 @@ export async function createWishAction(input: {
         ground: typeof l?.ground === 'string' ? l.ground : null,
       }))
     : undefined;
-  return mintWish(db, account, claims, { assetIds: Array.isArray(input.assetIds) ? input.assetIds.map(String) : [], subject: input.subject, lines });
+  return mintWish(db, account, claims, {
+    assetIds: Array.isArray(input.assetIds) ? input.assetIds.map(String) : [],
+    subject: input.subject,
+    lines,
+    circle: input.circle,
+    widen: input.widen === true,
+  });
 }

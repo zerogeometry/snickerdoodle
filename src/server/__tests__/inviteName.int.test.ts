@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
@@ -36,7 +37,7 @@ describe.skipIf(!URL)('the invited name sticks — integration', () => {
   async function inviteAndJoin(acct: { id: string; email: string }, name: string | null) {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const inv = await createInvite(db, sam, { familyId: ids.hartleyId, email: acct.email, relationship: 'PARENT', accessLevel: 'CONTRIBUTE', name });
-    expect(await acceptInvite(db, acct, inv.token)).toMatchObject({ ok: true });
+    expect(await acceptInvite(db, acct, inv.token, { version: JOIN_CONSENT_VERSION })).toMatchObject({ ok: true }); // they said yes (D27)
     return inv;
   }
 

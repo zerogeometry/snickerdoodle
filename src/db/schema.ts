@@ -29,11 +29,11 @@ import {
  */
 
 // ── Enums ────────────────────────────────────────────────────────────────────
-export const visibilityTier = pgEnum('visibility_tier', ['ONLY_ME', 'FAMILY', 'EXTENDED']);
+export const visibilityTier = pgEnum('visibility_tier', ['ONLY_ME', 'HOME', 'FAMILY', 'EXTENDED']);
 // NB: the Postgres type is named `family_circle`, not `circle` — `circle` is a
 // built-in geometric type, so a custom enum of that name collides at parameter
 // binding (every insert of a circle value fails). The TS export stays `circle`.
-export const circle = pgEnum('family_circle', ['FAMILY', 'EXTENDED']);
+export const circle = pgEnum('family_circle', ['HOME', 'FAMILY', 'EXTENDED']);
 export const accessLevel = pgEnum('access_level', ['VIEW', 'VIEW_BUY', 'CONTRIBUTE']);
 export const relationship = pgEnum('relationship', [
   'CHILD',
@@ -42,11 +42,14 @@ export const relationship = pgEnum('relationship', [
   'AUNT_UNCLE',
   'CLOSE_FRIEND',
   'OTHER',
+  'ADULT_CHILD',
 ]);
 export const membershipStatus = pgEnum('membership_status', ['ACTIVE', 'REMOVED', 'LEFT']);
 /** What an occasion is (the family calendar — founder, 27 Oct). */
 export const occasionKind = pgEnum('occasion_kind', ['BIRTHDAY', 'ANNIVERSARY', 'MILESTONE', 'OTHER']);
 /** A date that follows a LUNAR calendar — kept on the same lunar day each year (src/lib/occasions). */
+/** Whose day it is (D27): mine / ours, or someone else's — someone else's is never shared beyond home. */
+export const occasionWhose = pgEnum('occasion_whose', ['OURS', 'SOMEONE_ELSE']);
 export const lunarCalendar = pgEnum('lunar_calendar', ['CHINESE', 'KOREAN']);
 export const assetKind = pgEnum('asset_kind', ['DRAWING', 'PHOTO']);
 // Content-safety state (decision D8). PENDING until the automated gate runs;
@@ -189,6 +192,8 @@ export const invites = pgTable('invites', {
   /** The name the parent gave them in the invite sheet (screened; a grown-up's display name). On
    * joining it becomes their account name unless they've already chosen one of their own. */
   inviteeName: text('invitee_name'),
+  /** Set when this invite asks an EXISTING member to move into the home circle (D27): nothing changes until they say yes. */
+  membershipId: uuid('membership_id'),
   token: text('token').notNull().unique(),
   status: inviteStatus('status').notNull().default('PENDING'),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
@@ -223,6 +228,10 @@ export const memberships = pgTable(
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
     // When the one-time join saving was spent on an order (null = still available).
     joinSavingConsumedAt: timestamp('join_saving_consumed_at', { withTimezone: true }),
+    /** The joiner's own "yes" on the join card (D27): which wording (src/lib/joinConsent.ts) and when. Null for the
+     * leader (it's their family) and for members who joined before the card existed. Updated on moving into home. */
+    joinConsentVersion: text('join_consent_version'),
+    joinConsentedAt: timestamp('join_consented_at', { withTimezone: true }),
     createdAt,
   },
   (t) => [
@@ -278,6 +287,9 @@ export const assets = pgTable(
     isBrandSafeFixture: boolean('is_brand_safe_fixture').notNull().default(false),
     // Privacy-by-default at the DB level: no insert path can default wider.
     visibility: visibilityTier('visibility').notNull().default('FAMILY'),
+    /** D27: on a little one's keepsake someone else added, the child's parent may only NARROW it — this is their ceiling.
+     * Who sees it is the narrower of `visibility` (the adder's choice) and this. Null = no limit. */
+    parentLimit: visibilityTier('parent_limit'),
     // Content-safety gate (D8). An asset cannot reach a print order unless CLEAR.
     moderationStatus: moderationStatus('moderation_status').notNull().default('PENDING'),
     moderatedAt: timestamp('moderated_at', { withTimezone: true }),
@@ -878,7 +890,15 @@ export const giftLinks = pgTable(
     title: text('title'),
     /** Frozen [{ assetId, productKey, label, unitPricePence }] — never mutated. */
     items: jsonb('items').notNull(),
-    inviteId: uuid('invite_id').references(() => invites.id), // optional embedded family invite
+    inviteId: uuid('invite_id').references(() => invites.id), // optional embedded family invite (bound to the recipient's email)
+    /** D27: ONE link per person. Who it was sent to (an address, and their account when they're a member). */
+    recipientEmail: text('recipient_email'),
+    recipientAccountId: uuid('recipient_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+    /** Whose eyes it shows: only keepsakes this circle may see. NULL = a link made before D27 (shared with many) —
+     * treated as extended-only, since anyone may hold it. */
+    audienceCircle: circle('audience_circle'),
+    /** The links made by one send share a batch (the owner's list groups them; "switch them all off"). */
+    batchId: uuid('batch_id'),
     status: giftLinkStatus('status').notNull().default('ACTIVE'),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -954,6 +974,8 @@ export const occasions = pgTable(
     childId: uuid('child_id').references(() => children.id, { onDelete: 'cascade' }),
     memberAccountId: uuid('member_account_id').references(() => accounts.id, { onDelete: 'set null' }),
     shareCircle: circle('share_circle').notNull().default('FAMILY'),
+    /** Whose day (D27). SOMEONE_ELSE is seen by home only, whatever share_circle says (authz enforces it). */
+    whose: occasionWhose('whose').notNull().default('OURS'),
     createdByAccountId: uuid('created_by_account_id')
       .notNull()
       .references(() => accounts.id),

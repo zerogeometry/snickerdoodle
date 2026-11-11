@@ -204,7 +204,7 @@ describe.skipIf(!DB)('help & support — integration', () => {
       const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
       const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
       await db.update(assets).set({ moderationStatus: 'CLEAR', moderationDetail: { labels: [], original: { status: 'CLEAR', labels: [] } } }).where(eq(assets.id, a.assetId));
-      const { id: linkId, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [a.assetId] });
+      const { id: linkId, token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [a.assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
       expect((await getGiftLink(db, token)).state).toBe('active');
 
       expect(await reportGiftLink(db, { token, reason: 'inappropriate', note: 'not ok', email: 'Worried@Example.test' }, new Date(), { SUPPORT_INBOX: 'team@example.test' })).toEqual({ ok: true });
@@ -231,7 +231,7 @@ describe.skipIf(!DB)('help & support — integration', () => {
       const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
       const a = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await png(), keptInHome: true });
       await db.update(assets).set({ moderationStatus: 'CLEAR' }).where(eq(assets.id, a.assetId));
-      const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [a.assetId] });
+      const { token } = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [a.assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
       expect(await reportGiftLink(db, { token, reason: 'made-up' })).toEqual({ ok: false, reason: 'invalid' });
       expect(await reportGiftLink(db, { token, reason: 'other', email: 'nope' })).toEqual({ ok: false, reason: 'invalid' });
       expect(await reportGiftLink(db, { token, reason: 'copyright' })).toEqual({ ok: true });

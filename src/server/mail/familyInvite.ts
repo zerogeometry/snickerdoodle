@@ -40,3 +40,25 @@ export function familyInviteEmail(input: {
       `Questions? Just reply — it comes straight to us.`,
   };
 }
+
+/**
+ * "Sam asked you into the home" (D27): an EXISTING member is asked into the home circle. Nothing changes until they
+ * tap the link and say yes on the join card (accepting that the family leader looks after the family's keepsakes and
+ * details). Their own address only; the leader's first name only.
+ */
+export function moveIntoHomeEmail(input: { to: string; token: string; inviterName: string | null; memberName?: string | null; /** the circle has just launched */ newCircle?: boolean }): MailMessage {
+  const from = firstNameOf(input.inviterName);
+  const typed = firstNameOf(input.memberName ?? null);
+  const hi = typed && !containsAbusiveText(typed) ? `Hi ${typed},` : 'Hi there,';
+  return {
+    kind: 'family-invite',
+    to: input.to.trim().toLowerCase(),
+    subject: `${from ?? 'the family'} asked you into the home circle`,
+    text:
+      `${hi}\n\n` +
+      (input.newCircle ? `There's a new circle in your family's keepsake box: home, for the grown-ups at home.\n` : '') +
+      `${from ? `${from} would` : 'The family lead would'} like you in the home circle: the closest one, for the grown-ups at home.\n\n` +
+      `Nothing changes until you say yes. Have a look (it's just for you, and lasts 14 days):\n${appUrl(`/join/${input.token}`)}\n\n` +
+      `Not sure? Just ignore it — you stay exactly where you are.`,
+  };
+}

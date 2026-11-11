@@ -26,13 +26,16 @@ export const RELATIONSHIP_WORDS: Record<Relationship, string> = {
   AUNT_UNCLE: 'aunt or uncle',
   CLOSE_FRIEND: 'close friend',
   OTHER: 'family friend',
+  ADULT_CHILD: 'grown-up child',
 };
 
 /** What a circle means, in one plain sentence about what you see. */
 export function circleWords(circle: Circle): string {
-  return circle === 'FAMILY'
-    ? 'in the Family circle — the keepsakes shared with the family, and the Extended ones too'
-    : 'in the Extended family circle — the keepsakes shared with Extended family';
+  return circle === 'HOME'
+    ? 'in the home circle — the keepsakes shared with home, with the family, and the Extended ones too'
+    : circle === 'FAMILY'
+      ? 'in the Family circle — the keepsakes shared with the family, and the Extended ones too'
+      : 'in the Extended family circle — the keepsakes shared with Extended family';
 }
 
 /** What an access level lets you do. */

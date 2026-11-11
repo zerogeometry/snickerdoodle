@@ -6,7 +6,8 @@ import {
   assertCanViewAsset,
   canDeleteAsset,
   canEditAsset,
-  canSetAssetVisibility,
+  effectiveVisibility,
+  planVisibilityChange,
   canViewAsset,
   type AssetRef,
   type Membership,
@@ -226,8 +227,10 @@ export async function getStorageObjectGrant(
 }
 
 /**
- * Change an asset's visibility. Only the controller may, and only while ACTIVE.
- * Writes an append-only audit row (docs/04: visibility changes are logged).
+ * Change who sees a keepsake (D27, founder 10 Nov 2026). Whoever ADDED it chooses (any tier, up to the little one's
+ * parent's ceiling); on a little one's keepsake someone else added, the CHILD'S PARENT may only make it more private
+ * (stored as their ceiling) or lift that ceiling back to the adder's choice — never wider. Decided by
+ * planVisibilityChange in src/authz; only while ACTIVE. Writes an append-only audit row (docs/04).
  */
 export async function changeAssetVisibility(
   db: DbHandle,
@@ -238,10 +241,10 @@ export async function changeAssetVisibility(
   const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
   if (!row) throw denied('not found');
   const ref = toAssetRef(row);
-  if (!canSetAssetVisibility(ref, viewer)) {
-    throw denied('only the controlling parent may change visibility');
-  }
-  await db.update(assets).set({ visibility: next }).where(eq(assets.id, assetId));
+  const plan = planVisibilityChange(ref, viewer, next);
+  if (!plan.allowed) throw denied(plan.reason);
+  await db.update(assets).set(plan.patch).where(eq(assets.id, assetId));
+  const after = { ...ref, ...plan.patch };
   await db.insert(auditRecords).values({
     familyId: row.familyId,
     actorAccountId: viewer.accountId,
@@ -249,9 +252,9 @@ export async function changeAssetVisibility(
     event: 'ASSET_VISIBILITY_CHANGED',
     targetType: 'asset',
     targetId: assetId,
-    metadata: { from: row.visibility, to: next },
+    metadata: { from: effectiveVisibility(ref), to: effectiveVisibility(after), by: plan.role, ...plan.patch },
   });
-  return { ...ref, visibility: next };
+  return after;
 }
 
 /**
@@ -269,7 +272,7 @@ export async function deleteAsset(db: DbHandle, assetId: string, viewer: ViewerC
   const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
   if (!row) throw denied('not found');
   if (!canDeleteAsset(toAssetRef(row), viewer)) {
-    throw denied('only the controlling parent may delete this keepsake');
+    throw denied('only whoever added it, or the little one’s parent, may delete this keepsake');
   }
   // a paid order that isn't made yet still needs the drawing — wait until it's on its way, as
   // closing the account does (sweep 08-B5: the order used to fail silently, paid and never made)

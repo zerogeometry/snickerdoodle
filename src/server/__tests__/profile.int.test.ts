@@ -60,13 +60,15 @@ describe.skipIf(!DB || !S3)('profiles — pictures, header, family banner, name,
     expect(meta.exif).toBeUndefined();
 
     expect(await readProfileImage(db, res.id, ids.samId)).not.toBeNull(); // yourself
-    expect(await readProfileImage(db, res.id, ids.rosieId)).not.toBeNull(); // shares Hartley
+    expect(await readProfileImage(db, res.id, ids.joId)).not.toBeNull(); // Hartley's family circle
+    expect(await readProfileImage(db, res.id, ids.rosieId)).toBeNull(); // Hartley's extended circle: initials only (D27)
     expect(await readProfileImage(db, res.id, ids.blakeId)).toBeNull(); // another family
     expect(await readProfileImage(db, res.id, ids.malloryId)).toBeNull(); // removed member
     expect(await readProfileImage(db, res.id, null)).toBeNull(); // signed out — nothing public
 
-    const map = await profileImagesFor(db, ids.rosieId, [ids.samId]);
+    const map = await profileImagesFor(db, ids.joId, [ids.samId]);
     expect(map.get(ids.samId)?.avatarUrl).toBe(`/api/profile-image/${res.id}`);
+    expect((await profileImagesFor(db, ids.rosieId, [ids.samId])).get(ids.samId)?.avatarUrl).toBeNull();
     expect((await profileImagesFor(db, ids.blakeId, [ids.samId])).get(ids.samId)?.avatarUrl).toBeNull();
   });
 

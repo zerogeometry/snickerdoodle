@@ -41,7 +41,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Your creations</strong> — the drawings and photos you upload, and the designs we make from them.</li>
           <li><strong>Your orders</strong> — what you bought, your delivery address, and a secure payment token (we never see or store your full card details).</li>
           <li><strong>Your preferences</strong> — your marketing and reminder choices.</li>
-          <li><strong>Wishlists and shares</strong> — the wishlists you create and the private links you share with family.</li>
+          <li><strong>Wishlists and shares</strong> — the wishlists you create and the private links you share: each person gets their own link, and who you sent it to.</li>
           <li><strong>Messages you send us</strong> — what you tell us through our help page (and any order reference), plus the email address we reply to.</li>
           <li><strong>Basic technical data</strong> — device and cookie data, for security and to keep the site working.</li>
         </ul>
@@ -52,8 +52,9 @@ export default function PrivacyNoticePage() {
           drawing), each with the child&apos;s first name it&apos;s filed under, the day it was made and whether it was
           drawn on screen or paper; and, only if you tick them, your little ones&apos; first names and birthdays, their
           drawing days (so a new phone can pick them up), and your family calendar&apos;s birthdays and special days (a
-          name, an optional relation, and the day and month, never a year — seen by everyone you share your family
-          calendar with). App drawings get the same private storage and safety checks as uploads. Your account page
+          name, an optional relation, and the day and month, never a year). A date added from the app is kept to your
+          home — you, a partner and grown-up children — until you choose to share it wider on the website; the app can
+          never share anything wider itself. App drawings get the same private storage and safety checks as uploads. Your account page
           lists linked phones and their choices, lets you disconnect them, delete backed-up drawing days, and remove
           everything the app sent. Your data download includes all of this. A phone unused for 90 days is disconnected;
           drawing days nobody backs up for a year are deleted. Stopping a sync never deletes what&apos;s already here.
@@ -80,6 +81,31 @@ export default function PrivacyNoticePage() {
           design the service in line with the ICO&apos;s Children&apos;s Code. In practice: privacy is the default;
           we collect as little as possible; we never profile children or use their data for behavioural advertising;
           and you can see and delete anything about your child, any time, in one place.
+        </p>
+        <p>
+          <strong>Who sees what in your family.</strong> Nothing is ever public. A family has three circles you choose
+          people into: <strong>home</strong> (the family lead, a partner or co-parent, and grown-up children),{' '}
+          <strong>family</strong> and <strong>extended family</strong>. Each keepsake is set to only me, home, family or
+          extended, and the closer circles see the wider settings too (home sees everything shared with home, family and
+          extended; extended family sees only what&apos;s shared with extended). New keepsakes start at family. Sharing
+          is always person to person: when you share with someone, nobody in their own family gets anything through
+          them. Whoever adds a keepsake chooses who sees it; for anything filed under a child, that child&apos;s parent
+          always sees it and can make it more private or remove it, but never share it wider. Joining a family is never
+          silent: the person joining says yes first, and joining the home means agreeing that the family lead looks
+          after the family&apos;s keepsakes and details. Profile pictures and headers are seen by your home and family
+          circles (extended family sees your initials); a family banner by everyone in that family.
+        </p>
+        <p>
+          <strong>Birthdays and special days.</strong> When you add a date to the family calendar you say whose day it
+          is. Your own, your partner&apos;s and your little ones&apos; days can be shared with any circle; someone
+          else&apos;s day (a friend&apos;s, a brother-in-law&apos;s) stays in your home and can&apos;t be shared wider,
+          because it&apos;s theirs to share. Anyone in a family can add their own birthday and choose who sees it.
+          Beyond your home a date shows only a first name, the day and the month — never the year.
+        </p>
+        <p>
+          <strong>Ready-to-buy links.</strong> Each person you send one to gets their own private link, which shows only
+          what their circle can see, and which you can switch off on its own. A link you copy to share yourself shows
+          only what the circle you pick can see. Anyone holding a link can open it without signing in, for 14 days.
         </p>
         <p>
           <strong>When a person looks at a picture.</strong> Our safety checks are automatic, so nearly every picture
@@ -136,7 +162,7 @@ export default function PrivacyNoticePage() {
           <li><strong>Drawings and photos you upload:</strong> only as long as we need them to make and send your order, plus 30 days after it&apos;s sent in case anything needs reprinting — then we delete them, <strong>unless</strong> you choose to keep them in your Keepsake Home (we ask after you order).</li>
           <li><strong>The print file we send our printer:</strong> Prodigi keeps it for about 45 days after making your order, in case it needs reprinting, then deletes it.</li>
           <li><strong>Keepsake Home items:</strong> for as long as you want them. Delete any time.</li>
-          <li><strong>Profile pictures, profile headers and family banners:</strong> until you change or remove them, or close your account. Only people in your family can see them, and we strip location data from every one.</li>
+          <li><strong>Profile pictures, profile headers and family banners:</strong> until you change or remove them, or close your account. Only your home and family circles see your picture and header (extended family sees your initials), only that family sees its banner, and we strip location data from every one.</li>
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
           <li><strong>Messages you send us through the help page:</strong> two years after we receive them, so we can look back if an order needs it — then deleted.</li>
           <li><strong>Account data:</strong> until you close your account.</li>

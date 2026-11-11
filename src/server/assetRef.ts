@@ -7,6 +7,8 @@ export type AssetRefRow = {
   uploaderAccountId: string | null;
   controllerAccountId: string | null;
   visibility: AssetRef['visibility'];
+  /** D27: the little one's parent's ceiling — required, so a partial select can't quietly drop it. */
+  parentLimit: AssetRef['parentLimit'];
   ephemeralClaimId?: string | null;
   moderationStatus: string;
   moderationDetail?: unknown;
@@ -42,6 +44,7 @@ export function assetRefOf(row: AssetRefRow): AssetRef {
     uploaderAccountId: row.uploaderAccountId,
     controllerAccountId: row.controllerAccountId,
     visibility: row.visibility,
+    parentLimit: row.parentLimit,
     ephemeralClaimId: row.ephemeralClaimId ?? null,
     heldForReview: isHiddenUntilCleared(row),
   };

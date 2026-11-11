@@ -1,6 +1,6 @@
 {
-  "id": "0879906f-c7a1-4a3c-b42e-28f4c49c1648",
-  "prevId": "1a279ef8-76b1-413e-8074-4810b5e3f85b",
+  "id": "500daf3c-56bb-4306-96a5-d2c5ff0ca338",
+  "prevId": "011c0210-812c-4cad-aed9-f35835b6cd0c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -796,6 +796,13 @@
           "notNull": true,
           "default": "'FAMILY'"
         },
+        "parent_limit": {
+          "name": "parent_limit",
+          "type": "visibility_tier",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
         "moderation_status": {
           "name": "moderation_status",
           "type": "moderation_status",
@@ -1525,6 +1532,31 @@
           "primaryKey": false,
           "notNull": false
         },
+        "recipient_email": {
+          "name": "recipient_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "recipient_account_id": {
+          "name": "recipient_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audience_circle": {
+          "name": "audience_circle",
+          "type": "family_circle",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "batch_id": {
+          "name": "batch_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "gift_link_status",
@@ -1609,6 +1641,19 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
+        },
+        "gift_links_recipient_account_id_accounts_id_fk": {
+          "name": "gift_links_recipient_account_id_accounts_id_fk",
+          "tableFrom": "gift_links",
+          "tableTo": "accounts",
+          "columnsFrom": [
+            "recipient_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -1685,6 +1730,12 @@
         "invitee_name": {
           "name": "invitee_name",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "membership_id": {
+          "name": "membership_id",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": false
         },
@@ -1851,6 +1902,18 @@
         },
         "join_saving_consumed_at": {
           "name": "join_saving_consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "join_consent_version": {
+          "name": "join_consent_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "join_consented_at": {
+          "name": "join_consented_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
@@ -2300,6 +2363,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'FAMILY'"
+        },
+        "whose": {
+          "name": "whose",
+          "type": "occasion_whose",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'OURS'"
         },
         "created_by_account_id": {
           "name": "created_by_account_id",
@@ -5245,6 +5316,7 @@
       "name": "family_circle",
       "schema": "public",
       "values": [
+        "HOME",
         "FAMILY",
         "EXTENDED"
       ]
@@ -5399,6 +5471,14 @@
         "OTHER"
       ]
     },
+    "public.occasion_whose": {
+      "name": "occasion_whose",
+      "schema": "public",
+      "values": [
+        "OURS",
+        "SOMEONE_ELSE"
+      ]
+    },
     "public.order_status": {
       "name": "order_status",
       "schema": "public",
@@ -5482,7 +5562,8 @@
         "GRANDPARENT",
         "AUNT_UNCLE",
         "CLOSE_FRIEND",
-        "OTHER"
+        "OTHER",
+        "ADULT_CHILD"
       ]
     },
     "public.rights_req_status": {
@@ -5548,6 +5629,7 @@
       "schema": "public",
       "values": [
         "ONLY_ME",
+        "HOME",
         "FAMILY",
         "EXTENDED"
       ]

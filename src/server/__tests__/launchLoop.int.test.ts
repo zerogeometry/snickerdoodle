@@ -11,7 +11,7 @@ import { resolveViewerContext } from '@/server/assets';
 import { seedCatalogue } from '@/server/catalogue';
 import { ensureTestCosts } from '@/test/costFixture';
 import { addChild } from '@/server/children';
-import { createGiftLink, getGiftLink, listGiftListsForOwner, placeGiftLinkOrder, revokeGiftLink, sendGiftRequest } from '@/server/giftLinks';
+import { createGiftLink, getGiftLink, listGiftListsForOwner, placeGiftLinkOrder, revokeGiftLink, sendGiftLinks } from '@/server/giftLinks';
 import { deleteSavedDesign, listSavedDesigns, saveDesign } from '@/server/savedDesigns';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { markOrderPaid, placeOrder } from '@/server/orders';
@@ -24,6 +24,8 @@ import { deleteObject } from '@/storage';
 import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
 import { exclusively } from '@/test/globalJobs';
+import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
+const YES = { version: JOIN_CONSENT_VERSION };
 
 const DB = process.env.DATABASE_URL;
 const S3 = process.env.S3_ENDPOINT;
@@ -79,7 +81,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
 
   async function linkFor(assetIds: string[], productKey?: string) {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    return createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds, productKey });
+    return createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds, productKey, recipient: { kind: 'open', circle: 'FAMILY' } });
   }
 
   // ── G1: a gift-link purchase carries the child's artwork ──────────────────
@@ -131,7 +133,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const notInLink = await keptDrawing();
     const bloomArt = await keptDrawing(ids.bloomId, ids.blakeId);
     const [link] = await db.select().from(giftLinks).where(eq(giftLinks.id, (await linkFor([inLink])).id));
-    const grant = { familyId: link!.familyId, status: 'ACTIVE' as const, expiresAt: link!.expiresAt, assetIds: [inLink] };
+    const grant = { familyId: link!.familyId, status: 'ACTIVE' as const, expiresAt: link!.expiresAt, assetIds: [inLink], audienceCircle: 'FAMILY' as const };
 
     for (const assetId of [notInLink, bloomArt]) {
       await expect(
@@ -208,7 +210,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: a, transform: { scale: 0 } } }],
       account: null,
       joinProvenance: null,
-      giftLink: { familyId: ids.hartleyId, status: 'ACTIVE', expiresAt: new Date(Date.now() + 86_400_000), assetIds: [a, b] },
+      giftLink: { familyId: ids.hartleyId, status: 'ACTIVE', expiresAt: new Date(Date.now() + 86_400_000), assetIds: [a, b], audienceCircle: 'FAMILY' },
       giftMeta: { linkId: id, fromName: 'Uncle Bo' },
     });
     orderRefs.push(one.ref!);
@@ -245,7 +247,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect((await listSavedDesigns(db, ids.joId, ids.hartleyId)).some((d) => d.id === saved.id)).toBe(false);
 
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
-    const link = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id] });
+    const link = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id], recipient: { kind: 'open', circle: 'FAMILY' } });
     const res = await placeGiftLinkOrder(db, { token: link.token, account: null, joinProvenance: null, fromName: 'Granny' });
     expect(res.ok).toBe(true);
     orderRefs.push(res.ref!);
@@ -258,11 +260,21 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect(line!.productKey).toBe('mug');
     expect(line!.transform).toMatchObject({ scale: 1.4, offsetX: 0.2 });
 
-    // sending: owner only; members resolved server-side; junk emails dropped
-    const sent = await sendGiftRequest(db, sam, { familyId: ids.hartleyId, linkId: link.id, memberAccountIds: [ids.rosieId, ids.blakeId], emails: ['aunt@example.test', 'not-an-email'] });
-    expect(sent.sent).toBe(2); // Rosie (member) + the aunt; Blake is another family's — ignored
+    // sending (D27: one link per person): owner only; members resolved server-side; junk emails dropped
+    const sent = await sendGiftLinks(db, sam, {
+      familyId: ids.hartleyId,
+      assetIds: [],
+      designIds: [saved.id],
+      to: [{ memberAccountId: ids.joId }, { memberAccountId: ids.rosieId }, { memberAccountId: ids.blakeId }, { email: 'aunt@example.test' }, { email: 'not-an-email' }],
+    });
+    // Jo (family circle) sees the family-level design and gets her own link; Rosie (extended) and the aunt (someone
+    // new: extended) don't — they're named back to the parent, never sent an empty link; Blake is another family's
+    expect(sent.sent).toBe(1);
+    expect(sent.skipped).toEqual([ids.rosieId, 'aunt@example.test']);
+    const mine = await db.select().from(giftLinks).where(eq(giftLinks.batchId, sent.batchId));
+    expect(mine.map((l) => [l.recipientAccountId, l.audienceCircle])).toEqual([[ids.joId, 'FAMILY']]);
     const rosie = await resolveViewerContext(db, ids.rosieId, ids.hartleyId);
-    await expect(sendGiftRequest(db, rosie, { familyId: ids.hartleyId, linkId: link.id, memberAccountIds: [], emails: ['x@example.test'] })).rejects.toBeInstanceOf(AuthzError);
+    await expect(sendGiftLinks(db, rosie, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id], to: [{ email: 'x@example.test' }] })).rejects.toBeInstanceOf(AuthzError);
 
     expect(await deleteSavedDesign(db, ids.joId, saved.id)).toBe(false); // not theirs
     expect(await deleteSavedDesign(db, ids.samId, saved.id)).toBe(true);
@@ -407,7 +419,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       const [acct] = await db.insert(schema.accounts).values({ email }).returning();
       extraAccounts.push(acct!.id);
       const { token } = await createInvite(db, sam, { familyId: ids.hartleyId, email, relationship: 'AUNT_UNCLE', accessLevel: 'VIEW_BUY', shareOccasions: share });
-      expect((await acceptInvite(db, { id: acct!.id, email }, token)).ok).toBe(true);
+      expect((await acceptInvite(db, { id: acct!.id, email }, token, YES)).ok).toBe(true);
       const [m] = await db.select().from(memberships).where(and(eq(memberships.accountId, acct!.id), eq(memberships.familyId, ids.hartleyId)));
       expect(m!.seesOccasions).toBe(share);
     }

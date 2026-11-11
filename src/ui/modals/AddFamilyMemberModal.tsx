@@ -10,19 +10,29 @@ import { toast } from '@/lib/store';
 import { createInviteAction } from '@/app/actions/invite';
 import { addChildAction } from '@/app/actions/family';
 import { useRouter } from 'next/navigation';
-import type { AccessLevel, Relationship } from '@/domain/types';
+import type { AccessLevel, Circle, Relationship } from '@/domain/types';
+import { circlesFor, defaultCircleFor } from '@/domain/relationships';
 import { LunarChoice, type LunarValue } from '@/ui/components/LunarChoice';
 
-export type Rel = 'Child' | 'Parent' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
+export type Rel = 'Child' | 'Parent' | 'Grown-up child' | 'Grandparent' | 'Aunt / uncle' | 'Close friend' | 'Other';
 
-const RELS: { label: Rel; circle: 'Family' | 'Extended' | 'subject'; enum: Relationship }[] = [
+/** D27: a little one is a keepsake subject; everyone else is invited, and their relationship sets the circle they
+ * start in — which the parent can change right here (home only for a parent or a grown-up child). */
+const RELS: { label: Rel; circle: 'subject' | 'invite'; enum: Relationship }[] = [
   { label: 'Child', circle: 'subject', enum: 'CHILD' },
-  { label: 'Parent', circle: 'Family', enum: 'PARENT' },
-  { label: 'Grandparent', circle: 'Extended', enum: 'GRANDPARENT' },
-  { label: 'Aunt / uncle', circle: 'Extended', enum: 'AUNT_UNCLE' },
-  { label: 'Close friend', circle: 'Extended', enum: 'CLOSE_FRIEND' },
-  { label: 'Other', circle: 'Extended', enum: 'OTHER' },
+  { label: 'Parent', circle: 'invite', enum: 'PARENT' },
+  { label: 'Grown-up child', circle: 'invite', enum: 'ADULT_CHILD' },
+  { label: 'Grandparent', circle: 'invite', enum: 'GRANDPARENT' },
+  { label: 'Aunt / uncle', circle: 'invite', enum: 'AUNT_UNCLE' },
+  { label: 'Close friend', circle: 'invite', enum: 'CLOSE_FRIEND' },
+  { label: 'Other', circle: 'invite', enum: 'OTHER' },
 ];
+
+const CIRCLE_CHOICES: Record<Circle, { label: string; hint: string }> = {
+  HOME: { label: 'home', hint: 'the grown-ups at home. they’ll see what you share with home, family and extended — and they’ll say yes to you looking after the family’s keepsakes when they join.' },
+  FAMILY: { label: 'family', hint: 'they’ll see keepsakes you share with your family, and your extended ones too.' },
+  EXTENDED: { label: 'extended', hint: 'they’ll see keepsakes you share with extended family — never your home, family-only or private ones.' },
+};
 
 const ACCESS_ENUM: Record<string, AccessLevel> = { view: 'VIEW', view_buy: 'VIEW_BUY', contribute: 'CONTRIBUTE' };
 
@@ -30,12 +40,31 @@ function relOf(rel: Rel) {
   return RELS.find((r) => r.label === rel)!;
 }
 
-export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent' }: { open: boolean; onClose: () => void; /** where it opens (the pinboard row tapped) */ initialRel?: Rel }) {
+export function AddFamilyMemberModal({
+  open,
+  onClose,
+  initialRel = 'Grandparent',
+  initialCircle,
+}: {
+  open: boolean;
+  onClose: () => void;
+  /** where it opens (the pinboard row tapped) */
+  initialRel?: Rel;
+  /** the row's circle, when it allows that relationship */
+  initialCircle?: Circle;
+}) {
   const [rel, setRel] = useState<Rel>(initialRel);
+  const [circleChoice, setCircleChoice] = useState<Circle>(defaultCircleFor(relOf(initialRel).enum));
   // opened from a different row of the pinboard: start on that kind of person
   useEffect(() => {
     if (open) setRel(initialRel);
   }, [open, initialRel]);
+  // a new relationship starts on the row's circle when it may be there, else its own default (the parent can still
+  // pick another it allows)
+  useEffect(() => {
+    const allowed = circlesFor(relOf(rel).enum);
+    setCircleChoice(initialCircle && allowed.includes(initialCircle) ? initialCircle : defaultCircleFor(relOf(rel).enum));
+  }, [rel, initialCircle]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [birthday, setBirthday] = useState('');
@@ -48,8 +77,8 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const circle = relOf(rel).circle;
-  const isChild = circle === 'subject';
+  const isChild = relOf(rel).circle === 'subject';
+  const allowedCircles = circlesFor(relOf(rel).enum);
 
   const reset = () => {
     setName('');
@@ -105,6 +134,7 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
         relationship: relOf(rel).enum,
         accessLevel: ACCESS_ENUM[access] ?? 'VIEW_BUY',
         shareOccasions: shareCalendar,
+        circle: circleChoice, // the parent's choice — checked server-side against the relationship
         name: trimmed, // says hello in the invite email, and becomes their name when they join
       });
       if (res.needsAuth) {
@@ -181,19 +211,28 @@ export function AddFamilyMemberModal({ open, onClose, initialRel = 'Grandparent'
                 Added as one of your little ones — a <b className="text-green-save">keepsake subject</b>, not an account
                 holder.
               </>
-            ) : circle === 'Family' ? (
-              <>
-                Joins your <b className="text-green-save">Family</b> — they&apos;ll see keepsakes you share with your
-                family, and your Extended ones too.
-              </>
             ) : (
               <>
-                Joins your <b className="text-green-save">Extended family</b> — they&apos;ll see keepsakes you share with
-                Extended family, never your Family-only or private ones.
+                Joins your <b className="text-green-save">{CIRCLE_CHOICES[circleChoice].label}</b> circle —{' '}
+                {CIRCLE_CHOICES[circleChoice].hint}
               </>
             )}
           </p>
         </div>
+        {!isChild ? (
+          <fieldset className="mt-3">
+            <legend className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">
+              Which circle? <span className="font-normal normal-case text-ink-faint">· you can change it later</span>
+            </legend>
+            <div className="flex flex-wrap gap-1.5">
+              {allowedCircles.map((c) => (
+                <Chip key={c} active={circleChoice === c} onClick={() => setCircleChoice(c)}>
+                  {CIRCLE_CHOICES[c].label}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
       </div>
 
       {/* Birthday: a little one's, for the family calendar (an adult's isn't needed — 04-B8) */}

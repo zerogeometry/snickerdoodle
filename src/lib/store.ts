@@ -17,7 +17,7 @@ import { toSessionUpload, UPLOAD_SESSION_KEY, uploadSessionStorage, type UploadS
  * the central authz module once auth/storage/DB are wired.
  */
 
-export type VisibilityTier = 'ONLY_ME' | 'FAMILY' | 'EXTENDED';
+export type VisibilityTier = 'ONLY_ME' | 'HOME' | 'FAMILY' | 'EXTENDED';
 
 // ── money helpers (re-exported from the server-trusted pricing module) ───────
 export { DELIVERY_PENCE };

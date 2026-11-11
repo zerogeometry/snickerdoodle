@@ -10,7 +10,8 @@ import { Modal } from '@/ui/primitives/Modal';
 import { Toggle } from '@/ui/primitives/Toggle';
 import { toast } from '@/lib/store';
 import { removeMemberAction, setMemberAccessAction, setMemberCalendarAction } from '@/app/actions/family';
-import type { AccessLevel, Circle } from '@/domain/types';
+import type { AccessLevel, Circle, Relationship } from '@/domain/types';
+import { circlesFor } from '@/domain/relationships';
 
 export interface ManagedMember {
   accountId: string;
@@ -18,9 +19,14 @@ export interface ManagedMember {
   circle: Circle;
   accessLevel: AccessLevel;
   seesOccasions: boolean;
+  /** decides which circles they may be in (home: a parent or grown-up child — D27) */
+  relationship: Relationship;
+  /** they've been asked into home and haven't said yes yet */
+  homeAsked?: boolean;
 }
 
 const CIRCLES: { value: Circle; label: string; hint: string }[] = [
+  { value: 'HOME', label: 'Home', hint: 'sees home, family + extended keepsakes' },
   { value: 'FAMILY', label: 'Family', hint: 'sees family + extended keepsakes' },
   { value: 'EXTENDED', label: 'Extended', hint: 'sees only what you mark extended' },
 ];
@@ -57,6 +63,12 @@ export function ManageMemberModal({ member, onClose }: { member: ManagedMember |
         setState(before);
         return toast('couldn’t change that — try again');
       }
+      // into home waits for THEIR yes (D27): nothing changes until they tap the link we've emailed them
+      if (res.homeAsked) {
+        setState({ ...before, ...(patch.accessLevel ? { accessLevel: patch.accessLevel } : {}), homeAsked: true });
+        toast(`we’ve asked ${first} — they move into home once they say yes`);
+        return router.refresh();
+      }
       toast(`saved — ${first} sees the change straight away`);
       router.refresh();
     });
@@ -88,13 +100,16 @@ export function ManageMemberModal({ member, onClose }: { member: ManagedMember |
       <fieldset className="mb-4">
         <legend className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-ink-faint">what they can see</legend>
         <div className="flex flex-wrap gap-1.5">
-          {CIRCLES.map((c) => (
+          {CIRCLES.filter((c) => circlesFor(state.relationship).includes(c.value)).map((c) => (
             <Chip key={c.value} active={state.circle === c.value} disabled={pending} onClick={() => state.circle !== c.value && change({ circle: c.value })}>
               {c.label}
             </Chip>
           ))}
         </div>
         <p className="mt-1.5 text-xs text-ink-soft">{CIRCLES.find((c) => c.value === state.circle)?.hint}</p>
+        {state.homeAsked && state.circle !== 'HOME' ? (
+          <p role="status" className="mt-1.5 text-xs font-semibold text-cinnamon">asked into home — waiting for {first} to say yes</p>
+        ) : null}
       </fieldset>
 
       <fieldset className="mb-4">

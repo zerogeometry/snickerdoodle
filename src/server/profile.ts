@@ -2,7 +2,7 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { and, eq, gt, inArray, ne } from 'drizzle-orm';
 import sharp from 'sharp';
 import { accounts, auditRecords, emailChangeRequests, families, memberships, profileImages } from '@/db/schema';
-import { canManageFamily, canViewProfileImage, SCREENING_NOT_CONFIGURED_LABEL } from '@/authz';
+import { canManageFamily, canViewProfileImage, SCREENING_NOT_CONFIGURED_LABEL, type FamilySeat } from '@/authz';
 import { deleteObjectConfirmed, getObjectBytes, putObject } from '@/storage';
 import { resolveViewerContext } from './assets';
 import type { DbHandle } from './db';
@@ -26,11 +26,15 @@ const MAX_INPUT_PIXELS = 60_000_000;
 export const profileImageUrl = (id: string) => `/api/profile-image/${id}`;
 
 export async function activeFamilyIdsFor(db: DbHandle, accountId: string): Promise<string[]> {
-  const rows = await db
-    .select({ familyId: memberships.familyId })
+  return (await activeFamiliesFor(db, accountId)).map((r) => r.familyId);
+}
+
+/** Every family this account is ACTIVE in, with their circle there (profile pictures follow circle rules — D27). */
+export async function activeFamiliesFor(db: DbHandle, accountId: string): Promise<FamilySeat[]> {
+  return db
+    .select({ familyId: memberships.familyId, circle: memberships.circle, isOwner: memberships.isOwner })
     .from(memberships)
     .where(and(eq(memberships.accountId, accountId), eq(memberships.status, 'ACTIVE')));
-  return rows.map((r) => r.familyId);
 }
 
 export type SetImageResult = { ok: true; id: string; status: string } | { ok: false; reason: 'not-an-image' | 'too-big' | 'not-owner' };
@@ -166,11 +170,11 @@ export async function eraseProfileImage(db: DbHandle, row: { id: string; key: st
 export async function readProfileImage(db: DbHandle, id: string, viewerAccountId: string | null): Promise<{ bytes: Buffer; contentType: string } | null> {
   const [row] = await db.select().from(profileImages).where(eq(profileImages.id, id));
   if (!row) return null;
-  const viewerFamilies = viewerAccountId ? await activeFamilyIdsFor(db, viewerAccountId) : [];
+  const viewerFamilies = viewerAccountId ? await activeFamiliesFor(db, viewerAccountId) : [];
   const ownerFamilies = row.kind === 'FAMILY_BANNER' ? [] : await activeFamilyIdsFor(db, row.accountId);
   const decision = canViewProfileImage(
     { kind: row.kind, accountId: row.accountId, familyId: row.familyId, moderationStatus: row.moderationStatus, ownerFamilyIds: ownerFamilies },
-    { accountId: viewerAccountId, activeFamilyIds: viewerFamilies },
+    { accountId: viewerAccountId, activeFamilies: viewerFamilies },
   );
   if (!decision.allowed) return null;
   return { bytes: await getObjectBytes(row.key), contentType: row.contentType };
@@ -191,13 +195,13 @@ export async function profileImagesFor(
     .select()
     .from(profileImages)
     .where(and(inArray(profileImages.accountId, accountIds), ne(profileImages.kind, 'FAMILY_BANNER')));
-  const viewerFamilies = await activeFamilyIdsFor(db, viewerAccountId);
+  const viewerFamilies = await activeFamiliesFor(db, viewerAccountId);
   for (const id of accountIds) out.set(id, { avatarUrl: null, headerUrl: null });
   for (const r of rows) {
     const ownerFamilies = await activeFamilyIdsFor(db, r.accountId);
     const ok = canViewProfileImage(
       { kind: r.kind, accountId: r.accountId, familyId: null, moderationStatus: r.moderationStatus, ownerFamilyIds: ownerFamilies },
-      { accountId: viewerAccountId, activeFamilyIds: viewerFamilies },
+      { accountId: viewerAccountId, activeFamilies: viewerFamilies },
     ).allowed;
     if (!ok) continue;
     const slot = out.get(r.accountId)!;
@@ -213,7 +217,7 @@ export async function familyBannerFor(db: DbHandle, viewerAccountId: string, fam
   if (!r) return null;
   const ok = canViewProfileImage(
     { kind: r.kind, accountId: r.accountId, familyId: r.familyId, moderationStatus: r.moderationStatus, ownerFamilyIds: [] },
-    { accountId: viewerAccountId, activeFamilyIds: await activeFamilyIdsFor(db, viewerAccountId) },
+    { accountId: viewerAccountId, activeFamilies: await activeFamiliesFor(db, viewerAccountId) },
   ).allowed;
   return ok ? profileImageUrl(r.id) : null;
 }

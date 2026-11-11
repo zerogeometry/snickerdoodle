@@ -1,11 +1,11 @@
-import { and, desc, eq, gt, inArray } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { accounts, assets, children, families, invites, memberships } from '@/db/schema';
-import { canAddOccasion, canSeeFamilyCalendar, canSetCelebrate, canViewAsset } from '@/authz';
+import { canAddHouseholdOccasion, canAddOwnOccasion, canSeeFamilyCalendar, canSetCelebrate, canViewAsset } from '@/authz';
 import { cleanCelebrate } from '@/lib/occasions/catalogue';
 import { assetRefOf } from './assetRef';
 import { keepsakeLooks } from './keepsakeCopy';
 import { keepsakeThumbUrls } from './keepsakeThumbs';
-import { loadCalendar, occasionsFor, type CalendarEvent } from './occasions';
+import { loadCalendar, occasionsFor, type CalendarEvent, type OccasionForSheet } from './occasions';
 import { addDays } from './occasions/dates';
 import { hasReminderConsent } from './reminders';
 import { resolveViewerContext } from './assets';
@@ -15,6 +15,7 @@ import { ensureHomeFamily } from './onboarding';
 import { getCurrentAccount } from './session';
 import { familyBannerFor, profileImagesFor } from './profile';
 import { memberName } from './memberName';
+import { pendingHomeAsks } from './members';
 
 export interface FamilyMember {
   accountId: string;
@@ -27,6 +28,8 @@ export interface FamilyMember {
   seesOccasions: boolean;
   avatarUrl: string | null;
   relationship: Relationship;
+  /** asked into home and not yet said yes (D27) */
+  homeAsked: boolean;
 }
 
 export interface FamilyPendingInvite {
@@ -54,19 +57,14 @@ export interface OtherFamily {
   /** keepsakes in it the viewer can see */
   keepsakes: number;
   seesCalendar: boolean;
+  /** D27: the days the viewer added to THIS family's calendar (their own birthday…) — theirs to change. */
+  myDays: FamilyOccasion[];
+  /** May they add the household's days here too (a home member who can add), not just their own? */
+  canAddHousehold: boolean;
 }
 
-export interface FamilyOccasion {
-  id: string;
-  title: string;
-  kind: 'BIRTHDAY' | 'ANNIVERSARY' | 'MILESTONE' | 'OTHER';
-  date: string;
-  lunar: 'CHINESE' | 'KOREAN' | null;
-  childId: string | null;
-  memberAccountId: string | null;
-  shareCircle: Circle;
-  canChange: boolean;
-}
+/** An occasion as the add / change sheet gets it (whose day, who sees it, the viewer's say — src/authz/occasions). */
+export type FamilyOccasion = OccasionForSheet;
 
 export interface FamilyData {
   familyId: string;
@@ -88,7 +86,16 @@ export interface FamilyData {
   occasions: FamilyOccasion[];
   /** the days we celebrate (festival group ids) */
   celebrate: string[];
-  viewer: { accountId: string; canAddOccasion: boolean; canSetCelebrate: boolean; seesCalendar: boolean; remindersOn: boolean };
+  viewer: {
+    accountId: string;
+    /** may add the household's days (ours, or someone else's) to this calendar — the leader / a home member who can add */
+    canAddOccasion: boolean;
+    /** may add their own day (anyone in the family) */
+    canAddOwnDay: boolean;
+    canSetCelebrate: boolean;
+    seesCalendar: boolean;
+    remindersOn: boolean;
+  };
   myFamilies: OtherFamily[];
   /** the newest keepsakes the viewer can see here, small */
   recentlyKept: { id: string; thumbUrl: string | null }[];
@@ -111,6 +118,7 @@ export async function loadFamily(): Promise<FamilyData | null> {
 
   // the parent sees the addresses they invited; relatives never see each other's (04-B9)
   const viewerIsParent = memberRows.some(({ m, a }) => a.id === account.id && m.isOwner);
+  const askedHome = viewerIsParent ? await pendingHomeAsks(db, familyId) : new Set<string>();
   const members: FamilyMember[] = memberRows.map(({ m, a }) => {
     const name = memberName(a, m.relationship, { byThemself: a.id === account.id, byParent: viewerIsParent });
     return {
@@ -124,6 +132,7 @@ export async function loadFamily(): Promise<FamilyData | null> {
       seesOccasions: m.seesOccasions,
       avatarUrl: null as string | null,
       relationship: m.relationship,
+      homeAsked: askedHome.has(m.id),
     };
   });
   const pictures = await profileImagesFor(db, account.id, members.map((m) => m.accountId));
@@ -145,7 +154,8 @@ export async function loadFamily(): Promise<FamilyData | null> {
     ? await db
         .select({ id: invites.id, email: invites.email, circle: invites.circle, relationship: invites.relationship, expiresAt: invites.expiresAt })
         .from(invites)
-        .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date())))
+        // not a "move into home" ask (that's an existing member — their own card says so)
+        .where(and(eq(invites.familyId, familyId), eq(invites.status, 'PENDING'), gt(invites.expiresAt, new Date()), isNull(invites.membershipId)))
         .orderBy(desc(invites.createdAt))
         .then((rows) => rows.map(({ expiresAt, ...i }) => ({ ...i, expiresAtISO: expiresAt.toISOString() })))
     : [];
@@ -159,7 +169,7 @@ export async function loadFamily(): Promise<FamilyData | null> {
   const calendarFrom = `${today.slice(0, 7)}-01`;
   const calendarTo = addDays(`${String(Number(today.slice(0, 4)) + 1)}-${today.slice(5, 7)}-01`, -1);
   const calendar = await loadCalendar(db, account.id, familyId, calendarFrom, calendarTo);
-  const occasionRows = (await occasionsFor(db, account.id, familyId)) as FamilyOccasion[];
+  const occasionRows: FamilyOccasion[] = await occasionsFor(db, account.id, familyId);
 
   // ── keepsakes the viewer can see here: the count, and the newest few, small ──
   const kept = await db.select().from(assets).where(and(eq(assets.familyId, familyId), eq(assets.keptInHome, true))).orderBy(desc(assets.createdAt));
@@ -185,6 +195,7 @@ export async function loadFamily(): Promise<FamilyData | null> {
     ? await db.select().from(assets).where(and(inArray(assets.familyId, otherRows.map(({ f }) => f.id)), eq(assets.keptInHome, true)))
     : [];
   const myFamilies: OtherFamily[] = [];
+  const seatOf = (m: typeof memberships.$inferSelect) => ({ familyId: m.familyId, accountId: m.accountId, circle: m.circle, accessLevel: m.accessLevel, status: m.status, isOwner: m.isOwner, seesOccasions: m.seesOccasions });
   for (const { m, f } of otherRows) {
     const v = await resolveViewerContext(db, account.id, f.id);
     myFamilies.push({
@@ -194,7 +205,9 @@ export async function loadFamily(): Promise<FamilyData | null> {
       relationship: m.relationship,
       circle: m.circle,
       keepsakes: otherKept.filter((a) => a.familyId === f.id && a.moderationStatus !== 'BLOCKED' && canViewAsset(assetRefOf(a), v).allowed).length,
-      seesCalendar: canSeeFamilyCalendar({ familyId: f.id, accountId: m.accountId, circle: m.circle, accessLevel: m.accessLevel, status: m.status, isOwner: m.isOwner, seesOccasions: m.seesOccasions }, f.id),
+      seesCalendar: canSeeFamilyCalendar(seatOf(m), f.id),
+      myDays: (await occasionsFor(db, account.id, f.id)).filter((o) => o.editRole === 'creator'),
+      canAddHousehold: canAddHouseholdOccasion(seatOf(m), f.id),
     });
   }
 
@@ -215,7 +228,8 @@ export async function loadFamily(): Promise<FamilyData | null> {
     celebrate: cleanCelebrate(family?.celebrate),
     viewer: {
       accountId: account.id,
-      canAddOccasion: canAddOccasion(cm, familyId),
+      canAddOccasion: canAddHouseholdOccasion(cm, familyId),
+      canAddOwnDay: canAddOwnOccasion(cm, familyId),
       canSetCelebrate: canSetCelebrate(cm, familyId),
       seesCalendar: canSeeFamilyCalendar(cm, familyId),
       remindersOn: await hasReminderConsent(db, account.id),

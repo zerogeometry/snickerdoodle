@@ -9,7 +9,7 @@ import { getCurrentAccount } from '@/server/session';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
 import { sendMail } from '@/server/mail';
 import { familyInviteEmail } from '@/server/mail/familyInvite';
-import type { AccessLevel, Relationship } from '@/domain/types';
+import type { AccessLevel, Circle, Relationship } from '@/domain/types';
 
 /**
  * Send a family invite. Parent-initiated only (the server checks ownership). Delivered
@@ -23,6 +23,8 @@ export async function createInviteAction(input: {
   relationship: Relationship;
   accessLevel: AccessLevel;
   shareOccasions?: boolean;
+  /** the leader's circle choice (D27) — checked server-side against the relationship */
+  circle?: Circle;
   name?: string;
 }): Promise<{ ok: boolean; needsAuth?: boolean; reason?: 'already-member' | 'child' | 'invalid' }> {
   const account = await getCurrentAccount();
@@ -43,6 +45,7 @@ export async function createInviteAction(input: {
       accessLevel: input.accessLevel,
       shareOccasions: input.shareOccasions === true,
       name: typeof input.name === 'string' ? input.name : null,
+      ...(input.circle !== undefined ? { circle: input.circle } : {}),
     });
     await sendMail(familyInviteEmail({ to: email, token, inviterName: account.name, inviteeName }));
     return { ok: true };

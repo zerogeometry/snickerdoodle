@@ -12,8 +12,9 @@ import type { DbHandle } from '@/server/db';
 const DB = process.env.DATABASE_URL;
 
 /**
- * The family calendar (founder, 27 Oct): occasions reach exactly the circle they're shared with, only
- * people the owner shared the calendar with, across families; festivals only on the family's own page.
+ * The family calendar (founder, 27 Oct; "whose day is it?" — D27, 10 Nov 2026): occasions reach exactly the circle
+ * they're shared with — someone else's day only home — only people the owner shared the calendar with, across
+ * families; festivals only on the family's own page.
  */
 describe.skipIf(!DB)('the family calendar — who sees which dates', () => {
   let client: ReturnType<typeof postgres>;
@@ -42,15 +43,19 @@ describe.skipIf(!DB)('the family calendar — who sees which dates', () => {
 
   const titles = async (accountId: string, home = NOWHERE) => (await loadCalendar(db, accountId, home, from, to)).filter((e) => e.familyId === ids.hartleyId).map((e) => e.title);
 
-  it('an occasion reaches its circle: FAMILY → the Family circle; EXTENDED → everyone with the calendar', async () => {
-    const fam = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Granny & grandad’s 40th', kind: 'ANNIVERSARY', date: `1986${md}` });
-    const ext = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Rosie’s birthday', kind: 'BIRTHDAY', date: `--${md.slice(1)}`, shareCircle: 'EXTENDED' });
-    expect(fam.ok && ext.ok).toBe(true);
+  it('an occasion reaches its circle: FAMILY → the Family circle; EXTENDED → everyone with the calendar; someone else’s → home', async () => {
+    const fam = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Our 40th', kind: 'ANNIVERSARY', date: `1986${md}`, whose: 'OURS' });
+    const ext = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Sam’s birthday', kind: 'BIRTHDAY', date: `--${md.slice(1)}`, whose: 'OURS', shareCircle: 'EXTENDED' });
+    // a day that isn't ours (and no "whose" at all is the private side): home only, whatever is asked
+    const theirs = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Uncle Bo’s birthday', kind: 'BIRTHDAY', date: `--${md.slice(1)}`, shareCircle: 'EXTENDED' });
+    expect(fam.ok && ext.ok && theirs.ok).toBe(true);
 
-    expect(await titles(ids.joId)).toEqual(expect.arrayContaining(['Granny & grandad’s 40th', 'Rosie’s birthday']));
+    expect(await titles(ids.joId)).toEqual(expect.arrayContaining(['Our 40th', 'Sam’s birthday']));
     const rosie = await titles(ids.rosieId);
-    expect(rosie).toContain('Rosie’s birthday');
-    expect(rosie).not.toContain('Granny & grandad’s 40th'); // Family circle only
+    expect(rosie).toContain('Sam’s birthday');
+    expect(rosie).not.toContain('Our 40th'); // Family circle only
+    for (const who of [ids.joId, ids.rosieId]) expect(await titles(who)).not.toContain('Uncle Bo’s birthday');
+    expect(await titles(ids.samId, ids.hartleyId)).toContain('Uncle Bo’s birthday'); // home
     expect(await titles(ids.blakeId)).toEqual([]); // another family entirely
     expect(await titles(ids.malloryId)).toEqual([]); // removed: nothing
   });
@@ -63,22 +68,31 @@ describe.skipIf(!DB)('the family calendar — who sees which dates', () => {
 
   it('notes: the anniversary counts its years; another family’s festivals never repeat on your calendar', async () => {
     const sam = await loadCalendar(db, ids.samId, ids.hartleyId, from, to);
-    const anniv = sam.find((e) => e.title === 'Granny & grandad’s 40th')!;
-    expect(anniv.note).toMatch(/anniversary$/);
+    const anniv = sam.find((e) => e.title === 'Our 40th')!;
+    expect(anniv.note).toMatch(/anniversary$/); // home sees the count…
+    const forJo = (await loadCalendar(db, ids.joId, NOWHERE, from, to)).find((e) => e.title === 'Our 40th')!;
+    expect(forJo.note).toBeNull(); // …beyond home, no line that gives the year away (D27)
     expect(anniv.own).toBe(true);
     expect(sam.some((e) => e.kind === 'festival')).toBe(true); // the Hartleys celebrate Christmas by default
     expect((await loadCalendar(db, ids.joId, NOWHERE, from, to)).some((e) => e.kind === 'festival')).toBe(false); // Jo sees the Hartleys' dates, not their festivals
   });
 
-  it('who may add and change: the owner and contributors add; viewers and buyers don’t; contributors change only their own', async () => {
-    expect(await addOccasion(db, ids.rosieId, ids.hartleyId, { title: 'x', kind: 'OTHER', date: '--12-01' })).toEqual({ ok: false, reason: 'not-allowed' });
-    const jo = await addOccasion(db, ids.joId, ids.hartleyId, { title: 'Sports day', kind: 'OTHER', date: '--06-20' });
+  it('who may add and change (D27): anyone adds their OWN day; the household’s days, the leader (or home); the leader only narrows others’', async () => {
+    // outside home, nobody adds the household's days — however much access they have
+    expect(await addOccasion(db, ids.rosieId, ids.hartleyId, { title: 'x', kind: 'OTHER', date: '--12-01', whose: 'OURS' })).toEqual({ ok: false, reason: 'not-allowed' });
+    expect(await addOccasion(db, ids.joId, ids.hartleyId, { title: 'Sports day', kind: 'OTHER', date: '--06-20', whose: 'OURS' })).toEqual({ ok: false, reason: 'not-allowed' });
+    // …but anyone may add their own
+    const jo = await addOccasion(db, ids.joId, ids.hartleyId, { title: 'Jo', kind: 'BIRTHDAY', date: '--06-20', whose: 'OURS', memberAccountId: ids.joId, shareCircle: 'EXTENDED' });
     expect(jo.ok).toBe(true);
+    const joId = (jo as { id: string }).id;
     const [samOcc] = await db.select().from(occasions).where(and(eq(occasions.familyId, ids.hartleyId), eq(occasions.createdByAccountId, ids.samId)));
     expect((await updateOccasion(db, ids.joId, samOcc!.id, { title: 'mine now', kind: 'OTHER', date: '--01-01' })).ok).toBe(false);
-    expect((await updateOccasion(db, ids.samId, (jo as { id: string }).id, { title: 'Sports day!', kind: 'OTHER', date: '--06-21' })).ok).toBe(true);
-    expect(await deleteOccasion(db, ids.rosieId, (jo as { id: string }).id)).toBe(false);
-    expect(await deleteOccasion(db, ids.joId, (jo as { id: string }).id)).toBe(true);
+    expect((await updateOccasion(db, ids.joId, joId, { title: 'Jo', kind: 'BIRTHDAY', date: '--06-21', whose: 'OURS', memberAccountId: ids.joId, shareCircle: 'FAMILY' })).ok).toBe(true); // her own
+    // the leader: narrower, same details only
+    expect((await updateOccasion(db, ids.samId, joId, { title: 'Jo!', kind: 'BIRTHDAY', date: '--06-21', whose: 'OURS', memberAccountId: ids.joId, shareCircle: 'FAMILY' })).ok).toBe(false);
+    expect((await updateOccasion(db, ids.samId, joId, { title: 'Jo', kind: 'BIRTHDAY', date: '--06-21', whose: 'OURS', memberAccountId: ids.joId, shareCircle: 'HOME' })).ok).toBe(true);
+    expect(await deleteOccasion(db, ids.rosieId, joId)).toBe(false);
+    expect(await deleteOccasion(db, ids.joId, joId)).toBe(true);
   });
 
   it('screened, and a lunar date needs its year', async () => {
@@ -119,7 +133,10 @@ describe.skipIf(!DB)('the family calendar — who sees which dates', () => {
   it('reminders go to exactly who may see each date', async () => {
     const due = (await reminderCandidates(db, today, 31)).filter((c) => c.key.startsWith('occ:'));
     const who = (title: string) => due.filter((d) => d.title === title).map((d) => d.accountId).sort();
-    expect(who('Granny & grandad’s 40th')).toEqual([ids.joId, ids.samId].sort());
-    expect(who('Rosie’s birthday')).toEqual([ids.joId, ids.rosieId, ids.samId].sort());
+    expect(who('Our 40th')).toEqual([ids.joId, ids.samId].sort());
+    expect(who('Sam’s birthday')).toEqual([ids.joId, ids.rosieId, ids.samId].sort());
+    expect(who('Uncle Bo’s birthday')).toEqual([ids.samId]); // someone else's: home only
+    // and beyond home the reminder never carries a year line
+    expect(due.find((d) => d.title === 'Our 40th' && d.accountId === ids.joId)!.note).toBeNull();
   });
 });

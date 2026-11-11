@@ -127,6 +127,11 @@ printf '%s deploy %s (previous %s)\n' "$(date -u +%FT%TZ)" "$image" "${live:-non
 
 "$KIT_DIR/bin/smoke.sh" || alert "deployed $tag but the smoke test failed — look now; roll back with: sudo $KIT_DIR/bin/rollback.sh"
 
+# home circle (D27): partners / grown-up children not yet asked into home get their "move into the home" link —
+# once each, ever, so this is a no-op after the first deploy that has it. Runs on the LIVE app (after the swap), so
+# the link always lands on code that understands it.
+"$KIT_DIR/bin/job.sh" ask-partners-home || alert "deployed $tag but asking partners into home failed — rerun: sudo $KIT_DIR/bin/job.sh ask-partners-home"
+
 keep="$(current_image) $(previous_image)"
 docker image ls "$IMAGE_REPO" --format '{{.Repository}}:{{.Tag}}' | while read -r old; do
   case " $keep " in *" $old "*) ;; *) docker image rm "$old" >/dev/null 2>&1 || true ;; esac

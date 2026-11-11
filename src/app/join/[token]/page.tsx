@@ -11,6 +11,8 @@ import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { JoinLogin } from './JoinLogin';
+import { JoinConsent } from './JoinConsent';
+import { JOIN_CONSENT_VERSION, joinCard } from '@/lib/joinConsent';
 
 // The paper card every invite state sits on (Scrapbook D12).
 const CARD = 'pop-in tape w-full max-w-sm rounded-[22px] border-2 border-cocoa bg-paper p-7 text-center shadow-[0_4px_0_var(--color-cocoa)]';
@@ -34,7 +36,7 @@ export default async function JoinPage({
   searchParams,
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{ next?: string | string[] }>;
+  searchParams: Promise<{ next?: string | string[]; failed?: string }>;
 }) {
   const { token } = await params;
   const next = safeJoinNext((await searchParams).next);
@@ -111,10 +113,25 @@ export default async function JoinPage({
     );
   }
 
-  // Identity confirmed → accept and land in the app.
-  const result = await acceptInvite(db, account, token);
-  // land in the family they just joined (not their own box, if they already have one)
-  if (result.ok) redirect(next ?? `/home?family=${result.familyId}&joined=1`);
+  // Identity confirmed → their own YES on the join card (D27: never a silent join), then land in the app.
+  const failed = (await searchParams).failed === '1';
+  if (!failed) {
+    async function accept(formData: FormData) {
+      'use server';
+      const who = await getCurrentAccount();
+      if (!who) redirect(`/join/${token}`);
+      const version = String(formData.get('consent') ?? '');
+      const res = await acceptInvite(getDb(), who, token, { version });
+      // land in the family they just joined (not their own box, if they already have one)
+      if (res.ok) redirect(next ?? `/home?family=${res.familyId}&joined=1`);
+      redirect(`/join/${token}?failed=1`);
+    }
+    return (
+      <Shell>
+        <JoinConsent card={joinCard(invite.circle, invite.leaderName, invite.familyName, { moving: invite.moving })} version={JOIN_CONSENT_VERSION} action={accept} notNowHref="/" />
+      </Shell>
+    );
+  }
 
   return (
     <Shell>

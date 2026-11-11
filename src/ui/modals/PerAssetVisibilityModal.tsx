@@ -1,13 +1,14 @@
 'use client';
 
-import { IconHomeHeart, IconLock, IconShieldCheck, IconTrash, IconUser, IconUsers } from '@tabler/icons-react';
+import { IconHome, IconHomeHeart, IconLock, IconShieldCheck, IconTrash, IconUser, IconUsers } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon, type TablerIconComponent } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
 import { cn } from '@/ui/cn';
 
-type Tier = 'ONLY_ME' | 'FAMILY' | 'EXTENDED';
+type Tier = 'ONLY_ME' | 'HOME' | 'FAMILY' | 'EXTENDED';
+const RANK: Record<Tier, number> = { ONLY_ME: 0, HOME: 1, FAMILY: 2, EXTENDED: 3 };
 type Who = { label: string; color: string; textColor?: string };
 
 const OPTIONS: {
@@ -17,17 +18,19 @@ const OPTIONS: {
   iconColor: string;
   title: string;
   desc: string;
-  who: 'lock' | 'FAMILY' | 'EXTENDED';
+  who: 'lock' | 'HOME' | 'FAMILY' | 'EXTENDED';
 }[] = [
   { tier: 'ONLY_ME', icon: IconLock, iconBg: '#EFE6D6', iconColor: '#7A6A58', title: 'Only me', desc: 'Private to you — no one else sees it', who: 'lock' },
-  { tier: 'FAMILY', icon: IconHomeHeart, iconBg: '#FBE4DA', iconColor: '#C8623A', title: 'Family', desc: 'Your core household', who: 'FAMILY' },
+  // D27: home = the family leader, a partner / co-parent and grown-up children
+  { tier: 'HOME', icon: IconHome, iconBg: 'var(--color-honey-band)', iconColor: 'var(--color-cinnamon)', title: 'Home', desc: 'You and the grown-ups at home', who: 'HOME' },
+  { tier: 'FAMILY', icon: IconHomeHeart, iconBg: '#FBE4DA', iconColor: '#C8623A', title: 'Family', desc: 'Home and the family circle', who: 'FAMILY' },
   {
     tier: 'EXTENDED',
     icon: IconUsers,
     iconBg: '#E8F0DF',
     iconColor: '#5C8A3F',
     title: 'Extended family',
-    desc: 'Everyone in your circle, incl. grandparents',
+    desc: 'Everyone you’ve invited, grandparents too',
     who: 'EXTENDED',
   },
 ];
@@ -35,16 +38,18 @@ const OPTIONS: {
 /** Another member of the family, as the "who's included" stack shows them. */
 export interface VisibilityPerson {
   initial: string;
-  circle: 'FAMILY' | 'EXTENDED';
+  /** their circle (the family leader counts as home) */
+  circle: 'HOME' | 'FAMILY' | 'EXTENDED';
 }
 
 const STACK_COLORS = ['#93B97C', '#84BBD0', '#F2A640', '#E8786E'];
 
-/** The REAL people a tier reaches (a FAMILY-circle member sees Family + Extended; an
- * Extended-circle member sees only Extended) — never placeholder faces (NN1: show the
- * parent exactly who a choice exposes their child's art to). */
-function whoFor(tier: 'FAMILY' | 'EXTENDED', people: VisibilityPerson[]): Who[] {
-  const reached = tier === 'FAMILY' ? people.filter((p) => p.circle === 'FAMILY') : people;
+/** The REAL people a tier reaches (tiers nest: home sees home, family and extended; family sees family and
+ * extended; extended sees only extended) — never placeholder faces (NN1: show exactly who a choice exposes a
+ * child's art to). */
+const CIRCLE_RANK = { HOME: 1, FAMILY: 2, EXTENDED: 3 } as const;
+function whoFor(tier: 'HOME' | 'FAMILY' | 'EXTENDED', people: VisibilityPerson[]): Who[] {
+  const reached = people.filter((p) => CIRCLE_RANK[p.circle] <= RANK[tier]);
   const shown: Who[] = reached.slice(0, 3).map((p, i) => ({
     label: p.initial,
     color: STACK_COLORS[i % STACK_COLORS.length]!,
@@ -89,11 +94,24 @@ export function PerAssetVisibilityModal({
   onSave,
   onDelete,
   people = [],
+  role = 'adder',
+  widest = 'EXTENDED',
+  addedByName = null,
+  childParentName = null,
 }: {
   open: boolean;
   name: string;
   image?: string;
+  /** who sees it now */
   tier: Tier;
+  /** D27: the viewer added it (they choose, up to `widest`), or they're the little one's parent (narrower only) */
+  role?: 'adder' | 'childParent';
+  /** the widest choice open to them */
+  widest?: Tier;
+  /** who added it, when it wasn't the viewer ("Granny added this…") */
+  addedByName?: string | null;
+  /** on a little one's keepsake someone else added: the child's parent (so "only me" reads "just you and Sam") */
+  childParentName?: string | null;
   onClose: () => void;
   onSave: (tier: Tier) => void;
   /** When provided, shows a two-tap "delete this keepsake" control (NN8). */
@@ -143,13 +161,25 @@ export function PerAssetVisibilityModal({
       <div className="space-y-2.5">
         {OPTIONS.map((o) => {
           const on = tier === o.tier;
+          // wider than they may go: shown (so they see the whole ladder) but not choosable
+          const locked = RANK[o.tier] > RANK[widest];
+          const desc =
+            o.tier === 'ONLY_ME'
+              ? role === 'childParent' && addedByName
+                ? `Just you and ${addedByName}`
+                : childParentName
+                  ? `Just you and ${childParentName}`
+                  : o.desc
+              : o.desc;
           return (
             <button
               key={o.tier}
               type="button"
               onClick={() => setTier(o.tier)}
+              disabled={locked}
+              aria-pressed={on}
               className={cn(
-                'flex w-full items-center gap-3 rounded-xl border-[1.5px] p-3 text-left',
+                'flex min-h-11 w-full items-center gap-3 rounded-xl border-[1.5px] p-3 text-left disabled:cursor-not-allowed disabled:opacity-45',
                 on ? 'border-cinnamon bg-paper-2' : 'border-line',
               )}
             >
@@ -169,7 +199,7 @@ export function PerAssetVisibilityModal({
               </span>
               <span className="flex-1">
                 <span className="block text-[13px] font-bold text-cocoa">{o.title}</span>
-                <span className="block text-[11px] text-ink-faint">{o.desc}</span>
+                <span className="block text-[11px] text-ink-faint">{desc}</span>
               </span>
               <WhoStack who={o.who === 'lock' ? 'lock' : whoFor(o.who, people)} />
             </button>
@@ -178,9 +208,19 @@ export function PerAssetVisibilityModal({
       </div>
       <p className="mt-3 flex items-start gap-1.5 text-[11px] leading-relaxed text-ink-faint">
         <Icon icon={IconShieldCheck} size={14} className="mt-0.5 shrink-0 text-green-save" />
-        <span>
-          New keepsakes start as <b>Family</b>. Widen to Extended any time — nothing is ever public.
-        </span>
+        {role === 'childParent' ? (
+          <span>
+            {addedByName ? `${addedByName} added this.` : 'Someone else added this.'} You can make it more private, or take it off — it never goes wider than they chose.
+          </span>
+        ) : widest !== 'EXTENDED' ? (
+          <span>
+            {childParentName ? `${childParentName} has` : 'The little one’s parent has'} kept this one to <b>{OPTIONS.find((x) => x.tier === widest)?.title.toLowerCase()}</b> at most. Nothing is ever public.
+          </span>
+        ) : (
+          <span>
+            New keepsakes start as <b>Family</b>. It’s your choice who sees what you add — nothing is ever public.
+          </span>
+        )}
       </p>
       {onDelete ? (
         <div className="mt-3 border-t border-line pt-3">
@@ -195,7 +235,7 @@ export function PerAssetVisibilityModal({
             }}
             className="inline-flex items-center gap-1.5 text-[12px] font-bold text-berry hover:underline"
           >
-            <Icon icon={IconTrash} size={14} /> {confirmDelete ? 'tap again to delete for good' : 'delete this keepsake'}
+            <Icon icon={IconTrash} size={14} /> {confirmDelete ? 'tap again to delete for good' : role === 'childParent' ? 'take it off' : 'delete this keepsake'}
           </button>
           {confirmDelete ? (
             <p className="mt-1 text-[11px] leading-relaxed text-ink-faint">
