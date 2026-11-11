@@ -1,6 +1,7 @@
 import { test, expect, type Page } from './test';
 import { hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { assetRow, derivatives, resetRateLimits, studioReady, tabUpload, uploadArt } from './sweep-01-helpers';
+import { allStudioTools } from './helpers';
 
 /**
  * Test sweep 29 Oct — tester 01: every way INTO the Studio, and the way back. Each entry is opened, an
@@ -9,6 +10,8 @@ import { assetRow, derivatives, resetRateLimits, studioReady, tabUpload, uploadA
  */
 
 test.beforeEach(async () => resetRateLimits());
+// these flip the drawing (an "all tools" tool)
+test.beforeEach(async ({ page }) => allStudioTools(page));
 const nav = (page: Page) => page.getByRole('toolbar', { name: 'studio tools' }).or(page.getByRole('navigation', { name: 'studio tools' }));
 const flipAndDone = async (page: Page) => {
   await nav(page).getByRole('button', { name: 'flip', exact: true }).click();

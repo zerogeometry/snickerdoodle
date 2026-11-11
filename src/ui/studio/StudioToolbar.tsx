@@ -1,9 +1,10 @@
 'use client';
 
-import { IconChevronDown, IconChevronUp, IconInfoCircle, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconX } from '@tabler/icons-react';
+import { IconChevronDown, IconChevronUp, IconCircleMinus, IconCirclePlus, IconInfoCircle, IconLayoutSidebarLeftCollapse, IconLayoutSidebarLeftExpand, IconX } from '@tabler/icons-react';
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
-import { TOOL_GROUPS, TOOLS, type ToolDef, type ToolId } from './tools';
+import { readToolSet, shownTools, storeToolSet, TOOL_GROUPS, TOOLS, type ToolDef, type ToolId, type ToolSet } from './tools';
+import { Segmented } from './panel';
 import { ToolGlyph } from './ToolGlyph';
 
 const EXPANDED_KEY = 'snickerdoodle.studio.toolbar-expanded';
@@ -13,7 +14,8 @@ const EXPANDED_KEY = 'snickerdoodle.studio.toolbar-expanded';
  * behind it as a frosted row over the picture (`tray`); the stand-out chevron opens a labelled sheet.
  * Tablet/desktop: a left rail that expands to show labels. Expanded, every tool gets an (i) that
  * explains it in a sentence (tap/click — never hover-only). The expanded/collapsed choice is
- * remembered on this device.
+ * remembered on this device. "fewer tools" (the default) shows the everyday edits; "all tools" the
+ * rest — chosen in the phone's sheet or at the foot of the rail, and remembered on this device too.
  */
 export function StudioToolbar({
   active,
@@ -23,6 +25,9 @@ export function StudioToolbar({
   hidden = [],
   tray,
   trayKey,
+  reach = [],
+  scratch = false,
+  phoneElsewhere = [],
 }: {
   active: ToolId | null;
   /** Tools that can't be used right now (e.g. "background" before anything is see-through). */
@@ -36,9 +41,51 @@ export function StudioToolbar({
   tray?: ReactNode;
   /** Re-key the tray (the tool) so each one rises afresh. */
   trayKey?: string;
+  /** Tools the design already uses — shown even with fewer tools. */
+  reach?: ToolId[];
+  /** A blank canvas (its own everyday tools). */
+  scratch?: boolean;
+  /** Phone only: tools the page puts somewhere else (compare on the picture, start again by undo). */
+  phoneElsewhere?: ToolId[];
 }) {
-  const tools = TOOLS.filter((t) => !hidden.includes(t.id));
+  const [set, setSet] = useState<ToolSet>('fewer');
+  useEffect(() => setSet(readToolSet()), []);
+  // a tool opened from a shortcut, a "switch to" button or "where to start" stays on show this visit
+  const [reached, setReached] = useState<ToolId[]>([]);
+  useEffect(() => {
+    if (active) setReached((r) => (r.includes(active) ? r : [...r, active]));
+  }, [active]);
+  const shown = shownTools(set, { scratch, reach: [...reach, ...reached] });
+  const chooseSet = (next: ToolSet) => {
+    setSet(next);
+    storeToolSet(next);
+  };
+  const tools = TOOLS.filter((t) => !hidden.includes(t.id) && shown.has(t.id));
   const groups = TOOL_GROUPS.map((g) => ({ ...g, tools: tools.filter((t) => t.group === g.id) })).filter((g) => g.tools.length);
+  const phoneGroups = groups.map((g) => ({ ...g, tools: g.tools.filter((t) => !phoneElsewhere.includes(t.id)) })).filter((g) => g.tools.length);
+  // the phone row only fades at the edge (more a swipe away) when it really runs over
+  const rowRef = useRef<HTMLDivElement>(null);
+  const [overflows, setOverflows] = useState(false);
+  useEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const check = () => setOverflows(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [tools.length]);
+  const setSwitch = (
+    <Segmented<ToolSet>
+      label="how many tools"
+      value={set}
+      onChange={chooseSet}
+      options={[
+        { value: 'fewer', label: 'fewer tools' },
+        { value: 'all', label: 'all tools' },
+      ]}
+    />
+  );
   const groupHeading = (label: string) => <span className="block px-1 pt-1 text-[10px] font-extrabold uppercase tracking-wide text-ink-faint">{label}</span>;
   const [expanded, setExpanded] = useState(false); // desktop rail (remembered)
   const [sheet, setSheet] = useState(false); // phone: the labelled sheet over the canvas
@@ -137,6 +184,7 @@ export function StudioToolbar({
                   icons only <Icon icon={IconChevronDown} size={16} />
                 </button>
               </div>
+              <div className="pb-2">{setSwitch}</div>
               {infoCard}
               <div className="flex flex-col gap-2 overflow-x-hidden pb-3">
                 {groups.map((g) => (
@@ -166,9 +214,14 @@ export function StudioToolbar({
             </div>
           ) : null}
           <div className="pb-safe relative z-10 flex items-center gap-1 border-t-2 border-cocoa/10 bg-paper px-2 pt-1.5">
-            {/* the right edge fades: there are more tools a swipe away */}
-            <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="toolbar" aria-label="studio tools">
-              {groups.map((g, gi) => (
+            {/* the right edge fades when there are more tools a swipe away (all tools) */}
+            <div
+              ref={rowRef}
+              className={`flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${overflows ? 'pr-6 [mask-image:linear-gradient(to_right,#000_calc(100%-28px),transparent)]' : 'justify-evenly'}`}
+              role="toolbar"
+              aria-label="studio tools"
+            >
+              {phoneGroups.map((g, gi) => (
                 <Fragment key={g.id}>
                   {gi ? <span aria-hidden className="mx-0.5 h-6 w-px shrink-0 rounded-full bg-cocoa/15" /> : null}
                   {g.tools.map((t) => (
@@ -234,6 +287,20 @@ export function StudioToolbar({
           </Fragment>
         ))}
         {expanded && info ? <div className="mt-2">{infoCard}</div> : null}
+        <span aria-hidden className="mx-auto my-1 h-0.5 w-8 shrink-0 rounded-full bg-cocoa/15" />
+        {expanded ? (
+          setSwitch
+        ) : (
+          <button
+            type="button"
+            onClick={() => chooseSet(set === 'all' ? 'fewer' : 'all')}
+            aria-label={set === 'all' ? 'show fewer tools' : 'show all tools'}
+            className="press mx-auto flex min-h-12 w-[52px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[14px] py-1 text-[10px] font-extrabold leading-tight text-ink-soft hover:text-cocoa"
+          >
+            <Icon icon={set === 'all' ? IconCircleMinus : IconCirclePlus} size={18} />
+            {set === 'all' ? 'fewer tools' : 'all tools'}
+          </button>
+        )}
       </div>
       {tip && !expanded ? (
         <div

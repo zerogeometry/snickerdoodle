@@ -12,6 +12,7 @@ import {
   tabUpload,
   uploadArt,
 } from './sweep-01-helpers';
+import { allStudioTools } from './helpers';
 
 /**
  * Test sweep 29 Oct — tester 01. The founder's bug, fixed today: "lift a drawing's background, put it
@@ -26,6 +27,8 @@ import {
 
 test.skip(!hasDb, 'needs the local test database');
 test.beforeEach(async () => resetRateLimits());
+// these flip the drawing (an "all tools" tool)
+test.beforeEach(async ({ page }) => allStudioTools(page));
 
 const nav = (page: Page) => page.getByRole('toolbar', { name: 'studio tools' }).or(page.getByRole('navigation', { name: 'studio tools' }));
 const bgTool = (page: Page) => nav(page).getByRole('button', { name: 'background', exact: true });

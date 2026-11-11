@@ -16,6 +16,7 @@ import {
   stageHash,
   tabUpload,
 } from './sweep-01-helpers';
+import { allStudioTools } from './helpers';
 
 /**
  * Test sweep 29 Oct — tester 01: every Studio tool, one by one. Each one applies (the picture on the
@@ -59,6 +60,8 @@ async function appliesAndUndoes(page: Page, what: string, edit: () => Promise<vo
 test.describe('desktop', () => {
   test.use({ viewport: { width: 1280, height: 800 } });
   test.beforeEach(async () => resetRateLimits());
+  // every tool, one by one: start on "all tools"
+  test.beforeEach(async ({ page }) => allStudioTools(page));
 
   test('image tools: flip, rotate, crop, remove colour, eraser, bring back, background, compare, start again', async ({ page }) => {
     test.setTimeout(300_000);

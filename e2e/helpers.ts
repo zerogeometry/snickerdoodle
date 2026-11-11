@@ -19,6 +19,16 @@ export async function artwork(): Promise<Buffer> {
 
 /** Answer the cookie banner up front ("essential only") so it never covers the thumb-zone buttons, and
  * close the floating "get the app" bubble (tests/visual checks it on its own, with `appBubble`). */
+/** The Studio opens on "fewer tools" (the everyday edits). A test that reaches for bring back, draw, shapes,
+ * layers, crop, rotate or flip starts on "all tools", as a parent who picked it would (it's remembered per device). */
+export async function allStudioTools(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('snickerdoodle.studio.tool-set', 'all');
+    } catch {}
+  });
+}
+
 export async function quietCookies(page: Page, { appBubble = false }: { appBubble?: boolean } = {}) {
   await page.addInitScript((keepBubble) => {
     try {

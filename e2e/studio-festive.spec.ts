@@ -60,8 +60,11 @@ test('in season: the christmas drawer adds stickers and festive touches as layer
   await expect(editing.getByRole('button', { name: 'flip the reindeer' })).toHaveAttribute('aria-pressed', 'true');
   await editing.getByRole('button', { name: 'bigger reindeer' }).click();
   await expect(page.getByRole('group', { name: 'layers, top first' }).getByRole('button', { name: 'layer: reindeer sticker' })).toBeVisible();
+  // a sticker is a layer: on "fewer tools" (the default), layers comes onto the toolbar and stays
+  await expect(toolbar.getByRole('button', { name: 'layers' })).toBeVisible();
 
   // the Christmas greeting fonts are in the text tool
   await toolbar.getByRole('button', { name: 'add text' }).click();
   await expect(page.getByRole('group', { name: 'add text options' }).getByRole('button', { name: 'Emilys Candy' })).toBeVisible();
+  await expect(toolbar.getByRole('button', { name: 'layers' })).toBeVisible();
 });
