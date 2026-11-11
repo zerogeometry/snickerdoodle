@@ -15,7 +15,8 @@ import type { AccessLevel, Relationship } from '@/domain/types';
  * Send a family invite. Parent-initiated only (the server checks ownership). Delivered
  * through the Mailer port (console in dev; the chosen no-retention ESP in production).
  * The email says who it's from (the parent's first name only — 04-B11) and greets
- * them by the first name the parent typed (used for the email only, never stored).
+ * them by the name the parent typed — which is kept (screened) and becomes their account
+ * name when they join, unless they've already chosen their own.
  */
 export async function createInviteAction(input: {
   email: string;
@@ -35,14 +36,15 @@ export async function createInviteAction(input: {
   const familyId = await ensureHomeFamily(db, account.id, account.name);
   const viewer = await resolveViewerContext(db, account.id, familyId);
   try {
-    const { token, email } = await createInvite(db, viewer, {
+    const { token, email, inviteeName } = await createInvite(db, viewer, {
       familyId,
       email: input.email,
       relationship: input.relationship,
       accessLevel: input.accessLevel,
       shareOccasions: input.shareOccasions === true,
+      name: typeof input.name === 'string' ? input.name : null,
     });
-    await sendMail(familyInviteEmail({ to: email, token, inviterName: account.name, inviteeName: typeof input.name === 'string' ? input.name : null }));
+    await sendMail(familyInviteEmail({ to: email, token, inviterName: account.name, inviteeName }));
     return { ok: true };
   } catch (e) {
     // already in the family: say so plainly (the parent changes their level from their card instead)

@@ -202,7 +202,7 @@ put  S3_KMS_KEY_ALIAS_ORIGINALS "$ORIG"
 put  POD_MODE SANDBOX
 put  PRODIGI_BASE_URL https://api.sandbox.prodigi.com/v4.0
 put  MAIL_PROVIDER resend
-put  MAIL_FROM "snickerdoodle <hello@mail.snickerdoodle.co.uk>"
+put  MAIL_FROM "snickerdoodle <hello@snickerdoodle.co.uk>"   # the root domain is the one verified in Resend
 put  PRIVACY_INBOX privacy@snickerdoodle.co.uk
 put  CLIENT_IP_HEADER x-real-ip         # rate limits trust only the address Caddy saw
 put  SUPPORT_INBOX support@snickerdoodle.co.uk

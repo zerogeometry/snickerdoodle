@@ -240,7 +240,8 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
       await expect(page.getByRole('status')).toContainText(`Check ${maskEmail(email)} for a link`);
       await expect.poll(() => mailsTo(email, 'magic-link').length).toBe(before + 1);
       const m = mailsTo(email, 'magic-link').at(-1)!;
-      expect(m.subject).toBe('your one-tap link to snickerdoodle');
+      // names whose family it's for when the inviting parent has a first name (else the plain subject)
+      expect(m.subject).toMatch(/^your (one-tap link to snickerdoodle|link to join \S+’s family on snickerdoodle)$/);
       expect(m.body).toContain('it works once, for the next hour');
       const url = linkIn(m, /http:\/\/localhost:\d+\/api\/auth\/callback\/email\?\S+/)!;
       expect(decodeURIComponent(url)).toContain(`/join/${token}`);

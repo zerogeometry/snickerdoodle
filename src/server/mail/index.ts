@@ -1,3 +1,5 @@
+import { firstNameOf } from './words';
+
 /**
  * The ONE way the app sends email (magic links, family invites, order notes, reminders).
  * A port with swappable adapters, so choosing the real provider (decision D7 — a UK/EU
@@ -28,6 +30,22 @@ export interface MailMessage {
   replyTo?: string;
   /** Extra headers, e.g. List-Unsubscribe on the reminders (./reminderOff). */
   headers?: Record<string, string>;
+  /** The person this email is on behalf of (e.g. the inviting parent). Only their FIRST name is
+   * used, as the sender's name — "Sam via snickerdoodle". The address is always ours. */
+  onBehalfOf?: string | null;
+}
+
+/**
+ * The From line. Our address always; on someone's behalf the sender's NAME becomes "Sam via
+ * snickerdoodle", so the inbox shows a name they know before it's opened, not just an unfamiliar
+ * brand. First name only, letters only (firstNameOf) — nothing else from an account reaches a header.
+ */
+export function senderFor(from: string, onBehalfOf?: string | null): string {
+  const who = firstNameOf(onBehalfOf);
+  if (!who) return from;
+  const address = (/<([^<>\s]+)>/.exec(from)?.[1] ?? from).trim();
+  const brand = (/^\s*"?([^"<]+?)"?\s*</.exec(from)?.[1] ?? 'snickerdoodle').trim();
+  return `"${who} via ${brand}" <${address}>`;
 }
 
 export interface Mailer {
@@ -38,7 +56,7 @@ const consoleMailer: Mailer = {
   async send(m) {
     console.log(
       `\n┌─────────────────────────────────────────────────────────────\n` +
-        `│ ✉️  [${m.kind}] to ${m.to} — ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}\n` +
+        `│ ✉️  [${m.kind}] to ${m.to} — ${m.subject}${m.replyTo ? ` (reply to ${m.replyTo})` : ''}${m.onBehalfOf ? ` (from ${senderFor('snickerdoodle <hello@snickerdoodle.co.uk>', m.onBehalfOf)})` : ''}\n` +
         m.text
           .split('\n')
           .map((l) => `│ ${l}`)
@@ -55,7 +73,7 @@ export function resendMailer(apiKey: string, from: string, doFetch: typeof fetch
       const res = await doFetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from, to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}), ...(m.headers ? { headers: m.headers } : {}), tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
+        body: JSON.stringify({ from: senderFor(from, m.onBehalfOf), to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}), ...(m.headers ? { headers: m.headers } : {}), tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
       });
       if (!res.ok) throw new Error(`email not sent (${res.status}) — check the Resend key and domain`);
     },

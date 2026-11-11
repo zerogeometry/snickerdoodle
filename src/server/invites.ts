@@ -8,6 +8,8 @@ import type { DbHandle } from './db';
 import { familyNameForRelatives } from './onboarding';
 import { sendMail } from './mail';
 import { memberJoinedEmail } from './mail/familyNotices';
+import { firstNameOf } from './mail/words';
+import { isUnsetDisplayName, screenDisplayName } from './memberName';
 
 const INVITE_TTL_DAYS = 14;
 
@@ -63,6 +65,9 @@ export interface CreateInviteInput {
   /** Share the family calendar (children's birthdays) with them — the parent's explicit
    * choice (pre-ticked in the invite form). Absent ⇒ not shared. */
   shareOccasions?: boolean;
+  /** The name the parent typed for them. Screened; kept so it becomes their account name when they
+   * join (unless they've chosen their own). An unusable name is dropped, never a refused invite. */
+  name?: string | null;
 }
 
 /** Children are keepsake subjects, never account holders (NN3) — so never invited. */
@@ -79,7 +84,7 @@ export async function createInvite(
   db: DbHandle,
   inviter: ViewerContext,
   input: CreateInviteInput,
-): Promise<{ inviteId: string; token: string; email: string }> {
+): Promise<{ inviteId: string; token: string; email: string; inviteeName: string | null }> {
   if (
     inviter.accountId === null ||
     !canManageFamily(inviter.membership) ||
@@ -97,6 +102,7 @@ export async function createInvite(
     throw new InvalidInviteError();
   }
   if (await isActiveMemberEmail(db, input.familyId, email)) throw new AlreadyInFamilyError();
+  const inviteeName = screenDisplayName(input.name);
   const circle = defaultCircleFor(input.relationship); // server-authoritative
   const token = randomBytes(24).toString('base64url'); // unguessable
   const expiresAt = new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000);
@@ -111,6 +117,7 @@ export async function createInvite(
       circle,
       accessLevel: input.accessLevel,
       shareOccasions: input.shareOccasions === true,
+      inviteeName,
       token,
       status: 'PENDING',
       expiresAt,
@@ -127,7 +134,7 @@ export async function createInvite(
     metadata: { email, circle, accessLevel: input.accessLevel, shareOccasions: input.shareOccasions === true },
   });
 
-  return { inviteId: invite!.id, token, email };
+  return { inviteId: invite!.id, token, email, inviteeName };
 }
 
 export interface InviteDisplay {
@@ -152,6 +159,31 @@ export async function getInviteForDisplay(db: DbHandle, token: string): Promise<
     status: row.invite.status,
     expired: row.invite.expiresAt <= new Date(),
   };
+}
+
+/**
+ * For the sign-in email on the way into a family: the inviting parent's FIRST name, so that email
+ * says "your link to join Sam’s family" instead of arriving as an unexplained magic link. Only when
+ * the link is headed to /join for an invite that's still open AND was sent to this very address —
+ * anything else (or any hiccup) gives null and the plain sign-in email goes instead.
+ */
+export async function inviterForSignInLink(db: DbHandle, email: string, callbackUrl: string | null | undefined): Promise<string | null> {
+  let path = '';
+  try {
+    path = new URL(callbackUrl ?? '', 'http://x').pathname;
+  } catch {
+    return null;
+  }
+  const token = /^\/join\/([A-Za-z0-9_-]{16,128})$/.exec(path)?.[1];
+  if (!token) return null;
+  const [row] = await db
+    .select({ inviteEmail: invites.email, status: invites.status, expiresAt: invites.expiresAt, name: accounts.displayName })
+    .from(invites)
+    .innerJoin(accounts, eq(accounts.id, invites.createdByAccountId))
+    .where(eq(invites.token, token));
+  if (!row || row.status !== 'PENDING' || row.expiresAt <= new Date()) return null;
+  if (row.inviteEmail.toLowerCase() !== email.trim().toLowerCase()) return null;
+  return firstNameOf(row.name);
 }
 
 /** Where to land after joining. ONLY a gift-link path is honoured (an open redirect is
@@ -251,6 +283,21 @@ export async function acceptInvite(
       await tx.insert(auditRecords).values(
         spent.map((x) => ({ familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER' as const, event: 'INVITE_REVOKED' as const, targetType: 'invite', targetId: x.id, metadata: { reason: 'superseded', by: invite.id } })),
       );
+    }
+    // the name the parent gave them becomes their account name — unless they've already chosen one
+    // of their own. An empty name or the email's first part is only the stand-in, and even that is
+    // kept if they ever typed it themselves (their own name change is logged). Logged too.
+    if (invite.inviteeName) {
+      const [me] = await tx.select({ name: accounts.displayName, email: accounts.email }).from(accounts).where(eq(accounts.id, account.id));
+      const [chose] = await tx
+        .select({ id: auditRecords.id })
+        .from(auditRecords)
+        .where(and(eq(auditRecords.actorAccountId, account.id), eq(auditRecords.targetId, account.id), eq(auditRecords.event, 'PROFILE_UPDATED'), sql`${auditRecords.metadata}->>'field' = 'name'`, sql`coalesce(${auditRecords.metadata}->>'from', '') <> 'invite'`))
+        .limit(1);
+      if (me && !chose && isUnsetDisplayName(me.name, me.email)) {
+        await tx.update(accounts).set({ displayName: invite.inviteeName, updatedAt: new Date() }).where(eq(accounts.id, account.id));
+        await tx.insert(auditRecords).values({ familyId: invite.familyId, actorAccountId: account.id, actorType: 'MEMBER', event: 'PROFILE_UPDATED', targetType: 'account', targetId: account.id, metadata: { field: 'name', from: 'invite', inviteId: invite.id } });
+      }
     }
     return { isNew };
   });

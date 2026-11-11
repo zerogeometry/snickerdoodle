@@ -7,9 +7,9 @@ import { deleteObjectConfirmed, getObjectBytes, putObject } from '@/storage';
 import { resolveViewerContext } from './assets';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
+import { screenDisplayName } from './memberName';
 import { appUrl, sendMail } from './mail';
 import { defaultProviders, isModerationConfigured, moderateImage, type ModerationProviders } from './moderation';
-import { containsAbusiveText } from './textSafety';
 
 export type ProfileImageKind = 'AVATAR' | 'ACCOUNT_HEADER' | 'FAMILY_BANNER';
 
@@ -222,8 +222,8 @@ export async function familyBannerFor(db: DbHandle, viewerAccountId: string, fam
 
 /** Your display name, as your family sees it. Screened; 1–40 characters. */
 export async function updateDisplayName(db: DbHandle, accountId: string, raw: string): Promise<{ ok: boolean; name?: string }> {
-  const name = String(raw ?? '').trim().replace(/\s+/g, ' ');
-  if (name.length < 1 || name.length > 40 || containsAbusiveText(name)) return { ok: false };
+  const name = screenDisplayName(raw);
+  if (!name) return { ok: false };
   await db.update(accounts).set({ displayName: name, updatedAt: new Date() }).where(eq(accounts.id, accountId));
   await db.insert(auditRecords).values({ actorAccountId: accountId, actorType: 'MEMBER', event: 'PROFILE_UPDATED', targetType: 'account', targetId: accountId, metadata: { field: 'name' } });
   return { ok: true, name };
