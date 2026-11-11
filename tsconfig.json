@@ -41,7 +41,10 @@
     "vitest.config.ts",
     ".next-preview/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    ".next-e2e/dev/types/**/*.ts"
+    ".next-e2e/dev/types/**/*.ts",
+    ".next-preview/dev/types/**/*.ts",
+    ".next-xmas/types/**/*.ts",
+    ".next-xmas/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"
