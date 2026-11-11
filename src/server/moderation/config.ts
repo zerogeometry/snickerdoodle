@@ -36,8 +36,8 @@ export interface ClassifierConfig {
 }
 
 export interface TextReaderConfig {
-  /** 0–100. Lines of drawn text read with less confidence than this are dropped. Low on
-   * purpose: a misread word can only send a design to review, a dropped one can let abuse by. */
+  /** 0–100. Lines of printed text read with less confidence than this are dropped. Kept lowish: only an
+   * exact whole swear word counts (D28), so a shaky read rarely matters. */
   minConfidence: number;
 }
 
@@ -62,9 +62,4 @@ export const VIEWABLE_WITHOUT_HASH_CHECK: readonly string[] = ['Violence', 'Visu
 
 export const TEXT_READER_CONFIG: TextReaderConfig = {
   minConfidence: 50,
-};
-
-/** Textract (handwriting): lower still — a child's or a scrawled word reads with low confidence. */
-export const TEXTRACT_READER_CONFIG: TextReaderConfig = {
-  minConfidence: 30,
 };

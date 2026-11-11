@@ -3,7 +3,6 @@ import sharp from 'sharp';
 import { CLASSIFIER_ERROR_LABEL, DRAWN_WORDS_LABEL, TEXT_UNREADABLE_LABEL, moderateAndRecord, moderateDesignAndRecord, moderateImage, type ModerationProviders } from '../index';
 import { ModerationConfigError, assertModerationReady, defaultProviders, isHashCheckDeferred, isModerationConfigured, realProviders } from '../providers';
 import { REKOGNITION_REGION, type RekognitionPort } from '../rekognition';
-import type { TextractPort } from '../textract';
 import type { IwfImageInterceptAdapter } from '../iwf';
 
 /**
@@ -15,8 +14,6 @@ import type { IwfImageInterceptAdapter } from '../iwf';
 
 const png = () => sharp({ create: { width: 8, height: 8, channels: 3, background: { r: 9, g: 9, b: 9 } } }).png().toBuffer();
 const DEFERRED = { MODERATION_PROVIDER: 'real', CSAM_HASH_CHECK: 'deferred' };
-/** The handwriting reader (Textract), mocked: reads no words unless a test says otherwise. */
-const noHandwriting = { config: { region: 'eu-west-2' }, send: vi.fn(async () => ({ Blocks: [] })) } as TextractPort;
 
 /** A Rekognition mock that answers moderation and DetectText separately. */
 function rekognition(labels: unknown[] = [], words: string[] = [], fail = false) {
@@ -60,17 +57,17 @@ describe('the D25 setting', () => {
   it('startup reports the hash gate as DEFERRED, and says so in the log', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { client, send } = rekognition();
-    expect(await assertModerationReady(DEFERRED, { textract: noHandwriting, rekognition: client })).toEqual({ mode: 'real', hashGate: 'deferred' });
+    expect(await assertModerationReady(DEFERRED, { rekognition: client })).toEqual({ mode: 'real', hashGate: 'deferred' });
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('DEFERRED (founder decision D25)'));
     expect(send).not.toHaveBeenCalled();
   });
 
   it('no hash provider when deferred; the moment IWF is connected it is used instead', async () => {
     const { client } = rekognition();
-    expect(realProviders(DEFERRED, { textract: noHandwriting, rekognition: client }).hash).toBeNull();
+    expect(realProviders(DEFERRED, { rekognition: client }).hash).toBeNull();
     const check = vi.fn(async () => ({ match: true as const }));
     const iwf: IwfImageInterceptAdapter = { check };
-    const p = realProviders(DEFERRED, { textract: noHandwriting, rekognition: client, iwf });
+    const p = realProviders(DEFERRED, { rekognition: client, iwf });
     expect(p.hash).not.toBeNull();
     expect((await moderateImage({ buffer: await png(), sha256: 'x' }, p)).status).toBe('BLOCKED');
   });
@@ -80,7 +77,7 @@ describe('every upload is still screened before it can be CLEAR', () => {
   const run = async (labels: unknown[] = [], words: string[] = [], fail = false) => {
     if (fail) vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { client, send } = rekognition(labels, words, fail);
-    return { v: await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { textract: noHandwriting, rekognition: client })), send };
+    return { v: await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { rekognition: client })), send };
   };
 
   it('a clean picture: classifier + words both run (one image each), then CLEAR — marked deferred', async () => {
@@ -133,7 +130,7 @@ describe('the words check runs on uploads with IWF connected too', () => {
   it('drawn bad language flags alongside a clean hash check', async () => {
     const { client } = rekognition([], ['shit']);
     const noMatch: IwfImageInterceptAdapter = { check: async () => ({ match: false }) };
-    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders({ MODERATION_PROVIDER: 'real' }, { textract: noHandwriting, rekognition: client, iwf: noMatch }));
+    const v = await moderateImage({ buffer: await png(), sha256: 'x' }, realProviders({ MODERATION_PROVIDER: 'real' }, { rekognition: client, iwf: noMatch }));
     expect(v).toEqual({ status: 'FLAGGED', labels: [DRAWN_WORDS_LABEL] });
   });
 });
@@ -142,7 +139,7 @@ describe('what gets stored', () => {
   it('the upload verdict records the deferral and whether a reviewer may look', async () => {
     const { db, writes } = fakeDb();
     const { client } = rekognition([L('Explicit')]);
-    await moderateAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { textract: noHandwriting, rekognition: client }));
+    await moderateAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png(), sha256: 'x' }, realProviders(DEFERRED, { rekognition: client }));
     const set = writes.find((w) => 'moderationStatus' in w)!;
     expect(set.moderationStatus).toBe('FLAGGED');
     expect((set.moderationDetail as { original: unknown }).original).toMatchObject({ status: 'FLAGGED', hashCheck: 'deferred', sensitive: true });
@@ -151,7 +148,7 @@ describe('what gets stored', () => {
   it('a Studio design flagged for nudity is marked sensitive on top of a clean deferred upload', async () => {
     const { db, writes } = fakeDb();
     const { client } = rekognition([L('Explicit')]);
-    await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(DEFERRED, { textract: noHandwriting, rekognition: client }));
+    await moderateDesignAndRecord(db, { assetId: 'a1', familyId: 'f1', buffer: await png() }, realProviders(DEFERRED, { rekognition: client }));
     const set = writes.find((w) => 'moderationStatus' in w)!;
     expect(set.moderationStatus).toBe('FLAGGED');
     expect((set.moderationDetail as { design: unknown }).design).toMatchObject({ status: 'FLAGGED', sensitive: true });

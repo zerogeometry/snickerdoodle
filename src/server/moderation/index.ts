@@ -24,9 +24,9 @@ export interface ModerationVerdict {
 
 /** Labels for a check that couldn't give an answer — the item is held for review, never CLEARed. */
 export const CLASSIFIER_ERROR_LABEL = 'classifier-error';
-/** Words written in the picture matched the abuse list. */
+/** A swear word printed in the picture, as a whole word (D28). The label name is kept for old records. */
 export const DRAWN_WORDS_LABEL = 'drawn-words';
-/** The words-in-the-picture check failed — not a clean read, so held for review. */
+/** The printed-words check failed — not a clean read, so held for review. */
 export const TEXT_UNREADABLE_LABEL = 'text-unreadable';
 export { HASH_UNCHECKED_LABEL };
 
@@ -329,8 +329,8 @@ export async function screenStalePending(
 // ── Studio designs ───────────────────────────────────────────────────────────
 // A design can carry things the upload never had: pen lines, shapes, words. Anything drawn or
 // added in the Studio is screened like an upload BEFORE it can reach a print order — the same
-// classifier (it reads illustrations, not just photos), plus OCR so hand-drawn words get the
-// same abuse screen as typed ones. Same D8 rules: it FLAGS for review, never auto-rejects.
+// classifier (it reads illustrations, not just photos), plus the printed-words reader so words added
+// to the design get the same whole-word swear-word screen as typed ones (D28). Same D8 rules: it FLAGS for review, never auto-rejects.
 // The asset's status is the WORSE of the upload's verdict and the design's, so a clean design
 // can never clear a flagged upload (and a flagged design holds a clean upload back).
 

@@ -128,6 +128,11 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
   moderation classifier (AWS Rekognition Content Moderation, in-region eu-west-2) AND the
   words-in-the-picture check BEFORE it can reach a print order. CSAM match → preserve, DO NOT
   view/redistribute, report per the runbook.
+  - D28 (founder, 11 Nov 2026): the words check reads PRINTED words only (Rekognition DetectText —
+    slogans, signs, Studio words); handwriting is not read. Only an exact WHOLE swear word from the
+    one short list (src/server/textSafety.ts) counts — never letters inside a longer word, never
+    look-alike letters or joined-up gaps. Words that are also names or everyday words (dick, pussy,
+    fanny, cock, fag…) are left off. A match holds the picture for review like any flag.
   - D25 (founder, 9 Nov 2026): until IWF is onboarded the hash check is DEFERRED
     (`CSAM_HASH_CHECK=deferred`); the classifier + words check still gate every upload, and a
     deferred item flagged as possibly sexual/unknown/unreadable is REMOVE-ONLY in review. Connect
@@ -138,7 +143,8 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - Copyright posture S3-b: rights-warranty + brand framing toward the child's OWN original art +
   disclaimer of others' characters/logos + fast takedown. (Automated character-detection is P2+,
   not launch.) The IP posture itself is a stop-and-ask if a task would weaken it.
-- User text (Studio text, gift message, member name) screened for abuse; child FIRST NAME ONLY.
+- User text (Studio text, gift message, member name) screened for abuse with the same whole-word
+  list (D28); child FIRST NAME ONLY.
 - Generative (P3): PRESET magic edits only — NO free-text prompt box — and the output is
   re-screened through the upload classifier before it is ever shown or printed.
 

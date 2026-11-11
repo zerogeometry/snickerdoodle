@@ -16,7 +16,7 @@ export default function PrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 10 November 2026</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 11 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -148,7 +148,7 @@ export default function PrivacyNoticePage() {
           only sees what it needs to do its job:
         </p>
         <ul>
-          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery and bad language before it can be printed. If a check isn’t sure, a person may look (see section 4). Amazon doesn’t keep the pictures or use them to train anything.</li>
+          <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery, and for swear words printed on it (like a slogan on a T-shirt), before it can be printed. If a check isn’t sure, a person may look (see section 4). Amazon doesn’t keep the pictures or use them to train anything.</li>
           <li><strong>Stripe</strong> — takes your payment. Your card details go straight to Stripe; we never see or store them.</li>
           <li><strong>Prodigi</strong> — prints your order and delivers it. They get the print file for what you ordered and the delivery address.</li>
           <li><strong>Resend</strong> (Ireland, EU) — sends the site&apos;s emails, like your sign-in links, order updates and gift requests.</li>

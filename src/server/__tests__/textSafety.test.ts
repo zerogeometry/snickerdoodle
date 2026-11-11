@@ -49,31 +49,77 @@ describe('screenChildFirstName — child FIRST NAME ONLY, abuse-screened', () =>
   });
 });
 
-describe('containsAbusiveDrawnText — words READ from a picture (loose on purpose: a match only sends it to review)', () => {
-  it('the founder’s live test reads, 9 Nov 2026: a gap inside the word, and W read as V', () => {
-    expect(containsAbusiveDrawnText(['WAN KER'])).toBe(true);
-    expect(containsAbusiveDrawnText(['-', 'W', 'VANKER'])).toBe(true);
-    expect(containsAbusiveDrawnText(['W VANKER'])).toBe(true);
-    expect(containsAbusiveDrawnText(['WANKER', 'ER'])).toBe(true);
+describe('whole swear words only (founder, 11 Nov 2026, D28)', () => {
+  it('catches swear words and slurs standing on their own, in any case, next to punctuation', () => {
+    for (const bad of ['FUCK', 'what the fuck!', 'fucking hell', 'shit', 'bullshit', 'Shite', 'you cunt', 'WANKER', 'wankers', 'twat', 'dickhead', 'bitch', 'bastard', 'slut', 'whore', 'piss off', 'pissed', 'bollocks', 'arsehole', 'asshole', 'paedo', 'nonce', 'rape', 'mother-fucker', '"shit"', "fuckin'"]) {
+      expect(containsAbusiveText(bad), bad).toBe(true);
+    }
   });
 
-  it('spaced-out letters and look-alike swaps', () => {
-    for (const bad of ['f u c k', 'F-U-C-K', 'fvck', 'sh1t', 'SH!T', 'b1tch', 'c u n t', 'bo11ocks', 'tvvat']) expect(containsAbusiveDrawnText([bad]), bad).toBe(true);
+  it('letters inside a longer word never count', () => {
+    for (const fine of ['swanky', 'Scunthorpe United', 'grapes', 'drape', 'scrape', 'trapeze', 'parapet', 'class 3', 'classic', 'Dickens', 'Hitchcock', 'cocktail', 'Penistone', 'Shitake', 'Pissarro', 'Cunningham', 'encyclopaedia', 'announce', 'Bollinger', 'Arsenal', 'bassett']) {
+      expect(containsAbusiveText(fine), fine).toBe(false);
+    }
   });
 
-  it('kind words and ordinary drawings pass', () => {
-    for (const fine of ['love you nana', 'Happy Christmas', 'Olivia age 6', 'thank you', 'witch', 'bigger', 'vanilla ice cream', 'Wanda', 'banker', 'grapes', 'drape', 'Mississippi', 'Grandma xx', 'TO MUMMY', 'Max 4']) {
+  it('names and everyday words that double as rude words are never stopped', () => {
+    for (const fine of ['Dick', 'Dick Whittington', 'love from Grandad Dick', 'Moby Dick', 'pussy cat', 'Puss in Boots', 'Fanny', 'Aunt Fanny', 'cock-a-doodle-doo', 'the cock crowed', 'a fag', 'door knob', 'willy wonka', 'blue tit', 'bum bag', 'Willy']) {
+      expect(containsAbusiveText(fine), fine).toBe(false);
+    }
+  });
+
+  it('a child named Dick or Fanny can be added', () => {
+    expect(screenChildFirstName('Dick')).toEqual({ ok: true, value: 'Dick' });
+    expect(screenChildFirstName('Fanny')).toEqual({ ok: true, value: 'Fanny' });
+  });
+});
+
+describe('containsAbusiveDrawnText — printed words read from a picture: the same whole-word check', () => {
+  it('ordinary writing that the old joined-up, look-alike matching turned into swear words now passes', () => {
+    // each of these flagged a clean picture under the 9–10 Nov matching (gaps squashed, w/u/v and l/1/i folded)
+    for (const fine of ['push it', 'wish it would snow', 'I wish it was Christmas', 'fish it out', 'Josh! Tom', 'she is hit by a snowball', 'hot water bottle', 'eat watermelon', 'cat watching TV', 'Pop is so cool', 'Pip is super', 'who remembers', 'grass hole', 'lion on cereal', 'I love you Anka', 'Ivanka', 'situation', 'punctuation', 'WAN KER']) {
       expect(containsAbusiveDrawnText([fine]), fine).toBe(false);
     }
   });
 
-  it('lines are never glued to each other', () => {
-    expect(containsAbusiveDrawnText(['Wan', 'Ker'])).toBe(false); // two separate lines — not one word
+  it('wobbly children’s lettering and misreads pass (real reads of sample drawings)', () => {
+    for (const fine of ['fREASVRE', 'V ME IN', 'CH ISTmA5', 'suPERPIE', 'S WUD', 'MERY', 'qoK0H0', 'my DOG', 'SPARKLE', 'MERRY CHRISTMAS', 'love you nana', 'Olivia age 6', 'TO MUMMY', 'Max 4', 'sh1t', 'fvck', 'f u c k', 'VANKER']) {
+      expect(containsAbusiveDrawnText([fine]), fine).toBe(false);
+    }
   });
 
-  it('"rape" counts only as a word of its own in drawings (kids draw grapes)', () => {
-    expect(containsAbusiveDrawnText(['rape'])).toBe(true);
-    expect(containsAbusiveDrawnText(['grapes and pears'])).toBe(false);
+  it('a swear word printed as a word of its own is still caught (a slogan, a sign)', () => {
+    expect(containsAbusiveDrawnText(['NO', 'FUCKS', 'GIVEN'])).toBe(true);
+    expect(containsAbusiveDrawnText(['Happy Birthday', 'you old bastard'])).toBe(true);
+    expect(containsAbusiveDrawnText(['WANKER'])).toBe(true);
+  });
+
+  it('lines are never glued to each other', () => {
+    expect(containsAbusiveDrawnText(['Wan', 'Ker'])).toBe(false);
+    expect(containsAbusiveDrawnText(['sh', 'it'])).toBe(false);
   });
 });
 
+describe('regression: the 88 ordinary phrases of the founder’s 11 Nov test (26 were flagged before D28)', () => {
+  // things written on kids' pictures, clothes and signs — none of them rude. Checked as picture words AND as typed text.
+  const ORDINARY = [
+    'push it', 'wish it would snow', 'I wish it was Christmas', 'Josh! Tom', 'fish it out', 'his hat',
+    'she is hit by a snowball', 'hot water bottle', 'eat watermelon', 'jet watch', 'cat watching TV',
+    'Pop is so cool', 'Pip is super', 'who remembers', 'Dick Whittington', 'Moby Dick',
+    'love from Grandad Dick', 'Scunthorpe United', 'grass hole', 'ten on ceiling', 'lion on cereal',
+    'I love you Anka', 'Ivanka', 'class 3', 'classic cars', 'grapes', 'drape', 'Happy Christmas',
+    'love you nana', 'TO MUMMY', 'Max 4', 'Olivia age 6', 'thank you', 'witch', 'bigger', 'banker',
+    'Mississippi', 'Wanda', 'swanky', 'situation', 'punctuation', 'Duck pond', 'lucky duck', 'click',
+    'sticks', 'Fluffy', 'my DOG', 'SPARKLE', 'MERRY CHRISTMAS', 'NORTH POLE', 'snowman', 'Rudolph',
+    'reindeer', 'stocking', 'Santa Claus', 'angel', 'the wise men', 'Shepherd', 'Bethlehem',
+    'Mary and Joseph', 'dinosaur', 'sausage dog', 'Cassie', 'Sasha', 'Tasha', 'Mishka', 'Chester', 'Dickie',
+    'Pippa', 'Whitney', 'Twyla', 'Mum is the best', 'Dad is funny', 'Nan is kind', 'Pa is fun',
+    'my cat is called Shimmer', 'Fish', 'sushi', 'Shih Tzu', 'basket', 'bus stop', 'Scrabble', 'Bassett',
+    'Twitter', 'Cockapoo', 'Sheffield Wednesday', 'Wet paint', 'Exit',
+  ];
+  it('has all 88', () => expect(ORDINARY).toHaveLength(88));
+  it.each(ORDINARY)('%s passes', (fine) => {
+    expect(containsAbusiveDrawnText([fine])).toBe(false);
+    expect(containsAbusiveText(fine)).toBe(false);
+  });
+});
