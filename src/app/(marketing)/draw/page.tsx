@@ -54,8 +54,8 @@ export function generateMetadata(): Metadata {
 /** The facts, app-store style. "No ads" first and in honey: the one parents look for. */
 const FACTS: { label: string; strong?: boolean }[] = [
   { label: 'no ads', strong: true },
+  { label: 'educational' },
   { label: 'ages 3 to 12' },
-  { label: '366 lessons' },
   { label: 'works offline' },
 ];
 
@@ -141,7 +141,8 @@ export default function DrawPage() {
               </div>
             </div>
             <p className="mt-5 max-w-md text-[17px] leading-relaxed text-ink-soft">
-              Step-by-step drawing lessons for little artists, made by designers and artists. On screen or on real paper.
+              Step-by-step drawing for little ones, spoken aloud before reading age. On real paper or on screen. No ads, no
+              account, nothing uploaded.
             </p>
             {/* one line, phone to desktop */}
             <ul aria-label="at a glance" className="mt-5 flex flex-nowrap gap-1 min-[400px]:gap-1.5 sm:gap-2">

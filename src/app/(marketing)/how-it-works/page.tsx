@@ -15,7 +15,7 @@ const STEPS = [
   {
     icon: IconCamera,
     title: 'Upload or snap it',
-    body: "Pop in a drawing or take a photo. It goes straight to a private, UK-based home — never anywhere public, ever.",
+    body: 'Pop in a drawing or take a photo, and we tidy the shadows and creases for you. It goes straight to a private, UK-based home, never anywhere public.',
   },
   {
     icon: IconWand,
@@ -40,7 +40,8 @@ export default function HowItWorksPage() {
             How snickerdoodle works
           </h1>
           <p className="pop-in mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
-            Three little steps from a kitchen-table masterpiece to something you&apos;ll treasure for years.
+            No posting, no proofs, no waiting weeks. Three little steps from the kitchen table to something you&apos;ll
+            keep for years.
           </p>
         </div>
 

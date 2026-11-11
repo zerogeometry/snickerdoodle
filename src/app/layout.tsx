@@ -38,7 +38,7 @@ export function generateMetadata(): Metadata {
     metadataBase: new URL(siteOrigin()),
     title: { default: 'snickerdoodle — keep the magic', template: '%s · snickerdoodle' },
     description:
-      "Turn your little one's drawings into beautiful things you'll treasure forever — framed prints, mugs, cushions, jigsaws, blankets and cards.",
+      "Turn your child's own drawings into a whole collection of keepsakes and gifts in a few taps, kept safe in your family's private keepsake box.",
     // the share card for any page without its own picture: the lockup on paper (never a child's drawing)
     openGraph: { siteName: 'Snickerdoodle', locale: 'en_GB', type: 'website', images: [{ url: b.og, width: 1200, height: 630, alt: 'snickerdoodle' }] },
     manifest: '/manifest.webmanifest',

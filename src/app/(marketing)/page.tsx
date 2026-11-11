@@ -1,4 +1,4 @@
-import { IconGift, IconUpload, IconWand } from '@tabler/icons-react';
+import { IconCheck, IconGift, IconUpload, IconWand } from '@tabler/icons-react';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { Button } from '@/ui/primitives/Button';
@@ -13,7 +13,7 @@ import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 import { ChristmasHeroVisual } from '@/ui/components/ChristmasHeroVisual';
-import { isChristmasSeason, seasonClock } from '@/lib/season';
+import { formatShortDate, headlinePromise, isChristmasSeason, seasonClock } from '@/lib/season';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -36,23 +36,29 @@ type Step = { icon: TablerIconComponent; title: string; copy: string };
 
 const STEPS: Step[] = [
   { icon: IconUpload, title: '1 · Upload it', copy: 'Snap their latest masterpiece and pop it in.' },
-  { icon: IconWand, title: '2 · See the magic', copy: 'Watch it land on a whole family range in moments.' },
-  { icon: IconGift, title: '3 · Keep & give', copy: 'Treasure it, or share a wishlist with the grandparents.' },
+  { icon: IconWand, title: '2 · See the magic', copy: 'See it on prints, mugs, cushions and cards all at once. Tweak it if you like; you don’t have to.' },
+  { icon: IconGift, title: '3 · Keep & give', copy: 'Keep it in your private keepsake box, or share a ready-to-buy link so Granny can treat them in a tap.' },
 ];
+
+/** What families don't have to do (founder, 11 Nov: the competitive landscape, said without naming anyone). */
+const NO_FUSS = ['no posting originals', 'no templates', 'no waiting weeks'];
 
 const TAPE = ['rgb(246 196 69 / .8)', 'rgb(143 181 214 / .85)', 'rgb(232 120 110 / .8)', 'rgb(127 166 94 / .8)', 'rgb(246 196 69 / .8)'];
 
 /** The Christmas shelf under the hero, in season (D24): three placeholder photos, each straight into the
- * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough). */
-const XMAS_SHELF = [
-  { key: 'ceramicOrnament', src: '/christmas/bauble.webp', w: 896, h: 1152, label: 'this year’s ornament', alt: 'A ceramic christmas ornament printed with a child’s crayon snowman' },
-  { key: 'wrappingPaper', src: '/christmas/presents.webp', w: 1200, h: 800, label: 'wrapping paper', alt: 'Presents wrapped in papers printed with children’s drawings on repeat' },
-  { key: 'sack', src: '/christmas/sack.webp', w: 1000, h: 778, label: 'christmas sack', alt: 'A cotton Christmas sack printed with a child’s crayon reindeer' },
+ * create flow for that product (founder, 26 Oct: no separate Christmas page — the homepage is enough).
+ * Photos and titles: founder, 11 Nov (square crops of his images; "gifts" opens the whole range). */
+const XMAS_SHELF: { key?: string; src: string; w: number; h: number; label: string; alt: string }[] = [
+  { key: 'ceramicOrnament', src: '/christmas/shelf-ornament.webp', w: 1000, h: 1000, label: 'tree ornaments', alt: 'A ceramic tree ornament printed with a child’s crayon robin, hanging on the tree' },
+  { key: 'wrappingPaper', src: '/christmas/shelf-wrapping-paper.webp', w: 1000, h: 1000, label: 'wrapping paper', alt: 'Presents wrapped in paper printed with children’s drawings, beside a framed crayon Christmas tree' },
+  { src: '/christmas/shelf-gifts.webp', w: 1000, h: 1000, label: 'gifts', alt: 'A grandparent unwrapping a framed crayon drawing of the family by the Christmas tree' },
 ];
 
 export default function LandingPage() {
   // Christmas (D24): 1 Nov → 6 Jan the hero becomes the Christmas one (mockups/christmas, screen 1).
   const christmas = isChristmasSeason(seasonClock(new Date()));
+  // the same order-by date as the christmas strip (the main lab's last posting day), never a fixed date
+  const promise = christmas ? headlinePromise(seasonClock(new Date())) : null;
   const heroVisual = christmas ? <ChristmasHeroVisual /> : rangeHeroReady() ? <RangeHero /> : <ExampleMorph />;
   return (
     <>
@@ -92,13 +98,14 @@ export default function LandingPage() {
             <p className="pop-in mt-7 max-w-md text-lg leading-relaxed text-ink-soft" style={{ ['--i' as string]: 2 }}>
               {christmas ? (
                 <>
-                  Baubles, cards, wrapping paper and the 2027 calendar — made from their own drawings, and posted in time
+                  Baubles, cards, wrapping paper and the 2027 calendar, made from their own drawings and posted in time
                   for christmas. Draw it this weekend.
+                  {promise?.state === 'in-time' ? <> Order by {formatShortDate(promise.lastOrderDate)}.</> : null}
                 </>
               ) : (
                 <>
-                  Turn your little one&apos;s drawings into beautiful things you&apos;ll treasure forever — framed prints,
-                  mugs, cushions, jigsaws, blankets and cards.
+                  One drawing becomes a whole collection, from framed prints to cushions and cards, in a few taps. Their
+                  wonky, wonderful lines, made real.
                 </>
               )}
             </p>
@@ -109,12 +116,22 @@ export default function LandingPage() {
                 </Button>
                 <DesignFromScratch />
               </div>
-              <TrustLine className="mt-6">everything you make is yours</TrustLine>
+              <TrustLine className="mt-6">private, UK-based, and never used to train anything. yours to keep or delete.</TrustLine>
             </div>
           </div>
 
           <div className="relative mx-auto hidden w-full max-w-[420px] md:block">{heroVisual}</div>
         </div>
+        <ul aria-label="what you don't have to do" className="relative z-10 mx-auto -mt-8 flex max-w-6xl flex-wrap justify-center gap-x-6 gap-y-2 px-6 pb-12 md:-mt-12 md:pb-16">
+          {NO_FUSS.map((t) => (
+            <li key={t} className="flex items-center gap-2 text-sm font-semibold text-cocoa">
+              <span className="sticker flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-leaf-pale text-green-save" aria-hidden>
+                <Icon icon={IconCheck} size={13} />
+              </span>
+              {t}
+            </li>
+          ))}
+        </ul>
       </section>
 
       {/* Christmas shelf (in season only) — three taped snapshots into the create flow, on christmas doodle paper */}
@@ -128,7 +145,7 @@ export default function LandingPage() {
               {XMAS_SHELF.map((it, i) => (
                 <li key={it.label}>
                   <Link
-                    href={`/start-creating?for=${it.key}`}
+                    href={it.key ? `/start-creating?for=${it.key}` : '/start-creating'}
                     className="polaroid tape lift block text-center"
                     style={{ ['--tilt' as string]: i % 2 ? '2deg' : '-2deg', ['--tape' as string]: TAPE[i], ['--tape-rot' as string]: i % 2 ? '4deg' : '-3deg' }}
                   >
@@ -154,7 +171,7 @@ export default function LandingPage() {
         <FloatingDoodles tone="cool" />
         <div className="relative z-10 mx-auto max-w-6xl">
           <h2 className="text-center font-display text-3xl text-cobalt-deep md:text-4xl">
-            A few pictures. A whole family range. In moments.
+            A few doodles. A whole family collection in moments.
           </h2>
           <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-cobalt-deep">
             One drawing, turned into everything you&apos;d want to keep or give.
@@ -190,7 +207,7 @@ export default function LandingPage() {
         <div className="relative z-10 mx-auto max-w-6xl">
           <h2 className="text-center font-display text-3xl text-cocoa md:text-4xl">Made from little drawings, kept for years</h2>
           <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-ink-soft">
-            A peek inside a few families&apos; keepsake boxes — every one started life on the fridge door.
+            Every one of these started life on a desk or easel, drawn by a little one, not picked from a template.
           </p>
           <ExampleCarousel className="mt-10" />
         </div>
