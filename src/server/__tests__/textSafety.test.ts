@@ -99,3 +99,27 @@ describe('containsAbusiveDrawnText — printed words read from a picture: the sa
     expect(containsAbusiveDrawnText(['sh', 'it'])).toBe(false);
   });
 });
+
+describe('regression: the 88 ordinary phrases of the founder’s 11 Nov test (26 were flagged before D28)', () => {
+  // things written on kids' pictures, clothes and signs — none of them rude. Checked as picture words AND as typed text.
+  const ORDINARY = [
+    'push it', 'wish it would snow', 'I wish it was Christmas', 'Josh! Tom', 'fish it out', 'his hat',
+    'she is hit by a snowball', 'hot water bottle', 'eat watermelon', 'jet watch', 'cat watching TV',
+    'Pop is so cool', 'Pip is super', 'who remembers', 'Dick Whittington', 'Moby Dick',
+    'love from Grandad Dick', 'Scunthorpe United', 'grass hole', 'ten on ceiling', 'lion on cereal',
+    'I love you Anka', 'Ivanka', 'class 3', 'classic cars', 'grapes', 'drape', 'Happy Christmas',
+    'love you nana', 'TO MUMMY', 'Max 4', 'Olivia age 6', 'thank you', 'witch', 'bigger', 'banker',
+    'Mississippi', 'Wanda', 'swanky', 'situation', 'punctuation', 'Duck pond', 'lucky duck', 'click',
+    'sticks', 'Fluffy', 'my DOG', 'SPARKLE', 'MERRY CHRISTMAS', 'NORTH POLE', 'snowman', 'Rudolph',
+    'reindeer', 'stocking', 'Santa Claus', 'angel', 'the wise men', 'Shepherd', 'Bethlehem',
+    'Mary and Joseph', 'dinosaur', 'sausage dog', 'Cassie', 'Sasha', 'Tasha', 'Mishka', 'Chester', 'Dickie',
+    'Pippa', 'Whitney', 'Twyla', 'Mum is the best', 'Dad is funny', 'Nan is kind', 'Pa is fun',
+    'my cat is called Shimmer', 'Fish', 'sushi', 'Shih Tzu', 'basket', 'bus stop', 'Scrabble', 'Bassett',
+    'Twitter', 'Cockapoo', 'Sheffield Wednesday', 'Wet paint', 'Exit',
+  ];
+  it('has all 88', () => expect(ORDINARY).toHaveLength(88));
+  it.each(ORDINARY)('%s passes', (fine) => {
+    expect(containsAbusiveDrawnText([fine])).toBe(false);
+    expect(containsAbusiveText(fine)).toBe(false);
+  });
+});
