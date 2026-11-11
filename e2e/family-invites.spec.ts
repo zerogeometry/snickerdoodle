@@ -341,15 +341,37 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     expect(await pick(S.page)).toEqual([]);
   });
 
-  await test.step('birthdays: shared with the granny (calendar ticked), not with the aunt (unticked)', async () => {
-    await sql()`update children set birthday = '2021-03-14' where family_id = ${familyId}`;
-    await Gr.page.goto(`/home?family=${familyId}`);
-    const grannyHtml = await Gr.page.content();
+  // A child's birthday (Children's Code std 8, A-59 / 07baf74): the parent, and a relative the parent shared the
+  // family calendar with, get the day, the month and the age they turn next — never the date of birth, not even in
+  // the page's data. A relative the calendar wasn't shared with gets none of it: first names only.
+  await test.step('birthdays: the granny (calendar shared) sees the day, month and age, never the year; the aunt (not shared) sees none of it', async () => {
+    // a birthday 10 days away, so the home's "Coming up" line shows it; the little one turns 5
+    const now = new Date();
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 10));
+    const born = new Date(Date.UTC(next.getUTCFullYear() - 5, next.getUTCMonth(), next.getUTCDate()));
+    const iso = born.toISOString().slice(0, 10);
+    const label = next.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+    await sql()`update children set birthday = ${iso} where family_id = ${familyId}`;
+    // the page's data, as the browser got it: a birthday is {month, day, turns} — any 4-digit number in it is a year
+    const birthdayData = /\\?"birthday\\?":\{[^}]*\}/g;
+
+    for (const [who, page] of Object.entries({ parent: P.page, granny: Gr.page })) {
+      await page.goto(`/home?family=${familyId}`);
+      await expect(page.getByText(`turns 5 on ${label}`).first(), `${who} sees the coming-up birthday`).toBeVisible();
+      const html = await page.content();
+      expect(html, `${who}: never the date of birth`).not.toContain(iso);
+      const shared = html.match(birthdayData) ?? [];
+      expect(shared.length, `${who} gets the day and month`).toBeGreaterThan(0);
+      for (const b of shared) expect(b, `${who}: no year in the birthday data`).not.toMatch(/\d{4}/);
+    }
+
     await A.page.goto(`/home?family=${familyId}`);
+    await expect(A.page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(A.page.getByText(/turns \d+ on/)).toHaveCount(0);
     const auntHtml = await A.page.content();
-    expect(grannyHtml).toContain('2021-03-14');
-    expect(auntHtml).not.toContain('2021-03-14');
     expect(auntHtml).toContain('Olivia'); // first names only
+    expect(auntHtml).not.toContain(iso);
+    expect(auntHtml.match(birthdayData) ?? [], 'the aunt gets no birthday at all').toEqual([]);
   });
 
   await test.step('the parent changes the granny’s circle + access; it bites on her next page', async () => {
