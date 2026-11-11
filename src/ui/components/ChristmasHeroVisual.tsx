@@ -4,8 +4,8 @@ import { CHRISTMAS_STICKER_SVG } from '@/lib/stickers/christmas-art';
 
 /**
  * The homepage hero picture in the Christmas season (mockups/christmas, screen 1): a bundle of three taped
- * polaroids (founder, 11 Nov): the cards on the mantel and the presents under the tree fanned out behind, the
- * table set (the hero product) in front. Three of OUR Studio stickers are stuck on the page (the same vector
+ * polaroids (founder, 11 Nov): the cards on the mantel and the presents by the tree fanned out behind, the
+ * wrapped presents in front. Three of OUR Studio stickers are stuck on the page (the same vector
  * art families add in the Studio). The photos are brand-safe concept images of the real products. Stickers
  * render as <img> data URIs so their internal ids never clash; the wiggle is CSS-only and off under reduced
  * motion (globals.css).
@@ -31,17 +31,17 @@ const PHOTOS: { src: string; alt: string; box: string; tilt: string; tape: strin
   },
   // back right
   {
-    src: '/christmas/hero-treepresents.webp',
-    alt: 'Presents under the tree, wrapped in paper printed with children’s drawings',
+    src: '/christmas/hero-morepresents.webp',
+    alt: 'A child’s framed crayon snowman among presents under the tree, wrapped in paper printed with their drawings',
     box: 'right-0 top-[8%] w-[50%]',
     tilt: '5deg',
     tape: LEAF_TAPE,
     tapeRot: '6deg',
   },
-  // front and centre: the hero product
+  // front and centre
   {
-    src: '/christmas/hero-tableset.webp',
-    alt: 'A Christmas table set with placemats, a coaster and an ornament, all printed with a child’s crayon nativity',
+    src: '/christmas/hero-presents.webp',
+    alt: 'Presents under the tree, wrapped in papers printed with a child’s crayon reindeer and Christmas trees',
     box: 'bottom-0 left-[19%] w-[62%]',
     tilt: '-1.5deg',
     tape: HOLLY_TAPE,

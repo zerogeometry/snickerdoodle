@@ -94,12 +94,12 @@ export function DrawAppBubble({ iconSrc }: { iconSrc: string }) {
         <Link
           href="/draw"
           aria-label="learn to draw with the Snickerdoodle Draw app"
-          className="press sticker relative block size-[60px] rounded-full bg-sunshine focus-visible:outline-2 focus-visible:outline-offset-4 md:size-[68px]"
+          className="press sticker relative block size-[60px] rounded-full bg-sunshine focus-visible:outline-2 focus-visible:outline-offset-4 md:size-[102px]"
         >
-          <img src={iconSrc} alt="" width={68} height={68} decoding="async" className="block size-full rounded-full" />
+          <img src={iconSrc} alt="" width={102} height={102} decoding="async" className="block size-full rounded-full" />
           <span
             aria-hidden
-            className="absolute -left-8 -top-2.5 -rotate-6 whitespace-nowrap rounded-pill bg-cocoa px-2 py-[3px] text-[9.5px] font-extrabold uppercase leading-none tracking-[0.06em] text-paper shadow-[0_2px_0_color-mix(in_srgb,var(--color-cocoa)_35%,transparent)]"
+            className="absolute -left-8 -top-2.5 -rotate-6 whitespace-nowrap rounded-pill bg-cocoa px-2 py-[3px] text-[9.5px] font-extrabold md:-left-12 md:-top-4 md:px-3 md:py-[4.5px] md:text-[14px] uppercase leading-none tracking-[0.06em] text-paper shadow-[0_2px_0_color-mix(in_srgb,var(--color-cocoa)_35%,transparent)]"
           >
             learn to draw
           </span>
