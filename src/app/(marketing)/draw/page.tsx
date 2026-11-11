@@ -124,17 +124,19 @@ export default function DrawPage() {
           </div>
 
           <div className="pop-in min-w-0" style={{ ['--i' as string]: 1 }}>
-            <div className="flex items-center gap-4">
+            {/* Phones: the title shrinks with the screen so "Snickerdoodle" always fits inside the page's margins (founder,
+                11 Nov: it ran off the right edge). Desktop is unchanged. */}
+            <div className="flex items-center gap-3 md:gap-4">
               <img
                 src={d.icon}
                 alt=""
                 width={88}
                 height={88}
                 decoding="async"
-                className="sticker size-[72px] shrink-0 rounded-[22%] md:size-[88px]"
+                className="sticker size-16 shrink-0 rounded-[22%] min-[400px]:size-[72px] md:size-[88px]"
               />
               <div className="min-w-0">
-                <h1 id="draw-title" className="font-display text-[32px] leading-[1.02] text-cocoa md:text-5xl">
+                <h1 id="draw-title" className="font-display text-[clamp(22px,7.4vw,32px)] leading-[1.02] text-cocoa md:text-5xl">
                   Snickerdoodle Draw
                 </h1>
                 <p className="mt-1 text-sm text-ink-soft">free · made in the UK</p>
@@ -144,8 +146,8 @@ export default function DrawPage() {
               Step-by-step drawing for little ones, spoken aloud before reading age. On real paper or on screen. No ads, no
               account, nothing uploaded.
             </p>
-            {/* one line, phone to desktop */}
-            <ul aria-label="at a glance" className="mt-5 flex flex-nowrap gap-1 min-[400px]:gap-1.5 sm:gap-2">
+            {/* one line where it fits; on a narrow phone (or with bigger text) it wraps rather than running off the edge */}
+            <ul aria-label="at a glance" className="mt-5 flex flex-wrap gap-1 min-[400px]:gap-1.5 sm:flex-nowrap sm:gap-2">
               {FACTS.map((f) => (
                 <li
                   key={f.label}
