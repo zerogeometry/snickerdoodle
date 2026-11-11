@@ -79,6 +79,12 @@ body {
      `clip`, not `hidden`, so sticky headers keep working. */
   overflow-x: clip;
 }
+/* …and the same on the root. With <html> left `visible`, the browser hands body's overflow up to the
+   window instead, so a full-width card mid-pop-in (stretched to 1.14×) still made the page scroll
+   sideways for a moment on a phone. Clipping here keeps body's own clip in place. */
+html {
+  overflow-x: clip;
+}
 
 /* Display headings get the chunky, tight Scrapbook set. */
 .font-display {

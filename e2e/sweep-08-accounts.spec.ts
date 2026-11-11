@@ -264,6 +264,8 @@ test.describe('accessibility + both sizes', () => {
       await signInByEmailLink(page, email, '/account');
       await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
       await page.screenshot({ path: shot('account'), fullPage: true });
+      // judge the sheet as it SETTLES, not mid-pop (the 0.6s squash-and-stretch fades its buttons in), as expectAccessible does
+      await page.emulateMedia({ reducedMotion: 'reduce' });
       await page.getByRole('button', { name: /close your account/i }).click();
       await expect(page.getByRole('button', { name: 'close my account', exact: true })).toBeVisible();
       const sheet = await new AxeBuilder({ page }).include('[role="dialog"]').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();

@@ -110,8 +110,9 @@ test('signed URLs: one object, short-lived, can’t be re-pointed; the bucket is
 
 test('gift-link previews: wrong token, item not on the link, revoked, ONLY_ME → all the same 404', async () => {
   const token = randomBytes(24).toString('base64url');
-  const [link] = await sql()`insert into gift_links (family_id, created_by_account_id, token, items, expires_at)
-    values (${A.familyId}, ${A.accountId}, ${token}, ${sql().json([{ assetId: A.assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 }])}, now() + interval '1 day') returning id`;
+  // a link sent to the family circle (D27: every link is for a circle, and a FAMILY keepsake shows only on a FAMILY one)
+  const [link] = await sql()`insert into gift_links (family_id, created_by_account_id, token, items, expires_at, audience_circle)
+    values (${A.familyId}, ${A.accountId}, ${token}, ${sql().json([{ assetId: A.assetId, productKey: 'mug', label: 'mug', unitPricePence: 1800 }])}, now() + interval '1 day', 'FAMILY') returning id`;
   const anon = A.page.request;
   const get = (t: string, id: string) => anon.fetch(`/api/gift/${t}/preview/${id}`, { headers: { cookie: '' } });
   expect((await get(token, A.assetId)).status()).toBe(200); // control: the link shows its own item

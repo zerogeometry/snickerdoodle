@@ -17,6 +17,25 @@ async function fieldSizes(page: Page): Promise<{ name: string; px: number }[]> {
 }
 const noSideways = (page: Page) => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
 
+// The squash-and-stretch pop-in (10 Nov) stretches a full-width card to 1.14× for a moment. The page must
+// never scroll sideways while it does (body AND html clip overflow-x, src/app/globals.css): asked to scroll
+// across at every step of the pop, it stays put.
+test('touch phone: a card popping in never lets the page scroll sideways', async ({ page }) => {
+  await quietCookies(page);
+  await page.goto('/login');
+  const across: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    across.push(await page.evaluate(() => {
+      window.scrollTo(40, window.scrollY);
+      const x = window.scrollX;
+      window.scrollTo(0, window.scrollY);
+      return x;
+    }));
+    await page.waitForTimeout(60);
+  }
+  expect(across, 'scrollX while the login card pops in').toEqual(across.map(() => 0));
+});
+
 test('touch phone: text fields are 16px or more, and nothing runs off the side', async ({ page }) => {
   test.setTimeout(180_000);
   await quietCookies(page);

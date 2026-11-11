@@ -27,6 +27,15 @@ export function isTestSite(env: Env = process.env): boolean {
   return env.SITE_MODE === 'test';
 }
 
+/**
+ * Is the Snickerdoodle Draw privacy notice (/trust/privacy/draw) shown? It's a DRAFT until the founder
+ * approves it: on the (locked) test site always, on the live site only once `DRAW_PRIVACY_NOTICE=live`.
+ * Anything that links to it asks this first, so nobody is sent to a page that isn't there.
+ */
+export function drawNoticeShown(env: Env = process.env): boolean {
+  return env.DRAW_PRIVACY_NOTICE === 'live' || isTestSite(env);
+}
+
 /** PRIVATE LIVE: the real shop behind the shared password (see above). */
 export function isPrivateLive(env: Env = process.env): boolean {
   return env.SITE_MODE === 'private';

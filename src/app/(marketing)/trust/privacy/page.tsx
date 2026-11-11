@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Prose } from '@/ui/components/Prose';
 import { COMPANY } from '@/lib/company';
+import { drawNoticeShown } from '@/lib/siteMode';
 
 const COMPANY_ADDRESS = `${COMPANY.street}, ${COMPANY.city} ${COMPANY.postcode}`;
 
@@ -58,7 +59,12 @@ export default function PrivacyNoticePage() {
           lists linked phones and their choices, lets you disconnect them, delete backed-up drawing days, and remove
           everything the app sent. Your data download includes all of this. A phone unused for 90 days is disconnected;
           drawing days nobody backs up for a year are deleted. Stopping a sync never deletes what&apos;s already here.
-          See <a href="/trust/privacy/draw">the app&apos;s own notice</a> for what stays on the phone.{' '}
+          {/* the app's own notice is a draft until it's approved: no link to a page that isn't there yet */}
+          {drawNoticeShown() && (
+            <>
+              See <a href="/trust/privacy/draw">the app&apos;s own notice</a> for what stays on the phone.
+            </>
+          )}{' '}
           <em>
             Legal basis: our contract with you; for relatives&apos; names and birthdays, our legitimate interest in
             keeping your family&apos;s days in one place.

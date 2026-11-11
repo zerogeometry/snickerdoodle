@@ -32,6 +32,8 @@ export function ChristmasStrip({ serverNowIso, compact = false }: { serverNowIso
         <span className="min-w-0 truncate whitespace-nowrap text-[clamp(11px,3.5vw,13px)] md:text-[13px]">
           order by <b className="font-extrabold">{formatShortDate(p.lastOrderDate)}</b> for christmas
           {compact ? null : <span className="hidden sm:inline"> · draw it this weekend</span>}
+          {/* the (i) says it to the eye; this says it to a screen reader (the name keeps the visible words, WCAG 2.5.3) */}
+          <span className="sr-only">. see all the christmas delivery dates</span>
         </span>
         {/* (i) instead of the word "dates" (founder, 10 Nov): the whole strip opens the dates page */}
         <Icon icon={IconInfoCircle} size={20} className="ml-auto shrink-0 text-cinnamon" />
@@ -56,7 +58,6 @@ export function ChristmasStrip({ serverNowIso, compact = false }: { serverNowIso
     <div className={compact ? 'px-3 pb-2' : 'mx-auto w-full max-w-6xl px-4 md:px-6'}>
       <Link
         href={p.state === 'in-time' ? '/christmas/delivery-dates' : '/start-creating'}
-        aria-label={p.state === 'in-time' ? `order by ${formatShortDate(p.lastOrderDate)} for christmas. see all the christmas delivery dates` : undefined}
         className={`flex min-h-11 items-center gap-2 rounded-[14px] border-2 border-cocoa px-3 py-1 text-[13px] font-semibold text-cocoa ${tone}`}
       >
         {body}

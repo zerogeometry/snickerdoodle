@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { gateCookieValid, gateToken, isGateExempt, sameSitePath, testSiteProblems } from '@/lib/siteMode';
+import { drawNoticeShown, gateCookieValid, gateToken, isGateExempt, sameSitePath, testSiteProblems } from '@/lib/siteMode';
 import { encryptionFor } from '@/storage/objects';
 import { resendMailer, resolveMailer } from '@/server/mail';
 
@@ -67,5 +67,16 @@ describe('Resend mailer', () => {
   });
   it('needs its key and sender', () => {
     expect(() => resolveMailer({ MAIL_PROVIDER: 'resend' })).toThrow(/RESEND_API_KEY/);
+  });
+});
+
+describe('the Snickerdoodle Draw notice (a draft until approved)', () => {
+  it('is shown on the test site, and on the live site only once DRAW_PRIVACY_NOTICE=live', () => {
+    expect(drawNoticeShown({ SITE_MODE: 'test' })).toBe(true);
+    expect(drawNoticeShown({ DRAW_PRIVACY_NOTICE: 'live' })).toBe(true);
+    expect(drawNoticeShown({ SITE_MODE: 'private', DRAW_PRIVACY_NOTICE: 'live' })).toBe(true);
+    expect(drawNoticeShown({})).toBe(false);
+    expect(drawNoticeShown({ SITE_MODE: 'private' })).toBe(false);
+    expect(drawNoticeShown({ DRAW_PRIVACY_NOTICE: 'draft' })).toBe(false);
   });
 });

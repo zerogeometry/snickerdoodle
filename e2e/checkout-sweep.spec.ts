@@ -314,19 +314,23 @@ test.describe('checkout sweep 05', () => {
     expect(body).toContain('T5NOTE'); // the note travels with the order (screened + kept server-side)
   });
 
-  test('a drawing still held for review (no IWF) can’t be ordered — no order row, the basket stays', async ({ page }) => {
-    test.setTimeout(240_000);
-    await page.setViewportSize({ width: 1280, height: 800 });
-    const parent = await parentWithMug(page, { clear: false });
-    const before = (await sql()<{ n: number }[]>`select count(*)::int as n from orders o join accounts a on a.id = o.account_id where a.email = ${parent.toLowerCase()}`)[0]!.n;
-    await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
-    await expect(page.getByText(/didn.t go through/i)).toBeVisible({ timeout: 30_000 });
-    await page.screenshot({ path: `${SHOTS}/held-drawing-checkout.png` });
-    await expect(page).toHaveURL(/\/checkout$/);
-    const after = (await sql()<{ n: number }[]>`select count(*)::int as n from orders o join accounts a on a.id = o.account_id where a.email = ${parent.toLowerCase()}`)[0]!.n;
-    expect(after).toBe(before);
-    const items = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{}').state.items.length);
-    expect(items).toBe(1);
+  test.describe('held', () => {
+    // ABOUT a held drawing: no stand-in "the classifier says it's clean" (e2e/test.ts) — it stays held
+    test.use({ screenedClean: false });
+    test('a drawing still held for review (no IWF) can’t be ordered — no order row, the basket stays', async ({ page }) => {
+      test.setTimeout(240_000);
+      await page.setViewportSize({ width: 1280, height: 800 });
+      const parent = await parentWithMug(page, { clear: false });
+      const before = (await sql()<{ n: number }[]>`select count(*)::int as n from orders o join accounts a on a.id = o.account_id where a.email = ${parent.toLowerCase()}`)[0]!.n;
+      await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
+      await expect(page.getByText(/didn.t go through/i)).toBeVisible({ timeout: 30_000 });
+      await page.screenshot({ path: `${SHOTS}/held-drawing-checkout.png` });
+      await expect(page).toHaveURL(/\/checkout$/);
+      const after = (await sql()<{ n: number }[]>`select count(*)::int as n from orders o join accounts a on a.id = o.account_id where a.email = ${parent.toLowerCase()}`)[0]!.n;
+      expect(after).toBe(before);
+      const items = await page.evaluate(() => JSON.parse(sessionStorage.getItem('sd_basket') ?? '{}').state.items.length);
+      expect(items).toBe(1);
+    });
   });
 
   test.describe('Stripe TEST payments', () => {
