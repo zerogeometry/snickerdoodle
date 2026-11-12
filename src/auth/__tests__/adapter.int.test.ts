@@ -6,6 +6,7 @@ import postgres from 'postgres';
 import * as schema from '@/db/schema';
 import { accounts, sessions, verificationTokens } from '@/db/schema';
 import { DrizzleAccountsAdapter } from '@/auth/adapter';
+import { storeSignInCode, verificationTokenHash } from '@/auth/signInCode';
 import type { DbHandle } from '@/server/db';
 
 /**
@@ -54,6 +55,30 @@ describe.skipIf(!URL)('Auth.js Drizzle adapter — integration', () => {
     expect(first?.token).toBe(token);
     const second = await adapter.useVerificationToken!({ identifier: email, token });
     expect(second).toBeNull(); // already consumed — a link can't be replayed
+  });
+
+  it('the sign-in code is a token Auth.js finds by its own hash, for 15 minutes; using the link or the code ends the other', async () => {
+    const secret = 'adapter-test-secret';
+    const now = new Date();
+    await storeSignInCode(db, email, 'K7MP42QX', secret, now);
+    await adapter.createVerificationToken!({ identifier: email, token: `link-${nonce}`, expires: new Date(Date.now() + 3_600_000) });
+    const [row] = await db.select().from(verificationTokens).where(and(eq(verificationTokens.identifier, email), eq(verificationTokens.token, verificationTokenHash('K7MP42QX', secret))));
+    expect(row!.expires.getTime() - now.getTime()).toBe(15 * 60_000);
+    // the code signs in…
+    expect((await adapter.useVerificationToken!({ identifier: email, token: verificationTokenHash('K7MP42QX', secret) }))?.identifier).toBe(email);
+    // …and the link from the same email no longer does
+    expect(await adapter.useVerificationToken!({ identifier: email, token: `link-${nonce}` })).toBeNull();
+    // only for the email it was sent to
+    await storeSignInCode(db, email, 'AAAABBBB', secret, now);
+    expect(await adapter.useVerificationToken!({ identifier: `other-${email}`, token: verificationTokenHash('AAAABBBB', secret) })).toBeNull();
+    await db.delete(verificationTokens).where(eq(verificationTokens.identifier, email));
+  });
+
+  it('an old, run-out link ends only itself, never a fresh code', async () => {
+    await adapter.createVerificationToken!({ identifier: email, token: `old-${nonce}`, expires: new Date(Date.now() - 60_000) });
+    await storeSignInCode(db, email, 'CCCCDDDD', 'adapter-test-secret');
+    expect((await adapter.useVerificationToken!({ identifier: email, token: `old-${nonce}` }))?.token).toBe(`old-${nonce}`);
+    expect(await adapter.useVerificationToken!({ identifier: email, token: verificationTokenHash('CCCCDDDD', 'adapter-test-secret') })).not.toBeNull();
   });
 
   it('creates a session, reads session+user, and revocation deletes it', async () => {

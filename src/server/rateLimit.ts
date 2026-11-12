@@ -121,6 +121,9 @@ export async function purgeExpiredRateLimits(db: DbHandle): Promise<number> {
 export const LIMITS = {
   magicLinkPerEmail: { bucket: 'magic-link:email', limit: 5, windowSec: 3600 },
   magicLinkPerIp: { bucket: 'magic-link:ip', limit: 20, windowSec: 3600 },
+  // every open of a sign-in link or typed code (src/app/api/auth/[...nextauth]/route.ts): caps guessing the code
+  signInTriesPerEmail: { bucket: 'sign-in-try:email', limit: 10, windowSec: 900, failClosed: true },
+  signInTriesPerIp: { bucket: 'sign-in-try:ip', limit: 30, windowSec: 900, failClosed: true },
   emailChange: { bucket: 'email-change:account', limit: 5, windowSec: 3600 },
   guestUploadPerIp: { bucket: 'upload:guest-ip', limit: 60, windowSec: 3600 },
   homeUploadPerAccount: { bucket: 'upload:account', limit: 120, windowSec: 3600 },
