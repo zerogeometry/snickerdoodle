@@ -204,6 +204,21 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/textures/floaters-everyday.webp',
 ]);
 
+/**
+ * The trust pages anyone may read while the site is locked (founder, 12 Nov 2026): the App Store and Google Play
+ * reviewers must open the privacy notices and the "close your account" page from the store listings. Exact paths
+ * only, never a prefix: they're written to be public and hold no customer data. The shop, keepsake boxes, sign-in
+ * and the data-complaint form stay behind the password.
+ */
+export const PUBLIC_TRUST_PAGES: ReadonlySet<string> = new Set([
+  '/trust/privacy',
+  '/trust/privacy/draw',
+  '/trust/cookies',
+  '/trust/terms',
+  '/trust/family-promise',
+  '/trust/delete-account',
+]);
+
 /** Paths that must work without the password: the lock itself, provider webhooks and the
  * scheduled jobs (each carries its own signature / secret), the health check the deploy and the
  * uptime alarm ask (it says only "ok" + the build; its render check needs the jobs secret), Next's
@@ -227,6 +242,7 @@ export function isGateExempt(pathname: string): boolean {
     pathname === '/favicon.ico' ||
     pathname === '/robots.txt' ||
     pathname === '/manifest.webmanifest' ||
+    PUBLIC_TRUST_PAGES.has(pathname.replace(/\/+$/, '') || '/') ||
     PUBLIC_FILES.has(pathname)
   );
 }
