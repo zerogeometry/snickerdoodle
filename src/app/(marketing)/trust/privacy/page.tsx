@@ -32,7 +32,7 @@ export default function PrivacyNoticePage() {
           Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> (company number {COMPANY.companyNumber}, registered in
           England &amp; Wales, registered office {COMPANY_ADDRESS}). We are the &ldquo;data controller&rdquo; for the personal
           information described here. You can reach us at <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a>.
-          We are registered with the Information Commissioner&apos;s Office (ICO), registration number [ICO number].
+          We are registered with the Information Commissioner&apos;s Office (ICO), registration number {COMPANY.icoRegistration}.
         </p>
 
         <h2>2. The information we collect</h2>
@@ -207,7 +207,7 @@ export default function PrivacyNoticePage() {
 
         <p className="text-[13px] text-ink-faint">
           Contact: <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a> · Launch Mode Ltd,
-          {COMPANY_ADDRESS} · ICO registration [number].
+          {COMPANY_ADDRESS} · ICO registration {COMPANY.icoRegistration}.
         </p>
       </Prose>
     </div>
