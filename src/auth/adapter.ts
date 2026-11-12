@@ -114,12 +114,17 @@ export function DrizzleAccountsAdapter(db: DbHandle = getDb()): Adapter {
       return token;
     },
 
-    // Single-use: delete-and-return, so a magic link can't be replayed.
+    // Single-use: delete-and-return, so a magic link can't be replayed. Each email carries a link AND a code
+    // (src/auth/signInCode.ts): a good, unexpired one ends every other outstanding link and code for that address,
+    // so nothing left in an inbox still opens the account. (An expired one ends only itself.)
     async useVerificationToken({ identifier, token }) {
       const [row] = await db
         .delete(verificationTokens)
         .where(and(eq(verificationTokens.identifier, identifier), eq(verificationTokens.token, token)))
         .returning();
+      if (row && row.expires.valueOf() >= Date.now()) {
+        await db.delete(verificationTokens).where(eq(verificationTokens.identifier, identifier));
+      }
       return row ?? null;
     },
   };

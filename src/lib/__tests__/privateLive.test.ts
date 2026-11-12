@@ -82,6 +82,15 @@ describe('proxy — the private live site sits behind the password', () => {
     expect((await run('/api/webhooks/stripe', env)).status).not.toBe(401);
   });
 
+  it('a sign-in link opened without the password goes to the password page and keeps the whole link (not a bare "locked")', async () => {
+    const link = '/api/auth/callback/email?callbackUrl=%2Fapp%2Fconnect&token=K7MP42QX&email=sam%40x.test';
+    const res = await run(link, env);
+    expect(res.status).toBe(307);
+    expect(res.headers.get('location')).toContain(`/test-gate?next=${encodeURIComponent(link)}`);
+    // the rest of Auth.js is still just refused
+    expect((await run('/api/auth/session', env)).status).toBe(401);
+  });
+
   it('with the password, pages open — and are still never indexed, even the public ones', async () => {
     const { gateToken } = await import('@/lib/siteMode');
     const token = await gateToken(env);

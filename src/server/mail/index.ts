@@ -26,6 +26,9 @@ export interface MailMessage {
   subject: string;
   /** Plain-text body (warm, brand voice). Links must be absolute — see appUrl(). */
   text: string;
+  /** An optional HTML body, sent alongside the text (mail apps that can't show HTML fall back to the text). Used where
+   * a button reads better than a long address, e.g. the sign-in email (./signIn). Inline styles only; escape everything. */
+  html?: string;
   /** Where a reply goes (e.g. support@ on a customer's acknowledgement; the customer on the team's copy). */
   replyTo?: string;
   /** Extra headers, e.g. List-Unsubscribe on the reminders (./reminderOff). */
@@ -73,7 +76,7 @@ export function resendMailer(apiKey: string, from: string, doFetch: typeof fetch
       const res = await doFetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: senderFor(from, m.onBehalfOf), to: [m.to], subject: m.subject, text: m.text, ...(m.replyTo ? { reply_to: m.replyTo } : {}), ...(m.headers ? { headers: m.headers } : {}), tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
+        body: JSON.stringify({ from: senderFor(from, m.onBehalfOf), to: [m.to], subject: m.subject, text: m.text, ...(m.html ? { html: m.html } : {}), ...(m.replyTo ? { reply_to: m.replyTo } : {}), ...(m.headers ? { headers: m.headers } : {}), tags: [{ name: 'kind', value: m.kind.replace(/[^a-z0-9_-]/gi, '_') }] }),
       });
       if (!res.ok) throw new Error(`email not sent (${res.status}) — check the Resend key and domain`);
     },

@@ -22,7 +22,9 @@ export async function proxy(req: NextRequest) {
 
   const { pathname, search } = req.nextUrl;
   if (testSite && !isGateExempt(pathname) && !(await gateCookieValid(req.cookies.get(TEST_GATE_COOKIE)?.value))) {
-    if (pathname.startsWith('/api/')) {
+    // A sign-in link opened in a browser that hasn't had the password (the mail app's own, say) goes to the
+    // password page and then on to the link, like any page. Every other API call just gets "locked".
+    if (pathname.startsWith('/api/') && !pathname.startsWith('/api/auth/callback/')) {
       return new NextResponse('locked', { status: 401, headers: { 'X-Robots-Tag': 'noindex, nofollow', 'Content-Security-Policy': csp } });
     }
     const url = req.nextUrl.clone();
