@@ -20,8 +20,8 @@ export const KEEPSAKE_OPTIONS: { value: SyncKeepsakes; label: string; hint: stri
 export const SYNC_BOXES: { key: 'children' | 'progress' | 'birthdays'; label: string; hint: string; icon: TablerIconComponent }[] = [
   {
     key: 'children',
-    label: 'first names and birthdays',
-    hint: 'keep your little ones’ first names and birthdays the same in both places — a rename or birthday changed in draw updates here, and ours are offered to draw.',
+    label: 'first names',
+    hint: 'keep your little ones’ first names the same in both places — a rename in draw updates here. birthdays you add here stay here; the app goes by age group.',
     icon: IconCake,
   },
   {

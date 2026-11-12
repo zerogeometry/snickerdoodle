@@ -152,7 +152,8 @@ export function CreateGiftLinkModal({
   const [rel, setRel] = useState<Relationship>('GRANDPARENT');
   const [invite, setInvite] = useState(false);
   const [access, setAccess] = useState<AccessLevel>('VIEW_BUY');
-  const [shareCalendar, setShareCalendar] = useState(true);
+  // "also invite": the family calendar starts unticked here too (founder, 10 Nov 2026).
+  const [shareCalendar, setShareCalendar] = useState(false);
   const [note, setNote] = useState('');
   const [result, setResult] = useState<{ sent: number; skipped: string[] } | null>(null);
   // or: one open link to share yourself

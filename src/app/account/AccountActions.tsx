@@ -2,7 +2,7 @@
 
 import { IconDoorExit, IconDownload, IconShieldCheck, IconTrash, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { Icon } from '@/ui/primitives/Icon';
 import { toast } from '@/lib/store';
 import { deleteAllMyKeepsakesAction, exportMyDataAction } from '@/app/actions/data';
@@ -14,6 +14,10 @@ export function AccountActions() {
   const [pending, startTransition] = useTransition();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [closeOpen, setCloseOpen] = useState(false);
+  // /account?close=1 (from /trust/delete-account and the Draw app's grown-ups' corner) opens "close your account".
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('close') === '1') setCloseOpen(true);
+  }, []);
 
   const download = () =>
     startTransition(async () => {

@@ -187,7 +187,7 @@ export const invites = pgTable('invites', {
   relationship: relationship('relationship').notNull(),
   circle: circle('circle').notNull(),
   accessLevel: accessLevel('access_level').notNull(),
-  /** The parent's "share the family calendar" choice for this invitee (pre-ticked in the UI). */
+  /** The parent's "share the family calendar" choice for this invitee (starts unticked in the UI, founder 10 Nov 2026). */
   shareOccasions: boolean('share_occasions').notNull().default(false),
   /** The name the parent gave them in the invite sheet (screened; a grown-up's display name). On
    * joining it becomes their account name unless they've already chosen one of their own. */

@@ -39,6 +39,22 @@ describe.skipIf(!DB)('collectAccountData — subject-access export', () => {
     expect(controlled).not.toContain(ids.assetBloomFamily); // another family entirely
   });
 
+  it('the family calendar is in it, with dates added from Snickerdoodle Draw marked (founder, 10 Nov 2026)', async () => {
+    const [onSite] = await db.insert(schema.occasions).values({ familyId: ids.hartleyId, title: 'Pip', kind: 'BIRTHDAY', month: 5, day: 5, createdByAccountId: ids.samId }).returning();
+    const [fromApp] = await db.insert(schema.occasions).values({ familyId: ids.hartleyId, title: 'Nana', kind: 'BIRTHDAY', month: 6, day: 6, createdByAccountId: ids.samId }).returning();
+    await db.insert(schema.auditRecords).values({ familyId: ids.hartleyId, actorAccountId: ids.samId, actorType: 'MEMBER', event: 'OCCASION_CHANGED', targetType: 'occasion', targetId: fromApp!.id, metadata: { action: 'created', via: 'draw-app' } });
+    try {
+      const d = await collectAccountData(db, ids.samId);
+      expect(d.familyCalendar.find((o) => o.id === onSite!.id)).toMatchObject({ title: 'Pip', addedFromDrawApp: false });
+      expect(d.familyCalendar.find((o) => o.id === fromApp!.id)).toMatchObject({ title: 'Nana', addedFromDrawApp: true });
+      expect(d.keepsakesYouControl.every((a) => typeof a.sentFromDrawApp === 'boolean')).toBe(true);
+      // another family's dates aren't Sam's record
+      expect((await collectAccountData(db, ids.blakeId)).familyCalendar.some((o) => o.id === onSite!.id)).toBe(false);
+    } finally {
+      await db.delete(schema.occasions).where(inArray(schema.occasions.id, [onSite!.id, fromApp!.id]));
+    }
+  });
+
   it('08-B11: help-form messages are in it — sent signed in, or signed out from the same address — and nobody else’s', async () => {
     const [sam] = await db.select({ email: schema.accounts.email }).from(schema.accounts).where(eq(schema.accounts.id, ids.samId));
     const refs = [`T-${randomUUID().slice(0, 8)}`, `T-${randomUUID().slice(0, 8)}`, `T-${randomUUID().slice(0, 8)}`];

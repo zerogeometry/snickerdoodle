@@ -64,7 +64,7 @@ export interface CreateInviteInput {
   relationship: Relationship;
   accessLevel: AccessLevel;
   /** Share the family calendar (children's birthdays) with them — the parent's explicit
-   * choice (pre-ticked in the invite form). Absent ⇒ not shared. */
+   * choice (unticked to start in the invite form). Absent ⇒ not shared. */
   shareOccasions?: boolean;
   /** The name the parent typed for them. Screened; kept so it becomes their account name when they
    * join (unless they've chosen their own). An unusable name is dropped, never a refused invite. */

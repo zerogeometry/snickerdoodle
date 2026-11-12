@@ -51,7 +51,7 @@ export default function PrivacyNoticePage() {
           only what you choose when linking, which you can change on your account page: drawings for your keepsake box
           (only the ones a grown-up picks, the proud pile — including drawings your little one stars — or every
           drawing), each with the child&apos;s first name it&apos;s filed under, the day it was made and whether it was
-          drawn on screen or paper; and, only if you tick them, your little ones&apos; first names and birthdays, their
+          drawn on screen or paper; and, only if you tick them, your little ones&apos; first names (never their birthdays), their
           drawing days (so a new phone can pick them up), and your family calendar&apos;s birthdays and special days (a
           name, an optional relation, and the day and month, never a year). A date added from the app is kept to your
           home — you, a partner and grown-up children — until you choose to share it wider on the website; the app can

@@ -18,7 +18,7 @@ export const CAN = [
   'see your little ones’ first names, to file each drawing under the right one',
   'add a little one (first name only)',
   'send a drawing to your keepsake box when a grown-up taps keep it — and the proud pile or every drawing, if you pick that below',
-  'see their birthdays, and change a little one’s name or birthday — only with “first names and birthdays” ticked',
+  'change a little one’s first name — only with “first names” ticked (it never sees their birthdays)',
   'back up their drawing days — only with “drawing days” ticked',
   'see, add and change your family calendar’s birthdays and special days (a name and the day and month) — only with “family birthdays” ticked',
   'make a ready-to-buy link for a drawing it sent',
@@ -53,7 +53,10 @@ export function familyCant(birthdays: boolean): string {
 export function ConnectCard({ params, email, families, notOwner }: { params: ConnectParams; email: string; families: ConnectFamily[]; notOwner: boolean }) {
   const [familyId, setFamilyId] = useState<string>(families[0]?.id ?? 'new');
   const family = families.find((f) => f.id === familyId);
-  const [ticked, setTicked] = useState<Set<string>>(() => new Set(families[0]?.children.map((c) => c.id) ?? []));
+  // "who draws on this phone?" starts with nobody ticked, unless the family has just one little one (founder, 10 and
+  // 12 Nov 2026: nothing is chosen for you).
+  const startTicked = (kids: { id: string }[] | undefined) => new Set(kids && kids.length === 1 ? [kids[0]!.id] : []);
+  const [ticked, setTicked] = useState<Set<string>>(() => startTicked(families[0]?.children));
   const [sync, setSync] = useState<ConnectSyncDraft>({ ...EMPTY_CONNECT_SYNC });
   const ready = canConnectWith(sync);
   const [busy, setBusy] = useState(false);
@@ -61,7 +64,7 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
 
   const pickFamily = (id: string) => {
     setFamilyId(id);
-    setTicked(new Set(families.find((f) => f.id === id)?.children.map((c) => c.id) ?? []));
+    setTicked(startTicked(families.find((f) => f.id === id)?.children));
   };
   const toggle = (id: string) =>
     setTicked((t) => {
@@ -163,7 +166,7 @@ export function ConnectCard({ params, email, families, notOwner }: { params: Con
         <h2 id="sync-title" className="font-display text-lg leading-tight text-cocoa">
           what syncs?
         </h2>
-        <p className="mt-0.5 mb-3 text-xs leading-snug text-ink-soft">nothing’s picked until you pick. change any of it later, in the app’s grown-ups’ corner or on your account page.</p>
+        <p className="mt-0.5 mb-3 text-xs leading-snug text-ink-soft">nothing’s picked until you pick. send less or stop any time in the app’s grown-ups’ corner; send more from your account page.</p>
         <DrawSyncSlate name="connect" value={sync} onChange={setSync} disabled={busy} />
         <p className="mt-3 text-[11px] leading-relaxed text-ink-faint">stopping a sync never deletes anything already in your keepsake box — deleting is always its own tap.</p>
       </section>

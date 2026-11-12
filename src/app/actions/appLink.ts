@@ -100,7 +100,7 @@ export async function deleteDrawingDaysAction(): Promise<{ ok: boolean; deleted:
  * literal `confirm` is required so nothing can trigger it by accident. Deletes for good, through the
  * website's own cascading delete, in the families this account runs.
  */
-export async function removeEverythingDrawSentAction(input: { confirm: string }): Promise<{ ok: true; removed: number; kept: number } | { ok: false }> {
+export async function removeEverythingDrawSentAction(input: { confirm: string }): Promise<{ ok: true; removed: number; kept: number; dates: number } | { ok: false }> {
   const account = await getCurrentAccount();
   if (!account || input?.confirm !== 'remove-everything') return { ok: false };
   const db = getDb();
