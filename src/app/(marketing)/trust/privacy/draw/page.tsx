@@ -29,7 +29,7 @@ export default function DrawPrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Snickerdoodle Draw: Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 10 November 2026</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 12 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -175,12 +175,19 @@ export default function DrawPrivacyNoticePage() {
           family birthdays, the names and dates on your family calendar). It can&apos;t see your email address, it
           never shows prices, and it can&apos;t take a payment. Pictures from the website never come back into the app.
         </p>
+        {/* the founder's wording, signed off 12 Nov 2026 (launch list v6) */}
         <p>
-          <em>Legal basis: our contract with you. Linking and the choices you make are how you ask us to keep your
-          family&apos;s keepsakes and keep things in step. For the names and birthdays of relatives on your family
-          calendar (if you tick family birthdays): our legitimate interest, and yours, in keeping your family&apos;s
-          important days in one place. We use them only for your calendar and the reminders people have asked for,
-          never for anything else.</em>
+          <strong>Why we&apos;re allowed to use it.</strong> For your account and the choices you make when you link the
+          app: so we can do what you&apos;ve asked us to (our contract with you). For your little ones&apos; drawings, first
+          names and drawing days, and any relatives&apos; names and dates: because you and we both want your family&apos;s
+          keepsakes and special days kept safe in one place (this is called &ldquo;legitimate interests&rdquo;). We&apos;ve
+          checked that this puts your child&apos;s interests first. You can object at any time. We use relatives&apos; names and dates only for your calendar and the reminders people have asked
+          for, never for anything else.
+        </p>
+        <p>
+          <strong>Your right to object.</strong> You can object to us using your family&apos;s information this way at any
+          time. Tell us and we&apos;ll stop. The only things we&apos;d keep are what we need for legal or tax reasons, like
+          order records, and we&apos;ll tell you what they are.
         </p>
 
         <h2>7. On the website, and changing your mind</h2>
