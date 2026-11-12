@@ -10,16 +10,18 @@ import { and, eq, inArray } from 'drizzle-orm';
 const actor = vi.hoisted(() => ({ current: null as null | { id: string; email: string; name: string | null } }));
 vi.mock('@/server/session', async (orig) => ({ ...(await orig<typeof import('@/server/session')>()), getCurrentAccount: async () => actor.current }));
 vi.mock('@/auth', () => ({ auth: async () => null, signIn: vi.fn(), signOut: vi.fn(), handlers: {} }));
+// The browser's session cookie, for the "signed in recently" check on widening (A-63).
+const jar = vi.hoisted(() => ({ token: undefined as string | undefined }));
 vi.mock('next/headers', () => ({
   headers: async () => new Headers({ 'x-real-ip': '203.0.113.79' }),
-  cookies: async () => ({ get: () => undefined, set: vi.fn(), delete: vi.fn(), getAll: () => [] }),
+  cookies: async () => ({ get: (n: string) => (n === 'authjs.session-token' && jar.token ? { name: n, value: jar.token } : undefined), set: vi.fn(), delete: vi.fn(), getAll: () => [] }),
 }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 const mail = vi.hoisted(() => ({ sent: [] as unknown[] }));
 vi.mock('@/server/mail', async (orig) => ({ ...(await orig<typeof import('@/server/mail')>()), sendMail: vi.fn(async (m: unknown) => void mail.sent.push(m)) }));
 vi.mock('@/server/rateLimit', async (orig) => ({ ...(await orig<typeof import('@/server/rateLimit')>()), rateLimit: vi.fn(async () => ({ ok: true, retryAfterSec: 0 })) }));
 
-import { appAuthCodes, appTokens, invites } from '@/db/schema';
+import { appAuthCodes, appTokens, invites, sessions } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { approveAppLinkAction, removeEverythingDrawSentAction, updateAppSyncAction } from '@/app/actions/appLink';
@@ -64,7 +66,26 @@ describe.skipIf(!DB)('Snickerdoodle Draw sync — the website’s buttons (integ
     expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'all' } })).toEqual({ ok: false });
     as(ids.samId);
     expect(await updateAppSyncAction({ tokenId: 'nope', patch: { keepsakes: 'all' } })).toEqual({ ok: false });
+    // widening needs a sign-in in the last 15 minutes (A-63): none, or an old one, is refused
+    jar.token = undefined;
+    expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'all', birthdays: true } })).toEqual({ ok: false, reason: 'sign-in-again' });
+    const stale = `stale-${Date.now()}`;
+    await db.insert(sessions).values({ sessionToken: stale, userId: ids.samId, expires: new Date(Date.now() + 86_400_000), createdAt: new Date(Date.now() - 60 * 60_000) });
+    jar.token = stale;
+    expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'all', birthdays: true } })).toEqual({ ok: false, reason: 'sign-in-again' });
+    // someone else's fresh session in this browser doesn't count either
+    const joFresh = `jo-${Date.now()}`;
+    await db.insert(sessions).values({ sessionToken: joFresh, userId: ids.joId, expires: new Date(Date.now() + 86_400_000) });
+    jar.token = joFresh;
+    expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'all' } })).toEqual({ ok: false, reason: 'sign-in-again' });
+    // a fresh sign-in may widen
+    const fresh = `fresh-${Date.now()}`;
+    await db.insert(sessions).values({ sessionToken: fresh, userId: ids.samId, expires: new Date(Date.now() + 86_400_000) });
+    jar.token = fresh;
     expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'all', birthdays: true } })).toEqual({ ok: true, sync: { keepsakes: 'all', children: false, progress: false, birthdays: true } });
+    // narrowing never asks
+    jar.token = undefined;
+    expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { birthdays: false } })).toEqual({ ok: true, sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } });
     actor.current = null;
     expect(await updateAppSyncAction({ tokenId: tok!.id, patch: { keepsakes: 'none' } })).toEqual({ ok: false });
   });

@@ -1,6 +1,7 @@
 'use client';
 
 import { IconChevronDown, IconDeviceMobile, IconPencil, IconTrash } from '@tabler/icons-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { deleteDrawingDaysAction, removeEverythingDrawSentAction, unlinkAppDeviceAction, updateAppSyncAction } from '@/app/actions/appLink';
@@ -30,6 +31,8 @@ function DeviceRow({ device, busy, onDisconnect }: { device: LinkedDevice; busy:
   const [chosen, setChosen] = useState(device.syncChosen);
   const [open, setOpen] = useState(!device.syncChosen);
   const [saving, setSaving] = useState(false);
+  // Turning more on needs a sign-in in the last 15 minutes (A-63): set when the website asked for one.
+  const [signInAgain, setSignInAgain] = useState(false);
   const panelId = `draw-sync-${device.id}`;
 
   const change = async (next: ConnectSyncDraft) => {
@@ -45,8 +48,15 @@ function DeviceRow({ device, busy, onDisconnect }: { device: LinkedDevice; busy:
     setSaving(true);
     try {
       const res = await updateAppSyncAction({ tokenId: device.id, patch });
+      if (!res.ok && res.reason === 'sign-in-again') {
+        setSync(before.sync);
+        setChosen(before.chosen);
+        setSignInAgain(true);
+        return;
+      }
       if (!res.ok) throw new Error('not saved');
       setSync(res.sync);
+      setSignInAgain(false);
       toast('saved — the phone follows it next time it checks in');
     } catch {
       setSync(before.sync);
@@ -86,6 +96,15 @@ function DeviceRow({ device, busy, onDisconnect }: { device: LinkedDevice; busy:
       {open ? (
         <div id={panelId} className="pb-2 pt-1">
           {!chosen ? <p className="mb-2 rounded-lg bg-honey-band px-2.5 py-1.5 text-[11px] font-semibold text-cocoa">this phone was linked before you could choose, so nothing syncs until you pick.</p> : null}
+          {signInAgain ? (
+            <p role="status" className="mb-2 rounded-lg bg-honey-band px-2.5 py-1.5 text-[12px] leading-snug text-cocoa">
+              to turn more on, sign in again first, so it’s definitely you and not a little one on a signed-in tablet.{' '}
+              <Link href="/login?next=/account" className="font-extrabold underline underline-offset-2">
+                email me a sign-in link
+              </Link>
+              , then come back here. turning things off never asks.
+            </p>
+          ) : null}
           <DrawSyncSlate name={`dev-${device.id}`} value={{ keepsakes: chosen ? sync.keepsakes : null, children: sync.children, progress: sync.progress, birthdays: sync.birthdays }} onChange={change} disabled={saving} />
           <p className="mt-2 text-[11px] leading-relaxed text-ink-faint">turning something off stops it from now on — it never deletes what’s already here.</p>
         </div>
