@@ -16,7 +16,7 @@ export default function PrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 11 November 2026</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 12 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -65,10 +65,20 @@ export default function PrivacyNoticePage() {
               See <a href="/trust/privacy/draw">the app&apos;s own notice</a> for what stays on the phone.
             </>
           )}{' '}
-          <em>
-            Legal basis: our contract with you; for relatives&apos; names and birthdays, our legitimate interest in
-            keeping your family&apos;s days in one place.
-          </em>
+        </p>
+        {/* the founder's wording, signed off 12 Nov 2026 (launch list v6) */}
+        <p>
+          <strong>Why we&apos;re allowed to use it.</strong> For your account and the choices you make when you link the
+          app: so we can do what you&apos;ve asked us to (our contract with you). For your little ones&apos; drawings, first
+          names and drawing days, and any relatives&apos; names and dates: because you and we both want your family&apos;s
+          keepsakes and special days kept safe in one place (this is called &ldquo;legitimate interests&rdquo;). We&apos;ve
+          checked that this puts your child&apos;s interests first. You can object at any time.
+        </p>
+        <p>
+          <strong>If you&apos;re a relative:</strong> a parent may add your first name, how you&apos;re related, and your
+          birthday or a special day (never a year) to their family calendar, from the website or from Snickerdoodle Draw.
+          Because it&apos;s your day, it stays in their home and can&apos;t be shared any wider. Ask them to remove it, or
+          email <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a>.
         </p>
 
         <h2>3. Why we use it, and our legal basis</h2>
@@ -183,6 +193,11 @@ export default function PrivacyNoticePage() {
           give it to you in a portable form. You can withdraw consent for marketing or reminders at any time. We&apos;ll
           respond within the legal timeframe — though we may pause the clock if we need to confirm your identity or
           clarify your request.
+        </p>
+        <p>
+          <strong>Your right to object.</strong> You can object to us using your family&apos;s information this way at any
+          time. Tell us and we&apos;ll stop. The only things we&apos;d keep are what we need for legal or tax reasons, like
+          order records, and we&apos;ll tell you what they are.
         </p>
 
         <h2>10. Complaints</h2>
