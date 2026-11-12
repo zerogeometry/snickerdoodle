@@ -62,7 +62,7 @@ export default function DrawPrivacyNoticePage() {
 
         <h2>2. What stays on your device</h2>
         <ul>
-          <li><strong>Each artist&apos;s details</strong>: a first name (never a surname), age group, drawing buddy and, if you add one, a birthday.</li>
+          <li><strong>Each artist&apos;s details</strong>: a first name (never a surname), age group and drawing buddy. The app doesn&apos;t ask for a child&apos;s birthday.</li>
           <li><strong>Drawings</strong>, and photos of drawings made on paper. The app keeps only the tidied-up picture, and the tidying happens on the phone.</li>
           <li><strong>Progress</strong>: drawing days, weeks in a row, lessons done, stickers and ranks.</li>
           <li><strong>Family birthdays and special days</strong> you add in the grown-ups&apos; corner, so the app can suggest drawing something for someone.</li>
@@ -147,8 +147,8 @@ export default function DrawPrivacyNoticePage() {
             was drawn on screen or on paper. Nothing else about it.
           </li>
           <li>
-            <strong>First names and birthdays</strong> (unticked unless you tick it): your little ones&apos; first names and
-            birthdays are kept the same in the app and on the website, both ways.
+            <strong>First names</strong> (unticked unless you tick it): your little ones&apos; first names are kept the same
+            in the app and on the website, both ways. Their birthdays never go to the app.
           </li>
           <li>
             <strong>Drawing days</strong> (unticked unless you tick it): each little one&apos;s drawing days, rest weeks,

@@ -67,8 +67,10 @@ describe('the connect page’s choices', () => {
 
   it('says honestly what the app can do once linked (sign-off G5) and what it can’t', () => {
     const can = CAN.join(' | ');
-    for (const want of ['first names', 'birthdays', 'change a little one’s name or birthday', 'ready-to-buy link for a drawing it sent', 'delete drawings it sent', 'drawing days', 'birthdays and special days', 'proud pile or every drawing'])
+    for (const want of ['first names', 'change a little one’s first name', 'it never sees their birthdays', 'ready-to-buy link for a drawing it sent', 'delete drawings it sent', 'drawing days', 'birthdays and special days', 'proud pile or every drawing'])
       expect(can).toContain(want);
+    // children's own birthdays never go to the app (founder, 10 Nov 2026)
+    expect(can).not.toMatch(/see their birthdays|name or birthday/);
     expect(CANT.join(' | ')).toContain('bring pictures from here back into the app');
   });
 
@@ -85,6 +87,21 @@ describe('the connect page’s choices', () => {
       }),
     );
     expect(html).toContain('family members’ details');
+  });
+
+  it('"who draws on this phone?" starts with nobody ticked, unless there is just one little one (founder, 10 and 12 Nov 2026)', () => {
+    const params = { response_type: 'code', client_id: 'snickerdoodle-draw', code_challenge: 'x', code_challenge_method: 'S256', state: 's', redirect_uri: 'https://snickerdoodle.co.uk/app/callback' };
+    const render = (kids: string[]) =>
+      renderToStaticMarkup(
+        createElement(ConnectCard, { params, email: 'sam@example.test', notOwner: false, families: [{ id: 'f1', name: 'The Hartleys', children: kids.map((k, i) => ({ id: `c${i}`, firstName: k })) }] }),
+      );
+    const childBoxes = (html: string) => [...html.matchAll(/<input type="checkbox"[^>]*>/g)].map((m) => m[0]).slice(0, 2);
+    // two little ones: neither ticked (the sync boxes below are unticked too)
+    expect(childBoxes(render(['Olivia', 'Max'])).some((b) => b.includes('checked'))).toBe(false);
+    // just one: ticked for you
+    expect(childBoxes(render(['Olivia']))[0]).toContain('checked');
+    // and the page says the app can only send less, more from the account page
+    expect(render(['Olivia'])).toContain('send less or stop any time in the app’s grown-ups’ corner; send more from your account page');
   });
 });
 

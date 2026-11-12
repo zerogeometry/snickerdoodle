@@ -11,6 +11,7 @@ import {
   giftLinks,
   invites,
   memberships,
+  occasions,
   orderItems,
   orders,
   promoCodes,
@@ -20,6 +21,7 @@ import {
   supportRequests,
 } from '@/db/schema';
 import type { DbHandle } from './db';
+import { drawAddedOccasionIds } from './app/sync';
 import { profileDataFor } from './profile';
 
 /**
@@ -69,10 +71,22 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     db.select({ id: giftLinks.id, title: giftLinks.title, items: giftLinks.items, status: giftLinks.status, createdAt: giftLinks.createdAt, expiresAt: giftLinks.expiresAt }).from(giftLinks).where(inArray(giftLinks.familyId, ids)),
   );
 
-  const keepsakesYouControl = await db
-    .select({ id: assets.id, familyId: assets.familyId, kind: assets.kind, visibility: assets.visibility, keptInHome: assets.keptInHome, uploadedAt: assets.createdAt, fulfilledAt: assets.fulfilledAt, deleteAfter: assets.purgeAfter })
-    .from(assets)
-    .where(eq(assets.controllerAccountId, accountId));
+  const keepsakesYouControl = (
+    await db
+      .select({ id: assets.id, familyId: assets.familyId, kind: assets.kind, source: assets.source, visibility: assets.visibility, keptInHome: assets.keptInHome, uploadedAt: assets.createdAt, fulfilledAt: assets.fulfilledAt, deleteAfter: assets.purgeAfter })
+      .from(assets)
+      .where(eq(assets.controllerAccountId, accountId))
+  ).map(({ source, ...a }) => ({ ...a, sentFromDrawApp: source === 'app-screen' || source === 'app-paper' }));
+
+  // the family calendar: the dates in families they run, and any they added elsewhere — never a lunar
+  // calendar's working, just what was entered. Dates added from Snickerdoodle Draw are marked (both privacy
+  // notices promise the download includes them, founder 10 Nov 2026).
+  const calendarRows = await db
+    .select({ id: occasions.id, familyId: occasions.familyId, title: occasions.title, kind: occasions.kind, relation: occasions.relation, month: occasions.month, day: occasions.day, year: occasions.year, whose: occasions.whose, shareCircle: occasions.shareCircle, updatedAt: occasions.updatedAt })
+    .from(occasions)
+    .where(ownedFamilyIds.length ? or(inArray(occasions.familyId, ownedFamilyIds), eq(occasions.createdByAccountId, accountId)) : eq(occasions.createdByAccountId, accountId));
+  const fromDraw = await drawAddedOccasionIds(db, [...new Set(calendarRows.map((o) => o.familyId))]);
+  const familyCalendar = calendarRows.map((o) => ({ ...o, addedFromDrawApp: fromDraw.has(o.id) }));
 
   const saved = await db
     .select({ id: savedDesigns.id, assetId: savedDesigns.assetId, product: savedDesigns.variantSku, savedAt: savedDesigns.createdAt })
@@ -160,6 +174,7 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     invitesSent,
     giftLists,
     keepsakesYouControl,
+    familyCalendar,
     savedForLater: saved,
     orders: ordersOut,
     consents,

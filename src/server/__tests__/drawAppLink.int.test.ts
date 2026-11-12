@@ -264,15 +264,20 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     });
 
     it('a child added in the app joins the phone’s list; a surname is refused', async () => {
+      // a birthday from an older app is ignored, never stored (founder, 10 Nov 2026: no children's birthdays from the app)
       const kid = await addAppChild(db, scoped, { firstName: 'Ellie', birthday: '2021-04-02' });
-      expect(kid).toEqual({ id: expect.any(String), firstName: 'Ellie', birthday: '2021-04-02' });
+      expect(kid).toEqual({ id: expect.any(String), firstName: 'Ellie' });
+      expect((await db.select().from(children).where(eq(children.id, kid.id)))[0]!.birthday).toBeNull();
       const [tok] = await db.select().from(appTokens).where(eq(appTokens.id, scoped.tokenId));
       expect(tok!.childIds).toEqual([ids.oliviaId, kid.id]);
       await expectApiError(addAppChild(db, scoped, { firstName: 'Ellie Hartley' }), 422, 'name');
     });
 
     it('updating a ticked child goes through the website’s rules', async () => {
-      expect(await updateAppChild(db, scoped, ids.oliviaId, { birthday: '2020-06-01' })).toMatchObject({ id: ids.oliviaId, birthday: '2020-06-01' });
+      const [before] = await db.select().from(children).where(eq(children.id, ids.oliviaId));
+      // a birthday from the app is ignored: the website's stays as it was, and none comes back
+      expect(await updateAppChild(db, scoped, ids.oliviaId, { birthday: '2020-06-01' })).toEqual({ id: ids.oliviaId, firstName: before!.firstName });
+      expect((await db.select().from(children).where(eq(children.id, ids.oliviaId)))[0]!.birthday).toBe(before!.birthday);
       await expectApiError(updateAppChild(db, scoped, ids.oliviaId, { firstName: 'Olivia Smith' }), 422, 'name');
     });
   });
@@ -455,17 +460,19 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
   });
 
   describe('sync off → 403 sync-off', () => {
-    it('names and birthdays: off → no rename or birthday from the app, and /me shows first names only', async () => {
+    it('first names: off → no rename from the app; children\u2019s birthdays never reach the app either way', async () => {
       const off = await viewerFor(await link({ sync: NOTHING }));
       await expectApiError(updateAppChild(db, off, ids.oliviaId, { firstName: 'Liv' }), 403, 'sync-off');
-      await expectApiError(updateAppChild(db, off, ids.oliviaId, { birthday: '2020-01-01' }), 403, 'sync-off');
       await db.update(children).set({ birthday: '2020-06-01' }).where(eq(children.id, ids.oliviaId));
       const me = await getAppMe(db, off);
       expect(me.children.length).toBeGreaterThan(0);
       for (const c of me.children) expect(Object.keys(c).sort()).toEqual(['firstName', 'id']); // matching only
+      // with "first names" on: still no birthday (founder, 10 Nov 2026), and the app can rename
       const on = await viewerFor(await link({ sync: NAMES }));
-      expect((await getAppMe(db, on)).children.find((c) => c.id === ids.oliviaId)).toMatchObject({ birthday: '2020-06-01' });
-      expect(await updateAppChild(db, on, ids.oliviaId, { birthday: '2020-06-02' })).toMatchObject({ birthday: '2020-06-02' });
+      for (const c of (await getAppMe(db, on)).children) expect(Object.keys(c).sort()).toEqual(['firstName', 'id']);
+      expect(JSON.stringify((await getAppMe(db, on)).children)).not.toMatch(/2020-06-01|birthday/);
+      expect(await updateAppChild(db, on, ids.oliviaId, { birthday: '2020-06-02' })).not.toHaveProperty('birthday');
+      expect((await db.select().from(children).where(eq(children.id, ids.oliviaId)))[0]!.birthday).toBe('2020-06-01'); // the website's stays
     });
 
     it('adding a little one still works with names off (a drawing needs someone to file under), but the birthday isn’t kept', async () => {
@@ -666,12 +673,12 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     });
 
     it('a website date shows in the app as month/day only — the year never crosses; lunar dates and anniversaries map sensibly', async () => {
-      const wedding = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'granny and grandad', kind: 'ANNIVERSARY', date: '1980-06-21' });
+      const wedding = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Grandad', kind: 'ANNIVERSARY', date: '1980-06-21' });
       const lunar = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Nai Nai', kind: 'BIRTHDAY', date: '1950-02-10', lunar: 'CHINESE' });
       expect(wedding.ok && lunar.ok).toBe(true);
       const list = await listAppOccasions(db, av);
       const w = list.find((o) => wedding.ok && o.id === wedding.id)!;
-      expect(w).toMatchObject({ name: 'granny and grandad', kind: 'other', month: 6, day: 21 });
+      expect(w).toMatchObject({ name: 'Grandad', kind: 'other', month: 6, day: 21 });
       expect(JSON.stringify(list)).not.toMatch(/1980|1950|year/);
       expect(list.some((o) => lunar.ok && o.id === lunar.id)).toBe(false); // a lunar date moves each year: not sent as a fixed day
       // the app says 'other' on an anniversary: the website keeps calling it an anniversary
@@ -721,8 +728,20 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect(await db.select().from(occasions).where(eq(occasions.id, mine.id))).toHaveLength(0);
     });
 
+    it('a website date whose name isn\u2019t a single first name stays off the phone, so no surname reaches it (founder, 10 Nov 2026)', async () => {
+      const full = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Jo Smith', kind: 'BIRTHDAY', date: '--03-03' });
+      const fine = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Jo', kind: 'BIRTHDAY', date: '--03-04' });
+      expect(full.ok && fine.ok).toBe(true);
+      const list = await listAppOccasions(db, av);
+      expect(list.some((o) => full.ok && o.id === full.id)).toBe(false);
+      expect(list.some((o) => fine.ok && o.id === fine.id)).toBe(true);
+      expect(JSON.stringify(list)).not.toMatch(/Smith/);
+      // out of reach for changes too
+      await expectApiError(updateAppOccasion(db, av, full.ok ? full.id : '', { day: 5 }), 404, 'not-found');
+    });
+
     it('a date for a child this phone isn’t for stays off the phone', async () => {
-      const max = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'first day at school', kind: 'MILESTONE', date: '2025-09-03', childId: ids.maxId });
+      const max = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Max', kind: 'MILESTONE', date: '2025-09-03', childId: ids.maxId });
       const scoped = await viewerFor(await link({ childIds: [ids.oliviaId], sync: BDAYS }));
       expect((await listAppOccasions(db, scoped)).some((o) => max.ok && o.id === max.id)).toBe(false);
       expect((await listAppOccasions(db, av)).some((o) => max.ok && o.id === max.id)).toBe(true);
@@ -759,7 +778,11 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
 
   describe.skipIf(!S3)('remove everything Draw sent', () => {
     it('deletes for good every keepsake the app sent in the families this grown-up runs — website uploads untouched, others can’t', async () => {
-      const av = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: false } }));
+      const av = await viewerFor(await link({ sync: { keepsakes: 'all', children: false, progress: false, birthdays: true } }));
+      // a family date added from the app, and one added on the website
+      const fromApp = await addAppOccasion(db, av, { name: 'Nana', kind: 'birthday', month: 4, day: 4 });
+      const onSite = await addOccasion(db, ids.samId, ids.hartleyId, { title: 'Pip', kind: 'BIRTHDAY', date: '--04-05' });
+      expect(onSite.ok).toBe(true);
       const sent: string[] = [];
       for (let i = 0; i < 2; i++) {
         const r = await keepAppDrawing(db, av, { image: await blob(), childId: ids.oliviaId, madeOn: '2026-11-09', source: i ? 'app-paper' : 'app-screen', trigger: 'auto' }, { env: ON, screening: queued().screening });
@@ -768,7 +791,7 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       }
       const count = await countDrawSent(db, [ids.hartleyId]);
       expect(count).toBeGreaterThanOrEqual(2);
-      expect(await removeEverythingDrawSent(db, ids.joId, [ids.hartleyId])).toEqual({ removed: 0, kept: 0 }); // Jo doesn't run Hartley
+      expect(await removeEverythingDrawSent(db, ids.joId, [ids.hartleyId])).toEqual({ removed: 0, kept: 0, dates: 0 }); // Jo doesn't run Hartley
       expect(await countDrawSent(db, [ids.hartleyId])).toBe(count);
 
       const res = await removeEverythingDrawSent(db, ids.samId, [ids.hartleyId]);
@@ -782,6 +805,10 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect(audit).toHaveLength(2);
       // the family's website keepsake is still there
       expect(await db.select().from(assets).where(eq(assets.id, ids.assetFamily))).toHaveLength(1);
+      // the date the app added is gone (founder, 10 Nov 2026); the website's own date stays
+      expect(res.dates).toBeGreaterThanOrEqual(1);
+      expect(await db.select().from(occasions).where(eq(occasions.id, fromApp.id))).toHaveLength(0);
+      expect(await db.select().from(occasions).where(eq(occasions.id, onSite.ok ? onSite.id : ''))).toHaveLength(1);
     });
   });
 

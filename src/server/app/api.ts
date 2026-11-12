@@ -37,14 +37,13 @@ export class AppApiError extends Error {
 export interface AppChild {
   id: string;
   firstName: string;
-  birthday?: string;
 }
-/** A child as the app sees it. The birthday crosses only while the link's "first names and birthdays" is on. */
-const toChild = (c: { id: string; firstName: string; birthday: string | null }, sync: SyncChoices): AppChild => ({
-  id: c.id,
-  firstName: c.firstName,
-  ...(c.birthday && sync.children ? { birthday: c.birthday } : {}),
-});
+/**
+ * A child as the app sees it: an id and a first name, nothing else. Children's birthdays never cross to the app
+ * (founder, 10 Nov 2026: the app doesn't collect them and picks lessons by age group); a birthday a parent types on
+ * the website stays on the website.
+ */
+const toChild = (c: { id: string; firstName: string }): AppChild => ({ id: c.id, firstName: c.firstName });
 
 /** A sync choice is off for this link (DRAW-APP-sync-choices.md): 403 `{ reason: 'sync-off' }`. */
 const syncOff = () => new AppApiError(403, 'sync-off');
@@ -60,18 +59,18 @@ export async function listAppProducts(db: DbHandle): Promise<{ key: string; labe
 // ── GET /me ───────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * The family's name, the little ones this phone is for (first names — for matching a Draw artist to a
- * website child; birthdays only with "first names and birthdays" on) and the link's sync choices.
+ * The family's name, the little ones this phone is for (first names only — for matching a Draw artist to a
+ * website child) and the link's sync choices.
  * No email, no members, no keepsakes.
  */
 export async function getAppMe(db: DbHandle, av: AppViewer): Promise<{ family: { name: string }; children: AppChild[]; sync: SyncChoices }> {
   const [family] = await db.select({ name: families.displayName }).from(families).where(eq(families.id, av.familyId));
   const kids = await db
-    .select({ id: children.id, firstName: children.firstName, birthday: children.birthday })
+    .select({ id: children.id, firstName: children.firstName })
     .from(children)
     .where(eq(children.familyId, av.familyId))
     .orderBy(asc(children.createdAt));
-  return { family: { name: family?.name ?? 'your family' }, children: kids.filter((k) => childInScope(av, k.id)).map((k) => toChild(k, av.sync)), sync: av.sync };
+  return { family: { name: family?.name ?? 'your family' }, children: kids.filter((k) => childInScope(av, k.id)).map(toChild), sync: av.sync };
 }
 
 // ── PATCH /me/sync ────────────────────────────────────────────────────────────────────────────────
@@ -93,17 +92,14 @@ export async function updateAppSync(db: DbHandle, av: AppViewer, body: Record<st
 const str = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined);
 
 /**
- * Add a little one (first name + optional birthday), the same rules as the website: screened, no
- * surname. Allowed whatever the choices (a drawing needs a child to be filed under), but a birthday
- * is only kept while "first names and birthdays" is on — otherwise it's dropped, not stored.
+ * Add a little one (first name only), the same rules as the website: screened, no surname. Allowed whatever the
+ * choices (a drawing needs a child to be filed under). A birthday sent by an older app is ignored, never stored
+ * (founder, 10 Nov 2026: no children's birthdays from the app).
  */
 export async function addAppChild(db: DbHandle, av: AppViewer, body: Record<string, unknown>): Promise<AppChild> {
   const firstName = str(body.firstName);
   if (!firstName) throw new AppApiError(422, 'name');
-  let birthday = body.birthday === undefined || body.birthday === null ? null : str(body.birthday);
-  if (birthday === undefined) throw new AppApiError(422, 'birthday');
-  if (!av.sync.children) birthday = null;
-  const res = await addChild(db, av.viewer, { familyId: av.familyId, firstName, birthday });
+  const res = await addChild(db, av.viewer, { familyId: av.familyId, firstName, birthday: null });
   if (!res.ok) throw res.reason === 'not-owner' ? new AppApiError(403, 'not-owner') : new AppApiError(422, res.reason === 'birthday' ? 'birthday' : 'name');
   // a phone that's only for some of the children: the one it just added is one of them
   if (av.childIds !== null && !av.childIds.includes(res.child.id)) {
@@ -112,23 +108,19 @@ export async function addAppChild(db: DbHandle, av: AppViewer, body: Record<stri
       .set({ childIds: sql`coalesce(${appTokens.childIds}, '[]'::jsonb) || ${JSON.stringify([res.child.id])}::jsonb` })
       .where(eq(appTokens.id, av.tokenId));
   }
-  const [row] = await db.select({ id: children.id, firstName: children.firstName, birthday: children.birthday }).from(children).where(eq(children.id, res.child.id));
-  return toChild(row!, av.sync);
+  const [row] = await db.select({ id: children.id, firstName: children.firstName }).from(children).where(eq(children.id, res.child.id));
+  return toChild(row!);
 }
 
-/** A rename / birthday from the app — only while the link's "first names and birthdays" is on. */
+/** A rename from the app — only while the link's "first names" is on. A birthday sent by an older app is ignored. */
 export async function updateAppChild(db: DbHandle, av: AppViewer, childId: string, body: Record<string, unknown>): Promise<AppChild> {
   if (!av.sync.children) throw syncOff();
   if (!childInScope(av, childId)) throw new AppApiError(404, 'not-found');
-  const patch: { firstName?: string; birthday?: string | null } = {};
+  const patch: { firstName?: string } = {};
   if (body.firstName !== undefined) {
     const n = str(body.firstName);
     if (!n) throw new AppApiError(422, 'name');
     patch.firstName = n;
-  }
-  if (body.birthday !== undefined) {
-    if (body.birthday !== null && typeof body.birthday !== 'string') throw new AppApiError(422, 'birthday');
-    patch.birthday = (body.birthday as string | null) || null;
   }
   const res = await updateChild(db, av.viewer, { familyId: av.familyId, childId, ...patch });
   if (!res.ok) {
@@ -136,8 +128,8 @@ export async function updateAppChild(db: DbHandle, av: AppViewer, childId: strin
     if (res.reason === 'taken') throw new AppApiError(409, 'taken');
     throw new AppApiError(422, res.reason === 'birthday' ? 'birthday' : 'name');
   }
-  const [row] = await db.select({ id: children.id, firstName: children.firstName, birthday: children.birthday }).from(children).where(eq(children.id, childId));
-  return toChild(row!, av.sync);
+  const [row] = await db.select({ id: children.id, firstName: children.firstName }).from(children).where(eq(children.id, childId));
+  return toChild(row!);
 }
 
 // ── GET / PUT /artists/{childId}/progress — the drawing-days backup ──────────────────────────────

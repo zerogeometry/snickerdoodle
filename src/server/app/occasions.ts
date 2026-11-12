@@ -12,7 +12,7 @@ import { childInScope, type AppViewer } from './appAuth';
  * list, both ways, only while the link's `birthdays` choice is on (DRAW-APP-sync-choices.md, founder
  * decisions 10 Nov, item 4). Mapped onto the calendar's own occasions and its own rules (the owner's
  * membership, screening): a name, an optional relation, birthday or other, and the day and month — never a year,
- * never a picture. Children's own birthdays are NOT here (they travel with "first names and birthdays").
+ * never a picture. Children's own birthdays are NOT here, and never go to the app (founder, 10 Nov 2026).
  *
  * Who sees what (D27, founder 10 Nov 2026) is the WEBSITE's to decide, never the app's:
  *  - the app lists only the dates its grown-up may see (src/authz/occasions canSeeOccasion);
@@ -56,10 +56,21 @@ function requireBirthdays(av: AppViewer) {
 const calendarSeat = (av: AppViewer): CalendarMembership | null =>
   av.viewer.membership ? { ...av.viewer.membership, seesOccasions: true } : null;
 
+/** A date's name the app may carry: one first name, by the website's own rule (founder, 10 Nov 2026: a date made on
+ * the website as "Jo Smith's birthday" stays on the website, so no surname reaches the phone). */
+const nameFitsApp = (title: string) => {
+  const s = screenChildFirstName(title);
+  return s.ok && !!s.value;
+};
+
 /** Which of the family's dates the app may see: ones its grown-up may see (D27), not a lunar one (the app keeps
- * fixed days), and not one for a child this phone isn't for. */
+ * fixed days), not one for a child this phone isn't for, and only with a single first name for a name. */
 const visibleToApp = (av: AppViewer, o: Row) =>
-  o.familyId === av.familyId && !o.lunar && (!o.childId || childInScope(av, o.childId)) && canSeeOccasion(occasionRefOf(o), calendarSeat(av));
+  o.familyId === av.familyId &&
+  !o.lunar &&
+  (!o.childId || childInScope(av, o.childId)) &&
+  nameFitsApp(o.title) &&
+  canSeeOccasion(occasionRefOf(o), calendarSeat(av));
 
 /** A first name — one word, screened (the website's own rule for names). */
 function cleanName(raw: unknown): string {

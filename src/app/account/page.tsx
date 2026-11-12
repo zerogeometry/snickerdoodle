@@ -21,10 +21,11 @@ import { profileImagesFor } from '@/server/profile';
 import { getDb } from '@/db/client';
 import { getCreditBalance, getOrCreateReferralCode } from '@/server/referrals';
 
-export default async function AccountPage() {
-  // Auth-gated server-side: a guest is sent to log in.
+export default async function AccountPage({ searchParams }: { searchParams: Promise<{ close?: string }> }) {
+  // Auth-gated server-side: a guest is sent to log in, and comes back here (to "close your account" if that's
+  // what they came for, from /trust/delete-account or the Draw app).
   const account = await getCurrentAccount();
-  if (!account) redirect('/login');
+  if (!account) redirect((await searchParams).close === '1' ? '/login?next=%2Faccount%3Fclose%3D1' : '/login?next=%2Faccount');
 
   const displayName = account.name ?? account.email.split('@')[0] ?? account.email;
   const db = getDb();

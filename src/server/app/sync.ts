@@ -1,9 +1,10 @@
-import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, sql } from 'drizzle-orm';
 import { AuthzError, canManageFamily } from '@/authz';
-import { appArtistProgress, appTokens, assets, auditRecords, children } from '@/db/schema';
+import { appArtistProgress, appTokens, assets, auditRecords, children, occasions } from '@/db/schema';
 import { parseSyncPatch, widens, type SyncChoices, type SyncKeepsakes } from '@/lib/drawSync';
 import { isFreshSignIn } from '@/lib/freshSignIn';
 import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
+import { deleteOccasion } from '@/server/occasions';
 import type { DbHandle } from '@/server/db';
 
 /**
@@ -194,9 +195,32 @@ export async function countDrawSent(db: DbHandle, ownedFamilyIds: string[]): Pro
  * still needed by a paid order that isn't made yet is left until it's on its way (as everywhere).
  * Website uploads are never touched.
  */
-export async function removeEverythingDrawSent(db: DbHandle, accountId: string, ownedFamilyIds: string[]): Promise<{ removed: number; kept: number }> {
+/** The family-calendar dates added from Snickerdoodle Draw in these families (each one's audit row says so). */
+export async function drawAddedOccasionIds(db: DbHandle, familyIds: string[]): Promise<Set<string>> {
+  if (!familyIds.length) return new Set();
+  const rows = await db
+    .select({ id: auditRecords.targetId })
+    .from(auditRecords)
+    .where(
+      and(
+        inArray(auditRecords.familyId, familyIds),
+        eq(auditRecords.event, 'OCCASION_CHANGED'),
+        eq(auditRecords.targetType, 'occasion'),
+        sql`${auditRecords.metadata}->>'via' = 'draw-app'`,
+        sql`${auditRecords.metadata}->>'action' = 'created'`,
+      ),
+    );
+  return new Set(rows.map((r) => r.id).filter((x): x is string => !!x));
+}
+
+/**
+ * "Remove everything snickerdoodle draw sent": every drawing the app sent, and every family-calendar date it added
+ * (founder, 10 Nov 2026). Little ones added from the app stay: removing a child would remove their keepsakes.
+ */
+export async function removeEverythingDrawSent(db: DbHandle, accountId: string, ownedFamilyIds: string[]): Promise<{ removed: number; kept: number; dates: number }> {
   let removed = 0;
   let kept = 0;
+  let dates = 0;
   for (const familyId of ownedFamilyIds) {
     const viewer = await resolveViewerContext(db, accountId, familyId);
     if (!canManageFamily(viewer.membership)) continue; // re-checked here, never trusted from the caller
@@ -213,6 +237,11 @@ export async function removeEverythingDrawSent(db: DbHandle, accountId: string, 
         else throw e;
       }
     }
+    const fromDraw = await drawAddedOccasionIds(db, [familyId]);
+    if (fromDraw.size) {
+      const still = await db.select({ id: occasions.id }).from(occasions).where(and(eq(occasions.familyId, familyId), inArray(occasions.id, [...fromDraw])));
+      for (const o of still) if (await deleteOccasion(db, accountId, o.id)) dates++;
+    }
   }
-  return { removed, kept };
+  return { removed, kept, dates };
 }

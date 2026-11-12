@@ -156,7 +156,10 @@ test('family: invites → verify → join at the chosen circle/access; who sees 
     if (opts.rel) await sheet.getByRole('button', { name: opts.rel, exact: true }).click();
     await sheet.getByPlaceholder('their email').fill(email);
     await sheet.getByRole('combobox').selectOption({ label: opts.access });
-    if (opts.calendar === false) await sheet.getByRole('checkbox').uncheck();
+    // the family calendar starts unticked (founder, 10 Nov 2026); the parent ticks it for whoever should see it
+    const calendar = sheet.getByRole('checkbox');
+    await expect(calendar).not.toBeChecked();
+    if (opts.calendar !== false) await calendar.check();
     await sheet.getByRole('button', { name: 'send invite' }).click();
     await expect(P.page.getByText(/invite sent to/)).toBeVisible();
     const [inv] = await sql()`select id, token, circle, access_level, share_occasions from invites where email = ${email} and family_id = ${familyId} order by created_at desc limit 1`;

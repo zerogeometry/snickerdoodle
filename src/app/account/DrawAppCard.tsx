@@ -15,11 +15,11 @@ import { Icon } from '@/ui/primitives/Icon';
 
 const day = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-/** "the proud pile only · names & birthdays" — what syncs, in a line. */
+/** "the proud pile only · first names" — what syncs, in a line. */
 export function syncSummary(sync: SyncChoices, chosen: boolean): string {
   if (!chosen) return 'nothing yet — pick what syncs';
   const parts = [KEEPSAKE_OPTIONS.find((o) => o.value === sync.keepsakes)?.label ?? 'nothing automatic'];
-  if (sync.children) parts.push('names & birthdays');
+  if (sync.children) parts.push('first names');
   if (sync.progress) parts.push('drawing days');
   if (sync.birthdays) parts.push('family birthdays');
   return parts.join(' · ');
@@ -157,10 +157,11 @@ export function DrawAppCard({ devices, backups = [], sentCount = 0 }: { devices:
       const res = await removeEverythingDrawSentAction({ confirm: 'remove-everything' });
       if (!res.ok) throw new Error('no');
       setConfirming(false);
+      const dates = res.dates > 0 ? ` and ${res.dates} family ${res.dates === 1 ? 'date' : 'dates'}` : '';
       toast(
         res.kept > 0
-          ? `removed ${res.removed} — ${res.kept} ${res.kept === 1 ? 'is' : 'are'} in an order that isn’t made yet, so ${res.kept === 1 ? 'it stays' : 'they stay'} until it’s on its way`
-          : `removed ${res.removed} for good — the drawings on the phone stay put`,
+          ? `removed ${res.removed}${dates} — ${res.kept} ${res.kept === 1 ? 'is' : 'are'} in an order that isn’t made yet, so ${res.kept === 1 ? 'it stays' : 'they stay'}: press remove again once your order arrives`
+          : `removed ${res.removed}${dates} for good — the drawings on the phone stay put`,
       );
       router.refresh();
     } catch {
@@ -220,10 +221,10 @@ export function DrawAppCard({ devices, backups = [], sentCount = 0 }: { devices:
           ) : (
             <div id="draw-remove-confirm" role="group" aria-labelledby="draw-remove-q">
               <p id="draw-remove-q" className="text-[13px] font-bold leading-snug text-cocoa">
-                remove all {sentCount} {sentCount === 1 ? 'drawing' : 'drawings'} draw sent, for good?
+                remove all {sentCount} {sentCount === 1 ? 'drawing' : 'drawings'} draw sent, and the family dates it added, for good?
               </p>
               <p className="mt-0.5 text-[11px] leading-relaxed text-ink-soft">
-                they’re deleted from your keepsake box, any ready-to-buy links for them stop, and we can’t bring them back. the drawings on the phone stay put. anything in an order that isn’t made yet waits until it’s on its way.
+                they’re deleted from your keepsake box and family calendar, any ready-to-buy links for them stop, and we can’t bring them back. the drawings on the phone stay put, and so do little ones added from the app (removing one would remove their keepsakes). anything in an order that isn’t made yet stays: press remove again once your order arrives.
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 <Button variant="primary" size="sm" disabled={busy === 'remove-all'} onClick={removeAll}>

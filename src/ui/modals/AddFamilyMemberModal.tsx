@@ -70,8 +70,9 @@ export function AddFamilyMemberModal({
   const [birthday, setBirthday] = useState('');
   const [lunar, setLunar] = useState<LunarValue>(null);
   const [access, setAccess] = useState('view_buy');
-  // The family calendar is the point of inviting family — pre-ticked, visible, changeable later.
-  const [shareCalendar, setShareCalendar] = useState(true);
+  // The family calendar starts unticked: the parent ticks it for the people they want (founder, 10 Nov 2026 —
+  // Children's Code standard 7, high privacy by default). Visible, and changeable later per member.
+  const [shareCalendar, setShareCalendar] = useState(false);
 
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -87,7 +88,7 @@ export function AddFamilyMemberModal({
     setRel('Grandparent');
     setLunar(null);
     setAccess('view_buy');
-    setShareCalendar(true);
+    setShareCalendar(false);
     setError(null);
   };
 

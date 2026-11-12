@@ -215,7 +215,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     bannerUrl: await familyBannerFor(db, account.id, familyId),
     pendingInvites,
     // A child's birthday is their personal data: the parent (owner) always sees it; a relative
-    // only when the parent shared the family calendar with them (the pre-ticked invite choice,
+    // only when the parent shared the family calendar with them (the invite choice, unticked to start,
     // changeable per member any time). Everyone else sees first names only.
     children: childRows.map((c) => ({
       id: c.id,
