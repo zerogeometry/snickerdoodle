@@ -206,9 +206,10 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
 
 /**
  * The trust pages anyone may read while the site is locked (founder, 12 Nov 2026): the App Store and Google Play
- * reviewers must open the privacy notices and the "close your account" page from the store listings. Exact paths
- * only, never a prefix: they're written to be public and hold no customer data. The shop, keepsake boxes, sign-in
- * and the data-complaint form stay behind the password.
+ * reviewers must open the privacy notices, the "close your account" page and the support page (/help, the App
+ * Store's support link) from the store listings. Exact paths only, never a prefix: they're written to be public and
+ * hold no customer data (the help form is rate-limited per visitor). The shop, keepsake boxes, sign-in and the
+ * data-complaint form stay behind the password.
  */
 export const PUBLIC_TRUST_PAGES: ReadonlySet<string> = new Set([
   '/trust/privacy',
@@ -217,6 +218,7 @@ export const PUBLIC_TRUST_PAGES: ReadonlySet<string> = new Set([
   '/trust/terms',
   '/trust/family-promise',
   '/trust/delete-account',
+  '/help',
 ]);
 
 /** Paths that must work without the password: the lock itself, provider webhooks and the
