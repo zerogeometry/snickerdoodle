@@ -38,6 +38,9 @@ describe('break-in: site password gate', () => {
     }
     // a page under a folder that ALSO holds public files (/christmas/delivery-dates) stays locked
     expect(isGateExempt('/christmas/delivery-dates')).toBe(false);
+    // the trust pages the store reviewers open are through the lock (founder, 12 Nov 2026) — exactly those, no more
+    for (const p of ['/trust/privacy', '/trust/privacy/draw', '/trust/cookies', '/trust/terms', '/trust/family-promise', '/trust/delete-account', '/trust/privacy/', '/help']) expect(isGateExempt(p), p).toBe(true);
+    for (const p of ['/trust', '/trust/data-complaint', '/trust/privacy/draw/x', '/trust/privacyX', '/trust/../account', '/account', '/account?close=1', '/help/x', '/helpdesk', '/login']) expect(isGateExempt(p), p).toBe(false);
     expect(isGateExempt('/christmas/delivery-dates.webp')).toBe(false);
     expect(isGateExempt('/brand/not-a-real-file.png')).toBe(false);
   });
