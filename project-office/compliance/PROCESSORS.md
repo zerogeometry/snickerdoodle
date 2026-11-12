@@ -32,6 +32,22 @@ mailboxes: help-form and data-complaint messages). It needs its own row and Goog
 Processing Addendum (Admin console → Account → Legal and compliance). **Netlify** now only hosts DNS
 and an idle test copy, with no children's data.
 
+**Expo** (650 Industries, Inc.) — EAS Update + EAS Build, for Snickerdoodle Draw (N5; added 11 Nov 2026 from the
+sign-off pack §6.5, **open items for the founder to confirm**):
+- **Role:** processor. Delivers the app's over-the-air updates and builds the app (Apple/Google do distribution).
+- **Data:** from every install, on each update check (`u.expo.dev`): IP address, a random per-install id
+  (`EAS-Client-ID`, used to count monthly devices), platform, runtime version, update channel, ids of updates held.
+  **No names, drawings, birthdays or account data.** Expo also holds our app code and build credentials (not personal
+  data).
+- **DPA:** **to confirm** whether it's part of Expo's terms (accepted by using EAS) or needs accepting in the dashboard
+  (expo.dev → account `zerogeometry` → settings / legal). Save a dated copy in `compliance/dpas/`.
+- **Where / transfer:** USA. **To confirm:** UK–US data bridge (if DPF-certified with the UK Extension) or the UK
+  Addendum / IDTA in Expo's DPA. Low-risk transfer (an IP and a random id, no child content); note it in LG3.
+- **Retention / breach notice:** **to confirm** from Expo's DPA and privacy policy.
+- **Security:** 2FA on every owner of the `zerogeometry` Expo account; production OTA only on the founder's say-so
+  (`docs/UPDATES.md` in the app repo); look into EAS Update code signing (DPIA A-35).
+- **Links:** https://expo.dev/privacy · https://expo.dev/terms
+
 ## Getting the account copies (needs your login)
 
 **AWS Artifact (the DPA as it applies to our account)**
