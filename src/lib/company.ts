@@ -13,4 +13,6 @@ export const COMPANY = {
   registeredIn: 'England & Wales',
   companyNumber: '16671398',
   vatNumber: 'GB 521180434',
+  // Information Commissioner's Office data protection fee register (founder, 12 Nov 2026)
+  icoRegistration: 'ZC063204',
 } as const;

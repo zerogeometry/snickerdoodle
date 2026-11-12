@@ -239,7 +239,7 @@ export default function DrawPrivacyNoticePage() {
 
         <p className="text-[13px] text-ink-faint">
           Contact: <a href="mailto:hello@snickerdoodle.co.uk">hello@snickerdoodle.co.uk</a> · Launch Mode Ltd,{' '}
-          {COMPANY_ADDRESS} · ICO registration [number].
+          {COMPANY_ADDRESS} · ICO registration {COMPANY.icoRegistration}.
         </p>
       </Prose>
     </div>
