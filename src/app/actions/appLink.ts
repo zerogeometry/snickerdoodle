@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { getDb } from '@/db/client';
 import { callbackUrl, connectChoices, createAuthCode, parseConnectRequest, revokeAppTokens } from '@/server/app/link';
 import { deleteProgressBackups, parseConnectSync, removeEverythingDrawSent, updateSyncFromWebsite, type SyncChoices } from '@/server/app/sync';
+import { currentSignInAt } from '@/server/freshSignIn';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 
@@ -69,12 +70,16 @@ export async function notOwnerAppLinkAction(input: { params: ConnectParams }): P
   return { ok: true, url: callbackUrl(parsed.req, { code }) };
 }
 
-/** The account page's "what syncs" for one of this account's own phones (any subset of the three). */
-export async function updateAppSyncAction(input: { tokenId: string; patch: Record<string, unknown> }): Promise<{ ok: true; sync: SyncChoices } | { ok: false }> {
+/**
+ * The account page's "what syncs" for one of this account's own phones (any subset of the three). Widening answers
+ * `sign-in-again` unless this browser signed in within the last 15 minutes (A-63); the page then offers a sign-in link.
+ */
+export async function updateAppSyncAction(input: { tokenId: string; patch: Record<string, unknown> }): Promise<{ ok: true; sync: SyncChoices } | { ok: false; reason?: 'sign-in-again' }> {
   const account = await getCurrentAccount();
   if (!account || typeof input.tokenId !== 'string' || !/^[0-9a-f-]{36}$/i.test(input.tokenId) || !input.patch || typeof input.patch !== 'object') return { ok: false };
-  const res = await updateSyncFromWebsite(getDb(), account.id, input.tokenId, input.patch);
-  if (!res.ok) return { ok: false };
+  const db = getDb();
+  const res = await updateSyncFromWebsite(db, account.id, input.tokenId, input.patch, await currentSignInAt(db, account.id));
+  if (!res.ok) return res.reason === 'sign-in-again' ? { ok: false, reason: 'sign-in-again' } : { ok: false };
   revalidatePath('/account');
   return { ok: true, sync: res.sync };
 }

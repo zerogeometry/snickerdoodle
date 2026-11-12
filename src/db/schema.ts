@@ -917,6 +917,8 @@ export const sessions = pgTable('sessions', {
     .notNull()
     .references(() => accounts.id, { onDelete: 'cascade' }),
   expires: timestamp('expires', { withTimezone: true }).notNull(),
+  /** When this sign-in happened (A-63: widening what the Draw app sends needs a sign-in in the last 15 minutes). */
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const verificationTokens = pgTable(

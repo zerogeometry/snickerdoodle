@@ -1,7 +1,8 @@
 import { and, eq, inArray, isNull, lt } from 'drizzle-orm';
 import { AuthzError, canManageFamily } from '@/authz';
 import { appArtistProgress, appTokens, assets, auditRecords, children } from '@/db/schema';
-import { parseSyncPatch, type SyncChoices, type SyncKeepsakes } from '@/lib/drawSync';
+import { parseSyncPatch, widens, type SyncChoices, type SyncKeepsakes } from '@/lib/drawSync';
+import { isFreshSignIn } from '@/lib/freshSignIn';
 import { deleteAsset, KeepsakeInUseError, resolveViewerContext } from '@/server/assets';
 import type { DbHandle } from '@/server/db';
 
@@ -76,14 +77,22 @@ export async function updateTokenSync(
   return to;
 }
 
-export type WebsiteSyncResult = { ok: true; sync: SyncChoices } | { ok: false; reason: 'not-found' | 'invalid' };
+export type WebsiteSyncResult = { ok: true; sync: SyncChoices } | { ok: false; reason: 'not-found' | 'invalid' | 'sign-in-again' };
 
 /**
  * The account page's "what syncs" for one of THIS account's linked phones. The phone must be this
  * account's own, still linked, and the account must still run that family (the key would stop
- * working otherwise anyway).
+ * working otherwise anyway). Widening needs a sign-in in the last 15 minutes (`signedInAt`, A-63); narrowing, stopping
+ * and a phone's very first "nothing" never ask.
  */
-export async function updateSyncFromWebsite(db: DbHandle, accountId: string, tokenId: string, raw: Record<string, unknown>, now = new Date()): Promise<WebsiteSyncResult> {
+export async function updateSyncFromWebsite(
+  db: DbHandle,
+  accountId: string,
+  tokenId: string,
+  raw: Record<string, unknown>,
+  signedInAt: Date | null,
+  now = new Date(),
+): Promise<WebsiteSyncResult> {
   const parsed = parseSyncPatch(raw);
   if (!parsed.ok) return { ok: false, reason: 'invalid' };
   const [tok] = await db
@@ -93,6 +102,7 @@ export async function updateSyncFromWebsite(db: DbHandle, accountId: string, tok
   if (!tok) return { ok: false, reason: 'not-found' };
   const viewer = await resolveViewerContext(db, accountId, tok.familyId);
   if (!canManageFamily(viewer.membership)) return { ok: false, reason: 'not-found' };
+  if (widens(await getTokenSync(db, tokenId), parsed.patch) && !isFreshSignIn(signedInAt, now)) return { ok: false, reason: 'sign-in-again' };
   const sync = await updateTokenSync(db, { tokenId, accountId, familyId: tok.familyId }, parsed.patch, 'website', now);
   return { ok: true, sync };
 }

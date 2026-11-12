@@ -404,7 +404,7 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
       expect(await patch({ keepsakes: 'none' })).toEqual(NOTHING);
       await expectApiError(patch({ keepsakes: 'proud' }), 403, 'widen-on-website'); // none → proud is widening too
       // the website's account page can widen
-      expect(await updateSyncFromWebsite(db, ids.samId, (await viewerFor(token)).tokenId, { keepsakes: 'all', children: true, progress: true, birthdays: true })).toEqual({ ok: true, sync: EVERYTHING });
+      expect(await updateSyncFromWebsite(db, ids.samId, (await viewerFor(token)).tokenId, { keepsakes: 'all', children: true, progress: true, birthdays: true }, new Date())).toEqual({ ok: true, sync: EVERYTHING });
     });
 
     it('PATCH /me/sync validates every value', async () => {
@@ -419,22 +419,36 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     it('the account page: only this account’s own, live phones; changes audited as "website"', async () => {
       const token = await link({ sync: NOTHING });
       const av = await viewerFor(token);
-      expect(await updateSyncFromWebsite(db, ids.joId, av.tokenId, { keepsakes: 'all' })).toEqual({ ok: false, reason: 'not-found' }); // Jo can't change Sam's phone
-      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'nope' })).toEqual({ ok: false, reason: 'invalid' });
-      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'proud', children: true })).toEqual({ ok: true, sync: { keepsakes: 'proud', children: true, progress: false, birthdays: false } });
+      expect(await updateSyncFromWebsite(db, ids.joId, av.tokenId, { keepsakes: 'all' }, new Date())).toEqual({ ok: false, reason: 'not-found' }); // Jo can't change Sam's phone
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'nope' }, new Date())).toEqual({ ok: false, reason: 'invalid' });
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'proud', children: true }, new Date())).toEqual({ ok: true, sync: { keepsakes: 'proud', children: true, progress: false, birthdays: false } });
       expect((await viewerFor(token)).sync).toEqual({ keepsakes: 'proud', children: true, progress: false, birthdays: false }); // the phone follows on its next call
       const listed = (await listLinkedDevices(db, ids.samId)).find((d) => d.id === av.tokenId)!;
       expect(listed).toMatchObject({ sync: { keepsakes: 'proud', children: true, progress: false, birthdays: false }, syncChosen: true });
       expect((await consentFor(av.tokenId)).some((a) => (a.metadata as { by: string }).by === 'website')).toBe(true);
       await revokeAppTokens(db, { tokenId: av.tokenId }, 'unlinked-on-website', { accountId: ids.samId, actorType: 'MEMBER' });
-      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'all' })).toEqual({ ok: false, reason: 'not-found' }); // disconnected: nothing to change
+      expect(await updateSyncFromWebsite(db, ids.samId, av.tokenId, { keepsakes: 'all' }, new Date())).toEqual({ ok: false, reason: 'not-found' }); // disconnected: nothing to change
+    });
+
+    it('widening from the account page needs a sign-in in the last 15 minutes; narrowing never does (A-63)', async () => {
+      const token = await link({ sync: { keepsakes: 'proud', children: false, progress: true, birthdays: false } });
+      const { tokenId } = await viewerFor(token);
+      const stale = new Date(Date.now() - 20 * 60_000);
+      expect(await updateSyncFromWebsite(db, ids.samId, tokenId, { keepsakes: 'all' }, stale)).toEqual({ ok: false, reason: 'sign-in-again' });
+      expect(await updateSyncFromWebsite(db, ids.samId, tokenId, { birthdays: true }, null)).toEqual({ ok: false, reason: 'sign-in-again' });
+      expect(await updateSyncFromWebsite(db, ids.samId, tokenId, { keepsakes: 'none', birthdays: true }, stale)).toEqual({ ok: false, reason: 'sign-in-again' }); // one widening spoils the lot
+      expect((await viewerFor(token)).sync).toEqual({ keepsakes: 'proud', children: false, progress: true, birthdays: false }); // nothing changed
+      // narrowing and stopping never ask
+      expect(await updateSyncFromWebsite(db, ids.samId, tokenId, { keepsakes: 'none', progress: false }, null)).toEqual({ ok: true, sync: NOTHING });
+      // a fresh sign-in may widen
+      expect(await updateSyncFromWebsite(db, ids.samId, tokenId, { keepsakes: 'all' }, new Date(Date.now() - 5 * 60_000))).toEqual({ ok: true, sync: { ...NOTHING, keepsakes: 'all' } });
     });
 
     it('a phone linked before the choices existed syncs nothing until a grown-up picks', async () => {
       const [old] = await db.insert(appTokens).values({ tokenHash: `legacy-${Date.now()}`, accountId: ids.samId, familyId: ids.hartleyId, deviceLabel: 'a phone or tablet' }).returning();
       const listed = (await listLinkedDevices(db, ids.samId)).find((d) => d.id === old!.id)!;
       expect(listed).toMatchObject({ sync: NOTHING, syncChosen: false });
-      expect(await updateSyncFromWebsite(db, ids.samId, old!.id, { keepsakes: 'none' })).toEqual({ ok: true, sync: NOTHING });
+      expect(await updateSyncFromWebsite(db, ids.samId, old!.id, { keepsakes: 'none' }, new Date())).toEqual({ ok: true, sync: NOTHING });
       expect((await listLinkedDevices(db, ids.samId)).find((d) => d.id === old!.id)!.syncChosen).toBe(true); // choosing "none" is still a choice
       expect((await consentFor(old!.id))[0]!.metadata).toMatchObject({ by: 'website', from: null });
     });
