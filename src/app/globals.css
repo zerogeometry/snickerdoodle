@@ -629,6 +629,94 @@ html {
   will-change: transform;
 }
 
+/* The /draw film's own controls (src/ui/components/DrawFilm.tsx, founder 13 Nov 2026): a paper pill with a
+   honey progress line, instead of the browser's grey bar. With a mouse the pill tucks away while the film
+   plays and comes back when the pointer is over the film or anything in it has focus; touch screens keep it. */
+.film-bar {
+  transition: opacity 0.2s ease;
+}
+@media (hover: hover) and (pointer: fine) {
+  .film[data-phase='playing']:not(:hover):not(:focus-within) .film-bar {
+    opacity: 0;
+  }
+}
+/* the bar fits the film, not the window: on a small film the time goes (the slider still says it aloud) */
+.film {
+  container-type: inline-size;
+}
+@container (max-width: 459px) {
+  .film-time {
+    display: none;
+  }
+}
+@container (min-width: 460px) {
+  .film-bar {
+    inset-inline: 12px;
+    bottom: 12px;
+    gap: 10px;
+    padding-right: 10px;
+  }
+}
+@container (max-width: 559px) {
+  .film-length {
+    display: none;
+  }
+}
+.film-full {
+  aspect-ratio: auto !important;
+  border-radius: 0;
+}
+/* the progress line: honey up to where you are, oat after; a chunky ink-outlined knob */
+.film-track {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 44px; /* the tap target; the line itself is drawn below */
+  background: transparent;
+  cursor: pointer;
+}
+.film-track::-webkit-slider-runnable-track {
+  height: 12px;
+  border: 2px solid var(--color-cocoa);
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-honey) calc(var(--p, 0) * 100%), var(--color-paper-2) 0);
+}
+.film-track::-moz-range-track {
+  height: 8px;
+  border: 2px solid var(--color-cocoa);
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-honey) calc(var(--p, 0) * 100%), var(--color-paper-2) 0);
+}
+.film-track::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px;
+  border: 2px solid var(--color-cocoa);
+  border-radius: 999px;
+  background: var(--color-paper);
+  box-shadow: 0 2px 0 var(--color-cocoa);
+}
+.film-track::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-cocoa);
+  border-radius: 999px;
+  background: var(--color-paper);
+  box-shadow: 0 2px 0 var(--color-cocoa);
+}
+.film-track:focus-visible {
+  outline: none;
+}
+.film-track:focus-visible::-webkit-slider-thumb {
+  outline: 2px solid var(--color-cinnamon);
+  outline-offset: 2px;
+}
+.film-track:focus-visible::-moz-range-thumb {
+  outline: 2px solid var(--color-cinnamon);
+  outline-offset: 2px;
+}
+
 /* Doodle-paper section textures (founder, 5 Nov) — still, never animated. Children's line doodles
    (public/textures/*-doodles.webp, built by scripts/textures/build.py) are a MASK: the lines take
    their colour from tokens here, a shade away from the section, with a soft diagonal sheen across
