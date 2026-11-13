@@ -1,6 +1,6 @@
 import { EXAMPLES, exampleBySlug } from '@/lib/examples';
 
-const HERO = ['tractor-cushion', 'family-mug', 'zebra-framed-print', 'rainbow-heart-cushion', 'puppy-card'].map(exampleBySlug);
+const HERO = ['tractor-cushion', 'family-mug', 'framefamily', 'rainbow-heart-cushion', 'puppy-card'].map(exampleBySlug);
 
 /**
  * The hero: real keepsakes (made from children's drawings) crossfading in turn, floating on the
@@ -9,7 +9,7 @@ const HERO = ['tractor-cushion', 'family-mug', 'zebra-framed-print', 'rainbow-he
  */
 export function ExampleMorph({ className = '' }: { className?: string }) {
   return (
-    <div className={`hero-bob relative aspect-square w-full ${className}`} role="img" aria-label="Keepsakes made from children’s drawings: a tractor cushion, a family mug, a zebra in a gold frame, a rainbow heart cushion and a puppy card">
+    <div className={`hero-bob relative aspect-square w-full ${className}`} role="img" aria-label="Keepsakes made from children’s drawings: a tractor cushion, a family mug, a family drawing in a wooden frame, a rainbow heart cushion and a puppy card">
       {HERO.map((e, i) => (
         <div key={e.slug} className="morph-frame" style={{ ['--morph-i' as string]: i }} aria-hidden>
           <img

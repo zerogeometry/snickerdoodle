@@ -41,7 +41,7 @@ export default function OurStoryPage() {
 
         {/* Kept properly: two real keepsakes made from children's drawings. */}
         <div className="mt-12 flex items-start justify-center gap-4 sm:gap-8">
-          <ExamplePolaroid slug="zebra-framed-print" tilt="-3deg" tape="sky" className="pop-in w-[46%] max-w-[220px]" />
+          <ExamplePolaroid slug="framefamily" tilt="-3deg" tape="sky" className="pop-in w-[46%] max-w-[220px]" />
           <ExamplePolaroid slug="aeroplane-cushion" tilt="2.5deg" tape="berry" className="pop-in mt-6 w-[46%] max-w-[220px]" style={{ ['--i' as string]: 1 }} />
         </div>
 

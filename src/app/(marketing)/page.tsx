@@ -19,7 +19,7 @@ import Link from 'next/link';
 
 /** The range strip: real keepsakes, one per product we sell (founder-made examples). */
 const RANGE = [
-  { label: 'framed print', slug: 'zebra-framed-print' },
+  { label: 'phone case', slug: 'owlphone' },
   { label: 'cushion', slug: 'tractor-cushion' },
   { label: 'mug', slug: 'family-mug' },
   { label: 'heart cushion', slug: 'rainbow-heart-cushion' },
