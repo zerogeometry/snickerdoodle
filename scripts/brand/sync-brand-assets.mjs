@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Copies the brand into the site from the shared brand-assets folder (the one source for Snickerdoodle
  * AND Snickerdoodle Draw — logo/, icons/<season>/snickerdoodle/web/, backgrounds/):
  *   node scripts/brand/sync-brand-assets.mjs [path/to/brand-assets]   (default: ../brand-assets)
@@ -14,7 +14,7 @@
  * Supersedes build-brand-assets.mjs for the logo, icons and share card; that script still builds the
  * printed card-back badge, which stays the everyday mark (prints outlive the season).
  */
-import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -107,32 +107,5 @@ for (const season of ['everyday', 'christmas']) {
   await say(out('draw-og.png'));
 }
 
-// The /draw page's film placeholder poster (16:9): the everyday Draw lockup on paper. Swapped for a frame of
-// the real film when it arrives (src/lib/drawApp.ts DRAW_VIDEO).
-{
-  const DRAW = path.join(ROOT, 'public', 'draw');
-  mkdirSync(path.join(DRAW, 'screens'), { recursive: true });
-  // the lockup sits in the top half, leaving the bottom clear for the placeholder's play sticker (DrawFilm)
-  const lockup = await sharp(path.join(SRC, 'logo', 'everyday', 'snickerdoodle-draw-logo.png')).trim({ threshold: 1 }).resize({ width: 470, kernel: 'lanczos3' }).png().toBuffer();
-  const lm = await sharp(lockup).metadata();
-  const poster = path.join(DRAW, 'video-poster.webp');
-  await sharp({ create: { width: 1280, height: 720, channels: 3, background: '#FFFBF2' } }) // paper
-    .composite([{ input: lockup, left: Math.round((1280 - lm.width) / 2), top: 84 }])
-    .webp({ quality: 84, effort: 6 })
-    .toFile(poster);
-  await say(poster);
-
-  // App screenshots: the Play Store phone set (1080×1920, a sample child "Ellie", no real child's data), from the
-  // Draw repo beside brand-assets (or DRAW_REPO=…). Halved and webp'd: the gallery shows them ≤ 260px wide.
-  const repo = path.resolve(process.env.DRAW_REPO ?? path.join(SRC, '..', 'snickerdoodle-draw'));
-  const shots = path.join(repo, 'docs', 'store', 'screenshots');
-  if (!existsSync(shots)) {
-    console.warn(`(no Draw screenshots at ${shots}: kept the ones in public/draw/screens)`);
-  } else {
-    for (const name of ['01-today', '02-lesson', '03-reveal', '04-learn', '05-rewards']) {
-      const to = path.join(DRAW, 'screens', `${name}.webp`);
-      await sharp(path.join(shots, `${name}.png`)).resize({ width: 540, kernel: 'lanczos3' }).webp({ quality: 84, effort: 6 }).toFile(to);
-      await say(to);
-    }
-  }
-}
+// The /draw film, its poster (the film's end card) and the "a peek inside" screenshots are the founder's own
+// files now (13 Nov 2026, src/lib/drawApp.ts): nothing here overwrites them.
