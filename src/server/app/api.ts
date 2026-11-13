@@ -7,7 +7,8 @@ import { assetRefOf } from '@/server/assetRef';
 import { loadCatalogue } from '@/server/catalogue';
 import { addChild, updateChild } from '@/server/children';
 import { createGiftLink, NothingToShowError } from '@/server/giftLinks';
-import { ingestOriginalAsset, type ScreeningOptions } from '@/server/ingest';
+import { ingestOriginalAsset, UnreadableImageError, type ScreeningOptions } from '@/server/ingest';
+import { ImageTooLargeError } from '@/storage';
 import { appUrl } from '@/server/mail';
 import { getOrdersForAccount } from '@/server/orders';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
@@ -28,6 +29,8 @@ export class AppApiError extends Error {
   constructor(
     readonly status: 400 | 403 | 404 | 409 | 413 | 415 | 422 | 429,
     readonly reason: string,
+    /** For the server's own log line only (src/server/app/http.ts) — never sent to the app, never personal. */
+    readonly detail?: string,
   ) {
     super(reason);
     this.name = 'AppApiError';
@@ -252,19 +255,24 @@ export async function keepAppDrawing(
   const existing = await already();
   if (existing) return { assetId: existing.id, kept: true, created: false };
   if (!input.image || typeof input.image.arrayBuffer !== 'function') throw new AppApiError(422, 'image');
-  if (input.image.size > APP_UPLOAD_MAX_BYTES) throw new AppApiError(413, 'too-big');
+  if (input.image.size > APP_UPLOAD_MAX_BYTES) throw new AppApiError(413, 'too-big', `${input.image.size} bytes`);
   const buffer = Buffer.from(await input.image.arrayBuffer());
-  if (!isPng(buffer) && !isJpeg(buffer)) throw new AppApiError(415, 'image');
+  if (!isPng(buffer) && !isJpeg(buffer)) throw new AppApiError(415, 'image', `${buffer.length} bytes, not a PNG or JPEG`);
 
   const gate = await rateLimit(db, { ...LIMITS.homeUploadPerAccount, caller: av.accountId });
-  if (!gate.ok) throw new AppApiError(429, 'slow-down');
+  if (!gate.ok) throw new AppApiError(429, 'slow-down', 'uploads this hour');
 
   let assetId: string;
   try {
     ({ assetId } = await ingestOriginalAsset(db, av.viewer, { familyId: av.familyId, kind: 'DRAWING', childSubjectId: childId, buffer, keptInHome: true }, opts.screening ?? { background: true }));
   } catch (e) {
     if (e instanceof AuthzError) throw new AppApiError(403, 'not-owner');
-    throw new AppApiError(422, 'image'); // not an image sharp can read
+    // a PNG/JPEG we can't read (cut short on the way, say) or one with too many pixels
+    if (e instanceof UnreadableImageError || e instanceof ImageTooLargeError) throw new AppApiError(422, 'image', `${e.name}, ${buffer.length} bytes`);
+    // storage, encryption or the database: OUR trouble, not the picture's. It used to be answered as
+    // 422 image, unlogged, so a storage fault looked like a bad drawing and left no trace. Now it is a
+    // 500 the route logs (src/server/app/http.ts) and the app says "snickerdoodle is having a moment".
+    throw e;
   }
   try {
     await db.update(assets).set({ source, madeOn, appClientRef: clientRef }).where(eq(assets.id, assetId));
@@ -360,7 +368,7 @@ export async function mintAppWish(db: DbHandle, av: AppViewer, body: Record<stri
   const row = await appAsset(db, av, str(body.assetId) ?? '');
   const productKey = await liveProduct(db, body.productKey);
   const gate = await rateLimit(db, { ...LIMITS.giftLinksPerAccount, caller: av.accountId });
-  if (!gate.ok) throw new AppApiError(429, 'slow-down');
+  if (!gate.ok) throw new AppApiError(429, 'slow-down', 'ready-to-buy links this hour');
   let title: string | null = null;
   if (row.childSubjectId) {
     const [c] = await db.select({ firstName: children.firstName }).from(children).where(eq(children.id, row.childSubjectId));

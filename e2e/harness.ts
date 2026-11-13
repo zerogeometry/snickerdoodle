@@ -48,3 +48,20 @@ export async function clearForTest(uploaderEmail: string) {
   await sql()`update assets set moderation_status = 'CLEAR'
     where uploader_account_id = (select id from accounts where email = ${uploaderEmail.toLowerCase()})`;
 }
+
+/**
+ * A linked Snickerdoodle Draw phone for a signed-in grown-up, minus the phone: the family they own
+ * (made on their first visit to /home), a little one to file drawings under, and a key as the link
+ * flow stores one (only its sha256 — src/server/app/secrets.ts). The spec then calls the REAL app
+ * API with it, exactly as the app does.
+ */
+export async function linkDrawApp(email: string, childName = 'Olive'): Promise<{ key: string; childId: string; familyId: string }> {
+  const [m] = await sql()`select m.account_id, m.family_id from memberships m join accounts a on a.id = m.account_id
+    where a.email = ${email.toLowerCase()} and m.is_owner and m.status = 'ACTIVE'`;
+  if (!m) throw new Error('linkDrawApp: sign the grown-up in at /home first (that makes their family)');
+  const [child] = await sql()`insert into children (family_id, first_name, controller_account_id) values (${m.family_id}, ${childName}, ${m.account_id}) returning id`;
+  const key = `sdd_${randomBytes(32).toString('base64url')}`;
+  await sql()`insert into app_tokens (token_hash, account_id, family_id, device_label, sync_chosen_at)
+    values (${createHash('sha256').update(key, 'utf8').digest('hex')}, ${m.account_id}, ${m.family_id}, 'an e2e phone', now())`;
+  return { key, childId: child!.id as string, familyId: m.family_id as string };
+}

@@ -1,4 +1,5 @@
 import { exchangeAuthCode } from '@/server/app/link';
+import { AppApiError } from '@/server/app/api';
 import { appJson, jsonBody, withoutKey } from '@/server/app/http';
 
 /**
@@ -16,5 +17,6 @@ export const POST = withoutKey(async ({ req, db }) => {
     clientId: b.client_id,
     userAgent: req.headers.get('user-agent'),
   });
-  return res.ok ? appJson({ token: res.token }) : appJson({ reason: res.reason }, res.status);
+  if (!res.ok) throw new AppApiError(res.status, res.reason); // refused through the shared shell, so it's logged like every other refusal
+  return appJson({ token: res.token });
 });
