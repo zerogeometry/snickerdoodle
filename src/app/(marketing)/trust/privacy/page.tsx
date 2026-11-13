@@ -16,7 +16,7 @@ export default function PrivacyNoticePage() {
     <div className="px-6 py-12 md:py-16">
       <div className="mx-auto max-w-2xl">
         <h1 className="pop-in font-display text-[40px] leading-[1.02] text-cocoa md:text-6xl">Privacy Notice</h1>
-        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 12 November 2026</p>
+        <p className="sticker mt-3 inline-block -rotate-1 rounded-[12px] bg-honey-band px-3 py-1 text-xs font-bold text-cocoa">Last updated: 13 November 2026</p>
       </div>
 
       <Prose className="mt-8">
@@ -25,6 +25,17 @@ export default function PrivacyNoticePage() {
           Everything you make on Snickerdoodle is yours. We use your child&apos;s drawings and photos to make the things
           you order, we don&apos;t sell your data, we don&apos;t let anyone train AI on it, and we delete what we
           don&apos;t need. You can see and delete anything, any time. The full detail is below.
+        </p>
+
+        {/* A-57 (Children's Code std 4): a short part a child can read, like the app's notice */}
+        <h2>If you&apos;re a child reading this</h2>
+        <p>
+          Snickerdoodle is a website for grown-ups. Your grown-up can upload your drawings here, or send them from
+          Snickerdoodle Draw, to keep them safe in your family&apos;s private keepsake box, or to turn them into things
+          like a mug or a framed picture. Only the people your grown-up chooses can see your drawings, and we never show
+          them to strangers. We only use your first name, never your surname. Your grown-up can see everything we keep about
+          you, and delete it whenever they like. If something here worries you, talk to your grown-up, or ask them to
+          email us.
         </p>
 
         <h2>1. Who we are</h2>
@@ -160,7 +171,18 @@ export default function PrivacyNoticePage() {
         <ul>
           <li><strong>Amazon Web Services</strong> (London, UK) — hosts the website and our database, and keeps the drawings and photos you upload in private, encrypted storage. Our automatic safety checks run with Amazon in London too: every upload is checked for nudity, violence, hateful or rude imagery, and for swear words printed on it (like a slogan on a T-shirt), before it can be printed. If a check isn’t sure, a person may look (see section 4). Amazon doesn’t keep the pictures or use them to train anything.</li>
           <li><strong>Stripe</strong> — takes your payment. Your card details go straight to Stripe; we never see or store them.</li>
-          <li><strong>Prodigi</strong> — prints your order and delivers it. They get the print file for what you ordered and the delivery address.</li>
+          <li>
+            <strong>Prodigi</strong> (a UK company) — prints your order and delivers it. They get the print file for
+            what you ordered and the delivery address, and nothing else: never your account, your keepsake box or your
+            child&apos;s name. Some of what protects your data here depends on Prodigi rather than on us, so we&apos;ll
+            be straight about where we are:
+            <ul>
+              <li>They keep the print file for about 45 days after making your order, in case it needs reprinting, then delete it. They&apos;ve told us they can&apos;t delete it any sooner, even if we ask.</li>
+              <li>Prodigi has print labs in more than one country. We&apos;ve asked them to confirm in writing that orders going to UK addresses are always printed in the UK, and we&apos;re waiting for their answer.</li>
+              <li>We&apos;ve also asked which other companies help them make and send orders, and how quickly they&apos;d tell us about a security problem. We&apos;re waiting for those answers too.</li>
+            </ul>
+            We&apos;ll update this notice as soon as they reply.
+          </li>
           <li><strong>Resend</strong> (Ireland, EU) — sends the site&apos;s emails, like your sign-in links, order updates and gift requests.</li>
           <li><strong>Google Workspace</strong> — our own mailboxes (support@ and hello@), so a message you send us, and our reply, is kept there.</li>
         </ul>
@@ -172,11 +194,16 @@ export default function PrivacyNoticePage() {
           safeguard (such as the UK&apos;s international data transfer agreement or a recognised data bridge), and we
           assess that the protection is not materially lower than UK standards — with extra care for children&apos;s data.
         </p>
+        <p>
+          Your drawings and photos, our database and our safety checks all stay in the UK, with Amazon in London. Stripe,
+          Resend and Google may handle your payment details, emails and messages outside the UK, under those safeguards. For printing, see
+          what we&apos;re still confirming with Prodigi in section 6.
+        </p>
 
         <h2>8. How long we keep it</h2>
         <ul>
           <li><strong>Drawings and photos you upload:</strong> only as long as we need them to make and send your order, plus 30 days after it&apos;s sent in case anything needs reprinting — then we delete them, <strong>unless</strong> you choose to keep them in your Keepsake Home (we ask after you order).</li>
-          <li><strong>The print file we send our printer:</strong> Prodigi keeps it for about 45 days after making your order, in case it needs reprinting, then deletes it.</li>
+          <li><strong>The print file we send our printer:</strong> Prodigi keeps it for about 45 days after making your order, in case it needs reprinting, then deletes it. They can&apos;t delete it sooner, so if you ask us to delete a drawing you&apos;ve ordered, we delete everything we hold straight away, and Prodigi&apos;s copy goes when its 45 days are up.</li>
           <li><strong>Keepsake Home items:</strong> for as long as you want them. Delete any time.</li>
           <li><strong>Profile pictures, profile headers and family banners:</strong> until you change or remove them, or close your account. Only your home and family circles see your picture and header (extended family sees your initials), only that family sees its banner, and we strip location data from every one.</li>
           <li><strong>Order records:</strong> six years, because tax law requires it.</li>
@@ -192,7 +219,8 @@ export default function PrivacyNoticePage() {
           You can ask us to give you a copy of your data; correct it; delete it; restrict or object to how we use it; or
           give it to you in a portable form. You can withdraw consent for marketing or reminders at any time. We&apos;ll
           respond within the legal timeframe — though we may pause the clock if we need to confirm your identity or
-          clarify your request.
+          clarify your request. When you delete something, we delete our copies straight away; the one thing we can&apos;t
+          speed up is the print file our printer keeps for about 45 days after an order (see section 8).
         </p>
         <p>
           <strong>Your right to object.</strong> You can object to us using your family&apos;s information this way at any
