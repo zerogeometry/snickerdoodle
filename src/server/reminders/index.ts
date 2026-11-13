@@ -75,14 +75,15 @@ export async function runReminders(db: DbHandle, now = new Date()): Promise<{ pl
     }
     if (!lines.length) continue;
     const when = (n: number) => (n >= 25 ? 'in about a month' : n >= 12 ? 'in two weeks' : `in ${n} days`);
-    const first = lines[0]!;
     // a real off switch: no sign-in, and the headers mail apps use for their own one-tap unsubscribe (04-B10)
     const off = reminderOffLinks(d.accountId);
     await sendMail({
       kind: 'reminder',
       to: d.email,
       headers: off.headers,
-      subject: `coming up: ${first.title}${lines.length > 1 ? ` and ${lines.length - 1} more` : ''} ✦`,
+      // A-58 (Children's Code std 5): no names in the subject — a lock screen or a shared inbox shows it to anyone
+      // nearby. The names are inside the email.
+      subject: `${lines.length === 1 ? 'a special day is' : `${lines.length} special days are`} coming up ✦`,
       text:
         `A gentle heads-up from your family calendar:\n\n` +
         lines.map((l) => `• ${l.title}${l.note ? ` (${l.note})` : ''} — ${when(l.inDays)}, ${new Date(`${l.date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}`).join('\n') +

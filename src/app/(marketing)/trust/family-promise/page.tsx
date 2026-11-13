@@ -33,14 +33,15 @@ export default function FamilyPromisePage() {
         <h2 className="!mt-7 !text-lg !leading-snug">We don&apos;t keep what we don&apos;t need.</h2>
         <p>
           Once we&apos;ve made your order, we delete the drawing or photo you uploaded — unless you&apos;ve chosen to
-          keep it safe in your Keepsake Home. No quiet hoarding of your child&apos;s pictures on some server forever.
+          keep it safe in your Keepsake Home. (Our printer keeps its print file for about 45 days in case of a
+          reprint, then deletes it.) No quiet hoarding of your child&apos;s pictures on some server forever.
         </p>
 
         <h2 className="!mt-7 !text-lg !leading-snug">No AI is learning from your child.</h2>
         <p>
-          We use clever tools to turn a wobbly drawing into something beautiful. But the companies behind those tools
-          are contractually forbidden from keeping your images or using them to teach any AI. Your child&apos;s drawing
-          makes <strong>your</strong> product, and nothing else.
+          We use clever tools to turn a wobbly drawing into something beautiful, and they run on our own servers in
+          London, so no outside company sees your picture to do it. Nobody is allowed to use it to teach any AI. Your
+          child&apos;s drawing makes <strong>your</strong> product, and nothing else.
         </p>
 
         <h2 className="!mt-7 !text-lg !leading-snug">Private is the default.</h2>

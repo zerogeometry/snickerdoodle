@@ -78,7 +78,9 @@ describe.skipIf(!DB)('test sweep 04 — who each email goes to (integration)', (
     const got = ours().filter((m) => m.kind === 'reminder');
     expect(got.map((m) => m.to).sort()).toEqual([email.sam, email.jo].sort());
     for (const m of got) {
-      expect(m.subject).toBe(`coming up: Olivia turns ${turns} ✦`);
+      expect(m.subject).toBe('a special day is coming up ✦'); // A-58: never a child's name in the subject
+      expect(m.subject).not.toContain('Olivia');
+      expect(m.text).toContain(`Olivia turns ${turns}`);
       expect(m.text).toContain(`Olivia turns ${turns}`);
       expect(m.text).toContain('in about a month');
       expect(m.text).toMatch(/\/family\n?/); // the one-tap off switch
