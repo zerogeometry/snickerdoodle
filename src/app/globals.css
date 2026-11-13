@@ -852,6 +852,11 @@ html {
 }
 
 /* Brand-styled scrollbar for in-container scroll areas (the catalogue range). */
+/* /draw's "a peek inside" row (PeekScroller): starts in line with the page's content, runs off the right edge */
+.peek-row {
+  padding-inline: max(24px, calc((100% - 72rem) / 2 + 24px));
+  scroll-padding-inline: max(24px, calc((100% - 72rem) / 2 + 24px));
+}
 .brand-scroll {
   scrollbar-width: thin;
   scrollbar-color: var(--color-cta) var(--color-paper-2);
