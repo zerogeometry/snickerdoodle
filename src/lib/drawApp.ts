@@ -49,45 +49,40 @@ export function storeHref(store: DrawStore, links: Record<DrawStore, string | nu
 }
 
 /**
- * The film on /draw. TODO(founder): when the film is made, put the mp4 in public/draw/ (e.g.
- * '/draw/snickerdoodle-draw.mp4', ideally 1280×720, under ~8 MB), set `src`, and add it to PUBLIC_FILES.
- * Until then the frame shows the poster with "film coming soon". Keep 16:9, or change width/height to match.
+ * The film on /draw (founder, 13 Nov 2026): 26 seconds, 1280×720 (re-encoded from the 1080p master to ~2.8 MB),
+ * self-hosted, nothing loads until a parent presses play. The poster is the film's own end card.
  */
 export const DRAW_VIDEO: { src: string | null; poster: string; width: number; height: number; title: string } = {
-  src: null,
+  src: '/draw/snickerdoodle-draw.mp4',
   poster: '/draw/video-poster.webp',
   width: 1280,
   height: 720,
   title: 'a little film about Snickerdoodle Draw',
 };
 
-/** The app's store screenshots (a sample child, "Ellie": no real child's data), synced by
- * scripts/brand/sync-brand-assets.mjs. Captions follow the store listing's own. */
-export const DRAW_SCREENSHOTS: { src: string; alt: string; caption: string }[] = [
+/** "A peek inside" (founder, 13 Nov 2026: these three, in this order): a sample child, "Ellie", no real child's
+ * data. Phone and tablet shots side by side, so each carries its own size; the row lines them up by height. */
+export const DRAW_SCREENSHOTS: { src: string; alt: string; caption: string; width: number; height: number }[] = [
   {
-    src: '/draw/screens/01-today.webp',
-    alt: "The app's Today screen: a hello for Ellie and this week's drawing days.",
+    src: '/draw/screens/phone-today.webp',
+    alt: "The app's Today screen on a phone: good evening, Ellie, this week's drawing days, and today's new drawing, a happy face.",
     caption: 'today’s drawing',
+    width: 600,
+    height: 1303,
   },
   {
-    src: '/draw/screens/02-lesson.webp',
-    alt: 'A lesson in progress: step 3 of 4, "draw a little stalk on top", with a row of crayons.',
+    src: '/draw/screens/tablet-lesson.webp',
+    alt: 'A lesson on a tablet: step 3 of 4, "draw a big, puffy cloud of icing on top", a cupcake with crayons and colours alongside.',
     caption: 'step by step',
+    width: 1200,
+    height: 900,
   },
   {
-    src: '/draw/screens/03-reveal.webp',
-    alt: "A finished pumpkin drawing in a gold frame, signed with Ellie's name and the date.",
-    caption: 'framed, every time',
-  },
-  {
-    src: '/draw/screens/04-learn.webp',
-    alt: 'The Doodle Garden: a winding path of lessons, from dots and circles to a happy sun.',
-    caption: '366 lessons',
-  },
-  {
-    src: '/draw/screens/05-rewards.webp',
-    alt: 'Drawing days and weeks in a row, with a sticker collection.',
-    caption: 'drawing days add up',
+    src: '/draw/screens/phone-levelled-up.webp',
+    alt: 'You levelled up! Five little drawings taped inside a gold frame, above the smiling Snickerdoodle face.',
+    caption: 'levelling up',
+    width: 600,
+    height: 1303,
   },
 ];
 

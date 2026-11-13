@@ -1,17 +1,18 @@
-import { IconPlayerPlayFilled } from '@tabler/icons-react';
+﻿import { IconPlayerPlayFilled } from '@tabler/icons-react';
 import { DRAW_VIDEO } from '@/lib/drawApp';
 import { cn } from '../cn';
 import { Icon } from '../primitives/Icon';
 
 /**
- * The /draw film, in a taped polaroid. Until the film exists (DRAW_VIDEO.src is null) it is a placeholder:
- * the poster with a play sticker and "film coming soon", nothing to press. Once `src` is set it becomes a
- * native player: nothing loads until a parent presses play (preload="none"), never autoplays, self-hosted.
+ * The /draw film, in a taped polaroid. Without a film (DRAW_VIDEO.src null) it is a placeholder: the poster with
+ * a play sticker and "film coming soon", nothing to press. With one it is a native player: nothing loads until a
+ * parent presses play (preload="none"), never autoplays, self-hosted. No caption under the film (founder, 13 Nov
+ * 2026); the player keeps its name for screen readers.
  */
-export function DrawFilm({ className, captionClassName = 'text-ink-soft' }: { className?: string; captionClassName?: string }) {
+export function DrawFilm({ className }: { className?: string }) {
   const { src, poster, width, height, title } = DRAW_VIDEO;
   return (
-    <figure className={cn('mx-auto w-full max-w-[560px]', className)}>
+    <div className={cn('mx-auto w-full max-w-[560px]', className)}>
       <div className="polaroid tape rounded-[14px]" style={{ ['--tilt' as string]: '1.2deg', ['--tape' as string]: 'color-mix(in srgb, var(--color-sky) 80%, transparent)' }}>
         <div className="relative overflow-hidden rounded-[10px] bg-paper" style={{ aspectRatio: `${width} / ${height}` }}>
           {src ? (
@@ -31,10 +32,6 @@ export function DrawFilm({ className, captionClassName = 'text-ink-soft' }: { cl
           )}
         </div>
       </div>
-      <figcaption className={cn('mt-3 text-center text-[13px]', captionClassName)}>
-        {title}
-        {src ? '' : ' (coming soon)'}
-      </figcaption>
-    </figure>
+    </div>
   );
 }

@@ -191,11 +191,11 @@ export default function DrawPage() {
               ))}
             </ul>
           </div>
-          <DrawFilm className="pop-in-view" captionClassName="text-sky-pale" />
+          <DrawFilm className="pop-in-view" />
         </div>
       </section>
 
-      {/* ── A peek inside: the store screenshots (sideways scroll on phones) ── */}
+      {/* ── A peek inside: phone and tablet screenshots in one row, lined up by height (sideways scroll on phones) ── */}
       <section aria-labelledby="peek-title" className="py-14 md:py-20">
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2 id="peek-title" className="font-display text-[32px] leading-[1.05] text-cocoa md:text-[42px]">
@@ -208,14 +208,22 @@ export default function DrawPage() {
           tabIndex={0}
           className="brand-scroll mx-auto mt-8 max-w-6xl overflow-x-auto px-6 pb-5 pt-3 focus-visible:outline-2 md:overflow-visible"
         >
-          <ul className="flex snap-x snap-mandatory gap-5 md:grid md:grid-cols-5 md:gap-6">
+          {/* on phones the row scrolls sideways (the tablet shot wider, so it stays readable); on desktop every
+              picture is the same height, so the phones and the tablet line up */}
+          <ul className="flex snap-x snap-mandatory items-center gap-5 md:items-start md:justify-center md:gap-7">
             {DRAW_SCREENSHOTS.map((s, i) => (
-              <li key={s.src} className="w-[58vw] max-w-[230px] flex-none snap-center md:w-auto md:max-w-none">
+              <li
+                key={s.src}
+                className={cn(
+                  'flex-none snap-center md:w-auto md:max-w-none',
+                  s.width > s.height ? 'w-[82vw] max-w-[440px]' : 'w-[58vw] max-w-[230px]',
+                )}
+              >
                 <figure
                   className="polaroid lift pop-in-view rounded-[14px]"
                   style={{ ['--tilt' as string]: i % 2 ? '1.5deg' : '-1.5deg', ['--i' as string]: i }}
                 >
-                  <img src={s.src} alt={s.alt} width={540} height={960} loading="lazy" decoding="async" className="block h-auto w-full rounded-[10px]" />
+                  <img src={s.src} alt={s.alt} width={s.width} height={s.height} loading="lazy" decoding="async" className="block h-auto w-full rounded-[10px] md:h-[min(34vw,460px)] md:w-auto" />
                   <figcaption className="mt-2 px-1 text-center text-[13px] font-bold leading-snug text-ink-soft">{s.caption}</figcaption>
                 </figure>
               </li>
