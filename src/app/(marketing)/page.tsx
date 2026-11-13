@@ -206,9 +206,6 @@ export default function LandingPage() {
       <section className="relative px-6 py-16 md:py-24">
         <div className="relative z-10 mx-auto max-w-6xl">
           <h2 className="text-center font-display text-3xl text-cocoa md:text-4xl">Made from little drawings, kept for years</h2>
-          <p className="mx-auto mt-3 max-w-md text-center text-[15px] text-ink-soft">
-            Every one of these started life on a desk or easel, drawn by a little one, not picked from a template.
-          </p>
           <ExampleCarousel className="mt-10" />
         </div>
       </section>
