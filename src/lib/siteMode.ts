@@ -208,6 +208,8 @@ export const PUBLIC_FILES: ReadonlySet<string> = new Set([
   '/textures/everyday-doodles.webp',
   '/textures/floaters-christmas.webp',
   '/textures/floaters-everyday.webp',
+  '/textures/snow-dot.webp',
+  '/textures/snowflake.webp',
 ]);
 
 /**

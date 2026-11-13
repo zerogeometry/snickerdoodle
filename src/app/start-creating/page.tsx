@@ -250,7 +250,7 @@ export default function StartCreatingPage() {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat">
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
       <CameraCapture
         open={cameraOpen}

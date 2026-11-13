@@ -4,6 +4,7 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
+import { brandSeason } from '@/lib/brand';
 import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 
 export const metadata: Metadata = {
@@ -32,7 +33,8 @@ const STEPS = [
 export default function HowItWorksPage() {
   return (
     <div className="relative">
-      <FloatingDoodles tone="warm" />
+      {/* Christmas: the snow falls behind the whole page instead (src/lib/snow.ts) */}
+      {brandSeason() !== 'christmas' && <FloatingDoodles tone="warm" />}
       <div className="relative mx-auto max-w-4xl px-6 py-14 md:py-20">
         <div className="text-center">
           <CaveatNote className="pop-in -rotate-2 text-[28px] leading-none">it’s lovely and simple</CaveatNote>

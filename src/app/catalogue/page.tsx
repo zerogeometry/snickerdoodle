@@ -26,7 +26,7 @@ export default function CataloguePage() {
   useEffect(load, []);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat pb-10">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat pb-10">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your drawing' }} right={<BasketButton />} />
 
       <main id="main" className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 md:px-6">

@@ -433,7 +433,7 @@ export function ChristmasBundleBuilder() {
 
 export function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col bg-oat">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat">
       <FlowHeader back={{ href: '/start-creating', label: 'Back to your collection' }} />
       {/* pb-40 on phones clears the fixed thumb-zone action dock. */}
       <main id="main" className="mx-auto w-full max-w-7xl flex-1 px-4 pb-40 pt-6 md:px-6 md:pb-10 2xl:max-w-[1600px]">

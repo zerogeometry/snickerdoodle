@@ -29,6 +29,7 @@ import { UploadSession } from '@/ui/components/UploadSession';
 import { ScreeningNotice } from '@/ui/components/ScreeningNotice';
 import { FreshBuild } from '@/ui/components/FreshBuild';
 import { MotionTaps } from '@/ui/components/MotionTaps';
+import { PageSnow } from '@/ui/components/PageSnow';
 
 /** Metadata per request, so the favicons and share card wear the Santa hat in the Christmas season. */
 export function generateMetadata(): Metadata {
@@ -69,6 +70,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="en" data-season-preview={seasonPreviewDate() ?? undefined}>
       <body className="kraft min-h-dvh font-sans">
+        {/* Christmas snow behind the named pages (src/lib/snow.ts); a direct child of body (globals.css :has) */}
+        <PageSnow christmas={brandSeason() === 'christmas'} />
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-pill focus:bg-cta focus:px-4 focus:py-2 focus:text-cta-text"

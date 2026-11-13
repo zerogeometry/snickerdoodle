@@ -28,7 +28,7 @@ export default async function ConfirmationPage({ searchParams }: { searchParams:
   const undecided = account && ref ? await listUndecidedCreations(getDb(), account.id, ref) : [];
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat">
       <header className="border-b border-line px-6 py-3.5">
         <Link href="/" className="font-display text-xl font-semibold text-cocoa">
           snickerdoodle

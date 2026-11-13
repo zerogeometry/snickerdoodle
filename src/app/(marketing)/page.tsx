@@ -11,6 +11,7 @@ import { ExampleCarousel } from '@/ui/components/ExampleCarousel';
 import { RangeHero } from '@/ui/components/RangeHero';
 import { exampleBySlug } from '@/lib/examples';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
+import { SnowLayer } from '@/ui/components/Snowfall';
 import { DesignFromScratch } from '@/ui/components/DesignFromScratch';
 import { ChristmasHeroVisual } from '@/ui/components/ChristmasHeroVisual';
 import { formatShortDate, headlinePromise, isChristmasSeason, seasonClock } from '@/lib/season';
@@ -64,7 +65,8 @@ export default function LandingPage() {
     <>
       {/* Hero — the one handwritten moment, the headline, and the drawing taped to the page */}
       <section className="relative overflow-hidden">
-        <FloatingDoodles tone="warm" />
+        {/* Christmas: crayon snow falling behind the hero, in place of the floating doodles (founder, 13 Nov 2026) */}
+        {christmas ? <SnowLayer scope="section" /> : <FloatingDoodles tone="warm" />}
         <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-10 px-6 pb-16 pt-10 md:grid-cols-[1.4fr_1fr] md:gap-12 md:py-24">
           <div>
             <CaveatNote

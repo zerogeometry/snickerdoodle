@@ -629,6 +629,110 @@ html {
   will-change: transform;
 }
 
+/* Christmas snow (founder, 13 Nov 2026; src/ui/components/Snowfall.tsx). Crayon flakes falling gently behind
+   the content. Transform only, CSS only: the outer span falls at a steady speed (real snow reaches its
+   terminal speed almost at once) with the breeze carrying it sideways; the inner span sways, turns and tumbles
+   on the separate translate / rotate / scale properties. Distances are container units (cqh), so the same
+   flakes fill the viewport or one section. Never on an ancestor of fixed UI: the layer has no children but
+   flakes. */
+.snowfall {
+  pointer-events: none;
+  overflow: hidden;
+  container-type: size;
+}
+/* the whole background: behind everything (the page wrappers marked snow-clear let it show through) */
+.snowfall-page {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+}
+body:has(> .snowfall-page) .snow-clear {
+  background: transparent;
+}
+/* one section (the homepage hero): under its content, which sits at z-10 */
+.snowfall-section {
+  position: absolute;
+  inset: 0;
+}
+.snow-fall {
+  position: absolute;
+  top: calc(var(--size) * -1.6);
+  width: var(--size);
+  height: var(--size);
+  animation: snow-fall var(--fall) linear var(--at) infinite;
+  will-change: translate;
+}
+.snow-flake,
+.snow-dot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: url('/textures/snowflake.webp') center / contain no-repeat;
+  rotate: var(--turn);
+  animation:
+    snow-sway var(--sway-dur) ease-in-out infinite alternate,
+    snow-spin var(--spin) linear infinite var(--spin-dir),
+    snow-tumble var(--tumble) ease-in-out infinite alternate;
+  animation-delay: var(--at);
+  will-change: translate, rotate, scale;
+}
+.snow-dot {
+  background-image: url('/textures/snow-dot.webp');
+  animation: snow-sway var(--sway-dur) ease-in-out infinite alternate;
+  animation-delay: var(--at);
+  will-change: translate;
+}
+@keyframes snow-fall {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: var(--drift) calc(100cqh + var(--size) * 3.2);
+  }
+}
+@keyframes snow-sway {
+  from {
+    translate: calc(var(--sway) * -1) 0;
+  }
+  to {
+    translate: var(--sway) 0;
+  }
+}
+@keyframes snow-spin {
+  from {
+    rotate: var(--turn);
+  }
+  to {
+    rotate: calc(var(--turn) + 360deg);
+  }
+}
+/* a flake tipping edge-on and back as it flutters (a flat disc seen from the side looks narrower) */
+@keyframes snow-tumble {
+  from {
+    scale: 1 1;
+  }
+  to {
+    scale: 0.55 1;
+  }
+}
+/* half as many flakes on a phone */
+@media (max-width: 639px) {
+  .snow-fall[data-lite] {
+    display: none;
+  }
+}
+/* reduced motion: no falling at all; the snow stays scattered where it lies */
+@media (prefers-reduced-motion: reduce) {
+  .snow-fall,
+  .snow-flake,
+  .snow-dot {
+    animation: none !important;
+  }
+  .snow-fall {
+    translate: 0 calc(var(--rest) + var(--size) * 1.6);
+  }
+}
+
 /* Doodle-paper section textures (founder, 5 Nov) — still, never animated. Children's line doodles
    (public/textures/*-doodles.webp, built by scripts/textures/build.py) are a MASK: the lines take
    their colour from tokens here, a shade away from the section, with a soft diagonal sheen across

@@ -43,7 +43,7 @@ export function FamilyView({ data }: { data: FamilyData }) {
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
       <AppDesktopNav active="Family" />
 
       <main id="main" className="flex-1">

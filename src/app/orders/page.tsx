@@ -27,7 +27,7 @@ export default async function OrdersPage() {
   const orders = await getOrdersForAccount(getDb(), account.id);
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
       <AppDesktopNav active="Orders" />
 
       <main id="main" className="mx-auto w-full max-w-3xl flex-1 px-6 py-6">

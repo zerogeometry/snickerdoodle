@@ -246,7 +246,7 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
   };
 
   return (
-    <div className="flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
+    <div className="snow-clear flex min-h-dvh flex-col bg-oat pb-24 md:pb-0">
       <AppDesktopNav active="Home" />
 
       <main id="main" className="flex-1">

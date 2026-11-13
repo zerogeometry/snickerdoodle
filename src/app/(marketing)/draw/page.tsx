@@ -23,6 +23,7 @@ import { Icon } from '@/ui/primitives/Icon';
 import { cn } from '@/ui/cn';
 import { DrawFilm } from '@/ui/components/DrawFilm';
 import { FloatingDoodles } from '@/ui/components/FloatingDoodles';
+import { SnowLayer } from '@/ui/components/Snowfall';
 import { StoreBadges } from '@/ui/components/StoreBadge';
 
 /**
@@ -105,7 +106,8 @@ export default function DrawPage() {
     <>
       {/* ── Hero: the logo, then the app at a glance (store style) and the download buttons ── */}
       <section aria-labelledby="draw-title" className="relative overflow-hidden">
-        <FloatingDoodles tone="warm" />
+        {/* Christmas: crayon snow behind the hero, in place of the floating doodles (founder, 13 Nov 2026) */}
+        {season === 'christmas' ? <SnowLayer scope="section" /> : <FloatingDoodles tone="warm" />}
         <div className="relative z-10 mx-auto grid max-w-6xl items-center gap-9 px-6 pb-14 pt-6 md:grid-cols-[1fr_1.15fr] md:gap-14 md:pb-20 md:pt-14">
           <div className="pop-in flex justify-center">
             <div
