@@ -732,6 +732,65 @@ function StudioEditor() {
   const fit = () => setView({ zoom: 1, panX: 0, panY: 0 });
 
   /** The brush slider is in SCREEN px — convert to editing-copy px at the current zoom. */
+  // ── the brush ring: draw, rubber and restore show a circle the size of the mark they make, at the current
+  // zoom (founder, 13 Nov 2026: the crosshair didn't say how big the brush was). Mouse and stylus only —
+  // a finger has no pointer to show. Moved by hand (no re-render per move); hidden off the canvas.
+  const ringRef = useRef<HTMLDivElement>(null);
+  const ringAt = useRef<{ x: number; y: number } | null>(null);
+  const ringPx = (): number | null => {
+    const work = workRef.current;
+    if (!work || comparing) return null;
+    if (tool === 'erase' || tool === 'restore') return brush;
+    if (tool === 'draw') {
+      const [gw, gh] = rotatedSize(work.w, work.h, geo.rotate);
+      return Math.max(1, pen.width * Math.min(gw, gh)) * (Math.abs(viewMatrix(geo).a) || 1);
+    }
+    return null;
+  };
+  const ringSize = useRef(ringPx);
+  ringSize.current = ringPx;
+  const placeRing = useCallback(() => {
+    const ring = ringRef.current, at = ringAt.current;
+    const d = at ? ringSize.current() : null;
+    if (!ring) return;
+    if (!at || !d) {
+      ring.hidden = true;
+      return;
+    }
+    const size = Math.max(6, d);
+    ring.hidden = false;
+    ring.style.width = ring.style.height = `${size}px`;
+    ring.style.transform = `translate(${at.x - size / 2}px, ${at.y - size / 2}px)`;
+  }, []);
+  useEffect(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const move = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') {
+        ringAt.current = null;
+      } else {
+        const r = cv.getBoundingClientRect();
+        ringAt.current = { x: e.clientX - r.left, y: e.clientY - r.top };
+      }
+      placeRing();
+    };
+    const leave = () => {
+      ringAt.current = null;
+      placeRing();
+    };
+    cv.addEventListener('pointermove', move);
+    cv.addEventListener('pointerdown', move);
+    cv.addEventListener('pointerleave', leave);
+    return () => {
+      cv.removeEventListener('pointermove', move);
+      cv.removeEventListener('pointerdown', move);
+      cv.removeEventListener('pointerleave', leave);
+    };
+  }, [ready, placeRing]);
+  // the size slider, a zoom or a new tool resizes the ring where it is
+  useEffect(() => placeRing(), [brush, pen.width, view, tool, geo, comparing, placeRing]);
+  const ringTool = !comparing && (tool === 'draw' || tool === 'erase' || tool === 'restore');
+
   const brushInImage = () => {
     const work = workRef.current!;
     const scale = viewMatrix(geo).a; // geometry-space units per image px are 1
@@ -1300,13 +1359,22 @@ function StudioEditor() {
               onWheel={onWheel}
               aria-label="your drawing — use the tools to edit it"
               className="absolute inset-0 touch-none select-none"
-              style={{ cursor: tool === 'removeColour' || tool === 'draw' ? 'crosshair' : tool === 'erase' || tool === 'restore' ? 'cell' : tool === 'text' ? 'text' : tool === 'select' ? 'move' : 'grab' }}
+              style={{ cursor: ringTool ? 'none' : tool === 'removeColour' ? 'crosshair' : tool === 'text' ? 'text' : tool === 'select' ? 'move' : 'grab' }}
             />
           ) : (
             <div role="status" className="flex h-full items-center justify-center text-sm text-ink-soft">
               <span className="animate-pulse">getting your drawing ready…</span>
             </div>
           )}
+          {/* the brush ring (see ringPx): white edge outside, cocoa inside, so it shows on any picture */}
+          {ready ? (
+            <div
+              ref={ringRef}
+              hidden
+              aria-hidden
+              className="pointer-events-none absolute left-0 top-0 rounded-full border-[1.5px] border-cocoa shadow-[0_0_0_1px_rgb(255_255_255/0.9),inset_0_0_0_1px_rgb(255_255_255/0.6)]"
+            />
+          ) : null}
           {/* the WORDS EDITOR: typing happens in the box on the picture — same font, size, colour and
               angle as it prints (texture shows again when you're done). Always mounted while a words
               tool is up, so a tap can focus it at once and the keyboard comes up. */}
