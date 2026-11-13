@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { AuthzError, canContributeCreations, type ViewerContext } from '@/authz';
 import { assets, children, storageObjects } from '@/db/schema';
-import { getS3, originalKey, putObject, stripExif } from '@/storage';
+import { getS3, ImageTooLargeError, originalKey, putObject, stripExif } from '@/storage';
 import type { DbHandle } from './db';
 import { moderateAndRecord, type UploadModerationStatus } from './moderation';
 import { runAfterResponse, type Scheduler } from './background';
@@ -19,6 +19,27 @@ export function devUploadsAreFixtures(env: Record<string, string | undefined> = 
 }
 
 export type AssetKind = 'DRAWING' | 'PHOTO';
+
+/**
+ * The bytes aren't a picture we can read (cut short, or not an image at all). Its own error so a caller
+ * can tell "a bad picture" from "our storage or database is having trouble" — the first is the sender's
+ * to fix, the second is ours and must never be passed off as the first.
+ */
+export class UnreadableImageError extends Error {
+  constructor() {
+    super('unreadable image');
+    this.name = 'UnreadableImageError';
+  }
+}
+
+/** EXIF/GPS gone before storage. Anything that isn't a readable picture is one of the two picture errors. */
+async function sanitise(buffer: Buffer) {
+  try {
+    return await stripExif(buffer);
+  } catch (e) {
+    throw e instanceof ImageTooLargeError ? e : new UnreadableImageError();
+  }
+}
 
 export interface IngestInput {
   familyId: string;
@@ -85,7 +106,7 @@ export async function ingestOriginalAsset(
     controllerAccountId = child.controllerAccountId; // the controlling parent
   }
 
-  const sanitised = await stripExif(input.buffer); // EXIF/GPS gone before storage
+  const sanitised = await sanitise(input.buffer); // EXIF/GPS gone before storage
   const assetId = randomUUID();
   const key = originalKey(assetId);
   await putObject(key, sanitised.buffer, sanitised.contentType);
@@ -151,7 +172,7 @@ export async function ingestEphemeralUpload(
   input: { buffer: Buffer; kind: AssetKind; termsVersion: string; now?: Date },
   screening?: ScreeningOptions,
 ): Promise<EphemeralIngestResult> {
-  const sanitised = await stripExif(input.buffer); // EXIF/GPS gone before storage
+  const sanitised = await sanitise(input.buffer); // EXIF/GPS gone before storage
   const assetId = randomUUID();
   const claimId = randomUUID();
   const key = originalKey(assetId);

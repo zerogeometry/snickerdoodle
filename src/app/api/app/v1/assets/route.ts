@@ -9,12 +9,16 @@ import { appJson, withAppViewer } from '@/server/app/http';
  * clientRef? (the app's drawing id, ≤64 [A-Za-z0-9_-]; a repeat from the same family → 200 with the
  * existing { assetId, kept }, never a duplicate; 422 { reason: 'clientRef' } if malformed).
  * Off until DRAW_APP_UPLOADS=on (the Children's Code sign-off) — 403 { reason: 'not-yet' }.
+ * 422 { reason: 'body' } when the form itself can't be read; 422/415 'image' when the picture can't;
+ * 413 'too-big' over 20 MB. Our own trouble (storage, database) is a 500 'server', never 'image'.
  */
 export const POST = withAppViewer(async ({ req, db, av }) => {
   const length = Number(req.headers.get('content-length') ?? 0);
-  if (length > APP_UPLOAD_MAX_BYTES + 64 * 1024) throw new AppApiError(413, 'too-big');
+  if (length > APP_UPLOAD_MAX_BYTES + 64 * 1024) throw new AppApiError(413, 'too-big', `content-length ${length}`);
   const form = await req.formData().catch(() => null);
-  if (!form) throw new AppApiError(422, 'image');
+  // the body isn't a multipart form we can read (cut short on the way, or the wrong shape): its own
+  // reason, so it's never mistaken for a bad picture
+  if (!form) throw new AppApiError(422, 'body', `unreadable form: content-length ${length}, ${(req.headers.get('content-type') ?? 'no content-type').split(';')[0]}`);
   const image = form.get('image');
   const res = await keepAppDrawing(db, av, {
     image: image instanceof Blob ? image : null,

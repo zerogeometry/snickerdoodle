@@ -58,6 +58,12 @@ const nextConfig: NextConfig = {
     // photos — so raise it. (keepCreation independently guards at 25MB; we stay
     // under that with headroom for multipart overhead.)
     serverActions: { bodySizeLimit: '20mb' },
+    // Every request passes through the proxy (src/proxy.ts), and Next keeps only the first 10 MB of a
+    // body that does unless told otherwise: the rest is silently cut off. Snickerdoodle Draw sends a
+    // print-size drawing (up to 20 MB, APP_UPLOAD_MAX_BYTES) to /api/app/v1/assets, so a big one arrived
+    // cut short and was refused as "not a picture" (founder's iPad, 12 Nov 2026). 25 MB is Caddy's own
+    // cap (infra/aws-london/Caddyfile), so nothing bigger reaches the app anyway.
+    proxyClientMaxBodySize: '25mb',
   },
 };
 
