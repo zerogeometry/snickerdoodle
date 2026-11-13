@@ -60,7 +60,7 @@ export const DRAW_VIDEO: { src: string | null; poster: string; width: number; he
   title: 'a little film about Snickerdoodle Draw',
 };
 
-/** "A peek inside" (founder, 13 Nov 2026: these three, in this order): a sample child, "Ellie", no real child's
+/** "A peek inside" (founder, 13 Nov 2026: these, in this order; the last four added the same evening): a sample child, "Ellie", no real child's
  * data. Phone and tablet shots side by side, so each carries its own size; the row lines them up by height. */
 export const DRAW_SCREENSHOTS: { src: string; alt: string; caption: string; width: number; height: number }[] = [
   {
@@ -81,6 +81,34 @@ export const DRAW_SCREENSHOTS: { src: string; alt: string; caption: string; widt
     src: '/draw/screens/phone-levelled-up.webp',
     alt: 'You levelled up! Five little drawings taped inside a gold frame, above the smiling Snickerdoodle face.',
     caption: 'levelling up',
+    width: 600,
+    height: 1303,
+  },
+  {
+    src: '/draw/screens/tablet-learn.webp',
+    alt: "Learn to draw on a tablet: the Doodle Garden's path of little drawings, from a happy sun and party balloons to a spotty ladybird, with the other worlds listed alongside.",
+    caption: '366 lessons',
+    width: 1200,
+    height: 900,
+  },
+  {
+    src: '/draw/screens/phone-drawings.webp',
+    alt: "Ellie's drawings on a phone: a pizza slice, snowy mountains, a prickly hedgehog and an ice cream, taped up like polaroids and kept safe on the device.",
+    caption: 'all their drawings',
+    width: 600,
+    height: 1303,
+  },
+  {
+    src: '/draw/screens/tablet-rewards.webp',
+    alt: 'Rewards on a tablet: 10 drawing days, 3 weeks in a row, a sticker, the artist ranks from Doodler to Master Artist, and a stamp for each world.',
+    caption: 'drawing days add up',
+    width: 1200,
+    height: 900,
+  },
+  {
+    src: '/draw/screens/phone-draw.webp',
+    alt: 'Free drawing on a phone: a crayon sun, two balloons and wavy sea, with colours, undo and a done button.',
+    caption: 'draw anything',
     width: 600,
     height: 1303,
   },
