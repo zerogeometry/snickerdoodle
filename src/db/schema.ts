@@ -130,6 +130,8 @@ export const auditEvent = pgEnum('audit_event', [
   'APP_PROGRESS_DELETED',
   // a family-calendar date added / changed / removed (today: from Snickerdoodle Draw's shared list)
   'OCCASION_CHANGED',
+  // the admin app opened a customer's personal details (an order's address, a message's email) — who, when, which
+  'ADMIN_PERSONAL_DATA_VIEWED',
 ]);
 
 /** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
@@ -529,6 +531,15 @@ export const orders = pgTable(
     shippingMethod: text('shipping_method'),
     // Latest shipment info from the status sync: carrier + tracking number/url.
     tracking: jsonb('tracking').$type<{ carrier?: string | null; number?: string | null; url?: string | null } | null>(),
+    // ── money back (the admin app, 16 Nov 2026): what Stripe tells us after payment ──
+    // The Stripe payment behind the order (from the paid session), so a refund or chargeback finds its order.
+    stripePaymentIntent: text('stripe_payment_intent'),
+    // Refunded so far (pence, Stripe's running total) and when it last changed. A FULL refund of an order not yet
+    // at Prodigi cancels it, so it never prints (src/payments/webhook.ts).
+    refundedPence: integer('refunded_pence').notNull().default(0),
+    refundedAt: timestamp('refunded_at', { withTimezone: true }),
+    // A chargeback: Stripe's dispute id, its status and reason, the amount, and the deadline to answer by.
+    dispute: jsonb('dispute').$type<{ id: string; status: string; reason: string | null; amountPence: number; dueBy: string | null; openedAt: string; closedAt?: string | null } | null>(),
     // The last submission failure (order stays PAID + claimable for retry).
     submitError: text('submit_error'),
     // When the PAID→FULFILLING claim was taken — keys the stale-claim recovery sweep
@@ -1265,4 +1276,28 @@ export const appCheckoutGrants = pgTable('app_checkout_grants', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   usedAt: timestamp('used_at', { withTimezone: true }),
   createdAt,
+});
+
+// ── the admin app (16 Nov 2026, project-office/briefs/ADMIN-APP-plan.md) ─────────────────────────────
+
+/** The latest word on one thing the team watches: the box's watchdog, the weekly Prodigi check, each scheduled
+ * job's last run. Counts and names of checks only, never personal data. One row per key, overwritten. */
+export const opsStatus = pgTable('ops_status', {
+  key: text('key').primaryKey(),
+  ok: boolean('ok').notNull(),
+  summary: jsonb('summary').$type<{ problems?: string[]; note?: string; [k: string]: unknown }>(),
+  checkedAt: timestamp('checked_at', { withTimezone: true }).notNull(),
+});
+
+/** What the team has been told about, so an urgent email goes ONCE per problem (and "resolved" once it clears).
+ * The key names the problem (dispute:<id>, order-stuck:<order ref>:paid …): references only, never personal data. */
+export const opsAlerts = pgTable('ops_alerts', {
+  key: text('key').primaryKey(),
+  kind: text('kind').notNull(),
+  firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+  emailedAt: timestamp('emailed_at', { withTimezone: true }),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  /** A person dealt with it ("done" on the Today screen): it stays off the list until the problem changes. */
+  handledAt: timestamp('handled_at', { withTimezone: true }),
 });

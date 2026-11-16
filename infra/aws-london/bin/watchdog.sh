@@ -100,4 +100,19 @@ if [ "${#send[@]}" -gt 0 ]; then
   alert "$(printf '%s\n' "${send[@]}")"
 fi
 [ "${#problems[@]}" -eq 0 ] && log "watchdog: all well"
+
+# ── tell the admin app (its health screen and Today list): the problems' words, or an empty list ────
+if [ "$busy" = 0 ] && [ -r "$RUN_DIR/jobs_secret" ]; then
+  items=()
+  for p in "${problems[@]}"; do
+    msg="${p#*|}"
+    msg="${msg//\\/\\\\}" # JSON: backslashes, then quotes (the messages are our own words above)
+    items+=("\"${msg//\"/\\\"}\"")
+  done
+  json="{\"problems\":[$(IFS=,; echo "${items[*]}")]}"
+  curl -fsS --max-time 10 -X POST -H 'content-type: application/json' \
+    -H "authorization: Bearer $(cat "$RUN_DIR/jobs_secret")" \
+    --data "$json" http://127.0.0.1:3000/api/jobs/health-report >/dev/null 2>&1 \
+    || log "watchdog: could not report to the admin app"
+fi
 exit 0

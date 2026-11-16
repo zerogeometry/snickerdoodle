@@ -4,6 +4,7 @@ import { orders, webhookEvents } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { markOrderPaid } from '@/server/orders';
 import { expireAbandonedCheckouts } from '@/server/retention';
+import { recordDispute, recordRefund } from './moneyBack';
 
 /**
  * Verify a Stripe webhook signature. constructEvent recomputes the HMAC locally
@@ -73,6 +74,9 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
         if (payerEmail) {
           await db.update(orders).set({ buyerEmail: payerEmail.toLowerCase() }).where(and(eq(orders.id, order.id), isNull(orders.buyerEmail)));
         }
+        // The payment behind it, so a later refund or chargeback finds this order (src/payments/moneyBack.ts).
+        const intent = typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent?.id ?? null);
+        if (intent) await db.update(orders).set({ stripePaymentIntent: intent }).where(and(eq(orders.id, order.id), isNull(orders.stripePaymentIntent)));
         if (sessionIsPaid(session)) {
           await markOrderPaid(db, order.id);
           handled = true;
@@ -87,6 +91,19 @@ export async function handleStripeEvent(db: DbHandle, event: Stripe.Event): Prom
   if (event.type === 'checkout.session.expired') {
     const session = event.data.object as Stripe.Checkout.Session;
     if (session.id) handled = (await expireAbandonedCheckouts(db, { stripeSessionId: session.id })).length > 0;
+  }
+
+  // Money going back (the admin app, 16 Nov 2026): a refund is recorded, and a FULL refund of an order not yet
+  // at Prodigi cancels it; a chargeback is recorded with its deadline. The admin app shows both.
+  if (event.type === 'charge.refunded') {
+    const r = await recordRefund(db, event.data.object as Stripe.Charge);
+    handled = !!r;
+    if (r) console.log(`[payments] refund recorded on ${r.ref}${r.cancelled ? ' (cancelled before printing)' : ''}`);
+  }
+  if (event.type === 'charge.dispute.created' || event.type === 'charge.dispute.updated' || event.type === 'charge.dispute.closed') {
+    const r = await recordDispute(db, event.data.object as Stripe.Dispute, event.type === 'charge.dispute.closed');
+    handled = !!r;
+    if (r) console.log(`[payments] chargeback ${event.type.split('.').pop()} on ${r.ref}`);
   }
 
   await db.insert(webhookEvents).values({ id: event.id, type: event.type }).onConflictDoNothing();
