@@ -9,7 +9,8 @@ import type { NextConfig } from 'next';
  *    navigation, not a form);
  *  - nosniff: an uploaded file is never sniffed into something executable;
  *  - Referrer-Policy: a gift-link / invite token in a URL never leaks to another site;
- *  - Permissions-Policy: the camera is ours only (CameraCapture); no mic, location or payment API;
+ *  - Permissions-Policy: the camera is ours only (CameraCapture, the webcam window on computers —
+ *    phones open their own camera app, which needs no permission here); no mic, location or payment API;
  *  - HSTS: HTTPS only, for a year (no includeSubDomains/preload until every subdomain is HTTPS).
  * The Content-Security-Policy itself (scripts by per-request nonce, plus the framing/base/object/
  * form rules) is set by the proxy (src/proxy.ts) — src/lib/csp.ts builds it. The only responses the

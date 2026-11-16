@@ -11,6 +11,7 @@ import { ExamplePolaroid } from '@/ui/components/ExamplePolaroid';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { BasketButton } from '@/ui/components/BasketButton';
 import { CameraCapture } from '@/ui/components/CameraCapture';
+import { hasCameraApp, NATIVE_CAMERA_INPUT } from '@/lib/nativeCamera';
 import { FlowCatalogue } from '@/ui/components/FlowCatalogue';
 import { FlowHeader } from '@/ui/components/FlowHeader';
 import { AccountNav } from '@/ui/components/AccountNav';
@@ -45,6 +46,7 @@ export default function StartCreatingPage() {
   const setAspect = useUpload((s) => s.setAspect);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
   const [products, setProducts] = useState<CatalogueProduct[] | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -168,10 +170,18 @@ export default function StartCreatingPage() {
 
   const onFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // the same picture (or another snap) can come in again
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => applyUpload(String(reader.result), file.name);
     reader.readAsDataURL(file);
+  };
+
+  // "use camera": a phone or tablet opens its OWN camera app (the photo then takes the very same road as
+  // an upload — onFile above); a computer has none, so it gets the in-page webcam window (src/lib/nativeCamera.ts)
+  const takePhoto = () => {
+    if (hasCameraApp()) cameraRef.current?.click();
+    else setCameraOpen(true);
   };
 
   // ── ONE-TAP "remove background" (founder, 26 Oct): the drawing, lifted off its paper and tidied in one
@@ -252,6 +262,7 @@ export default function StartCreatingPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-oat">
       <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
+      <input ref={cameraRef} {...NATIVE_CAMERA_INPUT} onChange={onFile} className="hidden" aria-hidden tabIndex={-1} data-testid="camera-input" />
       <CameraCapture
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
@@ -303,7 +314,7 @@ export default function StartCreatingPage() {
                 <Icon icon={IconUpload} size={28} className="md:size-[18px]" />
                 <span className="sr-only md:not-sr-only">upload a drawing</span>
               </Button>
-              <Button variant="secondary" size="lg" className="flex-1 md:flex-none" onClick={() => setCameraOpen(true)}>
+              <Button variant="secondary" size="lg" className="flex-1 md:flex-none" onClick={takePhoto}>
                 <Icon icon={IconCamera} size={28} className="md:size-[18px]" />
                 <span className="sr-only md:not-sr-only">use camera</span>
               </Button>
