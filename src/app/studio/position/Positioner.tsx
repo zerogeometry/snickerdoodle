@@ -23,6 +23,9 @@ import {
   MAX_ZOOM,
   MIN_SCALE,
   mmToPx,
+  panOffset,
+  panReach,
+  panTravel,
   type Rotation,
   type Transform,
 } from '@/server/print/geometry';
@@ -45,9 +48,14 @@ import type { StudioData } from '@/server/studio';
 const MAX_PREVIEW_W = 680;
 const SSR_PREVIEW_W = 420;
 const SSR_MAX_PREVIEW_H = 640;
-const SNAP_OFFSET = 0.07; // |offset| within this of centre snaps to 0 (with a guide flash)
-const FIT_SNAP = 0.03; // scale within 3% of "fit" snaps back to the contain sentinel
-const NUDGE = 0.05; // arrow-key offset step (Shift = ×4)
+// FINER STEPS (founder, 16 Nov 2026: "finer increments … greater flexibility"):
+const SNAP_PX = 0.012; // a drag that lands within 1.2% of the canvas of centre snaps to it (with a guide flash)
+const SNAP_OFFSET = 0.02; // the repeat-pattern products' shift: within this of 0 snaps to it
+const FIT_SNAP = 0.012; // scale within 1.2% of "fit" snaps back to the contain sentinel
+const NUDGE = 0.01; // arrow-key move: 1% of the canvas a press (Shift = ×5)
+const NUDGE_BIG = 5;
+const ZOOM_KEY = 1.03; // +/− zoom 3% a press (Shift = 10%)
+const ZOOM_KEY_BIG = 1.1;
 const DOUBLE_TAP_MS = 300;
 const HISTORY_COALESCE_MS = 800; // slider drags / key bursts collapse into one undo entry
 
@@ -183,7 +191,6 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const [dragging, setDragging] = useState(false);
   const [snapAxis, setSnapAxis] = useState<{ x: boolean; y: boolean }>({ x: false, y: false });
   const snapAxisRef = useRef(snapAxis);
-  const hintedRef = useRef(false);
   const lastTapRef = useRef(0);
   const gestureRef = useRef<null | {
     pointers: Map<number, { x: number; y: number; startX: number; startY: number }>;
@@ -345,7 +352,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     // Prefer full print-ready; from BLOCK, falling back to the least this product needs
     // where it's seen (minimumDpi) still un-blocks the order honestly. The
     // 0.995 nudges the landing safely inside the boundary against px rounding.
-    const floor = lockToCover ? scaleFloor : Math.max(fitScale / 2, MIN_SCALE);
+    const floor = lockToCover ? scaleFloor : Math.max(fitScale / 4, MIN_SCALE);
     const scaleFor = (d: number) => zoomValue * (assess.effectiveDpi / d) * 0.995;
     const ok = scaleFor(assess.requiredDpi);
     const enhance = scaleFor(assess.minimumDpi);
@@ -571,10 +578,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     const src = { width: natural.w, height: natural.h };
     if (bd && !noProductView) {
       const geomPv = { printWidthPx: Math.max(1, Math.round(bd.qw)), printHeightPx: Math.max(1, Math.round(bd.qh)), bleedMm: t.bleedMm, requiredDpi: t.requiredDpi * bd.s };
-      const geom = (probe: Transform) => {
-        const r = computeLayerRect(geomPv, src, probe);
-        return { slackX: Math.abs(r.width - r.canvasWidth), slackY: Math.abs(r.height - r.canvasHeight) };
-      };
+      const geom = (probe: Transform) => panGeom(computeLayerRect(geomPv, src, probe));
       return { geom, pxPerSpace: 1 };
     }
     if (isPattern) {
@@ -582,17 +586,49 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       // that maps a drag 1:1 onto the pattern is one cell.
       const geom = (probe: Transform) => {
         const l = patternLayout(canvasSizePx(t), t.requiredDpi, src, probe);
-        return { slackX: l.cellW, slackY: l.stripH };
+        const c = canvasSizePx(t);
+        return { slackX: l.cellW, slackY: l.stripH, pastX: 0, pastY: 0, spanX: c.width, spanY: c.height };
       };
       return { geom, pxPerSpace: scale };
     }
-    const geom = (probe: Transform) => {
-      const r = computeLayerRect(placeT, src, probe);
-      return { slackX: Math.abs(r.width - r.canvasWidth), slackY: Math.abs(r.height - r.canvasHeight) };
-    };
+    const geom = (probe: Transform) => panGeom(computeLayerRect(placeT, src, probe));
     return { geom, pxPerSpace: scale };
   }, [bd, natural, t, placeT, scale, isPattern, noProductView]);
-  const slackNow = gestureGeom ? gestureGeom.geom(tf) : { slackX: 0, slackY: 0 };
+  const geomNow = gestureGeom ? gestureGeom.geom(tf) : null;
+
+  /**
+   * MOVE from `base` by (dx, dy) — in the view's own px — through the shared geometry: within the slack,
+   * then on past the edge (panTravel), measured at the placement `at` (the new zoom, mid-pinch). A repeat
+   * pattern shifts its phase instead (±½ cell, unchanged). A DRAG lands on centre within SNAP_PX; a key
+   * press (`snap` false) never snaps, so even the finest step moves it.
+   */
+  const panFrom = (base: Transform, dx: number, dy: number, at: Transform = base, snap = true): { offsetX: number; offsetY: number } => {
+    if (!gestureGeom) return { offsetX: base.offsetX, offsetY: base.offsetY };
+    const g = gestureGeom.geom(at);
+    if (isPattern) {
+      const ox = g.slackX > 0 ? Math.max(-1, Math.min(1, base.offsetX + (2 * dx) / g.slackX)) : 0;
+      const oy = g.slackY > 0 ? Math.max(-1, Math.min(1, base.offsetY + (2 * dy) / g.slackY)) : 0;
+      return snap ? { offsetX: Math.abs(ox) < SNAP_OFFSET ? 0 : ox, offsetY: Math.abs(oy) < SNAP_OFFSET ? 0 : oy } : { offsetX: ox, offsetY: oy };
+    }
+    const axis = (o: number, d: number, slack: number, past: number, span: number) => {
+      const travel = panTravel(o, slack, past) + d;
+      return snap && Math.abs(travel) < SNAP_PX * span ? 0 : panOffset(travel, slack, past);
+    };
+    return { offsetX: axis(base.offsetX, dx, g.slackX, g.pastX, g.spanX), offsetY: axis(base.offsetY, dy, g.slackY, g.pastY, g.spanY) };
+  };
+  /** A move slider runs across the whole reach, in travel (so equal steps move it equally, and there's no
+   * dead stretch where the drawing exactly fills the canvas); a repeat pattern's runs its ±½-cell shift. */
+  const sliderOf = (o: number, ax: 'x' | 'y') => {
+    if (!geomNow || isPattern) return o;
+    const [slack, past] = ax === 'x' ? [geomNow.slackX, geomNow.pastX] : [geomNow.slackY, geomNow.pastY];
+    const reach = panReach(slack, past);
+    return reach ? panTravel(o, slack, past) / reach : 0;
+  };
+  const offsetOfSlider = (v: number, ax: 'x' | 'y') => {
+    if (!geomNow || isPattern) return v;
+    const [slack, past] = ax === 'x' ? [geomNow.slackX, geomNow.pastX] : [geomNow.slackY, geomNow.pastY];
+    return panOffset(v * panReach(slack, past), slack, past);
+  };
 
   /** Live pointer deltas → the css-var transform on the image (no re-render). */
   const applyLive = (dxPv: number, dyPv: number, k: number) => {
@@ -651,13 +687,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     const s0 = base.scale === 0 ? fitScale : base.scale;
     let nextScale: number = Math.min(MAX_ZOOM, Math.max(scaleFloor, s0 * k));
     if (!lockToCover && Math.abs(nextScale - fitScale) < fitScale * FIT_SNAP) nextScale = 0;
-    const { slackX, slackY } = gestureGeom.geom({ ...base, scale: nextScale });
-    const dxSpace = dx / gestureGeom.pxPerSpace;
-    const dySpace = dy / gestureGeom.pxPerSpace;
-    let offsetX = slackX > 0 ? Math.max(-1, Math.min(1, base.offsetX + (2 * dxSpace) / slackX)) : 0;
-    let offsetY = slackY > 0 ? Math.max(-1, Math.min(1, base.offsetY + (2 * dySpace) / slackY)) : 0;
-    if (Math.abs(offsetX) < SNAP_OFFSET) offsetX = 0; // snap to centre
-    if (Math.abs(offsetY) < SNAP_OFFSET) offsetY = 0;
+    const { offsetX, offsetY } = panFrom(base, dx / gestureGeom.pxPerSpace, dy / gestureGeom.pxPerSpace, { ...base, scale: nextScale });
     return clampTransform({ ...base, scale: nextScale, offsetX, offsetY });
   };
 
@@ -725,39 +755,20 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     const { dx, dy, k } = gestureDeltas();
     if (Math.abs(dx) + Math.abs(dy) > 3 || Math.abs(k - 1) > 0.01) g.moved = true;
 
-    // Dragging at "fit" with no slack: nothing CAN move — say so once, honestly.
-    const { slackX, slackY } = gestureGeom.geom({ ...g.base, scale: g.base.scale === 0 ? 0 : g.base.scale * k });
-    if (g.moved && k === 1 && slackX === 0 && slackY === 0) {
-      if (!hintedRef.current) {
-        hintedRef.current = true;
-        toast('the drawing fills the frame exactly here — zoom in or out a touch to move it around');
-      }
-      return;
-    }
-
-    // Snap-to-centre pinning (drag only): pin the live delta on a snapped axis so the
-    // image visibly clicks to centre, with a guide flash.
-    let liveDx = slackX > 0 ? dx : 0;
-    let liveDy = slackY > 0 ? dy : 0;
+    // The live picture moves exactly where the drop will land (the shared geometry): to the reach of
+    // the range (past the edge too), clicking to centre with a guide flash.
+    let liveDx = dx;
+    let liveDy = dy;
     let snapX = false;
     let snapY = false;
-    if (k === 1) {
-      const slackPvX = slackX * gestureGeom.pxPerSpace;
-      const slackPvY = slackY * gestureGeom.pxPerSpace;
-      if (slackX > 0) {
-        const o = g.base.offsetX + (2 * (dx / gestureGeom.pxPerSpace)) / slackX;
-        if (Math.abs(o) < SNAP_OFFSET) {
-          liveDx = (-g.base.offsetX * slackPvX) / 2;
-          snapX = true;
-        }
-      }
-      if (slackY > 0) {
-        const o = g.base.offsetY + (2 * (dy / gestureGeom.pxPerSpace)) / slackY;
-        if (Math.abs(o) < SNAP_OFFSET) {
-          liveDy = (-g.base.offsetY * slackPvY) / 2;
-          snapY = true;
-        }
-      }
+    if (k === 1 && !isPattern) {
+      const pps = gestureGeom.pxPerSpace;
+      const geo = gestureGeom.geom(g.base);
+      const next = panFrom(g.base, dx / pps, dy / pps);
+      liveDx = (panTravel(next.offsetX, geo.slackX, geo.pastX) - panTravel(g.base.offsetX, geo.slackX, geo.pastX)) * pps;
+      liveDy = (panTravel(next.offsetY, geo.slackY, geo.pastY) - panTravel(g.base.offsetY, geo.slackY, geo.pastY)) * pps;
+      snapX = next.offsetX === 0 && dx !== 0;
+      snapY = next.offsetY === 0 && dy !== 0;
     }
     if (snapX !== snapAxisRef.current.x || snapY !== snapAxisRef.current.y) {
       snapAxisRef.current = { x: snapX, y: snapY };
@@ -804,7 +815,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
 
   // Keyboard equivalents (WCAG 2.5.1/2.5.7): every gesture has a key.
   const onCanvasKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const step = e.shiftKey ? NUDGE * 4 : NUDGE;
+    // a press moves 1% of the canvas (Shift: 5%), through the shared geometry — past the edge too
+    const nudge = (sx: number, sy: number) => {
+      const span = geomNow ? { x: geomNow.spanX, y: geomNow.spanY } : { x: 0, y: 0 };
+      const k = (e.shiftKey ? NUDGE_BIG : 1) * NUDGE;
+      update((prev) => (isPattern ? { offsetX: prev.offsetX + sx * k * 2, offsetY: prev.offsetY + sy * k * 2 } : panFrom(prev, sx * k * span.x, sy * k * span.y, prev, false)));
+    };
     const key = e.key;
     if ((e.ctrlKey || e.metaKey) && (key === 'z' || key === 'Z')) {
       e.preventDefault();
@@ -814,24 +830,24 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     }
     switch (key) {
       case 'ArrowLeft':
-        update((prev) => ({ offsetX: prev.offsetX - step }));
+        nudge(-1, 0);
         break;
       case 'ArrowRight':
-        update((prev) => ({ offsetX: prev.offsetX + step }));
+        nudge(1, 0);
         break;
       case 'ArrowUp':
-        update((prev) => ({ offsetY: prev.offsetY - step }));
+        nudge(0, -1);
         break;
       case 'ArrowDown':
-        update((prev) => ({ offsetY: prev.offsetY + step }));
+        nudge(0, 1);
         break;
       case '+':
       case '=':
-        zoomBy(1.08);
+        zoomBy(e.shiftKey ? ZOOM_KEY_BIG : ZOOM_KEY);
         break;
       case '-':
       case '_':
-        zoomBy(1 / 1.08);
+        zoomBy(1 / (e.shiftKey ? ZOOM_KEY_BIG : ZOOM_KEY));
         break;
       case 'r':
       case 'R':
@@ -1363,30 +1379,29 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               onChange={(v) =>
                 filledDefault
                   ? update({ scale: Math.max(scaleFloor, v) }) // frame: floor at cover; mug: floor at MIN_SCALE (can reach contain)
-                  : update({ scale: Math.abs(v - fitScale) < fitScale * 0.015 ? 0 : v })
+                  : update({ scale: Math.abs(v - fitScale) < fitScale * 0.006 ? 0 : v })
               }
             />
+            {/* across the WHOLE reach (to past the edge), in fine steps — never a dead stretch */}
             <Slider
               label="Left / right"
               min={-1}
               max={1}
-              step={0.05}
-              value={tf.offsetX}
-              onChange={(v) => update({ offsetX: v })}
+              step={0.002}
+              value={sliderOf(tf.offsetX, 'x')}
+              onChange={(v) => update({ offsetX: offsetOfSlider(v, 'x') })}
               format={() => ''}
-              disabled={slackNow.slackX === 0}
-              disabledHint="zoom in or out to move it sideways"
+              dataOffset={tf.offsetX}
             />
             <Slider
               label="Up / down"
               min={-1}
               max={1}
-              step={0.05}
-              value={tf.offsetY}
-              onChange={(v) => update({ offsetY: v })}
+              step={0.002}
+              value={sliderOf(tf.offsetY, 'y')}
+              onChange={(v) => update({ offsetY: offsetOfSlider(v, 'y') })}
               format={() => ''}
-              disabled={slackNow.slackY === 0}
-              disabledHint="zoom in or out to move it up or down"
+              dataOffset={tf.offsetY}
             />
             <button
               type="button"
@@ -1481,16 +1496,16 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
  *    cover (0.5) so it can't letterbox; the mug's floor is MIN_SCALE, so it can zoom DOWN through
  *    contain (which reads ~0.4–0.5×) to reveal the drawing's full height.
  *  - otherwise: "fit the whole image" sits at the CENTRE of the track — left half
- *    fit/2 → fit (more margin), right half fit → 4× (crop). Shown relative to fit.
+ *    fit/4 → fit (more margin), right half fit → MAX_ZOOM (crop). Shown relative to fit.
  */
 function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; value: number; filled: boolean; floor: number; onChange: (v: number) => void }) {
   const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
   const toT = filled
     ? (v: number) => (v - floor) / (MAX_ZOOM - floor || 1)
-    : (v: number) => (v <= fit ? (0.5 * (v - fit / 2)) / (fit - fit / 2 || 1) : 0.5 + (0.5 * (v - fit)) / (MAX_ZOOM - fit || 1));
+    : (v: number) => (v <= fit ? (0.5 * (v - fit / 4)) / (fit - fit / 4 || 1) : 0.5 + (0.5 * (v - fit)) / (MAX_ZOOM - fit || 1));
   const fromT = filled
     ? (raw: number) => floor + raw * (MAX_ZOOM - floor)
-    : (raw: number) => (raw <= 0.5 ? fit / 2 + (raw / 0.5) * (fit - fit / 2) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
+    : (raw: number) => (raw <= 0.5 ? fit / 4 + (raw / 0.5) * (fit - fit / 4) : fit + ((raw - 0.5) / 0.5) * (MAX_ZOOM - fit));
   const shown = filled ? value : value / fit; // filled: cover (scale 1) reads as 1.0×
   return (
     <label className="flex items-center gap-2">
@@ -1499,7 +1514,7 @@ function ZoomSlider({ fit, value, filled, floor, onChange }: { fit: number; valu
         type="range"
         min={0}
         max={1}
-        step={0.005}
+        step={0.001}
         value={clamp01(toT(value))}
         aria-label="Zoom"
         onChange={(e) => onChange(fromT(Number(e.target.value)))}
@@ -1521,6 +1536,7 @@ function Slider({
   format,
   disabled = false,
   disabledHint,
+  dataOffset,
 }: {
   label: string;
   min: number;
@@ -1532,6 +1548,8 @@ function Slider({
   /** Honest disabling: at "fit" there is no pan slack, so the slider would do nothing. */
   disabled?: boolean;
   disabledHint?: string;
+  /** the placement's own offset this slider sets (for tests — the track runs in travel) */
+  dataOffset?: number;
 }) {
   return (
     <label className={`flex items-center gap-2 ${disabled ? 'opacity-45' : ''}`} title={disabled ? disabledHint : undefined}>
@@ -1544,6 +1562,7 @@ function Slider({
         value={value}
         aria-label={disabled && disabledHint ? `${label} — ${disabledHint}` : label}
         disabled={disabled}
+        data-offset={dataOffset}
         onChange={(e) => onChange(Number(e.target.value))}
         // 44px tall to touch (the native track stays thin, centred) — CLAUDE.md tap targets
         className="h-11 min-w-0 flex-1 cursor-pointer accent-cinnamon disabled:cursor-default"
@@ -1582,4 +1601,17 @@ function sockOutlinePath(sock: SockSide, w: number, h: number): string {
     return `M${rows.map((p) => `${X(p.l)} ${p.y}`).join(' L')} L${[...rows].reverse().map((p) => `${X(p.rt)} ${p.y}`).join(' L')} Z`;
   };
   return `${side(false)} ${side(true)}`;
+}
+
+/** A placement's move range on one view: the slack, how far it may go past the edge (the smaller of the
+ * drawn size and the canvas) and the canvas itself — the inputs to panTravel / panOffset. */
+function panGeom(r: { width: number; height: number; canvasWidth: number; canvasHeight: number }) {
+  return {
+    slackX: Math.abs(r.width - r.canvasWidth),
+    slackY: Math.abs(r.height - r.canvasHeight),
+    pastX: Math.min(r.width, r.canvasWidth),
+    pastY: Math.min(r.height, r.canvasHeight),
+    spanX: r.canvasWidth,
+    spanY: r.canvasHeight,
+  };
 }

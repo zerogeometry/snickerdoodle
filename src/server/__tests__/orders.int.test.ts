@@ -240,8 +240,8 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, oi!.id));
     expect(art!.assetId).toBe(asset!.id);
     expect(art!.controllerAccountId).toBe(ids.samId);
-    // the client's wild transform was CLAMPED server-side (scale 99→4, offset 5→1, rotation 44→0)
-    expect(art!.transform).toMatchObject({ scale: 4, offsetX: 1, offsetY: -1, rotationDeg: 0 });
+    // the client's wild transform was CLAMPED server-side (scale 99→MAX_ZOOM 8, offset 5→MAX_OFFSET 2, rotation 44→0)
+    expect(art!.transform).toMatchObject({ scale: 8, offsetX: 2, offsetY: -2, rotationDeg: 0 });
     expect((art!.templateSnapshot as { requiredDpi: number }).requiredDpi).toBe(300); // template frozen
     expect(art!.status).toBe('PENDING'); // awaiting the fulfilment worker; the PAID order is the enqueue
   });
