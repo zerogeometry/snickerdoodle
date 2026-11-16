@@ -6,6 +6,13 @@ import type { SyncReport } from './sync';
  * is missing at Prodigi or a print file no longer matches Prodigi's print area, the support inbox gets a plain
  * list; a clean run sends nothing. Pure — the route sends it.
  */
+/** One plain line per product that needs a look (the admin app's health screen shows the same list). */
+export function prodigiSpecProblems(report: SyncReport): string[] {
+  return report.entries
+    .filter((e) => e.status !== 'ok' || e.warnings.length > 0)
+    .map((e) => `${e.productKey} · ${e.internalSku} (${e.providerSku}): ${e.status === 'missing' ? 'not found at Prodigi' : e.status === 'error' ? 'could not be checked' : e.warnings.join('; ')}`);
+}
+
 export function prodigiSpecAlert(report: SyncReport): { subject: string; text: string } | null {
   const problems = report.entries.filter((e) => e.status !== 'ok' || e.warnings.length > 0);
   if (problems.length === 0) return null;

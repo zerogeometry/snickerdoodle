@@ -407,6 +407,13 @@
       "when": 1794475215041,
       "tag": "0057_session_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1794867999893,
+      "tag": "0058_admin_app",
+      "breakpoints": true
     }
   ]
 }

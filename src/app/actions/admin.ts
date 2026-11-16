@@ -90,5 +90,7 @@ export async function setSupportStatusAction(id: string, status: SupportStatus):
     throw e;
   }
   revalidatePath('/admin/support');
+  revalidatePath('/admin/inbox');
+  revalidatePath('/admin');
   return { ok: true };
 }

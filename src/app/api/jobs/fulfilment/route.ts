@@ -1,4 +1,5 @@
 import { getDb } from '@/db/client';
+import { recordJobRun } from '@/server/admin/health';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { processFulfilment } from '@/fulfillment/worker';
 import { isProdigiConfigured, releaseBlockedArtwork, submitReadyOrders, syncSubmittedOrders } from '@/fulfillment/submit';
@@ -18,7 +19,7 @@ import { screenStalePending } from '@/server/moderation';
  *      Cancelled → CANCELLED.
  * Without a PRODIGI_API_KEY only step 1 runs (the dev loop stays walkable).
  */
-export async function POST(req: Request): Promise<Response> {
+async function run(req: Request): Promise<Response> {
   const denied = requireJobsSecret(req);
   if (denied) return denied;
   const db = getDb();
@@ -67,4 +68,10 @@ export async function POST(req: Request): Promise<Response> {
     );
   }
   return Response.json({ screening, render, released, submit, sync, errors }, { status: errors.length > 0 ? 500 : 200 });
+}
+
+/** The run, and its result recorded for the admin app's health screen (not for a caller without the secret). */
+export async function POST(req: Request): Promise<Response> {
+  const res = await run(req);
+  return res.status === 401 ? res : recordJobRun(getDb(), 'fulfilment', res);
 }
