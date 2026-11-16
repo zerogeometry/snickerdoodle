@@ -14,6 +14,9 @@ import { Icon } from '@/ui/primitives/Icon';
 const CAMERA_VIDEO: MediaTrackConstraints = { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } };
 
 /**
+ * COMPUTERS ONLY since 16 Nov 2026: phones and tablets open their own camera app instead
+ * (src/lib/nativeCamera.ts). A laptop has no camera app, so it keeps this webcam window.
+ *
  * A real camera capture (getUserMedia) — not a file picker. Prefers the rear
  * camera on mobile, falls back to any camera, and degrades gracefully to "upload
  * instead" when there's no camera or permission is denied. The stream is stopped
