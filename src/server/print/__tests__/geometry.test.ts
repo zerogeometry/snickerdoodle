@@ -5,10 +5,15 @@ import {
   clampTransform,
   computeLayerRect,
   containScale,
+  MAX_OFFSET,
   MAX_ZOOM,
   MIN_SCALE,
   MIN_FLOOR_DPI,
   minimumDpi,
+  PAN_PAST_EDGE,
+  panOffset,
+  panReach,
+  panTravel,
   type TemplateGeom,
   type Transform,
 } from '@/server/print/geometry';
@@ -32,8 +37,9 @@ describe('clampTransform — the server-authoritative clamp', () => {
     expect(clampTransform({ scale: 0 }).scale).toBe(0);
     expect(clampTransform({ scale: -3 }).scale).toBe(0);
   });
-  it('clamps offsets to [-1, 1]', () => {
-    expect(clampTransform({ offsetX: -5, offsetY: 5 })).toMatchObject({ offsetX: -1, offsetY: 1 });
+  it('clamps offsets to [-MAX_OFFSET, MAX_OFFSET] (±1 = to the edge, beyond = past it)', () => {
+    expect(clampTransform({ offsetX: -5, offsetY: 5 })).toMatchObject({ offsetX: -MAX_OFFSET, offsetY: MAX_OFFSET });
+    expect(clampTransform({ offsetX: 1.4 }).offsetX).toBe(1.4);
   });
   const rot: Array<[number, number]> = [
     [0, 0],
@@ -194,5 +200,38 @@ describe('minimumDpi — how much detail a print needs depends on how far away i
     // a thumbnail on a big frame: blocked, however far away
     const tiny = assessResolution(frame28x40, { width: 400, height: 571 }, T({ scale: 1 }));
     expect(tiny.decision).toBe('BLOCK');
+  });
+});
+
+describe('movement (founder, 16 Nov 2026): finer, and on past the edge', () => {
+  const box = sq(3000);
+  const src = { width: 1500, height: 1000 };
+  it('every saved placement (|offset| ≤ 1) prints exactly where it did — the slack maths unchanged', () => {
+    for (const o of [-1, -0.5, 0, 0.3, 1]) {
+      const r = computeLayerRect(box, src, T({ scale: 1.5, offsetX: o }));
+      const slack = Math.abs(r.width - r.canvasWidth);
+      expect(Math.abs(r.x + r.width / 2 - (r.canvasWidth / 2 + (o * slack) / 2))).toBeLessThanOrEqual(1); // (whole px)
+    }
+  });
+  it('past ±1 it carries on, by up to half the smaller of drawing and canvas — never entirely off', () => {
+    const small = computeLayerRect(box, src, T({ scale: 0.3, offsetX: MAX_OFFSET }));
+    expect(small.x).toBeLessThan(small.canvasWidth); // still on the canvas…
+    expect(small.x + small.width).toBeGreaterThan(small.canvasWidth); // …hanging off its edge
+    expect(small.canvasWidth - small.x).toBeCloseTo(small.width / 2, -1); // by half of itself
+    const big = computeLayerRect(box, src, T({ scale: 2, offsetX: -MAX_OFFSET }));
+    expect(big.x + big.width).toBeCloseTo(big.canvasWidth / 2, -1); // uncovers at most half the canvas
+  });
+  it('a drawing that exactly fills the canvas can still move (no dead stretch past ±1)', () => {
+    const fill = computeLayerRect(box, { width: 1000, height: 1000 }, T({ scale: 1, offsetX: 1.2 }));
+    expect(fill.x).toBeGreaterThan(0);
+  });
+  it('panOffset undoes panTravel (to the same spot), and stops at the reach', () => {
+    for (const [slack, past] of [[600, 2000], [0, 3000], [1200, 900]] as const)
+      for (const o of [-2, -1.3, -1, -0.4, 0, 0.7, 1, 1.6, 2]) {
+        const d = panTravel(o, slack, past);
+        expect(panTravel(panOffset(d, slack, past), slack, past)).toBeCloseTo(d, 6);
+      }
+    expect(panOffset(1e9, 600, 2000)).toBe(MAX_OFFSET);
+    expect(panReach(600, 2000)).toBeCloseTo(300 + PAN_PAST_EDGE * 2000, 6);
   });
 });
