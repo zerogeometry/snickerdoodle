@@ -7,7 +7,7 @@ import { commissionOwed, isMonth, lastMonth, listCodes, type CodeFilter } from '
 import { AdminEmpty, AdminShell, AdminStat, adminOr404, type AdminReviewer } from '../AdminShell';
 import { CodeList, CommissionPartners, NewCode, SectionError, SectionSkeleton } from './CodesClient';
 
-export const metadata: Metadata = { title: 'codes', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'codes · admin', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 const FILTERS: { id: CodeFilter; label: string }[] = [

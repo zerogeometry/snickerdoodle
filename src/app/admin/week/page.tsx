@@ -8,7 +8,7 @@ import { duration, gbp, parseSpendCsv } from '../../../../scripts/lib/gtm-metric
 import { Button } from '@/ui/primitives/Button';
 import { AdminEmpty, AdminShell, AdminStat, adminOr404, type AdminReviewer } from '../AdminShell';
 
-export const metadata: Metadata = { title: 'this week', robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: 'this week · admin', robots: { index: false, follow: false } };
 export const dynamic = 'force-dynamic';
 
 const SPEND_MAX_CHARS = 2000;

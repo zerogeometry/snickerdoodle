@@ -46,7 +46,12 @@ const reportedSql = sql`(${assets.moderationDetail} -> 'labels') ?| array[${sql.
 )}]`;
 
 /** Everything the needs list looks at, read in one go. */
-export async function gatherNeedFacts(db: DbHandle, now = new Date()): Promise<NeedFacts> {
+/** For tests on a shared database: look only at orders whose number starts with this, and nothing else. */
+export interface NeedScope {
+  orderRefPrefix: string;
+}
+
+export async function gatherNeedFacts(db: DbHandle, now = new Date(), scope?: NeedScope): Promise<NeedFacts> {
   const notSentBefore = new Date(now.getTime() - LIMITS.notSentHours * 3_600_000);
   const recent = new Date(now.getTime() - LIMITS.recentDays * 86_400_000);
 
@@ -126,6 +131,18 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date()): Promise<N
   }
 
   const at = (v: Date | string | null) => (v ? new Date(v) : null);
+  if (scope) {
+    const mine = orderRows.filter((o) => o.ref.startsWith(scope.orderRefPrefix));
+    orderRows.length = 0;
+    orderRows.push(...mine);
+    flagged!.n = 0;
+    if (flaggedProfiles) flaggedProfiles.n = 0;
+    reported!.n = 0;
+    rights.length = 0;
+    support.length = 0;
+    status.length = 0;
+    commission = null;
+  }
   return {
     disputes: orderRows
       .filter((o) => o.dispute)
@@ -140,8 +157,8 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date()): Promise<N
   };
 }
 
-export async function needsYou(db: DbHandle, now = new Date()): Promise<Need[]> {
-  return buildNeeds(await gatherNeedFacts(db, now), now);
+export async function needsYou(db: DbHandle, now = new Date(), scope?: NeedScope): Promise<Need[]> {
+  return buildNeeds(await gatherNeedFacts(db, now, scope), now);
 }
 
 export interface Pulse {

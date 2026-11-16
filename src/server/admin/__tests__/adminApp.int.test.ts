@@ -12,7 +12,7 @@ import { AuthzError, type Reviewer } from '@/authz';
 import { listOrders, orderDetail, retryOrder, revealContact } from '@/server/admin/orders';
 import { inbox, revealRights, setRightsStatus } from '@/server/admin/inbox';
 import { healthView, recordStatus } from '@/server/admin/health';
-import { markHandled, needsYou, pulse } from '@/server/admin/today';
+import { gatherNeedFacts, markHandled, needsYou, pulse } from '@/server/admin/today';
 import { morningEmail, runMorning, runUrgentAlerts } from '@/server/admin/alerts';
 import type { MailMessage } from '@/server/mail';
 import type { DbHandle } from '@/server/db';
@@ -30,6 +30,8 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
   let ids: SeededIds;
   const tag = `T${Date.now().toString(36).toUpperCase()}`;
   const ref = (s: string) => `${tag}-${s}`;
+  // the local database is shared with other suites' leftovers: the Today list is read for this suite's orders only
+  const mine = () => ({ orderRefPrefix: `${tag}-` });
   const admin: Reviewer = { accountId: null, isAdmin: true, mfaVerified: true };
   const noMfa: Reviewer = { accountId: null, isAdmin: true, mfaVerified: false };
   const member: Reviewer = { accountId: null, isAdmin: false, mfaVerified: true };
@@ -102,7 +104,7 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
     await handleStripeEvent(db, event('charge.refunded', { payment_intent: `pi_${tag}_atp`, amount: 3000, amount_refunded: 3000, refunded: true }));
     const [o] = await db.select().from(orders).where(eq(orders.ref, ref('ATP')));
     expect(o!.status).toBe('FULFILLING');
-    expect((await needsYou(db)).map((n) => n.key)).toContain(`order:${ref('ATP')}:refund-at-prodigi`);
+    expect((await needsYou(db, undefined, mine())).map((n) => n.key)).toContain(`order:${ref('ATP')}:refund-at-prodigi`);
   });
 
   it('a chargeback is recorded with its deadline and leads the list until answered', async () => {
@@ -111,25 +113,25 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
     await handleStripeEvent(db, event('charge.dispute.created', { id: `dp_${tag}`, status: 'needs_response', reason: 'fraudulent', amount: 3000, payment_intent: `pi_${tag}_disp`, created: Math.floor(Date.now() / 1000), evidence_details: { due_by: due } }));
     const [o] = await db.select().from(orders).where(eq(orders.ref, ref('DISP')));
     expect(o!.dispute).toMatchObject({ id: `dp_${tag}`, status: 'needs_response', amountPence: 3000, dueBy: new Date(due * 1000).toISOString() });
-    const needs = await needsYou(db);
+    const needs = await needsYou(db, undefined, mine());
     expect(needs[0]!.key).toBe(`dispute:dp_${tag}`);
     await handleStripeEvent(db, event('charge.dispute.updated', { id: `dp_${tag}`, status: 'under_review', reason: 'fraudulent', amount: 3000, payment_intent: `pi_${tag}_disp`, created: Math.floor(Date.now() / 1000) }));
-    expect((await needsYou(db)).map((n) => n.key)).not.toContain(`dispute:dp_${tag}`);
+    expect((await needsYou(db, undefined, mine())).map((n) => n.key)).not.toContain(`dispute:dp_${tag}`);
   });
 
   it('a paid order stuck 3 hours is emailed ONCE; "done" keeps it off; the email has no personal data', async () => {
     await placeOrder('STUCK', { paidAt: new Date(Date.now() - 3 * 3_600_000) });
     const sent: MailMessage[] = [];
     const send = async (m: MailMessage) => void sent.push(m);
-    await runUrgentAlerts(db, { send, env: { APP_URL: 'https://example.test', SUPPORT_INBOX: 'team@example.test' } });
-    const mine = () => sent.filter((m) => m.text.includes(ref('STUCK')));
-    expect(mine()).toHaveLength(1);
-    expect(mine()[0]!.to).toBe('team@example.test');
-    expect(mine()[0]!.text).not.toContain('sam@example.test');
-    await runUrgentAlerts(db, { send });
-    expect(mine()).toHaveLength(1); // once per problem
+    await runUrgentAlerts(db, { send, scope: mine(), env: { APP_URL: 'https://example.test', SUPPORT_INBOX: 'team@example.test' } });
+    const stuckMail = () => sent.filter((m) => m.text.includes(ref('STUCK')));
+    expect(stuckMail()).toHaveLength(1);
+    expect(stuckMail()[0]!.to).toBe('team@example.test');
+    expect(stuckMail()[0]!.text).not.toContain('sam@example.test');
+    await runUrgentAlerts(db, { send, scope: mine() });
+    expect(stuckMail()).toHaveLength(1); // once per problem
     await markHandled(db, admin, `order:${ref('STUCK')}:not-sent`);
-    expect((await needsYou(db)).map((n) => n.key)).not.toContain(`order:${ref('STUCK')}:not-sent`);
+    expect((await needsYou(db, undefined, mine())).map((n) => n.key)).not.toContain(`order:${ref('STUCK')}:not-sent`);
   });
 
   it('the customer’s details are only shown on request, and the look is recorded', async () => {
@@ -149,7 +151,7 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
     const [v] = await db.select({ id: productVariants.id }).from(productVariants).limit(1);
     const [item] = await db.insert(orderItems).values({ orderId: o.id, productKey: 'mug', qty: 1, unitPricePence: 2500, linePence: 2500 }).returning();
     await db.insert(orderItemArtwork).values({ orderItemId: item!.id, variantId: v!.id, controllerAccountId: ids.samId, templateSnapshot: {}, transform: {}, status: 'RENDER_FAILED', renderError: 'too small' });
-    expect((await needsYou(db)).map((n) => n.key)).toContain(`order:${ref('RETRY')}:render-failed`);
+    expect((await needsYou(db, undefined, mine())).map((n) => n.key)).toContain(`order:${ref('RETRY')}:render-failed`);
     expect(await retryOrder(db, admin, ref('RETRY'))).toBe(true);
     const [art] = await db.select().from(orderItemArtwork).where(eq(orderItemArtwork.orderItemId, item!.id));
     expect([art!.status, art!.renderError]).toEqual(['PENDING', null]);
@@ -162,10 +164,10 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
   it('data requests: read (recorded), move along, finish with an outcome', async () => {
     const [r] = await db.insert(rightsRequests).values({ type: 'COMPLAINT', subjectEmail: 'c@example.test', details: 'please stop', dueAt: new Date(Date.now() + 3 * 86_400_000) }).returning();
     rightsIds.push(r!.id);
-    expect((await needsYou(db)).map((n) => n.key)).toContain(`rights:${r!.id}`);
+    expect((await gatherNeedFacts(db)).rights.map((x) => x.id)).toContain(r!.id);
     expect((await revealRights(db, admin, r!.id))!.details).toBe('please stop');
     expect(await setRightsStatus(db, admin, r!.id, 'COMPLETED', 'replied and closed the account')).toBe(true);
-    expect((await needsYou(db)).map((n) => n.key)).not.toContain(`rights:${r!.id}`);
+    expect((await gatherNeedFacts(db)).rights.map((x) => x.id)).not.toContain(r!.id);
     expect(await setRightsStatus(db, admin, r!.id, 'IN_PROGRESS', null)).toBe(false); // finished stays finished
     const events = await db.select({ e: auditRecords.event }).from(auditRecords).where(eq(auditRecords.targetId, r!.id));
     expect(events.map((x) => x.e).sort()).toEqual(['ADMIN_PERSONAL_DATA_VIEWED', 'RIGHTS_REQUEST_COMPLETED']);
@@ -183,7 +185,7 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
   it('health shows each check; a failing one is on Today', async () => {
     await recordStatus(db, 'test:fake', false, { problems: ['made up for a test'] });
     expect((await healthView(db, admin)).checks.find((c) => c.key === 'test:fake')).toMatchObject({ ok: false, problems: ['made up for a test'] });
-    expect((await needsYou(db)).map((n) => n.key)).toContain('site:test:fake');
+    expect((await needsYou(db)).map((n) => n.key)).toContain('site:test:fake'); // (site items are never grouped)
     expect((await pulse(db)).healthy).toBe(false);
   });
 

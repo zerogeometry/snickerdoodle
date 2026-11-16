@@ -4,7 +4,7 @@ import { SUPPORT_EMAIL } from '@/lib/support';
 import { appUrl, sendMail, type MailMessage } from '../mail';
 import type { DbHandle } from '../db';
 import { pounds, waited, type Need } from './needs';
-import { londonDay, londonMidnight, needsYou, PAID_STATES } from './today';
+import { londonDay, londonMidnight, needsYou, PAID_STATES, type NeedScope } from './today';
 
 /**
  * The admin app's emails (project-office/briefs/ADMIN-APP-plan.md):
@@ -39,10 +39,10 @@ export function urgentEmail(items: Need[], now: Date, env?: Record<string, strin
 }
 
 /** The every-5-minutes run: email new urgent problems once; note the ones that have cleared. */
-export async function runUrgentAlerts(db: DbHandle, opts: { now?: Date; send?: Send; env?: Record<string, string | undefined> } = {}): Promise<{ urgent: number; emailed: number; cleared: number }> {
+export async function runUrgentAlerts(db: DbHandle, opts: { now?: Date; send?: Send; env?: Record<string, string | undefined>; scope?: NeedScope } = {}): Promise<{ urgent: number; emailed: number; cleared: number }> {
   const now = opts.now ?? new Date();
   const send = opts.send ?? sendMail;
-  const needs = await needsYou(db, now);
+  const needs = await needsYou(db, now, opts.scope);
   const urgent = needs.filter((n) => n.urgent && n.kind !== 'site');
   const keys = urgent.map((n) => n.key);
   const rows = keys.length ? await db.select().from(opsAlerts).where(inArray(opsAlerts.key, keys)) : [];
@@ -62,7 +62,7 @@ export async function runUrgentAlerts(db: DbHandle, opts: { now?: Date; send?: S
   const cleared = await db
     .update(opsAlerts)
     .set({ resolvedAt: now })
-    .where(and(isNotNull(opsAlerts.emailedAt), isNull(opsAlerts.resolvedAt), keys.length ? notInArray(opsAlerts.key, keys) : sql`true`))
+    .where(and(isNotNull(opsAlerts.emailedAt), isNull(opsAlerts.resolvedAt), keys.length ? notInArray(opsAlerts.key, keys) : sql`true`, opts.scope ? sql`${opsAlerts.key} like ${'%' + opts.scope.orderRefPrefix + '%'}` : sql`true`))
     .returning({ key: opsAlerts.key });
   return { urgent: urgent.length, emailed: fresh.length, cleared: cleared.length };
 }
