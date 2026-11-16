@@ -29,6 +29,7 @@ import {
 import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
 import { isWatchStrap, strapShadeSvg, strapSizeForCanvas } from '@/lib/watch-strap';
+import { safeAreaOf } from '@/lib/safe-area';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
 import { isZoomWheel, wheelZoomFactor } from './wheelZoom';
@@ -939,6 +940,57 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       }
     : undefined;
 
+  // The SAFE AREA ("the cosy edge", founder 16 Nov 2026): Prodigi prints right to the edge, but the outer
+  // band tucks into a seam / curls round / gets cut — shaded softly (never a hard stop), with a friendly
+  // line under the canvas. Follows the product's own outline (heart, disc) where the photo's mask has it.
+  const safe = safeAreaOf(variant.productKey);
+  const finishedWmm = (placeT.printWidthPx / t.requiredDpi) * 25.4;
+  const SAFE_HATCH = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-cocoa) 20%, transparent) 0 2px, color-mix(in srgb, var(--color-cocoa) 5%, transparent) 2px 7px)';
+  const renderSafeBand = (box: { left: number; top: number; w: number; h: number; angle?: number }, pxPerMm: number, photo?: { w: number; h: number }) => {
+    if (!safe) return null;
+    const band = safe.mm * pxPerMm;
+    if (safe.shape && safe.edge === 'all' && photo && ctx && ctx.ok && ctx.maskUrl) {
+      // the outline's own shape, shrunk about the print area's centre: the ring between them is the cosy edge
+      const k = Math.max(0.5, 1 - (2 * safe.mm) / finishedWmm);
+      const cx = box.left + box.w / 2, cy = box.top + box.h / 2;
+      const m = `url(${ctx.maskUrl})`;
+      return (
+        <div
+          aria-hidden
+          data-testid="safe-band"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: SAFE_HATCH,
+            WebkitMaskImage: `${m}, ${m}`, maskImage: `${m}, ${m}`,
+            WebkitMaskSize: `100% 100%, ${photo.w * k}px ${photo.h * k}px`, maskSize: `100% 100%, ${photo.w * k}px ${photo.h * k}px`,
+            WebkitMaskPosition: `0 0, ${cx * (1 - k)}px ${cy * (1 - k)}px`, maskPosition: `0 0, ${cx * (1 - k)}px ${cy * (1 - k)}px`,
+            WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+            maskMode: 'luminance',
+          }}
+        />
+      );
+    }
+    const tb = safe.edge === 'topBottom';
+    return (
+      <div
+        aria-hidden
+        data-testid="safe-band"
+        className="pointer-events-none absolute"
+        style={{ left: box.left, top: box.top, width: box.w, height: box.h, transform: box.angle ? `rotate(${box.angle}deg)` : undefined }}
+      >
+        <div className="absolute inset-x-0 top-0" style={{ height: band, background: SAFE_HATCH }} />
+        <div className="absolute inset-x-0 bottom-0" style={{ height: band, background: SAFE_HATCH }} />
+        {tb ? null : (
+          <>
+            <div className="absolute left-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
+            <div className="absolute right-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
+          </>
+        )}
+      </div>
+    );
+  };
+
   // The ONE guide (founder call 2026-07-07 — the old "print area" + "keep inside" pair
   // confused): a single clear rectangle = the frame opening / what prints, with corner
   // grips to drag-resize. `box` is in preview px for the current view.
@@ -1080,6 +1132,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               {dragging && snapAxis.y ? (
                 <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw, ...turnBox }} />
               ) : null}
+              {/* the cosy edge: still prints, but tucks round / gets cut — keep faces inside it */}
+              {renderSafeBand({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh, angle: bd.angle }, bd.qw / finishedWmm, { w: previewW, h: bd.pvH })}
               {/* the ONE guide + resize grips (the frame opening) */}
               {renderSelection({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh, angle: bd.angle })}
             </div>
@@ -1139,6 +1193,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 w-px bg-cinnamon/80" style={{ left: (artX + canvasSizePx(placeT).width / 2) * scale }} /> : null}
               {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 h-px bg-cinnamon/80" style={{ top: (artY + canvasSizePx(placeT).height / 2) * scale }} /> : null}
+              {/* the cosy edge on the print layout (a plain box here — the product's outline is on the photo view) */}
+              {safe && !isChart && !isPattern && !artWin
+                ? renderSafeBand({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale }, (scale * t.requiredDpi) / 25.4)
+                : null}
               {/* the ONE guide + resize grips (what prints / shows in the frame — beside the ruler on a height chart) */}
               {renderSelection(
                 isChart
@@ -1160,6 +1218,14 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               <>only the <b className="text-cinnamon">outlined box</b> prints — the sack round it stays plain · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             ) : isStrap ? (
               <>only the <b className="text-cinnamon">light parts</b> print — the shaded middle sits behind the watch · keep faces &amp; words on the strap, away from the holes</>
+            ) : safe ? (
+              <>
+                the <b className="text-cinnamon">outlined box</b> is what prints · drag a corner to resize
+                <span className="mt-1 flex items-center justify-center gap-1.5">
+                  <span aria-hidden className="inline-block h-2.5 w-4 shrink-0 rounded-[2px]" style={{ background: SAFE_HATCH }} />
+                  <span>{safe.note}</span>
+                </span>
+              </>
             ) : (
               <>the <b className="text-cinnamon">outlined box</b> is what {variant.productKey === 'framedPrint' ? 'shows in the frame' : 'prints'} · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             )}

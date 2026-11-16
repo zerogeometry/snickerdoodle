@@ -113,7 +113,6 @@ describe('range expansion — new products', () => {
     const file = (k: string) => Object.fromEntries(rows(k).map((r) => { const b = Math.round((r.bleedMm / 25.4) * r.dpi); return [r.prodigiSku, r.px && `${r.px.w + 2 * b}x${r.px.h + 2 * b}`]; }));
     expect(file('playingCards')).toEqual({ 'PLAY-CARD': '820x1122' });
     expect(file('cushion')).toMatchObject({ 'GLOBAL-CUSH-SH-SCSSS': '2008x1725', 'GLOBAL-CUSH-18R-SCSSS': '2775x2775', 'GLOBAL-CUSH-12X12-LIN': '1875x1875', 'GLOBAL-CUSH-22X22-LIN': '3375x3375' });
-    expect(file('card')).toEqual({ 'CLASSIC-GRE-FEDR-7X5-BLA': '1530x2160' });
   });
 
   it('only UK-made tea towels — never the US-made cotton/poly twill SKUs', () => {

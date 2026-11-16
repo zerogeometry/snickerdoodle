@@ -292,7 +292,7 @@ function exactPx(px: { w: number; h: number }, dpi: number): Pick<VariantDef, 'w
  * bleed) — so the positioner's outline and the previews show the product as it comes, not the file.
  * The print file is still exactly `file` (print area + 2 × bleed px, the rounded bleed taken off
  * both sides), so nothing Prodigi receives changes. Bleeds from Prodigi's templates + product pages
- * (print-accuracy report, 16 Nov 2026): playing cards 3 mm (63.5×89 mm card), greetings cards ~2 mm,
+ * (print-accuracy report, 16 Nov 2026): playing cards 3 mm (63.5×89 mm card),
  * cushions ~6 mm (the file is ¼″ bigger than the cover all round), blankets ~10 mm (stitched edge).
  */
 function trimmedPx(file: { w: number; h: number }, dpi: number, bleedMm: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
@@ -304,8 +304,6 @@ function trimmedPx(file: { w: number; h: number }, dpi: number, bleedMm: number)
 const CUSHION_SEAM_MM = 6;
 /** The fleece blanket's stitched edge: a 1000×650 mm file for a 980×630 mm blanket. */
 const BLANKET_EDGE_MM = 10;
-/** The greetings card's trim (the outer front is 1.3–2.5 mm bigger than the 127×178 mm card each side). */
-const CARD_TRIM_MM = 2;
 type Canvas = Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm' | 'gateDpi'>;
 /** A print canvas turned 90° when `turn` (the orientation that isn't Prodigi's native one): w↔h, px too. */
 function turned({ wMm, hMm, dpi, px, bleedMm, gateDpi }: Canvas, turn: boolean): Canvas {
@@ -456,7 +454,7 @@ const DEFS: Record<string, ProductDef> = {
     variants: [
       // the design's frame IS the outer-front panel it prints on — a quarter of Prodigi's 6120×2160
       // spread (cardPrint.ts) — so the positioner and the mockup frame exactly what prints (03-B2)
-      { size: '7×5″', pricePence: 550, ...trimmedPx(CARD_PANEL_PX, 300, CARD_TRIM_MM), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: '7×5″', pricePence: 550, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   // Greetings-card MULTIPACKS (founder, 2026-10-21): the same 7×5″ Fedrigoni card, a different (or
@@ -470,8 +468,8 @@ const DEFS: Record<string, ProductDef> = {
     description: "A pack of 7×5 cards, each with one of your little one's drawings on the front — mix and match, or the same favourite on every one. Blank inside, ready for your own words, for all the birthdays to come.",
     specs: { material: '330gsm Fedrigoni', size: '7×5″ portrait', inside: 'blank, to write in yourself', designs: 'a different drawing on every card, or the same', envelopes: 'one with every card' },
     variants: [
-      { size: 'pack of 5', pricePence: 1200, ...trimmedPx(CARD_PANEL_PX, 300, CARD_TRIM_MM), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
-      { size: 'pack of 10', pricePence: 2100, ...trimmedPx(CARD_PANEL_PX, 300, CARD_TRIM_MM), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'pack of 5', pricePence: 1200, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
+      { size: 'pack of 10', pricePence: 2100, ...exactPx(CARD_PANEL_PX, 300), prodigiSku: 'CLASSIC-GRE-FEDR-7X5-BLA' },
     ],
   },
   // The DATED 2027 wall calendar (founder, 2026-10-25 — CHRISTMAS-range-and-postage.md §5): Prodigi
@@ -550,8 +548,8 @@ const DEFS: Record<string, ProductDef> = {
   // (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
   christmasBauble: {
     category: 'FESTIVE', label: 'christmas bauble', blurb: "this year's bauble — one for every christmas they're little", print: true, visibleInShop: true,
-    description: "Their drawing on a shatterproof bauble for the tree, printed on both sides — so it looks lovely from every angle and won't break if little hands drop it.",
-    specs: { size: '8 cm ball', print: 'both sides', finish: 'shatterproof clear plastic, chrome cap, silver string', made: 'in the UK' },
+    description: "Their drawing on a disc inside a shatterproof clear bauble for the tree — it shows from both sides, so it looks lovely from every angle and won't break if little hands drop it.",
+    specs: { size: '8 cm ball', print: 'on a disc inside the ball, seen from both sides', finish: 'shatterproof clear plastic, chrome cap, silver string', made: 'in the UK' },
     // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
     variants: [{ size: '8 cm', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' }],
   },
@@ -574,7 +572,7 @@ const DEFS: Record<string, ProductDef> = {
   placemat: {
     category: 'FESTIVE', label: 'doodle placemats', blurb: 'their masterpiece at every place', print: true, visibleInShop: true,
     description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
-    specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
+    specs: { material: 'cork-backed', size: '28.5 × 20 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
     variants: (
       [
         { size: 'pack of 4', pricePence: 6000, sku: 'H-PLACE-4PK' },
@@ -590,7 +588,7 @@ const DEFS: Record<string, ProductDef> = {
   coaster: {
     category: 'FESTIVE', label: 'doodle coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
     description: 'Cork-backed coasters, each printed with the same drawing — in packs of 2, 4 or 6. For the mince pies and the cocoa, and long after.',
-    specs: { material: 'cork-backed', size: '10.6 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
+    specs: { material: 'cork-backed', size: '10 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
     variants: (
       [
         { size: 'pack of 2', pricePence: 1800, sku: 'H-COAST-2PK' },
@@ -621,8 +619,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   phoneCase: {
     category: 'TECH', label: 'doodle phone cases', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
-    description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
-    specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
+    description: "Their drawing printed edge to edge on a phone case — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
+    specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'edge to edge — tough wraps right round the sides; snap runs just over the edges', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
   // The Apple Watch strap (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md): faux leather, uk6, Royal Mail Standard
@@ -651,8 +649,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   heightChart: {
     category: 'PRINT', label: 'doodle height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
-    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
-    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
+    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom of the lower wooden bar 40 cm off the floor and the ruler reads true. They're only little once.",
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom of the lower wooden bar 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
       HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
     ),

@@ -169,7 +169,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'height-chart',
         q: 'How does the Snickerdoodle height chart work?',
-        a: 'The Snickerdoodle height chart is a canvas on wooden hangers with your child’s drawing running beside a printed ruler in centimetres and feet and inches. Hang it with the bottom edge 40 cm off the floor and it reads true from 50 cm up — so you can mark every birthday as they grow past it.',
+        a: 'The Snickerdoodle height chart is a canvas on wooden hangers with your child’s drawing running beside a printed ruler in centimetres and feet and inches. Hang it with the bottom of the lower wooden bar 40 cm off the floor and it reads true from 50 cm up — so you can mark every birthday as they grow past it.',
       },
     ],
   },
@@ -185,7 +185,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'christmas-bauble',
         q: 'Can I turn my child’s drawing into a Christmas bauble?',
-        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof plastic ball printed all the way round. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; see [how it works](/how-it-works).',
+        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof clear ball with their drawing on a disc inside, seen from both sides. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; see [how it works](/how-it-works).',
       },
       {
         id: 'christmas-grandparents',

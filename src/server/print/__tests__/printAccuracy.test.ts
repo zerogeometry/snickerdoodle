@@ -76,7 +76,6 @@ describe('tube socks — Prodigi’s 16 Nov size (6141×3543), designed upright'
 describe('the finished size vs the file — trim/seam (bleed) that never shows', () => {
   it.each([
     ['playingCards', 3, { w: 820, h: 1122 }],
-    ['card', 2, { w: 1530, h: 2160 }],
     ['cushion-12square', 6, { w: 1875, h: 1875 }],
     ['cushion', 6, { w: 2008, h: 1725 }], // the heart (the default cushion)
     ['blanket-medium-landscape', 10, { w: 5905, h: 3838 }],

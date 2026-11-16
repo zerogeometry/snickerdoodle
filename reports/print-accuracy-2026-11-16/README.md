@@ -125,7 +125,20 @@ The pictures beside this file are the evidence.
 
 **Not on sale today, but fix before showing them:** pet bandanas (Prodigi has changed their sizes: small and medium are now both 9450×2850 px), hoodies, jumpers, apron, baby bodysuit, storybook.
 
-## Code fixes that cut the risk without a sample
+## Update, same day: what's now fixed (branch `fix/print-accuracy`)
+
+- **Tube socks** now send Prodigi's new size, 6141×3543 px. We design them upright (30 cm round the leg, 52 cm long), like the ankle socks, and turn the file to Prodigi's shape. Which end Prodigi treats as the top of the sock is still question 4 below.
+- **Christmas sack:** the file stays Prodigi's full size, but the drawing now goes **only inside their 28×32 cm print box**, centred and 4 cm from the top. The rest stays plain sack. The shop pictures, the positioner ("only the outlined box prints — the sack round it stays plain"), the print file and the print-quality check all use that box.
+- **Previews at the finished size:** playing cards (3 mm trimmed), cushions (6 mm into the seam) and blankets (10 mm into the hem) no longer show the edge that gets cut or sewn in. The file Prodigi gets is unchanged. Greetings cards stay as they were: their extra edge is only 1–2.5 mm, and trimming it evenly would make the card the wrong shape, because the fold side isn't cut. The cosy edge marks where they're cut instead.
+- **The cosy edge:** on the positioner, a soft striped band marks the edge that still prints but tucks into a seam, curls round, sits at the rim or gets cut. It comes with one friendly line, for example "the shaded edge still prints, but it tucks round into the seam and the puffy sides — keep faces & words inside it". It applies to cushions, blankets, the ceramic ornament, playing cards, greetings cards and card packs, and the mug (top and bottom strips). Product photos don't show it; they show the finished look.
+- **Wording:**
+  - Bauble: "a disc inside a shatterproof clear bauble — it shows from both sides".
+  - Height chart: "the bottom of the lower wooden bar 40 cm off the floor".
+  - Phone case: "tough wraps right round the sides; snap runs just over the edges".
+  - Coaster: 10 cm. Placemat: 28.5 × 20 cm.
+- **Weekly Prodigi check:** it already ran every Monday, but only wrote to the server log. It now **emails the support inbox** when a product's print size no longer matches Prodigi's, or a product disappears.
+
+## Code fixes that cut the risk without a sample (as first proposed)
 
 Each would go on its own branch with a pull request into `feat/christmas-season`, only after you say yes.
 
@@ -161,5 +174,7 @@ Each would go on its own branch with a pull request into `feat/christmas-season`
 | `ornament.jpg` | Prodigi template · our print file · our preview |
 | `playing-cards.jpg` | our print file · our preview |
 | `adult-tee.jpg` | our print file · our preview |
+| `positioner-phone.jpg` | the new positioning screen on a phone: cushion, playing cards, mug, sack |
+| `positioner-on-the-product.jpg` | the cosy edge following the cushion's heart, the ornament's disc and the blanket; the sack's print box on the sack |
 
 The grid's coloured bands are 2 mm each from the file's edge: red, then orange, yellow, green, blue. If you can see red in a preview, the preview is showing the outermost 2 mm of the file.

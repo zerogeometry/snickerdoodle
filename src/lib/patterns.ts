@@ -10,7 +10,7 @@ export const isPatternProduct = (key: string | null | undefined): boolean => !!k
 /**
  * Products printed EDGE TO EDGE — the whole visible face is printable — so a BASE COLOUR can fill
  * all of it, under the drawing (founder, 22 Oct: "for all items that allow us to print all over").
- * The repeats, plus: the phone case (wraps round the sides), cushions (sublimated, the whole face),
+ * The repeats, plus: the phone case (edge to edge), cushions (sublimated, the whole face),
  * the fleece blanket, the jigsaw, the framed print (the paper fills the frame), the playing cards'
  * backs and the pet bandana. And (founder, 26 Oct — "all the items, including the new ones") the mug (its
  * printed wrap), the christmas sack (its printed panel), both ornaments (the disc / the ball) and the
