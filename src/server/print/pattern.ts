@@ -80,6 +80,25 @@ async function repeatPipeline(
   const motif = await sharp(srcBuf).rotate(transform.rotationDeg).resize(motifW, motifH, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
   const motifRaw = { raw: { width: motifW, height: motifH, channels: 4 as const } };
 
+  // A SOCK: each drawing at its own place along the sock (sockLayout) — no lattice, nothing wraps
+  if (layout.centres) {
+    const turned = new Map<number, { data: Buffer; width: number; height: number }>();
+    const placed = [];
+    for (const c of layout.centres) {
+      const deg = Math.round(c.angle * 10) / 10;
+      let m = turned.get(deg);
+      if (!m) {
+        const r = deg ? await sharp(motif, motifRaw).rotate(deg, { background: { r: 0, g: 0, b: 0, alpha: 0 } }).raw().toBuffer({ resolveWithObject: true }) : { data: motif, info: { width: motifW, height: motifH } };
+        m = { data: r.data, width: r.info.width, height: r.info.height };
+        turned.set(deg, m);
+      }
+      placed.push({ input: m.data, raw: { width: m.width, height: m.height, channels: 4 as const }, left: Math.round(c.x - m.width / 2), top: Math.round(c.y - m.height / 2) });
+    }
+    const flat = await sharp({ create: { width: canvas.width, height: canvas.height, channels: 4, background } }).composite(placed).flatten({ background }).raw().toBuffer({ resolveWithObject: true });
+    const pipeline = sharp(flat.data, { raw: { width: flat.info.width, height: flat.info.height, channels: flat.info.channels } }).removeAlpha();
+    return { pipeline, layout, dpi, width: canvas.width, height: canvas.height };
+  }
+
   // One strip, one cell tall, with a margin so motifs that cross an edge can be drawn whole and
   // then cropped: what leaves on the right comes back on the left (and bottom → top).
   const pad = Math.ceil(Math.max(motifW, motifH));

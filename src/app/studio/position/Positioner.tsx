@@ -32,6 +32,7 @@ import { isWatchStrap, strapShadeSvg, strapSizeForCanvas } from '@/lib/watch-str
 import { safeAreaOf } from '@/lib/safe-area';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
+import { sockSideFor, type SockSide } from '@/server/print/sockTemplates';
 import { isZoomWheel, wheelZoomFactor } from './wheelZoom';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
@@ -293,9 +294,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const lockToCover = filledDefault && !isMug;
   const scaleFloor = lockToCover ? 0.5 : MIN_SCALE;
   const canvas = canvasSizePx(t);
+  // a sock: Prodigi's template — the file is one sock's two sides; its drawings stay inside each side
+  const sockSide = isPattern ? sockSideFor({ width: canvas.width, height: canvas.height }, t.requiredDpi) : null;
   const aspect = canvas.width / canvas.height;
   const previewW = Math.min(availW, Math.max(80, Math.floor(maxPreviewH * aspect)));
   const previewH = Math.round(previewW / aspect);
+  const sockPath = sockSide ? sockOutlinePath(sockSide, previewW, previewH) : null;
   // Where the live product preview sits (founder, 24 Oct: "visible near the controls on a phone, not
   // buried"): on desktop in the controls column; on a phone BESIDE a tall, narrow print layout (height
   // chart, wrapping paper) when there's room, else as a compact card right under it — never below
@@ -1163,6 +1167,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   drawRef={patternDrawRef}
                 />
               ) : null}
+              {/* a sock: Prodigi's two sides of the sock, outlined — what's round them is not the sock */}
+              {sockPath ? (
+                <svg aria-hidden data-testid="sock-outline" className="pointer-events-none absolute left-0 top-0" width={previewW} height={previewH} viewBox={`0 0 ${previewW} ${previewH}`}>
+                  <path d={`M0 0 H${previewW} V${previewH} H0 Z ${sockPath}`} fillRule="evenodd" fill="color-mix(in srgb, var(--color-paper-2) 80%, transparent)" />
+                  <path d={sockPath} fill="none" stroke="color-mix(in srgb, var(--color-cocoa) 45%, transparent)" strokeWidth={1.5} strokeDasharray="5 4" />
+                </svg>
+              ) : null}
               {/* the height chart's ruler prints exactly like this, down the left edge */}
               {rulerSrc && chartLayout ? (
                 <img
@@ -1205,7 +1216,9 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
           {livePlace === 'beside' ? renderLivePreview('beside') : null}
           </div>
           <p className="mt-2 text-center text-[11px] text-ink-faint">
-            {isPattern ? (
+            {sockSide ? (
+              <>the <b className="text-cinnamon">two sides of each sock</b>, as they print · your drawings stay inside, clear of the heel and toe · drag a corner to make them bigger or smaller (smaller = more of them)</>
+            ) : isPattern ? (
               <>this is the pattern that prints · drag to shift it · drag a corner to make the drawings bigger or smaller</>
             ) : isChart ? (
               <>the ruler prints just like this · your drawing goes in the <b className="text-cinnamon">outlined box</b> beside it · drag a corner to resize</>
@@ -1558,4 +1571,15 @@ function Shell({ children, back = '/home', title = 'edit placement' }: { childre
       </main>
     </div>
   );
+}
+
+/** The two sides of a sock (Prodigi's template, the right side the left's mirror) as one SVG path, w × h px. */
+function sockOutlinePath(sock: SockSide, w: number, h: number): string {
+  const hw = w / 2, rh = h / sock.outline.length;
+  const rows = sock.outline.flatMap((o, r) => (o ? [{ y: ((r + 0.5) * rh).toFixed(1), l: o[0] * hw, rt: o[1] * hw }] : []));
+  const side = (mirror: boolean) => {
+    const X = (x: number) => (mirror ? w - x : x).toFixed(1);
+    return `M${rows.map((p) => `${X(p.l)} ${p.y}`).join(' L')} L${[...rows].reverse().map((p) => `${X(p.rt)} ${p.y}`).join(' L')} Z`;
+  };
+  return `${side(false)} ${side(true)}`;
 }

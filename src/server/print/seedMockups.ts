@@ -1099,9 +1099,9 @@ export function sideQuad(alpha: Uint8Array | Buffer, W: number, H: number, side:
   // the template's sock, in mm across THIS side's half (the right side = the left's mirror)
   const { w: hw, h: hh } = sock.halfMm;
   const tpl: [number, number][] = [];
-  sock.spans.forEach((span, r) => {
+  sock.outline.forEach((span, r) => {
     if (!span) return;
-    const y = ((r + 0.5) / sock.spans.length) * hh;
+    const y = ((r + 0.5) / sock.outline.length) * hh;
     for (let x = span[0] * hw; x <= span[1] * hw; x += 1) tpl.push([side === 'left' ? x : hw - x, y]);
   });
   const mp = moments(photo), mt = moments(tpl);

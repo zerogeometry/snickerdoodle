@@ -6,7 +6,8 @@ import { customizeReady, quietCookies, uploadAndOpenRange } from './helpers';
  *  - the cosy edge: the positioner softly shades the band that still prints but tucks into a seam /
  *    curls round / gets cut, and says why in a friendly line — on the products Prodigi's templates
  *    give a safe area for; nowhere else;
- *  - not the mug (founder, 16 Nov: Prodigi's 11oz mugs print practically rim to base) or the framed print.
+ *  - not the mug (founder, 16 Nov: Prodigi's 11oz mugs print practically rim to base) or the framed print;
+ *  - the socks show Prodigi's two sides of the sock, outlined, with their drawings inside.
  * SAFE_AREA_SHOTS=<dir> saves a screenshot of each placement (for the founder's review).
  */
 const rangeReady = (page: Page) => expect(page.getByRole('status').filter({ hasText: 'making your collection' })).toHaveCount(0, { timeout: 60_000 });
@@ -39,7 +40,7 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['lapto
       await quietCookies(page);
       await uploadAndOpenRange(page);
       await rangeReady(page);
-      for (const key of [...Object.keys(SHADED), 'framedPrint', 'mug']) {
+      for (const key of [...Object.keys(SHADED), 'framedPrint', 'mug', 'socks']) {
         await openPlacement(page, key);
         if (key in SHADED) {
           await expect(page.getByTestId('safe-band').first(), `${key}: shaded edge`).toBeVisible();
@@ -48,6 +49,11 @@ for (const [label, viewport] of [['phone', { width: 390, height: 844 }], ['lapto
           await expect(page.getByTestId('safe-band'), `${key}: no shaded edge`).toHaveCount(0);
         }
         expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth), `${key}: no sideways scroll`).toBeLessThanOrEqual(0);
+        // the socks: Prodigi's two sides of the sock outlined on the print layout, and a line that says so
+        if (key === 'socks') {
+          await expect(page.getByTestId('sock-outline')).toBeVisible();
+          await expect(page.getByText(/two sides of each sock/)).toBeVisible();
+        }
         if (SHOTS) await page.locator('[role="application"]').first().screenshot({ path: `${SHOTS}/${label}-${key}.png` });
         if (SHOTS && label === 'phone') await page.screenshot({ path: `${SHOTS}/${label}-${key}-page.png`, fullPage: false });
         // on the product photo the cosy edge follows the product's own outline (the heart, the disc)

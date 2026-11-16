@@ -52,7 +52,7 @@ export const PatternRepeat = forwardRef<
     for (const c of patternMotifCentres(layout, small)) {
       ctx.save();
       ctx.translate(c.x, c.y);
-      ctx.rotate((transform.rotationDeg * Math.PI) / 180);
+      ctx.rotate(((transform.rotationDeg + (c.angle ?? 0)) * Math.PI) / 180); // (a sock's drawing also follows the sock)
       ctx.drawImage(image, -w / 2, -h / 2, w, h);
       ctx.restore();
     }

@@ -19,27 +19,9 @@ async function raw(png: Buffer) {
   return sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
 }
 
-describe('patternLayout — a narrow print (the ankle sock) at its default zoom (founder, 23 Oct)', () => {
+describe('patternLayout — the flat sheets and the sock default (founder, 23 Oct)', () => {
   const src = { width: 1600, height: 1200 };
-  it('one whole column per side: two round, each motif about half its column, centred (never slivers of a neighbour)', () => {
-    const L = patternLayout({ width: 3543, height: 3543 }, 300, src, T);
-    expect(L.cols).toBe(2); // even, so the half-drop meets itself round the sock
-    // Prodigi's template: the file's left half is one side of the sock, its right half the other, the
-    // middle line down the front of the foot — so a motif sits mid-SIDE (¼ and ¾ across), never on the
-    // middle line, where it would be split round the front (16 Nov 2026)
-    const xs = [...new Set(patternMotifCentres(L, { width: 3543, height: 3543 }).map((c) => Math.round(c.x)))].sort((p, q) => p - q);
-    expect(xs).toEqual([Math.round(3543 / 4), Math.round((3 * 3543) / 4)]);
-    expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
-    expect(L.motifW / L.cellW).toBeLessThan(0.56); // white either side of it on the sock's face
-  });
-  it('tube socks wrap round too (designed upright, 300 mm round × 520 mm long): one whole column per visible side', () => {
-    const L = patternLayout({ width: 3543, height: 6141 }, 300, src, T);
-    expect(L.cols).toBe(2);
-    const xs = [...new Set(patternMotifCentres(L, { width: 3543, height: 6141 }).map((c) => Math.round(c.x)))].sort((p, q) => p - q);
-    expect(xs).toEqual([Math.round(3543 / 4), Math.round((3 * 3543) / 4)]); // mid-side, as on the template
-    expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
-    expect(L.motifW / L.cellW).toBeLessThan(0.56);
-  });
+  // (the socks line their drawings up along the sock on Prodigi's template — sockTemplate.test.ts)
   it('the flat sheets (tea towel, wrapping paper) keep the plain repeat', () => {
     for (const [w, h, dpi] of [[8208, 5492, 300], [4133, 11811, 150]] as const) {
       const L = patternLayout({ width: w, height: h }, dpi, src, T);
@@ -54,7 +36,7 @@ describe('patternLayout — a narrow print (the ankle sock) at its default zoom 
     const nudged = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 1, offsetX: 0.02 }));
     expect(Math.abs(nudged.phaseX - def.phaseX)).toBeLessThan(def.cellW * 0.02); // a nudge moves a nudge
     const small = patternLayout({ width: 3543, height: 3543 }, 300, src, clampTransform({ scale: 0.5 }));
-    expect(small.cols).toBeGreaterThan(2);
+    expect(small.cols * small.rows).toBeGreaterThan(def.cols * def.rows); // zoomed out: more drawings
     expect(small.motifW).toBeLessThan(def.motifW);
   });
 });
@@ -93,8 +75,9 @@ describe('patternLayout — the seam + scale maths', () => {
     }
   });
 
-  it('whole, EVEN columns that exactly fill the width (so a sock / roll wraps without a seam)', () => {
-    for (const [w, h, dpi] of [[3543, 3543, 300], [3543, 6141, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
+  it('whole, EVEN columns that exactly fill the width (so a roll / a narrow print wraps without a seam)', () => {
+    // (not the socks: their drawings sit wholly inside each side of the sock, nothing wraps — sockTemplate.test.ts)
+    for (const [w, h, dpi] of [[2400, 1800, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
       const l = patternLayout({ width: w, height: h }, dpi, { width: 1200, height: 1600 }, T);
       expect(l.cols % 2, `${w}`).toBe(0);
       expect(l.cols * l.cellW).toBeCloseTo(w, 6);

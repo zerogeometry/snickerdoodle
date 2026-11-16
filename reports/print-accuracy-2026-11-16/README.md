@@ -147,6 +147,19 @@ The pictures beside this file are the evidence.
   - **The print file itself** put each drawing on the file's middle line. On a real sock that is the front fold, so every drawing was split round the front of the foot. Now each drawing sits in the middle of a side (a quarter and three quarters across). This changes what Prodigi prints for every sock order from now on.
 - Evidence: `socks-ankle.jpg` and `socks-tube.jpg` (below).
 
+## Third update: how the drawings sit on the socks
+
+Your brief: symmetrical, nicely centred up the length of the sock, never over the edges; one line of drawings up each side, two once zoomed out. Built on the two Prodigi templates:
+
+- **Each side has a safe lane:** the clear part of the sock, kept 8 mm inside the outline, the black heel and the toe patch. Every drawing sits wholly inside it, so nothing runs over an edge, a seam, the heel or the front fold. The tests check every corner of every drawing.
+- **The drawings run along the sock,** toe to cuff (parallel to the floor when walking), each centred on the sock's middle. On the ankle sock they lean a little with the foot. The other side is the mirror image in position; the drawing itself is never flipped, so writing still reads the right way round.
+- **At first, one line up each side:**
+  - the **tube** sock takes four good-sized drawings a side;
+  - the **ankle** sock takes two. Prodigi's heel patch reaches nearly halfway across the sock, so the clear stretch is the foot, about 12 cm.
+- **Zoom out:** smaller drawings, more of them, then two lines side by side (three on the ankle sock when very small). Zooming out never shows fewer. Zooming in stops at the biggest size that still fits.
+- The print file, the shop photos and the positioning screen all use the same layout.
+- Evidence: `socks-ankle-drawings.jpg` and `socks-tube-drawings.jpg`, at the default size, zoomed out and zoomed out further. In each pair, the print file comes first with Prodigi's outline drawn on it in red, then our preview.
+
 ## Code fixes that cut the risk without a sample (as first proposed)
 
 Each would go on its own branch with a pull request into `feat/christmas-season`, only after you say yes.
@@ -186,6 +199,8 @@ Updated 16 Nov after your answers: the sack is off sale and your mug photos sett
 | `adult-tee.jpg` | our print file · our preview |
 | `positioner-phone.jpg` | the new positioning screen on a phone: cushion, playing cards, mug, sack |
 | `socks-ankle.jpg` | Prodigi's ankle template · the template laid on our new preview (left side blue, right side orange: each fills its sock exactly) · a drawing on the new preview |
+| `socks-ankle-drawings.jpg` | the ankle sock repeat at three zooms: the print file with Prodigi's outline (red) · our preview |
+| `socks-tube-drawings.jpg` | the same for the tube sock |
 | `socks-tube.jpg` | the tube template laid on our preview (each sock shows its own side) · a drawing on the new preview |
 | `positioner-on-the-product.jpg` | the cosy edge following the cushion's heart, the ornament's disc and the blanket; the sack's print box on the sack |
 
