@@ -61,7 +61,7 @@ export function christmasYear(now: Date): number {
 
 /** While the season is on, these lead the range, in this order (then everything else as usual). The
  * family bundle first (founder, 29 Oct). */
-export const CHRISTMAS_FEATURED = ['christmasBundle', 'ceramicOrnament', 'christmasBauble', 'cardPack', 'wrappingPaper', 'calendar', 'sack', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
+export const CHRISTMAS_FEATURED = ['christmasBundle', 'ceramicOrnament', 'christmasBauble', 'cardPack', 'wrappingPaper', 'calendar', 'mug', 'teaTowel', 'kidsJumper', 'christmasJumper'] as const;
 
 /**
  * The expected-popularity list with the Christmas products moved to the front while the season is on.

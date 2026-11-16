@@ -234,3 +234,44 @@ export function galleryRect(t: TemplateGeom, src: { width: number; height: numbe
   const r = computeLayerRect(galleryArtGeom(t), src, GALLERY_FIT);
   return { x: m + r.x, y: m + r.y, width: r.width, height: r.height };
 }
+
+/**
+ * An ART WINDOW: a product whose print FILE is bigger than the part that prints, so the drawing is
+ * placed inside a fixed box of the file and the rest stays white (unprinted). Today: the CHRISTMAS SACK.
+ * Prodigi's file is 320×500 mm (3779×5905 px), but their template marks the print area as a 28×32 cm
+ * box, centred across and 40 mm down from the top (measured off prodigi-christmas-sack.png, 16 Nov 2026
+ * — print-accuracy report). White isn't printed on the sack, so the white round the box is plain fabric.
+ * The print renderer, the mockup, the positioner and the resolution gate all place against this box.
+ */
+export const SACK_PRINT_BOX_MM = { w: 280, h: 320, top: 40 } as const;
+export const isSackProduct = (key: string | null | undefined): boolean => key === 'sack';
+
+export interface ArtWindow {
+  /** the box's top-left on the full canvas (print area + bleed), px */
+  x: number;
+  y: number;
+  /** the box as a placement geometry — the drawing's transform resolves against THIS */
+  geom: TemplateGeom;
+}
+
+/** The product's art window on THIS template (its own dpi), or null when the drawing may use the whole file. */
+export function artWindowOf(productKey: string | null | undefined, t: TemplateGeom): ArtWindow | null {
+  if (!isSackProduct(productKey)) return null;
+  const b = bleedPx(t);
+  const w = Math.min(t.printWidthPx, mmToPx(SACK_PRINT_BOX_MM.w, t.requiredDpi));
+  const h = Math.min(t.printHeightPx, mmToPx(SACK_PRINT_BOX_MM.h, t.requiredDpi));
+  const top = Math.min(t.printHeightPx - h, mmToPx(SACK_PRINT_BOX_MM.top, t.requiredDpi));
+  return {
+    x: b + Math.round((t.printWidthPx - w) / 2),
+    y: b + top,
+    geom: { printWidthPx: w, printHeightPx: h, bleedMm: 0, requiredDpi: t.requiredDpi, ...(t.gateDpi ? { gateDpi: t.gateDpi } : {}) },
+  };
+}
+
+/** The art window as fractions of the full canvas (x0,y0 top-left · x1,y1 bottom-right), for photo quads. */
+export function artWindowFrac(productKey: string | null | undefined, t: TemplateGeom): { x0: number; y0: number; x1: number; y1: number } | null {
+  const win = artWindowOf(productKey, t);
+  if (!win) return null;
+  const { width: CW, height: CH } = canvasSizePx(t);
+  return { x0: win.x / CW, y0: win.y / CH, x1: (win.x + win.geom.printWidthPx) / CW, y1: (win.y + win.geom.printHeightPx) / CH };
+}

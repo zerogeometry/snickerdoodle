@@ -301,18 +301,18 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       expect(s.amount_total).toBe(o.totalPence);
     });
 
-    it('a christmas bundle for 4 + a sack: the bundle is one Stripe line at £145, the sack takes £3 off', async () => {
+    it('a christmas bundle for 4 + a mug: the bundle is one Stripe line at £145, the mug takes £3 off', async () => {
       const art = await mkAsset();
       const bundle = { placemat: { assetId: art.id }, ornaments: [0, 1, 2, 3].map(() => ({ assetId: art.id })) };
-      const { o, s } = await charged({ items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'sack', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
-      expect(o.subtotalPence).toBe(14500 + catalogue['sack']!.pricePence);
+      const { o, s } = await charged({ items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'mug', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
+      expect(o.subtotalPence).toBe(14500 + catalogue['mug']!.pricePence);
       expect(o.parcelSavingPence).toBe(300);
       expect(s.amount_total).toBe(o.totalPence);
       const items = await stripe().checkout.sessions.listLineItems(s.id);
       expect(items.data.map((l) => [l.quantity, l.price?.unit_amount])).toContainEqual([1, 14500]);
       // …and the ORDER RECORD carries the bundle as its Prodigi pieces, which add up to £145 to the penny
       const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, o.id));
-      const bundleLines = lines.filter((l) => l.productKey !== 'sack');
+      const bundleLines = lines.filter((l) => l.productKey !== 'mug');
       expect(bundleLines.reduce((n, l) => n + l.linePence, 0)).toBe(14500);
     });
 

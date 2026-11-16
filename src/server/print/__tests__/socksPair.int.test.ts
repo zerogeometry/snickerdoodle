@@ -124,7 +124,9 @@ describe.skipIf(!DB || !S3)('a pair of socks — one print area per sock (integr
     };
     let diff = 0, n = 0, varied = 0;
     let prev: number[] | null = null;
-    for (const u of [0.35, 0.45, 0.55, 0.65]) for (const v of [0.25, 0.4, 0.55, 0.7, 0.85]) {
+    // (the sock repeat keeps the file's middle — the sock's front fold — clear: its drawings run up each
+    // side's lane, so sample the left side's lane, where they are)
+    for (const u of [0.17, 0.21, 0.25, 0.29, 0.33]) for (const v of [0.3, 0.4, 0.5, 0.6, 0.7, 0.8]) {
       const a = at(quads[0]!, u, v), b = at(quads[1]!, u, v);
       diff += Math.abs(a[0]! - b[0]!) + Math.abs(a[1]! - b[1]!) + Math.abs(a[2]! - b[2]!);
       if (prev && Math.abs(prev[0]! - a[0]!) + Math.abs(prev[2]! - a[2]!) > 60) varied++;

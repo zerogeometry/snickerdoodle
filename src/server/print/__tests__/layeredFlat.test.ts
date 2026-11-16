@@ -116,9 +116,9 @@ describe.skipIf(!STAGED)('every founder-photographed variant can be seeded', () 
       const attrsPlan = plan(v.productKey, v.attributes); // the variant exactly as the seeder sees it
       expect(attrsPlan?.register).toBe('layered-flat');
       if (attrsPlan?.register !== 'layered-flat') return;
-      const t = await layeredFlatTemplate(attrsPlan.dir, v.px!.w / v.px!.h, !!attrsPlan.tilted, !!attrsPlan.window);
+      const t = await layeredFlatTemplate(attrsPlan.dir, v.px!.w / v.px!.h, !!attrsPlan.tilted, !!attrsPlan.window, attrsPlan.pieces ?? false, !!attrsPlan.artboard);
       expect(t).not.toBeNull();
-      expect(() => assertQuadFitsBlank(t!.quad)).not.toThrow();
+      for (const q of [t!.quad, ...(t!.extraQuads ?? [])]) expect(() => assertQuadFitsBlank(q, { warped: !!t!.extraQuads?.length })).not.toThrow();
     }, 30_000);
   }
 });

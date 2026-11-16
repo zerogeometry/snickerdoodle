@@ -15,6 +15,7 @@ import { renderPreviewAction, type RenderPreviewResult } from '@/app/actions/ren
 import { removeBackgroundAction } from '@/app/actions/magic';
 import { mockupContextAction, type MockupContext } from '@/app/actions/mockup';
 import {
+  artWindowOf,
   canvasSizePx,
   clampTransform,
   computeLayerRect,
@@ -28,8 +29,10 @@ import {
 import { assessPrintResolution, patternLayout } from '@/server/print/pattern-geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart, rulerBandSvg } from '@/server/print/height-chart-geometry';
 import { isWatchStrap, strapShadeSvg, strapSizeForCanvas } from '@/lib/watch-strap';
+import { safeAreaOf } from '@/lib/safe-area';
 import { groundHex as groundHexOf, isColouredGround, isGroundProduct, isPatternProduct } from '@/lib/patterns';
 import { PatternRepeat } from './PatternRepeat';
+import { sockSideFor, type SockSide } from '@/server/print/sockTemplates';
 import { isZoomWheel, wheelZoomFactor } from './wheelZoom';
 import { MockupPreview } from '@/ui/components/MockupPreview';
 import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
@@ -291,9 +294,12 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const lockToCover = filledDefault && !isMug;
   const scaleFloor = lockToCover ? 0.5 : MIN_SCALE;
   const canvas = canvasSizePx(t);
+  // a sock: Prodigi's template — the file is one sock's two sides; its drawings stay inside each side
+  const sockSide = isPattern ? sockSideFor({ width: canvas.width, height: canvas.height }, t.requiredDpi) : null;
   const aspect = canvas.width / canvas.height;
   const previewW = Math.min(availW, Math.max(80, Math.floor(maxPreviewH * aspect)));
   const previewH = Math.round(previewW / aspect);
+  const sockPath = sockSide ? sockOutlinePath(sockSide, previewW, previewH) : null;
   // Where the live product preview sits (founder, 24 Oct: "visible near the controls on a phone, not
   // buried"): on desktop in the controls column; on a phone BESIDE a tall, narrow print layout (height
   // chart, wrapping paper) when there's room, else as a compact card right under it — never below
@@ -303,11 +309,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const scale = previewW / canvas.width; // canvas-px → preview-px
   const bleedPxv = mmToPx(t.bleedMm, t.requiredDpi);
 
-  // The drawing's placement area: the whole canvas, or (height chart) the art area beside the
-  // ruler band, `artX` canvas-px in from the left edge.
-  const placeT = useMemo(() => (isChart ? heightChartArtGeom(t) : t), [isChart, t]);
+  // The drawing's placement area: the whole canvas, (height chart) the art area beside the ruler
+  // band, or (christmas sack) Prodigi's print box inside the file — `artX`/`artY` canvas-px in.
+  const artWin = useMemo(() => artWindowOf(variant.productKey, t), [variant.productKey, t]);
+  const placeT = useMemo(() => (isChart ? heightChartArtGeom(t) : artWin ? artWin.geom : t), [isChart, artWin, t]);
   const chartLayout = useMemo(() => (isChart ? heightChartLayout(canvasSizePx(t), t.requiredDpi) : null), [isChart, t]);
-  const artX = chartLayout?.bandPx ?? 0;
+  const artX = chartLayout?.bandPx ?? artWin?.x ?? 0;
+  const artY = artWin?.y ?? 0;
   const rulerSrc = useMemo(
     () => (chartLayout ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(rulerBandSvg(chartLayout))}` : null),
     // the band depends only on the canvas size + dpi
@@ -487,7 +495,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
     return {
       position: 'absolute',
       left: (artX + rect.x) * scale + boxW / 2,
-      top: rect.y * scale + boxH / 2,
+      top: (artY + rect.y) * scale + boxH / 2,
       width: imgW,
       height: imgH,
       // Cover-fill DELIBERATELY oversizes the image past the aperture so overflow is
@@ -500,7 +508,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       transform: `translate(calc(-50% + var(--gx, 0px)), calc(-50% + var(--gy, 0px))) rotate(${tf.rotationDeg}deg) scale(var(--gk, 1))`,
       objectFit: 'fill',
     };
-  }, [rect, scale, tf.rotationDeg, artX]);
+  }, [rect, scale, tf.rotationDeg, artX, artY]);
 
   // ── Product-backdrop geometry (preview px): the print-area quad on the blank photo, and
   // the image's placement INSIDE it via the SAME shared geometry as the print renderer and
@@ -518,12 +526,18 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       const around = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
       return { pvH, qx: cx - w / 2, qy: cy - h / 2, qw: w, qh: h, s: w / t.printWidthPx, angle, around };
     }
-    const qx = ctx.quad[0]![0] * previewW;
-    const qy = ctx.quad[0]![1] * pvH;
-    const qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * previewW;
-    const qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
-    return { pvH, qx, qy, qw, qh, s: qw / t.printWidthPx, angle: 0, around: { x: qx, y: qy, w: qw, h: qh } };
-  }, [ctx, t, previewW]);
+    let qx = ctx.quad[0]![0] * previewW;
+    let qy = ctx.quad[0]![1] * pvH;
+    let qw = (ctx.quad[1]![0] - ctx.quad[0]![0]) * previewW;
+    let qh = (ctx.quad[3]![1] - ctx.quad[0]![1]) * pvH;
+    const around = { x: qx, y: qy, w: qw, h: qh };
+    if (artWin) {
+      // the christmas sack: the photo's print area is the whole file — place inside Prodigi's box on it
+      const c = canvasSizePx(t);
+      [qx, qy, qw, qh] = [qx + (artWin.x / c.width) * qw, qy + (artWin.y / c.height) * qh, (artWin.geom.printWidthPx / c.width) * qw, (artWin.geom.printHeightPx / c.height) * qh];
+    }
+    return { pvH, qx, qy, qw, qh, s: qw / placeT.printWidthPx, angle: 0, around };
+  }, [ctx, t, placeT, artWin, previewW]);
 
   const bdImgStyle = useMemo<React.CSSProperties | undefined>(() => {
     if (!bd || !natural) return undefined;
@@ -930,6 +944,52 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       }
     : undefined;
 
+  // The SAFE AREA ("the cosy edge", founder 16 Nov 2026): Prodigi prints right to the edge, but the outer
+  // band tucks into a seam / curls round / gets cut — shaded softly (never a hard stop), with a friendly
+  // line under the canvas. Follows the product's own outline (heart, disc) where the photo's mask has it.
+  const safe = safeAreaOf(variant.productKey);
+  const finishedWmm = (placeT.printWidthPx / t.requiredDpi) * 25.4;
+  const SAFE_HATCH = 'repeating-linear-gradient(135deg, color-mix(in srgb, var(--color-cocoa) 20%, transparent) 0 2px, color-mix(in srgb, var(--color-cocoa) 5%, transparent) 2px 7px)';
+  const renderSafeBand = (box: { left: number; top: number; w: number; h: number; angle?: number }, pxPerMm: number, photo?: { w: number; h: number }) => {
+    if (!safe) return null;
+    const band = safe.mm * pxPerMm;
+    if (safe.shape && photo && ctx && ctx.ok && ctx.maskUrl) {
+      // the outline's own shape, shrunk about the print area's centre: the ring between them is the cosy edge
+      const k = Math.max(0.5, 1 - (2 * safe.mm) / finishedWmm);
+      const cx = box.left + box.w / 2, cy = box.top + box.h / 2;
+      const m = `url(${ctx.maskUrl})`;
+      return (
+        <div
+          aria-hidden
+          data-testid="safe-band"
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: SAFE_HATCH,
+            WebkitMaskImage: `${m}, ${m}`, maskImage: `${m}, ${m}`,
+            WebkitMaskSize: `100% 100%, ${photo.w * k}px ${photo.h * k}px`, maskSize: `100% 100%, ${photo.w * k}px ${photo.h * k}px`,
+            WebkitMaskPosition: `0 0, ${cx * (1 - k)}px ${cy * (1 - k)}px`, maskPosition: `0 0, ${cx * (1 - k)}px ${cy * (1 - k)}px`,
+            WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat',
+            WebkitMaskComposite: 'xor', maskComposite: 'exclude',
+            maskMode: 'luminance',
+          }}
+        />
+      );
+    }
+    return (
+      <div
+        aria-hidden
+        data-testid="safe-band"
+        className="pointer-events-none absolute"
+        style={{ left: box.left, top: box.top, width: box.w, height: box.h, transform: box.angle ? `rotate(${box.angle}deg)` : undefined }}
+      >
+        <div className="absolute inset-x-0 top-0" style={{ height: band, background: SAFE_HATCH }} />
+        <div className="absolute inset-x-0 bottom-0" style={{ height: band, background: SAFE_HATCH }} />
+        <div className="absolute left-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
+        <div className="absolute right-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
+      </div>
+    );
+  };
+
   // The ONE guide (founder call 2026-07-07 — the old "print area" + "keep inside" pair
   // confused): a single clear rectangle = the frame opening / what prints, with corner
   // grips to drag-resize. `box` is in preview px for the current view.
@@ -1071,6 +1131,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
               {dragging && snapAxis.y ? (
                 <div className="pointer-events-none absolute h-px bg-cinnamon/80" style={{ top: bd.qy + bd.qh / 2, left: bd.qx, width: bd.qw, ...turnBox }} />
               ) : null}
+              {/* the cosy edge: still prints, but tucks round / gets cut — keep faces inside it */}
+              {renderSafeBand({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh, angle: bd.angle }, bd.qw / finishedWmm, { w: previewW, h: bd.pvH })}
               {/* the ONE guide + resize grips (the frame opening) */}
               {renderSelection({ left: bd.qx, top: bd.qy, w: bd.qw, h: bd.qh, angle: bd.angle })}
             </div>
@@ -1078,8 +1140,10 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
             <div
               {...canvasInteractionProps}
               className={`relative ${livePlace === 'beside' ? 'shrink-0' : 'mx-auto'} overflow-hidden rounded-[10px] border-2 border-cocoa/15 bg-paper-2 ${canvasInteractionClass}`}
-              style={{ width: previewW, height: previewH, ...groundFill }}
+              style={{ width: previewW, height: previewH, ...(artWin ? {} : groundFill) }}
             >
+              {/* the christmas sack: its base colour fills only Prodigi's print box (the sack round it stays plain) */}
+              {artWin && groundFill ? <div className="pointer-events-none absolute" style={{ left: artWin.x * scale, top: artWin.y * scale, width: artWin.geom.printWidthPx * scale, height: artWin.geom.printHeightPx * scale, ...groundFill }} /> : null}
               <img
                 ref={setImgEl}
                 src={cutout?.url ?? keepsake.imageUrl}
@@ -1103,6 +1167,13 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   drawRef={patternDrawRef}
                 />
               ) : null}
+              {/* a sock: Prodigi's two sides of the sock, outlined — what's round them is not the sock */}
+              {sockPath ? (
+                <svg aria-hidden data-testid="sock-outline" className="pointer-events-none absolute left-0 top-0" width={previewW} height={previewH} viewBox={`0 0 ${previewW} ${previewH}`}>
+                  <path d={`M0 0 H${previewW} V${previewH} H0 Z ${sockPath}`} fillRule="evenodd" fill="color-mix(in srgb, var(--color-paper-2) 80%, transparent)" />
+                  <path d={sockPath} fill="none" stroke="color-mix(in srgb, var(--color-cocoa) 45%, transparent)" strokeWidth={1.5} strokeDasharray="5 4" />
+                </svg>
+              ) : null}
               {/* the height chart's ruler prints exactly like this, down the left edge */}
               {rulerSrc && chartLayout ? (
                 <img
@@ -1114,30 +1185,55 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
                   style={{ width: chartLayout.bandPx * scale, height: previewH, maxWidth: 'none', maxHeight: 'none' }}
                 />
               ) : null}
+              {/* the christmas sack: only Prodigi's box prints — everything round it is shaded back to plain sack */}
+              {artWin ? (
+                <div
+                  className="pointer-events-none absolute"
+                  style={{ left: artWin.x * scale, top: artWin.y * scale, width: artWin.geom.printWidthPx * scale, height: artWin.geom.printHeightPx * scale, boxShadow: '0 0 0 100vmax color-mix(in srgb, var(--color-paper-2) 88%, transparent)' }}
+                />
+              ) : null}
               {/* the watch strap: what doesn't print (behind the watch, the trimmed edges, the holes), shaded */}
               {strapShadeSrc ? (
                 <img src={strapShadeSrc} alt="" aria-hidden draggable={false} className="pointer-events-none absolute left-0 top-0" style={{ width: previewW, height: previewH, maxWidth: 'none', maxHeight: 'none' }} />
               ) : null}
               {/* snap-to-centre guide flashes (drag only) */}
               {dragging && snapAxis.x ? <div className="pointer-events-none absolute inset-y-0 w-px bg-cinnamon/80" style={{ left: (artX + canvasSizePx(placeT).width / 2) * scale }} /> : null}
-              {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 top-1/2 h-px bg-cinnamon/80" /> : null}
+              {dragging && snapAxis.y ? <div className="pointer-events-none absolute inset-x-0 h-px bg-cinnamon/80" style={{ top: (artY + canvasSizePx(placeT).height / 2) * scale }} /> : null}
+              {/* the cosy edge on the print layout (a plain box here — the product's outline is on the photo view) */}
+              {safe && !isChart && !isPattern && !artWin
+                ? renderSafeBand({ left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale }, (scale * t.requiredDpi) / 25.4)
+                : null}
               {/* the ONE guide + resize grips (what prints / shows in the frame — beside the ruler on a height chart) */}
               {renderSelection(
                 isChart
                   ? { left: artX * scale, top: 0, w: previewW - artX * scale, h: previewH }
-                  : { left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale },
+                  : artWin
+                    ? { left: artWin.x * scale, top: artWin.y * scale, w: artWin.geom.printWidthPx * scale, h: artWin.geom.printHeightPx * scale }
+                    : { left: bleedPxv * scale, top: bleedPxv * scale, w: previewW - 2 * bleedPxv * scale, h: previewH - 2 * bleedPxv * scale },
               )}
             </div>
           )}
           {livePlace === 'beside' ? renderLivePreview('beside') : null}
           </div>
           <p className="mt-2 text-center text-[11px] text-ink-faint">
-            {isPattern ? (
+            {sockSide ? (
+              <>the <b className="text-cinnamon">two sides of each sock</b>, as they print · your drawings stay inside, clear of the heel and toe · drag a corner to make them bigger or smaller (smaller = more of them)</>
+            ) : isPattern ? (
               <>this is the pattern that prints · drag to shift it · drag a corner to make the drawings bigger or smaller</>
             ) : isChart ? (
               <>the ruler prints just like this · your drawing goes in the <b className="text-cinnamon">outlined box</b> beside it · drag a corner to resize</>
+            ) : artWin ? (
+              <>only the <b className="text-cinnamon">outlined box</b> prints — the sack round it stays plain · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             ) : isStrap ? (
               <>only the <b className="text-cinnamon">light parts</b> print — the shaded middle sits behind the watch · keep faces &amp; words on the strap, away from the holes</>
+            ) : safe ? (
+              <>
+                the <b className="text-cinnamon">outlined box</b> is what prints · drag a corner to resize
+                <span className="mt-1 flex items-center justify-center gap-1.5">
+                  <span aria-hidden className="inline-block h-2.5 w-4 shrink-0 rounded-[2px]" style={{ background: SAFE_HATCH }} />
+                  <span>{safe.note}</span>
+                </span>
+              </>
             ) : (
               <>the <b className="text-cinnamon">outlined box</b> is what {variant.productKey === 'framedPrint' ? 'shows in the frame' : 'prints'} · drag a corner to resize · keep faces &amp; words a little in from the edges</>
             )}
@@ -1475,4 +1571,15 @@ function Shell({ children, back = '/home', title = 'edit placement' }: { childre
       </main>
     </div>
   );
+}
+
+/** The two sides of a sock (Prodigi's template, the right side the left's mirror) as one SVG path, w × h px. */
+function sockOutlinePath(sock: SockSide, w: number, h: number): string {
+  const hw = w / 2, rh = h / sock.outline.length;
+  const rows = sock.outline.flatMap((o, r) => (o ? [{ y: ((r + 0.5) * rh).toFixed(1), l: o[0] * hw, rt: o[1] * hw }] : []));
+  const side = (mirror: boolean) => {
+    const X = (x: number) => (mirror ? w - x : x).toFixed(1);
+    return `M${rows.map((p) => `${X(p.l)} ${p.y}`).join(' L')} L${[...rows].reverse().map((p) => `${X(p.rt)} ${p.y}`).join(' L')} Z`;
+  };
+  return `${side(false)} ${side(true)}`;
 }

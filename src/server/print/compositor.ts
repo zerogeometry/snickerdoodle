@@ -7,10 +7,11 @@ import { getViewableAssetOrThrow } from '@/server/assets';
 import { deleteObjectConfirmed, derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { type RawTransform, type Transform, canvasSizePx, clampTransform, computeLayerRect, galleryRect, isGalleryProduct } from './geometry';
+import { type RawTransform, type Transform, canvasSizePx, clampTransform, computeLayerRect, galleryRect, isGalleryProduct, isSackProduct } from './geometry';
 import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
 import { renderRepeatPatternPixels } from './pattern';
 import { isHeightChart } from './height-chart-geometry';
+import { renderArtWindowFace } from './artWindow';
 import { renderHeightChartFacePixels } from './heightChart';
 import { applyFabricFx, MATERIAL_FX } from './fabricFx';
 import { firmAlpha } from './apparel';
@@ -80,7 +81,7 @@ const MAX_CONCURRENT = 3;
  */
 const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
 
-const RENDER_REV = 'r21'; // r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r24'; // r24: the sock repeat — drawings line up along each side's safe lane on Prodigi's template, mirrored; r23: socks follow Prodigi's template — each sock shows its own side (half) of the file, and a motif sits mid-side, not on the front fold; r22: previews show the trimmed product (bleed off: cards, playing cards, cushion seams, blanket edge), the sack prints in Prodigi's 28×32 cm box, tube socks upright; r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type { MockupSize };
 
@@ -507,7 +508,7 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
   // a coloured base forks the key (white keeps the existing key, so nothing re-renders)
   const ground = !fill && (face === 'pattern' || isGroundProduct(prod?.key)) ? normalizeGround(input.ground) : null;
   const gTag = groundTag(ground);
-  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : face === 'frameGrid' ? 'grid' : face === 'strap' ? 'strap' : 'hc'}${FACE_REV}${gTag}` : gTag;
+  const faceTag = face ? `-face${face === 'pattern' ? 'rep' : face === 'gallery' ? 'gal' : face === 'frameGrid' ? 'grid' : face === 'strap' ? 'strap' : face === 'panel' ? 'win' : 'hc'}${FACE_REV}${gTag}` : gTag;
   const key = derivativeKey(input.assetId, `mockup-${input.variantId}${viewTag}-${size}-v${tpl.templateVersion}${RENDER_REV}${fillTag}${spanTag}${faceTag}-${srcObj.id}${srcObj.sha256 ? `.${srcObj.sha256.slice(0, 10)}` : ''}-${transformHash(t)}`);
 
   // 5. The template's picture layers (blank; optional product-silhouette mask the design is clipped
@@ -565,10 +566,10 @@ export async function composeMockup(db: DbHandle, viewer: ViewerContext, input: 
 /** the PRINTED FACE a product's mockup shows (the print code's own render): the repeat, the height chart,
  * the calendar's gallery page (the whole drawing inside a white margin), the multi photo frame's grid
  * (the drawing in every square) */
-type Face = 'pattern' | 'heightChart' | 'gallery' | 'frameGrid' | 'strap';
+type Face = 'pattern' | 'heightChart' | 'gallery' | 'frameGrid' | 'strap' | 'panel';
 /** Which printed face a product's mockup shows (none = the drawing, placed). */
 const faceOf = (key: string | null | undefined): Face | undefined =>
-  isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : isWatchStrap(key) ? 'strap' : undefined;
+  isPatternProduct(key) ? 'pattern' : isHeightChart(key) ? 'heightChart' : isGalleryProduct(key) ? 'gallery' : isMultiPhotoFrameKey(key) ? 'frameGrid' : isWatchStrap(key) ? 'strap' : isSackProduct(key) ? 'panel' : undefined;
 /** Bump to re-render cached pattern / height-chart previews when the face rendering changes. */
 const FACE_REV = '2'; // 2: the repeat's motif follows the zoom; rows follow the motif (every zoom step adds copies)
 /** The most pixels a preview face is rendered at (a 5 m roll is 122 MP in print); its longest edge is
@@ -612,6 +613,12 @@ export async function renderPrintedFace(
       .raw()
       .toBuffer({ resolveWithObject: true });
     return { data, width: info.width, height: info.height, channels: 4 };
+  }
+  if (face === 'panel') {
+    // the christmas sack's file as it prints: white (unprinted fabric), the drawing inside Prodigi's 28×32 cm box
+    const f = await renderArtWindowFace(srcBuf, 'sack', geom, transform, { scale, groundHex });
+    const { data, info } = await f.pipeline.raw().toBuffer({ resolveWithObject: true });
+    return { data, width: info.width, height: info.height, channels: info.channels as 3 };
   }
   if (face === 'gallery') {
     // the page as it prints (no bleed — the mockup shows the trimmed page): white, the whole drawing in the margin
@@ -1082,7 +1089,7 @@ async function renderPerspective(args: {
   const src = await designSize(designBuf);
   if (!src.width || !src.height) throw new NoMockupTemplateError('unreadable design image');
   // A preview canvas never needs print resolution — it's warped down onto a working-size photo. Cap
-  // its longest edge (same shape): a big print (a tube sock, 6141×5433) otherwise tripped the
+  // its longest edge (same shape): a big print (a tube sock, 3543×6141) otherwise tripped the
   // drawn-pixel guard and the product had NO preview at all (founder testing, 23 Oct).
   const pk = Math.min(1, PERSPECTIVE_CANVAS_EDGE / Math.max(print.widthPx, print.heightPx));
   const dw = Math.max(2, Math.round(print.widthPx * pk));
@@ -1090,7 +1097,13 @@ async function renderPerspective(args: {
   // 'full width' closed card: the design spans the whole outside (front+back), so cover-fit it
   // into a DOUBLE-WIDE spread and keep just this panel — 'front' = the right half of [back|front].
   const cw = spanHalf ? dw * 2 : dw;
-  const layer = computeLayerRect({ printWidthPx: cw, printHeightPx: dh, bleedMm: 0, requiredDpi: print.requiredDpi * pk }, src, transform);
+  // Cover-fit over the BLEED canvas (print area + bleed), exactly as the print file is made, then keep the
+  // print area: the edge Prodigi trims off (playing cards, a card's outer front) never shows here either.
+  // (The full-width card spread keeps zero bleed — its panels are windowed from the double-wide spread.)
+  const pGeom = { printWidthPx: cw, printHeightPx: dh, bleedMm: spanHalf ? 0 : print.bleedMm, requiredDpi: print.requiredDpi * pk };
+  const pb = (canvasSizePx(pGeom).width - cw) / 2;
+  const onBleed = computeLayerRect(pGeom, src, transform);
+  const layer = { ...onBleed, x: onBleed.x - pb, y: onBleed.y - pb, canvasWidth: cw, canvasHeight: dh };
   if (layer.width * layer.height > MAX_DRAWN_PIXELS) throw new NoMockupTemplateError(`design aspect too extreme to composite (${layer.width}×${layer.height})`);
   // Window the transformed layer onto the cw×dh canvas (handles cover-crop AND contain-centre).
   const ix = Math.max(0, -layer.x);
@@ -1170,7 +1183,8 @@ async function renderPerspective(args: {
 /**
  * Which print area owns each pixel of the product's printable surface: the printmap's separate
  * pieces (each sock of a pair) are found as connected shapes, and each piece goes to the area whose
- * centre is nearest the piece's own centre. Off the printmap → -1. Without this, "nearest area
+ * centre is nearest the piece's own centre (or, when the big pieces and the areas match one for one, in
+ * left-to-right order — how the seeder made them). Off the printmap → -1. Without this, "nearest area
  * centre" per pixel let a diagonal pair's areas steal each other's edges (the left sock's toe showed
  * the right sock's mapping — founder, 23 Oct: "chopped up"). Cached per template + size.
  */
@@ -1200,7 +1214,15 @@ export async function pieceOwners(maskBuf: Buffer, id: string | undefined, W: nu
     }
     pieces.push({ sx, sy, n });
   }
-  const areaOf = pieces.map(({ sx, sy, n }) => {
+  // The seeder makes one area per piece, LEFT TO RIGHT (seedMockups piecesOf) — so when the big pieces and
+  // the areas match one for one, that order decides: an area's quad may be the WHOLE file with only its own
+  // half on the piece (the ankle socks' two sides, sideQuad), its centre then sitting off the piece.
+  const total = pieces.reduce((t, p) => t + p.n, 0);
+  const big = pieces.map((p, k) => ({ k, cx: p.sx / p.n, n: p.n })).filter((p) => p.n >= total * 0.05).sort((a, b) => a.cx - b.cx);
+  const byOrder = big.length === centres.length ? new Map(big.map((p, i) => [p.k, i])) : null;
+  const areaOf = pieces.map(({ sx, sy, n }, k) => {
+    const ordered = byOrder?.get(k);
+    if (ordered !== undefined) return ordered;
     const cx = sx / n, cy = sy / n;
     let best = 0, bestD = Infinity;
     centres.forEach(([x, y], k) => {

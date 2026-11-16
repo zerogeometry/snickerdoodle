@@ -12,7 +12,7 @@ import { resolveViewerContext } from '@/server/assets';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { definedPrintSpecs, seedCatalogue, DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { renderPrintFile } from '@/server/print/render';
-import { canvasSizePx, computeLayerRect, galleryRect, isGalleryProduct, templateGeom, type TemplateGeom, type Transform } from '@/server/print/geometry';
+import { artWindowOf, canvasSizePx, computeLayerRect, galleryRect, isGalleryProduct, templateGeom, type TemplateGeom, type Transform } from '@/server/print/geometry';
 import { heightChartArtGeom, heightChartLayout, isHeightChart } from '@/server/print/height-chart-geometry';
 import { CARD_PANEL_X, CARD_SPREAD } from '@/server/print/cardPrint';
 import { isPatternProduct } from '@/lib/patterns';
@@ -232,6 +232,9 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
     }
     const c = canvasSizePx(t);
     if (isHeightChart(s.productKey)) return { place: heightChartArtGeom(t), dx: heightChartLayout(c, t.requiredDpi).bandPx, dy: 0, cw: c.width, ch: c.height, turn: false };
+    // the christmas sack: the drawing is placed in Prodigi's 28×32 cm print box inside the file (print-accuracy, 16 Nov)
+    const win = artWindowOf(s.productKey, t);
+    if (win) return { place: win.geom, dx: win.x, dy: win.y, cw: c.width, ch: c.height, turn: false };
     if (s.productKey === 'card' || s.productKey === 'cardPack') {
       // the print places the design on the 1530×2160 outer-front PANEL (cardPrint.ts placeDesign), but the
       // positioner places it on the variant's TEMPLATE canvas — compare in the panel's px, scaled
@@ -312,14 +315,16 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
         // the region the design may be seen in: the whole file, the art beside a height chart's ruler, a card's front panel
         // a double-sided cushion is [front | back], both faces the same drawing here — look at the front
         const dual = s.attributes.sides === 'double';
-        const [x0, x1] = dual ? [0, a.W / 2] : card ? [CARD_PANEL_X.outerFront, CARD_PANEL_X.outerFront + CARD_SPREAD.widthPx / 4] : [isHeightChart(s.productKey) ? f.dx : 0, a.W];
+        const box = artWindowOf(s.productKey, t); // the sack: only its print box carries the drawing
+        const [x0, x1] = dual ? [0, a.W / 2] : card ? [CARD_PANEL_X.outerFront, CARD_PANEL_X.outerFront + CARD_SPREAD.widthPx / 4] : box ? [box.x, box.x + box.geom.printWidthPx] : [isHeightChart(s.productKey) ? f.dx : 0, a.W];
+        const [y0, y1] = box ? [box.y, box.y + box.geom.printHeightPx] : [0, a.H];
         for (const name of Object.keys(MARKERS) as MarkerName[]) {
           const m = MARKERS[name];
           const exp = expAt(m.u, m.v);
           // compare only a marker WHOLLY on the print (a half-cropped one's centroid is biased)
           const hu = MARK_SIDE / 2 / CAL.w, hv = MARK_SIDE / 2 / CAL.h;
           const corners = [expAt(m.u - hu, m.v - hv), expAt(m.u + hu, m.v - hv), expAt(m.u + hu, m.v + hv), expAt(m.u - hu, m.v + hv)];
-          const inside = corners.every(([x, y]) => x > x0 + 2 && x < x1 - 2 && y > 2 && y < a.H - 2);
+          const inside = corners.every(([x, y]) => x > x0 + 2 && x < x1 - 2 && y > y0 + 2 && y < y1 - 2);
           const got = a.centroid(m.rgb, x0 + 2, x1 - 2); // only where the design can be (not a ruler, a logo or a cushion's back face)
           if (!inside) continue; // cropped off by this placement — nothing to compare
           if (!got) {
@@ -333,6 +338,17 @@ describe.skipIf(!DB || !S3)('sweep 03 — the real print file for every print ge
         }
         // no blank (white) edge where a zoomed-in drawing covers the whole print area
         if (p.name === 'zoom+pan' && !gallery && !garment) {
+          const win = artWindowOf(s.productKey, t);
+          if (win) {
+            // the sack: the box is covered; outside it the file is white (unprinted sack) on purpose
+            const k = a.W / canvasSizePx(t).width;
+            const [bx0, by0, bx1, by1] = [win.x * k, win.y * k, (win.x + win.geom.printWidthPx) * k, (win.y + win.geom.printHeightPx) * k];
+            const inBox = [[bx0 + 3, by0 + 3], [bx1 - 4, by0 + 3], [bx0 + 3, by1 - 4], [bx1 - 4, by1 - 4]].filter(([x, y]) => a.isWhite(x!, y!));
+            if (inBox.length) problems.push(`zoom+pan: white inside the sack's print box at ${inBox.map((e) => e.map(Math.round).join(',')).join(' · ')}`);
+            const outside = [[2, 2], [a.W - 3, 2], [a.W / 2, a.H - 3]].filter(([x, y]) => !a.isWhite(x!, y!));
+            if (outside.length) problems.push(`zoom+pan: ink outside the sack's print box at ${outside.map((e) => e.map(Math.round).join(',')).join(' · ')}`);
+            continue;
+          }
           const edge = card
             ? [[CARD_PANEL_X.outerFront + 3, 3], [CARD_PANEL_X.outerFront + 1526, 3], [CARD_PANEL_X.outerFront + 3, 2156], [CARD_PANEL_X.outerFront + 1526, 2156]]
             : isHeightChart(s.productKey)

@@ -157,6 +157,18 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
  */
 export const DESIGNED_TURNED: ReadonlySet<string> = new Set(['teaTowel']);
 
+/**
+ * Is this VARIANT designed on a turned canvas? Every DESIGNED_TURNED product, plus the TUBE SOCK:
+ * Prodigi's tube-sock file is 6141×3543 px LANDSCAPE (52 cm along the sock × 30 cm round it — API,
+ * 16 Nov 2026; it was 6141×5433 in October), while their template draws it UPRIGHT (30 × 52 cm, cuff
+ * at the top, both sides of one sock side by side). We design upright — 30 cm round, so the repeat
+ * wraps like the ankle sock's — and turn the finished file 90° clockwise to Prodigi's spec.
+ * (Which end Prodigi treats as the cuff is asked of Prodigi — print-accuracy report, 16 Nov.)
+ */
+export function isDesignedTurned(productKey: string, attributes: Record<string, string> | null | undefined): boolean {
+  return DESIGNED_TURNED.has(productKey) || (productKey === 'socks' && attributes?.size === 'tube');
+}
+
 // Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
 // its own Prodigi SKU. (15oz white dropped 2026-07-09; PLAIN white dropped 2026-07-10 — the founder
 // wanted the coloured two-tones only. Blue leads.) £18 (round, whole-pound pricing).
@@ -236,7 +248,7 @@ function blanketVariants(): VariantDef[] {
     (['portrait', 'landscape'] as const).map((orientation) => ({
       size: s.size, orientation,
       pricePence: s.pricePence,
-      ...turned(exactPx(s.px, 150), orientation === 'portrait'),
+      ...turned(trimmedPx(s.px, 150, BLANKET_EDGE_MM), orientation === 'portrait'),
       prodigiSku: s.sku,
     })),
   );
@@ -275,6 +287,23 @@ const CARD_PANEL_PX = { w: 1530, h: 2160 } as const;
 function exactPx(px: { w: number; h: number }, dpi: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
   return { wMm: Math.round((px.w / dpi) * 25.4), hMm: Math.round((px.h / dpi) * 25.4), dpi, px, bleedMm: 0 };
 }
+/**
+ * Prodigi's EXACT file px, split into the finished product + the edge that's cut off or sewn in (the
+ * bleed) — so the positioner's outline and the previews show the product as it comes, not the file.
+ * The print file is still exactly `file` (print area + 2 × bleed px, the rounded bleed taken off
+ * both sides), so nothing Prodigi receives changes. Bleeds from Prodigi's templates + product pages
+ * (print-accuracy report, 16 Nov 2026): playing cards 3 mm (63.5×89 mm card),
+ * cushions ~6 mm (the file is ¼″ bigger than the cover all round), blankets ~10 mm (stitched edge).
+ */
+function trimmedPx(file: { w: number; h: number }, dpi: number, bleedMm: number): Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm'> {
+  const b = Math.round((bleedMm / 25.4) * dpi);
+  const px = { w: file.w - 2 * b, h: file.h - 2 * b };
+  return { ...exactPx(px, dpi), bleedMm };
+}
+/** The cushion's sewn edge: the file runs ¼″ (6.35 mm) past the cover all round. */
+const CUSHION_SEAM_MM = 6;
+/** The fleece blanket's stitched edge: a 1000×650 mm file for a 980×630 mm blanket. */
+const BLANKET_EDGE_MM = 10;
 type Canvas = Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm' | 'gateDpi'>;
 /** A print canvas turned 90° when `turn` (the orientation that isn't Prodigi's native one): w↔h, px too. */
 function turned({ wMm, hMm, dpi, px, bleedMm, gateDpi }: Canvas, turn: boolean): Canvas {
@@ -300,9 +329,11 @@ function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColo
 
 // Socks: one size (UK 6–10), sublimated all over — sold as a REPEAT PATTERN of the drawing (Prodigi
 // can't guarantee placement on a sock). Ankle prints to 'front', tube to 'default'. uk9, Tracked 48.
+// Both are designed UPRIGHT, the width going round the sock (300 mm): the tube is 300 × 520 mm, turned
+// at render to Prodigi's landscape 6141×3543 (isDesignedTurned).
 const SOCKS = [
   { size: 'ankle', sku: 'GLOBAL-ANKLE-SOCKS', px: { w: 3543, h: 3543 }, printTo: ['front'] },
-  { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 6141, h: 5433 }, printTo: ['default'] },
+  { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 3543, h: 6141 }, printTo: ['default'] },
 ] as const;
 
 // Wall height chart: canvas on wooden poster hangers (hanger colour = Prodigi `color`). Made at
@@ -361,18 +392,18 @@ const DEFS: Record<string, ProductDef> = {
       // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
       // The heart's print area is WIDER than tall (printAreaSizes 2008×1725px, their PSD 2009×1725,
       // 27 Oct): exact px, bleed 0, so Prodigi has nothing to crop. (It was a 280mm square + bleed.)
-      { size: 'heart', pricePence: 2200, ...exactPx({ w: 2008, h: 1725 }, 150), prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
-      { size: '18″ round', pricePence: 3000, ...exactPx({ w: 2775, h: 2775 }, 150), prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
+      { size: 'heart', pricePence: 2200, ...trimmedPx({ w: 2008, h: 1725 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      { size: '18″ round', pricePence: 3000, ...trimmedPx({ w: 2775, h: 2775 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
       // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
       // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]
       // print file. wMm/hMm here is the per-FACE size: the mockup shows one face either way, and
       // the DUAL fulfilment assembles the side-by-side double-wide from two face renders.
       // Round + squares: Prodigi's EXACT printAreaSizes (sandbox, 27 Oct — a DUAL's is two faces wide),
       // bleed 0; their area is the cushion plus its own bleed (18.5″ for the 18″ round).
-      { size: '12″ square', sides: 'single', pricePence: 3000, ...exactPx({ w: 1875, h: 1875 }, 150), prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
-      { size: '12″ square', sides: 'double', pricePence: 3500, ...exactPx({ w: 1875, h: 1875 }, 150), prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
-      { size: '22″ square', sides: 'single', pricePence: 4000, ...exactPx({ w: 3375, h: 3375 }, 150), prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
-      { size: '22″ square', sides: 'double', pricePence: 4500, ...exactPx({ w: 3375, h: 3375 }, 150), prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
+      { size: '12″ square', sides: 'single', pricePence: 3000, ...trimmedPx({ w: 1875, h: 1875 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-12X12-LIN' },
+      { size: '12″ square', sides: 'double', pricePence: 3500, ...trimmedPx({ w: 1875, h: 1875 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-12X12-LIN-DUAL' },
+      { size: '22″ square', sides: 'single', pricePence: 4000, ...trimmedPx({ w: 3375, h: 3375 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-22X22-LIN' },
+      { size: '22″ square', sides: 'double', pricePence: 4500, ...trimmedPx({ w: 3375, h: 3375 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-22X22-LIN-DUAL' },
     ],
   },
   // PAUSED (sweep 03-B5): Prodigi refuses a book order without its pages (pageCount + one file per page —
@@ -517,13 +548,17 @@ const DEFS: Record<string, ProductDef> = {
   // (£5 + £6.45, UNTRACKED) — priced at ~15% net after all costs.
   christmasBauble: {
     category: 'FESTIVE', label: 'christmas bauble', blurb: "this year's bauble — one for every christmas they're little", print: true, visibleInShop: true,
-    description: "Their drawing on a shatterproof bauble for the tree, printed on both sides — so it looks lovely from every angle and won't break if little hands drop it.",
-    specs: { size: '8 cm ball', print: 'both sides', finish: 'shatterproof clear plastic, chrome cap, silver string', made: 'in the UK' },
+    description: "Their drawing on a disc inside a shatterproof clear bauble for the tree — it shows from both sides, so it looks lovely from every angle and won't break if little hands drop it.",
+    specs: { size: '8 cm ball', print: 'on a disc inside the ball, seen from both sides', finish: 'shatterproof clear plastic, chrome cap, silver string', made: 'in the UK' },
     // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
     variants: [{ size: '8 cm', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' }],
   },
+  // The CHRISTMAS SACK — RETIRED (founder, 16 Nov 2026, the print-accuracy report: "not a great product as
+  // is, so let's remove the uncertainty around it"). A PAUSED row, like the christmas eve bundle: the seed
+  // takes it off sale everywhere (inactive ⇒ never priced, never orderable, not in the shop). Its print
+  // spec + art window stay only so an order already placed still renders the way it was previewed.
   sack: {
-    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: true, // D24
+    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: false, paused: true,
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
     // 320×500mm = Prodigi's print panel, NOT the whole sack: made at their printAreaSizes (3779×5905px
@@ -541,7 +576,7 @@ const DEFS: Record<string, ProductDef> = {
   placemat: {
     category: 'FESTIVE', label: 'doodle placemats', blurb: 'their masterpiece at every place', print: true, visibleInShop: true,
     description: 'A set of four cork-backed placemats, each printed with the same drawing — Christmas dinner, Sunday lunch, every breakfast after.',
-    specs: { material: 'cork-backed', size: '29 × 20.5 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
+    specs: { material: 'cork-backed', size: '28.5 × 20 cm', pack: 'four placemats, one drawing', made: 'in the UK' },
     variants: (
       [
         { size: 'pack of 4', pricePence: 6000, sku: 'H-PLACE-4PK' },
@@ -557,7 +592,7 @@ const DEFS: Record<string, ProductDef> = {
   coaster: {
     category: 'FESTIVE', label: 'doodle coasters', blurb: 'a little masterpiece under every mug', print: true, visibleInShop: true,
     description: 'Cork-backed coasters, each printed with the same drawing — in packs of 2, 4 or 6. For the mince pies and the cocoa, and long after.',
-    specs: { material: 'cork-backed', size: '10.6 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
+    specs: { material: 'cork-backed', size: '10 cm square', pack: '2, 4 or 6 coasters, one drawing', made: 'in the UK' },
     variants: (
       [
         { size: 'pack of 2', pricePence: 1800, sku: 'H-COAST-2PK' },
@@ -588,8 +623,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   phoneCase: {
     category: 'TECH', label: 'doodle phone cases', blurb: 'their masterpiece, in your pocket', print: true, visibleInShop: true,
-    description: "Their drawing printed right round a phone case, edge to edge — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
-    specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'printed edge to edge, wraps round the sides', finish: 'gloss or matte', made: 'in the UK' },
+    description: "Their drawing printed edge to edge on a phone case — so it's with you everywhere. Snap is slim and light; tough adds a cushioned inner layer for the drops. Gloss or matte.",
+    specs: { material: 'polycarbonate shell (tough: + shock-absorbing liner)', print: 'edge to edge — tough wraps right round the sides; snap runs just over the edges', finish: 'gloss or matte', made: 'in the UK' },
     variants: phoneCaseVariants(),
   },
   // The Apple Watch strap (5 Nov 2026 — PRODUCT-RANGE-global-uk-nov.md): faux leather, uk6, Royal Mail Standard
@@ -618,8 +653,8 @@ const DEFS: Record<string, ProductDef> = {
   },
   heightChart: {
     category: 'PRINT', label: 'doodle height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
-    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom edge 40 cm off the floor and the ruler reads true. They're only little once.",
-    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom edge 40 cm off the floor', made: 'in the UK' },
+    description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom of the lower wooden bar 40 cm off the floor and the ruler reads true. They're only little once.",
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom of the lower wooden bar 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
       HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
     ),
@@ -687,7 +722,8 @@ const DEFS: Record<string, ProductDef> = {
     specs: { cards: '54, one design on every back', size: '6 × 9 cm', box: 'white presentation box', made: 'in the UK' },
     // Standard post is Royal Mail RM24 (UNTRACKED), £6.45. Budget (RM48, £3.20) would allow ~£19 —
     // a per-product shipping rule the founder hasn't asked for, so this is priced on Standard.
-    variants: [{ size: '54 cards', pricePence: 2400, ...exactPx({ w: 820, h: 1122 }, 300), prodigiSku: 'PLAY-CARD' }],
+    // the card is 63.5×89 mm; Prodigi's file adds 3 mm all round that's trimmed off (their template)
+    variants: [{ size: '54 cards', pricePence: 2400, ...trimmedPx({ w: 820, h: 1122 }, 300, 3), prodigiSku: 'PLAY-CARD' }],
   },
   giftWrap: {
     category: 'ADDON', label: 'gift wrap', blurb: 'a handwritten-style note + wrap', print: false, paused: true,

@@ -90,9 +90,9 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
   it('STOREFRONT curation: the shop shows only visibleInShop products (the launch range + the ready D21 expansion); the curation view sees everything', async () => {
     // the storefront default — what every shopper-facing surface renders (def order = sortOrder)
     const shop = await loadCatalogue(db);
-    // + the calendar (PR #15) and the bauble + sack (D24), on show for Christmas
+    // + the calendar (PR #15) and the bauble (D24), on show for Christmas (the sack retired 16 Nov)
     // the Christmas family bundle is pinned to the top of every listing (founder, 29 Oct); + the multi photo frame and the watch strap (5 Nov)
-    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'phoneCase', 'watchStrap', 'socks', 'wrappingPaper', 'teaTowel', 'playingCards', 'heightChart']); // the height chart always last (PINNED_LAST — founder, 5 Nov)
+    expect(shop.map((p) => p.key)).toEqual(['christmasBundle', 'framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'placemat', 'coaster', 'phoneCase', 'watchStrap', 'socks', 'wrappingPaper', 'teaTowel', 'playingCards', 'heightChart']); // the height chart always last (PINNED_LAST — founder, 5 Nov)
 
     // the dev curation workbench — every ACTIVE product regardless of the flag
     const all = await loadCatalogue(db, { includeHidden: true });
@@ -105,7 +105,7 @@ describe.skipIf(!URL)('DB-backed catalogue + pricing — integration', () => {
     expect(cat.babyBodysuit!.pricePence).toBeGreaterThan(0);
 
     // and the flag itself is seeded exactly as the founder set it
-    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'sack', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'watchStrap', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']); // + the multi photo frame + the watch strap (founder, 5 Nov)
+    const SHOWN = new Set(['framedPrint', 'mug', 'cushion', 'kidsTee', 'jigsaw', 'blanket', 'card', 'cardPack', 'calendar', 'multiPhotoFrame', 'adultTee', 'ceramicOrnament', 'christmasBauble', 'placemat', 'coaster', 'christmasBundle', 'phoneCase', 'watchStrap', 'socks', 'heightChart', 'wrappingPaper', 'teaTowel', 'playingCards']); // + the multi photo frame + the watch strap (founder, 5 Nov)
     const flags = await db.select({ key: products.key, v: products.visibleInShop }).from(products);
     for (const f of flags.filter((x) => x.key !== TEST_KEY)) {
       expect(f.v, f.key).toBe(SHOWN.has(f.key));

@@ -146,11 +146,6 @@ export const SHOP_PRODUCTS: Record<string, ShopProductCopy> = {
     googleCategory: CAT.ornaments, productType: 'Christmas > Baubles',
     image: xmas('ball-and-present', 1200, 800, 'A clear plastic ball bauble printed with a child’s crayon Christmas tree, beside a present wrapped in that tree on repeat'),
   },
-  sack: {
-    slug: 'christmas-sack', name: 'christmas sack', title: 'Personalised Christmas sack with your child’s drawing',
-    googleCategory: CAT.holiday, productType: 'Christmas > Sacks',
-    image: xmas('sack', 1000, 778, 'A natural cotton Christmas sack printed with a child’s crayon reindeer, by a fireplace'),
-  },
   // The Christmas table set + the family bundle (founder, 27–29 Oct): demo photos on the founder's print maps
   // until the samples are photographed. Category: the seasonal-decorations node already checked
   // above, until a precise placemat/coaster taxonomy id is verified against the en-GB list.

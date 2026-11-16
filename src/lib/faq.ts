@@ -65,7 +65,6 @@ export const FAQ_PRODUCT_NAMES: Record<string, string> = {
   playingCards: 'Playing cards',
   ceramicOrnament: 'Ceramic christmas ornament',
   christmasBauble: 'Christmas bauble (plastic ball)',
-  sack: 'Christmas sack',
   placemat: 'Placemats (set of 4)',
   coaster: 'Coasters (packs of 2, 4 or 6)',
   christmasBundle: 'Christmas family bundle (a set for 2, 4 or 8, from £78)',
@@ -169,7 +168,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'height-chart',
         q: 'How does the Snickerdoodle height chart work?',
-        a: 'The Snickerdoodle height chart is a canvas on wooden hangers with your child’s drawing running beside a printed ruler in centimetres and feet and inches. Hang it with the bottom edge 40 cm off the floor and it reads true from 50 cm up — so you can mark every birthday as they grow past it.',
+        a: 'The Snickerdoodle height chart is a canvas on wooden hangers with your child’s drawing running beside a printed ruler in centimetres and feet and inches. Hang it with the bottom of the lower wooden bar 40 cm off the floor and it reads true from 50 cm up — so you can mark every birthday as they grow past it.',
       },
     ],
   },
@@ -180,12 +179,12 @@ export const FAQ: FaqSection[] = [
       {
         id: 'christmas-last-order',
         q: 'What’s the last day to order from Snickerdoodle for Christmas?',
-        a: `Snickerdoodle’s last day to order for Christmas 2026 is ${longDate(XMAS.uk9)} for most things, including baubles, sacks, mugs, tea towels and T-shirts. Cards and card packs close earlier, on ${longDate(XMAS.uk7)}, and wrapping paper on ${longDate(XMAS.gb2)}. These are safe dates with time to make and post everything; every date is on [our Christmas dates page](/christmas/delivery-dates).`,
+        a: `Snickerdoodle’s last day to order for Christmas 2026 is ${longDate(XMAS.uk9)} for most things, including baubles, mugs, tea towels and T-shirts. Cards and card packs close earlier, on ${longDate(XMAS.uk7)}, and wrapping paper on ${longDate(XMAS.gb2)}. These are safe dates with time to make and post everything; every date is on [our Christmas dates page](/christmas/delivery-dates).`,
       },
       {
         id: 'christmas-bauble',
         q: 'Can I turn my child’s drawing into a Christmas bauble?',
-        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof plastic ball printed all the way round. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; see [how it works](/how-it-works).',
+        a: 'Yes — Snickerdoodle prints your child’s drawing on a bauble for the tree, as a glossy ceramic disc or a shatterproof clear ball with their drawing on a disc inside, seen from both sides. Lots of families make a new one every Christmas, so the tree fills up with a timeline of their drawings. Made in the UK; see [how it works](/how-it-works).',
       },
       {
         id: 'christmas-grandparents',
