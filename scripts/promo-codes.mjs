@@ -9,6 +9,11 @@
 //   node --env-file=.env scripts/promo-codes.mjs create STMARYSPTA --percent 0 --commission 10 --partner "St Mary's PTA" --type PTA
 //   PTA class codes roll up to one school: add --class "Year 2" (e.g. STMARYS-Y2, STMARYS-Y3 …)
 //   options: --ends 2026-12-24 --starts 2026-11-01 --max 500 --min 15 --first-order
+//   (dates are UK days: a code starts / stops at midnight as that day begins. The rules — percent 0–50, pounds
+//   above £0, commission 0–30 with a partner, dates in order — live in scripts/lib/promo-codes.mjs, shared with
+//   the admin app's codes screen, so the two make identical codes. The admin app refuses a code that exists; here
+//   `create` on an existing code updates it and switches it back on.)
+//   The codes screen: /admin/codes (create, switch off/on, commission owed per month).
 //
 // WHO a code is for (src/pricing/promo.ts codeTerms): creator (INFLUENCER), REFERRAL and --free-card
 // codes are ALWAYS first-order-only (by account, or a guest by email); --first-order makes any other
@@ -23,34 +28,24 @@
 // push an order below 10% contribution, whatever values are set here.
 
 import postgres from 'postgres';
+import { buildCodeRow, describeOffer, inputFromArgs, normaliseCode } from './lib/promo-codes.mjs';
 
 const [cmd, ...rest] = process.argv.slice(2);
-const opt = (name) => {
-  const i = rest.indexOf(`--${name}`);
-  return i >= 0 ? rest[i + 1] : undefined;
-};
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 const gbp = (p) => `£${(p / 100).toFixed(2)}`;
 
 try {
   if (cmd === 'create') {
-    const code = String(rest[0] ?? '').trim().toUpperCase().replace(/\s+/g, '');
-    if (!/^[A-Z0-9-]{3,32}$/.test(code)) throw new Error('code must be 3–32 letters/digits/dashes');
-    const percent = opt('percent'), pounds = opt('pounds'), freeCard = rest.includes('--free-card');
-    if ([percent !== undefined, pounds !== undefined, freeCard].filter(Boolean).length !== 1) throw new Error('give exactly one of --percent N, --pounds N or --free-card');
-    const kind = freeCard ? 'FREE_CARD' : percent !== undefined ? 'PERCENT' : 'FIXED';
-    const value = freeCard ? 0 : percent !== undefined ? Math.round(Number(percent) * 100) : Math.round(Number(pounds) * 100);
-    const partnerEmail = opt('partner-email')?.trim().toLowerCase() || null;
-    if (partnerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(partnerEmail)) throw new Error('--partner-email must be an email address');
-    const firstOrder = rest.includes('--first-order');
-    const minSpend = Math.round(Number(opt('min') ?? 0) * 100);
-    const commission = Math.round(Number(opt('commission') ?? 0) * 100);
-    if (!(value >= 0) || (kind === 'PERCENT' && value > 5000)) throw new Error('percent must be 0–50');
-    if (!(commission >= 0 && commission <= 3000)) throw new Error('commission must be 0–30 (%)');
+    // the same rules as the admin app's codes screen (scripts/lib/promo-codes.mjs): the two make identical codes
+    const parsed = inputFromArgs(rest);
+    if (!parsed.ok) throw new Error(parsed.message);
+    const built = buildCodeRow(parsed.input);
+    if (!built.ok) throw new Error(built.problems.map((p) => p.message).join('; '));
+    const c = built.row;
     const [row] = await sql`
       insert into promo_codes (code, kind, value, min_spend_pence, partner_name, partner_type, partner_email, commission_bps, class_label, first_order_only, starts_at, ends_at, max_redemptions)
-      values (${code}, ${kind}, ${value}, ${minSpend}, ${opt('partner') ?? null}, ${opt('type') ?? null}, ${partnerEmail}, ${commission}, ${opt('class') ?? null}, ${firstOrder},
-              ${opt('starts') ? new Date(opt('starts')) : null}, ${opt('ends') ? new Date(opt('ends')) : null}, ${opt('max') ? Number(opt('max')) : null})
+      values (${c.code}, ${c.kind}, ${c.value}, ${c.minSpendPence}, ${c.partnerName}, ${c.partnerType}, ${c.partnerEmail}, ${c.commissionBps}, ${c.classLabel}, ${c.firstOrderOnly},
+              ${c.startsAt}, ${c.endsAt}, ${c.maxRedemptions})
       on conflict (code) do update set kind = excluded.kind, value = excluded.value, min_spend_pence = excluded.min_spend_pence,
         partner_name = excluded.partner_name, partner_type = excluded.partner_type, partner_email = excluded.partner_email, commission_bps = excluded.commission_bps,
         class_label = excluded.class_label, first_order_only = excluded.first_order_only,
@@ -58,7 +53,7 @@ try {
       returning code`;
     console.log(`✓ ${row.code} saved`);
   } else if (cmd === 'off') {
-    await sql`update promo_codes set active = false where code = ${String(rest[0] ?? '').toUpperCase()}`;
+    await sql`update promo_codes set active = false where code = ${normaliseCode(rest[0])}`;
     console.log('✓ switched off');
   } else if (cmd === 'partners') {
     // One row per partner (school / creator) and per class, with a partner subtotal — the PTA pack.
@@ -86,7 +81,7 @@ try {
     const rows = await sql`select code, kind, value, min_spend_pence, commission_bps, partner_name, partner_type, first_order_only, class_label, ends_at, max_redemptions, active from promo_codes where owner_account_id is null order by created_at`;
     console.table(rows.map((r) => ({
       code: r.code,
-      offer: r.kind === 'FREE_CARD' ? 'one card free' : r.kind === 'PERCENT' ? (r.value ? `${r.value / 100}% off` : 'no discount') : `${gbp(r.value)} off`,
+      offer: describeOffer(r),
       firstOrder: r.first_order_only || r.kind === 'FREE_CARD' || ['INFLUENCER', 'REFERRAL'].includes(r.partner_type) ? 'yes' : '—',
       minSpend: r.min_spend_pence ? gbp(r.min_spend_pence) : '—',
       partner: r.partner_name ? `${r.partner_name}${r.class_label ? ` (${r.class_label})` : ''} · ${r.commission_bps / 100}%` : '—',
