@@ -18,7 +18,7 @@
 //                   texture and folds read through the print
 //   printmap.png    white where the print goes (its alpha = print area + silhouette mask)
 //   overlay.png     optional detail laid OVER the art (heel / folded corner / roll curl)
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
 
@@ -34,7 +34,9 @@ const CANVAS = 2000;
  * printmap — a separate print-area file; omitted ⇒ the product's own outline is the print area.
  */
 const SETS = [
-  { out: 'socks/ankle', product: 'ankle-socks.png', overlay: 'ankle-socks-heel.png', fill: 0.8 },
+  // BUILT ON PRODIGI'S TEMPLATE (founder, 16 Nov 2026): the template's own sock outlines + heels, the photo's
+  // knit fitted into them (its right sock turned over so the pair lies heels out) — composeFromTemplate
+  { out: 'socks/ankle', product: 'ankle-socks.png', overlay: 'ankle-socks-heel.png', template: '../../templates/prodigi-ankle-socks-templates/prodigi-socks-ankle.png', fill: 0.8 },
   { out: 'socks/tube', product: 'tube-socks.png', fill: 0.82 },
   // LANDSCAPE, as photographed (founder) — its print is designed landscape (DESIGNED_TURNED)
   { out: 'teaTowel', product: 'tea-towel.png', overlay: 'tea-towel-fold.png', fill: 0.82 },
@@ -194,9 +196,331 @@ async function sackPanel(productPng, spec) {
   return sharp({ create: { width: CANVAS, height: CANVAS, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: rect, left, top }]).png().toBuffer();
 }
 
+/**
+ * Turn the RIGHT-HAND piece of a pair (a sock) over, left to right, in place — with its on-top detail (the
+ * heel) — and slide it right just far enough that the pair keeps the gap it had. The canvas grows to fit.
+ * Pieces = the product's two largest opaque islands.
+ */
+function mirrorRightPiece(product, overlay) {
+  const { W, H } = product;
+  const { label, ids: [L, R] } = twoPieces(product);
+  // each row's extent of the two pieces
+  const lMax = new Int32Array(H).fill(-1), rMin = new Int32Array(H).fill(W);
+  let rx0 = W, rx1 = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const l = label[y * W + x];
+      if (l === L && x > lMax[y]) lMax[y] = x;
+      if (l === R) { if (x < rMin[y]) rMin[y] = x; if (x < rx0) rx0 = x; if (x > rx1) rx1 = x; }
+    }
+  // the gap the pair had (closest rows), kept after the turn
+  let gap = Infinity;
+  for (let y = 0; y < H; y++) if (lMax[y] >= 0 && rMin[y] < W) gap = Math.min(gap, rMin[y] - lMax[y]);
+  if (!Number.isFinite(gap)) gap = Math.round(W * 0.03);
+  const flip = (x) => rx0 + rx1 - x;
+  // the right piece's own mask, grown a little so its heel detail (overlay) goes with it
+  const GROW = 12;
+  const own = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) if (label[i] === R) own[i] = 1;
+  const grown = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!own[y * W + x]) continue;
+      for (let dy = -GROW; dy <= GROW; dy += 3) for (let dx = -GROW; dx <= GROW; dx += 3) {
+        const xx = x + dx, yy = y + dy;
+        if (xx >= 0 && yy >= 0 && xx < W && yy < H) grown[yy * W + xx] = 1;
+      }
+    }
+  // how far right the turned piece must go to clear the left one by the same gap
+  let shift = 0;
+  for (let y = 0; y < H; y++) {
+    if (lMax[y] < 0) continue;
+    let m = W;
+    for (let x = rx0; x <= rx1; x++) if (own[y * W + x]) m = Math.min(m, flip(x));
+    if (m < W) shift = Math.max(shift, lMax[y] + gap - m);
+  }
+  const W2 = Math.max(W, rx1 + shift + GROW + 2);
+  const turn = (layer, mine) => {
+    const out = Buffer.alloc(W2 * H * 4);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (mine[i]) continue;
+        layer.data.copy(out, (y * W2 + x) * 4, i * 4, i * 4 + 4);
+      }
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x;
+        if (!mine[i]) continue;
+        const nx = flip(x) + shift;
+        if (nx >= 0 && nx < W2) layer.data.copy(out, (y * W2 + nx) * 4, i * 4, i * 4 + 4);
+      }
+    return { data: out, W: W2, H };
+  };
+  // the product: just the piece's own pixels; the overlay: the heel, which sits on (or just past) its edge
+  const prodMine = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) if (grown[i] && label[i] !== L) prodMine[i] = 1;
+  return { product: turn(product, prodMine), overlay: overlay ? turn(overlay, grown) : null };
+}
+
+/**
+ * A sock set BUILT ON PRODIGI'S TEMPLATE (founder, 16 Nov 2026: "build our ankle socks off the Prodigi
+ * template"). Prodigi's template is the print file itself, one sock's two sides side by side and mirrored.
+ * So: its artboard is laid square on our canvas; its two sock outlines ARE the print map; its heel patches
+ * are the heels (in the photo's black knit); and the founder's photo — the right sock turned over so the pair
+ * lies heels out — is fitted into each outline for its knit and shading. artboard.json says where the
+ * artboard sits: the seeder lays the WHOLE print file on exactly that rectangle, so the preview is the
+ * template, one to one — nothing is estimated.
+ */
+async function composeFromTemplate(set, out) {
+  // ── the template (Prodigi draws it in black at set alphas: the sock clear, the heel / toe patch ≈ 40 %,
+  //    the board round it ≈ 30 %, the outline solid)
+  const { data: td, info: ti } = await sharp(path.join(RAW, set.template)).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const TW = ti.width, TH = ti.height, TC = ti.channels;
+  const ta = (i) => td[i * TC + 3];
+  const isSock = (a) => a < 10 || (a >= 95 && a <= 125);
+  const isPatch = (a) => a >= 95 && a <= 125;
+  const side = new Uint8Array(TW * TH); // 1 = the left side's sock, 2 = the right side's
+  for (const [k, fx] of [[1, 0.25], [2, 0.75]]) {
+    const sx = Math.round(TW * fx);
+    let seed = -1;
+    for (let y = Math.round(TH * 0.5); y < TH && seed < 0; y++) if (isSock(ta(y * TW + sx))) seed = y * TW + sx;
+    if (seed < 0) throw new Error(`${out}: no sock found in the template's ${k === 1 ? 'left' : 'right'} half`);
+    const stack = [seed];
+    side[seed] = k;
+    while (stack.length) {
+      const i = stack.pop();
+      const x = i % TW, y = (i / TW) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < TW - 1 ? i + 1 : -1, y > 0 ? i - TW : -1, y < TH - 1 ? i + TW : -1]) {
+        if (j >= 0 && !side[j] && isSock(ta(j))) { side[j] = k; stack.push(j); }
+      }
+    }
+  }
+  // the artboard on the canvas, and each mask at that size (soft-edged by the resize)
+  const scale = (set.fill * CANVAS) / Math.max(TW, TH);
+  const aw = Math.round(TW * scale), ah = Math.round(TH * scale);
+  const left = Math.round((CANVAS - aw) / 2), top = Math.round((CANVAS - ah) / 2 - CANVAS * 0.01);
+  const maskAt = async (pick) => {
+    const m = Buffer.alloc(TW * TH);
+    for (let i = 0; i < TW * TH; i++) if (pick(i)) m[i] = 255;
+    const small = await sharp(m, { raw: { width: TW, height: TH, channels: 1 } }).resize(aw, ah, { kernel: 'lanczos3' }).extractChannel(0).raw().toBuffer();
+    const full = Buffer.alloc(CANVAS * CANVAS);
+    for (let y = 0; y < ah; y++) small.copy(full, (y + top) * CANVAS + left, y * aw, (y + 1) * aw);
+    return full;
+  };
+  const sockMask = [await maskAt((i) => side[i] === 1), await maskAt((i) => side[i] === 2)];
+  // the heel = the patch in the upper half (the toe patch below still prints — on the photo the toe is white)
+  const half = TW * Math.floor(TH / 2);
+  const heelMask = [await maskAt((i) => side[i] === 1 && i < half && isPatch(ta(i))), await maskAt((i) => side[i] === 2 && i < half && isPatch(ta(i)))];
+
+  // ── the photo, heels out
+  let product = despeckle(await load(set.product));
+  let overlay = set.overlay ? despeckle(await load(set.overlay)) : null;
+  ({ product, overlay } = mirrorRightPiece(product, overlay));
+  const { label, ids } = twoPieces(product);
+  const PW = product.W, PH = product.H;
+
+  const productOut = Buffer.alloc(CANVAS * CANVAS * 4);
+  const overlayOut = Buffer.alloc(CANVAS * CANVAS * 4);
+  for (let k = 0; k < 2; k++) {
+    const id = ids[k];
+    // this sock's pixels only, carried a little past the edge so the outline is always filled
+    const own = Buffer.alloc(PW * PH * 4);
+    let x0 = PW, x1 = -1;
+    for (let i = 0; i < PW * PH; i++) {
+      if (label[i] !== id) continue;
+      // the photo's own heel (its dark knit) is left out — the template's heel patch is drawn instead
+      const lum = 0.3 * product.data[i * 4] + 0.59 * product.data[i * 4 + 1] + 0.11 * product.data[i * 4 + 2];
+      if (lum >= 150) product.data.copy(own, i * 4, i * 4, i * 4 + 4);
+      const x = i % PW;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+    }
+    // the heel's knit colour: the photo's heel (its solid middle), else a near-black
+    const heelRgb = [0, 0, 0];
+    let heelN = 0;
+    if (overlay) {
+      for (let i = 0; i < PW * PH; i++) {
+        const x = i % PW;
+        if (x < x0 - 20 || x > x1 + 20 || overlay.data[i * 4 + 3] < 240) continue;
+        for (let c = 0; c < 3; c++) heelRgb[c] += overlay.data[i * 4 + c];
+        heelN++;
+      }
+    }
+    const heelBase = heelN ? heelRgb.map((v) => v / heelN) : [24, 22, 21];
+    const ownFill = spread(own, PW, PH);
+    // fit the template's sock onto the photo's: same centre + spread, then the turn (±60°, cuff up) that lands most of it on the sock
+    const tpl = [], photo = [];
+    for (let y = 0; y < CANVAS; y += 3) for (let x = 0; x < CANVAS; x += 3) if (sockMask[k][y * CANVAS + x] >= 128) tpl.push([x + 0.5, y + 0.5]);
+    for (let y = 0; y < PH; y += 3) for (let x = 0; x < PW; x += 3) if (label[y * PW + x] === id) photo.push([x + 0.5, y + 0.5]);
+    const M = fitAffine(tpl, photo, (x, y) => {
+      const px = Math.round(x), py = Math.round(y);
+      return px >= 0 && py >= 0 && px < PW && py < PH && label[py * PW + px] === id;
+    });
+    for (let y = 0; y < CANVAS; y++)
+      for (let x = 0; x < CANVAS; x++) {
+        const i = y * CANVAS + x;
+        const sa = sockMask[k][i], ha = heelMask[k][i];
+        if (!sa && !ha) continue;
+        const [px, py] = M.at(x + 0.5, y + 0.5);
+        const c = bilinear(ownFill, PW, PH, px - 0.5, py - 0.5);
+        if (sa) {
+          productOut[i * 4] = c[0]; productOut[i * 4 + 1] = c[1]; productOut[i * 4 + 2] = c[2];
+          productOut[i * 4 + 3] = Math.max(productOut[i * 4 + 3], sa);
+        }
+        if (ha) {
+          // the template's heel patch, exactly, in the heel's colour — shaded by the sock's own knit + folds
+          const lum = Math.max(0.55, Math.min(1.25, (0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]) / 236));
+          for (let ch = 0; ch < 3; ch++) overlayOut[i * 4 + ch] = Math.min(255, Math.round(heelBase[ch] * lum));
+          overlayOut[i * 4 + 3] = Math.max(overlayOut[i * 4 + 3], ha);
+        }
+      }
+    console.log(`${out.padEnd(14)} ${k ? 'right' : 'left'} side: the photo's knit fitted to the template's sock (${Math.round(M.fit * 1000) / 10}% overlap)`);
+  }
+  const raw4 = (b) => sharp(b, { raw: { width: CANVAS, height: CANVAS, channels: 4 } }).png().toBuffer();
+  const productPng = await raw4(productOut);
+  const overlayPng = await raw4(overlayOut);
+  const printmapPng = await whiteFrom(productPng);
+  const shadowPng = await shadowFrom(await alphaOf(productPng));
+  const dir = path.join(OUT, out);
+  mkdirSync(dir, { recursive: true });
+  copyFileSync(BACKGROUND, path.join(dir, 'background.png'));
+  await sharp(productPng).toFile(path.join(dir, 'product.png'));
+  await sharp(printmapPng).toFile(path.join(dir, 'printmap.png'));
+  await sharp(shadowPng).toFile(path.join(dir, 'shadow.png'));
+  await sharp(overlayPng).toFile(path.join(dir, 'overlay.png'));
+  // the rectangle the whole print file covers — the template's artboard (normalised)
+  writeFileSync(path.join(dir, 'artboard.json'), JSON.stringify({ x0: left / CANVAS, y0: top / CANVAS, x1: (left + aw) / CANVAS, y1: (top + ah) / CANVAS }) + '\n');
+  console.log(`${out.padEnd(14)} built on ${path.basename(set.template)}: artboard ${aw}×${ah} at (${left}, ${top})`);
+}
+
+/** The two largest opaque islands of a layer, left to right: their label map + ids. */
+function twoPieces({ data, W, H }) {
+  const label = new Int32Array(W * H).fill(-1);
+  const comps = [];
+  for (let start = 0; start < W * H; start++) {
+    if (label[start] !== -1 || data[start * 4 + 3] <= 8) continue;
+    const id = comps.length;
+    let n = 0, sx = 0;
+    const stack = [start];
+    label[start] = id;
+    while (stack.length) {
+      const i = stack.pop();
+      n++; sx += i % W;
+      const x = i % W, y = (i / W) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]) {
+        if (j >= 0 && label[j] === -1 && data[j * 4 + 3] > 8) { label[j] = id; stack.push(j); }
+      }
+    }
+    comps.push({ id, n, cx: sx / n });
+  }
+  const two = comps.sort((a, b) => b.n - a.n).slice(0, 2).sort((a, b) => a.cx - b.cx);
+  if (two.length < 2) throw new Error('the product needs two separate pieces');
+  return { label, ids: two.map((c) => c.id) };
+}
+
+/** Carry a cut-out's colours out past its edge: every pixel within `inset` px of the edge (the photo's own
+ * darkened rim) or beyond takes the colour of the nearest solid pixel further in (a breadth-first fill), so a
+ * shape laid a little wider than the photo is never blank and never streaked. */
+function spread(rgba, W, H, inset = 8) {
+  const solid = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) if (rgba[i * 4 + 3] >= 200) solid[i] = 1;
+  // shrink the solid area by `inset` (row then column passes of a box)
+  const rowOk = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) {
+    let run = 0;
+    const r = new Int32Array(W);
+    for (let x = 0; x < W; x++) { run = solid[y * W + x] ? run + 1 : 0; r[x] = run; }
+    for (let x = 0; x < W; x++) {
+      const xe = Math.min(W - 1, x + inset);
+      rowOk[y * W + x] = r[xe] >= xe - Math.max(0, x - inset) + 1 ? 1 : 0;
+    }
+  }
+  const core = new Uint8Array(W * H);
+  for (let x = 0; x < W; x++) {
+    let run = 0;
+    const c = new Int32Array(H);
+    for (let y = 0; y < H; y++) { run = rowOk[y * W + x] ? run + 1 : 0; c[y] = run; }
+    for (let y = 0; y < H; y++) {
+      const ye = Math.min(H - 1, y + inset);
+      core[y * W + x] = c[ye] >= ye - Math.max(0, y - inset) + 1 ? 1 : 0;
+    }
+  }
+  const out = Buffer.alloc(W * H * 4);
+  const done = new Uint8Array(W * H);
+  let queue = [];
+  for (let i = 0; i < W * H; i++) {
+    if (!core[i]) continue;
+    rgba.copy(out, i * 4, i * 4, i * 4 + 3);
+    out[i * 4 + 3] = 255;
+    done[i] = 1;
+    queue.push(i);
+  }
+  while (queue.length) {
+    const next = [];
+    for (const i of queue) {
+      const x = i % W, y = (i / W) | 0;
+      for (const j of [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1]) {
+        if (j < 0 || done[j]) continue;
+        out.copy(out, j * 4, i * 4, i * 4 + 4);
+        done[j] = 1;
+        next.push(j);
+      }
+    }
+    queue = next;
+  }
+  return out;
+}
+
+function bilinear(buf, W, H, x, y) {
+  const cx = Math.max(0, Math.min(W - 1.001, x)), cy = Math.max(0, Math.min(H - 1.001, y));
+  const x0 = Math.floor(cx), y0 = Math.floor(cy), fx = cx - x0, fy = cy - y0;
+  const at = (xx, yy, c) => buf[(yy * W + xx) * 4 + c];
+  return [0, 1, 2].map((c) => Math.round(at(x0, y0, c) * (1 - fx) * (1 - fy) + at(x0 + 1, y0, c) * fx * (1 - fy) + at(x0, y0 + 1, c) * (1 - fx) * fy + at(x0 + 1, y0 + 1, c) * fx * fy));
+}
+
+/** The affine map from one shape's points onto another's: the same centre and spread (second moments),
+ * turned (within ±60°) to where the most of the first lands inside the second (`inside`). Never mirrored. */
+function fitAffine(from, to, inside) {
+  const moments = (pts) => {
+    let mx = 0, my = 0;
+    for (const [x, y] of pts) { mx += x; my += y; }
+    mx /= pts.length; my /= pts.length;
+    let a = 0, b = 0, c = 0;
+    for (const [x, y] of pts) { a += (x - mx) ** 2; b += (x - mx) * (y - my); c += (y - my) ** 2; }
+    return { mx, my, a: a / pts.length, b: b / pts.length, c: c / pts.length };
+  };
+  const sqrtm = ({ a, b, c }) => { const s = Math.sqrt(Math.max(0, a * c - b * b)), t = Math.sqrt(a + c + 2 * s); return [[(a + s) / t, b / t], [b / t, (c + s) / t]]; };
+  const inv = (m) => { const d = m[0][0] * m[1][1] - m[0][1] * m[1][0]; return [[m[1][1] / d, -m[0][1] / d], [-m[1][0] / d, m[0][0] / d]]; };
+  const mul = (p, q) => [[p[0][0] * q[0][0] + p[0][1] * q[1][0], p[0][0] * q[0][1] + p[0][1] * q[1][1]], [p[1][0] * q[0][0] + p[1][1] * q[1][0], p[1][0] * q[0][1] + p[1][1] * q[1][1]]];
+  const mf = moments(from), mt = moments(to);
+  const St = sqrtm(mt), Sf = inv(sqrtm(mf));
+  let best = null;
+  for (let deg = -60; deg <= 60; deg += 0.5) {
+    const r = (deg * Math.PI) / 180;
+    const M = mul(mul(St, [[Math.cos(r), -Math.sin(r)], [Math.sin(r), Math.cos(r)]]), Sf);
+    if (M[0][0] * M[1][1] - M[0][1] * M[1][0] <= 0) continue;
+    let hit = 0;
+    for (let k = 0; k < from.length; k += 2) {
+      const dx = from[k][0] - mf.mx, dy = from[k][1] - mf.my;
+      if (inside(M[0][0] * dx + M[0][1] * dy + mt.mx, M[1][0] * dx + M[1][1] * dy + mt.my)) hit++;
+    }
+    const fit = hit / Math.ceil(from.length / 2);
+    if (!best || fit > best.fit) best = { M, fit };
+  }
+  const { M, fit } = best;
+  return {
+    fit,
+    at: (x, y) => {
+      const dx = x - mf.mx, dy = y - mf.my;
+      return [M[0][0] * dx + M[0][1] * dy + mt.mx, M[1][0] * dx + M[1][1] * dy + mt.my];
+    },
+  };
+}
+
 const has = (f) => existsSync(path.join(RAW, f));
 /** The raw files a set needs (all must be there, or it's skipped). */
-const needs = (set) => [set.product, set.printmap, set.overlay, ...(set.overlays ?? [])].filter((f) => f && !(set.productFromPrintmap && f === set.product));
+const needs = (set) => [set.product, set.printmap, set.overlay, set.template, ...(set.overlays ?? [])].filter((f) => f && !(set.productFromPrintmap && f === set.product));
 
 if (!existsSync(BACKGROUND)) throw new Error(`brand backdrop missing: ${BACKGROUND}`);
 const only = process.argv[2];
@@ -204,7 +528,7 @@ for (const set of SETS) {
   if (only && !set.out.startsWith(only)) continue;
   const missing = needs(set).filter((f) => !has(f));
   if (missing.length) { console.log(`${set.out.padEnd(14)} skipped — waiting for ${missing.join(', ')} in ${RAW}`); continue; }
-  await compose(set, set.out);
+  await (set.template ? composeFromTemplate(set, set.out) : compose(set, set.out));
 }
 
 /**

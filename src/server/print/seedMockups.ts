@@ -6,6 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { printTemplates, products, productVariants } from '@/db/schema';
 import type { DbHandle } from '@/server/db';
 import { setBundleLayout, setMockupTemplate, setMockupView } from './templates';
+import { SOCK_SIDES, type SockSide } from './sockTemplates';
 import { BUNDLE_LAYOUTS, buildBundleLayout, buildLayout, regionGeom, type BundleLayoutName } from './bundleMockup';
 import { buildFrameLayout, frameLayoutDir } from './frameLayout';
 import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
@@ -95,7 +96,7 @@ type Plan = { rotate?: 90 } & (
   | { file?: undefined; material: Material; register: 'layered-mug'; dir: string }
   | { file?: undefined; material: Material; register: 'layered-blanket'; dir: string; orientation: 'portrait' | 'landscape' }
   | { file?: undefined; material: Material; register: 'layered-card-single'; dir: string }
-  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean }
+  | { file?: undefined; material: Material; register: 'layered-flat'; dir: string; tilted?: boolean; window?: boolean; pieces?: boolean | SockSide; artboard?: boolean }
   | { file?: undefined; material: Material; register: 'drawn'; key: DrawnProductKey }
   | { file?: undefined; material: Material; register: 'drawn-strap' }
   | { file?: undefined; material: Material; register: 'layered-strap'; dir: string; size: string }
@@ -452,9 +453,16 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // the ankle pair lies at an angle — the pattern runs down the socks, cuff to toe (founder)
       const tube = size === 'tube';
       const dir = layeredFlatDir(`socks/${tube ? 'tube' : 'ankle'}`);
-      // PIECES: the pair is two of the same sock printed from the same print map, so each sock gets
-      // its own print area showing the WHOLE print file — the two socks in the photo match (founder)
-      return dir ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, tilted: !tube, pieces: true } : { material: 'PAPER', register: 'drawn', key: 'socks' };
+      // Prodigi's sock templates are the print file itself: ONE sock's two sides, side by side and mirrored
+      // (sockTemplates.ts). Founder, 16 Nov 2026 — "absolute certainty it will print cleanly and as previewed":
+      //  - ANKLE: the set is BUILT ON the template (compose-founder-layers composeFromTemplate) — its sock
+      //    outlines are the print map, its heel patches the heels, the photo's knit fitted into them — and the
+      //    whole print file lies on the template's artboard (artboard.json), one to one. No artboard → no
+      //    template (an old photo set must be recomposed, never shown with a guessed mapping).
+      //  - TUBE: each sock in the photo shows ITS side — the left half on the left sock, the right half on the
+      //    right, the template's traced outline laid on the sock's (sideQuad).
+      if (!dir) return { material: 'PAPER', register: 'drawn', key: 'socks' };
+      return tube ? { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, pieces: SOCK_SIDES.tube } : { material: 'LIGHT_FABRIC', register: 'layered-flat', dir, artboard: true };
     }
     case 'teaTowel': {
       // shown LANDSCAPE as photographed; its print canvas is designed landscape (DESIGNED_TURNED)
@@ -817,9 +825,10 @@ async function layeredBlanket(dir: string, orientation: 'portrait' | 'landscape'
  * rides on top of the art. Same canvas rules as the cushion/blanket.
  */
 const layeredFlatCache = new Map<string, { blank: Buffer; mask: Buffer; overlay?: Buffer; printmap: Buffer; window: Box; W: number; H: number }>();
-async function layeredFlat(dir: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; printmap: Buffer; window: Box; W: number; H: number }> {
+async function layeredFlat(dir: string): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; printmap: Buffer; window: Box; artboard?: Box; W: number; H: number }> {
   const hasOverlay = existsSync(path.join(dir, 'overlay.png'));
-  const files = ['background.png', 'shadow.png', 'product.png', 'printmap.png', ...(hasOverlay ? ['overlay.png'] : [])];
+  const hasArtboard = existsSync(path.join(dir, 'artboard.json'));
+  const files = ['background.png', 'shadow.png', 'product.png', 'printmap.png', ...(hasOverlay ? ['overlay.png'] : []), ...(hasArtboard ? ['artboard.json'] : [])];
   const key = dir + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
   const hit = layeredFlatCache.get(key);
   if (hit) return hit;
@@ -856,7 +865,14 @@ async function layeredFlat(dir: string): Promise<{ blank: Buffer; mask: Buffer; 
     .toBuffer();
   const overlay = hasOverlay ? await sharp(readFileSync(path.join(dir, 'overlay.png'))).ensureAlpha().png().toBuffer() : undefined;
 
-  const out = { blank, mask, overlay, printmap, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+  // a set built on a Prodigi template says where the template's artboard (= the whole print file) sits
+  let artboard: Box | undefined;
+  if (hasArtboard) {
+    const a = JSON.parse(readFileSync(path.join(dir, 'artboard.json'), 'utf8')) as Box;
+    if (![a.x0, a.y0, a.x1, a.y1].every((n) => typeof n === 'number' && n >= 0 && n <= 1) || a.x1 <= a.x0 || a.y1 <= a.y0) throw new Error(`layered ${dir}: artboard.json is not a normalised box`);
+    artboard = a;
+  }
+  const out = { blank, mask, overlay, printmap, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, artboard, W, H };
   layeredFlatCache.set(key, out);
   return out;
 }
@@ -875,14 +891,24 @@ export async function layeredFlatTemplate(
   /** the print area IS the product's window (the art cover-fits into it, a section of a long print) */
   window = false,
   /** each separate piece of the print area (a pair of socks) shows the WHOLE print file — one
-   * print area per piece (`quad` + `extraQuads`), each at its own angle, left to right */
-  pieces = false,
+   * print area per piece (`quad` + `extraQuads`), each at its own angle, left to right. A SockSide: a
+   * pair laid like Prodigi's sock template — each piece shows its OWN half of the file (sideQuad) */
+  pieces: boolean | SockSide = false,
+  /** the set is built on a Prodigi template: the WHOLE print file lies on its artboard (artboard.json) */
+  artboard = false,
 ): Promise<{ blank: Buffer; mask: Buffer; overlay?: Buffer; quad: Quad; extraQuads?: Quad[]; W: number; H: number } | null> {
   const d = await layeredFlat(dir);
+  if (artboard) return d.artboard ? { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.artboard), W: d.W, H: d.H } : null;
   if (window) return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: asQuad(d.window), W: d.W, H: d.H };
   if (pieces) {
     const a = await sharp(d.printmap).ensureAlpha().extractChannel(3).raw().toBuffer();
     const parts = piecesOf(a, d.W, d.H);
+    if (typeof pieces === 'object') {
+      if (parts.length !== 2) return null; // never guess which half goes where
+      const sides = parts.map((p, k) => sideQuad(p, d.W, d.H, k === 0 ? 'left' : 'right', pieces));
+      if (!sides[0] || !sides[1]) return null;
+      return { blank: d.blank, mask: d.mask, overlay: d.overlay, quad: sides[0].quad, extraQuads: [sides[1].quad], W: d.W, H: d.H };
+    }
     if (parts.length >= 2) {
       const quads = parts
         .map((p) => orientedCoverQuad(p, d.W, d.H, printAspect, tilted ? tiltOf(p, d.W, d.H) : 0))
@@ -1034,6 +1060,78 @@ export function tiltOf(alpha: Uint8Array | Buffer, W: number, H: number, step = 
   const big = pieces.filter((p) => p.n >= total * 0.05);
   const n = big.reduce((s, p) => s + p.n, 0);
   return n ? big.reduce((s, p) => s + p.t * p.n, 0) / n : 0;
+}
+
+/**
+ * The print area for ONE sock of a pair laid like Prodigi's sock template (the left sock = the template's
+ * left half, the right sock = its right half, mirrored — the ankle pair heels out; sockTemplates.ts). The
+ * template's traced sock outline is laid onto the sock's own outline in the photo by the affine map that
+ * matches their spread (centre + second moments), turned (within ±60°, cuff kept up) to the angle where the
+ * most of the template's sock lands on the photo's. The quad is the WHOLE print file at that registration,
+ * so the other half falls off the sock (the compositor gives each sock only the pixels on it). Corners TL,
+ * TR, BR, BL, normalised; `fit` = the share of the template's sock that lands on the photo's (1 = perfect).
+ * Exported for its unit test.
+ */
+export function sideQuad(alpha: Uint8Array | Buffer, W: number, H: number, side: 'left' | 'right', sock: SockSide, step = 3): { quad: [number, number][]; fit: number } | null {
+  type M2 = [[number, number], [number, number]];
+  type Moments = { mx: number; my: number; a: number; b: number; c: number };
+  const moments = (pts: [number, number][]): Moments => {
+    let mx = 0, my = 0;
+    for (const [x, y] of pts) { mx += x; my += y; }
+    mx /= pts.length; my /= pts.length;
+    let a = 0, b = 0, c = 0;
+    for (const [x, y] of pts) { a += (x - mx) ** 2; b += (x - mx) * (y - my); c += (y - my) ** 2; }
+    return { mx, my, a: a / pts.length, b: b / pts.length, c: c / pts.length };
+  };
+  const sqrtm = ({ a, b, c }: Moments): M2 => {
+    const s = Math.sqrt(Math.max(0, a * c - b * b)), t = Math.sqrt(a + c + 2 * s);
+    return [[(a + s) / t, b / t], [b / t, (c + s) / t]];
+  };
+  const inv = (m: M2): M2 => { const d = m[0][0] * m[1][1] - m[0][1] * m[1][0]; return [[m[1][1] / d, -m[0][1] / d], [-m[1][0] / d, m[0][0] / d]]; };
+  const mul = (p: M2, q: M2): M2 => [
+    [p[0][0] * q[0][0] + p[0][1] * q[1][0], p[0][0] * q[0][1] + p[0][1] * q[1][1]],
+    [p[1][0] * q[0][0] + p[1][1] * q[1][0], p[1][0] * q[0][1] + p[1][1] * q[1][1]],
+  ];
+  // the photo's sock
+  const photo: [number, number][] = [];
+  for (let y = 0; y < H; y += step) for (let x = 0; x < W; x += step) if (alpha[y * W + x]! >= 128) photo.push([x + 0.5, y + 0.5]);
+  if (photo.length < 50) return null;
+  // the template's sock, in mm across THIS side's half (the right side = the left's mirror)
+  const { w: hw, h: hh } = sock.halfMm;
+  const tpl: [number, number][] = [];
+  sock.spans.forEach((span, r) => {
+    if (!span) return;
+    const y = ((r + 0.5) / sock.spans.length) * hh;
+    for (let x = span[0] * hw; x <= span[1] * hw; x += 1) tpl.push([side === 'left' ? x : hw - x, y]);
+  });
+  const mp = moments(photo), mt = moments(tpl);
+  const Sp = sqrtm(mp), St = inv(sqrtm(mt));
+  const on = (x: number, y: number) => {
+    const px = Math.round(x), py = Math.round(y);
+    return px >= 0 && py >= 0 && px < W && py < H && alpha[py * W + px]! >= 128;
+  };
+  let best: { M: M2; fit: number } | null = null;
+  for (let deg = -60; deg <= 60; deg += 0.5) {
+    const r = (deg * Math.PI) / 180;
+    const M = mul(mul(Sp, [[Math.cos(r), -Math.sin(r)], [Math.sin(r), Math.cos(r)]]), St);
+    if (M[0][0] * M[1][1] - M[0][1] * M[1][0] <= 0) continue; // never a mirror image
+    let hit = 0;
+    for (let k = 0; k < tpl.length; k += 3) {
+      const dx = tpl[k]![0] - mt.mx, dy = tpl[k]![1] - mt.my;
+      if (on(M[0][0] * dx + M[0][1] * dy + mp.mx, M[1][0] * dx + M[1][1] * dy + mp.my)) hit++;
+    }
+    const fit = hit / Math.ceil(tpl.length / 3);
+    if (!best || fit > best.fit) best = { M, fit };
+  }
+  if (!best) return null;
+  const { M } = best;
+  const at = (x: number, y: number): [number, number] => {
+    const dx = x - mt.mx, dy = y - mt.my;
+    return [(M[0][0] * dx + M[0][1] * dy + mp.mx) / W, (M[1][0] * dx + M[1][1] * dy + mp.my) / H];
+  };
+  // the whole file in this side's mm: the left sock's half is the file's left (x 0..2·half), the right sock's its right (−half..half)
+  const [x0, x1] = side === 'left' ? [0, 2 * hw] : [-hw, hw];
+  return { quad: [at(x0, 0), at(x1, 0), at(x1, hh), at(x0, hh)], fit: best.fit };
 }
 
 /**
@@ -1496,8 +1594,8 @@ export async function authorTemplate(r: TemplateRow, ctx: AuthorCtx = authorCtx(
   }
 
   if (p.register === 'layered-flat') {
-    const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, !!p.pieces);
-    if (!d) return { skip: `${r.key} (no print area in ${p.dir})` };
+    const d = await layeredFlatTemplate(p.dir, printAspectEarly, !!p.tilted, !!p.window, p.pieces ?? false, !!p.artboard);
+    if (!d) return { skip: `${r.key} (${p.artboard ? `no artboard.json in ${p.dir} — re-run scripts/compose-founder-layers.mjs` : `no print area in ${p.dir}`})` };
     const quad = d.quad;
     const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, extraQuads: d.extraQuads, materialClass: p.material, mask: d.mask, overlay: d.overlay };
     const qa = p.tilted ? null : ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);

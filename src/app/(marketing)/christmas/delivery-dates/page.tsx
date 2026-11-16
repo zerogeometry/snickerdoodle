@@ -20,7 +20,7 @@ export const metadata: Metadata = {
 };
 
 const ROWS: { route: Route; what: string; how: string }[] = [
-  { route: 'uk9', what: 'baubles (ceramic), christmas sacks, mugs, tea towels, socks, t-shirts, hoodies & kids jumpers', how: 'tracked' },
+  { route: 'uk9', what: 'baubles (ceramic), mugs, tea towels, socks, t-shirts, hoodies & kids jumpers', how: 'tracked' },
   { route: 'uk3', what: 'cushions, fleece blankets, aprons', how: 'tracked' },
   { route: 'gb3', what: 'framed prints, jigsaws, height charts', how: 'tracked' },
   { route: 'uk2', what: 'christmas jumpers (grown-ups)', how: 'first class' },

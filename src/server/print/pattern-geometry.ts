@@ -61,6 +61,10 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
   // sock shows whole motifs with white either side, never slices of the next column at its edges
   // (founder, 23 Oct: "chopped up"; four-round always left slivers). That IS its 1.0× — the zoom
   // multiplies it and the shift starts from centred — so nudging either never jumps the pattern.
+  // "The side you see" is a HALF of the file: Prodigi's sock templates put one side of the sock in the
+  // left half and the other in the right, the file's middle line down the front of the foot and its outer
+  // edges meeting at the back (src/server/print/sockTemplates.ts) — so column i sits at (i + ½)·cellW, the
+  // middle of a side, never on the middle line (where it would be split round the front — 16 Nov 2026).
   const widthMm = (canvas.width / dpi) * 25.4;
   const narrow = widthMm < NARROW_MAX_MM;
   // one column = the side you see: half of the print round the sock
@@ -84,8 +88,8 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
     cols, rows, cellW, stripH,
     motifW: Math.max(1, Math.round(sw * fit)),
     motifH: Math.max(1, Math.round(sh * fit)),
-    // (a narrow print starts half a column across, so a whole motif sits mid-face)
-    phaseX: Math.round(((transform.offsetX + (narrow ? 1 : 0)) * cellW) / 2),
+    // (an even number of columns → each half of a narrow print, one side of the sock, holds whole columns, mid-side)
+    phaseX: Math.round((transform.offsetX * cellW) / 2),
     phaseY: Math.round((transform.offsetY * stripH) / 2),
   };
 }

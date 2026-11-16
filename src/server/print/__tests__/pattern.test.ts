@@ -24,14 +24,19 @@ describe('patternLayout — a narrow print (the ankle sock) at its default zoom 
   it('one whole column per side: two round, each motif about half its column, centred (never slivers of a neighbour)', () => {
     const L = patternLayout({ width: 3543, height: 3543 }, 300, src, T);
     expect(L.cols).toBe(2); // even, so the half-drop meets itself round the sock
-    expect(L.phaseX).toBe(Math.round(L.cellW / 2)); // shifted half a column → a motif mid-side
+    // Prodigi's template: the file's left half is one side of the sock, its right half the other, the
+    // middle line down the front of the foot — so a motif sits mid-SIDE (¼ and ¾ across), never on the
+    // middle line, where it would be split round the front (16 Nov 2026)
+    const xs = [...new Set(patternMotifCentres(L, { width: 3543, height: 3543 }).map((c) => Math.round(c.x)))].sort((p, q) => p - q);
+    expect(xs).toEqual([Math.round(3543 / 4), Math.round((3 * 3543) / 4)]);
     expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
     expect(L.motifW / L.cellW).toBeLessThan(0.56); // white either side of it on the sock's face
   });
   it('tube socks wrap round too (designed upright, 300 mm round × 520 mm long): one whole column per visible side', () => {
     const L = patternLayout({ width: 3543, height: 6141 }, 300, src, T);
     expect(L.cols).toBe(2);
-    expect(L.phaseX).toBe(Math.round(L.cellW / 2));
+    const xs = [...new Set(patternMotifCentres(L, { width: 3543, height: 6141 }).map((c) => Math.round(c.x)))].sort((p, q) => p - q);
+    expect(xs).toEqual([Math.round(3543 / 4), Math.round((3 * 3543) / 4)]); // mid-side, as on the template
     expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
     expect(L.motifW / L.cellW).toBeLessThan(0.56);
   });

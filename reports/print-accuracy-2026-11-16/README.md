@@ -24,9 +24,9 @@
 
 | # | Sample | Cost to us | Why |
 |---|---|---|---|
-| 1 | Christmas sack | £23.16 | Prodigi's template says only a 28×32 cm box prints. We sell, and preview, a 32×50 cm print. |
+| 1 | ~~Christmas sack~~ | ~~£23.16~~ | Taken off sale instead (16 Nov). |
 | 2 | Plastic bauble | £9.84 | It's a flat card disc inside the ball, not a print on the ball. We don't know the disc's size. |
-| 3 | 11oz two-tone mug | £8.70 | Prodigi says it is "NOT top-to-bottom printing", but our preview prints from rim to base. Our best-selling kind of product, and a cheap check. |
+| 3 | ~~11oz two-tone mug~~ | ~~£8.70~~ | Settled by your photos of Prodigi's mugs: it prints practically rim to base (16 Nov). |
 | 4 | Tube socks | £12.18 | Prodigi's size changed, and we can't tell which way up the pattern runs on the sock. Fix the code first, then check. |
 
 Optional: **kids t-shirt** (£12.30), only if you want to see the hand placement for yourself.
@@ -130,13 +130,22 @@ The pictures beside this file are the evidence.
 - **Tube socks** now send Prodigi's new size, 6141×3543 px. We design them upright (30 cm round the leg, 52 cm long), like the ankle socks, and turn the file to Prodigi's shape. Which end Prodigi treats as the top of the sock is still question 4 below.
 - **Christmas sack:** the file stays Prodigi's full size, but the drawing now goes **only inside their 28×32 cm print box**, centred and 4 cm from the top. The rest stays plain sack. The shop pictures, the positioner ("only the outlined box prints — the sack round it stays plain"), the print file and the print-quality check all use that box.
 - **Previews at the finished size:** playing cards (3 mm trimmed), cushions (6 mm into the seam) and blankets (10 mm into the hem) no longer show the edge that gets cut or sewn in. The file Prodigi gets is unchanged. Greetings cards stay as they were: their extra edge is only 1–2.5 mm, and trimming it evenly would make the card the wrong shape, because the fold side isn't cut. The cosy edge marks where they're cut instead.
-- **The cosy edge:** on the positioner, a soft striped band marks the edge that still prints but tucks into a seam, curls round, sits at the rim or gets cut. It comes with one friendly line, for example "the shaded edge still prints, but it tucks round into the seam and the puffy sides — keep faces & words inside it". It applies to cushions, blankets, the ceramic ornament, playing cards, greetings cards and card packs, and the mug (top and bottom strips). Product photos don't show it; they show the finished look.
+- **The cosy edge:** on the positioner, a soft striped band marks the edge that still prints but tucks into a seam, curls round, sits at the rim or gets cut. It comes with one friendly line, for example "the shaded edge still prints, but it tucks round into the seam and the puffy sides — keep faces & words inside it". It applies to cushions, blankets, the ceramic ornament, playing cards, greetings cards and card packs (the mug's strips were dropped later the same day — see below). Product photos don't show it; they show the finished look.
 - **Wording:**
   - Bauble: "a disc inside a shatterproof clear bauble — it shows from both sides".
   - Height chart: "the bottom of the lower wooden bar 40 cm off the floor".
   - Phone case: "tough wraps right round the sides; snap runs just over the edges".
   - Coaster: 10 cm. Placemat: 28.5 × 20 cm.
 - **Weekly Prodigi check:** it already ran every Monday, but only wrote to the server log. It now **emails the support inbox** when a product's print size no longer matches Prodigi's, or a product disappears.
+
+## Second update, same day: your answers
+
+- **Christmas sack: taken off sale** ("not a great product as is"). It is paused the way the Christmas Eve bundle was: out of the shop, the add-ons, the Christmas list, the Google feed, the FAQ and the delivery-dates page. Its print code stays only so an order already placed still prints the way it was previewed.
+- **Mug:** your photos of Prodigi's 11oz mugs show the print running practically rim to base, so the plain top and bottom strips are gone from the positioner, and the mug question is off the list for Prodigi.
+- **Socks: now built on Prodigi's own templates.** Both sock templates are *one sock's two sides*: the left half of the file is one side, the right half the other (mirrored), the middle line runs down the front of the foot and the two outer edges meet at the back. We had this wrong in two ways:
+  - **The preview** showed the whole file on each sock. Now the **ankle** preview is built straight on Prodigi's template: its two sock outlines are the print area, its heel patches are the heels (black knit), the photo's knit and shading are fitted into them, and the print file covers the template's board one to one. You see the two sides of one sock, exactly as Prodigi lays them out. The **tube** pair shows the left half on the left sock and the right half on the right, matched to the template's outline.
+  - **The print file itself** put each drawing on the file's middle line. On a real sock that is the front fold, so every drawing was split round the front of the foot. Now each drawing sits in the middle of a side (a quarter and three quarters across). This changes what Prodigi prints for every sock order from now on.
+- Evidence: `socks-ankle.jpg` and `socks-tube.jpg` (below).
 
 ## Code fixes that cut the risk without a sample (as first proposed)
 
@@ -155,12 +164,13 @@ Each would go on its own branch with a pull request into `feat/christmas-season`
 
 ## Questions to email Prodigi support (free)
 
+Updated 16 Nov after your answers: the sack is off sale and your mug photos settle the mug, so those two are gone.
+
 > Hello — a few print-spec questions before Christmas, please:
-> 1. **Christmas sack (XMAS-SACK):** your template shows a "print area" box of 28×32 cm inside a 320×500 mm artboard, but the API print area is 3779×5905 px (320×500 mm) and the sack is 49.5×75 cm. Which part of a 3779×5905 file is actually printed, and where does it sit on the sack?
-> 2. **Plastic bauble (XMAS-PLAS-BAUB):** the API print area is 1003×1062 px, but the template is a 72 mm circle. What shape and size is the printed card insert, which part of a 1003×1062 file ends up on it, and is the same image on both faces?
-> 3. **Two-tone 11oz mugs (H-MUG-11OZ-WBL etc.):** the API says "NOT top-to-bottom printing". How tall is the printed band, and how far is it from the rim and the base? Does the centre of the 2480 px file face away from the handle?
-> 4. **Tube socks (GLOBAL-TUBE-SOCKS):** the API area is now 6141×3543 (it was 6141×5433 in October). Which edge of the file is the top of the sock?
-> 5. **T-shirts (TEE-SS-STTK909, TEE-SS-STTM559):** the print area is the same at every size. How far below the collar is the top of the front print placed, and is the full area printed on the smallest sizes?
+> 1. **Plastic bauble (XMAS-PLAS-BAUB):** the API print area is 1003×1062 px, but the template is a 72 mm circle. What shape and size is the printed card insert, which part of a 1003×1062 file ends up on it, and is the same image on both faces?
+> 2. **Ankle socks (GLOBAL-ANKLE-SOCKS):** we lay our 3543×3543 px file out exactly like your template: the left half is one side of the sock (heel on the left), the right half the other side, the middle line down the front of the foot. Is that right? Are the darker grey heel and toe patches on the template printed, or are they the black knit heel and an unprinted toe?
+> 3. **Tube socks (GLOBAL-TUBE-SOCKS):** your template is upright (30 × 52 cm, cuff at the top), but the API print area is landscape, 6141×3543 px (it was 6141×5433 in October). Which edge of the landscape file is the cuff? Should we turn the upright design clockwise or anticlockwise? And is the live size the same as the sandbox's?
+> 4. **T-shirts (TEE-SS-STTK909, TEE-SS-STTM559):** the print area is the same at every size. How far below the collar is the top of the front print placed, and is the full area printed on the smallest sizes?
 
 ## Evidence files in this folder
 
@@ -175,6 +185,8 @@ Each would go on its own branch with a pull request into `feat/christmas-season`
 | `playing-cards.jpg` | our print file · our preview |
 | `adult-tee.jpg` | our print file · our preview |
 | `positioner-phone.jpg` | the new positioning screen on a phone: cushion, playing cards, mug, sack |
+| `socks-ankle.jpg` | Prodigi's ankle template · the template laid on our new preview (left side blue, right side orange: each fills its sock exactly) · a drawing on the new preview |
+| `socks-tube.jpg` | the tube template laid on our preview (each sock shows its own side) · a drawing on the new preview |
 | `positioner-on-the-product.jpg` | the cosy edge following the cushion's heart, the ornament's disc and the blanket; the sack's print box on the sack |
 
 The grid's coloured bands are 2 mm each from the file's edge: red, then orange, yellow, green, blue. If you can see red in a preview, the preview is showing the outermost 2 mm of the file.

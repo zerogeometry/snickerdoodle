@@ -7,18 +7,17 @@
 
 export const COMPLEMENTS: Readonly<Record<string, readonly string[]>> = {
   // the christmas table + tree: all uk9 homeware, so each rides in the same parcel
-  christmasBundle: ['sack', 'mug', 'teaTowel'],
+  christmasBundle: ['mug', 'teaTowel', 'christmasBauble'],
   placemat: ['coaster', 'mug', 'teaTowel'],
   coaster: ['placemat', 'mug', 'teaTowel'],
-  ceramicOrnament: ['sack', 'mug', 'teaTowel'],
-  sack: ['ceramicOrnament', 'mug', 'teaTowel'],
+  ceramicOrnament: ['mug', 'teaTowel', 'christmasBauble'],
   mug: ['coaster', 'teaTowel', 'placemat'],
   teaTowel: ['mug', 'coaster', 'placemat'],
-  christmasBauble: ['ceramicOrnament', 'sack', 'card'],
+  christmasBauble: ['ceramicOrnament', 'cardPack', 'card'],
   // natural fits from other labs (no saving claimed)
   card: ['cardPack', 'wrappingPaper', 'framedPrint'],
   cardPack: ['wrappingPaper', 'calendar', 'mug'],
-  wrappingPaper: ['card', 'cardPack', 'sack'],
+  wrappingPaper: ['card', 'cardPack', 'calendar'],
   calendar: ['framedPrint', 'mug', 'card'],
   framedPrint: ['jigsaw', 'card', 'mug'],
   multiPhotoFrame: ['framedPrint', 'calendar', 'cardPack'],

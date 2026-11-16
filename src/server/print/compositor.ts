@@ -81,7 +81,7 @@ const MAX_CONCURRENT = 3;
  */
 const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
 
-const RENDER_REV = 'r22'; // r22: previews show the trimmed product (bleed off: cards, playing cards, cushion seams, blanket edge), the sack prints in Prodigi's 28×32 cm box, tube socks upright; r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r23'; // r23: socks follow Prodigi's template — each sock shows its own side (half) of the file, and a motif sits mid-side, not on the front fold; r22: previews show the trimmed product (bleed off: cards, playing cards, cushion seams, blanket edge), the sack prints in Prodigi's 28×32 cm box, tube socks upright; r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type { MockupSize };
 
@@ -1183,7 +1183,8 @@ async function renderPerspective(args: {
 /**
  * Which print area owns each pixel of the product's printable surface: the printmap's separate
  * pieces (each sock of a pair) are found as connected shapes, and each piece goes to the area whose
- * centre is nearest the piece's own centre. Off the printmap → -1. Without this, "nearest area
+ * centre is nearest the piece's own centre (or, when the big pieces and the areas match one for one, in
+ * left-to-right order — how the seeder made them). Off the printmap → -1. Without this, "nearest area
  * centre" per pixel let a diagonal pair's areas steal each other's edges (the left sock's toe showed
  * the right sock's mapping — founder, 23 Oct: "chopped up"). Cached per template + size.
  */
@@ -1213,7 +1214,15 @@ export async function pieceOwners(maskBuf: Buffer, id: string | undefined, W: nu
     }
     pieces.push({ sx, sy, n });
   }
-  const areaOf = pieces.map(({ sx, sy, n }) => {
+  // The seeder makes one area per piece, LEFT TO RIGHT (seedMockups piecesOf) — so when the big pieces and
+  // the areas match one for one, that order decides: an area's quad may be the WHOLE file with only its own
+  // half on the piece (the ankle socks' two sides, sideQuad), its centre then sitting off the piece.
+  const total = pieces.reduce((t, p) => t + p.n, 0);
+  const big = pieces.map((p, k) => ({ k, cx: p.sx / p.n, n: p.n })).filter((p) => p.n >= total * 0.05).sort((a, b) => a.cx - b.cx);
+  const byOrder = big.length === centres.length ? new Map(big.map((p, i) => [p.k, i])) : null;
+  const areaOf = pieces.map(({ sx, sy, n }, k) => {
+    const ordered = byOrder?.get(k);
+    if (ordered !== undefined) return ordered;
     const cx = sx / n, cy = sy / n;
     let best = 0, bestD = Infinity;
     centres.forEach(([x, y], k) => {

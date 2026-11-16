@@ -949,7 +949,7 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
   const renderSafeBand = (box: { left: number; top: number; w: number; h: number; angle?: number }, pxPerMm: number, photo?: { w: number; h: number }) => {
     if (!safe) return null;
     const band = safe.mm * pxPerMm;
-    if (safe.shape && safe.edge === 'all' && photo && ctx && ctx.ok && ctx.maskUrl) {
+    if (safe.shape && photo && ctx && ctx.ok && ctx.maskUrl) {
       // the outline's own shape, shrunk about the print area's centre: the ring between them is the cosy edge
       const k = Math.max(0.5, 1 - (2 * safe.mm) / finishedWmm);
       const cx = box.left + box.w / 2, cy = box.top + box.h / 2;
@@ -971,7 +971,6 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
         />
       );
     }
-    const tb = safe.edge === 'topBottom';
     return (
       <div
         aria-hidden
@@ -981,12 +980,8 @@ function PositionerEditor({ data, draft = false, returnTo, focusVariantId }: Pos
       >
         <div className="absolute inset-x-0 top-0" style={{ height: band, background: SAFE_HATCH }} />
         <div className="absolute inset-x-0 bottom-0" style={{ height: band, background: SAFE_HATCH }} />
-        {tb ? null : (
-          <>
-            <div className="absolute left-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
-            <div className="absolute right-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
-          </>
-        )}
+        <div className="absolute left-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
+        <div className="absolute right-0" style={{ top: band, bottom: band, width: band, background: SAFE_HATCH }} />
       </div>
     );
   };

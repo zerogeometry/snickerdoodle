@@ -553,8 +553,12 @@ const DEFS: Record<string, ProductDef> = {
     // one print file, printed on both sides of the ball (Prodigi printAreaSizes, sandbox 2026-10-25)
     variants: [{ size: '8 cm', pricePence: 1900, ...exactPx({ w: 1003, h: 1062 }, 300), prodigiSku: 'XMAS-PLAS-BAUB' }],
   },
+  // The CHRISTMAS SACK — RETIRED (founder, 16 Nov 2026, the print-accuracy report: "not a great product as
+  // is, so let's remove the uncertainty around it"). A PAUSED row, like the christmas eve bundle: the seed
+  // takes it off sale everywhere (inactive ⇒ never priced, never orderable, not in the shop). Its print
+  // spec + art window stay only so an order already placed still renders the way it was previewed.
   sack: {
-    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: true, // D24
+    category: 'FESTIVE', label: 'christmas sack', blurb: 'where the magic waits on christmas eve', print: true, visibleInShop: false, paused: true,
     description: 'A cotton Christmas sack with their artwork on it — filled on Christmas Eve, treasured for years after.',
     specs: { material: 'cotton', size: '19×30″' },
     // 320×500mm = Prodigi's print panel, NOT the whole sack: made at their printAreaSizes (3779×5905px
