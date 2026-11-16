@@ -72,7 +72,7 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date()): Promise<N
       refundedPence: orders.refundedPence,
       refundedAt: orders.refundedAt,
       dispute: orders.dispute,
-      handOnly: sql<boolean>`not exists (select 1 from ${orderItems} i where i.order_id = ${orders.id} and i.spec ->> 'providerSku' is not null and coalesce(i.spec ->> 'provider', 'PRODIGI') = 'PRODIGI')`,
+      handOnly: sql<boolean>`exists (select 1 from ${orderItems} i where i.order_id = "orders"."id") and not exists (select 1 from ${orderItems} i where i.order_id = "orders"."id" and i.spec ->> 'providerSku' is not null and coalesce(i.spec ->> 'provider', 'PRODIGI') = 'PRODIGI')`,
     })
     .from(orders)
     .where(

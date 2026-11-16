@@ -20,6 +20,9 @@ export const ORDER_FILTERS: { id: OrderFilter; label: string }[] = [
   { id: 'money-back', label: 'refunded or cancelled' },
 ];
 
+/** An order's status in the admin app's words. */
+export const STATUS_WORDS: Record<string, string> = { PENDING: 'not paid', PAID: 'paid', FULFILLING: 'at Prodigi', SHIPPED: 'shipped', CANCELLED: 'cancelled' };
+
 export interface OrderRow {
   ref: string;
   status: string;
@@ -34,7 +37,7 @@ export interface OrderRow {
 }
 
 const TROUBLED = ['RENDER_FAILED', 'ERROR', 'BLOCKED_GATE'] as const;
-const troubleSql = sql<boolean>`exists (select 1 from ${orderItemArtwork} a join ${orderItems} i on i.id = a.order_item_id where i.order_id = ${orders.id} and a.status in ('RENDER_FAILED', 'ERROR', 'BLOCKED_GATE'))`;
+const troubleSql = sql<boolean>`exists (select 1 from ${orderItemArtwork} a join ${orderItems} i on i.id = a.order_item_id where i.order_id = "orders"."id" and a.status in ('RENDER_FAILED', 'ERROR', 'BLOCKED_GATE'))`;
 
 /** Orders, newest first. `q`: an order number (or part of one) or a customer's email. */
 export async function listOrders(db: DbHandle, reviewer: Reviewer, opts: { filter?: OrderFilter; q?: string; limit?: number } = {}): Promise<OrderRow[]> {
@@ -73,7 +76,7 @@ export async function listOrders(db: DbHandle, reviewer: Reviewer, opts: { filte
       refundedPence: orders.refundedPence,
       dispute: orders.dispute,
       isGift: orders.isGift,
-      items: sql<number>`(select coalesce(sum(i.qty), 0)::int from ${orderItems} i where i.order_id = ${orders.id})`,
+      items: sql<number>`(select coalesce(sum(i.qty), 0)::int from ${orderItems} i where i.order_id = "orders"."id")`,
       trouble: troubleSql,
     })
     .from(orders)
