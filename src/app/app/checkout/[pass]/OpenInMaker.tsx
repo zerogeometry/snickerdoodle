@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
+import { pictureName } from '@/lib/keepsakeFork';
 import { useUpload } from '@/lib/store';
 import { Button } from '@/ui/primitives/Button';
 import { FlowHeader } from '@/ui/components/FlowHeader';
@@ -19,7 +20,7 @@ export function OpenInMaker({ assetId, productKey }: { assetId: string; productK
         if (!res.ok) return setFailed(true);
         useUpload.getState().setUpload({
           dataUrl: res.dataUrl,
-          name: 'drawing.jpg',
+          name: pictureName(res.dataUrl),
           key: `keepsake-${assetId}`,
           assetId,
           kept: true,

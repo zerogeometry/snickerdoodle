@@ -3,6 +3,9 @@
 import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
 import { toast, useUpload } from '@/lib/store';
 
+/** A keepsake opened for editing comes as a PNG when it's see-through (keepsakeForStudioAction), else a JPEG. */
+export const pictureName = (dataUrl: string) => (dataUrl.startsWith('data:image/png') ? 'drawing.png' : 'drawing.jpg');
+
 /**
  * Make a keepsake the drawing in progress, so the usual create flow (the range, the basket) follows
  * — from "start from a keepsake" or a keepsake's basket button at home. It's already kept, so the flow
@@ -15,7 +18,7 @@ export async function openKeepsakeInFlow(assetId: string): Promise<boolean> {
   const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
-    name: 'drawing.jpg',
+    name: pictureName(res.dataUrl),
     key: `keepsake-${assetId}`,
     assetId,
     kept: true,
@@ -51,7 +54,7 @@ export async function forkPickedKeepsake(): Promise<string | null> {
   const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
-    name: 'drawing.jpg',
+    name: pictureName(res.dataUrl),
     key: `keepsake-${copy.assetId}`,
     assetId: copy.assetId,
     kept: true,
@@ -76,7 +79,7 @@ export async function unforkUnsavedCopy(): Promise<void> {
   const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
-    name: 'drawing.jpg',
+    name: pictureName(res.dataUrl),
     key: `keepsake-${original}`,
     assetId: original,
     kept: true,
