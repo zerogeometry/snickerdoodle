@@ -57,7 +57,9 @@ describe.skipIf(!URL)('the session endpoint keeps the login secret off the page'
   });
 
   it('the server still knows who is signed in (getCurrentAccount over auth())', async () => {
-    req.headers = new Headers({ cookie });
+    // a real request names its host and protocol; with no AUTH_URL (as in CI) Auth.js reads them, and with no
+    // protocol it assumes https, whose cookie has the __Secure- name, so this plain-http cookie would go unread
+    req.headers = new Headers({ cookie, host: 'localhost:3307', 'x-forwarded-proto': 'http' });
     const { getCurrentAccount } = await import('@/server/session');
     expect(await getCurrentAccount()).toEqual({ id: accountId, email, name: 'Sam' });
     const { auth } = await import('@/auth');
