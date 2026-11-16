@@ -10,7 +10,7 @@ import { isBundleKey } from '@/lib/christmas-bundle';
 import { isWatchStrap } from '@/lib/watch-strap';
 import { getObjectBytes, presignDownload, putObject } from '@/storage';
 import { isHeightChart } from './height-chart-geometry';
-import { isGalleryProduct } from './geometry';
+import { artWindowOf, artWindowFrac, isGalleryProduct } from './geometry';
 import { isLayoutProduct } from './bundleCompose';
 import type { InstantContext, ProductPhoto } from '@/lib/instantMockup';
 
@@ -98,15 +98,28 @@ export async function instantContexts(
         const overlay = t?.lightingObjectId ? byId.get(t.lightingObjectId) : undefined;
         const why = serverOnlyReason({ key: r.key, quad: t?.printQuad ?? null, materialClass: t?.materialClass ?? '', hasMask: !!mask, extraQuads: t?.extraQuads?.length ?? 0 });
         if (!why && t && t.printQuad && blank?.widthPx && blank.heightPx) {
+          // the christmas sack: the drawing goes inside Prodigi's print box, not the whole file — the
+          // browser places it on that box (the same artWindowOf geometry the server uses)
+          const geom = { printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi };
+          const win = artWindowOf(r.key, geom);
+          const f = artWindowFrac(r.key, geom);
+          const q = t.printQuad;
+          const quad: [number, number][] = f
+            ? (() => {
+                const [x0, y0, x1, y1] = [q[0]![0], q[0]![1], q[2]![0], q[2]![1]];
+                const X = (u: number) => x0 + u * (x1 - x0), Y = (v: number) => y0 + v * (y1 - y0);
+                return [[X(f.x0), Y(f.y0)], [X(f.x1), Y(f.y0)], [X(f.x1), Y(f.y1)], [X(f.x0), Y(f.y1)]];
+              })()
+            : q;
           contexts[id] = {
             blankUrl: await thumbUrl(blank.key),
             maskUrl: mask ? await thumbUrl(mask.key) : null,
             overlayUrl: overlay ? await thumbUrl(overlay.key) : null,
-            quad: t.printQuad,
+            quad,
             blankW: blank.widthPx,
             blankH: blank.heightPx,
             material: t.materialClass,
-            print: { printWidthPx: t.printWidthPx, printHeightPx: t.printHeightPx, bleedMm: t.bleedMm, requiredDpi: t.requiredDpi },
+            print: win ? win.geom : geom,
             ...(isGalleryProduct(r.key) ? { face: 'gallery' as const } : {}),
           };
           return;

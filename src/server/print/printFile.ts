@@ -1,4 +1,4 @@
-import { DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
+import { isDesignedTurned, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { CARD_SPREAD } from './cardPrint';
 import { canvasSizePx, type TemplateGeom } from './geometry';
 
@@ -16,7 +16,7 @@ export function printFileSize(productKey: string, attributes: Record<string, str
   const a = attributes ?? {};
   const { width, height } = canvasSizePx(t);
   const native = PRODIGI_NATIVE_ORIENTATION[productKey] ?? 'portrait';
-  const turn = DESIGNED_TURNED.has(productKey) || (!!a.orientation && a.orientation !== native);
+  const turn = isDesignedTurned(productKey, a) || (!!a.orientation && a.orientation !== native);
   const w = (turn ? height : width) * (a.sides === 'double' ? 2 : 1);
   return { w, h: turn ? width : height };
 }

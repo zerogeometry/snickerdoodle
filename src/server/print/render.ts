@@ -5,15 +5,16 @@ import sharp from 'sharp';
 import { printTemplates, productVariants, products, storageObjects } from '@/db/schema';
 import { getViewableAssetOrThrow } from '@/server/assets';
 import { CUSHION_BACK_MATCH, cushionBackHex, normalizeCushionBack } from '@/lib/catalogue-view';
-import { DESIGNED_TURNED, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
+import { isDesignedTurned, PRODIGI_NATIVE_ORIENTATION } from '@/server/catalogue';
 import { groundHex, groundTag, isGroundProduct, isPatternProduct, normalizeGround } from '@/lib/patterns';
 import { CARD_PACK_KEY } from '@/lib/card-packs';
 import { derivativeKey, getObjectBytes, getS3, putObject } from '@/storage';
 import type { ViewerContext } from '@/authz';
 import type { DbHandle } from '@/server/db';
-import { GALLERY_FIT, type RawTransform, assessResolution, canvasSizePx, clampTransform, computeLayerRect, galleryArtGeom, galleryRect, isGalleryProduct, templateGeom } from './geometry';
+import { GALLERY_FIT, type RawTransform, artWindowOf, assessResolution, canvasSizePx, clampTransform, computeLayerRect, galleryArtGeom, galleryRect, isGalleryProduct, templateGeom } from './geometry';
 import { renderRepeatPattern } from './pattern';
 import { renderHeightChartFace } from './heightChart';
+import { renderArtWindowFace } from './artWindow';
 import { isHeightChart } from './height-chart-geometry';
 import { assessPrintResolution, frameSlotGeom } from './pattern-geometry';
 import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
@@ -119,9 +120,9 @@ export async function renderPrintFile(
     }
     const ground = normalizeGround(input.ground);
     let { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, groundHex(ground));
-    // designed on a turned canvas (the landscape tea towel) → turn the file back to Prodigi's spec
+    // designed on a turned canvas (the landscape tea towel, the upright tube sock) → turn the file to Prodigi's spec
     let [fileW, fileH] = [canvas.width, canvas.height];
-    if (DESIGNED_TURNED.has(variantRow.key)) {
+    if (isDesignedTurned(variantRow.key, variantRow.attributes as Record<string, string> | null)) {
       png = await sharp(png).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
       [fileW, fileH] = [canvas.height, canvas.width];
     }
@@ -159,6 +160,21 @@ export async function renderPrintFile(
       .withMetadata({ density: tpl.requiredDpi })
       .toBuffer();
     return persistPrintFile(db, input.assetId, fileKind, png, tpl.requiredDpi, galleryAssess.effectiveDpi, galleryAssess.decision === 'UPSCALE', canvas.width, canvas.height);
+  }
+
+  // THE CHRISTMAS SACK: the file is Prodigi's full 320×500 mm, but only their 28×32 cm box prints — the
+  // drawing is placed inside that box (its transform resolves against the box, like the positioner and
+  // the mockup), and the rest stays white: white isn't printed, so it's plain sack (geometry.ts artWindowOf).
+  const win = variantRow?.key ? artWindowOf(variantRow.key, geom) : null;
+  if (win) {
+    const winAssess = assessResolution(win.geom, judged, transform);
+    if (winAssess.decision === 'BLOCK') {
+      throw new Error(`source too low-res for this product (would need ${winAssess.upscaleFactor.toFixed(1)}× upscale)`);
+    }
+    const winGround = isGroundProduct(variantRow!.key) ? normalizeGround(input.ground) : null;
+    const f = await renderArtWindowFace(srcBuf, variantRow!.key, geom, transform, { groundHex: winGround ? groundHex(winGround) : null });
+    const png = await f.pipeline.png().withMetadata({ density: tpl.requiredDpi }).toBuffer();
+    return persistPrintFile(db, input.assetId, fileKind, png, tpl.requiredDpi, winAssess.effectiveDpi, winAssess.decision === 'UPSCALE', f.width, f.height);
   }
 
   // A MULTI PHOTO FRAME square: this drawing's TILE — its 60 mm window (+ the bleed under a mount),

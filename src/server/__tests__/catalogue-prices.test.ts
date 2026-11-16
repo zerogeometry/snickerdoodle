@@ -103,12 +103,17 @@ describe('range expansion — new products', () => {
 
   it('print files are Prodigi’s EXACT printAreaSizes (sandbox, GB route)', () => {
     const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
-    expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '6141x5433' });
+    expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '3543x6141' }); // the tube is designed upright; the file turns to Prodigi's 6141×3543
     expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
     expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527', 'WRAP-KFT-ROL-70X200': '8280x23610', 'WRAP-KFT-ROL-70X300': '8280x35430', 'WRAP-KFT-ROL-70X500': '8280x59070' });
     expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '8208x5492' }); // designed landscape; the file turns back to 5492×8208
     expect(px('petBandana')).toEqual({ 'PET-BANDANA-SML': '7500x2244', 'PET-BANDANA-MED': '9447x2952', 'PET-BANDANA-LRG': '10158x3306' });
-    expect(px('playingCards')).toEqual({ 'PLAY-CARD': '820x1122' });
+    // the playing card is designed at its finished 63.5×89 mm with Prodigi's 3 mm trim round it — the FILE is still 820×1122
+    expect(px('playingCards')).toEqual({ 'PLAY-CARD': '750x1052' });
+    const file = (k: string) => Object.fromEntries(rows(k).map((r) => { const b = Math.round((r.bleedMm / 25.4) * r.dpi); return [r.prodigiSku, r.px && `${r.px.w + 2 * b}x${r.px.h + 2 * b}`]; }));
+    expect(file('playingCards')).toEqual({ 'PLAY-CARD': '820x1122' });
+    expect(file('cushion')).toMatchObject({ 'GLOBAL-CUSH-SH-SCSSS': '2008x1725', 'GLOBAL-CUSH-18R-SCSSS': '2775x2775', 'GLOBAL-CUSH-12X12-LIN': '1875x1875', 'GLOBAL-CUSH-22X22-LIN': '3375x3375' });
+    expect(file('card')).toEqual({ 'CLASSIC-GRE-FEDR-7X5-BLA': '1530x2160' });
   });
 
   it('only UK-made tea towels — never the US-made cotton/poly twill SKUs', () => {

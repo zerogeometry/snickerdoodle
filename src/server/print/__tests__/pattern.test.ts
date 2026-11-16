@@ -28,9 +28,9 @@ describe('patternLayout — a narrow print (the ankle sock) at its default zoom 
     expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
     expect(L.motifW / L.cellW).toBeLessThan(0.56); // white either side of it on the sock's face
   });
-  it('tube socks wrap round too: one whole column per visible side — four round (the leg shows ~a quarter of the print)', () => {
-    const L = patternLayout({ width: 6141, height: 5433 }, 300, src, T);
-    expect(L.cols).toBe(4);
+  it('tube socks wrap round too (designed upright, 300 mm round × 520 mm long): one whole column per visible side', () => {
+    const L = patternLayout({ width: 3543, height: 6141 }, 300, src, T);
+    expect(L.cols).toBe(2);
     expect(L.phaseX).toBe(Math.round(L.cellW / 2));
     expect(L.motifW / L.cellW).toBeGreaterThan(0.45);
     expect(L.motifW / L.cellW).toBeLessThan(0.56);
@@ -59,7 +59,7 @@ describe('patternLayout — the seam + scale maths', () => {
     // the real print canvases: ankle + tube socks (300 dpi), tea towel (300 dpi), a 2 m wrap roll (150 dpi)
     const canvases = [
       { w: 3543, h: 3543, dpi: 300 },
-      { w: 6141, h: 5433, dpi: 300 },
+      { w: 3543, h: 6141, dpi: 300 },
       { w: 8208, h: 5492, dpi: 300 },
       { w: 4133, h: 11811, dpi: 150 },
     ];
@@ -89,7 +89,7 @@ describe('patternLayout — the seam + scale maths', () => {
   });
 
   it('whole, EVEN columns that exactly fill the width (so a sock / roll wraps without a seam)', () => {
-    for (const [w, h, dpi] of [[3543, 3543, 300], [6141, 5433, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
+    for (const [w, h, dpi] of [[3543, 3543, 300], [3543, 6141, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
       const l = patternLayout({ width: w, height: h }, dpi, { width: 1200, height: 1600 }, T);
       expect(l.cols % 2, `${w}`).toBe(0);
       expect(l.cols * l.cellW).toBeCloseTo(w, 6);

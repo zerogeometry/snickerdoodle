@@ -6,7 +6,7 @@
 import { isPatternProduct } from '@/lib/patterns';
 import { frameGridForPx, isMultiPhotoFrameKey, slotBleedMm, slotPx, type FrameGrid } from '@/lib/multi-photo-frame';
 import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
-import { GALLERY_FIT, type ResolutionAssessment, type TemplateGeom, type Transform, assessResolution, canvasSizePx, galleryArtGeom, isGalleryProduct, mmToPx } from './geometry';
+import { GALLERY_FIT, type ResolutionAssessment, type TemplateGeom, type Transform, artWindowOf, assessResolution, canvasSizePx, galleryArtGeom, isGalleryProduct, mmToPx } from './geometry';
 
 /** The motif's default printed size, and how much of its cell it fills (the rest is breathing room). */
 export const PATTERN_MOTIF_MM = 90;
@@ -34,11 +34,10 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 const MAX_FILL = 0.9;
 /** A narrow print's default motif, as a share of its column's width (see patternLayout). */
 const NARROW_MOTIF_OF_CELL = 0.51;
-/** Prints narrower than this wrap round (socks: 300 + 520 mm) and get one whole column per side;
- * the flat sheets — tea towel (695 mm), wrapping paper (700 mm) — keep the plain repeat. */
+/** Prints narrower than this wrap round (both socks: 300 mm round — the tube sock is designed upright,
+ * 300 × 520 mm, since Prodigi's 16 Nov spec) and get one whole column per side; the flat sheets — tea
+ * towel (695 mm), wrapping paper (700 mm) — keep the plain repeat. */
 const NARROW_MAX_MM = 600;
-/** A narrow print this wide or more is a tube sock (520 mm): four columns round, not two. */
-const TUBE_MIN_MM = 450;
 
 /**
  * Where every motif goes. The ZOOM sets the motif's size directly (scale 0 = PATTERN_MOTIF_MM), so
@@ -57,16 +56,15 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
   const rotated = transform.rotationDeg % 180 !== 0;
   const sw = rotated ? src.height : src.width;
   const sh = rotated ? src.width : src.height;
-  // A NARROW print (a sock: ankle ~300 mm round, tube ~520) shows ONE column per side at its default: two
+  // A NARROW print (a sock: ankle and tube both ~300 mm round) shows ONE column per side at its default: two
   // columns round, each motif about half its column wide and centred on the side you see — so each
   // sock shows whole motifs with white either side, never slices of the next column at its edges
   // (founder, 23 Oct: "chopped up"; four-round always left slivers). That IS its 1.0× — the zoom
   // multiplies it and the shift starts from centred — so nudging either never jumps the pattern.
   const widthMm = (canvas.width / dpi) * 25.4;
   const narrow = widthMm < NARROW_MAX_MM;
-  // one column = the side you see: half an ankle sock's print, but only about a quarter of a tube
-  // sock's (its print is far wider than the leg — measured on the photo, 23 Oct)
-  const narrowCols = widthMm > TUBE_MIN_MM ? 4 : 2;
+  // one column = the side you see: half of the print round the sock
+  const narrowCols = 2;
   const baseMm = narrow ? clamp((widthMm / narrowCols) * NARROW_MOTIF_OF_CELL, MOTIF_MM_MIN, MOTIF_MM_MAX) : PATTERN_MOTIF_MM;
   // narrow prints space columns by the motif's share of its column, so 1.0× lands on narrowCols
   const colFill = narrow ? NARROW_MOTIF_OF_CELL : PATTERN_FILL;
@@ -163,6 +161,9 @@ export function assessPrintResolution(t: TemplateGeom, src: { width: number; hei
   if (isHeightChart(productKey)) return assessResolution(heightChartArtGeom(t), src, transform);
   // the calendar: the whole drawing inside the page's margin, whatever placement was sent
   if (isGalleryProduct(productKey)) return assessResolution(galleryArtGeom(t), src, GALLERY_FIT);
+  // the christmas sack: the drawing prints inside Prodigi's 28×32 cm box — judged on that box
+  const win = artWindowOf(productKey, t);
+  if (win) return assessResolution(win.geom, src, transform);
   if (!isPatternProduct(productKey)) return assessResolution(t, src, transform);
   const layout = patternLayout(canvasSizePx(t), t.requiredDpi, src, transform);
   return assessResolution(

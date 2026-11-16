@@ -1220,7 +1220,7 @@
   "GLOBAL-TUBE-SOCKS": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"gender":"Unisex","size":"l"},"printAreaSizes":{"default":{"w":6141,"h":5433}}}
+    {"attributes":{"gender":"Unisex","size":"l"},"printAreaSizes":{"default":{"w":6141,"h":3543}}}
    ]
   },
   "H-APR-AA-BTIE": {
