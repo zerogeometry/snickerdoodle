@@ -4,10 +4,10 @@ import { and, desc, eq } from 'drizzle-orm';
 import { assets, children, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { derivativeKey, presignDownload } from '@/storage';
-import sharp from 'sharp';
 import { getViewableAssetOrThrow, resolveAssetViewer } from '@/server/assets';
 import { getUploadClaims } from '@/server/session';
 import { workingBytes } from '@/server/magic';
+import { pictureForEditing } from '@/server/editingPicture';
 import { resolveViewerContext } from '@/server/assets';
 import { pickableKeepsakes, type PickerKeepsake } from '@/server/keepsakePicker';
 import { keepsakeThumbUrls } from '@/server/keepsakeThumbs';
@@ -86,14 +86,11 @@ export async function keepsakeForStudioAction(input: { assetId: string }): Promi
     const account = await getCurrentAccount();
     const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, await getUploadClaims());
     await getViewableAssetOrThrow(db, String(input.assetId), viewer); // ← the gate
-    const img = sharp(await workingBytes(db, String(input.assetId))).rotate();
-    const meta = await img.metadata();
-    const jpeg = await img.resize(2400, 2400, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88 }).toBuffer();
+    const picture = await pictureForEditing(await workingBytes(db, String(input.assetId))); // see-through stays see-through
     const [trim] = await db.select({ id: storageObjects.id, key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.key, derivativeKey(String(input.assetId), 'trimmed')));
     return {
       ok: true,
-      dataUrl: `data:image/jpeg;base64,${jpeg.toString('base64')}`,
-      aspect: (meta.width ?? 1) / (meta.height ?? 1),
+      ...picture,
       ...(trim ? { trim: { url: await presignDownload(trim.key, 600), sourceObjectId: trim.id } } : {}),
     };
   } catch {
