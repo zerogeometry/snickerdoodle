@@ -45,15 +45,46 @@ export type Rotation = 0 | 90 | 180 | 270;
 /** What the client proposes (it owns nothing authoritative). */
 export interface Transform {
   scale: number; // 0 = CONTAIN sentinel (fit whole image, the default); 1 = cover-fit; >1 zooms in
-  offsetX: number; // -1..1 pan within slack
-  offsetY: number; // -1..1
+  offsetX: number; // -1..1 pan within slack; beyond, to ±MAX_OFFSET, past the edge (panTravel)
+  offsetY: number;
   rotationDeg: Rotation;
 }
 
-export const MAX_ZOOM = 4;
+/** Zoom range (founder, 16 Nov 2026: more flexibility — was 0.1–4×). The DPI gate still warns or blocks
+ * a placement that would print soft, whatever the zoom. */
+export const MAX_ZOOM = 8;
 /** Sanity floor for an explicit numeric scale (a zoom-out below contain is legitimate —
- * a small motif with margins — but never microscopic). The UI offers contain/2 at most. */
-export const MIN_SCALE = 0.1;
+ * a small motif with margins — but never microscopic). The UI offers contain/4 at most. */
+export const MIN_SCALE = 0.05;
+/**
+ * MOVEMENT (founder, 16 Nov 2026: more range). |offset| ≤ 1 keeps its meaning — the drawing travels
+ * within its slack, until its edge meets the canvas's (so every saved placement prints exactly as it
+ * did). From 1 to MAX_OFFSET it carries on PAST that edge, by up to PAN_PAST_EDGE of the smaller of the
+ * drawing and the canvas (`pastPx`) — so it can sit off-centre with clear space round it, half of it can
+ * hang off an edge, and it moves even when it exactly fills the canvas; it never leaves entirely.
+ */
+export const MAX_OFFSET = 2;
+export const PAN_PAST_EDGE = 0.5;
+
+/** How far (px, signed) the drawing's centre moves from the canvas centre for an offset on one axis.
+ * `pastPx` = the smaller of the drawn size and the canvas, on that axis. */
+export function panTravel(offset: number, slack: number, pastPx: number): number {
+  const a = Math.abs(offset);
+  return Math.sign(offset) * ((slack / 2) * Math.min(a, 1) + Math.max(0, a - 1) * PAN_PAST_EDGE * pastPx);
+}
+
+/** The offset that moves the drawing's centre `travel` px on one axis (panTravel's inverse, clamped). */
+export function panOffset(travel: number, slack: number, pastPx: number): number {
+  const a = Math.abs(travel), half = slack / 2;
+  if (a === 0) return 0;
+  const o = half > 0 && a <= half ? a / half : 1 + (a - half) / (PAN_PAST_EDGE * pastPx || 1);
+  return Math.sign(travel) * Math.min(MAX_OFFSET, o);
+}
+
+/** The most a drawing's centre can travel from the canvas centre on one axis (offset ±MAX_OFFSET). */
+export function panReach(slack: number, pastPx: number): number {
+  return panTravel(MAX_OFFSET, slack, pastPx);
+}
 export const MAX_UPSCALE = 4; // the most a HAND-HELD print (mug, card, small jigsaw) may be enlarged
 const TIER0_MAX = 2; // classical resample handles up to 2×; above that needs ML (tier 1)
 
@@ -98,8 +129,8 @@ export function clampTransform(input: RawTransform | null | undefined): Transfor
   const s = Number.isFinite(t.scale) ? (t.scale as number) : 1;
   return {
     scale: s <= 0 ? 0 : clamp(s, MIN_SCALE, MAX_ZOOM),
-    offsetX: clamp(Number.isFinite(t.offsetX) ? (t.offsetX as number) : 0, -1, 1),
-    offsetY: clamp(Number.isFinite(t.offsetY) ? (t.offsetY as number) : 0, -1, 1),
+    offsetX: clamp(Number.isFinite(t.offsetX) ? (t.offsetX as number) : 0, -MAX_OFFSET, MAX_OFFSET),
+    offsetY: clamp(Number.isFinite(t.offsetY) ? (t.offsetY as number) : 0, -MAX_OFFSET, MAX_OFFSET),
     rotationDeg: snapRotation(t.rotationDeg ?? 0),
   };
 }
@@ -159,8 +190,9 @@ export function computeLayerRect(t: TemplateGeom, src: { width: number; height: 
   // offset 0 stays centred either way, so cover/contain defaults are unchanged.
   const slackX = Math.abs(drawW - CW);
   const slackY = Math.abs(drawH - CH);
-  const cx = CW / 2 + (transform.offsetX * slackX) / 2;
-  const cy = CH / 2 + (transform.offsetY * slackY) / 2;
+  // (beyond ±1 the drawing carries on past the edge — panTravel)
+  const cx = CW / 2 + panTravel(transform.offsetX, slackX, Math.min(drawW, CW));
+  const cy = CH / 2 + panTravel(transform.offsetY, slackY, Math.min(drawH, CH));
 
   return {
     x: Math.round(cx - drawW / 2),

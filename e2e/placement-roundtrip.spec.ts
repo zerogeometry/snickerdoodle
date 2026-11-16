@@ -24,8 +24,9 @@ const rotateBtn = (page: Page) => page.getByRole('button', { name: /^rotate \(\d
 async function editorState(page: Page) {
   return {
     zoom: Number(await zoom(page).inputValue()),
-    x: Number(await lr(page).inputValue()),
-    y: Number(await ud(page).inputValue()),
+    // the placement's own offsets (the sliders' tracks run in travel, across the whole reach — 16 Nov 2026)
+    x: Number(await lr(page).getAttribute('data-offset')),
+    y: Number(await ud(page).getAttribute('data-offset')),
     rot: Number(/\((\d+)°\)/.exec(await rotateBtn(page).innerText())![1]),
   };
 }
