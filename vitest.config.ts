@@ -7,6 +7,9 @@ export default defineConfig({
   oxc: { jsx: { runtime: 'automatic' } },
   test: {
     include: ['src/**/*.test.ts'],
+    // next-auth's ESM imports `next/server` with no extension, which plain Node can't resolve; let vite
+    // resolve it so a test can drive the real Auth.js handler (src/auth/__tests__/session.int.test.ts).
+    server: { deps: { inline: ['next-auth'] } },
   },
   resolve: {
     alias: {

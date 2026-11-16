@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import type { EmailConfig } from 'next-auth/providers';
 import { DrizzleAccountsAdapter } from './adapter';
+import { publicSession } from './publicSession';
 import { sendMail } from '@/server/mail';
 import { signInEmail } from '@/server/mail/signIn';
 import { newSignInCode, storeSignInCode } from './signInCode';
@@ -54,11 +55,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   pages: { signIn: '/login', verifyRequest: '/login?check=1', error: '/login' },
   providers: [magicLink],
   callbacks: {
-    // Database sessions: surface the account id on the session object so the
-    // server can resolve it into a ViewerContext.
+    // Database sessions: Auth.js passes the stored session (with its secret sessionToken) merged with the
+    // account, and whatever this returns is sent to the page as JSON. Return only id/email/name + expiry,
+    // so the server can resolve the account into a ViewerContext and no script ever sees the token.
     session({ session, user }) {
-      if (session.user) session.user.id = user.id;
-      return session;
+      return publicSession(session, user);
     },
   },
 });
