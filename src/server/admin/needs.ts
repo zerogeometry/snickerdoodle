@@ -267,8 +267,69 @@ export function buildNeeds(f: NeedFacts, now: Date): Need[] {
     });
   }
 
-  const shown = out.filter((n) => !(n.dismissable && f.handled.has(n.key)));
+  const shown = groupMany(out.filter((n) => !(n.dismissable && f.handled.has(n.key))));
   // a deadline within 7 days goes to the top of its group; then oldest first
   const order = (n: Need) => RANK[n.kind] - (n.due && n.due.getTime() - now.getTime() < LIMITS.rightsSoonDays * DAY ? 0.5 : 0);
   return shown.sort((a, b) => order(a) - order(b) || a.since.getTime() - b.since.getTime());
+}
+
+/** More than this many orders with the same problem (or messages waiting) become ONE line: a list stays readable at
+ * Christmas volume. The line links to the filtered list, where each one is dealt with. */
+export const GROUP_OVER = { order: 3, support: 5, rights: 5 } as const;
+
+const ORDER_GROUP_WORDS: Record<string, { title: (n: number) => string; detail: string; href: string }> = {
+  'render-failed': { title: (n) => `${n} orders: the print file didn’t make`, detail: 'Their print files failed, so they can’t go to Prodigi. Open each to try again.', href: '/admin/orders?show=attention' },
+  held: { title: (n) => `${n} orders held by the safety check`, detail: 'A picture on each needs clearing in review before it can be printed.', href: '/admin/review' },
+  'not-sent': { title: (n) => `${n} paid orders not at Prodigi yet`, detail: `Paid over ${LIMITS.notSentHours} hours ago and not handed to the printer.`, href: '/admin/orders?show=attention' },
+  slow: { title: (n) => `${n} orders slow at Prodigi`, detail: `At Prodigi ${LIMITS.slowWorkingDays}+ working days without shipping.`, href: '/admin/orders?show=prodigi' },
+  'by-hand': { title: (n) => `${n} orders to pack and post by hand`, detail: 'Nothing on them is made by Prodigi (gift wrap only).', href: '/admin/orders?show=paid' },
+  'prodigi-cancelled': { title: (n) => `${n} orders Prodigi cancelled`, detail: 'Paid but won’t arrive: refund each in Stripe, or make it again.', href: '/admin/orders?show=money-back' },
+  'refund-at-prodigi': { title: (n) => `${n} refunded orders still at Prodigi`, detail: 'Cancel each in Prodigi if they haven’t made it yet.', href: '/admin/orders?show=money-back' },
+};
+
+/**
+ * Many alike → one. The group's key names its newest member, so a new order joining a group is a new problem (and
+ * its urgent email goes); "done" on a group isn't offered (each is dealt with on its own page).
+ */
+function groupMany(items: Need[]): Need[] {
+  const out: Need[] = [];
+  const byProblem = new Map<string, Need[]>();
+  for (const n of items) {
+    if (n.kind === 'order' || n.kind === 'refund-at-prodigi') {
+      const problem = n.key.split(':')[2] ?? n.kind;
+      byProblem.set(problem, [...(byProblem.get(problem) ?? []), n]);
+    } else if (n.kind === 'support' || n.kind === 'rights') byProblem.set(n.kind, [...(byProblem.get(n.kind) ?? []), n]);
+    else out.push(n);
+  }
+  for (const [problem, list] of byProblem) {
+    const limit = problem === 'support' ? GROUP_OVER.support : problem === 'rights' ? GROUP_OVER.rights : GROUP_OVER.order;
+    if (list.length <= limit) {
+      out.push(...list);
+      continue;
+    }
+    const oldest = list.reduce((a, b) => (a.since < b.since ? a : b));
+    const newest = list.reduce((a, b) => (a.since > b.since ? a : b));
+    if (problem === 'support') {
+      out.push({ ...oldest, key: `support:many:${newest.key.split(':')[1]}`, title: `${list.length} help messages waiting`, detail: 'Oldest first in the inbox.', href: '/admin/inbox', action: 'open the inbox', dismissable: false });
+      continue;
+    }
+    if (problem === 'rights') {
+      const due = list.filter((n) => n.due).sort((a, b) => a.due!.getTime() - b.due!.getTime())[0]?.due ?? null;
+      out.push({ ...oldest, key: `rights:many:${newest.key.split(':')[1]}`, title: `${list.length} data requests and complaints`, detail: 'Each has a legal deadline. Soonest due first in the inbox.', due, href: '/admin/inbox', action: 'open the inbox', dismissable: false });
+      continue;
+    }
+    const w = ORDER_GROUP_WORDS[problem];
+    const refs = list.map((n) => n.key.split(':')[1]).sort();
+    out.push({
+      ...oldest,
+      key: `orders:${problem}:${newest.key.split(':')[1]}`,
+      title: w ? w.title(list.length) : `${list.length} orders need a look`,
+      detail: `${w?.detail ?? ''} ${refs.slice(0, 6).join(', ')}${refs.length > 6 ? ` and ${refs.length - 6} more` : ''}.`.trim(),
+      href: w?.href ?? '/admin/orders?show=attention',
+      action: 'see them',
+      urgent: list.some((n) => n.urgent),
+      dismissable: false,
+    });
+  }
+  return out;
 }

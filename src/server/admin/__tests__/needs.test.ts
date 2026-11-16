@@ -120,6 +120,26 @@ describe('the needs-you list', () => {
     expect(text).not.toMatch(/@/);
   });
 
+  it('many orders with the same problem become one line (a list stays readable at Christmas volume)', () => {
+    const f = empty();
+    f.orders = ['SD-1', 'SD-2', 'SD-3'].map((r, i) => order({ ref: r, paidAt: h(5 + i), troubled: [{ state: 'RENDER_FAILED', count: 1 }] }));
+    expect(keys(f)).toHaveLength(3); // three stay separate
+    f.orders.push(order({ ref: 'SD-4', paidAt: h(2.5), troubled: [{ state: 'RENDER_FAILED', count: 1 }] }));
+    const n = buildNeeds(f, NOW);
+    expect(n).toHaveLength(1);
+    expect(n[0]).toMatchObject({ key: 'orders:render-failed:SD-4', title: '4 orders: the print file didn’t make', urgent: true, dismissable: false });
+    expect(n[0]!.detail).toContain('SD-1, SD-2, SD-3, SD-4');
+    // a newer order joining makes it a new problem (so its urgent email goes)
+    f.orders.push(order({ ref: 'SD-5', paidAt: h(2.2), troubled: [{ state: 'RENDER_FAILED', count: 1 }] }));
+    expect(keys(f)).toEqual(['orders:render-failed:SD-5']);
+  });
+
+  it('more than five waiting messages become one line to the inbox', () => {
+    const f = empty();
+    f.support = Array.from({ length: 6 }, (_, i) => ({ id: `s${i}`, ref: `H-${i}`, topic: 'gifts', receivedAt: d(i + 1), orderRef: null }));
+    expect(buildNeeds(f, NOW).map((n) => [n.title, n.href])).toEqual([['6 help messages waiting', '/admin/inbox']]);
+  });
+
   it('waited() reads like a person', () => {
     expect(waited(new Date(NOW.getTime() - 30_000), NOW)).toBe('just now');
     expect(waited(h(0.5), NOW)).toBe('30 min');
