@@ -79,7 +79,7 @@ Each leaflet has its own code and its own link so you can see which one earns mo
 
 - **Images:** every photo is a brand sample (no children, no faces, no real names). They print at well over 300 dpi
   at these sizes.
-- **QR codes:** on both sides. Back: 39 mm (A6) and 46 mm (A5); front: 20 mm (A6) and 27 mm (A5). All on white with a
+- **QR codes:** on both sides. Back: 39 mm (A6) and 51 mm (A5); front: 21 mm (A6) and 30 mm (A5). All on white with a 3 mm
   clear border, so they scan from arm's length.
 
 ## Rebuild

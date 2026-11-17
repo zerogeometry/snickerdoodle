@@ -83,3 +83,22 @@ Each leaflet has its own code and QR tag (see the report, section 5). Before pri
 - **A glance test:** cover the words and someone still knows what Snickerdoodle does.
 - **An arm's-length test:** the headline and QR work at 60 cm.
 - **A rules check:** nothing speaks to a child, every price is true on the live site, and every condition is printed.
+
+## Changes after the independent critique (17 Nov, version 2.1)
+
+A second designer reviewed version 2 cold. Every fix below went in:
+
+| Critique | Fix |
+|---|---|
+| The front never says the preview is free | The front now carries the tomato promise "Scan to see their drawing on an ornament. Free, in seconds." beside its own QR. |
+| The "after" is smaller than the "before" | The ornament photo is cropped 1.6× so the ornament fills about 70% of the frame. The drawing shrank. |
+| "Ornament £21" next to "baubles from £19" and "on a bauble" | Named consistently: "Ornaments £21 · baubles £19"; the QR promise says "on an ornament". |
+| The arrow lands on the photo's tape | Re-angled so it points at the ornament; cinnamon with a paper halo so it reads on kraft. |
+| The spring headline asks mum to buy her own present | "For mum and granny, drawn by them." The drawing now has a white paper border so it reads as paper, not a print. The mismatched mug photo is gone from the front, and the promise says "on a card". |
+| The coupon hides its condition | "First order? A card's on us with your first keepsake." plus "use code". |
+| The A5 back is crowded | The subline is gone and the steps are one line each, so the QR card is bigger (51 mm). |
+| Small print at 5.3–5.7 pt; tag sublines at 5.6 pt | Small print is 6.3–6.6 pt (and shorter); tags are 6.5–7 pt; captions 7–8 pt. |
+| Things inside the 5 mm safe area; thin QR quiet zone | Everything moved inside, and `build.mjs` now warns if any text crosses the safe line. QRs have a 3 mm white border. |
+| "No posting the original"; "treat them in a tap"; "See it on everything" | "You keep the original."; "Send granny a ready-to-buy link. She orders in a tap."; "See it on gifts". |
+| Entry prices shown as fixed | "from" on mug, wrapping paper, calendar and jigsaw. |
+| The "for the grown-ups" pill fights the logo | Now a light outline pill. |

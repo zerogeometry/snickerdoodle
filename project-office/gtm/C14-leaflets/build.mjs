@@ -66,6 +66,16 @@ async function render(page, v, proof) {
   });
   const bad = await page.evaluate(() => [...document.images].filter((i) => !i.naturalWidth).map((i) => i.src));
   if (bad.length) throw new Error(`${v.name}: missing images ${bad.join(', ')}`);
+  // words and buttons must sit inside the safe area (trim minus 5 mm); pictures may run into it
+  const px = 96 / 25.4, safe = (BLEED + 5) * px, slack = 0.4 * px;
+  const out = await page.evaluate(({ safe, slack, px }) => [...document.querySelectorAll('.side')].flatMap((side, i) => {
+    const s = side.getBoundingClientRect();
+    return [...side.querySelectorAll('h1,h2,h3,p,.pill,.card,.tag,.coupon,.logo-tag')].filter((el) => !el.closest('.card,.tag,.coupon,.box') || el.matches('.card,.tag,.coupon'))
+      .map((el) => ({ el, r: el.getBoundingClientRect() }))
+      .filter(({ r }) => r.left - s.left < safe - slack || r.top - s.top < safe - slack || s.right - r.right < safe - slack || s.bottom - r.bottom < safe - slack)
+      .map(({ el, r }) => `${i ? 'back' : 'front'}: "${(el.textContent || el.className).trim().slice(0, 40)}" ${((Math.min(r.left - s.left, r.top - s.top, s.right - r.right, s.bottom - r.bottom)) / px - 3).toFixed(1)} mm from the trim`);
+  }), { safe, slack, px });
+  if (out.length) console.warn(`! ${v.name}: inside the 5 mm safe margin:\n  ${out.join('\n  ')}`);
 }
 
 // Print copies of every picture the leaflets use, into img/ (committed, so a rebuild needs no sources).

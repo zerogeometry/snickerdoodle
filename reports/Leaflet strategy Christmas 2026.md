@@ -153,18 +153,27 @@ get it.
 | A picture draws the eye whatever its size; text gets read more the bigger it is. One clear picture beats a collage. | eye tracking of 1,363 print ads ([Wedel & Pieters 2004](https://cir.nii.ac.jp/crid/1362825894564575360)) | One before → after picture and a big headline. No collage on the front. |
 | Five times as many people read the headline as the body copy; captions are read more than body text; before → after pictures fascinate. | Ogilvy ([summary](https://copyblogger.com/?p=33800), [imagery](https://www.shortform.com/blog/ad-imagery/)) | A five-word headline, "Their drawing, on your tree.", and a caption tag on the photo: "the robin they drew · ceramic ornament · £21". |
 | The words beside a QR code matter enormously. "Scan to unlock your exclusive offer" got 7.3% scans; "Scan to join" got 0.6%, on identical mailings of 27,000 each. | Stannp/Equinox test (vendor) ([Stannp](https://go.stannp.com/blogs/understanding-direct-mail-engagement-rates-what-to-expect-how-to-improve)) | The QR now promises a specific result: "Scan to see their drawing on a bauble, in seconds", plus "no account". |
-| QR codes should be about 4 cm with clear space, sit beside their promise, appear on both sides, and land on a page that works at once with no login. | Stannp; Royal Mail MarketReach ([Hillarys case](https://www.marketreach.co.uk/case-studies/hillarys-optimised-door-drop)) | QR on both sides: 39 mm (A6) and 46 mm (A5) on the back, a smaller one on the front. It opens the free preview, no account. |
+| QR codes should be about 4 cm with clear space, sit beside their promise, appear on both sides, and land on a page that works at once with no login. | Stannp; Royal Mail MarketReach ([Hillarys case](https://www.marketreach.co.uk/case-studies/hillarys-optimised-door-drop)) | QR on both sides: 39 mm (A6) and 51 mm (A5) on the back, 21 mm (A6) and 30 mm (A5) on the front, each with a 3 mm white border and its promise beside it. It opens the free preview, no account. |
 | One strong offer or benefit, a clear "what to do and by when", and a deadline. | MarketReach ([5 steps](https://www.marketreach.co.uk/blog/5-simple-steps-successful-door-drop)) | One benefit (see it on your tree), one action (scan), and one tomato pill: "order by sat 12 dec". |
 | Rivals lead with their category ("art fundraiser", "#1 solution") and rarely show the drawing beside the product. Grandparents are a common angle. | competitor scan (Artkive, Xmas4Schools, Cauliflower Cards, Art Projects for Schools, NOTHS sellers) | We lead with *your* child's drawing on the product, which nobody else does clearly, and say "send granny a ready-to-buy link". |
 
 **Front (stop them, show them):**
 
-- the before → after picture;
+- the before → after picture, with the ornament cropped in so the "after" is the biggest thing on the page;
 - a five-word headline;
-- the price ("Christmas baubles from £19 · free UK delivery");
+- the scan promise in tomato beside the QR: "Scan to see their drawing on an ornament. Free, in seconds.";
+- the prices, named consistently: "Ornaments £21 · baubles £19 · free UK delivery";
 - the deadline pill;
-- a small QR;
 - the logo on a paper tag (on kraft, the "doodle" half of the logo disappears without it).
+
+Before sign-off, an independent design critique checked the designs, and every one of its fixes went in:
+
+- the free promise is now on the front;
+- the "after" is bigger;
+- ornament and bauble are named consistently;
+- the small print is 6.3–6.6 pt, not 5.3;
+- everything sits inside the 5 mm safe area (the build now checks this);
+- the A5 back has fewer blocks.
 
 **Back (make it easy to act):**
 
@@ -177,8 +186,9 @@ get it.
 
 The A5s add three numbered steps and the "what happens to their drawings" box, because nobody is there to explain.
 
-**The spring book-bag version** leads with **"Mother's Day, drawn by them."** It shows one family drawing with an arrow to
-the card, mug, cushion and framed print made from it. The back opens with **"For the drawings in this book bag."**, which
+**The spring book-bag version** leads with **"For mum and granny, drawn by them."** Book bags reach mums too, so the
+headline gives them someone to buy for. It shows one family drawing with an arrow to the card, cushion and framed print
+made from it. The back opens with **"For the drawings in this book bag."**, which
 speaks to the parent unpacking the bag that evening. Its "also made real" photos use *different* drawings, to show any
 drawing works.
 
