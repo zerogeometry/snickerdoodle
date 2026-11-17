@@ -18,9 +18,9 @@ test.describe('sign in / sign out', () => {
   test('a guest is sent to /login from /account and /home', async ({ page }) => {
     await quietCookies(page);
     await page.goto('/account');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?next=%2F(account|home)[^&]*)?$/);
     await page.goto('/home');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?next=%2F(account|home)[^&]*)?$/);
   });
 
   test('the real form: email → one-tap link in the email → signed in at /home; the link works once', async ({ page, browser }) => {
@@ -70,7 +70,7 @@ test.describe('sign in / sign out', () => {
     await expect(page).toHaveURL(/localhost:\d+\/$/);
     expect((await sql()`select count(*)::int n from sessions where user_id = ${id}`)[0]!.n).toBe(0);
     await page.goto('/account');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?next=%2F(account|home)[^&]*)?$/);
   });
 
   test('an expired session is treated as signed out', async ({ page }) => {
@@ -80,7 +80,7 @@ test.describe('sign in / sign out', () => {
     await expect(page.getByRole('heading', { name: 'Your account' })).toBeVisible();
     await sql()`update sessions set expires = now() - interval '1 minute' where user_id = ${await accountId(email)}`;
     await page.goto('/account');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?next=%2F(account|home)[^&]*)?$/);
   });
 });
 
@@ -241,7 +241,7 @@ test.describe('data rights — see / download / delete', () => {
     expect(acct!.email).not.toContain('example.test');
     await page.waitForURL(/localhost:\d+\/$/); // the app's own full reload to the front page
     await page.goto('/account');
-    await expect(page).toHaveURL(/\/login$/);
+    await expect(page).toHaveURL(/\/login(\?next=%2F(account|home)[^&]*)?$/);
   });
 });
 
