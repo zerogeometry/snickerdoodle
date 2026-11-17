@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Snickerdoodle leaflet</title>
+<!--
+  One source for every Snickerdoodle leaflet (C14, Nov 2026). The build script (build.mjs) opens this
+  file once per version with a query string, e.g.
+    leaflet.html?size=a6&season=xmas&code=MAGICFAIR&qr=fair
+  and prints a 2-page PDF (front, back) at trim + 3 mm bleed on every edge.
+  Add ?proof to draw the trim (pink) and safe-area (blue) lines. Never send a proof to print.
+
+  Brand: the Scrapbook look (CLAUDE.md D12): kraft + oat paper, washi tape, taped polaroids, chunky
+  ink-outlined stickers. Tokens from src/app/globals.css, chosen for print (see README "colours").
+  Bricolage Grotesque 800 for headings; Gaegu 700 for ONE handwritten moment per side.
+  Icons: Tabler v3 outline, inlined from node_modules/@tabler/icons. Fonts are injected by build.mjs.
+  Audience: GROWN-UPS ONLY. No child is asked to do anything; no child's photo, name or face.
+-->
+<style>
+  :root {
+    /* print-safe brand tokens (globals.css). cta-deep and cobalt shift a lot in CMYK: not used for fills. */
+    --oat: #F8F5E9; --paper: #FFFBF2; --paper-2: #F6EEDF; --line: #D9C7A9; --kraft: #D8BE96;
+    --cocoa: #2B2118; --ink-soft: #5A4A3A;
+    --tomato: #C8402A; --honey: #F6C445; --honey-band: #FBE9B7;
+    --sky: #8FB5D6; --berry: #E8786E; --leaf: #7FA65E;
+    --bleed: 3mm; --safe: 5mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #888; }
+  body { font-family: 'Bricolage', sans-serif; color: var(--cocoa); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 0; }
+  .side { position: relative; overflow: hidden; background: var(--oat); page-break-after: always; break-after: page; }
+  .side:last-child { page-break-after: auto; break-after: auto; }
+  /* trim + bleed, set per size */
+  body.a6 .side { width: 111mm; height: 154mm; }
+  body.a5 .side { width: 154mm; height: 216mm; }
+  .safe { position: absolute; inset: calc(var(--bleed) + var(--safe)); display: flex; flex-direction: column; }
+
+  /* paper: faint doodle texture + a kraft strip that bleeds off the edge */
+  .texture { position: absolute; inset: 0; background-size: 62mm; opacity: .13; }
+  body.a5 .texture { background-size: 80mm; }
+  .kraft { position: absolute; left: 0; right: 0; bottom: 0; background: var(--kraft); }
+  .kraft::before { /* torn top edge */
+    content: ''; position: absolute; left: 0; right: 0; top: -2.4mm; height: 2.6mm; background: var(--kraft);
+    clip-path: polygon(0 60%, 4% 20%, 9% 70%, 14% 30%, 19% 80%, 25% 25%, 31% 65%, 37% 15%, 43% 70%, 49% 35%, 55% 75%, 61% 20%, 67% 60%, 73% 30%, 79% 80%, 85% 25%, 91% 70%, 96% 35%, 100% 60%, 100% 100%, 0 100%);
+  }
+
+  /* type */
+  .hand { font-family: 'Gaegu', cursive; font-weight: 700; color: var(--tomato); line-height: 1; }
+  h1, h2, h3 { font-weight: 800; letter-spacing: -0.02em; line-height: .95; font-variation-settings: 'wdth' 100; }
+  h1 .mr { color: var(--tomato); position: relative; white-space: nowrap; }
+  h1 .mr svg { position: absolute; left: -1%; bottom: -0.16em; width: 102%; height: .3em; z-index: -1; }
+  p { line-height: 1.25; }
+  b, strong { font-weight: 800; }
+
+  /* logo */
+  .logo { display: block; }
+
+  /* taped polaroids */
+  .pola { position: absolute; background: #fff; padding: 1.6mm 1.6mm 5mm; box-shadow: 0 .5mm 1.4mm rgba(43,33,24,.28); }
+  .pola .crop { overflow: hidden; background: var(--paper); }
+  .pola img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+  .pola figcaption { position: absolute; left: 0; right: 0; bottom: .7mm; text-align: center; font-size: 6.5pt; font-weight: 700; color: var(--ink-soft); }
+  .tape { position: absolute; height: 4.2mm; width: 15mm; top: -2.2mm; left: 50%; margin-left: -7.5mm; opacity: .88;
+    clip-path: polygon(0 8%, 6% 0, 12% 10%, 18% 0, 82% 0, 88% 9%, 94% 0, 100% 10%, 100% 92%, 94% 100%, 88% 90%, 82% 100%, 18% 100%, 12% 90%, 6% 100%, 0 90%); }
+  .tape.honey { background: repeating-linear-gradient(45deg, #F6C445 0 1.2mm, #F8D272 1.2mm 2.4mm); }
+  .tape.berry { background: repeating-linear-gradient(-45deg, #E8786E 0 1mm, #EE968E 1mm 2mm); }
+  .tape.sky { background: repeating-linear-gradient(90deg, #8FB5D6 0 1mm, #A9C6E0 1mm 2mm); }
+  .tape.leaf { background: repeating-linear-gradient(45deg, #7FA65E 0 1mm, #97B87A 1mm 2mm); }
+
+  /* chunky ink-outlined stickers (die-cut look: white ring + ink line) */
+  .sticker { position: absolute; display: grid; place-items: center; text-align: center; text-wrap: balance; padding: 2mm; border-radius: 50%;
+    background: var(--tomato); color: #fff; font-weight: 800; line-height: .95;
+    border: .55mm solid var(--cocoa); box-shadow: 0 0 0 1.1mm #fff, 0 0 0 1.55mm var(--cocoa), 0 .8mm 1.6mm 1.2mm rgba(43,33,24,.25); }
+  .sticker small { display: block; font-weight: 700; font-size: .62em; margin-top: .5mm; }
+  .sticker.honey { background: var(--honey); color: var(--cocoa); }
+  .pill { display: inline-flex; align-items: center; gap: 1.2mm; border-radius: 99px; font-weight: 800;
+    border: .45mm solid var(--cocoa); padding: .9mm 2.6mm; background: #fff; }
+
+  /* back-side pieces */
+  .steps { list-style: none; display: grid; }
+  .steps li { display: grid; grid-template-columns: auto 1fr; align-items: center; }
+  .num { display: grid; place-items: center; border-radius: 50%; font-weight: 800; color: #fff; border: .45mm solid var(--cocoa); box-shadow: 0 0 0 .6mm #fff, 0 0 0 .9mm var(--cocoa); }
+  .steps li:nth-child(1) .num { background: var(--tomato); }
+  .steps li:nth-child(2) .num { background: var(--honey); color: var(--cocoa); }
+  .steps li:nth-child(3) .num { background: var(--leaf); color: var(--cocoa); }
+  .steps h3 { display: flex; align-items: center; gap: 1.2mm; }
+  .steps h3 svg { flex: none; }
+  .steps p { color: var(--ink-soft); }
+
+  .coupon { position: relative; background: var(--honey-band); border: .5mm dashed var(--cocoa); border-radius: 3mm; }
+  .coupon .tape { width: 13mm; top: -2.4mm; left: auto; right: 6mm; margin: 0; transform: rotate(4deg); }
+  .coupon h2 { color: var(--cocoa); }
+  .coupon h2 em { font-style: normal; color: var(--tomato); }
+  .code { display: inline-block; font-weight: 800; letter-spacing: .06em; background: #fff; border: .5mm solid var(--cocoa); border-radius: 1.6mm; padding: .5mm 2.2mm; }
+
+  .qrrow { display: grid; grid-template-columns: auto 1fr; align-items: center; }
+  .qr { background: #fff; border: .45mm solid var(--cocoa); border-radius: 2mm; }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .scan h3 { color: var(--tomato); }
+  .url { font-weight: 800; }
+
+  .band { display: flex; align-items: center; gap: 1.5mm; font-weight: 700; }
+  .band svg { flex: none; }
+  .trust { display: flex; align-items: center; gap: 1.4mm; font-weight: 700; }
+  .smallprint { color: var(--ink-soft); line-height: 1.2; }
+  .for-grownups { display: inline-flex; align-items: center; gap: 1.2mm; font-weight: 800; letter-spacing: .02em;
+    background: var(--cocoa); color: var(--paper); border-radius: 99px; padding: .8mm 2.6mm; }
+
+  /* ---------- A6 (105 x 148) ---------- */
+  body.a6 .front .logo { width: 44mm; margin: 0 auto; }
+  body.a6 .front .hand { font-size: 15pt; text-align: center; margin-top: 2.2mm; }
+  body.a6 .front h1 { font-size: 27pt; text-align: center; margin-top: 1.2mm; position: relative; z-index: 0; }
+  body.a6 .stage { position: relative; flex: 1; margin-top: 2mm; }
+  body.a6 .front .strip { position: absolute; left: 0; right: 0; bottom: calc(var(--bleed) + 4.2mm); text-align: center; font-weight: 800; font-size: 8.6pt; }
+  body.a6 .front .strip span { color: var(--tomato); }
+  body.a6 .front .kraft { height: 17mm; }
+
+  body.a6 .back h2.title { font-size: 17pt; }
+  body.a6 .back .hand { font-size: 13pt; margin-top: .6mm; }
+  body.a6 .steps { gap: 2.6mm; margin-top: 3.4mm; }
+  body.a6 .steps li { gap: 2.6mm; }
+  body.a6 .num { width: 6.8mm; height: 6.8mm; font-size: 10.5pt; margin-left: 1mm; }
+  body.a6 .steps h3 { font-size: 10pt; }
+  body.a6 .steps p { font-size: 7.6pt; margin-top: .3mm; }
+  body.a6 .coupon { margin-top: 5mm; padding: 2.6mm 3mm 2.8mm; }
+  body.a6 .coupon h2 { font-size: 13pt; }
+  body.a6 .coupon p { font-size: 7.6pt; margin-top: 1mm; }
+  body.a6 .coupon .code { font-size: 10.5pt; margin-left: .8mm; }
+  body.a6 .qrrow { gap: 3.6mm; margin-top: 4.4mm; }
+  body.a6 .qr { width: 29mm; height: 29mm; padding: 2.6mm; }
+  body.a6 .scan h3 { font-size: 12pt; }
+  body.a6 .scan p { font-size: 7.8pt; margin-top: .8mm; }
+  body.a6 .scan .url { font-size: 8.6pt; }
+  body.a6 .band { font-size: 7.8pt; margin-top: 4mm; }
+  body.a6 .trust { font-size: 7.8pt; margin-top: 1.6mm; }
+  body.a6 .smallprint { font-size: 5.6pt; margin-top: auto; }
+
+  /* ---------- A5 (148 x 210) ---------- */
+  body.a5 .front .top { display: flex; justify-content: space-between; align-items: center; }
+  body.a5 .front .logo { width: 50mm; }
+  body.a5 .for-grownups { font-size: 8pt; }
+  body.a5 .front .hand { font-size: 19pt; margin-top: 4mm; }
+  body.a5 .front h1 { font-size: 40pt; margin-top: 1.5mm; position: relative; z-index: 0; }
+  body.a5 .front .lede { font-size: 10.5pt; margin-top: 5mm; max-width: 112mm; color: var(--ink-soft); }
+  body.a5 .front .lede b { color: var(--cocoa); }
+  body.a5 .stage { position: relative; flex: 1; margin-top: 2mm; }
+  body.a5 .front .strip { position: absolute; left: 0; right: 0; bottom: calc(var(--bleed) + 5.5mm); text-align: center; font-weight: 800; font-size: 10.5pt; }
+  body.a5 .front .strip span { color: var(--tomato); }
+  body.a5 .front .kraft { height: 21mm; }
+
+  body.a5 .back h2.title { font-size: 21pt; }
+  body.a5 .back .hand { font-size: 15pt; margin-top: 1mm; }
+  body.a5 .steps { grid-template-columns: repeat(3, 1fr); gap: 4mm; margin-top: 6mm; }
+  body.a5 .steps li { grid-template-columns: 1fr; gap: 1.6mm; align-items: start; }
+  body.a5 .num { width: 9mm; height: 9mm; font-size: 13pt; }
+  body.a5 .steps h3 { font-size: 11pt; }
+  body.a5 .steps p { font-size: 8.6pt; margin-top: .4mm; }
+  body.a5 .box { margin-top: 7mm; background: var(--paper); border: .45mm solid var(--line); border-radius: 3mm; padding: 3mm 3.5mm; display: grid; grid-template-columns: 1fr 1fr; gap: 1.6mm 4mm; }
+  body.a5 .box h3 { grid-column: 1 / -1; font-size: 11.5pt; display: flex; align-items: center; gap: 1.4mm; }
+  body.a5 .box p { font-size: 8.4pt; display: flex; gap: 1.2mm; align-items: flex-start; color: var(--ink-soft); }
+  body.a5 .box p svg { flex: none; margin-top: .2mm; }
+  body.a5 .lower { display: grid; grid-template-columns: 1fr 38mm; gap: 5mm; margin-top: 8mm; align-items: center; }
+  body.a5 .coupon { padding: 3.2mm 3.6mm 3.4mm; }
+  body.a5 .coupon h2 { font-size: 15.5pt; }
+  body.a5 .coupon p { font-size: 8.4pt; margin-top: 1.2mm; }
+  body.a5 .coupon .code { font-size: 12pt; margin-left: .8mm; }
+  body.a5 .qrcol { text-align: center; }
+  body.a5 .qr { width: 34mm; height: 34mm; padding: 3mm; margin: 0 auto; }
+  body.a5 .qrcol h3 { font-size: 10.5pt; color: var(--tomato); margin-top: 1.6mm; }
+  body.a5 .qrcol p { font-size: 7.6pt; margin-top: .5mm; }
+  body.a5 .band { font-size: 9pt; margin-top: 6mm; }
+  body.a5 .pills { display: flex; flex-wrap: wrap; gap: 2.4mm; margin-top: 6mm; }
+  body.a5 .pills .pill { font-size: 8.2pt; }
+  body.a5 .pills .pill:nth-child(odd) { transform: rotate(-1.5deg); }
+  body.a5 .pills .pill:nth-child(even) { transform: rotate(1.2deg); background: var(--honey-band); }
+  body.a5 .trust { font-size: 9pt; margin-top: 1.4mm; }
+  body.a5 .smallprint { font-size: 6.4pt; margin-top: auto; }
+
+  /* proof overlay: trim (pink) + safe area (blue) */
+  .proofline { position: absolute; pointer-events: none; z-index: 50; }
+  .proofline.trim { inset: var(--bleed); outline: .25mm solid #ff2d8a; }
+  .proofline.safe-l { inset: calc(var(--bleed) + var(--safe)); outline: .25mm dashed #2f7bff; }
+</style>
+</head>
+<body>
+<main id="sheet"></main>
+
+<script>
+// ---------- the versions ----------
+const q = new URLSearchParams(location.search);
+const SIZE = q.get('size') === 'a5' ? 'a5' : 'a6';
+const SEASON = q.get('season') === 'spring' ? 'spring' : 'xmas';
+const CODE = (q.get('code') || 'MAGICFAIR').toUpperCase();
+const QR = q.get('qr') || 'fair';
+const PROOF = q.has('proof');
+document.body.className = SIZE;
+
+const PUB = '../../../public/';
+// photos + textures come from img/: print-quality copies of the site's own images that build.mjs makes
+// (JPEG for photos, so the PDF carries them as-is; PNG for the see-through doodle texture)
+const IMG = (src) => 'img/' + src.replace(/\.webp$/, src.startsWith('textures/') ? '.png' : '.jpg');
+const ICON = {}; // filled by build.mjs from node_modules/@tabler/icons (outline set)
+const icon = (name, mm, colour = 'currentColor', stroke = 2) =>
+  (window.TABLER?.[name] || '').replace('<svg', `<svg style="width:${mm}mm;height:${mm}mm;color:${colour}" stroke-width="${stroke}"`);
+
+// one shared honey scribble underline
+const scribble = `<svg viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true"><path d="M3 13 C 40 4, 80 18, 120 9 S 180 6, 197 11" fill="none" stroke="#F6C445" stroke-width="9" stroke-linecap="round"/></svg>`;
+
+// ---------- copy (brand voice: lowercase, warm, plain; speaks to grown-ups only) ----------
+const COPY = {
+  xmas: {
+    logo: 'brand/snickerlogo-christmas.png',
+    texture: 'textures/christmas-doodles.webp',
+    hand: 'the present they made themselves',
+    h1: ['their drawing,', 'made real.'],
+    lede: 'Snap one of their drawings on your phone and see it on <b>baubles, cards, mugs, wrapping paper</b> and more, in moments. Made to order in the UK, with free delivery in every price.',
+    strip: 'baubles from <span>£19</span> · cards <span>£5.50</span> · free uk delivery',
+    photos: SIZE === 'a6'
+      ? [ ['christmas/bauble.webp', 'a bauble', 'honey'], ['christmas/hero-cardshanging.webp', 'cards', 'berry'], ['examples/family-mug.webp', 'a mug', 'sky'] ]
+      : [ ['christmas/bauble.webp', 'a bauble', 'honey'], ['christmas/hero-cardshanging.webp', 'cards', 'berry'], ['christmas/shelf-ornament.webp', 'an ornament', 'leaf'],
+          ['examples/family-mug.webp', 'a mug', 'sky'], ['christmas/ball-and-present.webp', 'wrapping paper', 'honey'] ],
+    band: 'for christmas: <b>cards by thu 10 dec</b>, most gifts by <b>sat 12 dec</b>',
+    backHand: "they're only little once",
+  },
+  spring: {
+    logo: 'brand/snickerlogo.png',
+    texture: 'textures/everyday-doodles.webp',
+    hand: "they're only little once",
+    h1: ['every drawing,', 'kept.'],
+    lede: 'Snap each drawing as it comes home and keep them all in one <b>private keepsake box</b>. When one is too good to keep to yourselves, see it on a <b>mug, cushion, card or print</b> in moments.',
+    strip: 'mugs from <span>£18</span> · cards <span>£5.50</span> · free uk delivery',
+    photos: [ ['examples/cushionheartflower.webp', 'a cushion', 'berry', 1.25], ['examples/family-mug.webp', 'a mug', 'sky'], ['examples/framecow.webp', 'a framed print', 'honey', 1.45],
+              ['examples/cardcastle.webp', 'a card', 'leaf', 1.7], ['examples/mugtruck.webp', 'another mug', 'honey', 1.45] ],
+    band: "mother's day is <b>sun 7 march</b>: order by the date on the site",
+    backHand: 'keep the magic',
+  },
+}[SEASON];
+
+const SMALL = SIZE === 'a6'
+  ? `For grown-ups. Free card: one greetings card off your first order when you're signed in and it sits beside another keepsake (a few very small baskets don't qualify; checkout always shows it). Christmas dates are our print labs' last order days; the site shows the latest. Snickerdoodle is a trading name of Launch Mode Ltd, 124 City Road, London EC1V 2NX. Please pass this on or recycle it.`
+  : `For grown-ups. Free card: one greetings card off your first order when you're signed in and it sits beside another keepsake (a few very small baskets don't qualify; checkout always shows it). ${SEASON === 'xmas' ? "Christmas dates are our print labs' last order days; the site always shows the latest." : 'Order-by dates are on the site.'} Snickerdoodle is for grown-ups to use on behalf of their family. It is a trading name of Launch Mode Ltd, 124 City Road, London EC1V 2NX. Please pass this on or recycle it.`;
+
+// ---------- layout ----------
+function pola([src, cap, tape, zoom = 1], css, rot) {
+  return `<figure class="pola" style="${css};transform:rotate(${rot}deg)"><span class="tape ${tape}"></span><div class="crop"><img src="${IMG(src)}" alt="" style="transform:scale(${zoom})"></div><figcaption>${cap}</figcaption></figure>`;
+}
+
+function front() {
+  const P = COPY.photos;
+  const stage = SIZE === 'a6'
+    ? pola(P[1], 'left:-1mm;top:6mm;width:34mm', -7) + pola(P[2], 'right:-1mm;top:9mm;width:33mm', 6) + pola(P[0], 'left:50%;margin-left:-22mm;top:2mm;width:44mm', 1.5)
+    : pola(P[1], 'left:0;top:3mm;width:39mm', -6) + pola(P[3], 'right:0;top:2mm;width:38mm', 5) + pola(P[2], 'left:3mm;top:52mm;width:34mm', 4)
+      + pola(P[4], 'right:5mm;top:52mm;width:34mm', -5) + pola(P[0], 'left:50%;margin-left:-26mm;top:10mm;width:52mm', -1.5);
+  const offer = SIZE === 'a6'
+    ? `<div class="sticker" style="width:26mm;height:26mm;right:0;bottom:7mm;font-size:10.5pt;transform:rotate(-9deg)">your first card's<br>on us<small>see back</small></div>`
+    : `<div class="sticker" style="width:31mm;height:31mm;right:-1mm;bottom:5mm;font-size:13pt;transform:rotate(-9deg)">your first card's<br>on us<small>see over</small></div>`;
+  const magic = SIZE === 'a6'
+    ? `<div class="sticker honey" style="width:19mm;height:19mm;left:1mm;bottom:9mm;font-size:8.6pt;transform:rotate(8deg)">keep the<br>magic</div>`
+    : `<div class="sticker honey" style="width:23mm;height:23mm;left:0;bottom:6mm;font-size:10.5pt;transform:rotate(8deg)">keep the<br>magic</div>`;
+  const top = SIZE === 'a6'
+    ? `<img class="logo" src="${PUB}${COPY.logo}" alt="snickerdoodle">`
+    : `<div class="top"><img class="logo" src="${PUB}${COPY.logo}" alt="snickerdoodle"><span class="for-grownups">${icon('heart', 3.2, '#FFFBF2')} for the grown-ups</span></div>`;
+  return `<section class="side front">
+    <div class="texture" style="background-image:url(${IMG(COPY.texture)})"></div>
+    <div class="kraft"></div>
+    <div class="safe">
+      ${top}
+      <p class="hand">${COPY.hand}</p>
+      <h1>${COPY.h1[0]}<br><span class="mr">${COPY.h1[1]}${scribble}</span></h1>
+      ${SIZE === 'a5' ? `<p class="lede">${COPY.lede}</p>` : ''}
+      <div class="stage">${stage}${offer}${magic}</div>
+    </div>
+    <p class="strip">${COPY.strip}</p>
+    ${proof()}
+  </section>`;
+}
+
+function back() {
+  const steps = [
+    ['camera', 'snap it', SEASON === 'xmas' ? 'one of their drawings, on your own phone. no posting originals.' : 'each drawing as it comes home, on your own phone.'],
+    ['sparkles', 'see the magic', SEASON === 'xmas' ? 'see it on baubles, cards, mugs and more, all at once.' : 'see it on mugs, cushions, cards and prints, all at once.'],
+    ['gift', 'keep & give', 'keep it in your private keepsake box, or send granny a ready-to-buy link.'],
+  ].map(([ic, h, p], i) => `<li><span class="num">${i + 1}</span><div><h3>${h}</h3><p>${p}</p></div></li>`).join('');
+
+  const coupon = `<div class="coupon"><span class="tape honey"></span>
+      <h2>first order? <em>your first card's on us.</em></h2>
+      <p>sign in, add a greetings card beside another keepsake, and it's free. pop in code <span class="code">${CODE}</span></p>
+    </div>`;
+  const qr = `<div class="qr" data-qr="${QR}"></div>`;
+  const band = `<p class="band">${icon(SEASON === 'xmas' ? 'truck' : 'heart', SIZE === 'a6' ? 3.6 : 4.2, '#C8402A')}<span>${COPY.band}</span></p>`;
+  const trust = `<p class="trust">${icon('lock', SIZE === 'a6' ? 3.6 : 4.2, '#2B2118')}<span>private by default. never public. only who you invite.</span></p>`;
+
+  if (SIZE === 'a6') {
+    return `<section class="side back">
+      <div class="safe">
+        <h2 class="title">from fridge door to forever</h2>
+        <p class="hand">${COPY.backHand}</p>
+        <ol class="steps">${steps}</ol>
+        ${coupon}
+        <div class="qrrow">${qr}<div class="scan"><h3>scan to start creating</h3><p>no account needed to see the magic.</p><p class="url">or visit snickerdoodle.co.uk</p></div></div>
+        ${band}${trust}
+        <p class="smallprint">${SMALL}</p>
+      </div>
+      ${proof()}
+    </section>`;
+  }
+  const box = `<div class="box">
+      <h3>${icon('home', 4.4, '#C8402A')} what happens to their drawings</h3>
+      <p>${icon('lock', 3.6, '#2B2118')}<span>they live in your <b>private keepsake box</b>. nothing is ever public.</span></p>
+      <p>${icon('heart', 3.6, '#2B2118')}<span>only the family you invite can see them. you choose who.</span></p>
+      <p>${icon('trash', 3.6, '#2B2118')}<span>see, download or delete anything, any time.</span></p>
+      <p>${icon('shield-check', 3.6, '#2B2118')}<span>we never ask for a child's surname. first names only.</span></p>
+    </div>`;
+  return `<section class="side back">
+    <div class="safe">
+      <h2 class="title">from fridge door to forever</h2>
+      <p class="hand">${COPY.backHand}</p>
+      <ol class="steps">${steps}</ol>
+      ${box}
+      <div class="lower">${coupon}<div class="qrcol">${qr}<h3>scan to start creating</h3><p class="url">or visit snickerdoodle.co.uk</p></div></div>
+      ${band}${trust}
+      <div class="pills">${[['home', 'made to order in the uk'], ['truck', 'free uk delivery in every price'], ['sparkles', 'see it before you buy'], ['camera', 'no posting originals']].map(([i, t]) => `<span class="pill">${icon(i, 3.6, '#C8402A')}${t}</span>`).join('')}</div>
+      <p class="smallprint">${SMALL}</p>
+    </div>
+    ${proof()}
+  </section>`;
+}
+
+function proof() { return PROOF ? '<div class="proofline trim"></div><div class="proofline safe-l"></div>' : ''; }
+
+document.getElementById('sheet').innerHTML = front() + back();
+// QR svgs are inlined by build.mjs (window.QRS[name]); fall back to an <img> when opened by hand
+document.querySelectorAll('[data-qr]').forEach((el) => {
+  const name = el.dataset.qr;
+  el.innerHTML = window.QRS?.[name] || `<img src="qr/${name}.svg" alt="" style="width:100%;height:100%">`;
+});
+// icons need the Tabler set: when build.mjs has injected it, re-render
+window.__render = () => { document.getElementById('sheet').innerHTML = front() + back();
+  document.querySelectorAll('[data-qr]').forEach((el) => { el.innerHTML = window.QRS?.[el.dataset.qr] || `<img src="qr/${el.dataset.qr}.svg" alt="" style="width:100%;height:100%">`; }); };
+</script>
+</body>
+</html>
