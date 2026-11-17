@@ -125,6 +125,9 @@ export const LIMITS = {
   signInTriesPerEmail: { bucket: 'sign-in-try:email', limit: 10, windowSec: 900, failClosed: true },
   signInTriesPerIp: { bucket: 'sign-in-try:ip', limit: 30, windowSec: 900, failClosed: true },
   emailChange: { bucket: 'email-change:account', limit: 5, windowSec: 3600 },
+  // "sign in with Face ID" (src/server/passkeys.ts): each try makes a one-time challenge row; adding is signed in
+  passkeySignInPerIp: { bucket: 'passkey-sign-in:ip', limit: 30, windowSec: 900, failClosed: true },
+  passkeyAddPerAccount: { bucket: 'passkey-add:account', limit: 10, windowSec: 3600 },
   guestUploadPerIp: { bucket: 'upload:guest-ip', limit: 60, windowSec: 3600 },
   homeUploadPerAccount: { bucket: 'upload:account', limit: 120, windowSec: 3600 },
   testGatePerIp: { bucket: 'test-gate:ip', limit: 10, windowSec: 900, failClosed: true },

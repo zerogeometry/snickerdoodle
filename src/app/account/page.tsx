@@ -13,6 +13,9 @@ import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { AccountActions } from './AccountActions';
 import { DrawAppCard } from './DrawAppCard';
+import { PasskeysCard } from './PasskeysCard';
+import { listPasskeys, mayAddPasskey } from '@/server/passkeys';
+import { currentSignInAt } from '@/server/freshSignIn';
 import { connectChoices, listLinkedDevices } from '@/server/app/link';
 import { countDrawSent, listProgressBackups } from '@/server/app/sync';
 import { ProfileCard } from './ProfileCard';
@@ -30,7 +33,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const displayName = account.name ?? account.email.split('@')[0] ?? account.email;
   const db = getDb();
   const ownedFamilyIds = connectChoices(db, account.id).then(({ owned }) => owned.map((f) => f.id));
-  const [creditPence, pictures, drawDevices, drawBackups, drawSent] = await Promise.all([
+  const [creditPence, pictures, drawDevices, drawBackups, drawSent, myPasskeys, signedInAt] = await Promise.all([
     getCreditBalance(db, account.id),
     profileImagesFor(db, account.id, [account.id]),
     listLinkedDevices(db, account.id),
@@ -38,6 +41,10 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     ownedFamilyIds.then((ids) => listProgressBackups(db, ids)),
     // keepsakes Snickerdoodle Draw sent (for "remove everything draw sent")
     ownedFamilyIds.then((ids) => countDrawSent(db, ids)),
+    // "sign in with Face ID": the devices that can open this account without the email
+    listPasskeys(db, account.id),
+    // adding one needs a sign-in here in the last 15 minutes (A-63)
+    currentSignInAt(db, account.id),
   ]);
   const mine = pictures.get(account.id);
   const initial = (account.name ?? account.email).charAt(0).toUpperCase();
@@ -66,6 +73,8 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
             your credit: <b>{formatPence(creditPence)}</b> <span className="text-ink-soft">— it comes off your next order automatically</span>
           </p>
         ) : null}
+
+        <PasskeysCard passkeys={myPasskeys} canAdd={mayAddPasskey(signedInAt)} />
 
         <DrawAppCard devices={drawDevices} backups={drawBackups} sentCount={drawSent} />
 

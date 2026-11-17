@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '@/db/schema';
-import { assets, auditRecords, children, invites, memberships, sessions } from '@/db/schema';
+import { assets, auditRecords, children, invites, memberships, passkeys, sessions } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError, canViewAsset } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
@@ -84,6 +84,8 @@ describe.skipIf(!DB)('parent controls — members, invites, children', () => {
   it('removing a member denies them immediately and signs them out everywhere (no session grace)', async () => {
     const sam = await owner();
     await db.insert(sessions).values({ sessionToken: `t-${ids.nonce}-jo`, userId: ids.joId, expires: new Date(Date.now() + 86_400_000) });
+    // …and a "sign in with Face ID" passkey on Jo's phone
+    const [pk] = await db.insert(passkeys).values({ accountId: ids.joId, credentialId: `cred-${ids.nonce}-jo`, publicKey: 'pk', deviceLabel: 'an iphone' }).returning();
     let jo = await resolveViewerContext(db, ids.joId, ids.hartleyId);
     expect(canViewAsset(await assetRef(ids.assetFamily), jo).allowed).toBe(true);
 
@@ -94,6 +96,9 @@ describe.skipIf(!DB)('parent controls — members, invites, children', () => {
     expect(canViewAsset(await assetRef(ids.assetFamily), jo).allowed).toBe(false);
     expect(canViewAsset(await assetRef(ids.assetExtended), jo).allowed).toBe(false);
     expect(await db.select().from(sessions).where(eq(sessions.userId, ids.joId))).toHaveLength(0);
+    // Face ID can't sign them straight back in either — the passkey went with the sessions, logged
+    expect(await db.select().from(passkeys).where(eq(passkeys.accountId, ids.joId))).toHaveLength(0);
+    expect(await audited('PASSKEY_REMOVED', pk!.id)).toBe(true);
     const [m] = await db.select().from(memberships).where(and(eq(memberships.familyId, ids.hartleyId), eq(memberships.accountId, ids.joId)));
     expect(m!.status).toBe('REMOVED');
     expect(m!.revokedAt).not.toBeNull();

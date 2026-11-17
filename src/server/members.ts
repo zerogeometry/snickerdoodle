@@ -7,6 +7,7 @@ import { circleAllowedFor } from '@/domain/relationships';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
 import { revokeAppTokens } from './app/link';
+import { deleteAllPasskeys } from './passkeys';
 import { sendMail, type MailMessage } from './mail';
 import { memberAccessChangedEmail, memberRemovedEmail } from './mail/familyNotices';
 import { moveIntoHomeEmail } from './mail/familyInvite';
@@ -79,6 +80,9 @@ export async function removeMember(
   if (!updated[0]) return { ok: false };
   // "Removal invalidates sessions immediately" (CLAUDE.md): sign them out everywhere.
   await db.delete(sessions).where(eq(sessions.userId, input.memberAccountId));
+  // …and their passkeys, so Face ID can't sign them straight back in (a fresh email sign-in still can — they may
+  // belong to other families — and they can add Face ID again then)
+  await deleteAllPasskeys(db,input.memberAccountId, 'member-removed', { accountId: ownerId, actorType: 'MEMBER', familyId: input.familyId });
   // and any Snickerdoodle Draw phone of theirs linked to this family (only owners can link, so this
   // is belt and braces — the key also re-checks the membership on every call)
   await revokeAppTokens(db, { accountId: input.memberAccountId, familyId: input.familyId }, 'member-removed', { accountId: ownerId, actorType: 'MEMBER' });

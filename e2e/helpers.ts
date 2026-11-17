@@ -29,13 +29,19 @@ export async function allStudioTools(page: Page) {
   });
 }
 
-export async function quietCookies(page: Page, { appBubble = false }: { appBubble?: boolean } = {}) {
-  await page.addInitScript((keepBubble) => {
-    try {
-      localStorage.setItem('snickerdoodle.cookie-choice', 'essential');
-      if (!keepBubble) localStorage.setItem('snickerdoodle.draw-bubble-hidden', '1');
-    } catch {}
-  }, appBubble);
+/** Also says "not now" to the "skip the email next time?" card (it shows only where the browser has Face ID /
+ * Windows Hello, which differs from PC to PC) — `passkeyCard: true` for the specs about it (e2e/passkey.spec.ts). */
+export async function quietCookies(page: Page, { appBubble = false, passkeyCard = false }: { appBubble?: boolean; passkeyCard?: boolean } = {}) {
+  await page.addInitScript(
+    ([keepBubble, keepPasskeyCard]) => {
+      try {
+        localStorage.setItem('snickerdoodle.cookie-choice', 'essential');
+        if (!keepBubble) localStorage.setItem('snickerdoodle.draw-bubble-hidden', '1');
+        if (!keepPasskeyCard) localStorage.setItem('sd-passkey-nudge-off', '1');
+      } catch {}
+    },
+    [appBubble, passkeyCard] as const,
+  );
 }
 
 /** Upload through the real "upload a drawing" control and wait for the personalised range.

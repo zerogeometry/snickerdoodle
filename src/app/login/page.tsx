@@ -11,6 +11,8 @@ import { Button } from '@/ui/primitives/Button';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
 import { Icon } from '@/ui/primitives/Icon';
 import { FlowHeader } from '@/ui/components/FlowHeader';
+import { canUsePasskeys, deviceWord, passkeyHere } from '@/ui/passkeyClient';
+import { PasskeySignIn } from './PasskeySignIn';
 
 /** The last code typed in this tab (sessionStorage: this tab only, gone when it closes), so a typo can come back to
  * the code box. Ignored after the code's own 15 minutes. */
@@ -50,6 +52,12 @@ export default function LoginPage() {
   const [comeBack, setComeBack] = useState<string | null>(null);
   // a guest's "+ keepsake": the drawing to keep once they're signed in
   const [keepId, setKeepId] = useState<string | null>(null);
+  // "sign in with Face ID" (src/app/login/PasskeySignIn.tsx): only where the browser can, worded for this device,
+  // and first when this device has used one before. Worked out after load (the server can't know).
+  const [passkey, setPasskey] = useState<{ word: string; first: boolean } | null>(null);
+  useEffect(() => {
+    if (canUsePasskeys()) setPasskey({ word: deviceWord(), first: passkeyHere() });
+  }, []);
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     // A code that didn't match comes back here as ?error=Verification. If it was typed in this tab in the last few
@@ -197,6 +205,7 @@ export default function LoginPage() {
                   open the link on this device and your drawing goes straight into your keepsake box ♥
                 </p>
               ) : null}
+              {passkey?.first ? <PasskeySignIn word={passkey.word} first keepId={keepId} next={nextPath} /> : null}
               <form onSubmit={submit} className="mt-5">
                 <label htmlFor="login-email" className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-ink-soft">
                   Email
@@ -217,6 +226,7 @@ export default function LoginPage() {
                   <p role="alert" className="mt-2 text-center text-xs font-semibold text-cinnamon">we couldn’t send a link just now — give it a few minutes and try again.</p>
                 ) : null}
               </form>
+              {passkey && !passkey.first ? <PasskeySignIn word={passkey.word} first={false} keepId={keepId} next={nextPath} /> : null}
               <p className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-green-save">
                 <Icon icon={IconShieldCheck} size={13} /> Your data is yours. We never sell it, ever.
               </p>

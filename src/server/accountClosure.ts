@@ -27,6 +27,7 @@ import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { recordErasure } from './erasureLedger';
 import { eraseProfileImage } from './profile';
 import { revokeAppTokens } from './app/link';
+import { deleteAllPasskeys } from './passkeys';
 import { appAuthCodes, appCheckoutGrants } from '@/db/schema';
 import type { DbHandle } from './db';
 
@@ -149,6 +150,8 @@ export async function closeAccount(
   const ownImages = await db.select().from(profileImages).where(and(eq(profileImages.accountId, accountId), inArray(profileImages.kind, ['AVATAR', 'ACCOUNT_HEADER'])));
   for (const img of ownImages) await eraseProfileImage(db, img, ledger); // picture + header
   await db.delete(sessions).where(eq(sessions.userId, accountId));
+  // …and its passkeys ("sign in with Face ID"): the account row stays (anonymised), so they must go by hand
+  await deleteAllPasskeys(db, accountId, 'account-closed', { accountId, actorType: 'MEMBER' });
   // …and every Snickerdoodle Draw phone linked to it stops working, at once
   await revokeAppTokens(db, { accountId }, 'account-closed', { accountId, actorType: 'MEMBER' }, now);
   await db.delete(appAuthCodes).where(eq(appAuthCodes.accountId, accountId));
