@@ -427,7 +427,7 @@ export function FlowCatalogue({
         ) : null}
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
           {upload ? (
-            <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>
+            <Button variant="keepOutline" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>
               <Icon icon={IconHeartPlus} size={16} /> {kept ? 'kept ♥' : keeping ? 'keeping…' : '+ keepsake'}
             </Button>
           ) : null}

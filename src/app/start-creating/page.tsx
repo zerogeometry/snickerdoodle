@@ -382,9 +382,9 @@ export default function StartCreatingPage() {
                     keep + toast as "+ keepsake" under the range (useKeepDrawing), without scrolling down */}
                 <div className="flex gap-2.5">
                   <Button
-                    variant="secondary"
+                    variant="keepOutline"
                     size="lg"
-                    className={`aspect-square shrink-0 !px-0 ${kept ? 'text-green-save disabled:opacity-100' : 'text-cinnamon'}`}
+                    className="aspect-square shrink-0 !px-0"
                     onClick={() => void keepNow()}
                     disabled={keeping || kept}
                     aria-busy={keeping}
