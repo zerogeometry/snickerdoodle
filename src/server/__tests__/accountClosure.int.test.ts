@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { accounts, assets, auditRecords, children, families, giftLinks, invites, memberships, orders, sessions, storageObjects } from '@/db/schema';
+import { accounts, assets, auditRecords, children, families, giftLinks, invites, memberships, orders, passkeys, sessions, storageObjects } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { resolveViewerContext } from '@/server/assets';
 import { closeAccount } from '@/server/accountClosure';
@@ -58,6 +58,7 @@ describe.skipIf(!DB || !S3)('closeAccount — right to erasure', () => {
     await createGiftLink(db, blake, { familyId: ids.bloomId, assetIds: [art.assetId], recipient: { kind: 'open', circle: 'FAMILY' } });
     await db.insert(children).values({ familyId: ids.bloomId, firstName: 'Wren', controllerAccountId: ids.blakeId });
     await db.insert(sessions).values({ sessionToken: `close-${ids.nonce}`, userId: ids.blakeId, expires: new Date(Date.now() + 86_400_000) });
+    await db.insert(passkeys).values({ accountId: ids.blakeId, credentialId: `cred-close-${ids.nonce}`, publicKey: 'pk', deviceLabel: 'an android phone or tablet' });
     const familyAssets = (await db.select({ id: assets.id }).from(assets).where(eq(assets.familyId, ids.bloomId))).map((a) => a.id);
     expect(familyAssets.length).toBeGreaterThan(0);
 
@@ -72,6 +73,8 @@ describe.skipIf(!DB || !S3)('closeAccount — right to erasure', () => {
     expect(await db.select().from(invites).where(eq(invites.familyId, ids.bloomId))).toHaveLength(0);
     expect(await db.select().from(memberships).where(eq(memberships.familyId, ids.bloomId))).toHaveLength(0);
     expect(await db.select().from(sessions).where(eq(sessions.userId, ids.blakeId))).toHaveLength(0);
+    // the account row stays (anonymised), so its passkeys must go by hand — they do
+    expect(await db.select().from(passkeys).where(eq(passkeys.accountId, ids.blakeId))).toHaveLength(0);
 
     const [acct] = await db.select().from(accounts).where(eq(accounts.id, ids.blakeId));
     expect(acct!.email).toBe(`closed-${ids.blakeId}@closed.invalid`);

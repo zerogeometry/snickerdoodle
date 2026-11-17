@@ -195,6 +195,33 @@ for (const vp of WIDTHS) {
       await shot(page, `${vp.name}-whose-corner`, { fullPage: false, mask: [page.locator('img[src^="http"]')] });
     });
 
+    // "sign in with Face ID" (passkeys, 17 Nov): no mockup — the auth/account area, in the same scrapbook language
+    // (CLAUDE.md). The browser's virtual authenticator stands in for the phone's Face ID.
+    test('sign in with Face ID: the after-sign-in card, the account list, the login button', async ({ page }) => {
+      test.skip(!hasDb, 'needs DATABASE_URL + AUTH_SECRET to sign in');
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('WebAuthn.enable');
+      await cdp.send('WebAuthn.addVirtualAuthenticator', {
+        options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true },
+      });
+      const parent = testEmail('visual-passkey');
+      await quietCookies(page, { passkeyCard: true });
+      await signInByEmailLink(page, parent, '/home');
+      const card = page.getByRole('region', { name: 'skip the email next time?' });
+      await expect(card).toBeVisible();
+      await expect(card).toHaveScreenshot(`${vp.name}-passkey-card.png`);
+      await card.getByRole('button', { name: /^use / }).click();
+      await expect(page.getByRole('status').filter({ hasText: 'all set' })).toBeVisible();
+      await page.goto('/account');
+      const list = page.getByRole('region', { name: /^sign in with / });
+      await expect(list.getByRole('button', { name: /^remove / })).toBeVisible();
+      await expect(list).toHaveScreenshot(`${vp.name}-passkey-account.png`, { mask: [list.getByText(/^added /)] });
+      await page.getByRole('button', { name: /log out/i }).click();
+      await page.goto('/login');
+      await expect(page.getByRole('button', { name: /^sign in with / })).toBeVisible();
+      await shot(page, `${vp.name}-login-face-id`);
+    });
+
     test('family home and a gift link (signed in)', async ({ page, browser }) => {
       test.skip(!hasDb, 'needs DATABASE_URL + AUTH_SECRET to sign in');
       test.setTimeout(180_000);

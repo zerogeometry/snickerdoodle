@@ -132,6 +132,9 @@ export const auditEvent = pgEnum('audit_event', [
   'OCCASION_CHANGED',
   // the admin app opened a customer's personal details (an order's address, a message's email) — who, when, which
   'ADMIN_PERSONAL_DATA_VIEWED',
+  // "sign in with Face ID": a passkey added / removed (by the person, or with a removal or a closed account)
+  'PASSKEY_ADDED',
+  'PASSKEY_REMOVED',
 ]);
 
 /** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
@@ -930,7 +933,48 @@ export const sessions = pgTable('sessions', {
   expires: timestamp('expires', { withTimezone: true }).notNull(),
   /** When this sign-in happened (A-63: widening what the Draw app sends needs a sign-in in the last 15 minutes). */
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  /** How: 'email' (the link or the code — Auth.js's own rows take the default) or 'passkey' (src/server/passkeys.ts). */
+  signInMethod: text('sign_in_method').notNull().default('email'),
 });
+
+// ── passkeys — "sign in with Face ID" (founder, 17 Nov 2026). Optional, next to the email sign-in. Holds the
+// PUBLIC half of a key the person's own phone or computer made; the private half and anything biometric (the face,
+// the fingerprint) never leave their device and are never sent to us. One row per device the person added.
+export const passkeys = pgTable(
+  'passkeys',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    accountId: uuid('account_id')
+      .notNull()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    /** The key's id, as the device reports it (base64url). */
+    credentialId: text('credential_id').notNull(),
+    /** The public key (base64url COSE). Can check a signature; can't make one. */
+    publicKey: text('public_key').notNull(),
+    /** The device's signature counter (0 for most synced passkeys) — a cloned key shows up as going backwards. */
+    counter: bigint('counter', { mode: 'number' }).notNull().default(0),
+    /** How the browser can reach it ('internal', 'hybrid', …), to offer it again next time. */
+    transports: jsonb('transports').$type<string[]>(),
+    /** What the account page calls it ("an iphone or ipad · icloud keychain"). Never a device id or model. */
+    deviceLabel: text('device_label').notNull(),
+    createdAt,
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  (t) => [uniqueIndex('passkey_credential_unique').on(t.credentialId), index('passkey_account_idx').on(t.accountId)],
+);
+
+// ── passkey_challenges — the one-time random number a passkey signs. Used once (deleted as it's checked), and only
+// for 5 minutes. `accountId` is set when adding a passkey (the signed-in person), null when signing in with one.
+export const passkeyChallenges = pgTable(
+  'passkey_challenges',
+  {
+    challenge: text('challenge').primaryKey(),
+    purpose: text('purpose').notNull(),
+    accountId: uuid('account_id').references(() => accounts.id, { onDelete: 'cascade' }),
+    expires: timestamp('expires', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('passkey_challenge_expires_idx').on(t.expires)],
+);
 
 export const verificationTokens = pgTable(
   'verification_tokens',

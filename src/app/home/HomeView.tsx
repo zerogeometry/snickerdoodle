@@ -13,6 +13,7 @@ import { APP_TABS } from '@/ui/components/appTabs';
 import { KeepsakeTile } from '@/ui/components/KeepsakeTile';
 import { MemberAvatar } from '@/ui/components/MemberAvatar';
 import { FamilyBanner } from '@/ui/components/FamilyBanner';
+import { PasskeyNudge } from '@/ui/components/PasskeyNudge';
 import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
@@ -68,8 +69,9 @@ function monthLabel(iso: string): string {
   return new Date(iso).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 }
 
-/** `joined`: they've just joined this family from an invite (/join → /home?family=…&joined=1). */
-export function HomeView({ data, joined = false }: { data: HomeData; joined?: boolean }) {
+/** `joined`: they've just joined this family from an invite (/join → /home?family=…&joined=1).
+ * `offerPasskey`: they've just signed in here by email (src/server/freshSignIn.ts offerPasskeyAfterSignIn). */
+export function HomeView({ data, joined = false, offerPasskey = false }: { data: HomeData; joined?: boolean; offerPasskey?: boolean }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
   const [filing, setFiling] = useState<HomeKeepsake | null>(null);
@@ -341,6 +343,9 @@ export function HomeView({ data, joined = false }: { data: HomeData; joined?: bo
             {data.keepsakes.length === 1 ? 'keepsake' : 'keepsakes'} kept
           </p>
         </div>
+
+        {/* just signed in by email: "skip the email next time?" (optional, once) */}
+        <PasskeyNudge offer={offerPasskey} />
 
         <div className="mx-auto w-full max-w-5xl">
           {/* Family circle (real members) */}
