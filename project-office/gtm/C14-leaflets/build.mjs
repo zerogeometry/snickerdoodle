@@ -68,18 +68,53 @@ async function render(page, v, proof) {
   if (bad.length) throw new Error(`${v.name}: missing images ${bad.join(', ')}`);
 }
 
-// print copies of the site's images (public/) into img/: photos as high-quality JPEG (Chrome embeds a JPEG
-// as it is; a WebP gets re-packed losslessly and the PDF balloons), textures as PNG (they're see-through)
+// Print copies of every picture the leaflets use, into img/ (committed, so a rebuild needs no sources).
+// Sources: the site's own public/ and mockups/, and the founder's brand-assets folder (not in git; set
+// BRAND_ASSETS if it isn't at ..\brand-assets next to the repo). Photos become high-quality JPEG (Chrome embeds a
+// JPEG as it is; a WebP or PNG photo gets re-packed losslessly and the PDF balloons); cut-outs stay PNG.
 const sharp = require('sharp');
-const publicDir = path.join(dir, '..', '..', '..', 'public');
-const html = fs.readFileSync(path.join(dir, 'leaflet.html'), 'utf8');
-for (const src of new Set([...html.matchAll(/'((?:christmas|examples|textures)\/[\w-]+\.webp)'/g)].map((m) => m[1]))) {
-  const isTexture = src.startsWith('textures/');
-  const dest = path.join(dir, 'img', src.replace(/\.webp$/, isTexture ? '.png' : '.jpg'));
+const repo = path.join(dir, '..', '..', '..');
+const brandAssets = [process.env.BRAND_ASSETS, path.join(repo, '..', 'brand-assets'), path.join(repo, '..', '..', '..', '..', 'brand-assets')]
+  .find((p) => p && fs.existsSync(p));
+const B = (p) => (brandAssets ? path.join(brandAssets, p) : null);
+const R = (p) => path.join(repo, p);
+// name in img/ : [source, longest edge in px, how]   how: 'jpg' | 'png' (keep transparency) | 'square' (centre crop, jpg)
+const IMAGES = {
+  'logo-christmas.png': [R('public/brand/snickerlogo-christmas.png'), 1200, 'png'],
+  'logo.png': [R('public/brand/snickerlogo.png'), 1200, 'png'],
+  'paper-kraft-christmas.jpg': [B('backgrounds/christmas/wrap-kraft-christmas-tile-2400.png'), 1400, 'jpg'],
+  'paper-oat-christmas.jpg': [B('backgrounds/christmas/wrap-oat-christmas-tile-2400.png'), 1400, 'jpg'],
+  'paper-kraft.jpg': [B('backgrounds/everyday/wrap-kraft-tile-2400.png'), 1400, 'jpg'],
+  'paper-oat.jpg': [B('backgrounds/everyday/wrap-oat-tile-2400.png'), 1400, 'jpg'],
+  'sketch-robin.jpg': [B('website/christmas/child-sketches/sketch-robin.png'), 1600, 'jpg'],
+  'robin-ornament.jpg': [B('website/christmas/robin-bauble-1x1.png'), 1800, 'jpg'],
+  'mug-tree.jpg': [B('website/christmas/christmas-tree-mug-1x1.png'), 900, 'square'],
+  'cards-hanging.jpg': [R('public/christmas/hero-cardshanging.webp'), 900, 'square'],
+  'wrapping-paper.jpg': [R('mockups/christmas/img/wrapped-presents.jpg'), 900, 'square'],
+  'calendar.jpg': [R('mockups/christmas/img/calendar-hands.jpg'), 900, 'square'],
+  'range-drawing.jpg': [R('public/examples/range/drawing.webp'), 900, 'jpg'],
+  'range-framed.png': [R('public/examples/range/framed-print.webp'), 900, 'png'],
+  'range-card.png': [R('public/examples/range/card.webp'), 900, 'png'],
+  'range-cushion.png': [R('public/examples/range/heart-cushion.webp'), 900, 'png'],
+  'card-castle.jpg': [R('public/examples/cardcastle.webp'), 900, 'square'],
+  'mug-truck.jpg': [R('public/examples/mugtruck.webp'), 900, 'square'],
+  'cushion-flower.jpg': [R('public/examples/cushionheartflower.webp'), 900, 'square'],
+  'jigsaw-digger.jpg': [R('public/examples/puzzledigger.webp'), 900, 'square'],
+  'range-mug.jpg': [R('public/examples/family-mug.webp'), 617, 'square'],
+};
+for (const [name, [src, edge, how]] of Object.entries(IMAGES)) {
+  const dest = path.join(dir, 'img', name);
   if (fs.existsSync(dest)) continue;
+  if (!src || !fs.existsSync(src)) throw new Error(`img/${name} is missing and its source isn't here (${src ?? 'brand-assets not found: set BRAND_ASSETS'})`);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const img = sharp(path.join(publicDir, src));
-  await (isTexture ? img.png({ compressionLevel: 9 }) : img.flatten({ background: '#ffffff' }).jpeg({ quality: 90, chromaSubsampling: '4:4:4' })).toFile(dest);
+  let im = sharp(src);
+  if (how === 'square') {
+    const m = await im.metadata();
+    const side = Math.min(m.width, m.height);
+    im = im.extract({ left: Math.floor((m.width - side) / 2), top: Math.floor((m.height - side) / 2), width: side, height: side }).flatten({ background: '#ffffff' });
+  }
+  im = im.resize({ width: edge, height: edge, fit: 'inside', withoutEnlargement: true });
+  await (how === 'png' ? im.png({ compressionLevel: 9 }) : im.flatten({ background: '#ffffff' }).jpeg({ quality: 90, chromaSubsampling: '4:4:4' })).toFile(dest);
 }
 
 const cmyk = process.argv.includes('--cmyk');

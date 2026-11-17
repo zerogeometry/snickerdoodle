@@ -1,6 +1,7 @@
 # C14 · Leaflets for Christmas 2026 and spring 2027
 
-> **What this is:** five print-ready leaflets for snickerdoodle.co.uk, made on 17 Nov 2026. Nothing has been printed,
+> **What this is:** five print-ready leaflets for snickerdoodle.co.uk, made on 17 Nov 2026 and redesigned the same day
+> (version 2: the drawing next to the thing it became; the reasoning is in [`CREATIVE-BRIEF.md`](CREATIVE-BRIEF.md)). Nothing has been printed,
 > ordered or paid for. The plan, prices, printers and the rules are in
 > [`reports/Leaflet strategy Christmas 2026.md`](../../../reports/Leaflet%20strategy%20Christmas%202026.md).
 > This replaces the October C12 draft (DRAWIT 10% off and the "draw it here" box), which predates the free first card
@@ -31,7 +32,8 @@ Each leaflet has its own code and its own link so you can see which one earns mo
 | `build.mjs` | Rebuilds everything (below). The list of leaflets and their codes is `VERSIONS` at the top. |
 | `boxes.py`, `cmyk.py` | Helpers the build calls: exact page and trim boxes; an optional CMYK copy. |
 | `fonts/` | Bricolage Grotesque as fixed weights for print (from the site's own font; OFL licence included). |
-| `img/` | Print copies of the site's own sample photos (made by the build from `public/`). |
+| `img/` | Print copies of every picture used: brand samples from your `brand-assets` folder (robin drawing and ornament, tree mug, kraft and oat doodle papers) and the site's `public/` and `mockups/`. The build makes them once; set `BRAND_ASSETS` if that folder moves. |
+| `CREATIVE-BRIEF.md` | What each leaflet must say, in what order, and why (with the evidence). |
 | `qr/` | The four QR codes as SVG (error correction M). |
 
 ## What you do (in order)
@@ -75,9 +77,10 @@ Each leaflet has its own code and its own link so you can see which one earns mo
   | kraft (bottom strip) | #D8BE96 | ~ 15 / 25 / 42 / 0 |
   | cocoa (text) | #2B2118 | rich dark; prints near-black |
 
-- **Images:** every photo is a brand sample from the site (no children, no real names). They print at well over 300 dpi
+- **Images:** every photo is a brand sample (no children, no faces, no real names). They print at well over 300 dpi
   at these sizes.
-- **QR codes:** 29 mm (A6) and 34 mm (A5) with a white border, so they scan from arm's length.
+- **QR codes:** on both sides. Back: 39 mm (A6) and 46 mm (A5); front: 20 mm (A6) and 27 mm (A5). All on white with a
+  clear border, so they scan from arm's length.
 
 ## Rebuild
 
@@ -97,7 +100,8 @@ code, make a QR for it (`qr/<name>.svg`, pointing at `…/start-creating?from=<n
   reaching children (ASA ruling on Greene King, 2017).
 - **No real children.** Brand sample photos only. No faces, names or schools.
 - **The offer is the site's real offer** (the free first card, D30), with its conditions in the small print, and prices
-  from the live site on 17 Nov 2026 (bauble from £19, mug from £18, card £5.50, free UK delivery in every price).
+  from the live site on 17 Nov 2026 (ceramic ornament £21, round bauble from £19, mug £18, card £5.50, heart cushion £22,
+  jigsaw £26, wrapping paper £23, 2027 calendar £22, free UK delivery in every price).
 - **Trust shown, not shouted:** private by default, never public, only who you invite, delete anything, no surnames.
   These are the product's own rules (CLAUDE.md).
 - **No data collected on paper.** The QR opens the site; nothing is filled in or handed back.

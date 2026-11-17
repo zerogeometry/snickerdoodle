@@ -135,45 +135,65 @@ A new brand selling a £35 gift should plan on **0.1–0.3% buying**, so 10,000 
 
 ## 4. What goes on a leaflet, and why
 
-Leaflets that convert do a few things well ([Royal Mail MarketReach](https://www.marketreach.co.uk/blog/5-simple-steps-successful-door-drop)):
-one strong offer, a simple message, a bold headline, a clear "what to do, how and by when", and a code or QR per version so
-you can tell what worked. Ours are built that way.
+*(Rewritten on 17 Nov after you said version 1 looked bad. The full reasoning is in
+`project-office/gtm/C14-leaflets/CREATIVE-BRIEF.md`.)*
 
-**Front: stop them and show them.**
+**Version 1 failed for one reason above all: it never showed the magic.** It had photos of finished gifts, but nothing
+showed that they came from a child's drawing. It looked like any personalised-gift leaflet. It also made the weakest
+thing (a free £5.50 card) the loudest, and crammed seven messages onto each side.
 
-- The headline from the site: **"their drawing, made real."** with "made real" in tomato and a honey scribble.
-- One handwritten line (Gaegu): **"the present they made themselves"** (Christmas) or **"they're only little once"**
-  (spring).
-- **Taped polaroids of real products** (bauble, cards, mug, ornament, wrapping paper), all brand samples from the site.
-  Showing the actual thing beats describing it.
-- A big tomato sticker: **"your first card's on us"**. An offer on the front gets the leaflet turned over.
-- Prices along the bottom: **baubles from £19 · cards £5.50 · free UK delivery**. People bin leaflets that hide the price.
-- The A5s say **"for the grown-ups"** at the top. It's honest and it settles the rules question (section 6).
+**Version 2 is built on one picture: the drawing next to the thing it became.** A crayon robin on a scrap of paper, a
+hand-drawn arrow ("made real!"), and the same robin on a ceramic ornament on the tree. You don't need to read anything to
+get it.
 
-**Back: make it easy, safe and urgent.**
+**What the evidence says, and how we've used it:**
 
-- **Three steps**: snap it (on your own phone, no posting originals), see the magic, keep & give (keepsake box, or a
-  ready-to-buy link for granny).
-- **The coupon**: "first order? your first card's on us", the condition in plain words, and the code in a box.
-- **A big QR** (29–34 mm) with **"scan to start creating"** and **"no account needed to see the magic"**, plus the web
-  address for people who'd rather type. The words next to a QR code matter a lot: one tested mailing found the best wording
-  drew over ten times the weakest (reported by MarketReach).
-- **The deadline**: "for christmas: cards by thu 10 dec, most gifts by sat 12 dec". Leaflets with a date get used.
-- **Trust, shown not shouted**: "private by default. never public. only who you invite." The A5s add four plain promises:
-  their drawings live in your private keepsake box; only the family you invite can see them; delete anything, any time;
-  we never ask for a child's surname.
-- **Small print** stating the offer's conditions, that dates are the print labs' and the site has the latest, and the
-  promoter's name and address (Launch Mode Ltd, 124 City Road, London EC1V 2NX: the registered office, not your home).
+| Finding | Source | What we did |
+|---|---|---|
+| A picture draws the eye whatever its size; text gets read more the bigger it is. One clear picture beats a collage. | eye tracking of 1,363 print ads ([Wedel & Pieters 2004](https://cir.nii.ac.jp/crid/1362825894564575360)) | One before → after picture and a big headline. No collage on the front. |
+| Five times as many people read the headline as the body copy; captions are read more than body text; before → after pictures fascinate. | Ogilvy ([summary](https://copyblogger.com/?p=33800), [imagery](https://www.shortform.com/blog/ad-imagery/)) | A five-word headline, "Their drawing, on your tree.", and a caption tag on the photo: "the robin they drew · ceramic ornament · £21". |
+| The words beside a QR code matter enormously. "Scan to unlock your exclusive offer" got 7.3% scans; "Scan to join" got 0.6%, on identical mailings of 27,000 each. | Stannp/Equinox test (vendor) ([Stannp](https://go.stannp.com/blogs/understanding-direct-mail-engagement-rates-what-to-expect-how-to-improve)) | The QR now promises a specific result: "Scan to see their drawing on a bauble, in seconds", plus "no account". |
+| QR codes should be about 4 cm with clear space, sit beside their promise, appear on both sides, and land on a page that works at once with no login. | Stannp; Royal Mail MarketReach ([Hillarys case](https://www.marketreach.co.uk/case-studies/hillarys-optimised-door-drop)) | QR on both sides: 39 mm (A6) and 46 mm (A5) on the back, a smaller one on the front. It opens the free preview, no account. |
+| One strong offer or benefit, a clear "what to do and by when", and a deadline. | MarketReach ([5 steps](https://www.marketreach.co.uk/blog/5-simple-steps-successful-door-drop)) | One benefit (see it on your tree), one action (scan), and one tomato pill: "order by sat 12 dec". |
+| Rivals lead with their category ("art fundraiser", "#1 solution") and rarely show the drawing beside the product. Grandparents are a common angle. | competitor scan (Artkive, Xmas4Schools, Cauliflower Cards, Art Projects for Schools, NOTHS sellers) | We lead with *your* child's drawing on the product, which nobody else does clearly, and say "send granny a ready-to-buy link". |
 
-**What I left out on purpose:**
+**Front (stop them, show them):**
 
-- **No "draw it here" box.** The October draft had one. It's lovely, but it's an instruction to a child, and a book-bag
-  leaflet must not do that.
-- **No screenshots of the app.** At this size they'd be unreadable, and the product photos sell better. One screenshot
-  could go on a later A5 once the keep tab is on the App Store.
-- **No sign-up form or tear-off slip.** Anything a parent fills in on paper is personal data you'd have to look after,
-  and anything handed back through a school is worse. The QR does the job.
-- **No extra discount.** See the decisions.
+- the before → after picture;
+- a five-word headline;
+- the price ("Christmas baubles from £19 · free UK delivery");
+- the deadline pill;
+- a small QR;
+- the logo on a paper tag (on kraft, the "doodle" half of the logo disappears without it).
+
+**Back (make it easy to act):**
+
+- **"Try it with their drawing, free."** and one line: snap it on your phone, no account, no posting the original;
+- a big QR with its promise;
+- **"Also made real"**: four small photos with prices (mug £18, cards £5.50, wrapping paper £23, 2027 calendar £22);
+- the granny link;
+- the free first card as a small coupon with the code;
+- the last order dates, the privacy line and the small print.
+
+The A5s add three numbered steps and the "what happens to their drawings" box, because nobody is there to explain.
+
+**The spring book-bag version** leads with **"Mother's Day, drawn by them."** It shows one family drawing with an arrow to
+the card, mug, cushion and framed print made from it. The back opens with **"For the drawings in this book bag."**, which
+speaks to the parent unpacking the bag that evening. Its "also made real" photos use *different* drawings, to show any
+drawing works.
+
+**Every picture is a brand sample** from your brand-assets folder or the site. They're made-up drawings, with no children,
+faces or real names. **Every price was checked** against the live site and the code on 17 Nov. The ornament in the hero is
+the £21 ceramic ornament, and the £19 is the round bauble, so the leaflet says exactly that.
+
+**What we left out on purpose:**
+
+- **A "draw it here" box:** it tells a child what to do.
+- **App screenshots:** unreadable at this size.
+- **Any form or tear-off slip:** personal data on paper.
+- **A bigger discount:** see the decisions.
+- **Reviews or customer counts:** we don't have them yet, and inventing them would break the advertising rules. The real
+  product photo and "free UK delivery, made in the UK" do that job for now.
 
 ## 5. Tracking which leaflet earns money
 
