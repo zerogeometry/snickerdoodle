@@ -46,7 +46,7 @@ describe.skipIf(!URL)('multi-buy — integration', () => {
   });
 
   it('two mugs: 15% multi-buy + the £3 same-parcel saving, recorded on the order', async () => {
-    const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 2 }], account: null, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 2 }], account: null });
     expect(res.ok).toBe(true);
     const [o] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);

@@ -4,9 +4,10 @@
 //   node --env-file=.env scripts/promo-codes.mjs list
 //   node --env-file=.env scripts/promo-codes.mjs create WELCOME10 --percent 10
 //   node --env-file=.env scripts/promo-codes.mjs create TENOFF --pounds 10 --min 60
-//   node --env-file=.env scripts/promo-codes.mjs create SARAHMAKES --percent 10 --commission 5 --partner "Sarah (Instagram)" --type INFLUENCER --partner-email sarah@example.com
-//   node --env-file=.env scripts/promo-codes.mjs create FIRSTCARD --free-card --max 500
-//   node --env-file=.env scripts/promo-codes.mjs create STMARYSPTA --percent 0 --commission 10 --partner "St Mary's PTA" --type PTA
+//   (D30, 17 Nov 2026: partner + campaign codes are free-card codes; the shop's own FIRSTCARD welcome comes from migration 0059)
+//   node --env-file=.env scripts/promo-codes.mjs create SARAHMAKES --free-card --commission 10 --partner "Sarah (Instagram)" --type INFLUENCER --partner-email sarah@example.com
+//   node --env-file=.env scripts/promo-codes.mjs create STMARYSPTA --free-card --commission 10 --partner "St Mary's PTA" --type PTA
+//   node --env-file=.env scripts/promo-codes.mjs create FAIR-BS11 --free-card --partner "Bristol fairs" --type CAMPAIGN
 //   PTA class codes roll up to one school: add --class "Year 2" (e.g. STMARYS-Y2, STMARYS-Y3 …)
 //   options: --ends 2026-12-24 --starts 2026-11-01 --max 500 --min 15 --first-order
 //   (dates are UK days: a code starts / stops at midnight as that day begins. The rules — percent 0–50, pounds

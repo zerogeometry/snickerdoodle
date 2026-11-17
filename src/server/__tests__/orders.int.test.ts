@@ -4,13 +4,12 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import type Stripe from 'stripe';
 import * as schema from '@/db/schema';
-import { assets, invites, memberships, orderItemArtwork, orderItems, orders, productVariants, webhookEvents } from '@/db/schema';
+import { assets, memberships, orderItemArtwork, orderItems, orders, productVariants, webhookEvents } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { getOrdersForAccount, markOrderPaid, placeOrder } from '@/server/orders';
 import { seedCatalogue } from '@/server/catalogue';
 import { handleStripeEvent } from '@/payments';
-import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
 
 const URL = process.env.DATABASE_URL;
@@ -56,7 +55,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
       account: null,
-      joinProvenance: null,
     });
     await track(res);
     expect(res.ok).toBe(true);
@@ -74,7 +72,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
         { productKey: 'babyBodysuit', qty: 1 }, // 2200
       ],
       account: null,
-      joinProvenance: null,
     });
     await track(res);
     expect(res.ok).toBe(true);
@@ -102,7 +99,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
         { productKey: 'card', qty: 1 }, // 550 — Guernsey, its own parcel: no saving
       ],
       account: null,
-      joinProvenance: null,
     });
     await track(res);
     expect(res.ok).toBe(true);
@@ -113,46 +109,22 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(order!.totalPence).toBe(4450 - 300);
   });
 
-  it('a joined member earns the 5%, and it is consumed (one-time) when the order is paid', async () => {
+  it('a joined member pays in full (the 5% join saving is retired) and the order is in their history', async () => {
     // Rosie is an EXTENDED member of the Hartleys from a VERIFIED invite (seed).
-    const [row] = await db
-      .select({ m: memberships, inv: invites })
-      .from(memberships)
-      .innerJoin(invites, eq(memberships.inviteId, invites.id))
-      .where(eq(memberships.accountId, ids.rosieId));
-    const provenance: JoinProvenance = {
-      invite: {
-        id: row!.inv.id,
-        familyId: row!.inv.familyId,
-        verified: row!.inv.status === 'VERIFIED',
-        revoked: row!.inv.status === 'REVOKED',
-        expiresAt: row!.inv.expiresAt.getTime(),
-      },
-      membership: {
-        familyId: row!.m.familyId,
-        status: row!.m.status,
-        inviteId: row!.m.inviteId,
-        isOwner: row!.m.isOwner,
-        savingConsumed: row!.m.joinSavingConsumedAt !== null,
-      },
-      now: Date.now(),
-    };
-
+    const [before] = await db.select().from(memberships).where(eq(memberships.accountId, ids.rosieId));
     const res = await placeOrder(db, {
       items: [{ productKey: 'jigsaw', qty: 1 }], // 2600 (the 30-piece jigsaw; the storybook is paused — 03-B5)
       account: { id: ids.rosieId },
-      joinProvenance: provenance,
     });
     await track(res);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.joinSavingPence).toBe(130); // 5% of 2600 = 130
-    expect(order!.totalPence).toBe(2600 - 130 + 0); // free delivery
+    expect(order!.joinSavingPence).toBe(0);
+    expect(order!.totalPence).toBe(2600); // free delivery, nothing off
 
-    // consumed: the membership now records when the saving was spent
-    const [m] = await db.select().from(memberships).where(eq(memberships.id, row!.m.id));
-    expect(m!.joinSavingConsumedAt).not.toBeNull();
+    // nothing is spent on the membership any more
+    const [m] = await db.select().from(memberships).where(eq(memberships.id, before!.id));
+    expect(m!.joinSavingConsumedAt).toEqual(before!.joinSavingConsumedAt);
 
-    // it shows in the member's order history
     const history = await getOrdersForAccount(db, ids.rosieId);
     expect(history.some((o) => o.ref === res.ref)).toBe(true);
   });
@@ -229,7 +201,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 99, offsetX: 5, offsetY: -5, rotationDeg: 44 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     await track(res);
 
@@ -259,7 +230,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       const res = await placeOrder(db, {
         items: [{ productKey: 'cushion-12square-double', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, back } }],
         account: { id: ids.samId },
-        joinProvenance: null,
       });
       await track(res);
       const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
@@ -286,7 +256,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       const res = await placeOrder(db, {
         items: [{ productKey: 'card', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 }, message } }],
         account: { id: ids.samId },
-        joinProvenance: null,
       });
       await track(res);
       const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
@@ -323,7 +292,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [{ productKey: 'cardPack-packof10', qty: 4, ground: '#C8402A', cards, artwork: { assetId: a.id, transform: t, message: { greeting: 'hi', message: 'x', signature: '', note: '', font: 'caveat' } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     await track(res);
     expect(res.ok).toBe(true);
@@ -343,7 +311,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
 
     // junk (or white) for a colour → every card line is plain white, never the client's string
     for (const junk of ['#c8402a; drop table', '#ffffff']) {
-      const plain = await placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, ground: junk, cards: cards.slice(0, 5) }], account: { id: ids.samId }, joinProvenance: null });
+      const plain = await placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, ground: junk, cards: cards.slice(0, 5) }], account: { id: ids.samId } });
       await track(plain);
       const [po] = await db.select().from(orders).where(eq(orders.ref, plain.ref!));
       const plainLines = await db.select().from(orderItems).where(eq(orderItems.orderId, po!.id));
@@ -353,11 +321,11 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     }
 
     // wrong number of cards → refused before anything is written
-    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: cards.slice(0, 4) }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/needs 5 cards/);
-    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1 }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/needs 5 cards/);
+    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: cards.slice(0, 4) }], account: { id: ids.samId } })).rejects.toThrow(/needs 5 cards/);
+    await expect(placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1 }], account: { id: ids.samId } })).rejects.toThrow(/needs 5 cards/);
     // every card passes the SAME gates as any print — a stranger's drawing is denied
     await expect(
-      placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: [a.id, a.id, a.id, a.id, ids.assetBloomFamily].map((assetId) => ({ assetId, transform: t })) }], account: { id: ids.samId }, joinProvenance: null }),
+      placeOrder(db, { items: [{ productKey: 'cardPack', qty: 1, cards: [a.id, a.id, a.id, a.id, ids.assetBloomFamily].map((assetId) => ({ assetId, transform: t })) }], account: { id: ids.samId } }),
     ).rejects.toThrow(AuthzError);
   });
 
@@ -369,7 +337,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: asset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     await track(res);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
@@ -394,7 +361,6 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       placeOrder(db, {
         items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: bloomAsset!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
         account: { id: ids.samId },
-        joinProvenance: null,
       }),
     ).rejects.toBeInstanceOf(AuthzError);
   });
@@ -408,13 +374,12 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
       placeOrder(db, {
         items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: flagged!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
         account: { id: ids.samId },
-        joinProvenance: null,
       }),
     ).rejects.toThrow(/cleared for printing/);
   });
 
   it('paused add-ons (gift wrap) cannot be ordered, even by a hand-crafted request', async () => {
-    const res = await placeOrder(db, { items: [{ productKey: 'giftWrap', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey: 'giftWrap', qty: 1 }], account: { id: ids.samId } });
     expect(res.ok).toBe(false);
   });
 });

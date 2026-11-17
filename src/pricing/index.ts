@@ -1,7 +1,6 @@
 export {
   CATALOGUE,
   DELIVERY_PENCE,
-  JOIN_SAVING_BPS,
   FAMILY_SET_SAVING_BPS,
   FAMILY_SET_MIN_QTY,
   FAMILY_SET_PRODUCT_KEYS,
@@ -14,8 +13,7 @@ export {
 } from './catalogue';
 export { formatPence } from './format';
 export { computeRetailPence, marginAtPrice, roundUpToX9Pence, RETAIL, type RetailParams } from './retail';
-export { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
-export { codeTerms, evaluatePromo, normalisePromoCode, PROMO_ECONOMICS, type PartnerType, type PromoKind, type PromoNotApplied, type PromoRule, type PromoOutcome } from './promo';
+export { codeTerms, evaluatePromo, normalisePromoCode, PROMO_ECONOMICS, type CardNotApplied, type PartnerType, type PromoKind, type PromoNotApplied, type PromoRule, type PromoOutcome } from './promo';
 export {
   priceBasket,
   quote,

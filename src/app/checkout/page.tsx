@@ -123,7 +123,16 @@ export default function CheckoutPage() {
 
   // What to tell the customer about their code — plain, friendly, never a dead end.
   const promoMessage = (() => {
-    if (!promoCode || !quote) return null;
+    if (!quote) return null;
+    // nothing typed: the shop's welcome — one greetings card free on a signed-in first order (src/server/promos.ts)
+    if (!promoCode) {
+      const w = quote.promoAuto ? quote.promo : null;
+      if (w?.applied) return { ok: true, text: 'your first card’s on us ✦' };
+      if (w?.reason === 'needs-card') return { ok: true, text: 'first order? your first greetings card is on us — add one to your basket ✦' };
+      if (w?.reason === 'needs-more') return { ok: false, text: 'your free card comes with a slightly bigger order — add something else and it’s on us' };
+      if (!signedIn && quote.lines.length > 0) return { ok: true, text: 'first order? log in and your first greetings card is on us ✦' };
+      return null;
+    }
     if (quote.promoError === 'unknown') return { ok: false, text: 'we don’t recognise that code — check the spelling?' };
     if (quote.promoError === 'expired') return { ok: false, text: 'that code has finished, sorry' };
     if (quote.promoError === 'not-started') return { ok: false, text: 'that code isn’t live yet' };
@@ -134,19 +143,24 @@ export default function CheckoutPage() {
     if (quote.promoError === 'needs-buyer') return { ok: false, text: 'that code is for a first order — log in (or add your email) and we’ll check it ✦' };
     const p = quote.promo;
     if (!p) return null;
-    if (p.applied && p.kind === 'FREE_CARD') return { ok: true, text: `${p.code} applied — one greetings card is on us ✦` };
+    if (p.applied && p.kind === 'FREE_CARD' && quote.promoSavingPence > 0) return { ok: true, text: `${p.code} applied — one greetings card is on us ✦` };
+    // a partner's code that tags the order, its free card not (yet) taken
+    if (p.applied && p.cardReason === 'needs-card') return { ok: true, text: `${p.code} applied — add a greetings card and your first one’s on us ✦` };
+    if (p.applied && p.cardReason === 'needs-more') return { ok: true, text: `${p.code} applied — your free card comes with a slightly bigger order` };
+    if (p.applied && p.kind === 'FREE_CARD') return { ok: true, text: `${p.code} applied ✦` };
     if (p.applied) return { ok: true, text: p.capped ? `${p.code} applied — this basket’s maximum saving` : `${p.code} applied ✦` };
     if (p.reason === 'needs-card') return { ok: false, text: `${p.code} gives you a greetings card free — add one to your basket ✦` };
     if (p.reason === 'needs-more') return { ok: false, text: `your free card comes with a slightly bigger order — add something else and it’s on us` };
     if (p.reason === 'min-spend') return { ok: false, text: `${p.code} works on orders over ${gbp(p.minSpendPence ?? 0)}` };
     if (p.reason === 'better-saving-applied') return { ok: true, text: `you’re already getting a better saving — we’ve kept that one` };
+    if (p.reason === 'first-order-card')
+      return { ok: false, text: signedIn ? 'the free card is for a first order — lovely to see you back ✦' : 'the free card is for a first order — log in and we’ll check it ✦' };
     return { ok: false, text: `${p.code} doesn’t apply to these items` };
   })();
 
   // Optimistic client figures until the server quote lands (then it governs).
   const subtotalPence = quote?.subtotalPence ?? basketSubtotal(items);
   const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
-  const savingPence = quote?.joinSavingPence ?? 0;
   const setSavingPence = quote?.familySetSavingPence ?? 0;
   const parcelSavingPence = quote?.parcelSavingPence ?? 0;
   const multiBuySavingPence = quote?.multiBuySavingPence ?? 0;
@@ -285,12 +299,6 @@ export default function CheckoutPage() {
         <dt>Subtotal</dt>
         <dd>{gbp(subtotalPence)}</dd>
       </div>
-      {savingPence > 0 ? (
-        <div className="flex justify-between text-green-save">
-          <dt>Family saving (5%)</dt>
-          <dd>−{gbp(savingPence)}</dd>
-        </div>
-      ) : null}
       {setSavingPence > 0 ? (
         <div className="flex justify-between text-green-save">
           <dt>Family set saving (5%)</dt>
@@ -319,7 +327,7 @@ export default function CheckoutPage() {
       ) : null}
       {promoSavingPence > 0 && quote?.promo ? (
         <div className="pop-in flex justify-between font-semibold text-green-save">
-          <dt>{quote.promo.kind === 'FREE_CARD' ? `Free card (${quote.promo.code})` : `Code ${quote.promo.code}`}</dt>
+          <dt>{quote.promo.kind === 'FREE_CARD' ? (quote.promoAuto ? 'Your first card’s on us' : `Free card (${quote.promo.code})`) : `Code ${quote.promo.code}`}</dt>
           <dd>−{gbp(promoSavingPence)}</dd>
         </div>
       ) : null}

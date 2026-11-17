@@ -167,7 +167,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     expect(q18.promo).toMatchObject({ applied: false, reason: 'min-spend', minSpendPence: 4000 });
     expect(q18.totalPence).toBe(1800);
     // £10 off a £65 framed print — and persisted on the order
-    const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r10.rule });
+    const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: r10.rule });
     const o = await track(res.ref);
     expect(o!.promoCodeId).toBe(ten.id);
     expect(o!.promoSavingPence).toBe(1000);
@@ -178,7 +178,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     const pct = await mkCode({ kind: 'PERCENT', value: 1000 });
     const r = await resolvePromo(db, pct.code);
     if (!r.ok) throw new Error('code should resolve');
-    const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 2 }], account: null, joinProvenance: null, promo: r.rule });
+    const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 2 }], account: null, promo: r.rule });
     const o = await track(res.ref);
     expect(o!.multiBuySavingPence).toBeGreaterThan(0);
     expect(o!.parcelSavingPence).toBe(300);
@@ -219,7 +219,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     expect(await resolvePromo(db, off.code)).toEqual({ ok: false, reason: 'unknown' });
     const r = await resolvePromo(db, once.code);
     if (!r.ok) throw new Error('should resolve before use');
-    await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule })).ref);
+    await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: r.rule })).ref);
     expect(await resolvePromo(db, once.code)).toEqual({ ok: false, reason: 'used-up' });
   });
 
@@ -230,28 +230,20 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     const a = await resolvePromo(db, once.code);
     const b = await resolvePromo(db, once.code); // a second shopper, before the first has paid
     if (!a.ok || !b.ok) throw new Error('both resolve while nothing is paid');
-    const oa = await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: a.rule })).ref);
-    const ob = await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: b.rule })).ref);
+    const oa = await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: a.rule })).ref);
+    const ob = await track((await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: b.rule })).ref);
     const paidWithCode = [oa, ob].filter((o) => o?.status === 'PAID' && o.promoSavingPence > 0);
     expect(paidWithCode).toHaveLength(1); // EXPECTED; today both are PAID with the discount
   });
 
-  // ── the 5% join saving ──────────────────────────────────────────────────────────────────────
-  it('the 5% join saving: never for a guest, an owner, a removed member, or a forged provenance', async () => {
+  // ── the 5% join saving is retired (17 Nov 2026) ───────────────────────────────────────────────
+  it('no join saving for anyone — a forged provenance changes nothing', async () => {
     const now = Date.now();
-    const invite = { id: 'inv-1', familyId: ids.hartleyId, verified: true, revoked: false, expiresAt: now + 86_400_000 };
-    const member = { familyId: ids.hartleyId, status: 'ACTIVE' as const, inviteId: 'inv-1', isOwner: false, savingConsumed: false };
     const items = [{ productKey: 'framedPrint', qty: 1 }];
-    const join = (p: object) => quote(items, { catalogue, joinProvenance: { invite, membership: member, now, ...p } as never }).joinSavingPence;
-    expect(quote(items, { catalogue, joinProvenance: null }).joinSavingPence).toBe(0); // guest
-    expect(join({})).toBe(Math.round(catalogue['framedPrint']!.pricePence * 0.05)); // genuine join
-    expect(join({ membership: { ...member, isOwner: true } })).toBe(0);
-    expect(join({ membership: { ...member, status: 'REMOVED' } })).toBe(0);
-    expect(join({ membership: { ...member, savingConsumed: true } })).toBe(0);
-    expect(join({ membership: { ...member, inviteId: 'some-other-invite' } })).toBe(0);
-    expect(join({ invite: { ...invite, verified: false } })).toBe(0);
-    expect(join({ invite: { ...invite, expiresAt: now - 1 } })).toBe(0);
-    expect(join({ invite: { ...invite, familyId: ids.bloomId } })).toBe(0); // cross-family
+    const forged = { joinProvenance: { invite: { id: 'inv-1', familyId: ids.hartleyId, verified: true, revoked: false, expiresAt: now + 86_400_000 }, membership: { familyId: ids.hartleyId, status: 'ACTIVE', inviteId: 'inv-1', isOwner: false, savingConsumed: false }, now } } as never;
+    const full = quote(items, { catalogue });
+    expect(full).not.toHaveProperty('joinSavingPence');
+    expect(quote(items, { catalogue, ...(forged as object) }).totalPence).toBe(full.totalPence);
   });
 
   // ── Stripe: what the card is charged == the order record ────────────────────────────────────
@@ -282,13 +274,13 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     };
 
     it('two mugs (multi-buy + same-parcel)', async () => {
-      const { o, s } = await charged({ items: [{ productKey: 'mug', qty: 2 }], account: null, joinProvenance: null });
+      const { o, s } = await charged({ items: [{ productKey: 'mug', qty: 2 }], account: null });
       expect(o.multiBuySavingPence + o.parcelSavingPence).toBeGreaterThan(0);
       expect(s.amount_total).toBe(o.totalPence);
     });
 
     it('a family set (3 garments)', async () => {
-      const { o, s } = await charged({ items: [{ productKey: 'kidsTee', qty: 1 }, { productKey: 'adultTee', qty: 1 }, { productKey: 'babyBodysuit', qty: 1 }], account: null, joinProvenance: null });
+      const { o, s } = await charged({ items: [{ productKey: 'kidsTee', qty: 1 }, { productKey: 'adultTee', qty: 1 }, { productKey: 'babyBodysuit', qty: 1 }], account: null });
       expect(s.amount_total).toBe(o.totalPence);
     });
 
@@ -296,7 +288,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       const ten = await mkCode({ kind: 'FIXED', value: 1000, minSpendPence: 6000 });
       const r = await resolvePromo(db, ten.code);
       if (!r.ok) throw new Error('code should resolve');
-      const { o, s } = await charged({ items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule });
+      const { o, s } = await charged({ items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: r.rule });
       expect(o.promoSavingPence).toBe(1000);
       expect(s.amount_total).toBe(o.totalPence);
     });
@@ -304,7 +296,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     it('a christmas bundle for 4 + a mug: the bundle is one Stripe line at £145, the mug takes £3 off', async () => {
       const art = await mkAsset();
       const bundle = { placemat: { assetId: art.id }, ornaments: [0, 1, 2, 3].map(() => ({ assetId: art.id })) };
-      const { o, s } = await charged({ items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'mug', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
+      const { o, s } = await charged({ items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'mug', qty: 1 }], account: { id: ids.samId } });
       expect(o.subtotalPence).toBe(14500 + catalogue['mug']!.pricePence);
       expect(o.parcelSavingPence).toBe(300);
       expect(s.amount_total).toBe(o.totalPence);
@@ -316,18 +308,9 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       expect(bundleLines.reduce((n, l) => n + l.linePence, 0)).toBe(14500);
     });
 
-    it('a joined member’s 5% reaches Stripe', async () => {
-      const now = Date.now();
-      const { o, s } = await charged({
-        items: [{ productKey: 'blanket', qty: 1 }],
-        account: null,
-        joinProvenance: {
-          invite: { id: 'inv', familyId: ids.hartleyId, verified: true, revoked: false, expiresAt: now + 60_000 },
-          membership: { familyId: ids.hartleyId, status: 'ACTIVE', inviteId: 'inv', isOwner: false, savingConsumed: false },
-          now,
-        },
-      });
-      expect(o.joinSavingPence).toBeGreaterThan(0);
+    it('a member’s order reaches Stripe at the full price (no join saving)', async () => {
+      const { o, s } = await charged({ items: [{ productKey: 'blanket', qty: 1 }], account: null });
+      expect(o.joinSavingPence).toBe(0);
       expect(s.amount_total).toBe(o.totalPence);
     });
   });
@@ -426,7 +409,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       keys.push(ing.key);
       assetIds.push(ing.assetId);
       await db.update(assets).set({ isBrandSafeFixture: true, moderationStatus: 'CLEAR' }).where(eq(assets.id, ing.assetId)); // brand-safe test art
-      const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 1, artwork: { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }], account: { id: ids.samId }, joinProvenance: null });
+      const res = await placeOrder(db, { items: [{ productKey: 'mug', qty: 1, artwork: { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }], account: { id: ids.samId } });
       const o = (await track(res.ref))!;
       expect(o.status).toBe('PAID');
       return { o, assetId: ing.assetId };
@@ -437,7 +420,7 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { labels: ['hash check unavailable'] } }).where(eq(assets.id, a.id));
       const before = (await db.select({ id: orders.id }).from(orders)).length;
       await expect(
-        placeOrder(db, { items: [{ productKey: 'mug', qty: 1, artwork: { assetId: a.id, transform: {} } }], account: { id: ids.samId }, joinProvenance: null }),
+        placeOrder(db, { items: [{ productKey: 'mug', qty: 1, artwork: { assetId: a.id, transform: {} } }], account: { id: ids.samId } }),
       ).rejects.toThrow(/not cleared/);
       expect((await db.select({ id: orders.id }).from(orders)).length).toBe(before);
     });

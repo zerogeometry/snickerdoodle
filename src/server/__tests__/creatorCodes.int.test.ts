@@ -11,7 +11,7 @@ vi.mock('@/server/mail', async (orig) => ({
 import * as schema from '@/db/schema';
 import { accounts, orders, promoCodes } from '@/db/schema';
 import { markOrderPaid, placeOrder } from '@/server/orders';
-import { resolvePromo } from '@/server/promos';
+import { freeCardEligible, resolvePromo } from '@/server/promos';
 import { seedCatalogue } from '@/server/catalogue';
 import { ensureTestCosts } from '@/test/costFixture';
 import type { DbHandle } from '@/server/db';
@@ -79,7 +79,9 @@ describe.skipIf(!URL)('creator codes + the free first card (integration)', () =>
   /** Resolve the code for this buyer and place (= pay, dev path) an order with it. */
   const buy = async (code: string, buyer: { accountId: string | null; email: string }, items = frame) => {
     const r = await resolvePromo(db, code, new Date(), buyer);
-    const res = await placeOrder(db, { items, account: buyer.accountId ? { id: buyer.accountId } : null, joinProvenance: null, promo: r.ok ? r.rule : null, buyerEmail: buyer.email });
+    // the free card: only for a signed-in first order — server-decided, exactly as the checkout does it
+    const eligible = await freeCardEligible(db, buyer);
+    const res = await placeOrder(db, { items, account: buyer.accountId ? { id: buyer.accountId } : null, promo: r.ok ? r.rule : null, buyerEmail: buyer.email, freeCardEligible: eligible });
     return { resolved: r, res, order: await orderOf(res.ref) };
   };
   /** A checkout still open at Stripe (PENDING) with the code — paid later by the webhook. */
@@ -120,14 +122,14 @@ describe.skipIf(!URL)('creator codes + the free first card (integration)', () =>
       expect(first.order?.partnerCommissionPence).toBeGreaterThan(0);
       expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: guest.toUpperCase() })).toEqual({ ok: false, reason: 'first-order-only' });
       if (!first.resolved.ok) throw new Error('resolved the first time');
-      const replay = await placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: first.resolved.rule, buyerEmail: guest });
+      const replay = await placeOrder(db, { items: frame, account: null, promo: first.resolved.rule, buyerEmail: guest });
       expect(replay).toEqual({ ok: false, reason: 'promo', promoError: 'first-order-only' });
     });
 
     it('a signed-in parent who has ordered before (with no code at all) doesn’t get it; a brand-new account does', async () => {
       const code = await creatorCode();
       const returning = await mkAccount('returning');
-      await placeOrder(db, { items: frame, account: { id: returning.id }, joinProvenance: null, buyerEmail: returning.email });
+      await placeOrder(db, { items: frame, account: { id: returning.id }, buyerEmail: returning.email });
       expect(await resolvePromo(db, code.code, new Date(), { accountId: returning.id, email: returning.email })).toEqual({ ok: false, reason: 'first-order-only' });
       // …and as a signed-out guest with the same email, it's the same person
       expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: returning.email })).toEqual({ ok: false, reason: 'first-order-only' });
@@ -171,7 +173,7 @@ describe.skipIf(!URL)('creator codes + the free first card (integration)', () =>
       const code = await creatorCode();
       const guest = email('later');
       const open = await openCheckout(code.id, guest);
-      await placeOrder(db, { items: frame, account: null, joinProvenance: null, buyerEmail: guest }); // paid, no code
+      await placeOrder(db, { items: frame, account: null, buyerEmail: guest }); // paid, no code
       await markOrderPaid(db, open.id);
       expect(await commissionOf(open.id)).toEqual({ c: 0, s: 'PAID' });
     });
@@ -191,15 +193,39 @@ describe.skipIf(!URL)('creator codes + the free first card (integration)', () =>
     // (a framed print alongside: the test database's stand-in costs are too thin for a card + mug to carry it)
     const cardAndFrame = [{ productKey: 'card', qty: 1 }, { productKey: 'framedPrint', qty: 1 }];
 
-    it('first order: exactly one card’s price comes off (server price), and only once per buyer', async () => {
+    it('a signed-in first order: exactly one card’s price comes off (server price), and only once per buyer', async () => {
       const free = await mkCode({ kind: 'FREE_CARD', value: 0 });
-      const guest = email('card');
-      const { order } = await buy(free.code, { accountId: null, email: guest }, cardAndFrame);
+      const a = await mkAccount('card');
+      const buyer = { accountId: a.id, email: a.email };
+      const { order } = await buy(free.code, buyer, cardAndFrame);
       const [cardRow] = await db.select({ price: schema.productVariants.pricePence }).from(schema.productVariants).where(eq(schema.productVariants.sku, 'card'));
       expect(order?.status).toBe('PAID');
       expect(order?.promoSavingPence).toBe(cardRow!.price);
       expect(order?.totalPence).toBe(order!.subtotalPence - cardRow!.price + order!.deliveryPence);
-      expect(await resolvePromo(db, free.code, new Date(), { accountId: null, email: guest })).toEqual({ ok: false, reason: 'first-order-only' });
+      // the second order: no longer a first order, so no card (the code itself isn't first-order-only)
+      expect(await freeCardEligible(db, buyer)).toBe(false);
+      const { order: second } = await buy(free.code, buyer, cardAndFrame);
+      expect(second?.promoSavingPence).toBe(0);
+    });
+
+    it('a guest never gets the free card ("for signing up and placing their first order")', async () => {
+      const free = await mkCode({ kind: 'FREE_CARD', value: 0 });
+      const { order } = await buy(free.code, { accountId: null, email: email('cardguest') }, cardAndFrame);
+      expect(order?.promoSavingPence).toBe(0);
+      expect(order?.promoCodeId).toBeNull();
+    });
+
+    it('a school’s free-card code with 10% commission: a returning family’s order is still tagged and earns (no card)', async () => {
+      const school = await mkCode({ kind: 'FREE_CARD', value: 0, commissionBps: 1000, partnerType: 'PTA', partnerName: 'a school' });
+      const a = await mkAccount('schoolfamily');
+      const buyer = { accountId: a.id, email: a.email };
+      const { order: first } = await buy(school.code, buyer, cardAndFrame);
+      expect(first?.promoSavingPence).toBeGreaterThan(0); // their first order: the card
+      expect(first?.partnerCommissionPence).toBeGreaterThan(0);
+      const { order: again } = await buy(school.code, buyer, frame);
+      expect(again?.promoCodeId).toBe(school.id); // still the school's
+      expect(again?.promoSavingPence).toBe(0);
+      expect(again?.partnerCommissionPence).toBeGreaterThan(0); // "a share of every order"
     });
 
     it('a card on its own can’t be given away (margin guard): full price, the code isn’t recorded as used', async () => {

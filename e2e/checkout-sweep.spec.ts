@@ -101,7 +101,7 @@ test.describe('checkout sweep 05', () => {
     };
     const text = await callAction(page, quoteCall!.id, [forged]);
     expect(text).toContain(`"totalPence":${price}`);
-    expect(text).toContain('"joinSavingPence":0');
+    expect(text).not.toContain('joinSavingPence'); // the 5% join saving is retired (17 Nov 2026)
     expect(text).toContain('"promoSavingPence":0');
     expect(text).toContain('"creditPence":0');
     expect(text).not.toContain('partnerCommissionPence');

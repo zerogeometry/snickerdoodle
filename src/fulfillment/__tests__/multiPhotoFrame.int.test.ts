@@ -100,7 +100,7 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
   }
 
   async function order(productKey: string, slots: Array<{ assetId: string; transform: typeof T } | null>, qty = 1) {
-    const res = await placeOrder(db, { items: [{ productKey, qty, slots }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey, qty, slots }], account: { id: ids.samId } });
     if (res.ok) {
       const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
       orderIds.push(o!.id);
@@ -293,7 +293,6 @@ describe.skipIf(!DB || !S3)('the multi photo frame — a drawing per square, ONE
       placeOrder(db, {
         items: [{ productKey: key, qty: 1, slots: [{ assetId: a, transform: T }] }],
         account: null,
-        joinProvenance: null,
         giftLink: { linkId: 'x', familyId: ids.hartleyId, assetIds: [a], expiresAt: null, revokedAt: null } as never,
       }),
     ).rejects.toThrow(/gift link/);

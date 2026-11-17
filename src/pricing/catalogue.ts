@@ -12,9 +12,6 @@
  * price (founder-approved 2026-07-01), so there is no separate delivery line. */
 export const DELIVERY_PENCE = 0;
 
-/** The join saving, in basis points (500 = 5%). Applied to goods, never delivery. */
-export const JOIN_SAVING_BPS = 500;
-
 /**
  * The family-set saving: 5% off GARMENT lines when the order carries 3 or more
  * garments ("dress the whole family" — one drawing, matching tees + bodysuit).

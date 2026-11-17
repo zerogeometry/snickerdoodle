@@ -149,7 +149,6 @@ describe.skipIf(!DB || !S3)('background screening (uploads checked after the cat
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);

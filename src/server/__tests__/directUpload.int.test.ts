@@ -261,7 +261,6 @@ describe.skipIf(!DB || !S3)('direct uploads via quarantine (integration)', () =>
         placeOrder(db, {
           items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: u.uploadId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
           account: { id: ids.samId },
-          joinProvenance: null,
         }),
       ).rejects.toThrow(/not found/);
     });

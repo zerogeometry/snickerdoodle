@@ -26,14 +26,13 @@ function appUrl(): string {
 
 /**
  * Create a Checkout Session for an order. Prices come from the server CATALOGUE,
- * never the client. A single negative "Family saving" line carries the join
- * discount so Stripe's total matches our authoritative total.
+ * never the client. One coupon carries every saving so Stripe's total matches our
+ * authoritative total.
  */
 export async function createCheckoutSession(args: {
   ref: string;
   lines: PricedLine[];
   deliveryPence: number;
-  joinSavingPence: number;
   // Required (not optional) on purpose: dropping it at a call-site must be a compile
   // error, or Stripe would charge more than the order total it is meant to mirror.
   familySetSavingPence: number;
@@ -48,7 +47,7 @@ export async function createCheckoutSession(args: {
   /** Where Stripe's "back" goes (an app path). Default: the basket. A gift-link order
    * returns to its gift list — a grandparent never lands in a basket they didn't fill. */
   cancelPath?: string;
-  /** The buyer's email (server-resolved): Stripe shows it fixed, so the receipt + referral checks
+  /** The buyer's email (server-resolved): Stripe shows it fixed, so the receipt + first-order checks
    * are about the person who placed the order. Omitted → Stripe asks for one. */
   customerEmail?: string;
   /** Close the session early (seconds from now; Stripe allows 30 min – 24 h) — e.g. while it holds
@@ -76,14 +75,14 @@ export async function createCheckoutSession(args: {
   // Checkout Session allows a single discount) so Stripe's total always equals
   // our authoritative order total.
   const discounts: Stripe.Checkout.SessionCreateParams.Discount[] = [];
-  const savingPence = args.joinSavingPence + args.familySetSavingPence + args.parcelSavingPence + args.multiBuySavingPence + args.promoSavingPence;
+  const savingPence = args.familySetSavingPence + args.parcelSavingPence + args.multiBuySavingPence + args.promoSavingPence;
   if (savingPence > 0) {
     const name =
       args.promoLabel && args.promoSavingPence > 0
         ? `Code ${args.promoLabel}`
         : args.multiBuySavingPence > 0
           ? 'Multi-buy saving'
-          : args.parcelSavingPence > 0 && args.joinSavingPence + args.familySetSavingPence === 0
+          : args.parcelSavingPence > 0 && args.familySetSavingPence === 0
             ? 'Same-parcel saving'
             : 'Family saving';
     const coupon = await stripe.coupons.create({ amount_off: savingPence, currency: 'gbp', duration: 'once', name });

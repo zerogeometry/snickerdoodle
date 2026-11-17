@@ -1,7 +1,6 @@
 import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, isFamilySetKey, type PricedCatalogue } from './catalogue';
-import { resolveJoinContext, type JoinContext, type JoinProvenance } from './joinContext';
 import { formatPence } from './format';
-import { evaluatePromo, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
+import { evaluatePromo, type CardNotApplied, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
 import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
@@ -31,7 +30,6 @@ export interface Quote {
   lines: PricedLine[];
   subtotalPence: number;
   deliveryPence: number;
-  joinSavingPence: number;
   /** The family-set saving: 5% off garment lines when 3+ garments ship together. */
   familySetSavingPence: number;
   /** The same-parcel saving: £3 off each extra item that ships in the same Prodigi parcel (src/pricing/parcels.ts). */
@@ -40,7 +38,6 @@ export interface Quote {
   multiBuySavingPence: number;
   totalPence: number;
   gift: boolean;
-  joinSavingApplied: boolean;
   familySetApplied: boolean;
   parcelSavingApplied: boolean;
   multiBuyApplied: boolean;
@@ -49,10 +46,10 @@ export interface Quote {
   /** Pence a promo code took off the goods (0 if none / not used). */
   promoSavingPence: number;
   /** What happened to the code the customer entered (null if none). Safe to show. */
-  promo: null | { code: string; kind: PromoKind; applied: boolean; reason?: PromoNotApplied; minSpendPence?: number; capped?: boolean };
+  promo: null | { code: string; kind: PromoKind; applied: boolean; reason?: PromoNotApplied; minSpendPence?: number; capped?: boolean; cardReason?: CardNotApplied };
   /** SERVER-ONLY: what the code's partner earns. Strip before returning to a client. */
   partnerCommissionPence: number;
-  /** Account credit (e.g. referral rewards) applied to this order. */
+  /** Account credit (e.g. an earlier referral reward, or an adjustment) applied to this order. */
   creditPence: number;
 }
 
@@ -97,8 +94,6 @@ function bpsOf(amountPence: number, bps: number): number {
 
 export interface PriceOpts {
   gift?: boolean;
-  /** The ONLY way to grant the join saving. Must come from {@link resolveJoinContext}. */
-  joinContext?: JoinContext | null;
   /** Override delivery (e.g. a future free-over-threshold rule). Defaults to standard. */
   deliveryPence?: number;
   /** The price list to price against — the server passes the DB-loaded one; defaults
@@ -108,13 +103,16 @@ export interface PriceOpts {
   promo?: PromoRule | null;
   /** The buyer's credit balance, resolved SERVER-side from the ledger (never the client). */
   creditAvailablePence?: number;
+  /** SERVER-decided: may this buyer have the free first card — a signed-in buyer's first paid order
+   * (src/server/promos.ts freeCardEligible)? Fail-closed: absent ⇒ no free card. */
+  freeCardEligible?: boolean;
 }
 
 /**
  * Price a basket authoritatively. Every unit price comes from the server
- * {@link CATALOGUE}; anything the client claims about price is ignored. The join
- * saving is applied to goods (never delivery) and ONLY when a server-minted
- * {@link JoinContext} is present.
+ * {@link CATALOGUE}; anything the client claims about price is ignored. The only
+ * welcome is the free first card (a code, decided server-side — src/pricing/promo.ts);
+ * the 5% join saving was retired on 17 Nov 2026.
  */
 export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts = {}): Quote {
   const gift = opts.gift ?? false;
@@ -147,13 +145,6 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   const subtotalPence = lines.reduce((n, l) => n + l.linePence, 0);
   const deliveryPence = lines.length > 0 ? (opts.deliveryPence ?? DELIVERY_PENCE) : 0;
 
-  const ctx = opts.joinContext ?? null;
-  const joinSavingApplied = ctx !== null && subtotalPence > 0;
-  // Clamp defensively: a saving can never exceed the goods it discounts, and a
-  // total can never go negative — true no matter what savingBps or delivery
-  // override is handed in server-side.
-  const joinSavingPence = joinSavingApplied ? Math.min(bpsOf(subtotalPence, ctx.savingBps), subtotalPence) : 0;
-
   // Family-set saving: resolved from the priced lines alone (keys + quantities) —
   // there is NO client flag to forge. 3+ garments in one order ship as one
   // consignment, and 5% of the garment lines goes back to the customer.
@@ -162,7 +153,7 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   const garmentPence = garmentLines.reduce((n, l) => n + l.linePence, 0);
   const familySetApplied = garmentQty >= FAMILY_SET_MIN_QTY && garmentPence > 0;
   const familySetSavingPence = familySetApplied
-    ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence - joinSavingPence)
+    ? Math.min(bpsOf(garmentPence, FAMILY_SET_SAVING_BPS), garmentPence, subtotalPence)
     : 0;
 
   // Multi-buy: buy more of the SAME product (counted across lines — any drawing, any variant), save
@@ -179,21 +170,19 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     return { bps, pence: bpsOf(l.linePence, bps) };
   });
   const multiBuyRaw = multiBuyLines.reduce((n, m) => n + m.pence, 0);
-  // Best single saving: multi-buy never stacks with the join / family-set savings — whichever is bigger.
-  const multiBuyWins = multiBuyRaw > joinSavingPence + familySetSavingPence;
-  const discountJoin = multiBuyWins ? 0 : joinSavingPence;
+  // Best single saving: multi-buy never stacks with the family-set saving — whichever is bigger.
+  const multiBuyWins = multiBuyRaw > familySetSavingPence;
   const discountSet = multiBuyWins ? 0 : familySetSavingPence;
   const multiBuySavingPence = multiBuyWins ? Math.min(multiBuyRaw, subtotalPence) : 0;
 
   // Same-parcel saving: resolved from the priced lines alone (keys + quantities), like the family set.
   // It's postage, so it stacks with multi-buy. Clamped so the savings together never exceed the goods.
-  const parcelSavingPence = Math.max(0, Math.min(parcelSaving(lines).savingPence, subtotalPence - discountJoin - discountSet - multiBuySavingPence));
+  const parcelSavingPence = Math.max(0, Math.min(parcelSaving(lines).savingPence, subtotalPence - discountSet - multiBuySavingPence));
 
   // Promo code — best single saving, margin-guarded (src/pricing/promo.ts).
   let promoSavingPence = 0;
   let partnerCommissionPence = 0;
   let promo: Quote['promo'] = null;
-  let finalJoin = discountJoin;
   let finalSet = discountSet;
   let finalParcel = parcelSavingPence;
   let finalMultiBuy = multiBuySavingPence;
@@ -219,24 +208,25 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
           freeCardUnitPence: productOfKey(l.productKey) === FREE_CARD_PRODUCT ? l.unitPricePence : null,
         };
       }),
-      discountJoin + discountSet + multiBuySavingPence + parcelSavingPence,
+      discountSet + multiBuySavingPence + parcelSavingPence,
+      undefined,
+      { cardEligible: opts.freeCardEligible === true },
     );
     if (outcome.applied) {
       promoSavingPence = outcome.discountPence;
       partnerCommissionPence = outcome.commissionPence;
       if (outcome.replacesOtherSavings) {
-        finalJoin = 0;
         finalSet = 0;
         finalParcel = 0;
         finalMultiBuy = 0; // a code never stacks with multi-buy either
       }
-      promo = { code: opts.promo.code, kind: opts.promo.kind, applied: true, capped: outcome.capped };
+      promo = { code: opts.promo.code, kind: opts.promo.kind, applied: true, capped: outcome.capped, ...(outcome.cardReason ? { cardReason: outcome.cardReason } : {}) };
     } else {
       promo = { code: opts.promo.code, kind: opts.promo.kind, applied: false, reason: outcome.reason, minSpendPence: outcome.minSpendPence };
     }
   }
 
-  const beforeCredit = Math.max(0, subtotalPence - finalJoin - finalSet - finalParcel - finalMultiBuy - promoSavingPence + deliveryPence);
+  const beforeCredit = Math.max(0, subtotalPence - finalSet - finalParcel - finalMultiBuy - promoSavingPence + deliveryPence);
   if (finalMultiBuy > 0) {
     lines.forEach((l, i) => {
       const m = multiBuyLines[i]!;
@@ -250,13 +240,11 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
     lines,
     subtotalPence,
     deliveryPence,
-    joinSavingPence: finalJoin,
     familySetSavingPence: finalSet,
     parcelSavingPence: finalParcel,
     multiBuySavingPence: finalMultiBuy,
     totalPence,
     gift,
-    joinSavingApplied: joinSavingApplied && finalJoin > 0,
     familySetApplied: familySetApplied && finalSet > 0,
     parcelSavingApplied: finalParcel > 0,
     multiBuyApplied: finalMultiBuy > 0,
@@ -269,15 +257,14 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
 }
 
 /**
- * The full client→quote path: resolves the join context from server-resolved
- * provenance (never from the client), then prices. The server action calls this.
+ * The full client→quote path: everything that changes the price (the code, credit, free-card
+ * eligibility) is server-resolved by the caller, never taken from the client. The server action calls this.
  */
 export function quote(
   requested: readonly RequestedLine[],
-  opts: { gift?: boolean; joinProvenance?: JoinProvenance | null; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number } = {},
+  opts: { gift?: boolean; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number; freeCardEligible?: boolean } = {},
 ): Quote {
-  const joinContext = opts.joinProvenance ? resolveJoinContext(opts.joinProvenance) : null;
-  return priceBasket(requested, { gift: opts.gift, joinContext, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0 });
+  return priceBasket(requested, { gift: opts.gift, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0, freeCardEligible: opts.freeCardEligible === true });
 }
 
 /**

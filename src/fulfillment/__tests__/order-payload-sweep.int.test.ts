@@ -87,7 +87,7 @@ describe.skipIf(!DB || !S3)('sweep 03 — the Prodigi order payload (integration
   }
 
   async function placeAndSubmit(items: Parameters<typeof placeOrder>[1]['items']) {
-    const res = await placeOrder(db, { items, account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items, account: { id: ids.samId } });
     expect(res.ok, JSON.stringify(res)).toBe(true);
     const [o] = await db.select({ id: orders.id, ref: orders.ref }).from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);

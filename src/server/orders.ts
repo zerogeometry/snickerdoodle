@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
-import { assets, memberships, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
+import { assets, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
 import { screenPendingNow } from './moderation';
@@ -14,7 +14,7 @@ import { fillFrameSlots, frameSlotCountOf, isMultiPhotoFrameKey } from '@/lib/mu
 import { BUNDLE_COMPONENT_SKUS, bundleSizeOf, expandBundle, isBundleKey, normalizeBundle, pieceOfSku } from '@/lib/christmas-bundle';
 import { defaultTransformFor } from '@/lib/catalogue-view';
 import { screenCardMessage, screenGiftNote, type ScreenedCardMessage } from '@/server/textSafety';
-import { clampQty, inCatalogue, quote, type JoinProvenance, type PromoRule } from '@/pricing';
+import { clampQty, inCatalogue, quote, type PromoRule } from '@/pricing';
 import { clampTransform, templateGeom, type RawTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { getObjectBytes } from '@/storage';
@@ -121,10 +121,8 @@ export async function placeOrder(
   input: {
     items: PlaceLine[];
     gift?: boolean;
-    /** The buyer (null for a guest) and their server-resolved join provenance —
-     * resolved by the caller (the action) from the session, never the request. */
+    /** The buyer (null for a guest) — resolved by the caller (the action) from the session, never the request. */
     account: { id: string } | null;
-    joinProvenance: JoinProvenance | null;
     /** A gift-link purchase: personalised lines are authorised by the link's CAPABILITY
      * (canPurchaseViaGiftLink) instead of the buyer's membership — so a guest can buy the
      * exact keepsakes a parent shared, and nothing else. Resolved server-side from the token. */
@@ -137,6 +135,8 @@ export async function placeOrder(
     promo?: PromoRule | null;
     /** The signed-in buyer's credit balance (server-resolved from the ledger). */
     creditAvailablePence?: number;
+    /** SERVER-decided: may this buyer have the free first card (src/server/promos.ts freeCardEligible)? */
+    freeCardEligible?: boolean;
     /** The buyer's email: the signed-in account's, or a guest's own (normalised) — referral checks,
      * the receipt, and Stripe's email (prefilled, so a guest can't pay as someone else). */
     buyerEmail?: string | null;
@@ -144,14 +144,14 @@ export async function placeOrder(
     giftNote?: unknown;
   },
 ): Promise<PlaceOrderResult> {
-  const { account, joinProvenance } = input;
+  const { account } = input;
   // the gift note is screened BEFORE anything is written (abuse ⇒ the buyer is asked to reword it)
   const note = screenedGiftNote(input);
   if (note === 'refused') return { ok: false, reason: 'gift-note' };
   const catalogue = await getCatalogue(db);
   const q = quote(
     input.items.map((l) => ({ productKey: l.productKey, qty: l.qty, ...(isBundleKey(l.productKey) ? { bundle: l.bundle } : {}) })),
-    { gift: input.gift, joinProvenance, catalogue, promo: input.promo ?? null, creditAvailablePence: account ? (input.creditAvailablePence ?? 0) : 0 },
+    { gift: input.gift, catalogue, promo: input.promo ?? null, creditAvailablePence: account ? (input.creditAvailablePence ?? 0) : 0, freeCardEligible: !!account && input.freeCardEligible === true },
   );
   if (q.lines.length === 0) return { ok: false, reason: 'empty' };
 
@@ -417,7 +417,6 @@ export async function placeOrder(
       status: 'PENDING',
       subtotalPence: q.subtotalPence,
       deliveryPence: q.deliveryPence,
-      joinSavingPence: q.joinSavingPence,
       familySetSavingPence: q.familySetSavingPence,
       parcelSavingPence: q.parcelSavingPence,
       multiBuySavingPence: q.multiBuySavingPence,
@@ -435,7 +434,7 @@ export async function placeOrder(
     })
     .returning();
   // A code is claimed in the SAME transaction that writes the order, its row locked: two checkouts
-  // can't both take a limited code's last use, and a referral code is re-checked against the buyer.
+  // can't both take a limited code's last use, and a first-order code is re-checked against the buyer.
   let order: typeof orders.$inferSelect | undefined;
   if (promoId) {
     const buyer = { accountId: account?.id ?? null, email: input.buyerEmail ?? null };
@@ -514,7 +513,6 @@ export async function placeOrder(
       ref,
       lines: q.lines,
       deliveryPence: q.deliveryPence,
-      joinSavingPence: q.joinSavingPence,
       familySetSavingPence: q.familySetSavingPence,
       parcelSavingPence: q.parcelSavingPence,
       multiBuySavingPence: q.multiBuySavingPence,
@@ -534,11 +532,11 @@ export async function placeOrder(
 }
 
 /**
- * Mark an order paid and spend the one-time join saving — ATOMICALLY and idempotently.
+ * Mark an order paid and settle its partner commission — ATOMICALLY and idempotently.
  *
- * The PENDING→PAID flip and the join-saving spend run in ONE transaction, guarded on
+ * The PENDING→PAID flip and the commission settlement run in ONE transaction, guarded on
  * the transition (`.where(status='PENDING')`). So a Stripe webhook retry (which finds
- * the order already PAID) can never double-spend, and a crash can't half-apply the flip.
+ * the order already PAID) can never double-settle, and a crash can't half-apply the flip.
  *
  * The PAID status IS the fulfilment enqueue (proposal/04 §6): the worker claims the
  * PENDING artwork of PAID orders. We deliberately do NOT add a separate post-flip
@@ -552,9 +550,6 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
       .where(and(eq(orders.id, orderId), eq(orders.status, 'PENDING')))
       .returning();
     if (!updated) return null; // already paid / unknown → no-op (idempotent)
-    if (updated.joinSavingPence > 0 && updated.accountId) {
-      await consumeJoinSaving(tx, updated.accountId);
-    }
     // a partner's commission: the follower's first paid order only, exactly once (src/server/promos.ts)
     await settlePartnerCommission(tx, updated);
     return updated;
@@ -565,29 +560,12 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
   if (flipped?.giftLinkId) {
     await notifyGiftListPurchase(db, flipped.id).catch((e) => console.error('gift-list notify failed', (e as Error).message));
   }
-  // Credit spent on this order + any referral reward — settled exactly once, after commit.
+  // Credit spent on this order — settled exactly once, after commit.
   if (flipped) {
     await settlePaidOrderCredits(db, flipped.id).catch((e) => console.error('credit settle failed', (e as Error).message));
     // "we've got your order" — once, on the real transition; a mail failure never touches the payment
     await sendOrderConfirmed(db, flipped.id).catch((e) => console.error('order confirmation not sent', flipped.ref, (e as Error).message));
   }
-}
-
-async function consumeJoinSaving(db: DbHandle | Tx, accountId: string): Promise<void> {
-  const [m] = await db
-    .select({ id: memberships.id })
-    .from(memberships)
-    .where(
-      and(
-        eq(memberships.accountId, accountId),
-        eq(memberships.status, 'ACTIVE'),
-        eq(memberships.isOwner, false),
-        isNull(memberships.joinSavingConsumedAt),
-      ),
-    )
-    .orderBy(desc(memberships.joinedAt))
-    .limit(1);
-  if (m) await db.update(memberships).set({ joinSavingConsumedAt: new Date() }).where(eq(memberships.id, m.id));
 }
 
 export interface OrderSummary {

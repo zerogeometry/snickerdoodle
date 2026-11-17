@@ -1,5 +1,14 @@
 # Discounts, vouchers & partner codes — what the margins allow (2026-10-12)
 
+> **Current rules — D30, 17 Nov 2026 (founder).** The ONE welcome is a free greetings card on a signed-in
+> buyer's first paid order (the shop's `FIRSTCARD` code, applied by checkout itself). Unique codes are only for
+> **partners** — creators, school PTAs — plus our own **campaign / custom** codes for tracking. Make them as
+> free-card codes with a commission: `create OAKFIELD-PTA --free-card --commission 10 --partner "Oakfield PTA" --type PTA`
+> · `create SARAHMAKES --free-card --commission 10 --partner "Sarah" --type INFLUENCER --partner-email …`
+> · `create FAIR-BS11 --free-card --partner "Bristol fairs" --type CAMPAIGN`. Commission is 10% of the order
+> before VAT. **Retired:** the 5% join saving and parents' "give £5, get £5" referral codes. The menu and
+> referral sections below are kept as the record of what came before.
+
 > Source: `node --env-file=.env scripts/discount-headroom.mjs` (live shop prices × Prodigi GB costs,
 > free delivery baked in, card fees 1.5% + 20p, VAT not counted as revenue). Full table regenerates
 > to `.prodigi-assets/DISCOUNT-HEADROOM.md`.
@@ -41,8 +50,8 @@ pushes, where a round number feels nicer.
 ## Safety built in (D15)
 - Codes are priced **only on the server**: the customer types text; value, minimum spend and
   commission live in `promo_codes`.
-- **Best single saving:** a code never stacks with the 5% join/family-set savings; the customer
-  gets the bigger one.
+- **Best single saving:** a code never stacks with the family-set / multi-buy / same-parcel savings; the
+  customer gets the bigger one. (The 5% join saving was retired on 17 Nov 2026.)
 - **Margin guard:** whatever a code says, an order always keeps at least **10%** of its ex-VAT goods
   revenue after product, delivery, card fees, discount and partner commission. The discount is trimmed
   first, then the commission. Items with no known cost (gift wrap) are never discounted.
@@ -51,7 +60,7 @@ pushes, where a round number feels nicer.
 - Manage with `scripts/promo-codes.mjs` (create / list / off / earnings).
 
 ## Referral + class codes (D17)
-- **Give £5, get £5:** every parent's code is on their account page with copy/share. The friend gets £5 off their first order over £30; the referrer gets £5 credit once it's paid, which comes off their next order automatically.
+- *(Retired 17 Nov 2026, D30.)* **Give £5, get £5:** every parent's code was on their account page with copy/share. The friend gets £5 off their first order over £30; the referrer gets £5 credit once it's paid, which comes off their next order automatically.
 - **PTA class codes:** `create STMARYS-Y2 --percent 0 --commission 10 --partner "St Mary's PTA" --class "Year 2" --type PTA`. `scripts/promo-codes.mjs partners` shows each school's total and per-class split (the number to pay the PTA).
 
 ## First-order codes + the free first card (C10, 30 Oct 2026)

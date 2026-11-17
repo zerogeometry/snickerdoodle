@@ -5,7 +5,6 @@ import { getDb } from '@/db/client';
 import { getGiftLink } from '@/server/giftLinks';
 import { withLivePrices } from './livePrices';
 import { getCatalogue } from '@/server/catalogue';
-import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { quote } from '@/pricing';
 import { getCurrentAccount } from '@/server/session';
 import { screenFromName } from '@/server/giftLinks';
@@ -65,19 +64,16 @@ export default async function GiftLinkPage({ params }: { params: Promise<{ token
     );
   }
 
-  // Totals are the SERVER's quote for this viewer — the same engine placeGiftLinkOrder
-  // charges with. A buyer who joined via this family's invite sees their 5% here.
+  // Totals are the SERVER's quote — the same engine placeGiftLinkOrder charges with.
   const db = getDb();
-  const provenance = await resolveSessionJoinProvenance();
-  const joinProvenance = provenance?.invite?.familyId === view.familyId ? provenance : null;
   const catalogue = await getCatalogue(db);
   const q = quote(
     view.items.filter((i) => !i.purchased).map((i) => ({ productKey: i.productKey, qty: 1 })), // ticked-off items aren't sold again
-    { gift: true, joinProvenance, catalogue },
+    { gift: true, catalogue },
   );
   // every line at the price checkout charges, so the lines and the total always agree (06-B3)
   const items = withLivePrices(view.items, catalogue);
-  const pricing = { subtotalPence: q.subtotalPence, deliveryPence: q.deliveryPence, joinSavingPence: q.joinSavingPence, totalPence: q.totalPence };
+  const pricing = { subtotalPence: q.subtotalPence, deliveryPence: q.deliveryPence, totalPence: q.totalPence };
   const viewer = await getCurrentAccount();
   const defaultFrom = viewer ? (screenFromName(viewer.name) ?? screenFromName(viewer.email.split('@')[0]) ?? '') : '';
 

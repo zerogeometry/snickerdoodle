@@ -70,7 +70,6 @@ describe.skipIf(!DB || !S3 || !GO)('Prodigi SANDBOX live smoke — one real orde
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);

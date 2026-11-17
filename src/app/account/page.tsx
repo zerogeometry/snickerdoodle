@@ -12,14 +12,14 @@ import { BottomTabBar } from '@/ui/components/BottomTabBar';
 import { AppDesktopNav } from '@/ui/components/AppDesktopNav';
 import { APP_TABS } from '@/ui/components/appTabs';
 import { AccountActions } from './AccountActions';
-import { ReferralCard } from './ReferralCard';
 import { DrawAppCard } from './DrawAppCard';
 import { connectChoices, listLinkedDevices } from '@/server/app/link';
 import { countDrawSent, listProgressBackups } from '@/server/app/sync';
 import { ProfileCard } from './ProfileCard';
 import { profileImagesFor } from '@/server/profile';
 import { getDb } from '@/db/client';
-import { getCreditBalance, getOrCreateReferralCode } from '@/server/referrals';
+import { getCreditBalance } from '@/server/referrals';
+import { formatPence } from '@/pricing';
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ close?: string }> }) {
   // Auth-gated server-side: a guest is sent to log in, and comes back here (to "close your account" if that's
@@ -30,8 +30,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const displayName = account.name ?? account.email.split('@')[0] ?? account.email;
   const db = getDb();
   const ownedFamilyIds = connectChoices(db, account.id).then(({ owned }) => owned.map((f) => f.id));
-  const [referralCode, creditPence, pictures, drawDevices, drawBackups, drawSent] = await Promise.all([
-    getOrCreateReferralCode(db, account),
+  const [creditPence, pictures, drawDevices, drawBackups, drawSent] = await Promise.all([
     getCreditBalance(db, account.id),
     profileImagesFor(db, account.id, [account.id]),
     listLinkedDevices(db, account.id),
@@ -61,7 +60,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         {/* Profile — header, picture, name (what your family sees) + email (only you) */}
         <ProfileCard profile={{ name: displayName, email: account.email, initial, avatarUrl: mine?.avatarUrl ?? null, headerUrl: mine?.headerUrl ?? null }} />
 
-        <ReferralCard code={referralCode} creditPence={creditPence} />
+        {/* Credit already earned (from the retired "give £5, get £5") still comes off the next order */}
+        {creditPence > 0 ? (
+          <p className="mt-4 rounded-2xl border-2 border-cocoa bg-honey-band p-4 text-[13px] text-cocoa">
+            your credit: <b>{formatPence(creditPence)}</b> <span className="text-ink-soft">— it comes off your next order automatically</span>
+          </p>
+        ) : null}
 
         <DrawAppCard devices={drawDevices} backups={drawBackups} sentCount={drawSent} />
 

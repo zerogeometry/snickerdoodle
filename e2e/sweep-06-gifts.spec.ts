@@ -444,7 +444,7 @@ test('06: a saved design ("+ keepsake" on a mug) shared as a link sells EXACTLY 
   await s.context().close();
 });
 
-test('06: invitee joins from the gift link and checks out with 5% at phone size; the saving is one-time', async ({ page, browser }) => {
+test('06: invitee joins from the gift link and checks out at phone size, at the full price (no join saving)', async ({ page, browser }) => {
   // it pays with the local "mark paid" path, which only a server WITHOUT a Stripe key takes
   test.skip(!!process.env.STRIPE_SECRET_KEY, 'needs a server with the Stripe key blanked (local mark-paid)');
   test.setTimeout(300_000);
@@ -459,10 +459,10 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   await signInByEmailLink(granny, grannyEmail, joinUrl.pathname + joinUrl.search);
   await sayYesToJoin(granny); // D27: never a silent join
   await expect(granny).toHaveURL(new RegExp(`${g.path}$`));
-  await expect(granny.getByText('welcome to the family — your 5% is applied')).toBeVisible();
+  await expect(granny.getByText('Family saving')).toHaveCount(0);
   const [m] = await sql()`select m.status, m.circle, m.access_level from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail} and m.family_id = ${g.familyId}`;
   expect(m).toMatchObject({ status: 'ACTIVE', circle: 'EXTENDED', access_level: 'VIEW_BUY' });
-  await granny.screenshot({ path: `${SHOTS}/gift-joined-5pc-phone.png`, fullPage: true });
+  await granny.screenshot({ path: `${SHOTS}/gift-joined-phone.png`, fullPage: true });
   // the invite is spent: a forwarded copy of the gift link no longer offers it
   const later = await stranger(browser);
   await later.goto(g.path);
@@ -471,10 +471,10 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   await granny.getByRole('button', { name: /^checkout$/ }).click();
   await expect.poll(() => granny.url(), { timeout: 30_000 }).toMatch(/\/checkout\/confirmation\?ref=|checkout\.stripe\.com/);
   const [o] = await sql()`select join_saving_pence, subtotal_pence, status from orders where gift_link_id = ${g.linkId}`;
-  expect(o!.join_saving_pence).toBe(Math.round(o!.subtotal_pence * 0.05));
+  expect(o!.join_saving_pence).toBe(0);
   expect(o!.status).toBe('PAID'); // local "mark paid" (Stripe key blanked on this server)
 
-  // a SECOND gift link from the same family: the one-time saving is spent
+  // a SECOND gift link from the same family, for her as a member now
   const sheet = await openGiftSheetWho(page);
   // she's family now (the only other member): her own member link
   await sheet.getByRole('group', { name: 'family members to send it to' }).getByRole('button').first().click();
@@ -485,8 +485,8 @@ test('06: invitee joins from the gift link and checks out with 5% at phone size;
   expect(l2!.audience_circle).toBe('EXTENDED'); // her circle
   const path2 = `/g/${l2!.token as string}`;
   await granny.goto(path2);
-  // 06-B: a signed-in family member is offered "checkout as guest" once their saving is spent (label keys on the saving, not on being signed in)
-  await expect(granny.getByRole('button', { name: /^checkout( as guest)?$/ })).toBeVisible();
+  // 06-B: signed in, she's offered plain "checkout" (never "checkout as guest")
+  await expect(granny.getByRole('button', { name: /^checkout$/ })).toBeVisible();
   await expect(granny.getByText('Family saving')).toHaveCount(0);
   await granny.screenshot({ path: `${SHOTS}/gift-second-link-member-phone.png`, fullPage: true });
   await granny.context().close();

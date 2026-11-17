@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { quote, type PricedCatalogue, type PromoRule } from '@/pricing';
 
 // "Your first card's on us" through the whole basket: one greetings card's price off, never stacked
-// with multi-buy / the bundle / the 5% savings (the best single saving wins), margin-guarded.
+// with multi-buy / the bundle / the family-set saving (the best single saving wins), margin-guarded, and only
+// for a buyer the SERVER says may have it — a signed-in first order (freeCardEligible; founder, 17 Nov 2026).
 const CAT: PricedCatalogue = {
   card: { pricePence: 550, label: 'greetings card', unitCostPence: 195, postFirstPence: 85, postExtraPence: 0 },
   'card-a5': { pricePence: 700, label: 'greetings card · A5', unitCostPence: 260, postFirstPence: 85, postExtraPence: 0 },
@@ -12,7 +13,7 @@ const CAT: PricedCatalogue = {
   'christmasBundle-for4': { pricePence: 9000, label: 'christmas family bundle', unitCostPence: 5000 },
 };
 const FREE: PromoRule = { id: 'f', code: 'FIRSTCARD', kind: 'FREE_CARD', value: 0, minSpendPence: 0, commissionBps: 0 };
-const q = (items: Array<{ productKey: string; qty: number }>, promo: PromoRule | null = FREE) => quote(items, { catalogue: CAT, promo });
+const q = (items: Array<{ productKey: string; qty: number }>, promo: PromoRule | null = FREE, freeCardEligible = true) => quote(items, { catalogue: CAT, promo, freeCardEligible });
 
 describe('a free first card, priced through the basket', () => {
   it('card + mug: the card comes off, delivery unchanged, the line is labelled as a free card', () => {
@@ -51,5 +52,21 @@ describe('a free first card, priced through the basket', () => {
     const frames = q([{ productKey: 'framedPrint', qty: 3 }, { productKey: 'card', qty: 1 }]);
     expect(frames.promoSavingPence > 0 && frames.multiBuySavingPence > 0).toBe(false);
     if (frames.multiBuySavingPence > 550) expect(frames.promo).toMatchObject({ applied: false, reason: 'better-saving-applied' });
+  });
+
+  it('not a signed-in first order (or eligibility not given): no free card — full price', () => {
+    const r = q([{ productKey: 'card', qty: 1 }, { productKey: 'mug', qty: 1 }], FREE, false);
+    expect(r.promo).toMatchObject({ applied: false, reason: 'first-order-card' });
+    expect(r.promoSavingPence).toBe(0);
+    expect(quote([{ productKey: 'card', qty: 1 }, { productKey: 'mug', qty: 1 }], { catalogue: CAT, promo: FREE }).promoSavingPence).toBe(0); // fail-closed
+  });
+
+  it('a school’s free-card code with commission: no card in the basket ⇒ the order is still tagged and earns', () => {
+    const SCHOOL: PromoRule = { ...FREE, id: 's', code: 'OAKFIELD-PTA', commissionBps: 1000 };
+    const r = quote([{ productKey: 'framedPrint', qty: 1 }], { catalogue: CAT, promo: SCHOOL, freeCardEligible: true });
+    expect(r.promo).toMatchObject({ applied: true, cardReason: 'needs-card' });
+    expect(r.promoSavingPence).toBe(0);
+    expect(r.partnerCommissionPence).toBe(Math.round(6500 / 1.2 / 10));
+    expect(r.totalPence).toBe(6500 + r.deliveryPence);
   });
 });

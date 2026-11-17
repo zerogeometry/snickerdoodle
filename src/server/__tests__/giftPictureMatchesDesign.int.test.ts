@@ -165,7 +165,7 @@ describe.skipIf(!DB || !S3)('a gift link shows the design exactly as the parent 
       expect(await difference(gift!, (await giftLinkPreview(db, link.token, assetId, c.sku))!)).toBe(0);
 
       // the relative buys it: the print order carries the same drawing, product, placement + colour
-      const res = await placeGiftLinkOrder(db, { token: link.token, account: null, joinProvenance: null, fromName: 'Granny' });
+      const res = await placeGiftLinkOrder(db, { token: link.token, account: null, fromName: 'Granny' });
       expect(res.ok).toBe(true);
       orderRefs.push(res.ref!);
       const [line] = await db
