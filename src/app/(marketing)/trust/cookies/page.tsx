@@ -24,7 +24,9 @@ export default function CookiesPage() {
         <h2>Essential cookies (always on)</h2>
         <p>
           These keep you signed in, keep your basket working, and protect the site from abuse. The site can&apos;t work
-          without them, so they don&apos;t need your consent.
+          without them, so they don&apos;t need your consent. Once you&apos;ve signed in, that phone or computer
+          stays signed in for a year from your last visit, so you don&apos;t need a new email each time. Sign out from
+          your account whenever you like, on a shared tablet especially.
         </p>
 
         <h2>Analytics cookies (only with your agreement)</h2>
