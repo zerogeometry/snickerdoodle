@@ -59,3 +59,5 @@ export {
   type OccasionEditRole,
   type OccasionRef,
 } from './occasions';
+
+export { filingChoicesFor, planFiling, type ChildRef, type FilingChoices, type FilingPatch, type FilingPlan } from './filing';

@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import { birthdayView, type BirthdayView } from '@/lib/birthdayView';
-import { canBuyFromGiftList, canDeleteAsset, canViewAsset, childParentOf, effectiveVisibility, originatorOf, visibilityChoicesFor, type AssetRef, type VisibilityRole } from '@/authz';
+import { canBuyFromGiftList, canDeleteAsset, canViewAsset, childParentOf, effectiveVisibility, filingChoicesFor, originatorOf, visibilityChoicesFor, type AssetRef, type VisibilityRole } from '@/authz';
 import { accounts, assets, children, families, invites, memberships, storageObjects } from '@/db/schema';
 import { getDb } from '@/db/client';
 import { presignDownload } from '@/storage';
@@ -54,6 +54,9 @@ export interface HomeKeepsake {
   held: boolean;
   /** Someone else's keepsake the viewer can see — they may report it (D8). */
   canReport: boolean;
+  /** Whose corner the viewer may file it in (src/authz filingChoicesFor): the little ones' ids, and whether they
+   * may take it out to "not yet filed". null = not theirs to file (the person button isn't shown). */
+  filing: { childIds: string[]; canUnfile: boolean } | null;
 }
 
 export interface HomePendingInvite {
@@ -68,6 +71,8 @@ export interface HomeChild {
   /** Day, month and the age they turn next, or null: only for the gentle "coming up" nudge. Never the
    * year (A-59): this goes to the browser, relatives included. */
   birthday: BirthdayView | null;
+  /** The viewer is this little one's parent (filing someone else's keepsake here hands THEM a say — said plainly). */
+  yours: boolean;
 }
 
 export interface HomeData {
@@ -146,6 +151,14 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
     };
   };
 
+  // The family's children (keepsake subjects), so the home can file keepsakes into each little one's corner — and
+  // who controls each (server-side only: the filing rule needs it; the browser gets first names).
+  const childRows = await db
+    .select({ id: children.id, firstName: children.firstName, birthday: children.birthday, familyId: children.familyId, controllerAccountId: children.controllerAccountId })
+    .from(children)
+    .where(eq(children.familyId, familyId));
+  const childRefs = childRows.map((c) => ({ id: c.id, familyId: c.familyId, controllerAccountId: c.controllerAccountId }));
+
   // Kept keepsakes (the home is the keepsake box), newest first, with their
   // preserved ORIGINAL's key for thumbnailing. Filtered through authz.
   const rows = await db
@@ -178,15 +191,9 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
       canManage: visibilityChoicesFor(refOf(r.asset), viewer) !== null,
       held: isHeldForReport(r.asset),
       canReport: visibilityChoicesFor(refOf(r.asset), viewer) === null && r.asset.uploaderAccountId !== account.id,
+      filing: filingChoicesFor({ ...refOf(r.asset), childSubjectId: r.asset.childSubjectId }, viewer, childRefs),
     })),
   );
-
-  // The family's children (keepsake subjects), so the home can file keepsakes into
-  // each little one's corner.
-  const childRows = await db
-    .select({ id: children.id, firstName: children.firstName, birthday: children.birthday })
-    .from(children)
-    .where(eq(children.familyId, familyId));
 
   const isOwner = familyChoices.find((f) => f.familyId === familyId)?.isOwner ?? false;
   const seesCalendar = memberRows.some(({ m }) => m.accountId === account.id && m.seesOccasions);
@@ -221,6 +228,7 @@ export async function loadHome(requestedFamilyId?: string | null): Promise<HomeD
       id: c.id,
       firstName: c.firstName,
       birthday: isOwner || seesCalendar ? birthdayView(c.birthday ? String(c.birthday) : null, new Date()) : null,
+      yours: c.controllerAccountId === account.id,
     })),
     keepsakes,
   };

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { cn } from '../cn';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'design' | 'designOutline';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'design' | 'designOutline' | 'keepOutline';
 type Size = 'sm' | 'md' | 'lg';
 
 // ≥44px tap target (min-h-11). Scrapbook buttons are chunky, rounded "stickers" that sit on a
@@ -26,6 +26,9 @@ const variants: Record<Variant, string> = {
   // CTAs so "magic edits" never read as a buy action.
   design: 'bg-cobalt text-white shadow-[0_4px_0_var(--color-cobalt-deep)] active:shadow-[0_1px_0_var(--color-cobalt-deep)]',
   designOutline: 'border-2 border-cobalt bg-paper text-cobalt hover:bg-sky-pale',
+  // Keeping (founder, 17 Nov): tomato outline — the same family as "add keepsake", quieter than checkout.
+  // Words in cinnamon (tomato for text, AA on paper); the heart icon itself can take tomato.
+  keepOutline: 'border-2 border-cta bg-paper text-cinnamon hover:bg-berry-pale disabled:opacity-100',
 };
 
 type BaseProps = {

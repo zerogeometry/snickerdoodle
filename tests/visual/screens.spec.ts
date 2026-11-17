@@ -1,6 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from '../../e2e/harness';
-import { quietCookies, uploadAndOpenRange } from '../../e2e/helpers';
+import { artwork, quietCookies, uploadAndOpenRange } from '../../e2e/helpers';
 
 /**
  * The main screens, as /mockups lays them out (landing · start creating · the range · customize ·
@@ -164,6 +164,35 @@ for (const vp of WIDTHS) {
       const photo = page.getByRole('img', { name: /^your 16×24″ landscape frame/ });
       await expect(photo).toHaveAttribute('src', /^blob:/, { timeout: 30_000 });
       await shot(page, `${vp.name}-customize-multi-photo-frame`, { mask: [photo] });
+    });
+
+    // Founder, 17 Nov: the keepsake box — the keep window (whose corner + who can see) and "whose corner?"
+    test('keepsake box: the keep window and the whose-corner sheet (signed in)', async ({ page }) => {
+      test.skip(!hasDb, 'needs DATABASE_URL + AUTH_SECRET to sign in');
+      test.setTimeout(180_000);
+      const parent = testEmail('visual-keep');
+      await quietCookies(page);
+      await signInByEmailLink(page, parent, '/home');
+      await sql()`update accounts set display_name = 'Sam' where email = ${parent}`;
+      const [m] = await sql()`select m.account_id, m.family_id from memberships m join accounts a on a.id = m.account_id where a.email = ${parent} and m.is_owner`;
+      for (const n of ['Sonny', 'Mabel']) await sql()`insert into children (family_id, first_name, controller_account_id) values (${m!.family_id}, ${n}, ${m!.account_id})`;
+      await page.goto('/home');
+      const opener = vp.width < 768 ? page.getByTestId('keep-tab') : page.getByTestId('add-keepsake');
+      const [chooser] = await Promise.all([page.waitForEvent('filechooser'), opener.click()]);
+      await chooser.setFiles([
+        { name: 'one.png', mimeType: 'image/png', buffer: await artwork() },
+        { name: 'two.png', mimeType: 'image/png', buffer: await artwork() },
+      ]);
+      await expect(page.getByTestId('keep-child')).toBeVisible();
+      await shot(page, `${vp.name}-keep-window`, { fullPage: false });
+      await page.getByTestId('keep-confirm').click();
+      await expect(page.getByRole('dialog')).toHaveCount(0, { timeout: 90_000 });
+      await clearForTest(parent);
+      await page.reload();
+      await page.getByTestId('file-keepsake').first().click();
+      await expect(page.getByRole('dialog', { name: 'whose corner?' })).toBeVisible();
+      await page.getByRole('dialog').getByText('Sonny’s corner').click();
+      await shot(page, `${vp.name}-whose-corner`, { fullPage: false, mask: [page.locator('img[src^="http"]')] });
     });
 
     // "sign in with Face ID" (passkeys, 17 Nov): no mockup — the auth/account area, in the same scrapbook language

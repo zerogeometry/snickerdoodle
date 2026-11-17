@@ -16,14 +16,11 @@ import { Basket } from '@/ui/components/Basket';
 import { FullCatalogueModal } from '@/ui/components/FullCatalogueModal';
 import { FamilySetModal } from '@/ui/components/FamilySetModal';
 import { FamilySetTile, familySetRequests, familySetVariantIds } from '@/ui/components/FamilySetTile';
-import { applyIngested, basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
+import { basketCount, basketSubtotal, gbp, toast, useBasket, usePlacements, useSelection, useUpload } from '@/lib/store';
 import { deliveryLine } from '@/lib/delivery';
 import { ChristmasPromise } from './ChristmasPromise';
-import { TOO_MANY_COPY } from '@/lib/rateLimitCopy';
 import { instantContext, mockupKey, prefetchContexts, RANGE_GROUP, rangeGroups, revealRange, whenPainted, type RangeReveal } from '@/lib/mockupPrefetch';
-import { uploadGuestImage } from '@/lib/guestUpload';
-import { keepUploadAction } from '@/app/actions/keep';
-import { savePendingKeep } from '@/lib/pending-keep';
+import { ensureUploadAsset, isIngesting, useKeepDrawing } from '@/ui/components/useKeepDrawing';
 import { basketLineId } from '@/lib/basket-line';
 import { defaultPlacementFor, displayGround, groupOf, isLineOfSku, productQtyInBasket, resolveDisplayVariant, splitCatalogue } from '@/lib/catalogue-view';
 import { colourName, GROUND_NOUN, isPatternProduct } from '@/lib/patterns';
@@ -33,6 +30,7 @@ import { isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { isBundleKey } from '@/lib/christmas-bundle';
 import type { CatalogueProduct, CatalogueVariant } from '@/server/catalogue';
 import { itemName } from '@/lib/product-names';
+import { scrollToTopNow } from '@/lib/scrollTop';
 
 function variantSub(v: CatalogueVariant): string | undefined {
   const bits = [v.attributes.size, v.attributes.colour, v.attributes.orientation === 'landscape' ? 'landscape' : null].filter(Boolean);
@@ -93,73 +91,16 @@ export function FlowCatalogue({
   const [whoMode, setWhoMode] = useState<'checkout' | 'share' | null>(null);
   const [fullOpen, setFullOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
-  // "+ keepsake": keep THIS drawing in the family's keepsake box (signed-in; no second upload)
-  const [keeping, setKeeping] = useState(false);
-  const [keptId, setKeptId] = useState<string | null>(null);
-  const kept = !!upload?.assetId && (keptId === upload.assetId || upload.kept === true);
-  // A single in-flight ingest, shared across clicks — so a slow first ingest can't
-  // deadlock the catalogue (the previous global "busy" flag froze every button).
-  const ingestRef = useRef<Promise<string | null> | null>(null);
+  // "+ keepsake": keep THIS drawing in the family's keepsake box (signed-in; no second upload) — the same
+  // action + toast as the create page's little heart (useKeepDrawing)
+  const { keep: keepDrawing, keeping, kept } = useKeepDrawing();
 
   const subtotal = basketSubtotal(items);
   const count = basketCount(items);
 
-  // Ingest the upload server-side once, so add-to-basket + render have a real asset.
-  // Concurrent callers share the SAME in-flight ingest (no double-upload, no freeze).
-  const ensureAsset = useCallback(async (): Promise<string | null> => {
-    if (upload?.assetId) return upload.assetId;
-    if (!upload) return null;
-    if (ingestRef.current) return ingestRef.current; // an ingest is already running — reuse it
-    const run = (async (): Promise<string | null> => {
-      try {
-        const blob = await fetch(upload.dataUrl).then((r) => r.blob());
-        const res = await uploadGuestImage(blob, upload.name || 'drawing.png', { termsAccepted: true });
-        if (res.ok && res.assetId) {
-          applyIngested(res.assetId, res.trimmed);
-          return res.assetId;
-        }
-        toast(res.blocked ? 'we couldn’t use that image — try another' : res.tooMany ? TOO_MANY_COPY : 'hmm, that didn’t work — try again');
-        return null;
-      } catch {
-        // e.g. a too-large upload or a network blip — surface it, never throw silently
-        toast('that didn’t upload — try again, or a smaller image');
-        return null;
-      }
-    })();
-    ingestRef.current = run;
-    try {
-      return await run;
-    } finally {
-      ingestRef.current = null;
-    }
-  }, [upload]);
-
-  const keepDrawing = async () => {
-    if (!guardUpload() || keeping) return;
-    setKeeping(true);
-    try {
-      const id = await ensureAsset();
-      if (!id) return;
-      const res = await keepUploadAction(id);
-      if (res.needsAuth) {
-        // keeping needs an account (the parent controls it): sign in, then we finish the keep —
-        // the drawing comes back on screen, and the server keeps it whichever device they sign in on
-        if (upload) await savePendingKeep({ ...upload, assetId: id });
-        toast('a quick sign-in and it’s kept');
-        router.push(`/login?next=${encodeURIComponent('/start-creating?resume=keep')}&keep=${encodeURIComponent(id)}`);
-        return;
-      }
-      if (res.ok) {
-        setKeptId(id);
-        // remembered with the drawing, so leaving the create flow doesn't let it go
-        const u = useUpload.getState().upload;
-        if (u?.assetId === id) useUpload.getState().setUpload({ ...u, kept: true });
-      }
-      toast(res.ok ? 'kept in your keepsake box ♥' : 'couldn’t keep that one — try again');
-    } finally {
-      setKeeping(false);
-    }
-  };
+  // Ingest the upload server-side once, so add-to-basket + render have a real asset. Every caller shares
+  // the SAME in-flight ingest (no double-upload, no freeze) — see ensureUploadAsset.
+  const ensureAsset = useCallback((): Promise<string | null> => ensureUploadAsset(), []);
 
   const guardUpload = (): boolean => {
     if (!upload) {
@@ -215,7 +156,7 @@ export function FlowCatalogue({
       return;
     }
     if (!guardUpload()) return;
-    if (!upload?.assetId && !ingestRef.current) toast('adding to your basket…'); // first add ingests — show it's working
+    if (!upload?.assetId && !isIngesting()) toast('adding to your basket…'); // first add ingests — show it's working
     const assetId = await ensureAsset();
     if (!assetId) return;
     defId = basketLineId(def.sku, design(assetId));
@@ -237,7 +178,7 @@ export function FlowCatalogue({
 
   const customize = async (p: CatalogueProduct) => {
     if (!guardUpload()) return;
-    if (!upload?.assetId && !ingestRef.current) toast('getting it ready…');
+    if (!upload?.assetId && !isIngesting()) toast('getting it ready…');
     const assetId = await ensureAsset();
     // carry the DEV curation view (?all=1) through, so a hidden product can be tried end to end
     // (inert in production — the server refuses includeHidden there)
@@ -486,11 +427,11 @@ export function FlowCatalogue({
         ) : null}
         <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">
           {upload ? (
-            <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>
+            <Button variant="keepOutline" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => void keepDrawing()} disabled={keeping || kept}>
               <Icon icon={IconHeartPlus} size={16} /> {kept ? 'kept ♥' : keeping ? 'keeping…' : '+ keepsake'}
             </Button>
           ) : null}
-          <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); }}>
+          <Button variant="secondary" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => { useUpload.getState().resetUpload(); router.push('/start-creating'); scrollToTopNow(); }}>
             create another
           </Button>
           <Button variant="design" size="lg" className="whitespace-nowrap !px-3 sm:flex-1" onClick={() => setWhoMode('share')} disabled={items.length === 0}>

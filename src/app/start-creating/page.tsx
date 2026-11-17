@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowBackUp, IconCamera, IconCircleCheck, IconLock, IconPencil, IconRefresh, IconSparkles, IconUpload } from '@tabler/icons-react';
+import { IconArrowBackUp, IconCamera, IconCircleCheck, IconHeartCheck, IconHeartPlus, IconLock, IconPencil, IconRefresh, IconSparkles, IconUpload } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
@@ -29,6 +29,7 @@ import { ChosenProduct } from '@/ui/components/ChosenProduct';
 import { SeeCollectionPill } from '@/ui/components/SeeCollectionPill';
 import { StartFromKeepsake } from '@/ui/components/StartFromKeepsake';
 import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
+import { useKeepDrawing } from '@/ui/components/useKeepDrawing';
 
 const TOO_MANY = 'that’s a lot of pictures for now — try again in a little while';
 
@@ -36,6 +37,7 @@ export default function StartCreatingPage() {
   const upload = useUpload((s) => s.upload);
   const setCutout = useUpload((s) => s.setCutout);
   const [removingBg, setRemovingBg] = useState(false);
+  const { keep: keepNow, keeping, kept } = useKeepDrawing();
   // the cut-out came from the one-tap button (so undoing it can't throw away work done in the Studio) —
   // kept WITH the drawing, so it's still there after customize / the Studio / anywhere and back
   const oneTap = upload?.cutout?.oneTap === true;
@@ -92,10 +94,11 @@ export default function StartCreatingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Back from saving in the studio, on a PHONE: open at "your masterpiece, made real" — the loader
-  // right there, the range arriving under it — instead of at the top (the drawing + its buttons stay
-  // just above). Desktop shows both side by side already, so it stays put. Re-run once the drawing
-  // above has loaded (its height moves the heading), then hand the scroll back to the shopper.
+  // Back from saving in the studio: open at "your masterpiece, made real" — the loader right there, the
+  // range arriving under it — not at the top of the page (founder, 17 Nov: the one page change that
+  // doesn't open at the top — ScrollToTop). On a phone that means scrolling down past the drawing + its
+  // buttons; from md up the range already sits at the top beside the drawing, so it stays put. Re-run
+  // once the drawing above has loaded (its height moves the heading), then hand the scroll back.
   const rangeRef = useRef<HTMLDivElement>(null);
   const toRangePending = useRef(false);
   const toRange = () => {
@@ -375,9 +378,26 @@ export default function StartCreatingPage() {
                 </div>
               </div>
               <div className="mt-5 flex w-full flex-col gap-2.5">
-                <Button variant="designOutline" size="lg" className="w-full" onClick={() => fileRef.current?.click()}>
-                  change image
-                </Button>
+                {/* the quick keep (founder, 17 Nov): a little heart beside "change image" — the very same
+                    keep + toast as "+ keepsake" under the range (useKeepDrawing), without scrolling down */}
+                <div className="flex gap-2.5">
+                  <Button
+                    variant="keepOutline"
+                    size="lg"
+                    className="aspect-square shrink-0 !px-0"
+                    onClick={() => void keepNow()}
+                    disabled={keeping || kept}
+                    aria-busy={keeping}
+                    aria-label={kept ? 'kept in your keepsake box' : keeping ? 'keeping…' : 'keep this in your keepsake box'}
+                    title={kept ? 'kept ♥' : 'keep it'}
+                    data-testid="quick-keep"
+                  >
+                    <Icon icon={kept ? IconHeartCheck : IconHeartPlus} size={22} />
+                  </Button>
+                  <Button variant="designOutline" size="lg" className="min-w-0 flex-1" onClick={() => fileRef.current?.click()}>
+                    change image
+                  </Button>
+                </div>
                 {/* the one-tap magic edit leads; the Studio is the advanced editor */}
                 {edited && !oneTap ? null : (
                 <Button

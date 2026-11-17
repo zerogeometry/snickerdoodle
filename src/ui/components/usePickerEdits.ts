@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { keepUploadAction } from '@/app/actions/keep';
+import { keepPhotoFile } from '@/lib/keepPhoto';
 import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
 import { putBackgroundBackAction, removeBackgroundAction } from '@/app/actions/magic';
-import { uploadGuestImage } from '@/lib/guestUpload';
-import { normalizeUpload, toast, useUpload, type Upload } from '@/lib/store';
+import { toast, useUpload, type Upload } from '@/lib/store';
 import { toSessionUpload } from '@/lib/uploadSession';
 
 /**
@@ -290,21 +290,9 @@ export function usePickerEdits(opts: {
     setUploading({ done: 0, of: list.length });
     let kept = 0;
     for (const f of list) {
-      try {
-        const raw = await new Promise<string>((resolve, reject) => {
-          const r = new FileReader();
-          r.onload = () => resolve(String(r.result));
-          r.onerror = reject;
-          r.readAsDataURL(f);
-        });
-        const { dataUrl, name } = await normalizeUpload(raw, f.name);
-        const blob = await fetch(dataUrl).then((r) => r.blob());
-        const up = await uploadGuestImage(blob, name, { termsAccepted: true });
-        if (up.ok && up.assetId && (await keepUploadAction(up.assetId)).ok) kept++;
-        else if (up.blocked) toast('we couldn’t use one of those images');
-      } catch {
-        /* counted below */
-      }
+      const res = await keepPhotoFile(f); // the shared keep road (src/lib/keepPhoto.ts) — never throws
+      if (res.ok) kept++;
+      else if (res.blocked) toast('we couldn’t use one of those images');
       setUploading((u) => (u ? { ...u, done: u.done + 1 } : u));
     }
     setUploading(null);

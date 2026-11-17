@@ -1,6 +1,6 @@
 'use client';
 
-import { IconArrowRight, IconCake, IconEye, IconGift, IconHeart, IconLock, IconMailForward, IconPencil, IconPlus, IconShoppingBag, IconSparkles, IconUsers, IconWand, IconX } from '@tabler/icons-react';
+import { IconArrowRight, IconCake, IconEye, IconGift, IconHeart, IconHeartPlus, IconLock, IconMailForward, IconPencil, IconPlus, IconShoppingBag, IconSparkles, IconUser, IconUsers, IconWand, IconX } from '@tabler/icons-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -18,7 +18,9 @@ import { AddFamilyMemberModal } from '@/ui/modals/AddFamilyMemberModal';
 import { CreateGiftLinkModal } from '@/ui/modals/CreateGiftLinkModal';
 import { PerAssetVisibilityModal } from '@/ui/modals/PerAssetVisibilityModal';
 import { toast } from '@/lib/store';
-import { deleteKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
+import { deleteKeepsakeAction, fileKeepsakeAction, setAssetVisibilityAction } from '@/app/actions/keep';
+import { FileKeepsakeModal } from '@/ui/modals/FileKeepsakeModal';
+import { KeepPhotos } from '@/ui/components/KeepPhotos';
 import { leaveFamilyAction, renameFamilyAction, revokeGiftBatchAction, revokeGiftLinkAction } from '@/app/actions/family';
 import { deleteSavedDesignAction } from '@/app/actions/designs';
 import { gbp } from '@/lib/store';
@@ -72,6 +74,7 @@ function monthLabel(iso: string): string {
 export function HomeView({ data, joined = false, offerPasskey = false }: { data: HomeData; joined?: boolean; offerPasskey?: boolean }) {
   const router = useRouter();
   const [active, setActive] = useState<HomeKeepsake | null>(null);
+  const [filing, setFiling] = useState<HomeKeepsake | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
   const nowForSeason = useNow();
@@ -197,6 +200,23 @@ export function HomeView({ data, joined = false, offerPasskey = false }: { data:
   };
   const childName = new Map(data.children.map((c) => [c.id, c.firstName]));
 
+  // "whose corner?" — the person button: only the corners the server says this person may file it in
+  const fileTo = async (childId: string | null): Promise<boolean> => {
+    if (!filing) return false;
+    const res = await fileKeepsakeAction(filing.id, childId);
+    if (!res.ok) return false;
+    setFiling(null);
+    toast(childId ? `filed in ${childName.get(childId) ?? 'their'}’s corner ♥` : 'moved to “not yet filed”');
+    router.refresh();
+    return true;
+  };
+  const filingOptions = (k: HomeKeepsake) => {
+    if (!k.filing) return [];
+    const allowed = new Set(k.filing.childIds);
+    const kids = data.children.filter((c) => allowed.has(c.id)).map((c) => ({ id: c.id as string | null, firstName: c.firstName as string | null, yours: c.yours }));
+    return k.filing.canUnfile ? [...kids, { id: null, firstName: null, yours: true }] : kids;
+  };
+
   const renderTile = (k: HomeKeepsake, i: number) => {
     const isNewest = k.id === newestId && highlightNew;
     const actions = keepsakeTileActions(k, data.canBuy);
@@ -207,9 +227,14 @@ export function HomeView({ data, joined = false, offerPasskey = false }: { data:
         ref={isNewest ? newestRef : undefined}
         className={`relative ${isNewest ? 'rounded-2xl ring-4 ring-honey ring-offset-2 ring-offset-oat' : ''}`}
       >
-        {/* eye + basket stickers, top-right — always shown (never hover-only), 44px hit areas */}
-        {actions.whoCanSee || actions.makeSomething ? (
+        {/* person + eye + basket stickers, top-right — always shown (never hover-only), 44px hit areas */}
+        {actions.fileIt || actions.whoCanSee || actions.makeSomething ? (
           <div className="absolute -right-1.5 -top-2 z-10 flex gap-2">
+            {actions.fileIt ? (
+              <button type="button" onClick={() => setFiling(k)} aria-label={`file ${name} in a little one’s corner`} className={TILE_ACTION} data-testid="file-keepsake">
+                <Icon icon={IconUser} size={17} />
+              </button>
+            ) : null}
             {actions.whoCanSee ? (
               <button type="button" onClick={() => setActive(k)} aria-label={`who can see ${name}`} className={TILE_ACTION}>
                 <Icon icon={IconEye} size={17} />
@@ -401,9 +426,21 @@ export function HomeView({ data, joined = false, offerPasskey = false }: { data:
 
           {/* Keepsakes (real, DB-backed, signed-URL images) */}
           <section style={{ ['--i' as string]: 3 }} className="pop-in border-t border-line px-6 py-6">
-            <p className="flex items-center gap-2 font-display text-lg font-semibold text-cocoa">
-              <Icon icon={IconHeart} size={18} className="text-cinnamon" /> Your keepsakes
-            </p>
+            {/* desktop: "add keepsake" on the right (founder, 17 Nov) — phones have the tab bar's "keep" */}
+            <div className="flex items-center justify-between gap-3">
+              <p className="flex items-center gap-2 font-display text-lg font-semibold text-cocoa">
+                <Icon icon={IconHeart} size={18} className="text-cinnamon" /> Your keepsakes
+              </p>
+              <KeepPhotos>
+                {(pick, busy) => (
+                  <div className="hidden md:block">
+                    <Button size="md" className="whitespace-nowrap" onClick={pick} disabled={busy} aria-busy={busy} data-testid="add-keepsake">
+                      <Icon icon={IconHeartPlus} size={18} /> {busy ? 'keeping…' : 'add keepsake'}
+                    </Button>
+                  </div>
+                )}
+              </KeepPhotos>
+            </div>
 
             {data.keepsakes.length === 0 ? (
               <div className="mt-4 flex flex-col items-center justify-center rounded-2xl border border-dashed border-line bg-paper-2 px-6 py-12 text-center">
@@ -643,6 +680,15 @@ export function HomeView({ data, joined = false, offerPasskey = false }: { data:
         widest={active?.widestChoice ?? 'EXTENDED'}
         addedByName={active?.addedByName ?? null}
         childParentName={active?.childParentName ?? null}
+      />
+      <FileKeepsakeModal
+        open={!!filing}
+        onClose={() => setFiling(null)}
+        image={(filing?.thumbUrl ?? filing?.imageUrl) ?? undefined}
+        current={filing?.childSubjectId ?? null}
+        options={filing ? filingOptions(filing) : []}
+        canAddLittleOnes={data.isOwner}
+        onSave={fileTo}
       />
       <AddFamilyMemberModal open={addOpen} onClose={() => setAddOpen(false)} />
       <CreateGiftLinkModal

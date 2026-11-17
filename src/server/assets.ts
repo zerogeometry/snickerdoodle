@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { assets, auditRecords, memberships, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
+import { assets, auditRecords, children, memberships, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { assetPrefix, deleteAllUnderPrefix, deleteObjectConfirmed, presignDownload } from '@/storage';
 import {
   AuthzError,
@@ -7,13 +7,15 @@ import {
   canDeleteAsset,
   canEditAsset,
   effectiveVisibility,
+  planFiling,
   planVisibilityChange,
+  type ChildRef,
   canViewAsset,
   type AssetRef,
   type Membership,
   type ViewerContext,
 } from '@/authz';
-import type { VisibilityTier } from '@/domain/types';
+import { VISIBILITY_TIERS, type VisibilityTier } from '@/domain/types';
 import type { DbHandle } from './db';
 import { recordErasure } from './erasureLedger';
 import { forgetAssetPreviews } from './print/previewCache';
@@ -108,7 +110,9 @@ export async function adoptEphemeralDraft(
   familyId: string,
   assetId: string,
   uploadClaims: string[],
-  opts: { keep: boolean } = { keep: true },
+  /** visibility: the adder's own first choice (D27: whoever adds it chooses) — set in the SAME write that files
+   * it, so it never shows wider for a moment. Default FAMILY (the column default). */
+  opts: { keep: boolean; visibility?: VisibilityTier } = { keep: true },
 ): Promise<void> {
   const viewer = await resolveAssetViewer(db, assetId, accountId, uploadClaims);
   await getViewableAssetOrThrow(db, assetId, viewer); // gate: claim holder (draft) or owner
@@ -128,6 +132,8 @@ export async function adoptEphemeralDraft(
         // parent has chosen): filed into the family so the order can use it, but still on the
         // clock — the post-purchase "keep it?" choice decides (see keepChoice.ts).
         ...(opts.keep ? { keptInHome: true, purgeAfter: null } : {}),
+        // they ARE the adder now, so any tier is theirs to pick (planVisibilityChange: adder, no ceiling yet)
+        ...(opts.visibility && VISIBILITY_TIERS.includes(opts.visibility) ? { visibility: opts.visibility } : {}),
       })
       .where(and(eq(assets.id, assetId), eq(assets.ephemeralClaimId, row.ephemeralClaimId))); // race guard
   } else if (row.controllerAccountId !== accountId) {
@@ -253,6 +259,56 @@ export async function changeAssetVisibility(
     targetType: 'asset',
     targetId: assetId,
     metadata: { from: effectiveVisibility(ref), to: effectiveVisibility(after), by: plan.role, ...plan.patch },
+  });
+  return after;
+}
+
+/** The family's little ones as the filing rule needs them (who controls each). Server-side only. */
+export async function familyChildRefs(db: DbHandle, familyId: string): Promise<ChildRef[]> {
+  const rows = await db
+    .select({ id: children.id, familyId: children.familyId, controllerAccountId: children.controllerAccountId })
+    .from(children)
+    .where(eq(children.familyId, familyId));
+  return rows;
+}
+
+/**
+ * File a keepsake into a little one's corner, or take it out (childId null) — founder, 17 Nov 2026. Filing hands
+ * that child's parent a say (D27), so it is decided by src/authz planFiling from the row and the family's REAL
+ * children (never the client's word): only whoever added it, or — once it's in their child's corner — that
+ * child's parent. Who added it and who sees it never widen. Logged: filing changes who always sees it.
+ */
+export async function fileAsset(db: DbHandle, assetId: string, viewer: ViewerContext, childId: string | null): Promise<AssetRef & { childSubjectId: string | null }> {
+  const row = (await db.select().from(assets).where(eq(assets.id, assetId)))[0];
+  if (!row || !row.familyId) throw denied('not found');
+  const ref = { ...toAssetRef(row), childSubjectId: row.childSubjectId };
+  // seeing it comes first: a keepsake the viewer can't see is "not found" to them
+  if (!canViewAsset(ref, viewer).allowed) throw denied('not found');
+  const kids = await familyChildRefs(db, row.familyId);
+  const child = childId === null ? null : (kids.find((k) => k.id === childId) ?? null);
+  if (childId !== null && !child) throw denied('not a little one in this family');
+  const plan = planFiling(ref, viewer, child, kids);
+  if (!plan.allowed) throw denied(plan.reason);
+  if (row.childSubjectId === plan.patch.childSubjectId) return ref; // already there
+  await db.update(assets).set(plan.patch).where(eq(assets.id, assetId));
+  const after = { ...ref, ...plan.patch };
+  await db.insert(auditRecords).values({
+    familyId: row.familyId,
+    actorAccountId: viewer.accountId,
+    actorType: 'MEMBER',
+    // filing changes who ALWAYS sees it (the little one's parent) — a visibility change in all but the tier
+    event: 'ASSET_VISIBILITY_CHANGED',
+    targetType: 'asset',
+    targetId: assetId,
+    metadata: {
+      kind: 'filed',
+      fromChild: row.childSubjectId,
+      toChild: plan.patch.childSubjectId,
+      fromController: row.controllerAccountId,
+      toController: plan.patch.controllerAccountId,
+      from: effectiveVisibility(ref),
+      to: effectiveVisibility(after),
+    },
   });
   return after;
 }

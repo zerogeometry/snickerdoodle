@@ -90,6 +90,9 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
   back up to the adder's choice). The adder and that parent always see it; "Only me" on a child's
   keepsake someone else added = the adder + that parent. Resolve the adder (uploaderAccountId) and the
   parent (controllerAccountId) on the asset; decide changes with planVisibilityChange().
+- FILING into a little one's corner (D31) hands that child's parent a say, so it goes through src/authz planFiling():
+  only whoever ADDED it files it; once it's in another parent's child's corner, only that parent moves it, and only to
+  another of their own little ones. Filing never changes the originator and never widens who sees it.
 - Joining any circle (and moving into HOME) needs the joiner's own YES on the join card, stored on the
   membership (src/lib/joinConsent.ts); never a silent join. Joining home = accepting that the family
   leader is responsible for the family's keepsakes and data.

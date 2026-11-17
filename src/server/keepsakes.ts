@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
 import { and, eq, gt, inArray, lte, or } from 'drizzle-orm';
 import { assets, pendingKeeps } from '@/db/schema';
-import { adoptEphemeralDraft } from '@/server/assets';
+import { adoptEphemeralDraft, changeAssetVisibility, resolveViewerContext } from '@/server/assets';
+import { VISIBILITY_TIERS, type VisibilityTier } from '@/domain/types';
+import { narrowerTier } from '@/authz';
 import { resolveChildSubject } from '@/server/children';
 import { resolveKeepFamily } from '@/server/onboarding';
 import type { DbHandle } from './db';
@@ -25,8 +27,9 @@ export async function keepAndFileCreations(
   uploadClaims: string[],
   assetIds: string[],
   subject?: string | null,
-  /** keep:false = file for an order without keeping yet (the parent chooses after purchase). */
-  opts: { keep: boolean } = { keep: true },
+  /** keep:false = file for an order without keeping yet (the parent chooses after purchase). visibility: the
+   * adder's first choice of who sees a draft they're adopting (the keep tab's "who can see"). */
+  opts: { keep: boolean; visibility?: VisibilityTier } = { keep: true },
 ): Promise<{ familyId: string | null; childId: string | null }> {
   const ids = [...new Set((assetIds ?? []).filter((x): x is string => !!x))];
   if (ids.length === 0) return { familyId: null, childId: null };
@@ -38,7 +41,7 @@ export async function keepAndFileCreations(
   const adopted: string[] = [];
   for (const id of ids) {
     try {
-      await adoptEphemeralDraft(db, account.id, familyId, id, uploadClaims, { keep: opts.keep });
+      await adoptEphemeralDraft(db, account.id, familyId, id, uploadClaims, { keep: opts.keep, visibility: opts.visibility });
       adopted.push(id);
     } catch {
       // not ours to keep / blocked / already gone
@@ -61,8 +64,29 @@ export async function keepAndFileCreations(
  * guest draft is adopted via its claim; one they uploaded signed-in is simply marked kept. Either
  * way it's kept, off the retention clock. Returns false when it isn't theirs to keep.
  */
-export async function keepUpload(db: DbHandle, account: { id: string; name: string | null }, uploadClaims: string[], assetId: string): Promise<boolean> {
-  await keepAndFileCreations(db, account, uploadClaims, [assetId]);
+export async function keepUpload(
+  db: DbHandle,
+  account: { id: string; name: string | null },
+  uploadClaims: string[],
+  assetId: string,
+  /** visibility: who sees it, chosen BEFORE it goes in the box (the keep tab). A draft takes it as it's adopted;
+   * a picture already in the family changes through the authz plan first — and if that's refused, it isn't kept
+   * (never kept wider than they asked). */
+  opts: { visibility?: VisibilityTier } = {},
+): Promise<boolean> {
+  const visibility = opts.visibility && VISIBILITY_TIERS.includes(opts.visibility) ? opts.visibility : undefined;
+  await keepAndFileCreations(db, account, uploadClaims, [assetId], null, { keep: true, visibility });
+  if (visibility) {
+    const [now] = await db.select().from(assets).where(eq(assets.id, assetId));
+    if (!now?.familyId) return false;
+    if (narrowerTier(now.visibility, now.parentLimit) !== visibility) {
+      try {
+        await changeAssetVisibility(db, assetId, await resolveViewerContext(db, account.id, now.familyId), visibility);
+      } catch {
+        return false;
+      }
+    }
+  }
   const [row] = await db
     .update(assets)
     .set({ keptInHome: true, purgeAfter: null })

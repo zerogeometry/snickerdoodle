@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cn } from '../cn';
 import { Icon, type TablerIconComponent } from '../primitives/Icon';
+import { KeepTab } from './KeepTab';
 import { TabTrack } from './TabTrack';
 
 /**
@@ -10,14 +11,16 @@ import { TabTrack } from './TabTrack';
  * tab's icon hops (TabTrack + .tab-pill / .hop in globals.css, reduced-motion-safe). Sits above the home
  * indicator via safe-area padding.
  */
-export type Tab = { label: string; href: string; icon: TablerIconComponent };
+/** `action: 'keep'` = not a page: it opens the phone's picker to add pictures to the keepsake box (KeepTab). */
+export type Tab = { label: string; href: string; icon: TablerIconComponent; action?: 'keep' };
 
 export function BottomTabBar({ tabs, active }: { tabs: Tab[]; active: string }) {
-  const at = Math.max(0, tabs.findIndex((t) => t.label === active));
+  const at = Math.max(0, tabs.findIndex((t) => t.label === active && !t.action));
   return (
     <nav aria-label="Primary" className="pb-safe fixed inset-x-0 bottom-0 z-40 px-3.5 md:hidden">
       <TabTrack at={at} count={tabs.length}>
         {tabs.map((t, i) => {
+          if (t.action === 'keep') return <KeepTab key={t.label} label={t.label} />;
           const on = i === at;
           return (
             <Link
