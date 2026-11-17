@@ -225,6 +225,7 @@ export const PUBLIC_TRUST_PAGES: ReadonlySet<string> = new Set([
   '/trust/privacy/draw',
   '/trust/cookies',
   '/trust/terms',
+  '/trust/terms/draw',
   '/trust/family-promise',
   '/trust/delete-account',
   '/help',

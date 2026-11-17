@@ -31,7 +31,8 @@ export default function TermsPage() {
           Snickerdoodle is a service operated by <strong>Launch Mode Ltd</strong> (company number {COMPANY.companyNumber}, registered in
           England &amp; Wales, registered office {COMPANY_ADDRESS}). These terms are the agreement between you and us when you
           use the service. By uploading a drawing or placing an order you accept them. How we handle personal
-          information is set out in our <Link href="/trust/privacy">Privacy Notice</Link>.
+          information is set out in our <Link href="/trust/privacy">Privacy Notice</Link>. Snickerdoodle Draw, our
+          drawing app, has its own short <Link href="/trust/terms/draw">terms</Link>.
         </p>
 
         <h2>2. Uploading a drawing — what you allow us to do</h2>
