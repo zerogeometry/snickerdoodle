@@ -29,6 +29,7 @@ import { UploadSession } from '@/ui/components/UploadSession';
 import { ScreeningNotice } from '@/ui/components/ScreeningNotice';
 import { FreshBuild } from '@/ui/components/FreshBuild';
 import { MotionTaps } from '@/ui/components/MotionTaps';
+import { ScrollToTop } from '@/ui/components/ScrollToTop';
 
 /** Metadata per request, so the favicons and share card wear the Santa hat in the Christmas season. */
 export function generateMetadata(): Metadata {
@@ -75,6 +76,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         >
           Skip to content
         </a>
+        <ScrollToTop />
         <UploadSession />
         {/* a tab left open across an update moves onto the new build when the parent comes back to it */}
         <FreshBuild build={process.env.APP_BUILD ?? ''} />
