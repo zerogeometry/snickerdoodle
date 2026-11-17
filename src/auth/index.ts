@@ -8,6 +8,7 @@ import { newSignInCode, storeSignInCode } from './signInCode';
 import { inviterForSignInLink } from '@/server/invites';
 import { getDb } from '@/db/client';
 import { clientIp, LIMITS, rateLimitAll } from '@/server/rateLimit';
+import { SESSION_POLICY } from './sessionPolicy';
 
 /**
  * Passwordless magic-link auth (Auth.js v5) over our `accounts` table.
@@ -49,7 +50,7 @@ const magicLink: EmailConfig = {
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: DrizzleAccountsAdapter(),
-  session: { strategy: 'database' },
+  session: SESSION_POLICY,
   trustHost: true,
   // a used, expired or mistyped link or code lands back on our own sign-in card, never Auth.js's plain page
   pages: { signIn: '/login', verifyRequest: '/login?check=1', error: '/login' },

@@ -147,7 +147,7 @@ Lawful-basis abbreviations: **Contract** = Art 6(1)(b); **LO** = legal obligatio
 | Promo/partner codes, commission per order | Partner (name), buyer | Operator | `promo_codes`, `orders.partner_commission_pence`; referral `owner_account_id`, `account_credits` | Not defined | Contract with partner; LI (attribution) |
 | ML-operations ledger | Account | System | `ml_operations` | Not defined | LI (cost/abuse cap) |
 | Audit records | All | System | `audit_records` (append-only trigger) | **Not defined** — and append-only conflicts with erasure of personal data in `metadata` (R-18) | LI / LO (accountability, Art 5(2)) |
-| Upload-claim cookie; session cookie | Visitor | System | Browser | 30 days (claim) / session | Strictly necessary (PECR reg 6 exemption) |
+| Upload-claim cookie; session cookie | Visitor | System | Browser | 30 days (claim) / sign-in: 1 year from the last visit, ended at once by sign-out, member removal or account closure (founder, 17 Nov 2026) | Strictly necessary (PECR reg 6 exemption) |
 | Server logs | All | System | Hosting logs (infra not yet built) | *Intended 30–90 days* | LI (security) |
 
 **Not collected:** child surname (screened out of name fields — but see R-19 for leakage routes), child account, location (EXIF/GPS stripped), biometrics, special-category data, payment card data.
