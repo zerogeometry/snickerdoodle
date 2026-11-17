@@ -105,7 +105,6 @@ describe.skipIf(!DB || !S3)('guest ephemeral upload + claim authz (integration)'
       placeOrder(db, {
         items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: r.assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
         account: { id: ids.samId },
-        joinProvenance: null,
       }),
     ).rejects.toBeInstanceOf(AuthzError);
   });
@@ -132,7 +131,6 @@ describe.skipIf(!DB || !S3)('guest ephemeral upload + claim authz (integration)'
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: r.assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     expect(res.ok).toBe(true);
     const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));

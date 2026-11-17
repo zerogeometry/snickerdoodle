@@ -228,7 +228,7 @@ export const memberships = pgTable(
     inviteId: uuid('invite_id').references(() => invites.id),
     joinedAt: timestamp('joined_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
-    // When the one-time join saving was spent on an order (null = still available).
+    // When the one-time join saving was spent on an order (the saving was retired on 17 Nov 2026, D30; kept for history).
     joinSavingConsumedAt: timestamp('join_saving_consumed_at', { withTimezone: true }),
     /** The joiner's own "yes" on the join card (D27): which wording (src/lib/joinConsent.ts) and when. Null for the
      * leader (it's their family) and for members who joined before the card existed. Updated on moving into home. */
@@ -1029,10 +1029,10 @@ export const promoCodes = pgTable(
     partnerEmail: text('partner_email'),
     /** PTA class codes roll up to one partner (partnerName) — e.g. "Year 2". */
     classLabel: text('class_label'),
-    /** A parent's personal REFERRAL code: whose it is (can't use your own; rewards go to them). */
+    /** A parent's personal REFERRAL code (retired 17 Nov 2026 — refused at checkout): whose it was. */
     ownerAccountId: uuid('owner_account_id').references(() => accounts.id, { onDelete: 'cascade' }),
-    /** Only valid on the buyer's first paid order. (Creator, referral + free-card codes always are:
-     * codeTerms, src/pricing/promo.ts.) */
+    /** Only valid on the buyer's first paid order. (Creator codes always are: codeTerms, src/pricing/promo.ts.
+     * A free card itself only ever comes off a signed-in first order, whatever the code.) */
     firstOrderOnly: boolean('first_order_only').notNull().default(false),
     startsAt: timestamp('starts_at', { withTimezone: true }),
     endsAt: timestamp('ends_at', { withTimezone: true }),

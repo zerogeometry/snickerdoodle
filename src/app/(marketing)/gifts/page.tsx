@@ -8,13 +8,13 @@ import { ExampleWall } from '@/ui/components/ExampleWall';
 
 export const metadata: Metadata = {
   title: 'gifts',
-  description: 'Share a ready-to-buy link so family can treat your little one — guest checkout in a tap, or join the family for 5% off.',
+  description: 'Share a ready-to-buy link so family can treat your little one — guest checkout in a tap, or join the family and never miss a birthday.',
 };
 
 const POINTS = [
   'Pick the pieces, share one private link',
   'Family checkout as a guest in under a minute',
-  "Or they join the family — 5% off, and they never miss a birthday",
+  "Or they join the family — and they never miss a birthday",
   'Ticked off the list once it’s bought — no doubling up',
 ];
 
@@ -59,7 +59,7 @@ export default function GiftsPage() {
                 <Icon icon={IconLink} size={18} /> make a gift list
               </Button>
               <span className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-green-save">
-                <Icon icon={IconUsersPlus} size={13} /> join the family for 5% off
+                <Icon icon={IconUsersPlus} size={13} /> family can join in too
               </span>
             </div>
           </div>

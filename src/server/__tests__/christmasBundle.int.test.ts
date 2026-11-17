@@ -54,7 +54,7 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
   };
 
   const order = async (productKey: string, bundle: unknown, qty = 1) => {
-    const res = await placeOrder(db, { items: [{ productKey, qty, bundle }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey, qty, bundle }], account: { id: ids.samId } });
     await track(res.ref);
     expect(res.ok).toBe(true);
     const [o] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
@@ -119,20 +119,20 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
   it('no placemat drawing, or a size we don’t sell → refused before anything is written', async () => {
     const mineNow = async () => (await db.select({ id: orders.id }).from(orders).where(eq(orders.accountId, ids.samId))).length;
     const before = await mineNow();
-    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { ornaments: [] } }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/placemats/);
-    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle-for4', qty: 1 }], account: { id: ids.samId }, joinProvenance: null })).rejects.toThrow(/placemats/);
+    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { ornaments: [] } }], account: { id: ids.samId } })).rejects.toThrow(/placemats/);
+    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle-for4', qty: 1 }], account: { id: ids.samId } })).rejects.toThrow(/placemats/);
     const mine = await mk();
-    expect(await placeOrder(db, { items: [{ productKey: 'christmasBundle-for6', qty: 1, bundle: { placemat: { assetId: mine.id } } }], account: { id: ids.samId }, joinProvenance: null })).toEqual({ ok: false, reason: 'empty' });
+    expect(await placeOrder(db, { items: [{ productKey: 'christmasBundle-for6', qty: 1, bundle: { placemat: { assetId: mine.id } } }], account: { id: ids.samId } })).toEqual({ ok: false, reason: 'empty' });
     expect(await mineNow()).toBe(before);
   });
 
   it('every drawing passes the authz gate at ORDER — a stranger’s, even on one ornament or the coasters, is denied', async () => {
     const mine = await mk();
     await expect(
-      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, ornaments: [{ assetId: ids.assetBloomFamily }] } }], account: { id: ids.samId }, joinProvenance: null }),
+      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, ornaments: [{ assetId: ids.assetBloomFamily }] } }], account: { id: ids.samId } }),
     ).rejects.toBeInstanceOf(AuthzError);
     await expect(
-      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, coaster: { assetId: ids.assetBloomFamily } } }], account: { id: ids.samId }, joinProvenance: null }),
+      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, coaster: { assetId: ids.assetBloomFamily } } }], account: { id: ids.samId } }),
     ).rejects.toBeInstanceOf(AuthzError);
   });
 
@@ -140,13 +140,13 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
     const mine = await mk();
     const flagged = await mk({ moderationStatus: 'FLAGGED' });
     await expect(
-      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, ornaments: [{ assetId: flagged.id }] } }], account: { id: ids.samId }, joinProvenance: null }),
+      placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id }, ornaments: [{ assetId: flagged.id }] } }], account: { id: ids.samId } }),
     ).rejects.toThrow(/cleared for printing/);
   });
 
   it('a guest can’t order one (a personalised order needs the controlling parent)', async () => {
     const mine = await mk();
-    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id } } }], account: null, joinProvenance: null })).rejects.toThrow(/signed in/);
+    await expect(placeOrder(db, { items: [{ productKey: 'christmasBundle', qty: 1, bundle: { placemat: { assetId: mine.id } } }], account: null })).rejects.toThrow(/signed in/);
   });
 
   it('add-to-basket: every drawing authz-checked; buying access is enough; the size priced by the server', async () => {
@@ -180,7 +180,7 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
     for (const sku of BUNDLE_ONLY_SKUS) expect(skus).not.toContain(sku);
     expect(all.find((p) => p.key === 'placemat')?.variants.map((v) => v.sku)).toEqual(['placemat']);
     // a hand-crafted order for a bundle-only pack is dropped — nothing to charge
-    const res = await placeOrder(db, { items: [{ productKey: 'placemat-packof1', qty: 5 }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey: 'placemat-packof1', qty: 5 }], account: { id: ids.samId } });
     expect(res).toEqual({ ok: false, reason: 'empty' });
   });
 
@@ -189,7 +189,7 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
     expect(catalogue.christmasEveBundle).toBeUndefined();
     const all = await loadCatalogue(db, { includeHidden: true });
     expect(all.some((p) => p.key === 'christmasEveBundle')).toBe(false);
-    const res = await placeOrder(db, { items: [{ productKey: 'christmasEveBundle', qty: 1 }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey: 'christmasEveBundle', qty: 1 }], account: { id: ids.samId } });
     expect(res).toEqual({ ok: false, reason: 'empty' });
   });
 });

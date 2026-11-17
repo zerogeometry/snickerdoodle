@@ -3,7 +3,6 @@
 import { getDb } from '@/db/client';
 import { resolveViewerContext } from '@/server/assets';
 import { createGiftLink, NothingToShowError, placeGiftLinkOrder, sendGiftLinks } from '@/server/giftLinks';
-import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { ensureHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 import { LIMITS, rateLimit } from '@/server/rateLimit';
@@ -49,7 +48,7 @@ export async function createOpenGiftLinkAction(input: {
 
 /**
  * Check out a gift link's frozen snapshot — guest or signed-in. Everything (lines,
- * keepsakes, price, join saving) is resolved server-side from the token; the client
+ * keepsakes, price) is resolved server-side from the token; the client
  * sends only the token. Returns a Stripe Checkout URL (or a placed ref in dev).
  */
 export async function checkoutGiftLinkAction(
@@ -63,12 +62,10 @@ export async function checkoutGiftLinkAction(
 }> {
   if (typeof token !== 'string' || !token) return { ok: false, reason: 'unavailable' };
   const account = await getCurrentAccount();
-  const joinProvenance = account ? await resolveSessionJoinProvenance() : null;
   try {
     const res = await placeGiftLinkOrder(getDb(), {
       token,
       account: account ? { id: account.id, name: account.name, email: account.email } : null,
-      joinProvenance,
       fromName: typeof fromName === 'string' ? fromName : null,
     });
     if (res.unavailable) return { ok: false, reason: 'unavailable' };

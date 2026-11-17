@@ -73,7 +73,6 @@ describe.skipIf(!DB || !S3)('pattern base colour — order → print file (integ
         { productKey: 'kidsTee', qty: 1, artwork: { assetId, transform: tf, ground: '#c8402a' } }, // a garment prints on its own colour: none
       ],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     expect(res.ok).toBe(true);
     refs.push(res.ref!);

@@ -829,7 +829,7 @@ describe.skipIf(!DB)('Snickerdoodle Draw: linking and the phone’s key (integra
     };
     const status = async (id: string) => (await db.select({ s: assets.moderationStatus }).from(assets).where(eq(assets.id, id)))[0]!.s;
     const orderIt = (assetId: string, accountId = ids.samId) =>
-      placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }], account: { id: accountId }, joinProvenance: null });
+      placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }], account: { id: accountId } });
 
     it('not checked yet (PENDING): the rest of the family can’t see it, and the app’s answer never says why', async () => {
       const id = await keepOne();

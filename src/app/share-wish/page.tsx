@@ -238,7 +238,7 @@ export default function ShareWishPage() {
                 buy from. No passwords — just a one-tap magic link.
               </p>
               <ul className="mt-3 space-y-1.5 text-[13px] text-ink-soft">
-                {['Your creations, kept safe & private', 'A ready-to-buy link to share', 'Family can join & save 5%'].map((b) => (
+                {['Your creations, kept safe & private', 'A ready-to-buy link to share', 'Family can join in too'].map((b) => (
                   <li key={b} className="flex items-center gap-2">
                     <Icon icon={IconCheck} size={14} className="text-green-save" /> {b}
                   </li>

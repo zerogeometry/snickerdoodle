@@ -8,7 +8,7 @@ export type PromoRefusal = 'unknown' | 'not-started' | 'expired' | 'used-up' | '
 export type PromoResolution = { ok: true; rule: PromoRule } | { ok: false; reason: PromoRefusal };
 
 /** Who's buying, server-resolved: the signed-in account, or a guest's own email (never a client claim
- * about anyone else). Personal referral codes are checked against it. */
+ * about anyone else). First-order codes, and a creator's own code, are checked against it. */
 export type PromoBuyer = { accountId: string | null; email?: string | null };
 
 /**
@@ -20,6 +20,30 @@ export const PROMO_HOLD_MS = 60 * 60 * 1000;
 export const CHECKOUT_SESSION_TTL_SEC = PROMO_HOLD_MS / 1000 - 60;
 
 const PAID = ['PAID', 'FULFILLING', 'SHIPPED'] as const;
+
+/**
+ * The shop's own welcome (founder, 17 Nov 2026): ONE greetings card free on a signed-in buyer's FIRST
+ * paid order — and no other welcome. It's a real code row (migration 0059), first-order-only, so it
+ * counts, reports and can be switched off on /admin/codes like any code; checkout applies it by itself
+ * when no other code is entered. The card only comes off with the rest of an order that still clears
+ * the margin floor (src/pricing/promo.ts), never on its own.
+ */
+export const WELCOME_CARD_CODE = 'FIRSTCARD';
+
+let welcomeCodeChecked = false;
+/**
+ * Make sure the welcome code's row exists (migration 0059 adds it; on a brand-new database that insert has to
+ * be skipped — see the migration). Once per process; never re-adds or re-enables a code switched off on
+ * /admin/codes (ON CONFLICT DO NOTHING).
+ */
+export async function ensureWelcomeCode(db: DbHandle): Promise<void> {
+  if (welcomeCodeChecked) return;
+  await db
+    .insert(promoCodes)
+    .values({ code: WELCOME_CARD_CODE, kind: 'FREE_CARD', value: 0, minSpendPence: 0, commissionBps: 0, firstOrderOnly: true, active: true })
+    .onConflictDoNothing({ target: promoCodes.code });
+  welcomeCodeChecked = true;
+}
 
 /** A guest's email as they typed it — trimmed, lowercased, and only if it looks like one. */
 export function normaliseBuyerEmail(raw: unknown): string | null {
@@ -52,7 +76,7 @@ async function usesOf(db: DbHandle | Tx, codeId: string, now: Date, buyer: Promo
   return count?.n ?? 0;
 }
 
-/** Is this buyer the code's own partner — a referral code's owner, or a creator by their email? */
+/** Is this buyer the code's own partner — a (retired) referral code's owner, or a creator by their email? */
 async function isOwnCode(db: DbHandle | Tx, row: typeof promoCodes.$inferSelect, buyer: PromoBuyer | null | undefined): Promise<boolean> {
   const email = buyer?.email?.toLowerCase() ?? null;
   if (row.partnerEmail && email && row.partnerEmail.toLowerCase() === email) return true;
@@ -94,7 +118,8 @@ export async function resolvePromo(
   const code = normalisePromoCode(raw);
   if (!code) return { ok: false, reason: 'unknown' };
   const [row] = await db.select().from(promoCodes).where(and(eq(promoCodes.code, code), eq(promoCodes.active, true)));
-  if (!row) return { ok: false, reason: 'unknown' };
+  // parents' personal referral codes are retired (17 Nov 2026): they no longer give or earn anything
+  if (!row || row.partnerType === 'REFERRAL') return { ok: false, reason: 'unknown' };
   if (row.startsAt && row.startsAt > now) return { ok: false, reason: 'not-started' };
   if (row.endsAt && row.endsAt <= now) return { ok: false, reason: 'expired' };
   if (row.maxRedemptions !== null && (await usesOf(db, row.id, now, buyer)) >= row.maxRedemptions) return { ok: false, reason: 'used-up' };
@@ -107,13 +132,51 @@ export async function resolvePromo(
 }
 
 /**
+ * May this buyer have the free first card? Only a SIGNED-IN buyer ("for signing up and placing their first
+ * order"), and only when neither their account nor its email has a paid order yet. Server-resolved, never
+ * a client claim — the pricing engine takes it as `freeCardEligible` (fail-closed).
+ */
+export async function freeCardEligible(db: DbHandle | Tx, buyer: PromoBuyer | null | undefined): Promise<boolean> {
+  if (!buyer?.accountId) return false;
+  return !(await hasPaidOrderBefore(db, { accountId: buyer.accountId, email: buyer.email ?? null }));
+}
+
+export type CheckoutPromo = {
+  /** The rule to price with (null: none). */
+  rule: PromoRule | null;
+  /** A code the customer TYPED that can't be used at all. */
+  refusal?: PromoRefusal;
+  /** The shop's welcome code, applied by itself (the customer typed nothing). */
+  auto: boolean;
+  /** Server-decided free-card eligibility, for the pricing engine. */
+  cardEligible: boolean;
+};
+
+/**
+ * The code a checkout prices with: what the customer typed (a partner's or a campaign code), or — when they
+ * typed nothing and may have it — the shop's welcome free card, by itself. Used by the quote AND by order
+ * placement, so what the basket shows is what the order charges.
+ */
+export async function resolveCheckoutPromo(db: DbHandle, typed: string | null | undefined, buyer: PromoBuyer, now = new Date()): Promise<CheckoutPromo> {
+  const cardEligible = await freeCardEligible(db, buyer);
+  if (typed && typed.trim()) {
+    const r = await resolvePromo(db, typed, now, buyer);
+    return r.ok ? { rule: r.rule, auto: false, cardEligible } : { rule: null, refusal: r.reason, auto: false, cardEligible };
+  }
+  if (!cardEligible) return { rule: null, auto: false, cardEligible };
+  await ensureWelcomeCode(db);
+  const welcome = await resolvePromo(db, WELCOME_CARD_CODE, now, buyer);
+  return { rule: welcome.ok ? welcome.rule : null, auto: welcome.ok, cardEligible };
+}
+
+/**
  * The placement-time re-check, INSIDE the transaction that writes the order: the code's row is
  * locked (FOR UPDATE) so two checkouts can't both read "one use left" — the second waits, then
  * counts the first one's open checkout. Returns why the code can no longer be used, or null.
  */
 export async function claimPromoForOrder(tx: Tx, codeId: string, buyer: PromoBuyer | null, now = new Date()): Promise<PromoRefusal | null> {
   const [row] = await tx.select().from(promoCodes).where(eq(promoCodes.id, codeId)).for('update');
-  if (!row || !row.active) return 'unknown';
+  if (!row || !row.active || row.partnerType === 'REFERRAL') return 'unknown';
   if (row.startsAt && row.startsAt > now) return 'not-started';
   if (row.endsAt && row.endsAt <= now) return 'expired';
   if (row.maxRedemptions !== null && (await usesOf(tx, row.id, now, buyer)) >= row.maxRedemptions) return 'used-up';

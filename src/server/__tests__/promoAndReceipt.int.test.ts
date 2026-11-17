@@ -78,45 +78,19 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
   };
   const frame = [{ productKey: 'framedPrint', qty: 1 }];
   const emailOf = async (accountId: string) => (await db.select({ email: accounts.email }).from(accounts).where(eq(accounts.id, accountId)))[0]!.email;
-  /** A paid order by a guest's email — so that email has had its first order. */
-  const pastOrderFor = async (email: string) => {
-    const res = await placeOrder(db, { items: frame, account: null, joinProvenance: null, buyerEmail: email });
-    return track(res.ref);
-  };
 
   // ── 07-B6 ───────────────────────────────────────────────────────────────────────────────────
-  describe('07-B6: a friend’s referral code — never your own, first order only — for guests too', () => {
+  describe('07-B6 retired (17 Nov 2026): a parent’s old referral code gives nothing, to anyone', () => {
     const referral = () => mkCode({ value: 500, minSpendPence: 3000, ownerAccountId: ids.samId, firstOrderOnly: true, partnerType: 'REFERRAL', partnerName: 'referral' });
 
-    it('a signed-out guest we can’t identify isn’t given it (the code owner checking out signed out, say)', async () => {
+    it('refused when typed — for a guest, a new guest, an account or the owner — and refused at placement too', async () => {
       const code = await referral();
-      expect(await resolvePromo(db, code.code, new Date(), { accountId: ids.samId })).toEqual({ ok: false, reason: 'own-code' });
-      expect(await resolvePromo(db, code.code, new Date(), null)).toEqual({ ok: false, reason: 'needs-buyer' });
-      expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: null })).toEqual({ ok: false, reason: 'needs-buyer' });
-    });
-
-    it('a guest is checked by their email: the owner’s own email is refused; so is an email that has already ordered', async () => {
-      const code = await referral();
-      const samEmail = await emailOf(ids.samId);
-      expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: samEmail.toUpperCase() })).toEqual({ ok: false, reason: 'own-code' });
-      const returning = `returning-${ids.nonce}@example.test`;
-      await pastOrderFor(returning);
-      expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: returning })).toEqual({ ok: false, reason: 'first-order-only' });
-      // a genuinely new guest gets it — no account wall
-      expect(await resolvePromo(db, code.code, new Date(), { accountId: null, email: `new-${ids.nonce}@example.test` })).toMatchObject({ ok: true });
-    });
-
-    it('£5 off once, not again and again: the second order by the same guest email is refused at placement', async () => {
-      const code = await referral();
-      const guest = `twice-${ids.nonce}@example.test`;
-      const r = await resolvePromo(db, code.code, new Date(), { accountId: null, email: guest });
-      if (!r.ok) throw new Error('a new guest should get the code');
-      const first = await track((await placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: r.rule, buyerEmail: guest })).ref);
-      expect(first?.status).toBe('PAID');
-      expect(first?.promoSavingPence).toBe(500);
-      // the SAME rule, replayed for the same guest (e.g. resolved before the first order was paid)
-      const again = await placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: r.rule, buyerEmail: guest });
-      expect(again).toEqual({ ok: false, reason: 'promo', promoError: 'first-order-only' });
+      const newGuest = `new-${ids.nonce}@example.test`;
+      for (const buyer of [null, { accountId: null, email: newGuest }, { accountId: ids.joId }, { accountId: ids.samId }]) {
+        expect(await resolvePromo(db, code.code, new Date(), buyer)).toEqual({ ok: false, reason: 'unknown' });
+      }
+      const rule = { id: code.id, code: code.code, kind: code.kind, value: code.value, minSpendPence: code.minSpendPence, commissionBps: 0 };
+      expect(await placeOrder(db, { items: frame, account: null, promo: rule, buyerEmail: newGuest })).toEqual({ ok: false, reason: 'promo', promoError: 'unknown' });
     });
   });
 
@@ -127,8 +101,8 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
       const a = await resolvePromo(db, once.code);
       const b = await resolvePromo(db, once.code);
       if (!a.ok || !b.ok) throw new Error('both resolve while nothing is paid');
-      const oa = await track((await placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: a.rule })).ref);
-      const rb = await placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: b.rule });
+      const oa = await track((await placeOrder(db, { items: frame, account: null, promo: a.rule })).ref);
+      const rb = await placeOrder(db, { items: frame, account: null, promo: b.rule });
       expect(rb).toEqual({ ok: false, reason: 'promo', promoError: 'used-up' });
       expect(oa?.status).toBe('PAID');
       expect(oa!.promoSavingPence).toBeGreaterThan(0);
@@ -138,7 +112,7 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
       const twice = await mkCode({ kind: 'PERCENT', value: 1000, maxRedemptions: 2 });
       const r = await resolvePromo(db, twice.code);
       if (!r.ok) throw new Error('resolves');
-      const results = await Promise.all([0, 1, 2, 3, 4].map((i) => placeOrder(db, { items: frame, account: null, joinProvenance: null, promo: r.rule, buyerEmail: `rush-${i}-${ids.nonce}@example.test` })));
+      const results = await Promise.all([0, 1, 2, 3, 4].map((i) => placeOrder(db, { items: frame, account: null, promo: r.rule, buyerEmail: `rush-${i}-${ids.nonce}@example.test` })));
       for (const res of results) await track(res.ref);
       expect(results.filter((x) => x.ok)).toHaveLength(2);
       expect(results.filter((x) => !x.ok && x.reason === 'promo' && x.promoError === 'used-up')).toHaveLength(3);
@@ -175,7 +149,6 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
     const res = await placeOrder(db, {
       items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'mug', qty: 2, artwork: { assetId: art!.id, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
       buyerEmail: await emailOf(ids.samId),
     });
     const o = (await track(res.ref))!;
@@ -203,14 +176,14 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
   it('05-B6: the gift note travels with a gift order (screened), and comes back on the receipt', async () => {
     mail.sent.length = 0;
     const guest = `gift-${ids.nonce}@example.test`;
-    const res = await placeOrder(db, { items: frame, gift: true, giftNote: '  happy christmas, love from us all  ', account: null, joinProvenance: null, buyerEmail: guest });
+    const res = await placeOrder(db, { items: frame, gift: true, giftNote: '  happy christmas, love from us all  ', account: null, buyerEmail: guest });
     const o = (await track(res.ref))!;
     expect(o.giftNote).toBe('happy christmas, love from us all');
     expect(o.buyerEmail).toBe(guest); // the guest's receipt email is kept, not thrown away
     expect(mail.sent.find((m) => m.kind === 'order-confirmed' && m.to === guest)?.text).toContain('Your gift note: “happy christmas, love from us all”');
     // abuse is refused before anything is written; a note on a non-gift order is dropped
-    expect(await placeOrder(db, { items: frame, gift: true, giftNote: 'you little shit', account: null, joinProvenance: null })).toEqual({ ok: false, reason: 'gift-note' });
-    const plain = (await track((await placeOrder(db, { items: frame, gift: false, giftNote: 'not a gift', account: null, joinProvenance: null })).ref))!;
+    expect(await placeOrder(db, { items: frame, gift: true, giftNote: 'you little shit', account: null })).toEqual({ ok: false, reason: 'gift-note' });
+    const plain = (await track((await placeOrder(db, { items: frame, gift: false, giftNote: 'not a gift', account: null })).ref))!;
     expect(plain.giftNote).toBeNull();
   });
 

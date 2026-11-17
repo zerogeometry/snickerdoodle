@@ -88,7 +88,6 @@ describe.skipIf(!DB || !S3)('the printed gift-note insert through the real submi
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
       gift: true,
       giftNote,
     });

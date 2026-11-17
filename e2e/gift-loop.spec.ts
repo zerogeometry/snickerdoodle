@@ -10,7 +10,7 @@ import { makeOpenGiftLink, sayYesToJoin, sendGiftLinkTo, shareNewestWithExtended
  *    D27, founder answer C — the parent picks who an open link is for);
  *  - or the link is GRANNY'S OWN (D27: one link per person) and carries an INVITE bound to her address: she joins the
  *    family (verify by the email link → says yes on the join card → an ACTIVE membership at the circle/access the
- *    parent set) and checks out with the 5% family saving, priced by the server. Grandparents are extended family, so
+ *    parent set) and checks out at the price the server sets (the 5% family saving was retired on 17 Nov 2026). Grandparents are extended family, so
  *    the parent shares the drawing with the extended family first — her link shows only what her circle may see.
  * Signing in uses the real email-link callback (e2e/harness.ts); the one stand-in is the content
  * review, which holds every upload on a server without real screening (as production would).
@@ -67,15 +67,13 @@ test('gift loop: a guest buys from a gift link — no account, no saving', async
   await granny.context().close();
 });
 
-test('gift loop: invite → verify by email link → joined at the set circle → 5% off, priced by the server', async ({ page, browser }) => {
+test('gift loop: invite → verify by email link → joined at the set circle → checks out, priced by the server', async ({ page, browser }) => {
   test.setTimeout(240_000);
   const grannyEmail = testEmail('granny');
   const { path } = await parentMakesGiftLink(page, { email: grannyEmail });
 
   const granny = await newPage(browser);
   await granny.goto(path);
-  // the guest price first: no saving until they've joined
-  await expect(granny.getByText('welcome to the family')).toHaveCount(0);
   await granny.getByRole('link', { name: /join family & checkout/ }).click();
   await expect(granny).toHaveURL(/\/join\//);
   const joinUrl = new URL(granny.url());
@@ -87,8 +85,7 @@ test('gift loop: invite → verify by email link → joined at the set circle �
   expect(await sql()`select m.id from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail}`).toHaveLength(0);
   await sayYesToJoin(granny);
   await expect(granny).toHaveURL(new RegExp(`${path}$`)); // joined, and straight back to the list
-  await expect(granny.getByText('welcome to the family — your 5% is applied')).toBeVisible();
-  await expect(granny.getByText('Family saving')).toBeVisible();
+  await expect(granny.getByText('Family saving')).toHaveCount(0); // no join saving any more
 
   // the membership is ACTIVE, at the circle the relationship sets (grandparent → extended) + the access chosen
   const [m] = await sql()`select m.status, m.circle, m.access_level, m.is_owner, m.join_consent_version from memberships m join accounts a on a.id = m.account_id where a.email = ${grannyEmail}`;
@@ -98,6 +95,6 @@ test('gift loop: invite → verify by email link → joined at the set circle �
   await checkOut(granny, /^checkout$/);
   const token = path.split('/').pop()!;
   const [order] = await sql()`select o.join_saving_pence, o.subtotal_pence from orders o join gift_links g on g.id = o.gift_link_id where g.token = ${token}`;
-  expect(order!.join_saving_pence).toBe(Math.round(order!.subtotal_pence * 0.05)); // the 5%, server-side
+  expect(order!.join_saving_pence).toBe(0); // the 5% join saving is retired
   await granny.context().close();
 });

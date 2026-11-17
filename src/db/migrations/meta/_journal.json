@@ -414,6 +414,13 @@
       "when": 1794867999893,
       "tag": "0058_admin_app",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1794960000000,
+      "tag": "0059_welcome_free_card",
+      "breakpoints": true
     }
   ]
 }

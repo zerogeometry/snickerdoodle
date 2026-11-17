@@ -33,8 +33,8 @@ export function GiftCheckout({
   items: GiftItem[];
   inviteToken: string | null;
   familyName: string | null;
-  /** The server's quote for this viewer (incl. a join saving if they joined this family). */
-  pricing: { subtotalPence: number; deliveryPence: number; joinSavingPence: number; totalPence: number };
+  /** The server's quote — what checkout charges. */
+  pricing: { subtotalPence: number; deliveryPence: number; totalPence: number };
   /** Pre-fills "who's it from?" for a signed-in relative. */
   defaultFrom: string;
   /** Someone is signed in — never told "checkout as guest" (06-B4). */
@@ -64,8 +64,6 @@ export function GiftCheckout({
       );
     });
   };
-  const joined = pricing.joinSavingPence > 0;
-
   return (
     <div className="grid gap-6 md:grid-cols-[1.35fr_1fr]">
       <div>
@@ -111,12 +109,6 @@ export function GiftCheckout({
             </dt>
             <dd>{gbp(pricing.subtotalPence)}</dd>
           </div>
-          {joined ? (
-            <div className="flex justify-between font-semibold text-green-save">
-              <dt>Family saving</dt>
-              <dd>−{gbp(pricing.joinSavingPence)}</dd>
-            </div>
-          ) : null}
           <div className="flex justify-between">
             <dt>Delivery</dt>
             <dd>{pricing.deliveryPence === 0 ? <span className="font-semibold text-green-save">Free</span> : gbp(pricing.deliveryPence)}</dd>
@@ -154,7 +146,7 @@ export function GiftCheckout({
               <span className="flex items-start gap-1.5 text-[12px] font-bold leading-snug text-ink-soft">
                 <Icon icon={IconUsersPlus} size={15} className="mt-px shrink-0 text-cinnamon" /> you’re invited to join {familyName ?? 'the family'}
               </span>
-              <span className="shrink-0 whitespace-nowrap rounded-pill bg-green-save px-2.5 py-1 text-[11px] font-extrabold text-paper">save 5%</span>
+              <span className="shrink-0 whitespace-nowrap rounded-pill bg-green-save px-2.5 py-1 text-[11px] font-extrabold text-paper">free to join</span>
             </span>
             <Button href={`/join/${inviteToken}?next=${encodeURIComponent(`/g/${token}`)}`} size="md" className="mt-2.5 w-full">
               join family &amp; checkout
@@ -166,11 +158,6 @@ export function GiftCheckout({
           </div>
         ) : null}
 
-        {joined ? (
-          <p className="mt-3 rounded-xl bg-leaf-pale px-3 py-2 text-center text-[12px] font-semibold text-green-save">
-            welcome to the family — your 5% is applied
-          </p>
-        ) : null}
         {allBought ? null : (
         <Button
           variant={inviteToken ? 'secondary' : 'primary'}
@@ -179,7 +166,7 @@ export function GiftCheckout({
           onClick={toCheckout}
           disabled={pending}
         >
-          {pending ? 'one moment…' : joined || signedIn ? 'checkout' : 'checkout as guest'}
+          {pending ? 'one moment…' : signedIn ? 'checkout' : 'checkout as guest'}
         </Button>
         )}
         {problem ? (

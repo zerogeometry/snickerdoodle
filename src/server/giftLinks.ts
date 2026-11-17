@@ -5,7 +5,6 @@ import { products, productVariants, savedDesigns } from '@/db/schema';
 import { accounts, assets, auditRecords, memberships, families, giftLinks, invites, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { containsAbusiveText } from './textSafety';
 import { screenPendingNow } from './moderation';
-import type { JoinProvenance } from '@/pricing';
 import { getCatalogue, loadCatalogue } from './catalogue';
 import { composeMockup } from './print/compositor';
 import sharp from 'sharp';
@@ -353,7 +352,7 @@ export type GiftLinkView =
   | {
       state: 'active';
       id: string;
-      /** Server-side only (never rendered): used to scope the join saving to this family. */
+      /** Server-side only (never rendered): the family the link belongs to. */
       familyId: string;
       /** null ⇒ the parent hasn't named the family yet (pages use neutral wording). */
       familyName: string | null;
@@ -584,15 +583,13 @@ export async function revokeGiftLink(db: DbHandle, owner: ViewerContext, giftLin
  * is the snapshotted keepsake on its snapshotted product, at the default (whole-drawing)
  * placement; price/variant/geometry are resolved by placeOrder as for any order. The
  * buyer may be a guest: authorisation is the link's capability (canPurchaseViaGiftLink,
- * re-checked per line inside placeOrder), not membership. A buyer who JOINED via the
- * link's invite gets the one-time 5% from their server-resolved join provenance.
+ * re-checked per line inside placeOrder), not membership.
  */
 export async function placeGiftLinkOrder(
   db: DbHandle,
   input: {
     token: string;
     account: { id: string; name?: string | null; email?: string } | null;
-    joinProvenance: JoinProvenance | null;
     /** How the buyer signs it ("Granny") — shown to the family's parent only. */
     fromName?: string | null;
   },
@@ -619,9 +616,6 @@ export async function placeGiftLinkOrder(
   const remaining = items.filter((i) => !bought.has(itemKey(i)) && seen.has(i.assetId));
   if (remaining.length === 0) return { ok: false, allBought: true };
 
-  // Only honour a join saving earned in THIS link's family (not another family's invite).
-  const joinProvenance = input.joinProvenance?.invite?.familyId === link.familyId ? input.joinProvenance : null;
-
   try {
     return await placeOrder(db, {
       // Saved designs are sold exactly as designed; plain keepsakes at the whole-drawing default.
@@ -638,7 +632,6 @@ export async function placeGiftLinkOrder(
       })),
       gift: true,
       account: input.account,
-      joinProvenance,
       giftLink: grant,
       cancelPath: `/g/${input.token}`,
       giftMeta: { linkId: link.id, fromName: screenFromName(input.fromName) ?? defaultFromName(input.account) },

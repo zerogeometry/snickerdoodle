@@ -152,8 +152,9 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - Authz module EXHAUSTIVELY unit-tested: full matrix tier × circle × access × actor
   (member/guest/anon/admin/controller-vs-other-parent) AND the family-scope/cross-family deny.
   This suite is a launch gate.
-- Server-side PRICING unit-tested: totals; 5% join-saving present ONLY with a valid server-side
-  join context, absent for guest/member/forged-flag; add-ons; gift price-hiding.
+- Server-side PRICING unit-tested: totals; the free first card (D30) ONLY on a server-decided signed-in
+  first order with a paid order beside it, never for a guest/repeat buyer/forged flag; no join saving and no
+  referral reward (both retired); partner commission; add-ons; gift price-hiding.
 - Also tested: single-image generative request-builder; EXIF strip; gift-link snapshot immutability
   + "deleted source → 410"; retention purge (kept survives; unkept past window is gone DB+storage+
   provider+backup); removed member denied with no session grace.
@@ -162,7 +163,7 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
   binned); generative output is re-screened before display/print; child-surname rejected in name fields.
 - Integration: services+db; webhook signature + idempotency; signed-URL minting gated by authz.
 - e2e: wow flow (no account wall); create→studio→visibility→save; gift loop (guest OR invite→verify
-  →join at set circle/access with saving); studio by finger AND stylus; low-res→DPI warning→upscale.
+  →join at set circle/access); studio by finger AND stylus; low-res→DPI warning→upscale.
 - A change touching visibility/pricing/ownership/deletion REQUIRES tests in the same PR.
 
 ## Security

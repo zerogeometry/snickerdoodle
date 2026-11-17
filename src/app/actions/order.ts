@@ -1,10 +1,9 @@
 'use server';
 
 import { getDb } from '@/db/client';
-import { resolveSessionJoinProvenance } from '@/server/joinProvenance';
 import { keepAndFileCreations } from '@/server/keepsakes';
 import { basketHasPrintWithoutDrawing, placeOrder, type PlaceLine } from '@/server/orders';
-import { normaliseBuyerEmail, resolvePromo, type PromoRefusal } from '@/server/promos';
+import { normaliseBuyerEmail, resolveCheckoutPromo, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
 import type { RawTransform } from '@/server/print/geometry';
@@ -18,7 +17,7 @@ const MAX_PACK_CARDS = 20;
 /**
  * Place an order from the client's basket. The client sends product keys +
  * quantities and (for a personalised line) the keepsake + its placement; the
- * buyer, join provenance, price, variant, print geometry and clamped transform
+ * buyer, the code, price, variant, print geometry and clamped transform
  * are ALL resolved/frozen server-side. Returns a Stripe Checkout URL when
  * configured, otherwise a placed-order ref (dev).
  *
@@ -130,24 +129,26 @@ export async function placeOrderAction(input: {
     await keepAndFileCreations(db, account, claims, assetIds, input.subject, { keep: false });
   }
 
-  const joinProvenance = account ? await resolveSessionJoinProvenance() : null;
   // who's buying: the account, or a guest by the email they gave (never an account wall)
   const buyerEmail = account?.email ?? normaliseBuyerEmail(input.email);
-  const resolved = input.promoCode
-    ? await resolvePromo(db, input.promoCode, new Date(), { accountId: account?.id ?? null, email: buyerEmail })
-    : null;
+  // the code typed, or (typed nothing, signed-in first order) the shop's welcome free card by itself
+  const promo = await resolveCheckoutPromo(db, input.promoCode, { accountId: account?.id ?? null, email: buyerEmail });
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   try {
-    const res = await placeOrder(db, {
-      promo: resolved?.ok ? resolved.rule : null,
-      creditAvailablePence,
-      buyerEmail,
-      items,
-      gift: input.gift ?? false,
-      giftNote: input.giftNote,
-      account: account ? { id: account.id } : null,
-      joinProvenance,
-    });
+    const place = (rule: typeof promo.rule) =>
+      placeOrder(db, {
+        promo: rule,
+        freeCardEligible: promo.cardEligible,
+        creditAvailablePence,
+        buyerEmail,
+        items,
+        gift: input.gift ?? false,
+        giftNote: input.giftNote,
+        account: account ? { id: account.id } : null,
+      });
+    let res = await place(promo.rule);
+    // the welcome card was applied by itself: if it can't be claimed after all, the order goes ahead without it
+    if (!res.ok && res.reason === 'promo' && promo.auto) res = await place(null);
     if (!res.ok) {
       if (res.reason === 'too-small') return { ok: false, reason: 'too-small', productKey: res.productKey };
       if (res.reason === 'promo') return { ok: false, reason: 'promo', promoError: res.promoError };

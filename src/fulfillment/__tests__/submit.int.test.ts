@@ -137,7 +137,6 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     const res = await placeOrder(db, {
       items: [{ productKey, qty: 1, artwork: { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     const [o] = await db.select({ id: orders.id, ref: orders.ref }).from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);
@@ -500,7 +499,6 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     const res = await placeOrder(db, {
       items: [{ productKey: 'cardPack-packof10', qty: 1, cards: drawings.map((assetId) => ({ assetId, transform: t })) }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);

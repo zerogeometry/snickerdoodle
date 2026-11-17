@@ -5,8 +5,8 @@
  * decides what it's worth. Three rules keep a code from ever selling at a loss:
  *
  *  1. MINIMUM SPEND — FIXED vouchers (£5 / £10) only on baskets big enough to carry them.
- *  2. BEST SINGLE SAVING — a code never stacks with the 5% join / family-set savings; the
- *     customer gets whichever is bigger (generous AND margin-safe).
+ *  2. BEST SINGLE SAVING — a code never stacks with the family-set / multi-buy / same-parcel
+ *     savings; the customer gets whichever is bigger (generous AND margin-safe).
  *  3. MARGIN GUARD — whatever happens, the order keeps at least `floorBps` of its full-price
  *     ex-VAT goods revenue as contribution (after product + delivery cost, card fees, the
  *     discount AND any partner commission). The discount is capped first, then the commission.
@@ -16,25 +16,35 @@
  * A FREE_CARD code ("your first card's on us") takes ONE greetings card's price off — the cheapest
  * single card in the basket — or nothing: the guard never turns it into "£1.40 off a card". If giving
  * the card away would take the order under the floor, the code waits for a bigger basket.
+ *
+ * THE FREE CARD IS THE ONE WELCOME (founder, 17 Nov 2026): one greetings card free on a signed-in
+ * buyer's FIRST paid order — and nothing else (the 5% join saving and the parents' "give £5, get £5"
+ * referral codes are retired). The caller says, server-side, whether this buyer may have it
+ * (`cardEligible`); the shop's own FIRSTCARD code gives it automatically (src/server/promos.ts).
+ * A PARTNER code (a creator, a school PTA, or our own campaign) is a free-card code too: when the card
+ * can't come off — not a signed-in first order, no single card in the basket, or too small a basket —
+ * the code still counts as an attribution code, so the partner's commission and the order's tag stand.
  */
 
 export type PromoKind = 'PERCENT' | 'FIXED' | 'FREE_CARD';
 export type PartnerType = 'INFLUENCER' | 'PTA' | 'REFERRAL' | 'CAMPAIGN';
 
 /**
- * WHO a code is for, in one place (founder, Oct 2026). A code is for the buyer's FIRST paid order
- * (by account, or a guest by email) when it's flagged so, when it's a free card, or when it's a
- * creator (INFLUENCER) or a friend's REFERRAL code — the follower's 10% is a welcome, not a standing
- * discount. A partner's commission accrues on the follower's first paid order only — exactly once,
- * settled when it's paid (src/server/promos.ts) — for every partner EXCEPT a school PTA, whose pitch
- * is "a share of every order" (briefs/DISCOUNTS.md). Nobody earns on, or saves with, their own code.
+ * WHO a code is for, in one place (founder, Oct 2026; free card 17 Nov 2026). A code is for the
+ * buyer's FIRST paid order (by account, or a guest by email) when it's flagged so, or when it's a
+ * creator (INFLUENCER) code. A free-card code isn't first-order-only as a CODE (a school's code keeps
+ * tagging a family's later orders); the CARD itself only ever comes off a signed-in first order
+ * (`cardEligible`, decided by the server). A partner's commission accrues on the follower's first
+ * paid order only — exactly once, settled when it's paid (src/server/promos.ts) — for every partner
+ * EXCEPT a school PTA, whose pitch is "a share of every order" (briefs/DISCOUNTS.md). Nobody earns
+ * on, or saves with, their own code. (REFERRAL codes are retired: resolvePromo refuses them.)
  */
 export function codeTerms(c: { kind: PromoKind; partnerType: PartnerType | null; firstOrderOnly: boolean }): {
   firstOrderOnly: boolean;
   commissionFirstOrderOnly: boolean;
 } {
   return {
-    firstOrderOnly: c.firstOrderOnly || c.kind === 'FREE_CARD' || c.partnerType === 'INFLUENCER' || c.partnerType === 'REFERRAL',
+    firstOrderOnly: c.firstOrderOnly || c.partnerType === 'INFLUENCER' || c.partnerType === 'REFERRAL',
     commissionFirstOrderOnly: c.partnerType !== 'PTA',
   };
 }
@@ -80,22 +90,31 @@ export type PromoOutcome =
       capped: boolean;
       /** The code's discount beat the other savings (which are therefore dropped). */
       replacesOtherSavings: boolean;
+      /** A partner's free-card code that applied as attribution only: why its card didn't come off. */
+      cardReason?: CardNotApplied;
     }
   | { applied: false; reason: PromoNotApplied; minSpendPence?: number };
 
-/** Why a valid code didn't change this basket. `needs-card`: a free-card code with no single card in
- * it. `needs-more`: the free card would take the order under the margin floor — add something else. */
-export type PromoNotApplied = 'min-spend' | 'nothing-eligible' | 'better-saving-applied' | 'needs-card' | 'needs-more';
+/** Why a free card didn't come off. `needs-card`: no single greetings card in the basket.
+ * `needs-more`: the free card would take the order under the margin floor — add something else.
+ * `first-order-card`: the card is for a signed-in buyer's first order, and this isn't one.
+ * `better-saving-applied`: the basket already earns a bigger saving. */
+export type CardNotApplied = 'needs-card' | 'needs-more' | 'first-order-card' | 'better-saving-applied';
+/** Why a valid code didn't change this basket. */
+export type PromoNotApplied = 'min-spend' | 'nothing-eligible' | CardNotApplied;
 
 /**
  * Evaluate a resolved rule against a priced basket.
- * @param otherSavingPence  the join + family-set savings the basket already earns.
+ * @param otherSavingPence  the family-set / multi-buy / same-parcel savings the basket already earns.
+ * @param opts.cardEligible  SERVER-decided: may this buyer have the free card (a signed-in first order)?
+ *   Fail-closed: absent ⇒ no free card.
  */
 export function evaluatePromo(
   rule: PromoRule,
   lines: readonly PromoLine[],
   otherSavingPence: number,
   e: PromoEconomics = PROMO_ECONOMICS,
+  opts: { cardEligible?: boolean } = {},
 ): PromoOutcome {
   const subtotal = lines.reduce((n, l) => n + l.linePence, 0);
   if (subtotal < rule.minSpendPence) return { applied: false, reason: 'min-spend', minSpendPence: rule.minSpendPence };
@@ -104,18 +123,6 @@ export function evaluatePromo(
   const S = eligible.reduce((n, l) => n + l.linePence, 0); // eligible goods, VAT-inclusive
   const C = eligible.reduce((n, l) => n + (l.lineCostPence ?? 0), 0); // their landed cost
   if (S <= 0) return { applied: false, reason: 'nothing-eligible' };
-
-  let wanted: number;
-  if (rule.kind === 'FREE_CARD') {
-    const cards = eligible.map((l) => l.freeCardUnitPence ?? 0).filter((p) => p > 0);
-    if (cards.length === 0) return { applied: false, reason: 'needs-card' };
-    wanted = Math.min(...cards); // ONE card — the cheapest, if they differ
-  } else wanted = rule.kind === 'PERCENT' ? Math.round((S * rule.value) / 10000) : Math.min(rule.value, S);
-  const isAttributionOnly = wanted === 0;
-
-  // Best single saving: a real discount must beat what the basket already gets.
-  if (!isAttributionOnly && wanted <= otherSavingPence) return { applied: false, reason: 'better-saving-applied' };
-  const baseSaving = isAttributionOnly ? otherSavingPence : 0; // attribution codes keep the other savings
 
   const exVat = (gross: number) => gross / (1 + e.vatRate);
   const floor = (exVat(S) * e.floorBps) / 10000;
@@ -127,11 +134,30 @@ export function evaluatePromo(
     return exVat(x) * (1 - commissionRate) - e.stripePct * x - e.stripeFixedPence - C;
   };
 
+  let wanted: number;
+  let cardReason: CardNotApplied | undefined;
+  if (rule.kind === 'FREE_CARD') {
+    const cards = eligible.map((l) => l.freeCardUnitPence ?? 0).filter((p) => p > 0);
+    const card = cards.length ? Math.min(...cards) : 0; // ONE card — the cheapest, if they differ
+    if (!opts.cardEligible) cardReason = 'first-order-card';
+    else if (card === 0) cardReason = 'needs-card';
+    else if (card <= otherSavingPence) cardReason = 'better-saving-applied';
+    // a free card is all or nothing: if the order can't carry the whole card (even with no
+    // commission), it waits for a bigger basket — never a part-price card
+    else if (contribution(card, 0) < floor) cardReason = 'needs-more';
+    // the card can't come off: a partner's code still tags the order (attribution only, so the
+    // commission stands); the shop's own free-card code just doesn't apply
+    if (cardReason && rule.commissionBps <= 0) return { applied: false, reason: cardReason };
+    wanted = cardReason ? 0 : card;
+  } else wanted = rule.kind === 'PERCENT' ? Math.round((S * rule.value) / 10000) : Math.min(rule.value, S);
+  const isAttributionOnly = wanted === 0;
+
+  // Best single saving: a real discount must beat what the basket already gets.
+  if (!isAttributionOnly && wanted <= otherSavingPence) return { applied: false, reason: 'better-saving-applied' };
+  const baseSaving = isAttributionOnly ? otherSavingPence : 0; // attribution codes keep the other savings
+
   let discount = isAttributionOnly ? 0 : wanted;
   let capped = false;
-  // 0) a free card is all or nothing: if the order can't carry the whole card (even with no
-  //    commission), the code waits for a bigger basket — never a part-price card
-  if (rule.kind === 'FREE_CARD' && contribution(discount, 0) < floor) return { applied: false, reason: 'needs-more' };
   // 1) cap the discount so contribution (with full commission) stays ≥ floor
   if (rule.kind !== 'FREE_CARD' && !isAttributionOnly && contribution(discount, c) < floor) {
     const k = (1 - c) / (1 + e.vatRate) - e.stripePct; // contribution per pence of x
@@ -150,7 +176,7 @@ export function evaluatePromo(
     capped = true;
   }
   if (!isAttributionOnly && discount === 0) return { applied: false, reason: 'nothing-eligible' };
-  return { applied: true, discountPence: discount, commissionPence: commission, capped, replacesOtherSavings: discount > 0 };
+  return { applied: true, discountPence: discount, commissionPence: commission, capped, replacesOtherSavings: discount > 0, ...(cardReason ? { cardReason } : {}) };
 }
 
 /** Normalise what a customer typed: trim, upper-case, collapse spaces. */

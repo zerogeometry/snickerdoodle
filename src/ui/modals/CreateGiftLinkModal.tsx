@@ -434,7 +434,7 @@ export function CreateGiftLinkModal({
                     </span>
                   </label>
                   <p className="mt-2 text-[11px] leading-relaxed text-ink-soft">
-                    Each gets their own invite, only to their own address: 5% off, and they join the circle their relationship gives them once they say yes.
+                    Each gets their own invite, only to their own address, and they join the circle their relationship gives them once they say yes.
                   </p>
                 </>
               ) : null}

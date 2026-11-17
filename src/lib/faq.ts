@@ -282,7 +282,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'grandparents-buy',
         q: 'How can grandparents buy something with my child’s drawing?',
-        a: 'With Snickerdoodle you pick the pieces and share one ready-to-buy link — by WhatsApp, text or email — and grandparents tap it to find the basket already filled. They can check out as a guest in under a minute, or join the family and save 5%. See [gifts](/gifts).',
+        a: 'With Snickerdoodle you pick the pieces and share one ready-to-buy link — by WhatsApp, text or email — and grandparents tap it to find the basket already filled. They can check out as a guest in under a minute, or join the family. See [gifts](/gifts).',
       },
       {
         id: 'gift-list',

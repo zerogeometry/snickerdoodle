@@ -80,7 +80,7 @@ describe.skipIf(!DB || !S3)('the 2027 calendar — 13 pages, one Prodigi item (i
   }
 
   async function order(productKey: string, pages: Array<{ assetId: string; transform: typeof T } | null>, qty = 1) {
-    const res = await placeOrder(db, { items: [{ productKey, qty, pages }], account: { id: ids.samId }, joinProvenance: null });
+    const res = await placeOrder(db, { items: [{ productKey, qty, pages }], account: { id: ids.samId } });
     if (res.ok) {
       const [o] = await db.select({ id: orders.id }).from(orders).where(eq(orders.ref, res.ref!));
       orderIds.push(o!.id);

@@ -4,7 +4,7 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import sharp from 'sharp';
 import * as schema from '@/db/schema';
-import { children, consentRecords, giftLinks, invites, memberships, orderItemArtwork, orderItems, orders, reminderSends } from '@/db/schema';
+import { children, consentRecords, giftLinks, memberships, orderItemArtwork, orderItems, orders, reminderSends } from '@/db/schema';
 import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed';
 import { AuthzError } from '@/authz';
 import { resolveViewerContext } from '@/server/assets';
@@ -16,12 +16,11 @@ import { deleteSavedDesign, listSavedDesigns, saveDesign } from '@/server/savedD
 import { ingestOriginalAsset } from '@/server/ingest';
 import { markOrderPaid, placeOrder } from '@/server/orders';
 import { resolveHomeFamily } from '@/server/onboarding';
-import { resolvePromo } from '@/server/promos';
-import { getCreditBalance, getOrCreateReferralCode } from '@/server/referrals';
+import { resolveCheckoutPromo, resolvePromo, WELCOME_CARD_CODE } from '@/server/promos';
+import { getCreditBalance } from '@/server/referrals';
 import { acceptInvite, createInvite, setMemberSeesOccasions } from '@/server/invites';
 import { runReminders, setReminderConsent } from '@/server/reminders';
 import { deleteObject } from '@/storage';
-import type { JoinProvenance } from '@/pricing';
 import type { DbHandle } from '@/server/db';
 import { exclusively } from '@/test/globalJobs';
 import { JOIN_CONSENT_VERSION } from '@/lib/joinConsent';
@@ -89,7 +88,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const assetId = await keptDrawing();
     const { token } = await linkFor([assetId]);
 
-    const res = await placeGiftLinkOrder(db, { token, account: null, joinProvenance: null });
+    const res = await placeGiftLinkOrder(db, { token, account: null });
     expect(res.ok).toBe(true);
     orderRefs.push(res.ref!);
 
@@ -106,7 +105,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
   it('the parent chooses what the keepsake is sold as; an un-giftable product is refused', async () => {
     const assetId = await keptDrawing();
     const { token } = await linkFor([assetId], 'mug');
-    const res = await placeGiftLinkOrder(db, { token, account: null, joinProvenance: null });
+    const res = await placeGiftLinkOrder(db, { token, account: null });
     expect(res.ok).toBe(true);
     orderRefs.push(res.ref!);
     const [line] = await db.select({ productKey: orderItems.productKey }).from(orderItems).innerJoin(orders, eq(orders.id, orderItems.orderId)).where(eq(orders.ref, res.ref!));
@@ -121,11 +120,11 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const a = await linkFor([assetId]);
     await revokeGiftLink(db, sam, a.id);
-    expect(await placeGiftLinkOrder(db, { token: a.token, account: null, joinProvenance: null })).toMatchObject({ ok: false, unavailable: true });
+    expect(await placeGiftLinkOrder(db, { token: a.token, account: null })).toMatchObject({ ok: false, unavailable: true });
 
     const b = await linkFor([assetId]);
     await db.update(giftLinks).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(giftLinks.id, b.id));
-    expect(await placeGiftLinkOrder(db, { token: b.token, account: null, joinProvenance: null })).toMatchObject({ ok: false, unavailable: true });
+    expect(await placeGiftLinkOrder(db, { token: b.token, account: null })).toMatchObject({ ok: false, unavailable: true });
   });
 
   it("a gift-link grant never widens to a keepsake outside its snapshot (or another family's)", async () => {
@@ -137,37 +136,20 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
 
     for (const assetId of [notInLink, bloomArt]) {
       await expect(
-        placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 0 } } }], account: null, joinProvenance: null, giftLink: grant }),
+        placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 0 } } }], account: null, giftLink: grant }),
       ).rejects.toBeInstanceOf(AuthzError);
     }
   });
 
-  it('a relative who JOINED this family gets the 5% on the gift link; another family’s join does not count', async () => {
+  it('a relative who JOINED this family pays the gift link in full — the 5% join saving is retired (17 Nov 2026)', async () => {
     const assetId = await keptDrawing();
     const { token } = await linkFor([assetId]);
-    const [row] = await db
-      .select({ m: memberships, inv: invites })
-      .from(memberships)
-      .innerJoin(invites, eq(memberships.inviteId, invites.id))
-      .where(and(eq(memberships.accountId, ids.rosieId), eq(memberships.familyId, ids.hartleyId)));
-    const provenance: JoinProvenance = {
-      invite: { id: row!.inv.id, familyId: row!.inv.familyId, verified: true, revoked: false, expiresAt: Date.now() + 86_400_000 },
-      membership: { familyId: row!.m.familyId, status: 'ACTIVE', inviteId: row!.m.inviteId, isOwner: false, savingConsumed: false },
-      now: Date.now(),
-    };
-
-    const joined = await placeGiftLinkOrder(db, { token, account: { id: ids.rosieId }, joinProvenance: provenance });
+    const joined = await placeGiftLinkOrder(db, { token, account: { id: ids.rosieId } });
     expect(joined.ok).toBe(true);
     orderRefs.push(joined.ref!);
     const [o1] = await db.select().from(orders).where(eq(orders.ref, joined.ref!));
-    expect(o1!.joinSavingPence).toBe(Math.round(o1!.subtotalPence * 0.05));
-
-    const foreign: JoinProvenance = { ...provenance, invite: { ...provenance.invite!, familyId: ids.bloomId }, membership: { ...provenance.membership!, familyId: ids.bloomId } };
-    const second = await linkFor([await keptDrawing()]); // the first link's item is now bought (ticked off)
-    const other = await placeGiftLinkOrder(db, { token: second.token, account: { id: ids.rosieId }, joinProvenance: foreign });
-    orderRefs.push(other.ref!);
-    const [o2] = await db.select().from(orders).where(eq(orders.ref, other.ref!));
-    expect(o2!.joinSavingPence).toBe(0);
+    expect(o1!.joinSavingPence).toBe(0);
+    expect(o1!.totalPence).toBe(o1!.subtotalPence - o1!.parcelSavingPence - o1!.multiBuySavingPence - o1!.familySetSavingPence + o1!.deliveryPence);
   });
 
   // ── G16: the gift list keeps tabs ─────────────────────────────────────────
@@ -178,7 +160,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
 
     // Granny buys the whole list as a guest, signing it.
-    const first = await placeGiftLinkOrder(db, { token, account: null, joinProvenance: null, fromName: '  Granny  ' });
+    const first = await placeGiftLinkOrder(db, { token, account: null, fromName: '  Granny  ' });
     expect(first.ok).toBe(true);
     orderRefs.push(first.ref!);
     const [o] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
@@ -191,7 +173,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect(JSON.stringify(view)).not.toContain('Granny'); // link-holders never learn who
 
     // Nothing left to sell.
-    expect(await placeGiftLinkOrder(db, { token, account: null, joinProvenance: null })).toMatchObject({ ok: false, allBought: true });
+    expect(await placeGiftLinkOrder(db, { token, account: null })).toMatchObject({ ok: false, allBought: true });
 
     // The parent sees the sticker.
     const lists = await listGiftListsForOwner(db, sam, ids.hartleyId);
@@ -209,13 +191,12 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const one = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: a, transform: { scale: 0 } } }],
       account: null,
-      joinProvenance: null,
       giftLink: { familyId: ids.hartleyId, status: 'ACTIVE', expiresAt: new Date(Date.now() + 86_400_000), assetIds: [a, b], audienceCircle: 'FAMILY' },
       giftMeta: { linkId: id, fromName: 'Uncle Bo' },
     });
     orderRefs.push(one.ref!);
 
-    const rest = await placeGiftLinkOrder(db, { token, account: null, joinProvenance: null, fromName: 'x'.repeat(41) });
+    const rest = await placeGiftLinkOrder(db, { token, account: null, fromName: 'x'.repeat(41) });
     orderRefs.push(rest.ref!);
     const lines = await db
       .select({ assetId: orderItemArtwork.assetId })
@@ -248,7 +229,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
 
     const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
     const link = await createGiftLink(db, sam, { familyId: ids.hartleyId, assetIds: [], designIds: [saved.id], recipient: { kind: 'open', circle: 'FAMILY' } });
-    const res = await placeGiftLinkOrder(db, { token: link.token, account: null, joinProvenance: null, fromName: 'Granny' });
+    const res = await placeGiftLinkOrder(db, { token: link.token, account: null, fromName: 'Granny' });
     expect(res.ok).toBe(true);
     orderRefs.push(res.ref!);
     const [line] = await db
@@ -280,40 +261,28 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     expect(await deleteSavedDesign(db, ids.samId, saved.id)).toBe(true);
   });
 
-  // ── D17: give £5, get £5 — referral codes + the credit ledger ─────────────
-  it('referral: friend gets £5 off a first order; referrer earns £5 credit once paid; no self-use, no repeat; credit spends at checkout', async () => {
+  // ── D17 retired (17 Nov 2026): parents' referral codes give + earn nothing; earned credit still spends ──
+  it('an old referral code is refused (resolve AND placement); no referrer credit accrues; credit already earned spends once', async () => {
     const [sam] = await db.select().from(schema.accounts).where(eq(schema.accounts.id, ids.samId));
-    const code = await getOrCreateReferralCode(db, { id: sam!.id, email: sam!.email, name: null });
-    expect(await getOrCreateReferralCode(db, { id: sam!.id, email: sam!.email, name: null })).toBe(code); // stable
+    const code = `SAM-${ids.nonce.toUpperCase()}`.slice(0, 16);
+    const [old] = await db
+      .insert(schema.promoCodes)
+      .values({ code, kind: 'FIXED', value: 500, minSpendPence: 3000, partnerType: 'REFERRAL', partnerName: 'referral', ownerAccountId: ids.samId, firstOrderOnly: true })
+      .returning();
+    const guestEmail = `friend-${ids.nonce}@example.test`;
     try {
-      // the owner can't use their own code
-      expect(await resolvePromo(db, code, new Date(), { accountId: ids.samId, email: sam!.email })).toEqual({ ok: false, reason: 'own-code' });
+      expect(await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail })).toEqual({ ok: false, reason: 'unknown' });
+      // a rule smuggled past the resolver is still refused when the order is placed
+      const rule = { id: old!.id, code, kind: 'FIXED' as const, value: 500, minSpendPence: 3000, commissionBps: 0 };
+      expect(await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: rule, buyerEmail: guestEmail })).toEqual({ ok: false, reason: 'promo', promoError: 'unknown' });
+      // a friend's paid order earns the old referrer nothing
+      const plain = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, buyerEmail: guestEmail });
+      orderRefs.push(plain.ref!);
+      expect(await getCreditBalance(db, ids.samId)).toBe(0);
 
-      // a guest we can't identify isn't given it (07-B6); a brand-new guest, by their email, is: £5 off a £65 print
-      expect(await resolvePromo(db, code, new Date(), null)).toEqual({ ok: false, reason: 'needs-buyer' });
-      const guestEmail = `friend-${ids.nonce}@example.test`;
-      const r = await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail });
-      expect(r.ok).toBe(true);
-      if (!r.ok) return;
-      const first = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
-      orderRefs.push(first.ref!);
-      const [o1] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
-      expect(o1!.promoSavingPence).toBe(500);
-      expect(await getCreditBalance(db, ids.samId)).toBe(500); // dev path pays immediately → reward settled
-
-      // the same buyer again: no second discount (refused at placement), no second reward
-      const again = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guestEmail });
-      expect(again).toEqual({ ok: false, reason: 'promo', promoError: 'first-order-only' });
-      expect(await getCreditBalance(db, ids.samId)).toBe(500);
-      expect(await resolvePromo(db, code, new Date(), { accountId: null, email: guestEmail })).toEqual({ ok: false, reason: 'first-order-only' });
-
-      // a self-referral by email (owner buying as a guest): refused, earns nothing
-      const self = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: sam!.email });
-      expect(self).toEqual({ ok: false, reason: 'promo', promoError: 'own-code' });
-      expect(await getCreditBalance(db, ids.samId)).toBe(500);
-
-      // Sam spends the credit: £5 off, debited once
-      const spend = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: { id: ids.samId }, joinProvenance: null, creditAvailablePence: 500, buyerEmail: sam!.email });
+      // credit already on the ledger (an earlier reward) still comes off, debited once
+      await db.insert(schema.accountCredits).values({ accountId: ids.samId, deltaPence: 500, reason: 'REFERRAL_REWARD', orderId: null });
+      const spend = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: { id: ids.samId }, creditAvailablePence: 500, buyerEmail: sam!.email });
       orderRefs.push(spend.ref!);
       const [o4] = await db.select().from(orders).where(eq(orders.ref, spend.ref!));
       expect(o4!.creditAppliedPence).toBe(500);
@@ -322,10 +291,51 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       await markOrderPaid(db, o4!.id); // retry → idempotent
       expect(await getCreditBalance(db, ids.samId)).toBe(0);
     } finally {
-      const refs = await db.select({ id: orders.id }).from(orders).where(inArray(orders.ref, orderRefs));
       await db.delete(schema.accountCredits).where(eq(schema.accountCredits.accountId, ids.samId));
-      await db.update(orders).set({ promoCodeId: null }).where(inArray(orders.id, refs.map((x) => x.id)));
-      await db.delete(schema.promoCodes).where(eq(schema.promoCodes.code, code));
+      await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, old!.id));
+    }
+  });
+
+  // ── the free first card: the one welcome (founder, 17 Nov 2026) ───────────
+  it('the free first card: by itself for a signed-in first order (with a paid order beside it); never twice; never for a guest', async () => {
+    const [fresh] = await db.insert(schema.accounts).values({ email: `first-card-${ids.nonce}@example.test` }).returning();
+    const buyer = { accountId: fresh!.id, email: fresh!.email };
+    try {
+      // typed nothing, signed in, no paid order yet → the welcome card, by itself
+      const auto = await resolveCheckoutPromo(db, undefined, buyer);
+      expect(auto).toMatchObject({ auto: true, cardEligible: true });
+      expect(auto.rule?.code).toBe(WELCOME_CARD_CODE);
+
+      // the shop's code exists (migration 0059, or checkout itself on a brand-new database) and is first-order-only
+      const [welcome] = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.code, WELCOME_CARD_CODE));
+      expect(welcome).toMatchObject({ kind: 'FREE_CARD', firstOrderOnly: true, active: true, commissionBps: 0 });
+
+      // a card on its own is never free: it comes with the rest of an order
+      const alone = await placeOrder(db, { items: [{ productKey: 'card', qty: 1 }], account: { id: fresh!.id }, buyerEmail: fresh!.email, promo: auto.rule, freeCardEligible: true });
+      orderRefs.push(alone.ref!);
+      const [oa] = await db.select().from(orders).where(eq(orders.ref, alone.ref!));
+      expect(oa!.promoSavingPence).toBe(0);
+      expect(oa!.promoCodeId).toBeNull();
+      await db.delete(orders).where(eq(orders.id, oa!.id)); // (not a first order we want to keep)
+
+      // a card + a blanket on the first order (clears the margin floor at any costs the DB holds — a bare CI database
+      // still has placeholder card costs): the card's price comes off
+      const first = await placeOrder(db, { items: [{ productKey: 'card', qty: 1 }, { productKey: 'blanket', qty: 1 }], account: { id: fresh!.id }, buyerEmail: fresh!.email, promo: auto.rule, freeCardEligible: true });
+      expect(first.ok).toBe(true);
+      orderRefs.push(first.ref!);
+      const [o1] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
+      expect(o1!.promoCodeId).toBe(welcome!.id);
+      expect(o1!.promoSavingPence).toBeGreaterThan(0);
+
+      // paid (dev path) → no longer eligible, and the code itself refuses a second order
+      expect(await resolveCheckoutPromo(db, undefined, buyer)).toMatchObject({ rule: null, auto: false, cardEligible: false });
+      expect(await resolvePromo(db, WELCOME_CARD_CODE, new Date(), buyer)).toEqual({ ok: false, reason: 'first-order-only' });
+
+      // a guest is never eligible for the card ("for signing up and placing their first order")
+      expect(await resolveCheckoutPromo(db, undefined, { accountId: null, email: `guest-card-${ids.nonce}@example.test` })).toMatchObject({ rule: null, cardEligible: false });
+    } finally {
+      const refs = await db.select({ id: orders.id }).from(orders).where(eq(orders.accountId, fresh!.id));
+      if (refs.length) await db.update(orders).set({ promoCodeId: null }).where(inArray(orders.id, refs.map((x) => x.id)));
     }
   });
 
@@ -344,7 +354,7 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       if (!r.ok) return;
 
       // DB unit costs drive the guard (the framed print's landed cost: real, or ensureTestCosts' fixture).
-      const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, joinProvenance: null, promo: r.rule, buyerEmail: guest });
+      const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: r.rule, buyerEmail: guest });
       expect(res.ok).toBe(true);
       orderRefs.push(res.ref!);
       const [o] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
@@ -375,7 +385,6 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const res = await placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId: tiny, transform: { scale: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
     expect(res).toMatchObject({ ok: false, reason: 'too-small', productKey: 'framedPrint' });
     expect((await samsOrders()).length).toBe(before.length);

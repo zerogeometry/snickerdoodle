@@ -10,7 +10,7 @@
 /** The code format the shop accepts (src/pricing/promo.ts normalisePromoCode): 3–32 letters, digits or dashes. */
 export const CODE_FORMAT = /^[A-Z0-9-]{3,32}$/;
 export const KINDS = /** @type {const} */ (['PERCENT', 'FIXED', 'FREE_CARD']);
-/** Partner types a code can be MADE with. REFERRAL codes are made by the shop, one per parent (src/server/referrals.ts). */
+/** Partner types a code can be MADE with. (Parents' REFERRAL codes were retired on 17 Nov 2026.) */
 export const MAKEABLE_PARTNER_TYPES = /** @type {const} */ (['INFLUENCER', 'PTA', 'CAMPAIGN']);
 export const LIMITS = { maxPercent: 50, maxPounds: 100, maxMinSpendPounds: 1000, maxCommissionPercent: 30, maxUses: 100_000, partnerName: 80, classLabel: 40 };
 
@@ -135,7 +135,7 @@ export function buildCodeRow(input, now = new Date()) {
   if (partnerName && partnerName.length > LIMITS.partnerName) bad('partnerName', `keep the partner’s name under ${LIMITS.partnerName} letters`);
   const typeRaw = text(input.partnerType)?.toUpperCase() ?? null;
   const partnerType = /** @type {MakeablePartnerType | null} */ (typeRaw);
-  if (typeRaw === 'REFERRAL') bad('partnerType', 'referral codes are made by the shop, one for each parent: choose creator, school PTA or campaign');
+  if (typeRaw === 'REFERRAL') bad('partnerType', 'parents’ referral codes are retired: choose creator, school PTA or campaign');
   else if (typeRaw && !MAKEABLE_PARTNER_TYPES.includes(/** @type {MakeablePartnerType} */ (typeRaw))) bad('partnerType', 'choose creator, school PTA or campaign');
   if (commissionBps > 0 && !partnerName) bad('partnerName', 'a code that earns commission needs the partner it’s paid to');
   if (commissionBps > 0 && !typeRaw) bad('partnerType', 'a code that earns commission needs a partner type');

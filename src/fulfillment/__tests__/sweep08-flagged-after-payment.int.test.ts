@@ -64,7 +64,6 @@ describe.skipIf(!DB || !S3)('sweep 08 — a flagged keepsake and the print pipel
     placeOrder(db, {
       items: [{ productKey: 'framedPrint', qty: 1, artwork: { assetId, transform: { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 } } }],
       account: { id: ids.samId },
-      joinProvenance: null,
     });
 
   it('a FLAGGED keepsake cannot be ordered at all; a still-PENDING one is screened first, never ordered unchecked', async () => {

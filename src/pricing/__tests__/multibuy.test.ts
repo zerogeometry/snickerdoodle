@@ -127,14 +127,13 @@ describe('pricing — multi-buy in the basket', () => {
     expect(q.lines.every((l) => !l.multiBuyBps)).toBe(true);
   });
 
-  it('never stacks with the join saving — the bigger one wins', () => {
-    const join = { savingBps: 500 } as Parameters<typeof priceBasket>[1] extends infer O ? (O extends { joinContext?: infer J } ? NonNullable<J> : never) : never;
-    // 2 mugs: multi-buy 15% (£5.40) beats 5% join (£1.80) → join dropped
-    const two = p([{ productKey: 'mug', qty: 2 }], { joinContext: join });
-    expect([two.multiBuySavingPence, two.joinSavingPence]).toEqual([540, 0]);
-    // a single framed print: no multi-buy → the join saving stands
-    const one = p([{ productKey: 'framedPrint', qty: 1 }], { joinContext: join });
-    expect([one.multiBuySavingPence, one.joinSavingPence]).toEqual([0, 325]);
+  it('the join saving is retired: multi-buy stands alone, and a forged join context adds nothing', () => {
+    const forged = { joinContext: { familyId: 'f', inviteId: 'i', savingBps: 500 } } as unknown as Parameters<typeof priceBasket>[1];
+    const two = p([{ productKey: 'mug', qty: 2 }], forged);
+    expect(two.multiBuySavingPence).toBe(540); // 2 mugs: multi-buy 15%
+    expect(two.totalPence).toBe(3600 - 540 - two.parcelSavingPence); // the same-parcel saving still stacks
+    const one = p([{ productKey: 'framedPrint', qty: 1 }], forged);
+    expect(one.totalPence).toBe(6500); // no multi-buy, nothing else
   });
 
   it('never stacks with the family-set saving on garments either', () => {

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import type { MembershipStatus } from '@/domain/types';
 import {
   CATALOGUE,
   DELIVERY_PENCE,
@@ -7,9 +6,6 @@ import {
   priceBasket,
   quote,
   recipientLineLabel,
-  resolveJoinContext,
-  type JoinContext,
-  type JoinProvenance,
   type PricedLine,
   type RequestedLine,
 } from '@/pricing';
@@ -22,7 +18,7 @@ const NOW = 1_750_000_000_000; // fixed clock (epoch ms) — never use Date.now(
 describe('priceBasket — totals', () => {
   it('empty basket → all zero, no delivery', () => {
     const q = priceBasket([]);
-    expect(q).toMatchObject({ subtotalPence: 0, deliveryPence: 0, joinSavingPence: 0, totalPence: 0 });
+    expect(q).toMatchObject({ subtotalPence: 0, deliveryPence: 0, totalPence: 0 });
     expect(q.lines).toEqual([]);
   });
 
@@ -118,106 +114,33 @@ describe('gift price-hiding', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// The 5% join saving — provenance gating (the non-negotiable)
+// The 5% join saving is RETIRED (founder, 17 Nov 2026): the free first card is the one welcome
 // ─────────────────────────────────────────────────────────────────────────────
-function provenance(over: {
-  invite?: Partial<NonNullable<JoinProvenance['invite']>> | null;
-  membership?: Partial<NonNullable<JoinProvenance['membership']>> | null;
-} = {}): JoinProvenance {
-  const invite =
-    over.invite === null
-      ? null
-      : { id: 'inv-1', familyId: 'fam-A', verified: true, revoked: false, expiresAt: NOW + 86_400_000, ...over.invite };
-  const membership =
-    over.membership === null
-      ? null
-      : { familyId: 'fam-A', status: 'ACTIVE' as MembershipStatus, inviteId: 'inv-1', isOwner: false, savingConsumed: false, ...over.membership };
-  return { invite, membership, now: NOW };
-}
-
-describe('resolveJoinContext — only a genuine verified join earns the saving', () => {
-  it('valid verified in-window join → context', () => {
-    const ctx = resolveJoinContext(provenance());
-    expect(ctx).not.toBeNull();
-    expect(ctx).toMatchObject({ familyId: 'fam-A', inviteId: 'inv-1', savingBps: 500 });
-  });
-
-  const denied: Array<[string, JoinProvenance]> = [
-    ['guest: no invite, no membership', provenance({ invite: null, membership: null })],
-    ['no invite (membership only)', provenance({ invite: null })],
-    ['no membership (invite only)', provenance({ membership: null })],
-    ['invite not verified', provenance({ invite: { verified: false } })],
-    ['invite revoked', provenance({ invite: { revoked: true } })],
-    ['invite expired', provenance({ invite: { expiresAt: NOW - 1 } })],
-    ['membership REMOVED', provenance({ membership: { status: 'REMOVED' } })],
-    ['join saving already consumed (one-time)', provenance({ membership: { savingConsumed: true } })],
-    ['membership LEFT', provenance({ membership: { status: 'LEFT' } })],
-    ['owner is not joining via invite', provenance({ membership: { isOwner: true } })],
-    ['membership not from THIS invite', provenance({ membership: { inviteId: 'other-invite' } })],
-    ['membership has no invite (existing member)', provenance({ membership: { inviteId: null } })],
-    ['cross-family membership vs invite', provenance({ membership: { familyId: 'fam-B' } })],
-  ];
-  for (const [name, p] of denied) {
-    it(`denies — ${name}`, () => {
-      expect(resolveJoinContext(p)).toBeNull();
-    });
-  }
-});
-
-describe('join saving — applied to goods only, via quote()', () => {
+describe('no join saving — whatever the request or the caller claims', () => {
   const items: RequestedLine[] = [
     { productKey: 'storybook', qty: 1 }, // 2600
     { productKey: 'framedPrint', qty: 1 }, // 6500
   ]; // subtotal 9100
 
-  it('valid join → 5% off the subtotal, delivery untouched', () => {
-    const q = quote(items, { joinProvenance: provenance() });
-    expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(455); // Math.round(5% of 9100) = 455
-    expect(q.deliveryPence).toBe(DELIVERY_PENCE);
-    expect(q.totalPence).toBe(9100 - 455 + DELIVERY_PENCE);
-  });
-
-  it('guest (no provenance) → no saving', () => {
+  it('a quote carries no join saving at all', () => {
     const q = quote(items, {});
-    expect(q.joinSavingApplied).toBe(false);
-    expect(q.joinSavingPence).toBe(0);
+    expect(q).not.toHaveProperty('joinSavingPence');
+    expect(q).not.toHaveProperty('joinSavingApplied');
     expect(q.totalPence).toBe(9100 + DELIVERY_PENCE);
   });
 
-  it('forged "I am joining" with no real provenance → no saving', () => {
-    // Whatever the client claims, the server resolves provenance; here it's a
-    // guest, so resolveJoinContext returns null and no discount is granted.
-    const q = quote(items, { joinProvenance: provenance({ invite: null, membership: null }) });
-    expect(q.joinSavingApplied).toBe(false);
+  it('a smuggled join context or provenance changes nothing (the option no longer exists)', () => {
+    const forged = {
+      joinContext: { familyId: 'f', inviteId: 'i', savingBps: 500 },
+      joinProvenance: { invite: { id: 'i', familyId: 'f', verified: true, revoked: false, expiresAt: NOW + 1 }, membership: { familyId: 'f', status: 'ACTIVE', inviteId: 'i', isOwner: false, savingConsumed: false }, now: NOW },
+    } as unknown as Parameters<typeof quote>[1];
+    expect(quote(items, forged).totalPence).toBe(9100 + DELIVERY_PENCE);
+    expect(priceBasket(items, forged as unknown as Parameters<typeof priceBasket>[1]).totalPence).toBe(9100 + DELIVERY_PENCE);
+  });
+
+  it('a gift is priced in full for the payer (recipient prices hidden)', () => {
+    const q = quote(items, { gift: true });
     expect(q.totalPence).toBe(9100 + DELIVERY_PENCE);
-  });
-
-  it('existing active member (membership not from an invite) → no saving', () => {
-    const q = quote(items, { joinProvenance: provenance({ membership: { inviteId: null } }) });
-    expect(q.joinSavingApplied).toBe(false);
-  });
-
-  it('no saving on an empty basket even with a valid join', () => {
-    const q = quote([], { joinProvenance: provenance() });
-    expect(q.joinSavingPence).toBe(0);
-    expect(q.totalPence).toBe(0);
-  });
-
-  it('saving rounds to the nearest penny', () => {
-    // Use an odd subtotal to exercise rounding: storybook 2600 + card 550 = 3150.
-    const odd = quote([{ productKey: 'storybook', qty: 1 }, { productKey: 'card', qty: 1 }], {
-      joinProvenance: provenance(),
-    }); // subtotal 3150 → 5% = 157.5 → Math.round → 158
-    expect(odd.joinSavingPence).toBe(158);
-  });
-
-  it('gift AND a valid join compose (recipient prices hidden, payer pays the discounted total)', () => {
-    const q = quote(items, { gift: true, joinProvenance: provenance() }); // subtotal 9100
-    expect(q.gift).toBe(true);
-    expect(q.joinSavingApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(455);
-    expect(q.totalPence).toBe(9100 - 455 + DELIVERY_PENCE);
     expect(recipientLineLabel(q.lines[0]!, q.gift)).toBe('gift');
   });
 });
@@ -292,25 +215,22 @@ describe('family-set saving — 3+ garments in one order', () => {
     expect(q.totalPence).toBe(1800);
   });
 
-  it('composes with the join saving (both apply; total reflects both)', () => {
-    const q = quote(
+  it('the family set is the only saving on garments — a forged join context adds nothing', () => {
+    const q = priceBasket(
       [
         { productKey: 'kidsTee', qty: 1 }, // 2500
         { productKey: 'adultTee', qty: 2 }, // 6400 → garments 8900
       ],
-      { joinProvenance: provenance() },
+      { joinContext: { familyId: 'f', inviteId: 'i', savingBps: 50_000 } } as unknown as Parameters<typeof priceBasket>[1],
     ); // subtotal 8900
-    expect(q.joinSavingApplied).toBe(true);
     expect(q.familySetApplied).toBe(true);
-    expect(q.joinSavingPence).toBe(445); // 5% of 8900
-    expect(q.familySetSavingPence).toBe(445); // 5% of the same garments
-    expect(q.totalPence).toBe(8900 - 445 - 445 + DELIVERY_PENCE);
+    expect(q.familySetSavingPence).toBe(445); // 5% of the garments
+    expect(q.totalPence).toBe(8900 - 445 + DELIVERY_PENCE);
   });
 
-  it('combined savings can never exceed the goods (clamped, total ≥ 0)', () => {
-    const oversized: JoinContext = { familyId: 'f', inviteId: 'i', savingBps: 50_000 };
-    const q = priceBasket([{ productKey: 'kidsTee', qty: 3 }], { joinContext: oversized });
-    expect(q.joinSavingPence + q.familySetSavingPence).toBeLessThanOrEqual(q.subtotalPence);
+  it('savings can never exceed the goods (clamped, total ≥ 0)', () => {
+    const q = priceBasket([{ productKey: 'kidsTee', qty: 3 }]);
+    expect(q.familySetSavingPence).toBeLessThanOrEqual(q.subtotalPence);
     expect(q.totalPence).toBeGreaterThanOrEqual(0);
   });
 
@@ -333,14 +253,6 @@ describe('family-set saving — 3+ garments in one order', () => {
 // Defensive integrity — the total can never go negative (CLAUDE.md)
 // ─────────────────────────────────────────────────────────────────────────────
 describe('priceBasket — totals never go negative', () => {
-  it('an absurd savingBps cannot drive the total below zero or the saving above the goods', () => {
-    // savingBps is fixed at 500 by resolveJoinContext; this exercises the clamp directly.
-    const oversized: JoinContext = { familyId: 'f', inviteId: 'i', savingBps: 50_000 };
-    const q = priceBasket([{ productKey: 'card', qty: 1 }], { joinContext: oversized }); // subtotal 400
-    expect(q.joinSavingPence).toBeLessThanOrEqual(q.subtotalPence);
-    expect(q.totalPence).toBeGreaterThanOrEqual(0);
-  });
-
   it('a negative delivery override cannot produce a negative total', () => {
     const q = priceBasket([{ productKey: 'card', qty: 1 }], { deliveryPence: -100_000 });
     expect(q.totalPence).toBeGreaterThanOrEqual(0);
@@ -453,11 +365,9 @@ describe('card packs — pricing', () => {
     expect(priceBasket([evil], { catalogue: cat }).totalPence).toBe(2100);
   });
 
-  it('the 5% join saving applies ONLY with a valid server-side join context', () => {
+  it('a pack is charged in full — there is no join saving to claim', () => {
     const items: RequestedLine[] = [{ productKey: 'cardPack-packof10', qty: 1 }];
-    expect(quote(items, { catalogue: cat, joinProvenance: provenance() })).toMatchObject({ joinSavingApplied: true, joinSavingPence: 105, totalPence: 2100 - 105 });
-    expect(quote(items, { catalogue: cat })).toMatchObject({ joinSavingApplied: false, joinSavingPence: 0, totalPence: 2100 }); // guest
-    expect(quote(items, { catalogue: cat, joinProvenance: provenance({ invite: null, membership: null }) })).toMatchObject({ joinSavingApplied: false, totalPence: 2100 }); // forged
+    expect(quote(items, { catalogue: cat })).toMatchObject({ totalPence: 2100 });
   });
 
   it('a pack is not a garment — no family-set saving', () => {
