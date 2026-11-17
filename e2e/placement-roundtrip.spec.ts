@@ -198,8 +198,9 @@ test('double-tap toggles fit ↔ fill (a contained product); on a frame it snaps
     const b = (await app(page).boundingBox())!;
     await page.mouse.dblclick(b.x + b.width / 2, b.y + b.height / 2);
   };
-  // the sack (a tall print panel) contains (fit) a square drawing by default → double-tap fills → fits again
-  await goClient(page, '/customize/sack');
+  // the adults' tee (a tall 40 × 50 cm print panel) contains (fit) a square drawing by default → double-tap fills → fits
+  // again (it was the sack, off sale since 16 Nov 2026)
+  await goClient(page, '/customize/adultTee');
   await openEditor(page);
   const fit = await editorState(page);
   await dbl();

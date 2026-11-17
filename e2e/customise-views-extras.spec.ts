@@ -50,8 +50,9 @@ for (const vp of [{ name: 'phone', width: 390, height: 844 }, { name: 'desktop',
     const log: string[] = [];
     await ready(page);
 
-    // the front / the back: the ornament + the sack (unprinted back = white fill), the bauble (printed both sides)
-    for (const [key, label] of [['ceramicOrnament', 'ceramic christmas ornament'], ['christmasBauble', 'christmas bauble'], ['sack', 'christmas sack']] as const) {
+    // the front / the back: the ornament (unprinted back = white fill), the bauble (printed both sides) — the sack
+    // is off sale (16 Nov 2026)
+    for (const [key, label] of [['ceramicOrnament', 'ceramic christmas ornament'], ['christmasBauble', 'christmas bauble']] as const) {
       await open(page, key, label);
       await page.getByRole('button', { name: 'show the back' }).click();
       await composed(seen, (c) => c.view === 'back', `${key}: the back composed`);

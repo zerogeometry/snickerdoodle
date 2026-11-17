@@ -2,6 +2,7 @@ import { test, expect, type Page } from './test';
 import Stripe from 'stripe';
 import { clearForTest, hasDb, signInByEmailLink, sql, testEmail } from './harness';
 import { gbp, quietCookies, uploadAndOpenRange } from './helpers';
+import { payOnStripe as payStripeCheckout, seenOnStripe } from './stripe-pay';
 
 /**
  * Test sweep 05 (29 Oct 2026) — basket, prices, checkout, orders, in the real pages.
@@ -337,40 +338,10 @@ test.describe('checkout sweep 05', () => {
     test.skip(!stripeTest, 'needs STRIPE_SECRET_KEY=sk_test_… and STRIPE_WEBHOOK_SECRET');
     const stripe = () => new Stripe(KEY);
 
-    /**
-     * Fill Stripe Checkout (hosted, test mode) and pay. Fields are found the way a person finds them —
-     * by their label — falling back to the standard autofill token, never Stripe's internal ids (which
-     * Stripe changes).
-     */
+    /** Fill Stripe Checkout (hosted, test mode) and pay — the shared helper (e2e/stripe-pay.ts), which finds
+     * Stripe's fields wherever Stripe puts them (on the page or inside its own frames). */
     async function payOnStripe(page: Page, card: string) {
-      await expect(page).toHaveURL(/checkout\.stripe\.com/, { timeout: 60_000 });
-      const field = (label: RegExp, autocomplete: string) => page.getByLabel(label).or(page.locator(`input[autocomplete~="${autocomplete}"]`)).first();
-      const name = field(/^full name$/i, 'name');
-      await expect(name).toBeVisible({ timeout: 30_000 }); // the form is up
-      // a signed-in parent's email is handed to Stripe, which then shows it as plain text, not a box
-      const email = field(/^email$/i, 'email');
-      if (await email.count()) await email.fill('t5-payer@example.test');
-      await name.fill('Test Person');
-      // the address form: line 1, city, postcode (UK only)
-      const manual = page.getByRole('button', { name: /enter address manually/i });
-      if (await manual.isVisible().catch(() => false)) await manual.click();
-      await field(/^address( line 1)?$/i, 'address-line1').fill('1 Test Street');
-      await field(/^(town or city|city)$/i, 'address-level2').fill('London');
-      await field(/^(postal code|postcode)$/i, 'postal-code').fill('SW1A 1AA');
-      const cardNumber = field(/^card number$/i, 'cc-number');
-      if (!(await cardNumber.isVisible())) {
-        // card is one of several payment methods: open it (the accordion button sits under an overlay)
-        await page.getByRole('button', { name: /^pay with card$/i }).or(page.getByTestId('card-accordion-item-button')).first().dispatchEvent('click');
-      }
-      await cardNumber.fill(card);
-      await field(/^(expiration|expiry)/i, 'cc-exp').fill('12 / 34');
-      await field(/cvc/i, 'cc-csc').fill('123');
-      const same = page.getByRole('checkbox', { name: /same as shipping/i });
-      if ((await same.count()) && !(await same.first().isChecked())) await same.first().check();
-      // never sign up to Stripe's "save my information" (it would ask for a phone number)
-      const save = page.getByRole('checkbox', { name: /save my information/i });
-      if ((await save.count()) && (await save.first().isChecked())) await save.first().uncheck();
-      await page.getByRole('button', { name: 'Pay', exact: true }).or(page.getByTestId('hosted-payment-submit-button')).first().click();
+      await payStripeCheckout(page, card, 't5-payer@example.test');
     }
 
     async function orderOf(parent: string) {
@@ -442,7 +413,7 @@ test.describe('checkout sweep 05', () => {
       const parent = await parentWithMug(page);
       await page.locator('aside').getByRole('button', { name: /^checkout$/ }).click();
       await payOnStripe(page, '4000000000000002');
-      await expect(page.getByText(/card (was|has been) declined/i).first()).toBeVisible({ timeout: 60_000 });
+      expect(await seenOnStripe(page, /card (was|has been) declined/i), 'Stripe says the card was declined').toBe(true);
       await page.screenshot({ path: `${SHOTS}/stripe-declined.png` });
       const o = await orderOf(parent);
       expect(o.status).toBe('PENDING');

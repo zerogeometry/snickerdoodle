@@ -18,6 +18,9 @@ export function PhoneModelPicker({ value, onChange }: { value: string | null; on
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
+  // the blur's short delay (so a tapped option lands first) — cancelled if the box is used again before it runs
+  const closing = useRef<number | undefined>(undefined);
+  const keepOpen = () => window.clearTimeout(closing.current);
   const results = useMemo(() => searchPhones(query), [query]);
   const chosen = PHONE_MODELS.find((m) => m.name === value) ?? null;
 
@@ -68,12 +71,18 @@ export function PhoneModelPicker({ value, onChange }: { value: string | null; on
           placeholder={chosen ? 'type to change phone…' : 'type your phone, e.g. iPhone 16 Pro'}
           value={query}
           onChange={(e) => {
+            keepOpen();
             setQuery(e.target.value);
             setOpen(true);
             setActive(0);
           }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          onFocus={() => {
+            keepOpen();
+            setOpen(true);
+          }}
+          onBlur={() => {
+            closing.current = window.setTimeout(() => setOpen(false), 120);
+          }}
           onKeyDown={onKeyDown}
           className="block min-h-12 w-full rounded-[14px] border-2 border-cocoa/25 bg-paper pl-10 pr-3 text-base text-cocoa placeholder:text-ink-faint focus:border-cocoa"
         />
