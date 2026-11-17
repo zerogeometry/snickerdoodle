@@ -71,6 +71,8 @@
     "satori": "^0.26.0",
     "server-only": "^0.0.1",
     "sharp": "^0.35.2",
+    "simplewebauthn-browser": "npm:@simplewebauthn/browser@13.3.0",
+    "simplewebauthn-server": "npm:@simplewebauthn/server@13.3.3",
     "stripe": "^22.3.0",
     "three": "^0.185.1",
     "zustand": "^5.0.14"

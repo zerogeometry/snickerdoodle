@@ -97,6 +97,30 @@ describe.skipIf(!URL)('Auth.js Drizzle adapter — integration', () => {
     expect(await adapter.getSessionAndUser!(sessionToken)).toBeNull();
   });
 
+  it('an email sign-in is marked email; a Face ID (passkey) sign-in reads, refreshes and signs out like any other', async () => {
+    const id = randomUUID();
+    await adapter.createUser!({ id, email: `pk-sess-${nonce}@example.com`, emailVerified: new Date() });
+    created.push(id);
+    // Auth.js's own sessions (the link, the code) take the default
+    await adapter.createSession!({ sessionToken: `email-tok-${nonce}`, userId: id, expires: new Date(Date.now() + 3_600_000) });
+    const [byEmail] = await db.select().from(sessions).where(eq(sessions.sessionToken, `email-tok-${nonce}`));
+    expect(byEmail!.signInMethod).toBe('email');
+
+    // a passkey sign-in writes its row itself (src/server/passkeys.ts) — Auth.js reads it like its own
+    const token = `passkey-tok-${nonce}`;
+    await db.insert(sessions).values({ sessionToken: token, userId: id, expires: new Date(Date.now() + 3_600_000), signInMethod: 'passkey' });
+    const got = await adapter.getSessionAndUser!(token);
+    expect(got?.user.id).toBe(id);
+    // the daily "still here" refresh moves the expiry and leaves how they signed in alone
+    const later = new Date(Date.now() + 7_200_000);
+    expect((await adapter.updateSession!({ sessionToken: token, expires: later }))?.expires.getTime()).toBe(later.getTime());
+    const [row] = await db.select().from(sessions).where(eq(sessions.sessionToken, token));
+    expect(row!.signInMethod).toBe('passkey');
+    // log out ends it
+    await adapter.deleteSession!(token);
+    expect(await adapter.getSessionAndUser!(token)).toBeNull();
+  });
+
   it('updateUser marks the email verified', async () => {
     const id = created[0]!;
     const when = new Date();

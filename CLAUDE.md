@@ -171,6 +171,11 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
   policies). TLS + at-rest KMS encryption (separate keys for originals). No secrets in client/bundle;
   secret store only; .env never committed. Hashed passwords; least-privilege DB; ADMIN routes MFA.
   Webhooks verify signatures + are idempotent. Card data never stored (Stripe token only).
+- Sign-in = the email link/code (Auth.js, database sessions) + OPTIONAL passkeys ("sign in with Face ID",
+  src/server/passkeys.ts, @simplewebauthn aliased as simplewebauthn-*). A passkey can only be ADDED while signed in
+  by email; it keeps the PUBLIC key only (nothing biometric, ever); a passkey sign-in writes an ordinary `sessions`
+  row (fresh for A-63). Anything that deletes a person's sessions (member removal, account closure) also deletes
+  their passkeys (deleteAllPasskeys). Add / remove are audited (PASSKEY_ADDED / PASSKEY_REMOVED).
 - noindex on app/gift/checkout; gift-link tokens unguessable, non-indexed, revocable, expirable.
   ONE gift link PER PERSON (D27): sent only to them, revocable on its own, showing only what that
   person's circle may see (checked live); an open link carries the circle the parent picked.
