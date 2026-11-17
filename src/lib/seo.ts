@@ -34,6 +34,7 @@ export const PUBLIC_PAGES: { path: string; priority: number; changeFrequency: 'w
   { path: '/trust/family-promise', priority: 0.6, changeFrequency: 'yearly' },
   { path: '/trust/privacy', priority: 0.5, changeFrequency: 'yearly' },
   { path: '/trust/terms', priority: 0.4, changeFrequency: 'yearly' },
+  { path: '/trust/terms/draw', priority: 0.3, changeFrequency: 'yearly' },
   { path: '/trust/cookies', priority: 0.3, changeFrequency: 'yearly' },
   { path: '/trust/data-complaint', priority: 0.3, changeFrequency: 'yearly' },
 ];
