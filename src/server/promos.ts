@@ -30,6 +30,21 @@ const PAID = ['PAID', 'FULFILLING', 'SHIPPED'] as const;
  */
 export const WELCOME_CARD_CODE = 'FIRSTCARD';
 
+let welcomeCodeChecked = false;
+/**
+ * Make sure the welcome code's row exists (migration 0059 adds it; on a brand-new database that insert has to
+ * be skipped — see the migration). Once per process; never re-adds or re-enables a code switched off on
+ * /admin/codes (ON CONFLICT DO NOTHING).
+ */
+export async function ensureWelcomeCode(db: DbHandle): Promise<void> {
+  if (welcomeCodeChecked) return;
+  await db
+    .insert(promoCodes)
+    .values({ code: WELCOME_CARD_CODE, kind: 'FREE_CARD', value: 0, minSpendPence: 0, commissionBps: 0, firstOrderOnly: true, active: true })
+    .onConflictDoNothing({ target: promoCodes.code });
+  welcomeCodeChecked = true;
+}
+
 /** A guest's email as they typed it — trimmed, lowercased, and only if it looks like one. */
 export function normaliseBuyerEmail(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;
@@ -149,6 +164,7 @@ export async function resolveCheckoutPromo(db: DbHandle, typed: string | null | 
     return r.ok ? { rule: r.rule, auto: false, cardEligible } : { rule: null, refusal: r.reason, auto: false, cardEligible };
   }
   if (!cardEligible) return { rule: null, auto: false, cardEligible };
+  await ensureWelcomeCode(db);
   const welcome = await resolvePromo(db, WELCOME_CARD_CODE, now, buyer);
   return { rule: welcome.ok ? welcome.rule : null, auto: welcome.ok, cardEligible };
 }

@@ -301,14 +301,14 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
     const [fresh] = await db.insert(schema.accounts).values({ email: `first-card-${ids.nonce}@example.test` }).returning();
     const buyer = { accountId: fresh!.id, email: fresh!.email };
     try {
-      // the shop's code exists (migration 0059) and is first-order-only
-      const [welcome] = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.code, WELCOME_CARD_CODE));
-      expect(welcome).toMatchObject({ kind: 'FREE_CARD', firstOrderOnly: true, active: true, commissionBps: 0 });
-
       // typed nothing, signed in, no paid order yet → the welcome card, by itself
       const auto = await resolveCheckoutPromo(db, undefined, buyer);
       expect(auto).toMatchObject({ auto: true, cardEligible: true });
       expect(auto.rule?.code).toBe(WELCOME_CARD_CODE);
+
+      // the shop's code exists (migration 0059, or checkout itself on a brand-new database) and is first-order-only
+      const [welcome] = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.code, WELCOME_CARD_CODE));
+      expect(welcome).toMatchObject({ kind: 'FREE_CARD', firstOrderOnly: true, active: true, commissionBps: 0 });
 
       // a card on its own is never free: it comes with the rest of an order
       const alone = await placeOrder(db, { items: [{ productKey: 'card', qty: 1 }], account: { id: fresh!.id }, buyerEmail: fresh!.email, promo: auto.rule, freeCardEligible: true });
@@ -318,8 +318,9 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       expect(oa!.promoCodeId).toBeNull();
       await db.delete(orders).where(eq(orders.id, oa!.id)); // (not a first order we want to keep)
 
-      // a card + a mug on the first order: the card's price comes off
-      const first = await placeOrder(db, { items: [{ productKey: 'card', qty: 1 }, { productKey: 'mug', qty: 1 }], account: { id: fresh!.id }, buyerEmail: fresh!.email, promo: auto.rule, freeCardEligible: true });
+      // a card + a blanket on the first order (clears the margin floor at any costs the DB holds — a bare CI database
+      // still has placeholder card costs): the card's price comes off
+      const first = await placeOrder(db, { items: [{ productKey: 'card', qty: 1 }, { productKey: 'blanket', qty: 1 }], account: { id: fresh!.id }, buyerEmail: fresh!.email, promo: auto.rule, freeCardEligible: true });
       expect(first.ok).toBe(true);
       orderRefs.push(first.ref!);
       const [o1] = await db.select().from(orders).where(eq(orders.ref, first.ref!));
