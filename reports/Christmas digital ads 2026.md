@@ -335,8 +335,9 @@ and B)
 >    3 December? Could you also tell me how many features share each send, the open and click rates you usually see, and
 >    the image size and word count? I'd love to know if you'd consider a reader competition instead, for example "win a framed
 >    print of your child's drawing", as we'd happily give the prize.
-> 2. **February half-term (copy date about 12 January):** what would a package of the Avon print edition plus one e-news
->    cost? It lands nicely for Mother's Day.
+> 2. **February half-term (copy date about 12 January):** we sell UK-wide, so could you send prices for the national e-news
+>    plus a print ad across as many editions as a package allows, and the number of copies each covers? It lands nicely for
+>    Mother's Day.
 >
 > Our budget for the Christmas send is about £150, and I'd add a code just for Primary Times families so you can see what it
 > does.
