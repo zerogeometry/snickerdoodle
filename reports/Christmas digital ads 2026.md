@@ -53,6 +53,7 @@ I scored every option on the same footing, then kept only the cheapest per famil
 | **Happity newsletter (brand partnerships)** | ask; book at ≤£150, or on commission | **120k subscribers**, parents of babies and toddlers; 350k site visits a month ([S](https://www.happity.co.uk/blog/partners-press/)) | ~90% | **~£4.63** at £150 | £10–£35 | **In (move 2)** |
 | **Picniq weekly newsletter** | **£150** ([S](https://www.picniq.co.uk/about/advertise)) | **140k+ families** (S) | ~75% | **~£4.76** | £9–£30 | **In (move 2)** |
 | Day Out With The Kids email | ask | list not published; opens "in excess of 30%" ([S](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)) | ~75% | unknown | unknown | **Backup** for move 2 |
+| **Primary Times national e-news** | price on request; worth it at ≤£150 | **85,000+ subscribers**, parents of 4–11s (their email to you, 18 Nov) | ~90% | ~£6.50 at £150; ~£4.40 at £100 | £10–£35 | **Ask (from their reply)**: the right parents; shared send of 5–7 items |
 | **The Parent Edit** (UK luxury parenting and lifestyle magazine) | ask; book at ≤£150 | not published; already runs a 2026 "one-off personalised Christmas gift" guide ([S](https://www.theparentedit.co.uk/)) | ~80% | unknown | unknown | **Ask (lifestyle pick)**: best product fit found |
 | The Green Parent newsletter | ask | 15k a week (2024 kit, [S](https://thegreenparent.co.uk/content/files/2024/04/TGP-Media-Kit-2024.pdf)) | ~70% | it would need to cost under ~£30 a send to match London Mums | unknown | Out unless very cheap |
 | Big UK parenting Substacks (How to Feed 25k, Talking Sense 18k, Every Shade of Grey 16k, The Frazzled Mums Club 11k) | no price published | 11k–25k each ([S, their own pages](https://charlottestirlingreed.substack.com/)) | 50–90% | £50–£140 if a slot costs £300 | — | **Commission only (move 3)**, never a fee |
@@ -319,6 +320,28 @@ and B)
 > if you prefer.
 >
 > Thanks very much,
+> Simon
+> snickerdoodle.co.uk · [your phone]
+
+**B4. Primary Times: reply to Victoria** (they've already been in touch, 18 Nov)
+
+> **Subject:** Re: Snickerdoodle: national e-news before Christmas, and February
+>
+> Hi Victoria,
+>
+> Thanks to Marie for the call and the examples. Two things, please:
+>
+> 1. **The national e-news (85,000+):** what does one feature cost, and do you have a send between 26 November and
+>    3 December? Could you also tell me how many features share each send, the open and click rates you usually see, and
+>    the image size and word count? I'd love to know if you'd consider a reader competition instead, for example "win a framed
+>    print of your child's drawing", as we'd happily give the prize.
+> 2. **February half-term (copy date about 12 January):** what would a package of the Avon print edition plus one e-news
+>    cost? It lands nicely for Mother's Day.
+>
+> Our budget for the Christmas send is about £150, and I'd add a code just for Primary Times families so you can see what it
+> does.
+>
+> Thanks,
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
