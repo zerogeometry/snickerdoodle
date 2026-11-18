@@ -2,12 +2,23 @@
 
 Written 18 November 2026 for Simon. **Nothing has been contacted, booked, signed up to or paid for.**
 
+*Corrected the same day: the first draft used the old "about £5 an order" from the costs report. Every margin, break-even
+count and verdict below now uses the per-product Prodigi Pro figures in
+[05 · Product profitability](investor-deck/05-profitability-and-growth-roadmap.md), and the ads and emails now lead with frames
+and blankets.*
+
 **The answer.** Yes: put this Christmas's marketing money into digital, not print or offline. It can go live in days, say the
 right "order by" date, be counted with a code, and be switched off the minute a cut-off passes. Print can't do any of that
-in the 16–20 selling days left. But at about £5 margin an order, **no fixed-fee placement found pays for itself**. So lead with
-**commission-only partner codes** (you pay only when someone buys). Then run a handful of **cheap, capped tests**: Bristol24/7's
-gift guide, The Bristol Magazine newsletter, London Mums, Happity, a few Get Blogged slots, and a **£150 Meta baseline**. Keep
-total cash **under about £550**. Expect about 10–35 orders, and treat it as the price of learning what to back for Mother's Day.
+in the 16–20 selling days left. On Prodigi Pro an order leaves about **£10.37 on a typical basket and £14.34 when it's led by
+frames and blankets** (worked out product by product in
+[05 · Product profitability on Prodigi Pro](investor-deck/05-profitability-and-growth-roadmap.md)). At that, the cheapest
+newsletters (**London Mums, and Happity if it's £75 or less**) can roughly pay for themselves on the first order. So:
+**commission-only partner codes** first (you pay only when someone buys, and keep about £6.70–£9.20 an order), then a handful of
+**cheap, capped tests**: Bristol24/7's gift guide, The Bristol Magazine newsletter, London Mums, Happity, a few Get Blogged
+slots, and a **£150 Meta baseline**. Keep total cash **under about £550**. **Make every ad sell framed prints, multi frames,
+blankets and cushions**, not mugs, baubles and cards: they leave two to four times as much per order, and their last order date
+is the latest (Mon 14 Dec). Expect about 10–35 orders, worth roughly **£100–£500 of profit against the £545** on first orders
+(E), more with repeat orders, and use it to learn what to back for Mother's Day.
 
 **How to read the numbers.** **S** = published (with a link). **E** = my estimate. You're VAT-registered, so ex-VAT prices are
 your real cost once VAT is reclaimed. "Your turn" = you do it. "I'll do" = I can do it for you.
@@ -18,7 +29,7 @@ your real cost once VAT is reclaimed. "Your turn" = you do it. "I'll do" = I can
 |---|---|---|---|---|---|
 | 1 | **Make one code per placement** (list in Measurement). Your turn: on [/admin/codes](https://snickerdoodle.co.uk/admin/codes). I'll do: write the SQL instead if you'd rather paste it into production yourself | £0 | Thu 19 Nov | — | — |
 | 2 | **Email Bristol24/7 about its Christmas gift guide** (email 2 below). Last year's went up Thu 27 Nov ([S](https://www.bristol247.com/lifestyle/gift-guide/christmas-gift-guide-2025/)), and no 2026 guide was listed on 18 Nov ([S](https://www.bristol247.com/lifestyle/gift-guide/)) | Ask. Say yes only to a code deal or about £100 or less (E cap) | **Thu 19 Nov** | about Thu 26 Nov (E) | 15 / 17 / 19 |
-| 3 | **Send commission-code emails** to 5–10 small parenting blogs, Instagram gift-guide accounts and Substacks, plus Bristol Mum, Bristol Parent and Practically Perfect Mums (emails 3 and 5) | £2.92 a first order, nothing up front | Fri 20 Nov | 30 Nov – 2 Dec (E) | 9–11 / 11–13 / 13–15 |
+| 3 | **Send commission-code emails** to 5–10 small parenting blogs, Instagram gift-guide accounts and Substacks, plus Bristol Mum, Bristol Parent and Practically Perfect Mums (emails 3 and 5) | 10% of a first order before VAT (about £3.70 on a £44 order, £5.10 on a £62 frame order), nothing up front | Fri 20 Nov | 30 Nov – 2 Dec (E) | 9–11 / 11–13 / 13–15 |
 | 4 | **Ask Happity** about its Sunday What's On email to 140k+ parents (email 4) | Ask. Go only if about £75 or less (E cap), or on a code | Fri 20 Nov | Sun 29 Nov or Sun 6 Dec | 12 / 14 / 16 (or 5 / 7 / 9) |
 | 5 | **Post a free Get Blogged brief** (text below). Accept up to 4 gift-guide slots, only ones that publish by Wed 2 Dec. Your turn: the sign-up | £21–£26 a slot incl. VAT and fee ([S](https://www.getblogged.net/pricing/)), about £100 total | Fri 20 Nov | 1–2 Dec (E) | 9–10 / 11–12 / 13–14 |
 | 6 | **Book one Bristol Magazine newsletter slot** with an "order by" message (email 1) | £45 ex VAT ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)) | Mon 23 Nov | the weekend send around Fri 4 Dec (E, day to confirm) | 7 / 9 / 11 |
@@ -41,8 +52,8 @@ week of 7 December (−6.7% on the year), so early-December shoppers need a nudg
 ([S, IMRG via Retail Economics](https://www.retaileconomics.co.uk/report-online-retail/archive/december-2025)).
 
 **2. Print can't land in time, and it can't pay back.** Door drops average about **0.5–0.6% response at about £200 per
-customer** ([S, DMA/JICMAIL](https://dma.org.uk/uploads/misc/door-drops-2024-report-final.pdf)). That's 40 times your £5
-margin. A leaflet lasts about **5.6 days in the home** ([S](https://dma.org.uk/article/what-is-the-response-rate-from-leaflet-distribution-revised-edition)).
+customer** ([S, DMA/JICMAIL](https://dma.org.uk/uploads/misc/door-drops-2024-report-final.pdf)). That's 14–20 times the
+£10–£14 an order leaves on Prodigi Pro. A leaflet lasts about **5.6 days in the home** ([S](https://dma.org.uk/article/what-is-the-response-rate-from-leaflet-distribution-revised-edition)).
 Royal Mail's door-to-door service needs about three weeks' notice, so a drop booked now would land around 8–9 Dec, just as
 cards close. The print deadlines for local magazines have also gone: The Bristol Magazine's December copy closed 11 Nov
 ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)), and Primary Times' winter-issue copy
@@ -65,34 +76,47 @@ Day job.
 **Assumptions, used the same way in every row (all E):**
 
 - **Newsletters:** 30% of the list opens it, unless the publisher publishes a rate. 2% of openers click a paid slot. 2% of
-  clickers buy (a £35 personalised gift, a new shop, no reviews yet).
+  clickers buy (a personalised gift, a new shop, no reviews yet).
 - **Blogs and gift guides:** 1,000–3,000 views per post during the window. The same 2% click and 2% buy.
 - **Paid social:** 1% of people shown the ad click. 2% of clickers buy.
-- **Margin:** £5 an order. **Break-even orders = cost ÷ £5.**
+- **What an order leaves, on Prodigi Pro** (from [05 · Product profitability](investor-deck/05-profitability-and-growth-roadmap.md),
+  E on the mix): **£10.37** on a typical basket (about £44) and **£14.34** on a frame-led one (about £62). Those already
+  allow for card fees, reprints, running costs and the free first card, and they're after Pro's 15% off the product (Pro's
+  own £35 a month isn't in them). Small gifts alone (mugs, baubles, cards) leave only about £6.45.
+- **Break-even orders = cost ÷ £10.37 (typical) or ÷ £14.34 (frame-led)**, rounded up.
+- **Worth repeating:** a cost per first order of about **£20–£25 or less**, because roughly a third of customers are expected
+  to come back (05 puts frame-led break-even at about £17 within a year and £23 over three years, E).
 - **A newsletter is a one-day hit.** Most replies come within about 48 hours of the send (E).
 
-Ranked by likely sales per £ and by whether it can be live by 30 November.
+Ranked by likely profit per £ and by whether it can be live by 30 November.
 
-| # | Option | Cost | Reach | Efficacy evidence | Estimated cost per order (maths) | Break-even orders | Live by 30 Nov? | Confidence |
-|---|---|---|---|---|---|---|---|---|
-| 1 | **Commission-only partner codes** (small blogs, Instagram, Substacks) | 10% of the order before VAT, on a follower's first paid order: **£2.92 on £35** (site rule) | Varies; small lists, 1k–20k (E) | About 1.5 code uses per 1,000 views in one vendor example ([S, Influee](https://influee.co/gb/blog/influencer-discount-codes)) | Fixed at **£2.92**, about £2 left per order. Volume unknown: 0–15 orders across 5–10 partners (E) | **0**: never loses money | Maybe. Depends on replies (E) | High on cost, low on volume |
-| 2 | **Bristol24/7 gift guide or newsletter story** | Newsletter story **£175** (2022, [S](https://www.bristol247.com/wp-content/uploads/2022/04/B247-Media-Pack-20221-1.pdf)); 2026 likely £175–£250 (E); gift-guide slot not published | Newsletter 12k+, **33.3% open** (2022, S); Instagram 100k+ ([S](https://www.bristol247.com/partnership-opportunities/)) | Open rate only (S). No click or sales figure published | £175 ÷ (12,000 × 33% × 2% × 2% ≈ 1.6 orders) ≈ £110. Realistically 1–4 orders with the guide page, **£45–£175 each** | 35 at £175; 0 on a code deal | Yes, if a guide runs about 26 Nov (E) | Medium on reach, low on price |
-| 3 | **London Mums newsletter** | **£75** for 50 words plus an image ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | **41,000+** opt-in subscribers, monthly ([S](https://new.londonmumsmagazine.com/wp-content/uploads/2025/01/MEDIA-KIT-London-Mums-2025.pdf)) | None published | £75 ÷ (41,000 × 30% × 2% × 2% ≈ 4.9 orders) ≈ £15. Realistically 2–6 orders, **£13–£38 each** | 15 | Unknown: send date not published | Medium (price S, response E) |
-| 4 | **Happity What's On email** (parents of 0–5s, UK) | Not published; "all budgets" ([S](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity)). Price signal: a $4.62 per 1,000 subscribers benchmark ([S, Paved](https://ppc.land/paved-finds-hr-newsletter-ad-rates-run-15-times-higher-than-lifestyle-lists/)) suggests about £500 (E) | **140k+ parents**, Sunday nights ([S](https://support.happity.co.uk/en/articles/6081998-what-is-the-what-s-on-newsletter-and-how-can-my-classes-be-included)) | None published | 140,000 × 30% × 2% × 2% ≈ 17 orders (E). Realistically 5–17. At £500 that's **£30–£100 each**; at £75, £5–£15 | 100 at £500; 15 at £75 | Yes, Sun 29 Nov, if they reply fast | Low on price, medium on reach |
-| 5 | **Get Blogged gift-guide slots** (×4) | **£20.80–£26** a slot incl. VAT and fee; free brief ([S](https://www.getblogged.net/pricing/)) | Not published per blog | None published | Per slot: 1,000–3,000 views × 2% × 2% = 0.4–1.2 orders. Four slots ≈ 2–5 orders, **£20–£50 each** | 4–5 per slot | Maybe. More likely 1–4 Dec (E) | Low |
-| 6 | **The Bristol Magazine newsletter** | **£45** a send ex VAT; £150 for 4 ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)) | **5,000+** subscribers (July 2024 figure, S); affluent BS6, BS8 and BS9 | None published; listings live "within 24 hours" (S) | £45 ÷ (5,000 × 30% × 2% × 2% ≈ 0.6 orders) ≈ £75. Realistically 0–2 orders, **£23 each at best** | 9 | Yes | High on price, medium on reach |
-| 7 | **Small Bristol family sites** (Bristol Mum, Bristol Parent, Practically Perfect Mums) | Not published ([S](https://bristolmum.com/contact/disclosure-policy), [S](https://bristolparent.co.uk/?p=45422)). Propose the £2.92 code | Not published | None published | On a code: **£2.92 an order**, volume unknown (E) | 0 on a code | Maybe | Low |
-| 8 | **Meta baseline** (2–12 Dec) | **£150** cap. December CPM (cost per 1,000 times the ad is shown) about **£20** (E, from earlier research) | 7,500 impressions | Black Friday week 2025: prices **+59%**, but buying per click **+48%** and cost per purchase **−20%** ([S, Lebesgue, US-led](https://lebesgue.io/facebook-ads/are-meta-ads-worth-it-black-friday)) | £150 ÷ (7,500 × 1% × 2% ≈ 1.5 orders) ≈ £100. Realistically 1–3 orders, **£50–£150 each** (earlier research: £45–£110 a sale, E) | 30 | Yes, but wait until 2 Dec | Medium |
-| 9 | **Nextdoor Local Deals** (BS9, BS11, Portishead) | "From £1" ([S](https://business.nextdoor.com/en-gb/small-business/industry/retail)) | Not published | None published | Can't calculate. Assume Meta-like: **£50–£150** (E) | 6 on a £30 test | Yes (self-serve) | Low |
-| 10 | **Pinterest ads** | Clicks £0.25–£0.60 (E, earlier research); 10p–£1.20 per UK blog ([S](https://www.lilachbullock.com/pinterest-advertising-cost-uk/)) | Gift searches peak Oct–Dec ([S](https://business.pinterest.com/en-gb/blog/festive-gifting-pinterest/)) | No UK sales rate published | £100 ÷ (167–400 clicks × 0.3–1% ≈ 0.5–4 orders) = **£25–£200** | 20 on £100 | Yes, in 1–3 days | Low |
-| 11 | **Acast podcast self-serve** | **£250** minimum; host-read from $25 CPM ([S](https://learn.acast.com/en/articles/6521702-setting-a-campaign-budget)) | About 12,500 plays | Host-read: 31% higher purchase rate than pre-recorded ([S](https://stackinfluence.com/blog/2026-podcast-advertising-what-the-numbers-show)) | 12,500 × 0.03–0.1% buying (E) ≈ 4–13 orders, **£20–£65 each**. No parent targeting | 50 | Maybe | Very low |
-| 12 | **Paid creator post or UGC video plus a boost** | Micro post £350–£1,000 ([S, Awin](https://www.awin.com/gb/sector-insights/uk-influencer-marketing-cost)) plus a **30–50% December premium** ([S, vendor](https://influencerfee.com/blog/influencer-holiday-campaign-guide/)); UGC video about £62 ([S](https://influee.co/gb/pricing/ugc-creation)) | 7k–45k followers | Partnership ads: 19% more clicks, 10% more buying ([S](https://www.netinfluencer.com/meta-partnership-ads-outperform-licensed-ugc-across-130m-usd-in-ad-spend-report-finds/)) | £455 ÷ about 1–5 orders = **£90–£450** (E) | 90–300 | Unlikely | Low |
-| 13 | **TikTok Ads Manager** | **$50 a day** minimum, about £38.50 ([S](https://ads.tiktok.com/help/article/about-daily-budgets)); **£693** for 18 days | Skews young | None found for UK | Not estimated | 139 | Yes, but over budget | High (on the floor) |
+| # | Option | Cost | Reach | Efficacy evidence | Estimated cost per order (maths) | Break-even orders (typical / frame-led) | Verdict on Pro | Live by 30 Nov? | Confidence |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | **Commission-only partner codes** (small blogs, Instagram, Substacks) | 10% of the order before VAT, on a follower's first paid order (site rule): **£3.67 on a £44 order, £5.13 on £62** | Varies; small lists, 1k–20k (E) | About 1.5 code uses per 1,000 views in one vendor example ([S, Influee](https://influee.co/gb/blog/influencer-discount-codes)) | Fixed at 10% of the order. **About £6.70 left per typical order, £9.21 per frame-led one.** Volume unknown: 0–15 orders across 5–10 partners (E) | **0**: never loses money | **Profit on every sale** | Maybe. Depends on replies (E) | High on cost, low on volume |
+| 2 | **Happity What's On email** (parents of 0–5s, UK) | Not published; "all budgets" ([S](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity)). Price signal: a $4.62 per 1,000 subscribers benchmark ([S, Paved](https://ppc.land/paved-finds-hr-newsletter-ad-rates-run-15-times-higher-than-lifestyle-lists/)) suggests about £500 (E) | **140k+ parents**, Sunday nights ([S](https://support.happity.co.uk/en/articles/6081998-what-is-the-what-s-on-newsletter-and-how-can-my-classes-be-included)) | None published | 140,000 × 30% × 2% × 2% ≈ 17 orders (E). Realistically 5–17. At £75, **£5–£15 each**; at £500, £30–£100 | 8 / 6 at £75; 49 / 35 at £500 | **Pays back at £75**; a loss at £500 | Yes, Sun 29 Nov, if they reply fast | Low on price, medium on reach |
+| 3 | **London Mums newsletter** | **£75** for 50 words plus an image ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | **41,000+** opt-in subscribers, monthly ([S](https://new.londonmumsmagazine.com/wp-content/uploads/2025/01/MEDIA-KIT-London-Mums-2025.pdf)) | None published | £75 ÷ (41,000 × 30% × 2% × 2% ≈ 4.9 orders) ≈ £15. Realistically 2–6 orders, **£13–£38 each** | 8 / 6 | **About break-even**; worth repeating | Unknown: send date not published | Medium (price S, response E) |
+| 4 | **Small Bristol family sites** (Bristol Mum, Bristol Parent, Practically Perfect Mums) | Not published ([S](https://bristolmum.com/contact/disclosure-policy), [S](https://bristolparent.co.uk/?p=45422)). Propose the 10% code | Not published | None published | On a code: as row 1, volume unknown (E) | 0 on a code | **Profit on every sale** | Maybe | Low |
+| 5 | **The Bristol Magazine newsletter** | **£45** a send ex VAT; £150 for 4 ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)) | **5,000+** subscribers (July 2024 figure, S); affluent BS6, BS8 and BS9 | None published; listings live "within 24 hours" (S) | £45 ÷ (5,000 × 30% × 2% × 2% ≈ 0.6 orders) ≈ £75. Realistically 0–2 orders, **£23 each at best** | 5 / 4 | **A small loss**; worth repeating at its best | Yes | High on price, medium on reach |
+| 6 | **Get Blogged gift-guide slots** (×4) | **£20.80–£26** a slot incl. VAT and fee; free brief ([S](https://www.getblogged.net/pricing/)) | Not published per blog | None published | Per slot: 1,000–3,000 views × 2% × 2% = 0.4–1.2 orders. Four slots ≈ 2–5 orders, **£20–£50 each** | 3 / 2 a slot (10 / 7 for all four) | **A small loss**; worth repeating at its best | Maybe. More likely 1–4 Dec (E) | Low |
+| 7 | **Bristol24/7 gift guide or newsletter story** | Newsletter story **£175** (2022, [S](https://www.bristol247.com/wp-content/uploads/2022/04/B247-Media-Pack-20221-1.pdf)); 2026 likely £175–£250 (E); gift-guide slot not published | Newsletter 12k+, **33.3% open** (2022, S); Instagram 100k+ ([S](https://www.bristol247.com/partnership-opportunities/)) | Open rate only (S). No click or sales figure published | £175 ÷ (12,000 × 33% × 2% × 2% ≈ 1.6 orders) ≈ £110. Realistically 1–4 orders with the guide page, **£45–£175 each** | 17 / 13 at £175; 10 / 7 at £100; 0 on a code deal | **A loss at £175**; fine on a code | Yes, if a guide runs about 26 Nov (E) | Medium on reach, low on price |
+| 8 | **Pinterest ads** | Clicks £0.25–£0.60 (E, earlier research); 10p–£1.20 per UK blog ([S](https://www.lilachbullock.com/pinterest-advertising-cost-uk/)) | Gift searches peak Oct–Dec ([S](https://business.pinterest.com/en-gb/blog/festive-gifting-pinterest/)) | No UK sales rate published | £100 ÷ (167–400 clicks × 0.3–1% ≈ 0.5–4 orders) = **£25–£200** | 10 / 7 on £100 | **A loss**, and the evidence is thin | Yes, in 1–3 days | Low |
+| 9 | **Meta baseline** (2–12 Dec) | **£150** cap. December CPM (cost per 1,000 times the ad is shown) about **£20** (E, from earlier research) | 7,500 impressions | Black Friday week 2025: prices **+59%**, but buying per click **+48%** and cost per purchase **−20%** ([S, Lebesgue, US-led](https://lebesgue.io/facebook-ads/are-meta-ads-worth-it-black-friday)) | £150 ÷ (7,500 × 1% × 2% ≈ 1.5 orders) ≈ £100. Realistically 1–3 orders, **£50–£150 each** (05 puts frame-led Meta at about £65 a first order, E) | 15 / 11 | **A loss** (about 20p back per £1 on a first order, per 05). Buy it as the measuring stick | Yes, but wait until 2 Dec | Medium |
+| 10 | **Nextdoor Local Deals** (BS9, BS11, Portishead) | "From £1" ([S](https://business.nextdoor.com/en-gb/small-business/industry/retail)) | Not published | None published | Can't calculate. Assume Meta-like: **£50–£150** (E) | 3 / 3 on a £30 test | **A loss**, probably | Yes (self-serve) | Low |
+| 11 | **Acast podcast self-serve** | **£250** minimum; host-read from $25 CPM ([S](https://learn.acast.com/en/articles/6521702-setting-a-campaign-budget)) | About 12,500 plays | Host-read: 31% higher purchase rate than pre-recorded ([S](https://stackinfluence.com/blog/2026-podcast-advertising-what-the-numbers-show)) | 12,500 × 0.03–0.1% buying (E) ≈ 4–13 orders, **£20–£65 each**. No parent targeting | 25 / 18 | **A loss**, and untargeted | Maybe | Very low |
+| 12 | **Paid creator post or UGC video plus a boost** | Micro post £350–£1,000 ([S, Awin](https://www.awin.com/gb/sector-insights/uk-influencer-marketing-cost)) plus a **30–50% December premium** ([S, vendor](https://influencerfee.com/blog/influencer-holiday-campaign-guide/)), so £455–£1,500; UGC video about £62 ([S](https://influee.co/gb/pricing/ugc-creation)) | 7k–45k followers | Partnership ads: 19% more clicks, 10% more buying ([S](https://www.netinfluencer.com/meta-partnership-ads-outperform-licensed-ugc-across-130m-usd-in-ad-spend-report-finds/)) | £455 ÷ about 1–5 orders = **£90–£450** (E) | 44–145 / 32–105 | **A big loss** | Unlikely | Low |
+| 13 | **TikTok Ads Manager** | **$50 a day** minimum, about £38.50 ([S](https://ads.tiktok.com/help/article/about-daily-budgets)); **£693** for 18 days | Skews young | None found for UK | Not estimated | 67 / 49 | **Over budget** | Yes, but over budget | High (on the floor) |
 
-**What the table says.** Rows 1 and 7 can't lose money. Everything else is a test that, on these assumptions, returns
-roughly £5–£25 of margin for every £45–£150 spent. **London Mums and a cheap Happity price are the only fixed fees that
-come close to break-even.** Meta is the measuring stick: if it sells at about £100 an order, anything cheaper is worth
-repeating at Mother's Day.
+**What the table says.** On Prodigi Pro the picture is better than a £5 margin suggests, but only for the cheapest slots:
+
+- **Commission codes (rows 1 and 4) make money on every sale.**
+- **Happity at about £75 and London Mums are at or near break-even on the first order.** Book them if the dates work.
+- **The Bristol Magazine and Get Blogged lose a little** at the estimates, but come in under the £20–£25 "worth repeating" line
+  at their best.
+- **Bristol24/7 at full price, Meta, Pinterest, Nextdoor, podcasts and paid creators lose money** on first orders.
+- **Meta is the measuring stick:** if it sells at about £65 an order with frames in the ad, anything cheaper is worth
+  repeating at Mother's Day.
+- **The product in the ad matters more than the placement.** The same slot selling a £65 framed print instead of an £18 mug
+  leaves about three times as much per order (£15.23 against £4.42 on Pro, from 05).
 
 ## The cut-off read
 
@@ -238,8 +262,8 @@ How many late gift requests still appear is unverified.
 
 - **National commerce desks:** network links only, and their pages are already written.
 - **Awin Access this season:** at least **£99 + VAT a month for 3 months, plus 3.5%**
-  ([S](https://www.awin.com/gb/terms-and-conditions/awin-access-faq)). That's about £356 before commission, or about 70 orders
-  just to cover fees.
+  ([S](https://www.awin.com/gb/terms-and-conditions/awin-access-faq)). That's about £356 before commission, or about 35 typical
+  orders just to cover fees.
 - **Linkby:** publisher minimums of **$2,500–$10,000** ([S](https://support.linkby.com/en/articles/8682217-10-2-do-you-have-a-list-of-suitable-publishers-and-minimum-budgets-broken-down-by-region)).
 - **Press Loft paid:** £200 a month ([S](https://pressloft.com/pricing)). Its 60-day free trial needs a sign-up; your call.
 - **Pay-per-placement PR firms:** £150–£450.
@@ -257,9 +281,12 @@ for purchase targeting to learn (E).
 
 - **Who:** UK, age 25–65+. Leave targeting broad, or add "Parents (all)", which Meta now treats only as a suggestion
   ([S](https://www.jonloomer.com/targeting-suggestions/)). **No retargeting, no lookalikes.**
-- **Creative:** a 1080×1350 feed image and a 1080×1920 Stories/Reels version (E, standard sizes). Show the drawing and the
-  product, hands and artwork only, **never a child's face**, and brand-safe sample drawings only.
-- **When:** switch the card ad off after 10 Dec, and run only frames and cushions on 13–14 Dec.
+- **Creative:** a 1080×1350 feed image and a 1080×1920 Stories/Reels version (E, standard sizes). **Sell the framed print,
+  the multi frame and the blanket** (£15–£27 left an order on Pro), not the bauble or the mug (£3–£4.50). The drawing can still
+  be on a bauble in the background as the Christmas hook. Show the drawing and the product, hands and artwork only, **never a
+  child's face**, and brand-safe sample drawings only.
+- **When:** frames, blankets and cushions take orders until Mon 14 Dec, so a frame-led ad can run the whole window. Stop on
+  14 Dec.
 - **Set-up:** create the business account by Fri 27 Nov ([Meta Business](https://business.facebook.com/), then
   [Ads Manager](https://adsmanager.facebook.com/)), so the first review isn't on the critical path. Your turn: the account.
   I'll do: the ads.
@@ -291,9 +318,9 @@ send 5–10, not 2.
 
 **Stop chasing (creators and podcasts):**
 
-- **Paid micro posts:** £350–£1,000 plus a December premium, so 90–300 orders to break even.
+- **Paid micro posts:** £350–£1,000 plus a December premium, so 44–145 typical orders to break even.
 - **Paid UGC videos plus partnership ads:** the rights and timing don't fit 16 days. Do it for Mother's Day.
-- **Acast:** £250 minimum, 50 orders to break even, no parent targeting.
+- **Acast:** £250 minimum, 25 typical orders to break even, no parent targeting.
 - **Spotify podcast ads:** UK self-serve unconfirmed.
 - **Direct parenting-podcast reads:** no public UK prices, and shows record 1–2 weeks ahead.
 - **Creator platforms** (Collabstr, #paid): fees on top of fees.
@@ -312,8 +339,8 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 >
 > Hello,
 >
-> I'm Simon. I run Snickerdoodle from Shirehampton: we turn children's drawings into keepsakes, like baubles, mugs, cards and
-> framed prints. The art is the star, so nothing we show ever has a child's face in it.
+> I'm Simon. I run Snickerdoodle from Shirehampton: we turn children's drawings into keepsakes, like framed prints, blankets,
+> cushions and baubles. The art is the star, so nothing we show ever has a child's face in it.
 >
 > I'd like a £45 image-and-text box (or the 645×300 banner) in the Weekend E-dition, ideally the send around Fri 4 December,
 > with a second around 27 November if you have it. Could you tell me which December sends are still free, the copy deadline,
@@ -331,8 +358,8 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 >
 > Hello,
 >
-> I'm Simon, and I run Snickerdoodle from Shirehampton. We turn a child's drawing into a keepsake: a bauble for the tree, a
-> mug for grandad, a framed print. Parents snap the drawing on their phone, and nothing we show ever has a child's face in it.
+> I'm Simon, and I run Snickerdoodle from Shirehampton. We turn a child's drawing into a keepsake: a framed print for grandma,
+> a blanket, a bauble for the tree. Parents snap the drawing on their phone, and nothing we show ever has a child's face in it.
 >
 > Are you running a Christmas gift guide this year? If so, could you tell me the price, the copy deadline and the publish date?
 > I'm a very small business, so I'd also love to know if you'd consider a lower fee plus a commission code: your readers'
@@ -350,14 +377,15 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 >
 > Hi,
 >
-> I'm Simon, and I run a tiny business in Shirehampton. Snickerdoodle turns children's drawings into keepsakes: baubles, mugs, cards,
-> cushions. The art is the star, so nothing we show has a child's face in it, and the drawings stay private.
+> I'm Simon, and I run a tiny business in Shirehampton. Snickerdoodle turns children's drawings into keepsakes: framed prints,
+> blankets, cushions, baubles. The art is the star, so nothing we show has a child's face in it, and the drawings stay private.
 >
 > Would you consider a mention in a post, or in a Christmas roundup, on a commission basis? I'd make you your own code, and you'd
 > earn 10% of each reader's first order (before VAT), with no fee from you and nothing up front from me. Your readers get our
 > usual welcome, their first card free.
 >
-> Last orders are Thu 10 Dec for cards and Sat 12 Dec for most gifts, so early December would be perfect. If you'd rather a
+> Last orders are Mon 14 Dec for framed prints, blankets and cushions (Sat 12 Dec for most other gifts), so early December
+> would be perfect. If you'd rather a
 > small flat fee, tell me your price and which dates are free.
 >
 > Thanks,
@@ -370,8 +398,8 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 >
 > Hello,
 >
-> I'm Simon from Snickerdoodle, a small UK shop that turns little ones' drawings and photos into keepsakes: baubles, cards,
-> mugs, framed prints. They make lovely gifts from the children to their grandparents. We only show the art, never a child's
+> I'm Simon from Snickerdoodle, a small UK shop that turns little ones' drawings and photos into keepsakes: framed prints,
+> blankets, cushions, baubles. They make lovely gifts from the children to their grandparents. We only show the art, never a child's
 > face.
 >
 > Could you send your price for a slot in the Sunday What's On email, and say whether 29 November or 6 December is still free?
@@ -393,7 +421,7 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 >
 > Would you like your own code? You'd earn 10% of each follower's first order (before VAT), with nothing to buy
 > and no minimum. Please label posts "Ad". I can send you pictures (hands and drawings only), prices and the order-by dates:
-> Thu 10 Dec for cards, Sat 12 Dec for most gifts.
+> Mon 14 Dec for framed prints, blankets and cushions, Sat 12 Dec for most other gifts.
 >
 > No pressure at all. A "not this year" is completely fine.
 >
@@ -403,15 +431,15 @@ I'll do: draft replies when they answer, and make the images in the sizes they a
 **6. Get Blogged brief** (paste into the brief box)
 
 > **Snickerdoodle: their drawing, made real (UK Christmas gift guides)**
-> We turn a child's drawing into a keepsake: ceramic ornaments (£21), baubles (£19), mugs (£18), cards (£5.50), framed prints, cushions. Free
-> UK delivery, made in the UK. Looking for inclusion in **UK Christmas gift guides or roundups published by Wed 2 December**
+> We turn a child's drawing into a keepsake: framed prints (from £65), multi frames (from £62), fleece blankets (from £60),
+> cushions and ceramic ornaments. Free UK delivery, made in the UK. Looking for inclusion in **UK Christmas gift guides or roundups published by Wed 2 December**
 > (gifts for grandparents, gifts from kids, personalised). We supply images (drawings and products only, no children
 > shown), copy, prices, a tracked link and your own code. Please state the publish date and your typical monthly views.
 > Posts must be labelled as ads. Last order dates: Thu 10 Dec (cards), Sat 12 Dec (most gifts), Mon 14 Dec (framed prints,
 > cushions).
 
-**One sample ad line** (no hype): *"Their drawing, on your tree. Snap it on your phone, see it on a bauble in seconds. Free UK
-delivery. Order by Sat 12 Dec. They're only little once."*
+**One sample ad line** (no hype): *"Their wonky crayon robin, framed for grandma. Snap it on your phone, see it framed in
+seconds. Free UK delivery. Order by Mon 14 Dec. They're only little once."*
 
 ## Measurement: codes, not trackers
 
@@ -436,8 +464,13 @@ The site has **no Meta pixel, Pinterest tag, TikTok pixel or Google tag**, and i
 - **It will under-count.** Signed-in first orders get the free card anyway, so some people won't type the code, and grandparents
   often see an ad on a phone and buy on a laptop. Read the result as "at least this many".
 
-**The commission maths, plainly.** A £35 order is £29.17 before VAT. 10% is **£2.92** out of about £5 margin, which leaves
-about **£2 an order**. That's thin, but a commission deal can **never lose you money**, and every fixed fee in the table can.
+**The commission maths, plainly.** A typical £44 order is £36.67 before VAT, so 10% is **£3.67**. The £10.37 that order
+leaves on Pro already allows for the free first card, so the commission comes off the top: about **£6.70 left**. A £62
+frame-led order pays £5.13 commission and leaves about **£9.21**. A commission deal can **never lose you money**, and most of
+the fixed fees in the table can.
+
+**Room to sweeten it (your call).** If December replies are slow, 15% would still leave about £4.90 on a typical order and
+£6.60 on a frame-led one. The current offer (D30, 10%) stays as it is unless you decide otherwise.
 
 **I'll do:**
 
@@ -447,10 +480,16 @@ about **£2 an order**. That's thin, but a commission deal can **never lose you 
 
 ## Conclusion
 
-This Christmas can't be won with paid placements at a £5 margin. It can be used to find the two or three places that work,
-for almost nothing. The real lesson is about structure: anything paid by results beats anything paid by the slot, and the
-gap is widest for a small new shop with no reviews. If a commission partner or a cheap newsletter produces even 3–5 orders,
-that is the channel to book early for Mother's Day.
+On Prodigi Pro, with £10–£14 left per order, this Christmas can roughly pay for its cheapest tests and find the two or three
+places that work. Two things decide it. **First, structure:** anything paid by results beats anything paid by the slot, and the
+gap is widest for a small new shop with no reviews. **Second, the product in the ad:** a framed print or blanket leaves three to
+four times what a mug or bauble does, and it has the latest cut-off. If a commission partner or a cheap newsletter produces even
+3–5 frame-led orders, that's the channel to book early for Mother's Day.
+
+**Out of this report's scope, but worth a look:** the profitability file rates **Google Shopping, advertising frames only**, as
+the paid channel closest to paying back (about £40 a first order, E). The Merchant feed already exists. Measuring it properly
+needs the Google tag behind consent, so whether to add it is your decision, and it's probably a Mother's Day job, not a
+16-day one.
 
 **For 2027:**
 
