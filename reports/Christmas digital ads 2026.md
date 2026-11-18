@@ -20,7 +20,7 @@ and buy the biggest audiences of parents of young children in the UK for the lea
 | # | Move | Cash | Families reached (E) | Cost per 1,000 families reached (E) | Likely orders (E) | Ask or book by | Live |
 |---|---|--:|---|--:|--:|---|---|
 | 1 | **Tidy the free Google Shopping listings** (already live) | £0 | 1,600–18,000 people searching for exactly this gift | **£0** | 1–8 | Fri 20 Nov | already, improves in 1–3 days |
-| 2 | **The two biggest parent newsletters: Picniq + Happity** | £150 + up to £150 | ~70,000 parents who open them (2 × ~140,000 lists) | **£4–£5** | 10–34 | Fri 20 Nov | 26 Nov – 2 Dec |
+| 2 | **The two biggest parent newsletters: Picniq + Happity** | £150 + up to £150 | ~65,000 parents who open them (lists of 140,000 and 120,000) | **£4–£5** | 9–31 | Fri 20 Nov | 26 Nov – 2 Dec |
 | 3 | **Free word of mouth:** parent and grandparent Facebook groups, 5–10 commission-only creators, and a Small Business Saturday press push | £0 (+ ~£40 of samples) | 3,000–40,000 | **£0–£2** | 2–25 | Fri 20 Nov | 23 Nov – 5 Dec |
 | 4 | **One paid search test: Google Shopping**, frames, blankets and cushions only | £100 | 100–250 clicks from people searching gift phrases | (paid per click, £0.40–£0.70) | 2–5 | Fri 27 Nov | Wed 2 Dec |
 
@@ -50,7 +50,7 @@ I scored every option on the same footing, then kept only the cheapest per famil
 | Facebook parent/grandparent group promo threads | £0 | 3k–20k views (E) | 85–95% | **£0** | £0 | **In (move 3)** |
 | Commission-only creators and Substacks | £0 up front | 1k–20k each (E) | 70–90% | **£0** | 10% of the order (£3.67 typical) | **In (move 3)** |
 | Small Business Saturday + press | £0 + samples | 5k–200k if it lands (E) | 25–80% | **~£0–£2** | ~£0 | **In (move 3)**, lumpy |
-| **Happity What's On** | ask; book at ≤£150 | **140k+ parents of 0–5s** ([S](https://support.happity.co.uk/en/articles/6081998-what-is-the-what-s-on-newsletter-and-how-can-my-classes-be-included)) | ~90% | **~£4** at £150 | £9–£30 | **In (move 2)** |
+| **Happity newsletter (brand partnerships)** | ask; book at ≤£150, or on commission | **120k subscribers**, parents of babies and toddlers; 350k site visits a month ([S](https://www.happity.co.uk/blog/partners-press/)) | ~90% | **~£4.63** at £150 | £10–£35 | **In (move 2)** |
 | **Picniq weekly newsletter** | **£150** ([S](https://www.picniq.co.uk/about/advertise)) | **140k+ families** (S) | ~75% | **~£4.76** | £9–£30 | **In (move 2)** |
 | Day Out With The Kids email | ask | list not published; opens "in excess of 30%" ([S](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)) | ~75% | unknown | unknown | **Backup** for move 2 |
 | Google Shopping, paid | £100 | 100–250 clicks at £0.40–£0.70 (E) | 60–80% | (per click) | £20–£50 | **In (move 4)** |
@@ -102,9 +102,9 @@ stance, and it couldn't reach 100 reviews by Christmas anyway. 2027.
 
 ## Move 2: the two biggest parent newsletters (£150 + up to £150)
 
-**Why.** These are the only two UK-wide lists of about 140,000 parents each that a small shop can buy into. At **about £4–£5
+**Why.** These are the only two UK-wide lists of 120,000+ parents each that a small shop can buy into. At **about £4–£5
 per 1,000 parents who open them**, they're 5–10 times cheaper per family than Meta. One send each, about a week apart, puts the
-shop in front of roughly **70,000 parents** who open them.
+shop in front of roughly **65,000 parents** who open them.
 
 **Picniq** ([advertise page](https://www.picniq.co.uk/about/advertise)). A UK-wide family days-out site.
 - **Price:** weekly newsletter feature **£150 + VAT** (S). Reach is **140,000+ subscribers**, plus 680,000 on Facebook (S).
@@ -116,10 +116,15 @@ shop in front of roughly **70,000 parents** who open them.
 - **Creative:** one image, a headline, about 50 words and a link (E).
 - *Confidence: price and list size on its own page. Open rate not published.*
 
-**Happity What's On** ([marketing page](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity)).
-- **Audience:** a Sunday-night email to **140,000+ parents** of babies and toddlers, the purest parent list found (S).
-- **Price:** not published.
-- **Book if it's £150 or less**, for Sun 29 Nov (or Sun 6 Dec as second best).
+**Happity** ([Partnerships & press page](https://www.happity.co.uk/blog/partners-press/)). The UK's baby and toddler class
+booking site.
+- **Audience:** a brand newsletter to **120,000 subscribers**, plus 350,000 site visits a month (S). These are parents of
+  babies and toddlers, the purest parent list found.
+- **Not the "What's On" email.** The 140,000-parent Sunday "What's On" email only features classes run by Happity members, so
+  it isn't for sale to a shop (S).
+- **Contact:** the short form on that page, or **partnerships@happity.co.uk** (both published on that page).
+- **Price:** not published. Happity also runs an **affiliate programme**, so ask whether it would work on commission instead.
+- **Book if it's £150 or less**, or on commission, for a send between 26 Nov and 2 Dec.
 - **The angle:** toddler scribbles and photos make the classic grandparent gift, so lead with the framed print and blanket.
 - *Confidence: reach on its own page; price unknown.*
 
@@ -200,7 +205,7 @@ review and new-account limits are out of the way.
 | **Thu 19 – Fri 20 Nov** | Move 1 checks in Merchant Center. Send emails A (Picniq) and B (Happity). Send email D to 5–10 creators. Join the Facebook groups. Register for Small Business Saturday; start the Press Loft trial |
 | Mon 23 Nov | First Facebook promo-thread round. Chase Picniq and Happity if they haven't replied; ask the backups if needed |
 | Fri 27 Nov | Google Ads account linked. **Black Friday:** no paid social, as you're not discounting and ads cost the most that week |
-| Thu 26 Nov – Wed 2 Dec | Picniq send; Happity on Sun 29 Nov |
+| Thu 26 Nov – Wed 2 Dec | Picniq and Happity sends, about a week apart |
 | Mon 30 Nov | Press pitches out. Second Facebook round |
 | **Wed 2 Dec** | Google Shopping test starts |
 | Sat 5 Dec | Small Business Saturday |
@@ -247,9 +252,10 @@ The site has no Meta pixel, Pinterest tag, TikTok pixel or Google tag, and the c
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
-**B. Happity What's On**
+**B. Happity** (to partnerships@happity.co.uk, or the form on the
+[Partnerships page](https://www.happity.co.uk/blog/partners-press/))
 
-> **Subject:** Advertising in What's On: Sunday 29 November?
+> **Subject:** A Christmas slot in your newsletter: framed keepsakes from little ones' drawings
 >
 > Hello,
 >
@@ -257,8 +263,10 @@ The site has no Meta pixel, Pinterest tag, TikTok pixel or Google tag, and the c
 > blankets, cushions. They make lovely gifts from the children to their grandparents. We only ever show the art, never a
 > child's face.
 >
-> Could you send your price for a slot in the Sunday What's On email, and say whether 29 November (or 6 December) is still
-> free? Please include the image size and word count too. I'd add a code just for Happity parents, so you can see the results.
+> I'd love a slot in your newsletter, ideally a send between 26 November and 2 December. Could you tell me the price, which
+> dates are still free, and the image size and word count? My budget is about £150. I'd also happily work through your
+> affiliate programme instead, if that suits you better. Either way I'd add a code just for Happity parents, so you can see
+> the results.
 >
 > Thanks,
 > Simon
