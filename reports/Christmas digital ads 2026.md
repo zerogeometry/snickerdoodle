@@ -1,501 +1,342 @@
-# Go digital, pay on results, and stop by 12 December
+# Four moves for Christmas: the biggest parent audiences for the least money
 
 Written 18 November 2026 for Simon. **Nothing has been contacted, booked, signed up to or paid for.**
 
-*Corrected the same day: the first draft used the old "about £5 an order" from the costs report. Every margin, break-even
-count and verdict below now uses the per-product Prodigi Pro figures in
-[05 · Product profitability](investor-deck/05-profitability-and-growth-roadmap.md), and the ads and emails now lead with frames
-and blankets.*
+*Revised the same day, three times, after your notes:*
+- *Margins now come from the Prodigi Pro figures in
+  [05 · Product profitability](investor-deck/05-profitability-and-growth-roadmap.md), not the old £5.*
+- *The plan is UK-wide, not Bristol-led.*
+- *Every option is now judged on one measure: **cost per 1,000 people reached who are parents of young children or
+  grandparents**. This version replaces the earlier 8-step list.*
 
-**The answer.** Yes: put this Christmas's marketing money into digital, not print or offline. It can go live in days, say the
-right "order by" date, be counted with a code, and be switched off the minute a cut-off passes. Print can't do any of that
-in the 16–20 selling days left. On Prodigi Pro an order leaves about **£10.37 on a typical basket and £14.34 when it's led by
-frames and blankets** (worked out product by product in
-[05 · Product profitability on Prodigi Pro](investor-deck/05-profitability-and-growth-roadmap.md)). At that, the cheapest
-newsletters (**London Mums, and Happity if it's £75 or less**) can roughly pay for themselves on the first order. So:
-**commission-only partner codes** first (you pay only when someone buys, and keep about £6.70–£9.20 an order), then a handful of
-**cheap, capped tests**: Bristol24/7's gift guide, The Bristol Magazine newsletter, London Mums, Happity, a few Get Blogged
-slots, and a **£150 Meta baseline**. Keep total cash **under about £550**. **Make every ad sell framed prints, multi frames,
-blankets and cushions**, not mugs, baubles and cards: they leave two to four times as much per order, and their last order date
-is the latest (Mon 14 Dec). Expect about 10–35 orders, worth roughly **£100–£500 of profit against the £545** on first orders
-(E), more with repeat orders, and use it to learn what to back for Mother's Day.
+**How to read the numbers.** **S** = published (with a link). **E** = my estimate. Prices are ex VAT where the publisher
+quotes them that way. You're VAT-registered, so that's your real cost. "Your turn" = you do it. "I'll do" = I can do it for you.
 
-**How to read the numbers.** **S** = published (with a link). **E** = my estimate. You're VAT-registered, so ex-VAT prices are
-your real cost once VAT is reclaimed. "Your turn" = you do it. "I'll do" = I can do it for you.
+## The answer
 
-## Do this first
+**Go digital, and do four things only.** Two are free and aimed at people already looking for this kind of gift. Two are paid
+and buy the biggest audiences of parents of young children in the UK for the least money:
 
-| # | What | Cost | Book by | Goes live | Selling days to 10 / 12 / 14 Dec |
-|---|---|---|---|---|---|
-| 1 | **Make one code per placement** (list in Measurement). Your turn: on [/admin/codes](https://snickerdoodle.co.uk/admin/codes). I'll do: write the SQL instead if you'd rather paste it into production yourself | £0 | Thu 19 Nov | — | — |
-| 2 | **Email Bristol24/7 about its Christmas gift guide** (email 2 below). Last year's went up Thu 27 Nov ([S](https://www.bristol247.com/lifestyle/gift-guide/christmas-gift-guide-2025/)), and no 2026 guide was listed on 18 Nov ([S](https://www.bristol247.com/lifestyle/gift-guide/)) | Ask. Say yes only to a code deal or about £100 or less (E cap) | **Thu 19 Nov** | about Thu 26 Nov (E) | 15 / 17 / 19 |
-| 3 | **Send commission-code emails** to 5–10 small parenting blogs, Instagram gift-guide accounts and Substacks, plus Bristol Mum, Bristol Parent and Practically Perfect Mums (emails 3 and 5) | 10% of a first order before VAT (about £3.70 on a £44 order, £5.10 on a £62 frame order), nothing up front | Fri 20 Nov | 30 Nov – 2 Dec (E) | 9–11 / 11–13 / 13–15 |
-| 4 | **Ask Happity** about its Sunday What's On email to 140k+ parents (email 4) | Ask. Go only if about £75 or less (E cap), or on a code | Fri 20 Nov | Sun 29 Nov or Sun 6 Dec | 12 / 14 / 16 (or 5 / 7 / 9) |
-| 5 | **Post a free Get Blogged brief** (text below). Accept up to 4 gift-guide slots, only ones that publish by Wed 2 Dec. Your turn: the sign-up | £21–£26 a slot incl. VAT and fee ([S](https://www.getblogged.net/pricing/)), about £100 total | Fri 20 Nov | 1–2 Dec (E) | 9–10 / 11–12 / 13–14 |
-| 6 | **Book one Bristol Magazine newsletter slot** with an "order by" message (email 1) | £45 ex VAT ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)) | Mon 23 Nov | the weekend send around Fri 4 Dec (E, day to confirm) | 7 / 9 / 11 |
-| 7 | **Ask London Mums** for its December send date. Book only if it goes out by about 6 Dec (reuse email 1, change the names) | £75 ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | Mon 23 Nov | early Dec (E) | about 5–9 / 7–11 / 9–13 |
-| 8 | **Run a £150 Meta baseline** (Facebook and Instagram). Your turn: set up the ad account by Fri 27 Nov. I'll do: the ads and sizes | £150, hard cap | Fri 27 Nov | Wed 2 Dec (after Cyber Monday) | 9 / 11 / 13 |
+| # | Move | Cash | Families reached (E) | Cost per 1,000 families reached (E) | Likely orders (E) | Ask or book by | Live |
+|---|---|--:|---|--:|--:|---|---|
+| 1 | **Tidy the free Google Shopping listings** (already live) | £0 | 1,600–18,000 people searching for exactly this gift | **£0** | 1–8 | Fri 20 Nov | already, improves in 1–3 days |
+| 2 | **The two biggest parent newsletters: Picniq + Happity** | £150 + up to £150 | ~70,000 parents who open them (2 × ~140,000 lists) | **£4–£5** | 10–34 | Fri 20 Nov | 26 Nov – 2 Dec |
+| 3 | **Free word of mouth:** parent and grandparent Facebook groups, 5–10 commission-only creators, and a Small Business Saturday press push | £0 (+ ~£40 of samples) | 3,000–40,000 | **£0–£2** | 2–25 | Fri 20 Nov | 23 Nov – 5 Dec |
+| 4 | **One paid search test: Google Shopping**, frames, blankets and cushions only | £100 | 100–250 clicks from people searching gift phrases | (paid per click, £0.40–£0.70) | 2–5 | Fri 27 Nov | Wed 2 Dec |
 
-Cash ceiling if everything says yes: about **£545**. Commission is paid only on sales.
+- **Total cash:** about **£440**, or **£515** if you add the London Mums backup.
+- **Likely result (E):** about **15–70 orders**, worth roughly **£150–£800 of profit** at £10.37 a typical order and £14.34
+  a frame-led one. The middle case (~30 orders) roughly **pays its own way**, and the free moves carry most of the upside.
+- **Every ad sells framed prints, multi frames, blankets and cushions.** They leave £10–£27 an order on Pro against £3–£4.50
+  for a mug or bauble, and they take orders until Mon 14 Dec, the latest last order date.
+- **Precision without data about children.** Every move reaches parents by **where they already are**: parent newsletters,
+  parent groups, gift searches. None uses ad audiences built by guessing a child's age. Those exist on Meta and would add
+  precision, but they're a grey area under our own rule ("no behavioural targeting of or about children"), so they're
+  **your decision, and not part of this plan**.
 
-## Digital or offline now? Digital, for four reasons
+## How I chose: one measure for everything
 
-**1. People do buy late, but your window shuts first.** PwC found **47% do their festive spending in early-to-mid December**
-([S](https://www.pwc.co.uk/press-room/press-releases/research-commentary/festive-spending-forecast-to-reach-p24-6bn-this-year--pwc-uk---.html)).
-Mintel says **one in four don't start until December**
-([S](https://www.mintel.com/press-centre/christmas-shoppers-to-leave-it-late-this-year/)). In 2025, **39% planned to leave
-some gifts to the final fortnight**
-([S](https://retailtechinnovationhub.com/home/2025/12/16/shoppers-rely-on-black-friday-deals-loyalty-points-and-ai-to-make-festive-money-go-further)).
-So demand is still there. But a made-to-order keepsake has to be ordered by **10–14 December**, which cuts off that whole
-final-fortnight crowd. Your usable window is roughly 27 November to 12 December. Last year online sales were weakest in the
-week of 7 December (−6.7% on the year), so early-December shoppers need a nudge, not a wait
-([S, IMRG via Retail Economics](https://www.retaileconomics.co.uk/report-online-retail/archive/december-2025)).
-
-**2. Print can't land in time, and it can't pay back.** Door drops average about **0.5–0.6% response at about £200 per
-customer** ([S, DMA/JICMAIL](https://dma.org.uk/uploads/misc/door-drops-2024-report-final.pdf)). That's 14–20 times the
-£10–£14 an order leaves on Prodigi Pro. A leaflet lasts about **5.6 days in the home** ([S](https://dma.org.uk/article/what-is-the-response-rate-from-leaflet-distribution-revised-edition)).
-Royal Mail's door-to-door service needs about three weeks' notice, so a drop booked now would land around 8–9 Dec, just as
-cards close. The print deadlines for local magazines have also gone: The Bristol Magazine's December copy closed 11 Nov
-([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)), and Primary Times' winter-issue copy
-closed on 4 Nov last year
-([S](https://primarytimes.co.uk/assets/files/2025%20media%20packs/Avon%20Media%20pack%202025.pdf)).
-
-**3. Digital can be counted.** Each placement gets its own code, so by Monday 7 Dec you'll know which ones sold. A leaflet in
-a drawer tells you nothing until it's too late to change course.
-
-**4. Digital switches off at the cut-off.** An ad can say "cards by Thu 10 Dec" and then stop. A printed leaflet keeps
-"selling" a card you can no longer deliver for Christmas.
-
-**The fair case for offline.** Face to face at a fair, a grandparent can hold a bauble, and none of the digital lists here is
-big. So keep the offline work that is **nearly free or already in hand**: the fairs (28 Nov to 6 Dec) and the 1,500 hand-out
-leaflets for about £90 from the leaflets and fairs reports. Don't add any paid print. Primary Times book bags stay a Mother's
-Day job.
-
-## One table: what each option costs per order
+I scored every option on the same footing, then kept only the cheapest per family reached that can go live in time.
 
 **Assumptions, used the same way in every row (all E):**
+- **Opens:** 30% of a newsletter list opens it, unless the publisher says otherwise.
+- **Who's in the audience:** each row has an estimated share of parents of 0–10s or grandparents (shown in the "who" column).
+- **Sales:** 2% of openers click, and 2% of clickers buy.
+- **What an order leaves:** **£10.37** typical, **£14.34** frame-led (05, on Pro).
 
-- **Newsletters:** 30% of the list opens it, unless the publisher publishes a rate. 2% of openers click a paid slot. 2% of
-  clickers buy (a personalised gift, a new shop, no reviews yet).
-- **Blogs and gift guides:** 1,000–3,000 views per post during the window. The same 2% click and 2% buy.
-- **Paid social:** 1% of people shown the ad click. 2% of clickers buy.
-- **What an order leaves, on Prodigi Pro** (from [05 · Product profitability](investor-deck/05-profitability-and-growth-roadmap.md),
-  E on the mix): **£10.37** on a typical basket (about £44) and **£14.34** on a frame-led one (about £62). Those already
-  allow for card fees, reprints, running costs and the free first card, and they're after Pro's 15% off the product (Pro's
-  own £35 a month isn't in them). Small gifts alone (mugs, baubles, cards) leave only about £6.45.
-- **Break-even orders = cost ÷ £10.37 (typical) or ÷ £14.34 (frame-led)**, rounded up.
-- **Worth repeating:** a cost per first order of about **£20–£25 or less**, because roughly a third of customers are expected
-  to come back (05 puts frame-led break-even at about £17 within a year and £23 over three years, E).
-- **A newsletter is a one-day hit.** Most replies come within about 48 hours of the send (E).
+| Option | Cash | Reach | Share who are parents of young children or grandparents (E) | **£ per 1,000 of them** (E) | Cost per order (E) | Verdict |
+|---|--:|---|--:|--:|---|---|
+| Google free listings | £0 | 2k–20k searches ([S, how it works](https://support.google.com/merchants/answer/13889434?hl=en)) | 80–90% | **£0** | £0 | **In (move 1)** |
+| Facebook parent/grandparent group promo threads | £0 | 3k–20k views (E) | 85–95% | **£0** | £0 | **In (move 3)** |
+| Commission-only creators and Substacks | £0 up front | 1k–20k each (E) | 70–90% | **£0** | 10% of the order (£3.67 typical) | **In (move 3)** |
+| Small Business Saturday + press | £0 + samples | 5k–200k if it lands (E) | 25–80% | **~£0–£2** | ~£0 | **In (move 3)**, lumpy |
+| **Happity What's On** | ask; book at ≤£150 | **140k+ parents of 0–5s** ([S](https://support.happity.co.uk/en/articles/6081998-what-is-the-what-s-on-newsletter-and-how-can-my-classes-be-included)) | ~90% | **~£4** at £150 | £9–£30 | **In (move 2)** |
+| **Picniq weekly newsletter** | **£150** ([S](https://www.picniq.co.uk/about/advertise)) | **140k+ families** (S) | ~75% | **~£4.76** | £9–£30 | **In (move 2)** |
+| Day Out With The Kids email | ask | list not published; opens "in excess of 30%" ([S](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)) | ~75% | unknown | unknown | **Backup** for move 2 |
+| Google Shopping, paid | £100 | 100–250 clicks at £0.40–£0.70 (E) | 60–80% | (per click) | £20–£50 | **In (move 4)** |
+| Pinterest keyword ads | ~£70 | £3–£6 per 1,000 shown (E) | 50–70% | £6–£16 | unproven | Out: new-account delivery in December unproven |
+| London Mums | £75 ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | 41k, London only | ~60% | ~£10 | £13–£38 | **Backup** if Happity says no |
+| Meta Reach, adults 25–65+ | £150 | 9k–21k adults (E) | 25–45% | **£20–£50** | £50–£150 | Out: 5–10× the cost per family of the newsletters. Backup only if both lists say no |
+| Meta with child-age parent audiences | £150 | similar | 60–80% (unverified) | £15–£30 | — | **Your decision** (see above); not in the plan |
+| The Bristol Magazine newsletter | £45 | 5k, Bristol only | ~50% | ~£60 | £23+ | Out: tiny and local |
+| Bristol24/7 gift guide | £175+ | 12k, Bristol, general readers | ~30% | ~£50+ | £45–£175 | Out unless it takes a commission code |
+| Get Blogged gift-guide slots | £21–£26 each | not published | depends on blog | unknown | £20–£50 | Out: can't see reach, so can't score |
+| Mumsnet, Netmums, Gransnet, beehiiv, Reach | £1.5k–£15k minimums | large | high | — | — | Out: price |
+| HotUKDeals | — | — | 10–25% | — | — | Out: merchants may not post ([S](https://help.hotukdeals.com/help/who-can-post-deals)) |
+| TikTok, podcasts, paid creators | £250–£1,500 | — | low–medium | — | £20–£450 | Out: price, fit |
 
-Ranked by likely profit per £ and by whether it can be live by 30 November.
+The cost per order for every paid option rests on the 2% / 2% assumption, so read them as ranges, not promises. The
+**ranking**, cost per 1,000 families, is the sturdier figure: it depends only on price, list size and the opens assumption.
 
-| # | Option | Cost | Reach | Efficacy evidence | Estimated cost per order (maths) | Break-even orders (typical / frame-led) | Verdict on Pro | Live by 30 Nov? | Confidence |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | **Commission-only partner codes** (small blogs, Instagram, Substacks) | 10% of the order before VAT, on a follower's first paid order (site rule): **£3.67 on a £44 order, £5.13 on £62** | Varies; small lists, 1k–20k (E) | About 1.5 code uses per 1,000 views in one vendor example ([S, Influee](https://influee.co/gb/blog/influencer-discount-codes)) | Fixed at 10% of the order. **About £6.70 left per typical order, £9.21 per frame-led one.** Volume unknown: 0–15 orders across 5–10 partners (E) | **0**: never loses money | **Profit on every sale** | Maybe. Depends on replies (E) | High on cost, low on volume |
-| 2 | **Happity What's On email** (parents of 0–5s, UK) | Not published; "all budgets" ([S](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity)). Price signal: a $4.62 per 1,000 subscribers benchmark ([S, Paved](https://ppc.land/paved-finds-hr-newsletter-ad-rates-run-15-times-higher-than-lifestyle-lists/)) suggests about £500 (E) | **140k+ parents**, Sunday nights ([S](https://support.happity.co.uk/en/articles/6081998-what-is-the-what-s-on-newsletter-and-how-can-my-classes-be-included)) | None published | 140,000 × 30% × 2% × 2% ≈ 17 orders (E). Realistically 5–17. At £75, **£5–£15 each**; at £500, £30–£100 | 8 / 6 at £75; 49 / 35 at £500 | **Pays back at £75**; a loss at £500 | Yes, Sun 29 Nov, if they reply fast | Low on price, medium on reach |
-| 3 | **London Mums newsletter** | **£75** for 50 words plus an image ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | **41,000+** opt-in subscribers, monthly ([S](https://new.londonmumsmagazine.com/wp-content/uploads/2025/01/MEDIA-KIT-London-Mums-2025.pdf)) | None published | £75 ÷ (41,000 × 30% × 2% × 2% ≈ 4.9 orders) ≈ £15. Realistically 2–6 orders, **£13–£38 each** | 8 / 6 | **About break-even**; worth repeating | Unknown: send date not published | Medium (price S, response E) |
-| 4 | **Small Bristol family sites** (Bristol Mum, Bristol Parent, Practically Perfect Mums) | Not published ([S](https://bristolmum.com/contact/disclosure-policy), [S](https://bristolparent.co.uk/?p=45422)). Propose the 10% code | Not published | None published | On a code: as row 1, volume unknown (E) | 0 on a code | **Profit on every sale** | Maybe | Low |
-| 5 | **The Bristol Magazine newsletter** | **£45** a send ex VAT; £150 for 4 ([S](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf)) | **5,000+** subscribers (July 2024 figure, S); affluent BS6, BS8 and BS9 | None published; listings live "within 24 hours" (S) | £45 ÷ (5,000 × 30% × 2% × 2% ≈ 0.6 orders) ≈ £75. Realistically 0–2 orders, **£23 each at best** | 5 / 4 | **A small loss**; worth repeating at its best | Yes | High on price, medium on reach |
-| 6 | **Get Blogged gift-guide slots** (×4) | **£20.80–£26** a slot incl. VAT and fee; free brief ([S](https://www.getblogged.net/pricing/)) | Not published per blog | None published | Per slot: 1,000–3,000 views × 2% × 2% = 0.4–1.2 orders. Four slots ≈ 2–5 orders, **£20–£50 each** | 3 / 2 a slot (10 / 7 for all four) | **A small loss**; worth repeating at its best | Maybe. More likely 1–4 Dec (E) | Low |
-| 7 | **Bristol24/7 gift guide or newsletter story** | Newsletter story **£175** (2022, [S](https://www.bristol247.com/wp-content/uploads/2022/04/B247-Media-Pack-20221-1.pdf)); 2026 likely £175–£250 (E); gift-guide slot not published | Newsletter 12k+, **33.3% open** (2022, S); Instagram 100k+ ([S](https://www.bristol247.com/partnership-opportunities/)) | Open rate only (S). No click or sales figure published | £175 ÷ (12,000 × 33% × 2% × 2% ≈ 1.6 orders) ≈ £110. Realistically 1–4 orders with the guide page, **£45–£175 each** | 17 / 13 at £175; 10 / 7 at £100; 0 on a code deal | **A loss at £175**; fine on a code | Yes, if a guide runs about 26 Nov (E) | Medium on reach, low on price |
-| 8 | **Pinterest ads** | Clicks £0.25–£0.60 (E, earlier research); 10p–£1.20 per UK blog ([S](https://www.lilachbullock.com/pinterest-advertising-cost-uk/)) | Gift searches peak Oct–Dec ([S](https://business.pinterest.com/en-gb/blog/festive-gifting-pinterest/)) | No UK sales rate published | £100 ÷ (167–400 clicks × 0.3–1% ≈ 0.5–4 orders) = **£25–£200** | 10 / 7 on £100 | **A loss**, and the evidence is thin | Yes, in 1–3 days | Low |
-| 9 | **Meta baseline** (2–12 Dec) | **£150** cap. December CPM (cost per 1,000 times the ad is shown) about **£20** (E, from earlier research) | 7,500 impressions | Black Friday week 2025: prices **+59%**, but buying per click **+48%** and cost per purchase **−20%** ([S, Lebesgue, US-led](https://lebesgue.io/facebook-ads/are-meta-ads-worth-it-black-friday)) | £150 ÷ (7,500 × 1% × 2% ≈ 1.5 orders) ≈ £100. Realistically 1–3 orders, **£50–£150 each** (05 puts frame-led Meta at about £65 a first order, E) | 15 / 11 | **A loss** (about 20p back per £1 on a first order, per 05). Buy it as the measuring stick | Yes, but wait until 2 Dec | Medium |
-| 10 | **Nextdoor Local Deals** (BS9, BS11, Portishead) | "From £1" ([S](https://business.nextdoor.com/en-gb/small-business/industry/retail)) | Not published | None published | Can't calculate. Assume Meta-like: **£50–£150** (E) | 3 / 3 on a £30 test | **A loss**, probably | Yes (self-serve) | Low |
-| 11 | **Acast podcast self-serve** | **£250** minimum; host-read from $25 CPM ([S](https://learn.acast.com/en/articles/6521702-setting-a-campaign-budget)) | About 12,500 plays | Host-read: 31% higher purchase rate than pre-recorded ([S](https://stackinfluence.com/blog/2026-podcast-advertising-what-the-numbers-show)) | 12,500 × 0.03–0.1% buying (E) ≈ 4–13 orders, **£20–£65 each**. No parent targeting | 25 / 18 | **A loss**, and untargeted | Maybe | Very low |
-| 12 | **Paid creator post or UGC video plus a boost** | Micro post £350–£1,000 ([S, Awin](https://www.awin.com/gb/sector-insights/uk-influencer-marketing-cost)) plus a **30–50% December premium** ([S, vendor](https://influencerfee.com/blog/influencer-holiday-campaign-guide/)), so £455–£1,500; UGC video about £62 ([S](https://influee.co/gb/pricing/ugc-creation)) | 7k–45k followers | Partnership ads: 19% more clicks, 10% more buying ([S](https://www.netinfluencer.com/meta-partnership-ads-outperform-licensed-ugc-across-130m-usd-in-ad-spend-report-finds/)) | £455 ÷ about 1–5 orders = **£90–£450** (E) | 44–145 / 32–105 | **A big loss** | Unlikely | Low |
-| 13 | **TikTok Ads Manager** | **$50 a day** minimum, about £38.50 ([S](https://ads.tiktok.com/help/article/about-daily-budgets)); **£693** for 18 days | Skews young | None found for UK | Not estimated | 67 / 49 | **Over budget** | Yes, but over budget | High (on the floor) |
+## Move 1: tidy the free Google Shopping listings (£0, this week)
 
-**What the table says.** On Prodigi Pro the picture is better than a £5 margin suggests, but only for the cheapest slots:
+**Why first.** It's free, it's already switched on through the product feed, and the people who see it are **typing a gift
+search right now**. That's the most precise audience there is. Competition is real: Argos sells a child's-drawing mug at £10, and
+a Not On The High Street seller has 2,425 reviews ([S](https://www.notonthehighstreet.com/hoobynoo/product/childs-drawing-personalised-teacher-mug)).
+So we can't win on stars before Christmas. Google needs about 100 reviews for store ratings
+([S](https://support.google.com/merchants/answer/190657)). We can win on clean, accurate listings.
 
-- **Commission codes (rows 1 and 4) make money on every sale.**
-- **Happity at about £75 and London Mums are at or near break-even on the first order.** Book them if the dates work.
-- **The Bristol Magazine and Get Blogged lose a little** at the estimates, but come in under the £20–£25 "worth repeating" line
-  at their best.
-- **Bristol24/7 at full price, Meta, Pinterest, Nextdoor, podcasts and paid creators lose money** on first orders.
-- **Meta is the measuring stick:** if it sells at about £65 an order with frames in the ad, anything cheaper is worth
-  repeating at Mother's Day.
-- **The product in the ad matters more than the placement.** The same slot selling a £65 framed print instead of an £18 mug
-  leaves about three times as much per order (£15.23 against £4.42 on Pro, from 05).
+**Already good.** The feed's titles lead with the words people search: "Framed print of your child's drawing", "Personalised
+fleece blanket with your child's drawing". It uses brand-safe photos only, free UK delivery, and marks the Christmas range.
 
-## The cut-off read
+**Your turn (about 1–2 hours in [Merchant Center](https://merchants.google.com/)):**
+1. Open **Products → Needs attention** and fix or send me every warning.
+2. Check the **returns policy** in Merchant Center matches the site's returns page. Google checks they agree
+   ([S](https://support.google.com/merchants/answer/14011730)).
+3. Check **shipping** shows £0 with realistic handling and transit days, and that the **holiday cut-offs** match the site:
+   cards 10 Dec, most gifts 12 Dec, frames, blankets and cushions 14 Dec.
+4. On **Performance**, filter to free listings and tell me which products get seen. I'll strengthen those first.
 
-These come from the live site's code (`src/lib/season.ts` on `feat/christmas-season`). Shoppers see them at
-[snickerdoodle.co.uk/christmas/delivery-dates](https://snickerdoodle.co.uk/christmas/delivery-dates). They are marked
-**provisional** and deliberately "safe". All are UK orders, until midnight:
+**I'll do:** fix anything in the feed or product pages that the warnings point to, and tighten the titles and descriptions of
+the frames, multi frames, blankets and cushions.
 
-- **Thu 10 Dec:** cards and card packs.
-- **Fri 11 Dec:** calendars, wrapping paper, the plastic bauble.
-- **Sat 12 Dec:** mugs, ceramic baubles, tees, hoodies, tea towels, socks, the family bundle, the Christmas jumper.
-- **Mon 14 Dec:** framed prints, jigsaws, the height chart, cushions, blankets, aprons.
-- **Wed 16 Dec:** phone cases.
+**One decision for you.** Google won't badge the "free first card" because it's limited to first orders
+([S](https://support.google.com/merchants/answer/13422697?hl=en-GB)). Offering **a free card with every framed print** would
+qualify for a promotion badge on the listing. It costs about **£1.90 an order** (the card on Pro plus its post) against £15+
+left on a frame. Yes or no.
 
-From a 25 Nov start there are **16 days to 10 Dec, 18 to 12 Dec and 20 to 14 Dec** (counting both ends). **Black Friday is
-Fri 27 Nov and Cyber Monday is Mon 30 Nov.** Ads cost the most that week (up to +84% on Black Friday in 2025,
-[S](https://lebesgue.io/facebook-ads/are-meta-ads-worth-it-black-friday)). Shoppers that week are hunting discounts, and you
-aren't offering any. So hold paid social until Wed 2 Dec. Newsletters and guides can still go out on Black Friday weekend.
+**Not doing:** Google Customer Reviews. It needs a Google script on the order page, which clashes with the no-trackers
+stance, and it couldn't reach 100 reviews by Christmas anyway. 2027.
 
-| Option | Earliest realistic go-live (E) | Days to 10 Dec | to 12 Dec | to 14 Dec |
-|---|---|--:|--:|--:|
-| Bristol24/7 gift guide | Thu 26 Nov | 15 | 17 | 19 |
-| Nextdoor (if tried) | Thu 26 Nov | 15 | 17 | 19 |
-| Happity, first Sunday | Sun 29 Nov | 12 | 14 | 16 |
-| Commission partners | Mon 30 Nov | 11 | 13 | 15 |
-| Get Blogged slots, family sites | Tue 1 Dec | 10 | 12 | 14 |
-| Meta baseline | Wed 2 Dec | 9 | 11 | 13 |
-| Bristol Magazine, London Mums | Fri 4 Dec | 7 | 9 | 11 |
-| Happity, second Sunday | Sun 6 Dec | 5 | 7 | 9 |
+## Move 2: the two biggest parent newsletters (£150 + up to £150)
 
-**When to stop paying.**
+**Why.** These are the only two UK-wide lists of about 140,000 parents each that a small shop can buy into. At **about £4–£5
+per 1,000 parents who open them**, they're 5–10 times cheaper per family than Meta. One send each, about a week apart, puts the
+shop in front of roughly **70,000 parents** who open them.
 
-- **Stop all paid spend that shows cards after Thu 10 Dec.**
-- **After Sat 12 Dec, stop everything except framed prints and cushions** (and their 14 Dec siblings).
-- **After Mon 14 Dec, stop.**
+**Picniq** ([advertise page](https://www.picniq.co.uk/about/advertise)). A UK-wide family days-out site.
+- **Price:** weekly newsletter feature **£150 + VAT** (S). Reach is **140,000+ subscribers**, plus 680,000 on Facebook (S).
+- **Booking:** by email to the advertising contact on that page. No self-serve.
+- **Two things to ask before paying:**
+  - Does it accept a gift shop? The rate card is written for attractions.
+  - How many other features share each send? The price is far below the usual rate, which suggests several (E).
+- **Aim for** a send between Thu 26 Nov and Wed 2 Dec.
+- **Creative:** one image, a headline, about 50 words and a link (E).
+- *Confidence: price and list size on its own page. Open rate not published.*
 
-The site has **no gift card or e-voucher**. So the "last-minute gift" guides, which peak around 16–19 Dec
-([S](https://coolmompicks.com/blog/2025/12/18/2025-holiday-gift-guide-last-minute-gifts-for-everyone-on-your-list/)), don't
-fit this year. A gift card is a 2027 idea.
+**Happity What's On** ([marketing page](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity)).
+- **Audience:** a Sunday-night email to **140,000+ parents** of babies and toddlers, the purest parent list found (S).
+- **Price:** not published.
+- **Book if it's £150 or less**, for Sun 29 Nov (or Sun 6 Dec as second best).
+- **The angle:** toddler scribbles and photos make the classic grandparent gift, so lead with the framed print and blanket.
+- *Confidence: reach on its own page; price unknown.*
 
-## The options in detail
+**Backups, in order:**
+1. **Day Out With The Kids:** a UK-wide family list with opens over 30% (S). Ask its price if Picniq won't take a gift shop
+   ([enquiries](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)).
+2. **London Mums:** £75, 41,000 subscribers, London only. Book it if Happity says no or quotes over £150.
+3. **Meta Reach:** if *both* big lists say no, put their £300 into Meta Reach for UK adults 25–65+, with no retargeting and no
+   lookalikes. Run 2–14 Dec, frame-led.
 
-### National newsletters
+**Your turn:** send emails A and B below by **Fri 20 Nov**. Pay only once a send date by 2 Dec is confirmed.
+**I'll do:** the images in their sizes, the 50-word copy and the codes PICNIQ and HAPPITY.
 
-**Happity What's On.** Goes to **140k+ parents** across the UK every Sunday night. It covers babies and toddlers, so it suits
-photo keepsakes and grandparent gifts better than drawings. Happity sells "marketing packages to suit all budgets". No price,
-deadline or specs are published. The marketing page is
-[here](https://support.happity.co.uk/en/articles/5317492-marketing-advertising-opportunities-with-happity) (it blocks some
-browsers; the help pages hold a contact route). Creative: one square image, about 50 words, a link and a code (E). To make
-29 Nov, ask by Fri 20 Nov. *Confidence: reach confirmed on their own help page; price unknown.*
+## Move 3: free word of mouth (£0, about 10 hours of your time over three weeks)
 
-**London Mums.** **£75** buys 50 words plus an image in a monthly email to 41,000+ subscribers. It reaches London, and you
-deliver UK-wide, so that works. The December send date isn't published, so ask before paying. Book through the media kit
-contact ([2026 kit](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)).
-*Confidence: price and size on their own kit.*
+Three free routes, one message: *"their drawing, framed for grandma, order by Mon 14 Dec"*.
 
-**The Motherload (maybe).** A 95,000-member Facebook community network and about 60,000 monthly site users. It offers
-sponsored threads and features to suit "most budgets"; email them for a media kit
-([S](https://the-motherload.co.uk/work-with-us/)). No newsletter figure is given. Ask only if Happity says no.
-*Confidence: their own page; price unknown.*
+**a. UK parent and grandparent Facebook groups.** This is the purest free audience (85–95% on target, E). Many groups allow
+business posts **only in a weekly promo thread or on a set day**, and remove them anywhere else
+([S](https://multiplegroupposter.com/blog/facebook-group-promotion-rules/)).
+- **Your turn:**
+  - With your own profile, search Facebook for "UK mums", "[city] mums", "grandparents UK" and similar, and join 5–10 of the
+    biggest that have a promo day.
+  - Read each one's pinned rules.
+  - Post in the promo thread three times: weeks of 23 Nov, 30 Nov and 7 Dec.
+- **I'll do:** the post (C below) and a fresh image each week.
+- **Effort:** about 3–5 hours.
+- **The rule:** never use a customer's child's picture, and never ask parents to post their child's drawings in the group.
 
-**Small UK parenting Substacks** (for example
-[Working Mum in TV Land](https://reletter.com/publications/working-mum-in-tv-land), flagged "accepts sponsors"). A fair price
-is about £20–£60 a send for a 10k list (E, from the Paved benchmark). Offer the commission code first (email 5).
-
-**Stop chasing (national):**
-
-- **Mumsnet.** The live media-kit page now says **"Minimum spend: £10k"**
-  ([S](https://advertising.mumsnet.com/media-kit-page)). **This conflicts with the £5,000** in the earlier report, whose source
-  page now returns 404. Either way it's out of reach. Gransnet sits in the same sales team.
-- **Netmums direct:** from **€1,500** ([S, broker](https://adintime.com/en/3908-netmums.html)).
-- **Netmums affiliate:** runs through Webgains ([S](https://webgains.com/publisher-spotlight-netmums/)). Joining a network
-  won't happen in time, and the fees are unknown. Look at it in 2027.
-- **beehiiv ad network:** campaigns start at **$15k** ([S](https://www.beehiiv.com/newsletter-solutions/monetize/ad-network/brands)).
-- **Reach (Lemon-Aid and the rest):** sold through sales teams, "from £1k" ([S](https://content.reachsolutions.co.uk/advertisewithReach)).
-- **MadeForMums, Mother&Baby:** sales-led and network-linked, with no rates published.
-- **Paved marketplace:** mostly US readers, who can't get your gifts for Christmas.
-- **Working Families:** the list goes to employers, not parents.
-- **Hoop:** the app is ad-free.
-- **Fun Kids, Nat Geo Kids:** children's audiences. Excluded by your rules.
-
-### Bristol and the South West
-
-**Bristol24/7.** The biggest local audience: 12k+ newsletter subscribers at 33.3% opens (2022), 100k+ on Instagram. It isn't
-aimed at parents. Last year's **sponsored Christmas Gift Guide** was one entry per business: 60–100 words, one photo, a web
-link and an Instagram handle. It went up Thu 27 Nov 2025 ([S](https://www.bristol247.com/lifestyle/gift-guide/christmas-gift-guide-2025/)).
-The 2026 media pack sits behind a login. Ask for the guide price and lead time, and propose a code deal instead (email 2).
-Book through [advertise@bristol247.com or the advertise page](https://www.bristol247.com/advertise/). *Confidence: the format
-is confirmed on their site; 2026 prices aren't published.*
-
-**The Bristol Magazine "Weekend E-dition".** **£45** ex VAT for a 645×300 banner or an image-and-text box, sent to 5,000+
-subscribers in Clifton, Redland, Henleaze, Stoke Bishop and Westbury. That's next door to BS11, with plenty of grandparents.
-Listings go live "within 24 hours if required". Book through the
-[media pack](https://thebristolmag.co.uk/wp-content/uploads/2025/11/BRISTOL-MEDIA-PACK-2026.pdf) or the
-[advertise page](https://thebristolmag.co.uk/?p=7463) (advertising line 0117 974 2800). Book **one** send for around 4 Dec
-with "order by Thu 10 Dec / Sat 12 Dec". Add 27 Nov only if you want two to compare. *Confidence: 2026 pack on their own
-site; audience figures from 2024.*
-
-**Bristol Mum, Bristol Parent, Practically Perfect Mums** (Portishead and North Somerset, running since 2012). They're the
-best fit, being real local parents, and all take ads "on request". None publishes a price or audience. Small owner-run sites
-are the likeliest to say yes to a commission code (E). Links:
-[Bristol Mum](https://bristolmum.com/contact/disclosure-policy), [Bristol Parent](https://bristolparent.co.uk/?p=45422),
-[Practically Perfect Mums](https://practicallyperfectmums.co.uk/about-us/). *Confidence: ad routes confirmed; everything else
-unknown.*
-
-**Optional extras:**
-
-- **The Bath Magazine newsletter:** £45 a week (2024 pack, [S](https://thebathmagazine.co.uk/wp-content/uploads/BATH-MEDIA-PACK-Optimised-2024.pdf)).
-- **Nextdoor Local Deals:** "from £1" ([S](https://business.nextdoor.com/en-gb/small-business/industry/retail)), aimed at
-  BS9, BS11 and Portishead. A £20–£30 test, if you want one more. Your turn: the business page sign-up.
-
-**Stop chasing (Bristol):**
-
-- **Visit West "Merry Bristmas":** **£800 + VAT** for a *Bath* newsletter banner to visitors, and probably sold out
-  ([S](https://assets.simpleviewinc.com/simpleview/image/upload/v1/clients/bristol/Merry_Bristmas_2026_95aec19b-6150-42be-a719-a78a41007b00.pdf)).
-- **Bristol Live (Reach):** "from £1k".
-- **Bristol24/7 Better Business:** £215 a month ([S](https://my.bristol247.com/better-business/)).
-- **Primary Times Avon digital:** price on application, probably £250+ (Cardiff's guide price). It's school-linked, so raise it
-  in the December Mother's Day call.
-- **Bristol Cable:** print only.
-- **Mumbler:** no Bristol edition.
-- **Shop Bristol Independents:** for shops with a counter only.
-- **Heart, Global AdPower:** audio, a poor fit at this budget.
-- **Community magazines:** print only, and past their deadlines.
-
-### Gift guides
-
-**What's realistic now.** The big national guides (MadeForMums, Mumsnet, HELLO!, IndyBest) choose editorially and earn
-through affiliate networks such as Awin, Skimlinks and CJ ([S](https://hellomagazine.com/hello-product-review-guidelines)).
-Glossy guides mostly closed by late October ([S](https://blog.pressloft.com/2025/09/what-makes-a-perfect-gift-guide-pitch/)).
-What's still open is **small, one-person guides**. Some are still being published this week, for example one dated 17 Nov
-2026 ([S](https://www.editorsbeauty.com/features/christmas-gifts-for-kids-2026)).
-
-**Get Blogged** is the only published price list for paid guide inclusion: **from £20.80** for a gift guide, £26 for a
-roundup, £45.50 for a sponsored post. Prices include VAT and the 30% fee. The free Starter plan needs no card
-([S](https://www.getblogged.net/pricing/)). You post a brief and bloggers send proposals. Accept only slots that publish by
-2 Dec. Reach per blog isn't shown, so treat it as about £100 of tests. *Confidence: prices on their own page; reach unknown.*
-
-**Free: #journorequest** on [X](https://x.com/search?q=%23journorequest&f=live) and Bluesky. Watch for "personalised",
-"gifts from kids" and "grandparents". It costs only time, and you must be able to send a picture, price and link within hours.
-How many late gift requests still appear is unverified.
-
-**Stop chasing (gift guides):**
-
-- **National commerce desks:** network links only, and their pages are already written.
-- **Awin Access this season:** at least **£99 + VAT a month for 3 months, plus 3.5%**
-  ([S](https://www.awin.com/gb/terms-and-conditions/awin-access-faq)). That's about £356 before commission, or about 35 typical
-  orders just to cover fees.
-- **Linkby:** publisher minimums of **$2,500–$10,000** ([S](https://support.linkby.com/en/articles/8682217-10-2-do-you-have-a-list-of-suitable-publishers-and-minimum-budgets-broken-down-by-region)).
-- **Press Loft paid:** £200 a month ([S](https://pressloft.com/pricing)). Its 60-day free trial needs a sign-up; your call.
-- **Pay-per-placement PR firms:** £150–£450.
-- **ResponseSource/Vuelio:** no published price.
-- **Startups.co.uk:** picks come from its own index only.
-- **Last-minute guides:** published after your cut-offs.
-
-### Paid social: the baseline
-
-**Meta (Facebook and Instagram)** is the only paid-social test worth running this Christmas. It can start the same day or within
-48 hours (E), though brand-new accounts carry daily spending limits that lift over time
-([S](https://www.jonloomer.com/glossary/daily-spending-limit/)). Run **£150 over Wed 2 – Sat 12 Dec** (about £14 a
-day), aimed at **link clicks**. Without a pixel it can't aim at sales, and £150 is far below the roughly £2,750 a week needed
-for purchase targeting to learn (E).
-
-- **Who:** UK, age 25–65+. Leave targeting broad, or add "Parents (all)", which Meta now treats only as a suggestion
-  ([S](https://www.jonloomer.com/targeting-suggestions/)). **No retargeting, no lookalikes.**
-- **Creative:** a 1080×1350 feed image and a 1080×1920 Stories/Reels version (E, standard sizes). **Sell the framed print,
-  the multi frame and the blanket** (£15–£27 left an order on Pro), not the bauble or the mug (£3–£4.50). The drawing can still
-  be on a bauble in the background as the Christmas hook. Show the drawing and the product, hands and artwork only, **never a
-  child's face**, and brand-safe sample drawings only.
-- **When:** frames, blankets and cushions take orders until Mon 14 Dec, so a frame-led ad can run the whole window. Stop on
-  14 Dec.
-- **Set-up:** create the business account by Fri 27 Nov ([Meta Business](https://business.facebook.com/), then
-  [Ads Manager](https://adsmanager.facebook.com/)), so the first review isn't on the critical path. Your turn: the account.
-  I'll do: the ads.
-
-*Confidence: medium. Cost figures are blended UK and US data.*
-
-**Stop chasing (paid social):**
-
-- **TikTok Ads Manager:** £38.50 a day minimum.
-- **TikTok Promote:** needs existing posts and gives little control over age.
-- **Pinterest:** a real gift-search audience, but the sales evidence is thin and its pins live on past 12 Dec. Make it a 2027
-  test.
-- **Meta purchase targeting:** needs a pixel.
-
-### Creators and podcasts
-
-**The advice has changed since the micro-influencer report.**
-
-- **No follower discount.** The % codes are retired. The partner just gets **10% of the order before VAT on their follower's
-  first paid order**, and the follower gets the shop's usual free first card.
-- **No gifting before Christmas.** A keepsake sent about 24 Nov arrives about 1 Dec. Only about 44% of gifted posts ever go live
-  ([S](https://www.modash.io/blog/influencer-gifting-survey)), so most would land after the cut-offs. Gifting moves to Mother's
+**b. Commission-only creators and Substacks.**
+- **Your turn:** send email D to 5–10 UK parent creators from the top of the
+  [micro-influencer report](UK%20parent%20micro%20influencer%20targets.md) list. Re-check each live profile first, and prefer
+  those who already post gifts.
+- **The deal:** they earn 10% of each follower's first order before VAT (D30). That leaves you about **£6.70 a typical order,
+  £9.21 frame-led**, so it can't lose money.
+- **No gifting now.** A sample sent today arrives about 1 Dec, too late to post before the cut-offs. Gifting moves to Mother's
   Day.
-- **Who to ask:** pick from the top of that report's list. Prefer the "Green" and "Amber" creators who already sell photo
-  gifts, and re-check each live profile first.
+- **Your call:** if replies are slow, 15% would still leave about £4.90 a typical order.
 
-Commission-only offers are likely to get polite yeses and few posts in December, when creators chase paid Q4 deals (E). So
-send 5–10, not 2.
+**c. Small Business Saturday, Sat 5 Dec** ([register free](https://smallbusinesssaturdayuk.com/)).
+- **What it gives you:** free registration, a free marketing pack, and local press and BBC local radio run "shop small" pieces
+  that week (S).
+- **Why local here:** this is the one place where being local helps. Press covers businesses on its own patch, and a Bristol
+  "local maker" story still sells UK-wide.
+- **Add national routes:** Press Loft's **60-day free trial** for national online gift-guide requests
+  ([S](https://www.pressloft.com/signup.php)), and a 10-minute daily check of **#journorequest** on
+  [X](https://x.com/search?q=%23journorequest&f=live).
+- **Chance of coverage (E):** about 25–40% for a local mention, 5–15% for a national online guide.
+- **Your turn:** register for Small Business Saturday and start the Press Loft trial (both are sign-ups, so they're yours),
+  then send pitch E to about 10 local outlets by **Mon 30 Nov**.
+- **I'll do:** the press note, five brand-safe product images and the pitch for each outlet.
 
-**Stop chasing (creators and podcasts):**
+## Move 4: one paid search test, Google Shopping (£100)
 
-- **Paid micro posts:** £350–£1,000 plus a December premium, so 44–145 typical orders to break even.
-- **Paid UGC videos plus partnership ads:** the rights and timing don't fit 16 days. Do it for Mother's Day.
-- **Acast:** £250 minimum, 25 typical orders to break even, no parent targeting.
-- **Spotify podcast ads:** UK self-serve unconfirmed.
-- **Direct parenting-podcast reads:** no public UK prices, and shows record 1–2 weeks ahead.
-- **Creator platforms** (Collabstr, #paid): fees on top of fees.
+**Why this, not Meta.** Search ads reach people **by what they're looking for**, not by who they are. That's the most precise
+paid audience and needs no data about children. The profitability file already rates Shopping, advertising frames, as the paid
+channel closest to paying back (05). It runs from the feed that already exists.
 
-**Labelling.** Every paid, gifted or commission post must say **"Ad" or "#ad" up front**. A code or affiliate link makes it an
-ad, and the brand shares responsibility ([S, ASA](https://www.asa.org.uk/resource/influencers-guide.html)).
+**The set-up:**
+- **Products:** framed prints, multi frames, blankets and cushions only.
+- **Campaign:** standard Shopping (not Performance Max, which may hold back spend without a conversion tag,
+  [S](https://support.google.com/google-ads/answer/10724896?hl=en)), "Maximise clicks" with a **£0.70 maximum per click**.
+- **Budget:** **£7 a day** from Wed 2 to Mon 14 Dec, about £90.
+- **Expect:** about 100–250 clicks (E).
+
+**The honest catch: measurement.** People don't type codes from a Shopping ad, and the site has no Google tag on purpose. So
+we'll read it from Google's click report plus the number of frame, blanket and cushion orders from 2–14 Dec against the fortnight
+before. That's rough, but enough to decide whether to fund it properly for Mother's Day.
+
+**Your turn:** open a [Google Ads](https://ads.google.com/) account and link it to Merchant Center by **Fri 27 Nov**, so
+review and new-account limits are out of the way.
+**I'll do:** the campaign settings, written out step by step for you to click through.
+
+## The calendar
+
+| When | What |
+|---|---|
+| **Thu 19 – Fri 20 Nov** | Move 1 checks in Merchant Center. Send emails A (Picniq) and B (Happity). Send email D to 5–10 creators. Join the Facebook groups. Register for Small Business Saturday; start the Press Loft trial |
+| Mon 23 Nov | First Facebook promo-thread round. Chase Picniq and Happity if they haven't replied; ask the backups if needed |
+| Fri 27 Nov | Google Ads account linked. **Black Friday:** no paid social, as you're not discounting and ads cost the most that week |
+| Thu 26 Nov – Wed 2 Dec | Picniq send; Happity on Sun 29 Nov |
+| Mon 30 Nov | Press pitches out. Second Facebook round |
+| **Wed 2 Dec** | Google Shopping test starts |
+| Sat 5 Dec | Small Business Saturday |
+| Mon 7 Dec | First read of the codes. Third Facebook round, saying "last orders this week" |
+| **Thu 10 Dec** | Last orders for cards: stop mentioning cards |
+| **Sat 12 Dec** | Last orders for mugs, baubles, tees: frames, blankets and cushions only from here |
+| **Mon 14 Dec** | Last orders for frames, blankets, cushions: **stop everything** |
+
+These dates are the live site's last order dates (`src/lib/season.ts` on `feat/christmas-season`, marked provisional), shown at
+[snickerdoodle.co.uk/christmas/delivery-dates](https://snickerdoodle.co.uk/christmas/delivery-dates). From 25 Nov that's
+16, 18 and 20 selling days.
+
+## Measurement: codes, not trackers
+
+The site has no Meta pixel, Pinterest tag, TikTok pixel or Google tag, and the cookie banner allows essential cookies only.
+**Stay that way this Christmas.**
+
+- **One code per route:** PICNIQ, HAPPITY, GROUPS (Facebook groups), PRESS, plus each creator's own partner code. Your turn:
+  make them on [/admin/codes](https://snickerdoodle.co.uk/admin/codes) by Fri 20 Nov, or I'll write the SQL for you to paste.
+- **Google:** its click reports, plus the order count for those products (above).
+- **It will under-count.** Some people won't type the code, and grandparents see an ad on a phone and buy on a laptop. Read
+  every number as "at least this many".
+- **I'll do:** every Monday (30 Nov, 7 Dec, 14 Dec) you paste the /admin/codes numbers, and I'll tally orders and cost per
+  order for each route.
 
 ## Ready-to-send emails (Your turn: change anything that isn't you)
 
-I'll do: draft replies when they answer, and make the images in the sizes they ask for from the brand-safe sample photos
-(the robin drawing and ornament).
+**A. Picniq**
 
-**1. The Bristol Magazine newsletter**
-
-> **Subject:** A December slot in the Weekend E-dition?
+> **Subject:** A gift feature in your weekly newsletter?
 >
 > Hello,
 >
-> I'm Simon. I run Snickerdoodle from Shirehampton: we turn children's drawings into keepsakes, like framed prints, blankets,
-> cushions and baubles. The art is the star, so nothing we show ever has a child's face in it.
+> I'm Simon, and I run Snickerdoodle, a small UK shop that turns children's drawings into keepsakes: a framed print for
+> grandma, a blanket, a cushion. Families snap the drawing on their phone, and nothing we show ever has a child's face in it.
 >
-> I'd like a £45 image-and-text box (or the 645×300 banner) in the Weekend E-dition, ideally the send around Fri 4 December,
-> with a second around 27 November if you have it. Could you tell me which December sends are still free, the copy deadline,
-> and the image size you'd like?
+> I'd like to book your £150 + VAT weekly newsletter feature, ideally a send between 26 November and 2 December. Before I do,
+> could you tell me three things: do you take gift shops as well as days out, how many features share each send, and what the
+> copy deadline and image size are?
 >
-> I'll put a code just for your readers in the ad, so we can both see what it does.
+> I'll add a code just for Picniq families, so we can both see what it does.
 >
 > Thanks very much,
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
-**2. Bristol24/7 Christmas gift guide**
+**B. Happity What's On**
 
-> **Subject:** Your 2026 Christmas gift guide: is there room for one more?
->
-> Hello,
->
-> I'm Simon, and I run Snickerdoodle from Shirehampton. We turn a child's drawing into a keepsake: a framed print for grandma,
-> a blanket, a bauble for the tree. Parents snap the drawing on their phone, and nothing we show ever has a child's face in it.
->
-> Are you running a Christmas gift guide this year? If so, could you tell me the price, the copy deadline and the publish date?
-> I'm a very small business, so I'd also love to know if you'd consider a lower fee plus a commission code: your readers'
-> orders would carry a Bristol24/7 code, and you'd earn on each one.
->
-> I can send 60–100 words, a photo and a link the same day.
->
-> Thanks,
-> Simon
-> snickerdoodle.co.uk · [your phone]
-
-**3. A small Bristol or North Somerset family site** (Bristol Parent, Bristol Mum, Practically Perfect Mums)
-
-> **Subject:** A local Christmas idea for your readers (paid on results)
->
-> Hi,
->
-> I'm Simon, and I run a tiny business in Shirehampton. Snickerdoodle turns children's drawings into keepsakes: framed prints,
-> blankets, cushions, baubles. The art is the star, so nothing we show has a child's face in it, and the drawings stay private.
->
-> Would you consider a mention in a post, or in a Christmas roundup, on a commission basis? I'd make you your own code, and you'd
-> earn 10% of each reader's first order (before VAT), with no fee from you and nothing up front from me. Your readers get our
-> usual welcome, their first card free.
->
-> Last orders are Mon 14 Dec for framed prints, blankets and cushions (Sat 12 Dec for most other gifts), so early December
-> would be perfect. If you'd rather a
-> small flat fee, tell me your price and which dates are free.
->
-> Thanks,
-> Simon
-> snickerdoodle.co.uk · [your phone]
-
-**4. Happity What's On email**
-
-> **Subject:** Advertising in What's On: Sunday 29 Nov or 6 Dec?
+> **Subject:** Advertising in What's On: Sunday 29 November?
 >
 > Hello,
 >
 > I'm Simon from Snickerdoodle, a small UK shop that turns little ones' drawings and photos into keepsakes: framed prints,
-> blankets, cushions, baubles. They make lovely gifts from the children to their grandparents. We only show the art, never a child's
-> face.
+> blankets, cushions. They make lovely gifts from the children to their grandparents. We only ever show the art, never a
+> child's face.
 >
-> Could you send your price for a slot in the Sunday What's On email, and say whether 29 November or 6 December is still free?
-> Please include the image size and word count too. I'd add a code just for Happity parents so you can see the results. If you
-> ever work on commission, I'd happily do that instead.
+> Could you send your price for a slot in the Sunday What's On email, and say whether 29 November (or 6 December) is still
+> free? Please include the image size and word count too. I'd add a code just for Happity parents, so you can see the results.
 >
 > Thanks,
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
-**5. A small parenting blog, Instagram gift-guide account or Substack** (commission only)
+**C. Facebook group promo-thread post**
+
+> Hello all! I'm Simon, and I make Snickerdoodle keepsakes in the UK. Snap your little one's drawing on your phone and we'll
+> turn it into a framed print, a cosy blanket or a cushion, the wonky bits and all. Lovely for grandparents who already
+> have everything. Free UK delivery. Last orders for frames, blankets and cushions are Mon 14 Dec. Use code GROUPS at
+> snickerdoodle.co.uk. Happy to answer anything here.
+>
+> [image: a brand-safe sample drawing next to its framed print]
+
+**D. A UK parent creator or Substack (commission only)**
 
 > **Subject:** Your own code for a gift your followers can't buy anywhere else
 >
 > Hi [name],
 >
 > I loved your [specific post]. I'm Simon, and I run Snickerdoodle: we turn a child's drawing into a keepsake, so the wonky
-> crayon robin ends up on the tree. The art is the star, so you never need to show your children.
+> crayon robin ends up framed on grandma's wall. The art is the star, so you never need to show your children.
 >
-> Would you like your own code? You'd earn 10% of each follower's first order (before VAT), with nothing to buy
-> and no minimum. Please label posts "Ad". I can send you pictures (hands and drawings only), prices and the order-by dates:
-> Mon 14 Dec for framed prints, blankets and cushions, Sat 12 Dec for most other gifts.
+> Would you like your own code? You'd earn 10% of each follower's first order (before VAT), with nothing to buy and no
+> minimum. Please label posts "Ad". I can send you pictures (hands and drawings only), prices and the order-by dates: Mon 14
+> Dec for framed prints, blankets and cushions, Sat 12 Dec for most other gifts.
 >
 > No pressure at all. A "not this year" is completely fine.
 >
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
-**6. Get Blogged brief** (paste into the brief box)
+**E. Small Business Saturday press pitch** (local paper, BBC local radio, regional lifestyle sites)
 
-> **Snickerdoodle: their drawing, made real (UK Christmas gift guides)**
-> We turn a child's drawing into a keepsake: framed prints (from £65), multi frames (from £62), fleece blankets (from £60),
-> cushions and ceramic ornaments. Free UK delivery, made in the UK. Looking for inclusion in **UK Christmas gift guides or roundups published by Wed 2 December**
-> (gifts for grandparents, gifts from kids, personalised). We supply images (drawings and products only, no children
-> shown), copy, prices, a tracked link and your own code. Please state the publish date and your typical monthly views.
-> Posts must be labelled as ads. Last order dates: Thu 10 Dec (cards), Sat 12 Dec (most gifts), Mon 14 Dec (framed prints,
-> cushions).
+> **Subject:** Small Business Saturday: the Shirehampton shop framing children's drawings
+>
+> Hello [name],
+>
+> For your Small Business Saturday coverage on 5 December: I'm Simon, and I started Snickerdoodle in Shirehampton to turn
+> children's drawings into keepsakes, like framed prints, blankets and cushions, made in the UK. The idea is simple: they're only
+> little once, so keep the wonky crayon robin instead of losing it in a drawer.
+>
+> I can send product photos (drawings and products only, never children), prices and a sample. I'm free to talk any day this
+> week or next.
+>
+> Thanks,
+> Simon
+> snickerdoodle.co.uk · [your phone]
 
-**One sample ad line** (no hype): *"Their wonky crayon robin, framed for grandma. Snap it on your phone, see it framed in
-seconds. Free UK delivery. Order by Mon 14 Dec. They're only little once."*
+**One sample ad line** (for Picniq, Happity and the groups): *"Their wonky crayon robin, framed for grandma. Snap it on your
+phone, see it framed in seconds. Free UK delivery. Order by Mon 14 Dec. They're only little once."*
 
-## Measurement: codes, not trackers
+Every post with a code or commission must say **"Ad" or "#ad" up front**
+([S, ASA](https://www.asa.org.uk/resource/influencers-guide.html)).
 
-The site has **no Meta pixel, Pinterest tag, TikTok pixel or Google tag**, and its cookie banner allows essential cookies only.
-**Stay pixel-free this Christmas.**
+## Why digital, not print
 
-- **The law:** the ICO says advertising pixels need prior opt-in consent
-  ([S](https://cy.ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guidance-on-the-use-of-storage-and-access-technologies)).
-- **The numbers:** with an equal "reject" button, about half of visitors refuse
-  ([S](https://voxbooster.com/blog/cookie-consent-banner-statistics-2026)), so a pixel would see only half the sales anyway.
-- **The risk:** this site holds children's pictures. Adding a pixel is your decision, and not one to rush for 16 days.
+- **Print can't land in time or pay back.** Door drops average about 0.5–0.6% response, at about **£200 per customer**
+  ([S, DMA/JICMAIL](https://dma.org.uk/uploads/misc/door-drops-2024-report-final.pdf)). That's 14–20 times what an order
+  leaves on Pro. A drop booked now lands around 8–9 Dec, and local print deadlines have closed.
+- **Digital can be counted.** A code per route tells you by 7 Dec what's working. A leaflet tells you nothing in time.
+- **Digital stops at the cut-off.** An ad can say "frames by Mon 14 Dec" and then stop.
+- **Shoppers still buy late, but your window shuts first.** 47% do their festive spending in early-to-mid December
+  ([S, PwC](https://www.pwc.co.uk/press-room/press-releases/research-commentary/festive-spending-forecast-to-reach-p24-6bn-this-year--pwc-uk---.html)),
+  but made-to-order keepsakes close 10–14 Dec. So the work is to reach people from 26 Nov to 12 Dec.
+- **Keep the offline work that's already in hand:** the fairs (28 Nov – 6 Dec) and the 1,500 hand-out leaflets. Add no paid
+  print.
 
-**How to count:**
+## For 2027
 
-- **One code per placement.** Use a CAMPAIGN code (it carries the free first card, and otherwise just tags the order) for
-  paid slots, for example BRISTOLMAG, B247GIFT, HAPPITY, LONDONMUMS, META. Use a partner code (10% commission) for each blog
-  or creator.
-- **One UTM link per placement** (a tag on the end of the web address), for example
-  `snickerdoodle.co.uk/?utm_source=bristolmag&utm_medium=newsletter&utm_campaign=xmas26`. The site keeps no visit logs on
-  purpose, so this is mainly so the publisher's and Meta's click reports match up.
-- **The scoreboard:** /admin/codes shows paid orders and takings per code.
-- **It will under-count.** Signed-in first orders get the free card anyway, so some people won't type the code, and grandparents
-  often see an ad on a phone and buy on a laptop. Read the result as "at least this many".
+- **A gift card or e-voucher,** to sell after the cut-offs and fit the 16–19 Dec "last-minute" guides.
+- **Google Customer Reviews or Trustpilot from spring,** to reach the 100 reviews that unlock stars.
+- **Mother's Day (Sun 7 Mar):** fund whichever of Picniq, Happity and Google Shopping sold. Do the creator gifting then.
+- **Pins and gift-guide pitches** in July–October. Pinterest's Christmas searches start in October
+  ([S](https://business.pinterest.com/en-gb/blog/festive-gifting-pinterest/)).
 
-**The commission maths, plainly.** A typical £44 order is £36.67 before VAT, so 10% is **£3.67**. The £10.37 that order
-leaves on Pro already allows for the free first card, so the commission comes off the top: about **£6.70 left**. A £62
-frame-led order pays £5.13 commission and leaves about **£9.21**. A commission deal can **never lose you money**, and most of
-the fixed fees in the table can.
+## Research notes
 
-**Room to sweeten it (your call).** If December replies are slow, 15% would still leave about £4.90 on a typical order and
-£6.60 on a frame-led one. The current offer (D30, 10%) stays as it is unless you decide otherwise.
-
-**I'll do:**
-
-- Every Monday (30 Nov, 7 Dec, 14 Dec), you paste the /admin/codes numbers (or run my SQL), and I tally orders and cost per
-  order for each placement.
-- On 7 Dec I'll tell you which ones to stop.
-
-## Conclusion
-
-On Prodigi Pro, with £10–£14 left per order, this Christmas can roughly pay for its cheapest tests and find the two or three
-places that work. Two things decide it. **First, structure:** anything paid by results beats anything paid by the slot, and the
-gap is widest for a small new shop with no reviews. **Second, the product in the ad:** a framed print or blanket leaves three to
-four times what a mug or bauble does, and it has the latest cut-off. If a commission partner or a cheap newsletter produces even
-3–5 frame-led orders, that's the channel to book early for Mother's Day.
-
-**Out of this report's scope, but worth a look:** the profitability file rates **Google Shopping, advertising frames only**, as
-the paid channel closest to paying back (about £40 a first order, E). The Merchant feed already exists. Measuring it properly
-needs the Google tag behind consent, so whether to add it is your decision, and it's probably a Mother's Day job, not a
-16-day one.
-
-**For 2027:**
-
-- **Awin in January.** Get network-linkable so the July–October national gift guides (and Netmums or Webgains) are possible.
-- **Mother's Day test (Sun 7 March 2027).** Book bags, gifted creators, one Meta flight, and repeat whichever newsletters
-  sold this December.
-- **A gift card or e-voucher.** It lets you sell after the cut-offs and fit the 16–19 Dec "last-minute" guides.
-- **Book creators, Bristol24/7's guide and Primary Times' winter issue in September–early October.**
-- **A Pinterest test in spring.**
+All figures, dates and sources:
+- [research_notes/Christmas ads UK wide reach/](../research_notes/Christmas%20ads%20UK%20wide%20reach/): the UK-wide newsletters,
+  free reach, and paid reach costs, all read 18 Nov 2026.
+- [research_notes/Christmas digital ads 2026/](../research_notes/Christmas%20digital%20ads%202026/): the first round, covering
+  national and Bristol newsletters, gift guides, paid social, creators and timing.
