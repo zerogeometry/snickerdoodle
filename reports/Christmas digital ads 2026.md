@@ -79,6 +79,8 @@ So we can't win on stars before Christmas. Google needs about 100 reviews for st
 **Already good.** The feed's titles lead with the words people search: "Framed print of your child's drawing", "Personalised
 fleece blanket with your child's drawing". It uses brand-safe photos only, free UK delivery, and marks the Christmas range.
 
+**Every click is written out in [Google Shopping steps](Google%20Shopping%20steps%20Christmas%202026.md).**
+
 **Your turn (about 1–2 hours in [Merchant Center](https://merchants.google.com/)):**
 1. Open **Products → Needs attention** and fix or send me every warning.
 2. Check the **returns policy** in Merchant Center matches the site's returns page. Google checks they agree
@@ -189,7 +191,7 @@ before. That's rough, but enough to decide whether to fund it properly for Mothe
 
 **Your turn:** open a [Google Ads](https://ads.google.com/) account and link it to Merchant Center by **Fri 27 Nov**, so
 review and new-account limits are out of the way.
-**I'll do:** the campaign settings, written out step by step for you to click through.
+**I'll do:** done. Every click is in [Google Shopping steps](Google%20Shopping%20steps%20Christmas%202026.md), part 2.
 
 ## The calendar
 
@@ -257,6 +259,40 @@ The site has no Meta pixel, Pinterest tag, TikTok pixel or Google tag, and the c
 >
 > Could you send your price for a slot in the Sunday What's On email, and say whether 29 November (or 6 December) is still
 > free? Please include the image size and word count too. I'd add a code just for Happity parents, so you can see the results.
+>
+> Thanks,
+> Simon
+> snickerdoodle.co.uk · [your phone]
+
+**B1. Backup: Day Out With The Kids** (send if Picniq won't take a gift shop, or has no date by 2 Dec)
+
+> **Subject:** A December email slot for a family gift shop?
+>
+> Hello,
+>
+> I'm Simon, and I run Snickerdoodle, a small UK shop that turns children's drawings into keepsakes: framed prints, blankets
+> and cushions, made in the UK. We only ever show the art, never a child's face.
+>
+> Do you take gift brands in your family email, and if so, what's the price and the earliest send you have between
+> 26 November and 3 December? Please also tell me the list size, the image size and the word count. My budget for this
+> is about £150, and I'd add a code just for your families so you can see the results.
+>
+> Thanks,
+> Simon
+> snickerdoodle.co.uk · [your phone]
+
+**B2. Backup: London Mums** (send if Happity says no or quotes over £150)
+
+> **Subject:** Your December newsletter: is there room for a £75 slot?
+>
+> Hello,
+>
+> I'm Simon from Snickerdoodle, a small UK shop that turns children's drawings into keepsakes: framed prints, blankets,
+> cushions. Free UK delivery, and we never show a child's face.
+>
+> I'd like to book the £75 newsletter slot (50 words and an image) in your December send. Could you tell me the send date,
+> the copy deadline and the image size? It needs to go out by about 6 December, as our last orders for framed prints are
+> Mon 14 December. I'd add a LONDONMUMS code so you can see what it does.
 >
 > Thanks,
 > Simon
