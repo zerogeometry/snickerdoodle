@@ -53,6 +53,9 @@ I scored every option on the same footing, then kept only the cheapest per famil
 | **Happity newsletter (brand partnerships)** | ask; book at ≤£150, or on commission | **120k subscribers**, parents of babies and toddlers; 350k site visits a month ([S](https://www.happity.co.uk/blog/partners-press/)) | ~90% | **~£4.63** at £150 | £10–£35 | **In (move 2)** |
 | **Picniq weekly newsletter** | **£150** ([S](https://www.picniq.co.uk/about/advertise)) | **140k+ families** (S) | ~75% | **~£4.76** | £9–£30 | **In (move 2)** |
 | Day Out With The Kids email | ask | list not published; opens "in excess of 30%" ([S](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)) | ~75% | unknown | unknown | **Backup** for move 2 |
+| **The Parent Edit** (UK luxury parenting and lifestyle magazine) | ask; book at ≤£150 | not published; already runs a 2026 "one-off personalised Christmas gift" guide ([S](https://www.theparentedit.co.uk/)) | ~80% | unknown | unknown | **Ask (lifestyle pick)**: best product fit found |
+| The Green Parent newsletter | ask | 15k a week (2024 kit, [S](https://thegreenparent.co.uk/content/files/2024/04/TGP-Media-Kit-2024.pdf)) | ~70% | it would need to cost under ~£30 a send to match London Mums | unknown | Out unless very cheap |
+| Big UK parenting Substacks (How to Feed 25k, Talking Sense 18k, Every Shade of Grey 16k, The Frazzled Mums Club 11k) | no price published | 11k–25k each ([S, their own pages](https://charlottestirlingreed.substack.com/)) | 50–90% | £50–£140 if a slot costs £300 | — | **Commission only (move 3)**, never a fee |
 | Google Shopping, paid | £100 | 100–250 clicks at £0.40–£0.70 (E) | 60–80% | (per click) | £20–£50 | **In (move 4)** |
 | Pinterest keyword ads | ~£70 | £3–£6 per 1,000 shown (E) | 50–70% | £6–£16 | unproven | Out: new-account delivery in December unproven |
 | London Mums | £75 ([S](https://www.londonmumsmagazine.com/wp-content/uploads/2025/12/MEDIA-KIT-London-Mums-2026.pdf)) | 41k, London only | ~60% | ~£10 | £13–£38 | **Backup** if Happity says no |
@@ -128,6 +131,22 @@ booking site.
 - **The angle:** toddler scribbles and photos make the classic grandparent gift, so lead with the framed print and blanket.
 - *Confidence: reach on its own page; price unknown.*
 
+**What about family lifestyle newsletters instead of days out?** I looked hard (notes:
+[family lifestyle publishers](../research_notes/Christmas%20ads%20UK%20wide%20reach/family_lifestyle_publishers.md),
+[independent parenting newsletters](../research_notes/Christmas%20ads%20UK%20wide%20reach/independent_parenting_newsletters.md)).
+**No UK lifestyle newsletter comes close on reach for the money:**
+- **Happity isn't a days-out list.** It's a parenting audience (baby and toddler classes), so it stays the lead.
+- **Junior** has closed. **Smallish, JUNO and Absolutely Mama** have no current ad offer.
+- **MadeForMums, Mother&Baby, Mumsnet and Netmums** are sold through sales teams with big minimums.
+- **The big independent parenting Substacks** have 11k–25k readers each. None publishes a price; typical rates for lists that
+  size are $500–$3,000. At even £300 they'd cost **10–30 times more per family** than Picniq or Happity. So they're offered
+  commission only, in move 3.
+- **One lifestyle title is worth a single email: The Parent Edit**, a UK parenting and lifestyle magazine. It already runs a
+  2026 "one-off personalised Christmas gift" guide, plus guides by age (0–3, 3–5, 5–8) and gifts for mothers. That's exactly
+  where Snickerdoodle belongs. It sells advertorial gift-guide slots but publishes no price or reach. Ask it (email B3).
+  **If it quotes £150 or less with a readership you're happy with, take it instead of Picniq.** Otherwise keep Picniq, with
+  gift-led copy, as the reach buy.
+
 **Backups, in order:**
 1. **Day Out With The Kids:** a UK-wide family list with opens over 30% (S). Ask its price if Picniq won't take a gift shop
    ([enquiries](https://www.dayoutwiththekids.co.uk/marketing-packages-and-listings)).
@@ -158,6 +177,18 @@ business posts **only in a weekly promo thread or on a set day**, and remove the
 - **Your turn:** send email D to 5–10 UK parent creators from the top of the
   [micro-influencer report](UK%20parent%20micro%20influencer%20targets.md) list. Re-check each live profile first, and prefer
   those who already post gifts.
+- **Add the four biggest UK parenting newsletters** to that list, commission only. None publishes a business email, so reply
+  through Substack or their Instagram:
+  1. **The Frazzled Mums Club** (Anna Mathur, 11k+, [annamathur.substack.com](https://annamathur.substack.com/)). The likeliest
+     yes: it already carries affiliate links and a code every Friday.
+  2. **Every Shade of Grey** (Katherine Ormerod, 16k+, [katherineormerod.substack.com](https://katherineormerod.substack.com/)).
+     Style, home and parenting, so the best fit for a gift mention.
+  3. **How to Feed** (Charlotte Stirling-Reed, 25k+, [charlottestirlingreed.substack.com](https://charlottestirlingreed.substack.com/)).
+     The best audience, parents of babies to under-11s, but a nutrition list, so less likely to say yes.
+  4. **Talking Sense** (Dr Martha Deiros Collado, 18k+, [drmarthapsychologist.substack.com](https://drmarthapsychologist.substack.com/)).
+     A psychologist's list, so the same caveat.
+  
+  Subscriber counts are as shown on their own pages, 18 Nov 2026 (S).
 - **The deal:** they earn 10% of each follower's first order before VAT (D30). That leaves you about **£6.70 a typical order,
   £9.21 frame-led**, so it can't lose money.
 - **No gifting now.** A sample sent today arrives about 1 Dec, too late to post before the cut-offs. Gifting moves to Mother's
@@ -202,7 +233,7 @@ review and new-account limits are out of the way.
 
 | When | What |
 |---|---|
-| **Thu 19 – Fri 20 Nov** | Move 1 checks in Merchant Center. Send emails A (Picniq) and B (Happity). Send email D to 5–10 creators. Join the Facebook groups. Register for Small Business Saturday; start the Press Loft trial |
+| **Thu 19 – Fri 20 Nov** | Move 1 checks in Merchant Center. Send emails A (Picniq), B (Happity) and B3 (The Parent Edit). Send email D to 5–10 creators. Join the Facebook groups. Register for Small Business Saturday; start the Press Loft trial |
 | Mon 23 Nov | First Facebook promo-thread round. Chase Picniq and Happity if they haven't replied; ask the backups if needed |
 | Fri 27 Nov | Google Ads account linked. **Black Friday:** no paid social, as you're not discounting and ads cost the most that week |
 | Thu 26 Nov – Wed 2 Dec | Picniq and Happity sends, about a week apart |
@@ -269,6 +300,25 @@ The site has no Meta pixel, Pinterest tag, TikTok pixel or Google tag, and the c
 > the results.
 >
 > Thanks,
+> Simon
+> snickerdoodle.co.uk · [your phone]
+
+**B3. The Parent Edit** (the form at [theparentedit.co.uk/contact](https://www.theparentedit.co.uk/contact); send alongside A
+and B)
+
+> **Subject:** Your personalised Christmas gift guide: is there room for one more?
+>
+> Hello,
+>
+> I'm Simon, and I run Snickerdoodle, a small UK shop that turns children's drawings into heirloom keepsakes: framed prints,
+> blankets and cushions, made in the UK. The art is the star, so nothing we show ever has a child's face in it.
+>
+> I loved your one-off personalised Christmas gift guide. Do you have an advertorial slot left in a gift guide or your
+> newsletter before about 3 December? Could you send the price, your newsletter readership and the copy deadline? My budget is
+> about £150. I'd add a code just for your readers, so you can see what it does, and I'm happy to work on commission instead
+> if you prefer.
+>
+> Thanks very much,
 > Simon
 > snickerdoodle.co.uk · [your phone]
 
