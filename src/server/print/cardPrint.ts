@@ -16,9 +16,12 @@ import type { ScreenedCardMessage } from '@/server/textSafety';
  */
 export const CARD_SPREAD = { widthPx: 6120, heightPx: 2160 } as const;
 const PANEL_W = CARD_SPREAD.widthPx / 4; // 1530 — even quarters
-// The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
-// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel).
-const BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
+// The Snickerdoodle back logo's width + centre on the outer-rear panel: CENTRED along the bottom
+// (founder, 19 Nov 2026 — was bottom-left on a cream disc). ≈23mm wide × 8.5mm tall, its bottom edge
+// ≈8mm above the trim. Fractions of the back PANEL — the on-screen "opened out" card (seedMockups)
+// places the same logo with the same numbers, so the picture and the print agree.
+export const CARD_BACK_BADGE = { widthFrac: 0.18, cxFrac: 0.5, cyFrac: 0.92 } as const;
+const BADGE = CARD_BACK_BADGE;
 const H = CARD_SPREAD.heightPx;
 const REQUIRED_DPI = 300;
 
@@ -36,14 +39,17 @@ export const CARD_PANEL_X = {
  * `faceHex` (white, or the card's BASE COLOUR — so a see-through drawing sits on the colour).
  * `scale = 0` stays the CONTAIN sentinel, so the print matches whatever the shopper positioned.
  */
-async function placeDesign(design: Buffer, transform: Transform, w: number, faceHex: string): Promise<Buffer> {
+async function placeDesign(design: Buffer, transform: Transform, w: number, faceHex: string | null): Promise<Buffer> {
   const meta = await sharp(design).metadata();
   const src = { width: meta.width ?? 0, height: meta.height ?? 0 };
   if (!src.width || !src.height) throw new Error('card print: unreadable design image');
   const rect = computeLayerRect({ printWidthPx: w, printHeightPx: H, bleedMm: 0, requiredDpi: REQUIRED_DPI }, src, transform);
   // cut from the source BEFORE resizing — a big zoomed layer is never decoded whole (sweep 03-B3)
   const { part, left: ox, top: oy } = await visibleLayerPart(design, src, rect);
-  return sharp({ create: { width: w, height: H, channels: 4, background: faceHex } })
+  // null = a see-through face (only the drawing itself is opaque) — the full-width back, so the logo
+  // under it still shows wherever the drawing doesn't reach; the spread's white shows elsewhere
+  const background = faceHex ?? { r: 0, g: 0, b: 0, alpha: 0 };
+  return sharp({ create: { width: w, height: H, channels: 4, background } })
     .composite([{ input: part, left: ox, top: oy }])
     .png()
     .toBuffer();
@@ -58,7 +64,8 @@ export interface CardPrintInput {
   span: 'front' | 'full';
   /** The SCREENED inside message, or null for a blank (write-by-hand) inside. */
   message: ScreenedCardMessage | null;
-  /** Snickerdoodle back badge (PNG with alpha), centred on the outer-rear panel. Optional. */
+  /** Snickerdoodle back logo (PNG with alpha), centred along the bottom of the outer-rear panel —
+   * UNDER the drawing when it spans the whole outside (founder, 19 Nov 2026). Optional. */
   branding?: Buffer | null;
   /** The card's BASE COLOUR (#rrggbb, already normalised) — fills the OUTSIDE under the design: the
    * outer front, plus the outer rear when the drawing spans the whole outside. The inside always
@@ -68,26 +75,19 @@ export interface CardPrintInput {
 
 /**
  * Assemble the card's flat 4-panel PRINT file (6120×2160 @300dpi). front-only fills the outer-front
- * panel with the design; full-width spans outer rear+front. A base colour fills exactly the panels
- * the design covers (front-only leaves the rear white). A blank inside stays white. The screened
+ * panel with the design; full-width spans outer rear+front, OVER the back logo. A base colour fills
+ * exactly the panels the design covers (front-only leaves the rear white). A blank inside stays white. The screened
  * message and the font token are the single source of truth shared with the on-screen preview, so
  * they can't disagree. This is the PRINT path — it never touches the display compositor's pixels.
  */
 export async function assembleCardPrintSpread(input: CardPrintInput): Promise<Buffer> {
   const { design, transform, span, message, branding } = input;
-  const faceHex = input.groundHex ?? '#ffffff';
   const layers: OverlayOptions[] = [];
 
-  // OUTSIDE — the design, on its base colour. full-width = one wide face across rear+front;
-  // front-only = the front panel (the rear stays white).
-  if (span === 'full') {
-    layers.push({ input: await placeDesign(design, transform, PANEL_W * 2, faceHex), left: CARD_PANEL_X.outerRear, top: 0 });
-  } else {
-    layers.push({ input: await placeDesign(design, transform, PANEL_W, faceHex), left: CARD_PANEL_X.outerFront, top: 0 });
-  }
-
-  // BACK logo — the Snickerdoodle mark at the founder's spot: bottom-left of the outer-rear panel
-  // (over white for front-only, over the design's back portion — and its colour — for full-width).
+  // BACK logo FIRST — the Snickerdoodle mark at the founder's spot, centred along the bottom of the
+  // outer rear. Laid down before the outside so a drawing that wraps round to the back sits ON TOP of
+  // it (founder, 19 Nov 2026): the logo shows only where the drawing doesn't reach. Front-only cards
+  // leave the rear white, so there it's always clear.
   if (branding) {
     const badge = await sharp(branding).resize(Math.round(PANEL_W * BADGE.widthFrac), null, { fit: 'inside' }).png().toBuffer();
     const bm = await sharp(badge).metadata();
@@ -96,6 +96,16 @@ export async function assembleCardPrintSpread(input: CardPrintInput): Promise<Bu
       left: CARD_PANEL_X.outerRear + Math.round(PANEL_W * BADGE.cxFrac - (bm.width ?? 0) / 2),
       top: Math.round(H * BADGE.cyFrac - (bm.height ?? 0) / 2),
     });
+  }
+
+  // OUTSIDE — the design, on its base colour. full-width = one wide face across rear+front, over the
+  // logo: a base colour covers it like the drawing does (it's the design's own background), while
+  // without one the face is see-through so the logo peeks out round a cut-out drawing — exactly what
+  // the on-screen "opened out" card shows. front-only = the front panel (the rear stays white).
+  if (span === 'full') {
+    layers.push({ input: await placeDesign(design, transform, PANEL_W * 2, input.groundHex ?? null), left: CARD_PANEL_X.outerRear, top: 0 });
+  } else {
+    layers.push({ input: await placeDesign(design, transform, PANEL_W, input.groundHex ?? '#ffffff'), left: CARD_PANEL_X.outerFront, top: 0 });
   }
 
   // INSIDE — the note on inside-front (facing/left), the greeting/message/signature on inside-back.
