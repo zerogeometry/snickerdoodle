@@ -12,6 +12,8 @@ import { buildFrameLayout, frameLayoutDir } from './frameLayout';
 import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
 import { BUNDLE_KEY } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
+import { renderCardBackBadge } from './cardBranding';
+import { CARD_BACK_BADGE } from './cardPrint';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
 
@@ -1436,11 +1438,29 @@ async function alphaBox(buf: Buffer): Promise<Box> {
 // Founder-authored CARD "Outside Open" — the flat unfolded outside (a display VIEW, not the print).
 // background → shadow → printmap-back (left panel) → printmap-front (right panel) = the white card;
 // the child's image covers either the FRONT panel ('front') or the whole spread across the fold
-// ('full'); snicker-overlay is the branding badge laid OVER the image. Two axis-aligned zones → FLAT.
+// ('full'); the Snickerdoodle back badge is laid OVER the image. Two axis-aligned zones → FLAT.
+// The badge is the PRINT's own (cardBranding.ts), placed on the back panel with the print's numbers —
+// no longer the folder's snicker-overlay.png (the old logo), so the picture shows what gets printed.
 function layeredCardOutsideDir(): string | null {
   const dir = path.join(LAYERED, 'card', 'Outside Open');
   const has = (f: string) => existsSync(path.join(dir, f));
-  return has('background.png') && has('shadow.png') && has('printmap-back.png') && has('printmap-front.png') && has('snicker-overlay.png') ? dir : null;
+  return has('background.png') && has('shadow.png') && has('printmap-back.png') && has('printmap-front.png') ? dir : null;
+}
+/** A W×H see-through overlay with the printed card-back badge on the back panel (`back`, fractions of
+ * the picture) — the same spot and size, relative to the panel, as assembleCardPrintSpread prints it. */
+export async function cardBackBadgeOverlay(W: number, H: number, back: Box): Promise<Buffer> {
+  const panelW = (back.x1 - back.x0) * W;
+  const panelH = (back.y1 - back.y0) * H;
+  const badge = await sharp(renderCardBackBadge()).resize(Math.round(panelW * CARD_BACK_BADGE.widthFrac), null, { fit: 'inside', kernel: 'lanczos3' }).png().toBuffer();
+  const bm = await sharp(badge).metadata();
+  return sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{
+      input: badge,
+      left: Math.round(back.x0 * W + panelW * CARD_BACK_BADGE.cxFrac - (bm.width ?? 0) / 2),
+      top: Math.round(back.y0 * H + panelH * CARD_BACK_BADGE.cyFrac - (bm.height ?? 0) / 2),
+    }])
+    .png()
+    .toBuffer();
 }
 async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: Buffer; W: number; H: number; frontBox: Box; fullBox: Box }> {
   const frontPng = readFileSync(path.join(dir, 'printmap-front.png'));
@@ -1457,9 +1477,9 @@ async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: 
     ])
     .png()
     .toBuffer();
-  const overlay = readFileSync(path.join(dir, 'snicker-overlay.png'));
   const frontBox = await alphaBox(frontPng);
   const backBox = await alphaBox(backPng);
+  const overlay = await cardBackBadgeOverlay(W, H, backBox);
   const fullBox = { x0: Math.min(frontBox.x0, backBox.x0), y0: Math.min(frontBox.y0, backBox.y0), x1: Math.max(frontBox.x1, backBox.x1), y1: Math.max(frontBox.y1, backBox.y1) };
   return { blank, overlay, W, H, frontBox, fullBox };
 }
@@ -1761,7 +1781,7 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
   // Alternate views — the CARD's flat "outside" spread, authored per card variant as two views:
   // 'outside-front' (the design on the front panel only) + 'outside-full' (spanning both panels
   // across the fold). Display-only (mockup_views); the print file is assembled separately. The
-  // snicker-overlay badge rides as the foreground overlay.
+  // printed card-back badge rides as the foreground overlay (cardBackBadgeOverlay).
   const cardOutsideDir = layeredCardOutsideDir();
   if (cardOutsideDir) {
     const o = await buildCardOutside(cardOutsideDir);

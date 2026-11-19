@@ -11,8 +11,8 @@
  * them by season. Re-run whenever brand-assets changes. (The doodle textures and floating doodles come from
  * backgrounds/<season>/doodle-sheet*-reference.png via scripts/textures/build.py.)
  *
- * Supersedes build-brand-assets.mjs for the logo, icons and share card; that script still builds the
- * printed card-back badge, which stays the everyday mark (prints outlive the season).
+ * Supersedes build-brand-assets.mjs for the logo, icons and share card. The printed card-back badge has
+ * its own script, build-card-back-badge.mjs — always the everyday mark (prints outlive the season).
  */
 import { copyFileSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

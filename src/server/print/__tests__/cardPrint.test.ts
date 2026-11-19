@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import sharp, { type OutputInfo } from 'sharp';
-import { assembleCardPrintSpread, CARD_SPREAD, CARD_PANEL_X } from '@/server/print/cardPrint';
+import { assembleCardPrintSpread, CARD_BACK_BADGE, CARD_SPREAD, CARD_PANEL_X } from '@/server/print/cardPrint';
 import { renderCardBackBadge } from '@/server/print/cardBranding';
 import type { ScreenedCardMessage } from '@/server/textSafety';
 
@@ -73,6 +73,36 @@ describe('card 4-panel print assembly', () => {
     let ink = 0;
     for (let i = 0; i < data.length; i += info.channels) if (data[i + 3]! > 40 && data[i]! < 120) ink++;
     expect(ink).toBeGreaterThan(200);
+  });
+
+  it('the back logo prints sharp and inside the safe area — never scaled UP, clear of the trim and the fold', async () => {
+    const badge = renderCardBackBadge();
+    const m = await sharp(badge).metadata();
+    const printedW = Math.round(PANEL_W * CARD_BACK_BADGE.widthFrac);
+    expect(m.width!).toBeGreaterThanOrEqual(printedW); // only ever shrunk → at least 300dpi at its printed size
+    // where it lands on the spread (square badge): ≥ 15px bleed + 3mm (≈35px) from every trim edge and the fold
+    const half = printedW / 2;
+    const cx = PANEL_W * CARD_BACK_BADGE.cxFrac;
+    const cy = CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac;
+    const SAFE = 15 + 35;
+    expect(cx - half).toBeGreaterThanOrEqual(SAFE);
+    expect(cx + half).toBeLessThanOrEqual(PANEL_W - SAFE);
+    expect(cy - half).toBeGreaterThanOrEqual(SAFE);
+    expect(cy + half).toBeLessThanOrEqual(CARD_SPREAD.heightPx - SAFE);
+  });
+
+  it('the real back logo lands on the print — cocoa ink at its spot, on single cards and over a full-width drawing', async () => {
+    for (const span of ['front', 'full'] as const) {
+      const p = await pixels(await assembleCardPrintSpread({ design: await green(), transform: tf, span, message: null, branding: renderCardBackBadge() }));
+      const w = Math.round(PANEL_W * CARD_BACK_BADGE.widthFrac);
+      const x0 = Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac - w / 2), y0 = Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac - w / 2);
+      let ink = 0;
+      for (let y = y0; y < y0 + w; y += 2) for (let x = x0; x < x0 + w; x += 2) {
+        const [r, g, b] = at(p, x, y);
+        if (r < 110 && g < 80 && b < 80) ink++; // the logo's dark cocoa
+      }
+      expect(ink).toBeGreaterThan(100);
+    }
   });
 
   it('a message prints the note on inside-front and the greeting/message/signature on inside-back', async () => {

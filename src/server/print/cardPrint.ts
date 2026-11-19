@@ -17,8 +17,11 @@ import type { ScreenedCardMessage } from '@/server/textSafety';
 export const CARD_SPREAD = { widthPx: 6120, heightPx: 2160 } as const;
 const PANEL_W = CARD_SPREAD.widthPx / 4; // 1530 — even quarters
 // The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
-// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel).
-const BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
+// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel). Fractions of
+// the back PANEL — the on-screen "opened out" card (seedMockups) places the same badge with the same
+// numbers, so the picture and the print agree.
+export const CARD_BACK_BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
+const BADGE = CARD_BACK_BADGE;
 const H = CARD_SPREAD.heightPx;
 const REQUIRED_DPI = 300;
 

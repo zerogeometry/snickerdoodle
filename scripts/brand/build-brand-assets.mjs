@@ -4,7 +4,8 @@
  * The lockup master (6336×2688, transparent) gives the header logo, the share card, the badges AND
  * the icon face (cropped from it, so install icons are crisp at 512px — the founder's favicon.png is
  * only 200px and is used for nothing bigger than its own size).
- * Writes into public/brand, public/favicon.ico and the print card-back badge. Re-run after a new master.
+ * Writes into public/brand and public/favicon.ico. Re-run after a new master. (The printed card-back
+ * badge comes from scripts/brand/build-card-back-badge.mjs, from the everyday brand-assets logo.)
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -103,7 +104,8 @@ icoPngs.forEach((png, i) => {
 writeFileSync(path.join(ROOT, 'public', 'favicon.ico'), Buffer.concat([header, ...icoPngs]));
 console.log('public/favicon.ico  16/32/48');
 
-// ── the badge: the lockup on a cream disc (site badge + the printed card's back mark) ─────────────
+// ── the badge: the lockup on a cream disc (site badge). The printed card's back mark is NOT built here
+// any more — scripts/brand/build-card-back-badge.mjs builds it from the everyday brand-assets logo. ──
 async function badge(size) {
   const disc = Buffer.from(
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${size / 2 - 0.5}" fill="#FFFBF2"/></svg>`,
@@ -115,10 +117,6 @@ async function badge(size) {
 }
 await (await badge(282)).toFile(out('snickerdoodle-badge.png'));
 await say(out('snickerdoodle-badge.png'));
-// printed at 18% of a 1530px panel (≈275px) — 300px source keeps it crisp at 300dpi
-const cardBadge = path.join(ROOT, 'src', 'server', 'print', 'assets', 'card-back-badge.png');
-await (await badge(300)).toFile(cardBadge);
-await say(cardBadge);
 
 // ── share card (Open Graph) for pages without their own picture: the lockup on paper ─────────────
 const ogMark = await sharp(lockup).resize({ width: 760, kernel: 'lanczos3' }).png().toBuffer();
