@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Snickerdoodle leaflet</title>
+<!--
+  One source for every C14 leaflet (version 2, 17 Nov 2026; why it looks like this: CREATIVE-BRIEF.md).
+  build.mjs opens this file once per version, e.g. leaflet.html?size=a6&season=xmas&code=MAGICFAIR&qr=fair,
+  and prints a 2-page PDF (front, back) at trim + 3 mm bleed. Add &proof for the trim (pink) and safe (blue) lines.
+
+  The look follows the approved social posts in brand-assets/social: kraft doodle paper, one big picture,
+  one sentence-case headline, a handwritten paper tag, one tomato pill. Tokens from src/app/globals.css.
+  Bricolage Grotesque (static weights in fonts/) + Gaegu 700 for ONE handwritten moment per side.
+  Tabler icons inlined by build.mjs. Every image is a brand sample: no children, no faces, no real names.
+  Audience: GROWN-UPS ONLY. Nothing asks a child to do anything.
+-->
+<style>
+  :root {
+    --oat: #F8F5E9; --paper: #FFFBF2; --line: #D9C7A9; --cocoa: #2B2118; --ink-soft: #5A4A3A;
+    --tomato: #C8402A; --honey: #F6C445; --honey-band: #FBE9B7; --sky: #8FB5D6; --berry: #E8786E; --leaf: #7FA65E;
+    --bleed: 3mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #888; }
+  body { font-family: 'Bricolage', sans-serif; color: var(--cocoa); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  @page { margin: 0; }
+  .side { position: relative; overflow: hidden; page-break-after: always; break-after: page; }
+  .side:last-child { page-break-after: auto; break-after: auto; }
+  body.a6 .side { width: 111mm; height: 154mm; }
+  body.a5 .side { width: 154mm; height: 216mm; }
+  .front { background-color: #C9A77C; background-repeat: repeat; }
+  .back { background-color: #EFE6D6; background-repeat: repeat; }
+  .abs { position: absolute; }
+  /* calm the doodle paper so words read over it (the social posts use it this softly) */
+  .front::before, .back::before { content: ''; position: absolute; inset: 0; }
+  .front::before { background: rgba(201,167,124,.42); }
+  .back::before { background: rgba(248,245,233,.66); }
+  .logo-tag { background: #fff; box-shadow: 0 .5mm 1.4mm rgba(43,33,24,.3); }
+  .logo-tag img { display: block; width: 100%; }
+  .over { z-index: 6; }
+  .pill.outline { background: rgba(255,251,242,.9); color: var(--cocoa); border: .35mm solid var(--cocoa); font-weight: 700; }
+  /* tomato on kraft is too light for thin handwriting: cinnamon with a paper halo */
+  .note { color: #A8331F; text-shadow: 0 0 .5mm #FFFBF2, 0 0 .5mm #FFFBF2, 0 0 1mm #FFFBF2; }
+  .promise { color: #A8331F; font-weight: 800; line-height: 1.12; }
+  .zoom { width: 100%; height: 100%; overflow: hidden; }
+
+  /* type */
+  h1, h2, h3 { font-weight: 800; letter-spacing: -0.025em; line-height: .98; }
+  .hand { font-family: 'Gaegu', cursive; font-weight: 700; line-height: 1; }
+  p { line-height: 1.28; }
+  b { font-weight: 800; }
+
+  /* pieces */
+  .sheet { background: #fff; box-shadow: 0 .6mm 1.8mm rgba(43,33,24,.35); }
+  .sheet img, .photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .photo { background: #fff; padding: 1.8mm; box-shadow: 0 .8mm 2.4mm rgba(43,33,24,.38); }
+  .tape { position: absolute; height: 5mm; width: 18mm; top: -2.6mm; left: 50%; margin-left: -9mm; opacity: .9; z-index: 2;
+    clip-path: polygon(0 8%, 6% 0, 12% 10%, 18% 0, 82% 0, 88% 9%, 94% 0, 100% 10%, 100% 92%, 94% 100%, 88% 90%, 82% 100%, 18% 100%, 12% 90%, 6% 100%, 0 90%); }
+  .tape.honey { background: repeating-linear-gradient(45deg, #F6C445 0 1.3mm, #F8D272 1.3mm 2.6mm); }
+  .tape.berry { background: repeating-linear-gradient(-45deg, #E8786E 0 1.1mm, #EE968E 1.1mm 2.2mm); }
+  .tape.sky { background: repeating-linear-gradient(90deg, #8FB5D6 0 1.1mm, #A9C6E0 1.1mm 2.2mm); }
+  .tag { background: #fff; padding: 1.6mm 2.6mm 1.8mm; box-shadow: 0 .5mm 1.4mm rgba(43,33,24,.3); z-index: 3; }
+  .tag .t { font-family: 'Gaegu', cursive; font-weight: 700; line-height: 1; }
+  .tag .s { font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft); margin-top: .7mm; }
+  .pill { display: inline-flex; align-items: center; gap: 1.4mm; border-radius: 99px; font-weight: 800; white-space: nowrap; }
+  .pill.tomato { background: var(--tomato); color: #fff; }
+  .pill.ink { background: var(--cocoa); color: var(--paper); }
+  .card { background: #fff; border-radius: 2.4mm; box-shadow: 0 .4mm 1.2mm rgba(43,33,24,.18); }
+  .qr svg { display: block; width: 100%; height: 100%; }
+  .thumb { text-align: center; }
+  .thumb .im { background: #fff; padding: 1mm; box-shadow: 0 .4mm 1.1mm rgba(43,33,24,.25); }
+  .thumb img { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; }
+  .thumb .cap { font-weight: 700; margin-top: 1.1mm; line-height: 1.1; }
+  .thumb .cap b { color: var(--tomato); }
+  .line { display: flex; align-items: center; gap: 1.6mm; font-weight: 700; }
+  .line svg { flex: none; }
+  .coupon { background: var(--honey-band); border: .45mm dashed var(--cocoa); border-radius: 2.4mm; display: flex; align-items: center; justify-content: space-between; }
+  .coupon .code { font-weight: 800; letter-spacing: .07em; background: #fff; border: .45mm solid var(--cocoa); border-radius: 1.4mm; white-space: nowrap; }
+  .smallprint { color: var(--ink-soft); line-height: 1.22; }
+  .num { display: inline-grid; place-items: center; border-radius: 50%; background: var(--tomato); color: #fff; font-weight: 800; flex: none; }
+  .cutout { filter: drop-shadow(0 .7mm 1.2mm rgba(43,33,24,.35)); }
+  .box { background: var(--paper); border: .4mm solid var(--line); border-radius: 2.4mm; }
+  .box p { display: flex; gap: 1.4mm; align-items: flex-start; color: var(--ink-soft); }
+  .box p svg { flex: none; margin-top: .3mm; }
+
+  .proofline { position: absolute; pointer-events: none; z-index: 50; }
+  .proofline.trim { inset: var(--bleed); outline: .25mm solid #ff2d8a; }
+  .proofline.safe { inset: calc(var(--bleed) + 5mm); outline: .25mm dashed #2f7bff; }
+</style>
+</head>
+<body>
+<main id="sheet"></main>
+<script>
+const q = new URLSearchParams(location.search);
+const SIZE = q.get('size') === 'a5' ? 'a5' : 'a6';
+const SEASON = q.get('season') === 'spring' ? 'spring' : 'xmas';
+const CODE = (q.get('code') || 'MAGICFAIR').toUpperCase();
+const QRNAME = q.get('qr') || 'fair';
+const PROOF = q.has('proof');
+document.body.className = SIZE;
+
+const img = (name) => `img/${name}`;
+const icon = (name, mm, colour = 'currentColor', stroke = 2) =>
+  (window.TABLER?.[name] || '').replace('<svg', `<svg style="width:${mm}mm;height:${mm}mm;color:${colour}" stroke-width="${stroke}"`);
+const proof = () => (PROOF ? '<div class="proofline trim"></div><div class="proofline safe"></div>' : '');
+const qr = () => `<div class="qr" style="width:100%;height:100%">${window.QRS?.[QRNAME] || ''}</div>`;
+// a hand-drawn arrow (tomato crayon), drawn in a 100 x 60 box
+const arrow = (w, h, rot = 0) => `<svg viewBox="0 0 100 60" style="width:${w}mm;height:${h}mm;transform:rotate(${rot}deg)" aria-hidden="true">
+  <path d="M4 14 C 30 2, 62 6, 86 38" fill="none" stroke="#A8331F" stroke-width="4.6" stroke-linecap="round"/>
+  <path d="M70 36 L 88 42 L 90 22" fill="none" stroke="#A8331F" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const S = (a6, a5) => (SIZE === 'a6' ? a6 : a5); // pick a measurement by size
+// the QR's promise says exactly what happens (a vendor test found the wording beside a QR moved scans ~12x)
+const XMAS0 = SEASON === 'xmas';
+const PROMISE = XMAS0 ? 'Scan to see their drawing on an ornament.<br>Free, in seconds.' : 'Scan to see their drawing on a card.<br>Free, in seconds.';
+const PROMISE_SHORT = XMAS0 ? ['Scan to see their drawing', 'on an ornament, free'] : ['Scan to see their drawing', 'on a card, free'];
+// a QR on a white card with a 3 mm clear border (more than the 4-module quiet zone)
+const qrCard = (left, top, w, label = '') => `<div class="abs card" style="left:${left}mm;top:${top}mm;width:${w}mm;padding:3mm 3mm ${label ? '1.6mm' : '3mm'};text-align:center"><div style="width:${w - 6}mm;height:${w - 6}mm">${qr()}</div>${label}</div>`;
+
+// ---------- the words (brand voice: warm, plain; grown-ups only) ----------
+const XMAS = SEASON === 'xmas';
+const PAPER_FRONT = XMAS ? 'paper-kraft-christmas.jpg' : 'paper-kraft.jpg';
+const PAPER_BACK = XMAS ? 'paper-oat-christmas.jpg' : 'paper-oat.jpg';
+const LOGO = XMAS ? 'logo-christmas.png' : 'logo.png';
+
+const SMALL = `For grown-ups. Free card: one greetings card off a signed-in first order that has another keepsake in it (checkout shows when it applies). ${XMAS ? "Last order dates are our print labs'; the site shows the latest." : 'Order-by dates are on the site.'} Prices include VAT and UK delivery. Snickerdoodle is a trading name of Launch Mode Ltd, 124 City Road, London EC1V 2NX. Please pass it on or recycle it.`;
+
+const PRODUCTS = XMAS
+  ? [['mug-tree.jpg', 'mug', 'from £18'], ['cards-hanging.jpg', 'cards', '£5.50'], ['wrapping-paper.jpg', 'wrapping paper', 'from £23'], ['calendar.jpg', '2027 calendar', 'from £22']]
+  // spring: other drawings than the one on the front, to show any drawing works
+  : [['card-castle.jpg', 'card', '£5.50', 1.7], ['mug-truck.jpg', 'mug', 'from £18', 1.55], ['cushion-flower.jpg', 'heart cushion', '£22', 1.45], ['jigsaw-digger.jpg', 'jigsaw', 'from £26', 1.4]];
+
+// ---------- FRONT ----------
+// the "after" is the biggest thing on the page: crop in on the ornament (it fills ~70% of the frame)
+const robinPhoto = `<div class="zoom"><img src="${img('robin-ornament.jpg')}" alt="" style="transform:scale(1.6);transform-origin:42% 52%"></div>`;
+function front() {
+  const bgSize = S('64mm', '82mm');
+  let html = `<section class="side front" style="background-image:url(${img(PAPER_FRONT)});background-size:${bgSize}">`;
+  const grownups = `<span class="abs pill outline" style="right:8mm;top:14mm;font-size:7.6pt;padding:1.1mm 3mm">${icon('heart', 3, '#2B2118')} for the grown-ups</span>`;
+  const urlLabel = '<p style="font-size:7.4pt;font-weight:800;margin-top:.4mm">snickerdoodle.co.uk</p>';
+  if (SIZE === 'a6') {
+    html += `
+      <div class="abs logo-tag" style="left:8mm;top:10mm;width:32mm;padding:1.4mm 2.2mm;transform:rotate(-2deg)"><span class="tape sky" style="width:12mm;margin-left:-6mm"></span><img src="${img(LOGO)}" alt="snickerdoodle"></div>
+      <h1 class="abs" style="left:8mm;top:27.5mm;width:95mm;font-size:27pt">Their drawing,<br>on your tree.</h1>
+      <div class="abs sheet" style="left:8.5mm;top:58mm;width:35mm;height:43.5mm;transform:rotate(-6deg)"><span class="tape honey" style="width:15mm;margin-left:-7.5mm"></span><img src="${img('sketch-robin.jpg')}" alt=""></div>
+      <p class="abs hand note over" style="left:44mm;top:46.5mm;font-size:15pt;transform:rotate(-5deg)">made real!</p>
+      <div class="abs over" style="left:33mm;top:51mm">${arrow(19, 12, 24)}</div>
+      <div class="abs photo" style="left:46mm;top:57.5mm;width:57mm;height:57mm;transform:rotate(3deg)"><span class="tape berry" style="transform:rotate(-4deg)"></span>${robinPhoto}</div>
+      <div class="abs tag" style="left:22mm;top:102mm;transform:rotate(-3deg)"><p class="t" style="font-size:12.5pt">the robin they drew</p><p class="s" style="font-size:6.5pt">ceramic ornament · £21</p></div>
+      <p class="abs promise" style="left:8mm;top:117.5mm;width:64mm;font-size:9.4pt">${PROMISE.replace('<br>', ' ')}</p>
+      <p class="abs" style="left:8mm;top:127.6mm;width:64mm;font-weight:800;font-size:7.6pt;line-height:1.2">Ornaments £21 · baubles £19 · free UK delivery</p>
+      <span class="abs pill tomato" style="left:8mm;top:137mm;font-size:9.4pt;padding:1.5mm 3.6mm">order by sat 12 dec</span>
+      ${qrCard(76, 116.5, 27)}`;
+  } else if (XMAS) {
+    html += `
+      <div class="abs logo-tag" style="left:8mm;top:10.5mm;width:42mm;padding:1.8mm 2.8mm;transform:rotate(-2deg)"><span class="tape sky" style="width:15mm;margin-left:-7.5mm"></span><img src="${img(LOGO)}" alt="snickerdoodle"></div>
+      ${grownups}
+      <h1 class="abs" style="left:8mm;top:33mm;width:136mm;font-size:41pt">Their drawing,<br>on your tree.</h1>
+      <div class="abs sheet" style="left:10mm;top:78mm;width:50mm;height:62mm;transform:rotate(-6deg)"><span class="tape honey"></span><img src="${img('sketch-robin.jpg')}" alt=""></div>
+      <p class="abs hand note over" style="left:58mm;top:66mm;font-size:20pt;transform:rotate(-5deg)">made real!</p>
+      <div class="abs over" style="left:46mm;top:71mm">${arrow(26, 16, 24)}</div>
+      <div class="abs photo" style="left:63mm;top:80mm;width:81mm;height:81mm;transform:rotate(3deg)"><span class="tape berry" style="transform:rotate(-4deg)"></span>${robinPhoto}</div>
+      <div class="abs tag" style="left:30mm;top:151mm;transform:rotate(-3deg)"><p class="t" style="font-size:16pt">the robin they drew</p><p class="s" style="font-size:7pt">ceramic ornament · £21</p></div>
+      <p class="abs promise" style="left:8mm;top:170mm;width:96mm;font-size:12pt">${PROMISE}</p>
+      <p class="abs" style="left:8mm;top:182.5mm;width:98mm;font-weight:800;font-size:9.6pt">Ornaments £21 · baubles £19 · free UK delivery</p>
+      <span class="abs pill tomato" style="left:8mm;top:191mm;font-size:11pt;padding:1.8mm 4.2mm">order by sat 12 dec</span>
+      ${qrCard(110, 167, 36, urlLabel)}`;
+  } else {
+    html += `
+      <div class="abs logo-tag" style="left:8mm;top:10.5mm;width:42mm;padding:1.8mm 2.8mm;transform:rotate(-2deg)"><span class="tape sky" style="width:15mm;margin-left:-7.5mm"></span><img src="${img(LOGO)}" alt="snickerdoodle"></div>
+      ${grownups}
+      <h1 class="abs" style="left:8mm;top:33mm;width:138mm;font-size:39pt">For mum and granny,<br>drawn by them.</h1>
+      <div class="abs sheet" style="left:9mm;top:78mm;width:64mm;height:64mm;padding:3mm;transform:rotate(-5deg)"><span class="tape sky"></span><img src="${img('range-drawing.jpg')}" alt=""></div>
+      <div class="abs tag" style="left:14mm;top:137mm;transform:rotate(-4deg)"><p class="t" style="font-size:16pt">one drawing</p><p class="s" style="font-size:7pt">a whole family range</p></div>
+      <p class="abs hand note over" style="left:63mm;top:66mm;font-size:20pt;transform:rotate(-5deg)">made real!</p>
+      <div class="abs over" style="left:57mm;top:72mm">${arrow(24, 14, 22)}</div>
+      <img class="abs cutout" src="${img('range-framed.png')}" alt="" style="left:80mm;top:80mm;width:64mm;transform:rotate(3deg)">
+      <img class="abs cutout" src="${img('range-card.png')}" alt="" style="left:70mm;top:120mm;width:42mm;transform:rotate(-5deg)">
+      <img class="abs cutout" src="${img('range-cushion.png')}" alt="" style="left:103mm;top:125mm;width:43mm;transform:rotate(4deg)">
+      <p class="abs promise" style="left:8mm;top:170mm;width:96mm;font-size:12pt">${PROMISE}</p>
+      <p class="abs" style="left:8mm;top:182.5mm;width:98mm;font-weight:800;font-size:9.6pt">Cards £5.50 · mugs from £18 · free UK delivery</p>
+      <span class="abs pill tomato" style="left:8mm;top:191mm;font-size:11pt;padding:1.8mm 4.2mm">mother's day: sun 7 march</span>
+      ${qrCard(110, 167, 36, urlLabel)}`;
+  }
+  return html + proof() + '</section>';
+}
+
+// ---------- BACK ----------
+function back() {
+  const bgSize = S('64mm', '82mm');
+  let html = `<section class="side back" style="background-image:url(${img(PAPER_BACK)});background-size:${bgSize}">`;
+  const thumbs = (w, cap) => PRODUCTS.map(([f, n, p, z = 1]) => `<div class="thumb" style="width:${w}mm"><div class="im"><div style="overflow:hidden"><img src="${img(f)}" alt="" style="transform:scale(${z})"></div></div><p class="cap" style="font-size:${cap}pt">${n} <b>${p}</b></p></div>`).join('');
+  const lead = XMAS ? 'Try it with their drawing, free.' : 'For the drawings in this book bag.';
+  const coupon = (fs, pad, codefs) => `<div class="coupon" style="padding:${pad};gap:2mm"><p style="font-size:${fs}pt;font-weight:800;line-height:1.15">First order? <span style="color:var(--tomato)">A card's on us with your first keepsake.</span></p><div style="text-align:center;flex:none"><p style="font-size:${(fs * 0.72).toFixed(1)}pt;font-weight:700;color:var(--ink-soft)">use code</p><span class="code" style="font-size:${codefs}pt;padding:.5mm 2mm;display:inline-block">${CODE}</span></div></div>`;
+  const dates = XMAS ? 'For Christmas: cards by <b>thu 10 dec</b>, gifts by <b>sat 12 dec</b>' : "Mother's Day is <b>sun 7 march</b>: order by the date on the site";
+  const granny = 'Send granny a ready-to-buy link. She orders in a tap.';
+  const promiseLabel = (fs, url) => `<p class="promise" style="font-size:${fs}pt;margin-top:1.6mm">${PROMISE_SHORT[0]}<br>${PROMISE_SHORT[1]}</p><p style="font-size:${url}pt;font-weight:700;margin-top:.6mm;padding-bottom:1mm">or visit snickerdoodle.co.uk</p>`;
+
+  if (SIZE === 'a6') {
+    html += `
+      <h2 class="abs" style="left:8mm;top:8.5mm;width:95mm;font-size:19pt">${lead}</h2>
+      <p class="abs" style="left:8mm;top:18.5mm;width:94mm;font-size:8.4pt;color:var(--ink-soft)">Snap it on your phone and see it on an ornament, cards, a mug and more, in seconds. No account. You keep the original.</p>
+      ${qrCard(8, 31, 45, promiseLabel(8.6, 7))}
+      <p class="abs" style="left:57mm;top:30.5mm;font-size:8.6pt;font-weight:800">Also made real</p>
+      <div class="abs" style="left:57mm;top:35.5mm;width:46mm;display:grid;grid-template-columns:1fr 1fr;gap:1.8mm 2.4mm">${thumbs(21.8, 7)}</div>
+      <p class="abs line" style="left:8mm;top:96.5mm;width:95mm;font-size:8pt">${icon('gift', 3.8, '#C8402A')}<span>${granny}</span></p>
+      <div class="abs" style="left:8mm;top:102.5mm;width:95mm">${coupon(8.4, '1.8mm 2.4mm', 9)}</div>
+      <p class="abs line" style="left:8mm;top:117.5mm;width:95mm;font-size:7.8pt">${icon('truck', 3.6, '#C8402A')}<span>${dates}</span></p>
+      <p class="abs line" style="left:8mm;top:122.8mm;width:95mm;font-size:7.8pt">${icon('lock', 3.6, '#2B2118')}<span>Private by default. Nothing is ever public.</span></p>
+      <p class="abs smallprint" style="left:8mm;top:129.5mm;width:95mm;font-size:6.3pt">${SMALL}</p>`;
+  } else {
+    const steps = [
+      ['Snap it', 'on your phone. You keep the original.'],
+      ['See it on gifts', XMAS ? 'ornaments, cards, mugs and more, free.' : 'cards, mugs, cushions and more, free.'],
+      XMAS ? ['Order or share', 'or send granny a ready-to-buy link.'] : ['Keep it or give it', 'in your private keepsake box, or as a gift.'],
+    ].map(([h, p], i) => `<div style="display:flex;gap:2.2mm"><span class="num" style="width:7mm;height:7mm;font-size:10.5pt">${i + 1}</span><div><h3 style="font-size:10.5pt">${h}</h3><p style="font-size:8.2pt;color:var(--ink-soft);margin-top:.5mm">${p}</p></div></div>`).join('');
+    html += `
+      <h2 class="abs" style="left:8mm;top:9.5mm;width:138mm;font-size:${XMAS ? 25 : 22.5}pt;white-space:nowrap">${lead}</h2>
+      <div class="abs" style="left:8mm;top:22mm;width:138mm;display:grid;grid-template-columns:repeat(3,1fr);gap:4mm">${steps}</div>
+      ${qrCard(8, 40, 57, promiseLabel(10.6, 7.8))}
+      <p class="abs" style="left:72mm;top:39.5mm;font-size:10.5pt;font-weight:800">Also made real</p>
+      <div class="abs" style="left:72mm;top:45.5mm;width:72mm;display:grid;grid-template-columns:1fr 1fr;gap:2.4mm 5mm">${thumbs(33, 8)}</div>
+      <div class="abs box" style="left:8mm;top:131mm;width:138mm;padding:3mm 3.6mm;display:grid;grid-template-columns:1fr 1fr;gap:1.6mm 5mm">
+        <h3 style="grid-column:1/-1;font-size:10.5pt;display:flex;align-items:center;gap:1.6mm">${icon('home', 4.4, '#C8402A')} What happens to their drawings</h3>
+        <p style="font-size:8.2pt">${icon('lock', 3.6, '#2B2118')}<span>They live in your <b>private keepsake box</b>. Nothing is ever public.</span></p>
+        <p style="font-size:8.2pt">${icon('heart', 3.6, '#2B2118')}<span>Only the family you invite can see them. You choose who.</span></p>
+        <p style="font-size:8.2pt">${icon('trash', 3.6, '#2B2118')}<span>See, download or delete anything, any time.</span></p>
+        <p style="font-size:8.2pt">${icon('shield-check', 3.6, '#2B2118')}<span>We never ask for a child's surname. First names only.</span></p>
+      </div>
+      <div class="abs" style="left:8mm;top:164mm;width:138mm">${coupon(10.4, '2mm 3mm', 11)}</div>
+      <p class="abs line" style="left:8mm;top:179.5mm;width:138mm;font-size:8.8pt">${icon(XMAS ? 'truck' : 'heart', 4, '#C8402A')}<span>${dates}</span></p>
+      <p class="abs line" style="left:8mm;top:185.5mm;width:138mm;font-size:8.8pt">${icon('gift', 4, '#C8402A')}<span>${granny}</span></p>
+      <p class="abs smallprint" style="left:8mm;top:193mm;width:138mm;font-size:6.6pt">${SMALL}</p>`;
+  }
+  return html + proof() + '</section>';
+}
+
+window.__render = () => { document.getElementById('sheet').innerHTML = front() + back(); };
+window.__render();
+</script>
+</body>
+</html>
