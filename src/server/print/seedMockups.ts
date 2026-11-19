@@ -12,6 +12,8 @@ import { buildFrameLayout, frameLayoutDir } from './frameLayout';
 import { frameGridOf, MULTI_PHOTO_FRAME_KEY } from '@/lib/multi-photo-frame';
 import { BUNDLE_KEY } from '@/lib/christmas-bundle';
 import { drawPhoneCase } from '@/server/print/phoneCaseMockup';
+import { renderCardBackBadge } from './cardBranding';
+import { CARD_BACK_BADGE } from './cardPrint';
 import { traceCaseTemplate, type TracedCase } from '@/server/print/phoneCaseTemplate';
 import { PHONE_MODELS, type CaseFinish, type CaseGrade } from '@/lib/phone-cases';
 
@@ -1436,20 +1438,40 @@ async function alphaBox(buf: Buffer): Promise<Box> {
 // Founder-authored CARD "Outside Open" — the flat unfolded outside (a display VIEW, not the print).
 // background → shadow → printmap-back (left panel) → printmap-front (right panel) = the white card;
 // the child's image covers either the FRONT panel ('front') or the whole spread across the fold
-// ('full'); snicker-overlay is the branding badge laid OVER the image. Two axis-aligned zones → FLAT.
+// ('full'); the Snickerdoodle back logo shows on the front-only view only (full-width cards carry none).
+// The badge is the PRINT's own (cardBranding.ts), placed on the back panel with the print's numbers —
+// no longer the folder's snicker-overlay.png (the old logo), so the picture shows what gets printed.
 function layeredCardOutsideDir(): string | null {
   const dir = path.join(LAYERED, 'card', 'Outside Open');
   const has = (f: string) => existsSync(path.join(dir, f));
-  return has('background.png') && has('shadow.png') && has('printmap-back.png') && has('printmap-front.png') && has('snicker-overlay.png') ? dir : null;
+  return has('background.png') && has('shadow.png') && has('printmap-back.png') && has('printmap-front.png') ? dir : null;
 }
-async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: Buffer; W: number; H: number; frontBox: Box; fullBox: Box }> {
+/** A W×H see-through overlay with the printed card-back badge on the back panel (`back`, fractions of
+ * the picture) — the same spot and size, relative to the panel, as assembleCardPrintSpread prints it. */
+export async function cardBackBadgeOverlay(W: number, H: number, back: Box): Promise<Buffer> {
+  const panelW = (back.x1 - back.x0) * W;
+  const panelH = (back.y1 - back.y0) * H;
+  const badge = await sharp(renderCardBackBadge()).resize(Math.round(panelW * CARD_BACK_BADGE.widthFrac), null, { fit: 'inside', kernel: 'lanczos3' }).png().toBuffer();
+  const bm = await sharp(badge).metadata();
+  return sharp({ create: { width: W, height: H, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+    .composite([{
+      input: badge,
+      left: Math.round(back.x0 * W + panelW * CARD_BACK_BADGE.cxFrac - (bm.width ?? 0) / 2),
+      top: Math.round(back.y0 * H + panelH * CARD_BACK_BADGE.cyFrac - (bm.height ?? 0) / 2),
+    }])
+    .png()
+    .toBuffer();
+}
+async function buildCardOutside(dir: string): Promise<{ blankFront: Buffer; blankFull: Buffer; W: number; H: number; frontBox: Box; fullBox: Box }> {
   const frontPng = readFileSync(path.join(dir, 'printmap-front.png'));
   const backPng = readFileSync(path.join(dir, 'printmap-back.png'));
   const meta = await sharp(frontPng).metadata();
   const W = meta.width!, H = meta.height!;
   const backdrop = await sharp(readFileSync(path.join(dir, 'background.png'))).flatten({ background: '#ffffff' }).resize(W, H, { fit: 'cover' }).toBuffer();
+  const frontBox = await alphaBox(frontPng);
+  const backBox = await alphaBox(backPng);
   // blank = backdrop + shadow + the full white card (both panels); the design overlays a panel zone.
-  const blank = await sharp(backdrop)
+  const blankFull = await sharp(backdrop)
     .composite([
       { input: readFileSync(path.join(dir, 'shadow.png')), left: 0, top: 0 },
       { input: backPng, left: 0, top: 0 },
@@ -1457,11 +1479,11 @@ async function buildCardOutside(dir: string): Promise<{ blank: Buffer; overlay: 
     ])
     .png()
     .toBuffer();
-  const overlay = readFileSync(path.join(dir, 'snicker-overlay.png'));
-  const frontBox = await alphaBox(frontPng);
-  const backBox = await alphaBox(backPng);
+  // front-only: the back logo printed on the white back (the design never reaches it). Full width: NO
+  // logo — the founder's strict rule (19 Nov 2026), exactly as the print does it.
+  const blankFront = await sharp(blankFull).composite([{ input: await cardBackBadgeOverlay(W, H, backBox), left: 0, top: 0 }]).png().toBuffer();
   const fullBox = { x0: Math.min(frontBox.x0, backBox.x0), y0: Math.min(frontBox.y0, backBox.y0), x1: Math.max(frontBox.x1, backBox.x1), y1: Math.max(frontBox.y1, backBox.y1) };
-  return { blank, overlay, W, H, frontBox, fullBox };
+  return { blankFront, blankFull, W, H, frontBox, fullBox };
 }
 
 /** One variant's print geometry — what the seeder reads from print_templates (and the product photo
@@ -1761,17 +1783,17 @@ export async function seedMockups(db: DbHandle): Promise<SeedMockupsResult> {
   // Alternate views — the CARD's flat "outside" spread, authored per card variant as two views:
   // 'outside-front' (the design on the front panel only) + 'outside-full' (spanning both panels
   // across the fold). Display-only (mockup_views); the print file is assembled separately. The
-  // snicker-overlay badge rides as the foreground overlay.
+  // back logo is on the front-only blank (cardBackBadgeOverlay); full-width cards carry none.
   const cardOutsideDir = layeredCardOutsideDir();
   if (cardOutsideDir) {
     const o = await buildCardOutside(cardOutsideDir);
     const px = (b: Box) => ({ w: Math.round((b.x1 - b.x0) * o.W), h: Math.round((b.y1 - b.y0) * o.H) });
     for (const r of rows.filter((row) => row.key === 'card')) {
-      for (const [view, box] of [['outside-front', o.frontBox], ['outside-full', o.fullBox]] as const) {
+      for (const [view, box, blank] of [['outside-front', o.frontBox, o.blankFront], ['outside-full', o.fullBox, o.blankFull]] as const) {
         const d = px(box);
         await setMockupView(db, {
-          variantId: r.id, view, blank: o.blank, contentType: 'image/png',
-          printQuad: asQuad(box), printWidthPx: d.w, printHeightPx: d.h, materialClass: 'PAPER', overlay: o.overlay,
+          variantId: r.id, view, blank, contentType: 'image/png',
+          printQuad: asQuad(box), printWidthPx: d.w, printHeightPx: d.h, materialClass: 'PAPER',
         });
         authoredViews++;
       }

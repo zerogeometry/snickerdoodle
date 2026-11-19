@@ -16,9 +16,12 @@ import type { ScreenedCardMessage } from '@/server/textSafety';
  */
 export const CARD_SPREAD = { widthPx: 6120, heightPx: 2160 } as const;
 const PANEL_W = CARD_SPREAD.widthPx / 4; // 1530 — even quarters
-// The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
-// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel).
-const BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
+// The Snickerdoodle back logo's width + centre on the outer-rear panel: CENTRED along the bottom
+// (founder, 19 Nov 2026 — was bottom-left on a cream disc). ≈23mm wide × 8.5mm tall, its bottom edge
+// ≈8mm above the trim. Fractions of the back PANEL — the on-screen "opened out" card (seedMockups)
+// places the same logo with the same numbers, so the picture and the print agree.
+export const CARD_BACK_BADGE = { widthFrac: 0.18, cxFrac: 0.5, cyFrac: 0.92 } as const;
+const BADGE = CARD_BACK_BADGE;
 const H = CARD_SPREAD.heightPx;
 const REQUIRED_DPI = 300;
 
@@ -58,7 +61,9 @@ export interface CardPrintInput {
   span: 'front' | 'full';
   /** The SCREENED inside message, or null for a blank (write-by-hand) inside. */
   message: ScreenedCardMessage | null;
-  /** Snickerdoodle back badge (PNG with alpha), centred on the outer-rear panel. Optional. */
+  /** Snickerdoodle back logo (PNG with alpha), centred along the bottom of the outer-rear panel —
+   * FRONT-ONLY cards only: a card whose drawing spans front and back carries NO logo (founder's strict
+   * rule, 19 Nov 2026), whatever is passed here. Optional. */
   branding?: Buffer | null;
   /** The card's BASE COLOUR (#rrggbb, already normalised) — fills the OUTSIDE under the design: the
    * outer front, plus the outer rear when the drawing spans the whole outside. The inside always
@@ -68,8 +73,9 @@ export interface CardPrintInput {
 
 /**
  * Assemble the card's flat 4-panel PRINT file (6120×2160 @300dpi). front-only fills the outer-front
- * panel with the design; full-width spans outer rear+front. A base colour fills exactly the panels
- * the design covers (front-only leaves the rear white). A blank inside stays white. The screened
+ * panel with the design and the logo goes on the white back; full-width spans outer rear+front and
+ * carries NO logo (the founder's strict rule). A base colour fills
+ * exactly the panels the design covers (front-only leaves the rear white). A blank inside stays white. The screened
  * message and the font token are the single source of truth shared with the on-screen preview, so
  * they can't disagree. This is the PRINT path — it never touches the display compositor's pixels.
  */
@@ -86,9 +92,9 @@ export async function assembleCardPrintSpread(input: CardPrintInput): Promise<Bu
     layers.push({ input: await placeDesign(design, transform, PANEL_W, faceHex), left: CARD_PANEL_X.outerFront, top: 0 });
   }
 
-  // BACK logo — the Snickerdoodle mark at the founder's spot: bottom-left of the outer-rear panel
-  // (over white for front-only, over the design's back portion — and its colour — for full-width).
-  if (branding) {
+  // BACK logo — the Snickerdoodle mark centred along the bottom of the outer rear, on FRONT-ONLY cards.
+  // STRICT RULE (founder, 19 Nov 2026): when the drawing spans front and back there is NO logo at all.
+  if (branding && span === 'front') {
     const badge = await sharp(branding).resize(Math.round(PANEL_W * BADGE.widthFrac), null, { fit: 'inside' }).png().toBuffer();
     const bm = await sharp(badge).metadata();
     layers.push({
