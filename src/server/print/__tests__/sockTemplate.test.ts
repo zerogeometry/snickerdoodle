@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pieceOwners } from '../compositor';
 import { layeredFlatTemplate, plan, sideQuad } from '../seedMockups';
 import { renderRepeatPattern } from '../pattern';
-import { patternLayout } from '../pattern-geometry';
+import { patternLayout, SOCK_GAP_MM } from '../pattern-geometry';
 import { sockSideFor, SOCK_SIDES, type SockSide } from '../sockTemplates';
 
 /**
@@ -185,10 +185,66 @@ describe('the sock repeat (founder, 16 Nov 2026): one line of drawings up each s
         const out = allInside(kind, 0.38, src);
         expect(out.cols * out.rows).toBeGreaterThan(def.cols * def.rows);
         expect(out.cols, `${kind} ${src.width}×${src.height} two lines`).toBeGreaterThanOrEqual(4);
-        const big = allInside(kind, 4, src); // pinched far in
-        expect(big.rows).toBeGreaterThanOrEqual(2);
+        const big = allInside(kind, 4, src); // pinched far in: bigger drawings, still wholly inside
+        expect(big.motifW).toBeGreaterThanOrEqual(def.motifW);
+        expect(big.rows).toBeGreaterThanOrEqual(1);
         allInside(kind, 0.7, src, 90); // turned drawings fit too
       }
+  });
+
+  const mm = (px: number) => (px / 300) * 25.4;
+
+  it('first print (founder, 19 Nov 2026 — "two tiny little repeat prints"): as big as two along the sock allows', () => {
+    for (const src of SHAPES) {
+      const at = `${src.width}×${src.height}`;
+      const def = patternLayout(CANVAS.ankle, 300, src, tf(0));
+      // the ankle sock: two a side, each as big as still fits two along the foot — the longer side over
+      // 5.4 cm (it was 4.9 cm, with a gap that grew with it)
+      expect(def.rows, at).toBe(2);
+      expect(mm(Math.max(def.motifW, def.motifH)), at).toBeGreaterThan(54);
+      // …and that really is the biggest two: a touch bigger and only one fits (a wide drawing is held by
+      // the foot's width instead, so it has a little more room)
+      if (src.height >= src.width) expect(patternLayout(CANVAS.ankle, 300, src, tf(1.05)).rows, at).toBe(1);
+      // the tube sock (long: two along is never its limit): a column of drawings most of the lane wide
+      const tube = patternLayout(CANVAS.tube, 300, src, tf(0));
+      expect(tube.rows, at).toBeGreaterThanOrEqual(3);
+      expect(mm(tube.motifW), at).toBeGreaterThan(60);
+    }
+  });
+
+  it('zoom in on the ankle sock: ONE bigger drawing a side; the tube sock stops while its whole column still fits', () => {
+    for (const src of SHAPES) {
+      const def = patternLayout(CANVAS.ankle, 300, src, tf(0));
+      const big = allInside('ankle', 2, src);
+      expect(big.rows).toBe(1);
+      expect(big.motifW).toBeGreaterThan(def.motifW * 1.05);
+      const tubeDef = patternLayout(CANVAS.tube, 300, src, tf(0));
+      const tubeBig = allInside('tube', 2, src);
+      expect(tubeBig.motifW).toBeGreaterThan(tubeDef.motifW);
+      expect(tubeBig.rows, 'no collapse to one drawing at the lane’s widest point').toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('THE GAP STAYS PUT: zooming changes the drawings, the space between them along the sock is SOCK_GAP_MM at every zoom', () => {
+    for (const kind of ['ankle', 'tube'] as const)
+      for (const src of SHAPES)
+        for (const scale of [0.3, 0.45, 0.6, 0.8, 1, 1.15]) {
+          const L = patternLayout(CANVAS[kind], 300, src, tf(scale));
+          const at = `${kind} ${src.width}×${src.height} @${scale}`;
+          // one line on the left side (the first drawing's line), top to bottom
+          const left = L.centres!.filter((m) => m.x < CANVAS[kind].width / 2);
+          const lines = L.cols / 2;
+          const line = left.filter((_, i) => i % lines === 0).sort((a, b) => a.y - b.y);
+          const rowH = CANVAS[kind].height / SOCK_SIDES[kind].lane.length;
+          // measured down the file: never closer than the gap, and the usual gap IS the gap (give or take
+          // the half-row steps the drawings are placed on). A bigger jump happens only where the drawings
+          // must skip a stretch they don't fit (two lines can't pass the ankle sock's heel).
+          const gaps = line.slice(1).map((m, i) => mm(m.y - line[i]!.y - L.motifH)).sort((a, b) => a - b);
+          if (!gaps.length) continue;
+          // (within a millimetre: two lines side by side lean with the foot, which nudges each one's height)
+          expect(gaps[0]!, at).toBeGreaterThanOrEqual(SOCK_GAP_MM - 1);
+          expect(gaps[Math.floor((gaps.length - 1) / 2)]!, at).toBeLessThanOrEqual(SOCK_GAP_MM + mm(rowH) + 0.1);
+        }
   });
 
   it('the print file: nothing on the front fold (the middle line) or past the sock’s outline', async () => {

@@ -4,7 +4,7 @@ import sharp from 'sharp';
 import { assessResolution, clampTransform } from '@/server/print/geometry';
 import { assessPrintResolution } from '@/server/print/pattern-geometry';
 import { isPatternProduct } from '@/lib/patterns';
-import { patternLayout, PATTERN_MOTIF_MM, renderRepeatPattern, scalePatternLayout } from '@/server/print/pattern';
+import { patternLayout, PATTERN_GAP_MM, PATTERN_MOTIF_MM, renderRepeatPattern, scalePatternLayout } from '@/server/print/pattern';
 import { patternMotifCentres } from '@/server/print/pattern-geometry';
 
 const T = clampTransform({ scale: 0 });
@@ -22,11 +22,14 @@ async function raw(png: Buffer) {
 describe('patternLayout — the flat sheets and the sock default (founder, 23 Oct)', () => {
   const src = { width: 1600, height: 1200 };
   // (the socks line their drawings up along the sock on Prodigi's template — sockTemplate.test.ts)
-  it('the flat sheets (tea towel, wrapping paper) keep the plain repeat', () => {
+  it('the flat sheets (tea towel, wrapping paper): a half-drop repeat CENTRED on the sheet — a whole drawing dead in the middle', () => {
     for (const [w, h, dpi] of [[8208, 5492, 300], [4133, 11811, 150]] as const) {
       const L = patternLayout({ width: w, height: h }, dpi, src, T);
-      expect(L.phaseX).toBe(0);
       expect(L.cols).toBeGreaterThan(2);
+      const centres = patternMotifCentres(L, { width: w, height: h });
+      expect(centres.some((c) => Math.abs(c.x - w / 2) <= 1 && Math.abs(c.y - h / 2) <= 1), `${w}×${h}`).toBe(true);
+      // and the two sides match: every copy has its mirror twin across the middle line
+      for (const c of centres) expect(centres.some((d) => Math.abs(d.x - (w - c.x)) <= 1.5 && Math.abs(d.y - c.y) <= 1.5), `${w}×${h} @${c.x},${c.y}`).toBe(true);
     }
   });
   it('the default IS 1.0×: touching the zoom or the shift never jumps the pattern; zooming works from there', () => {
@@ -63,26 +66,62 @@ describe('patternLayout — the seam + scale maths', () => {
           prev = now;
         }
         // and it really changes: every 30% of zoom out adds copies (the old layout printed the same
-        // file from 80% to 50% on an ankle sock)
-        for (let pct = 100; pct - 30 >= 34; pct -= 10) {
+        // file from 80% to 50% on an ankle sock). A sock starts at the biggest that fits two along it,
+        // so there it takes 40% to make room for a third.
+        const step = c.w === 3543 ? 40 : 30;
+        for (let pct = 100; pct - step >= 34; pct -= 10) {
           const at = (p: number) => {
             const l = patternLayout({ width: c.w, height: c.h }, c.dpi, src, clampTransform({ scale: p / 100 }));
             return l.cols * l.rows;
           };
-          expect(at(pct - 30), `${c.w}×${c.h} ${src.width}×${src.height}: ${pct}% → ${pct - 30}%`).toBeGreaterThan(at(pct));
+          expect(at(pct - step), `${c.w}×${c.h} ${src.width}×${src.height}: ${pct}% → ${pct - step}%`).toBeGreaterThan(at(pct));
         }
       }
     }
   });
 
-  it('whole, EVEN columns that exactly fill the width (so a roll / a narrow print wraps without a seam)', () => {
-    // (not the socks: their drawings sit wholly inside each side of the sock, nothing wraps — sockTemplate.test.ts)
-    for (const [w, h, dpi] of [[2400, 1800, 300], [4133, 29527, 150], [2952, 4133, 150], [5492, 8208, 300]] as const) {
-      const l = patternLayout({ width: w, height: h }, dpi, { width: 1200, height: 1600 }, T);
-      expect(l.cols % 2, `${w}`).toBe(0);
-      expect(l.cols * l.cellW).toBeCloseTo(w, 6);
-      expect(Math.abs(l.rows * l.stripH - h)).toBeLessThanOrEqual(l.rows); // whole rows, ≤ ½px each
-    }
+  it('THE GAP STAYS PUT (founder, 19 Nov 2026): zooming changes each drawing, never the space between them', () => {
+    // the tea towel (300 dpi) and the wrapping rolls (150 dpi); a square, a tall and a wide drawing
+    // (not the socks: they have their own fixed gap — sockTemplate.test.ts)
+    for (const [w, h, dpi] of [[8208, 5492, 300], [4133, 11811, 150], [4133, 29527, 150]] as const)
+      for (const src of [{ width: 1000, height: 1000 }, { width: 1200, height: 1600 }, { width: 1600, height: 1000 }]) {
+        const mm = (px: number) => (px / dpi) * 25.4;
+        let prevW = 0;
+        for (const scale of [0.34, 0.5, 0.75, 1, 1.25, 1.6, 2, 2.6, 3.3]) {
+          const l = patternLayout({ width: w, height: h }, dpi, src, clampTransform({ scale }));
+          const at = `${w}×${h} ${src.width}×${src.height} @${scale}`;
+          // across: the next column's drawing starts one gap after this one ends; down: the same
+          expect(mm(l.cellW - l.motifW), at).toBeCloseTo(PATTERN_GAP_MM, 0);
+          expect(mm(l.stripH - l.motifH), at).toBeCloseTo(PATTERN_GAP_MM, 0);
+          // …while the drawing itself grows with the zoom
+          expect(l.motifW, at).toBeGreaterThan(prevW);
+          prevW = l.motifW;
+        }
+      }
+  });
+
+  it('measured on the print file itself: the white space between neighbours is the same at 1× and 2×', async () => {
+    // a solid red square fills its whole motif box, so the white run between two drawings IS the spacing
+    const red = await sharp({ create: { width: 400, height: 400, channels: 3, background: '#d62728' } }).png().toBuffer();
+    const canvas = { width: 1800, height: 1800 }; // ~305 mm square at 150 dpi
+    // down the middle column: from the centre drawing's bottom edge to the top of the next one below it
+    const whiteBelowCentre = async (scale: number) => {
+      const { png, layout } = await renderRepeatPattern(red, canvas, 150, clampTransform({ scale }));
+      const { data, info } = await raw(png);
+      const x = Math.round(canvas.width / 2);
+      const isRed = (y: number) => data[(y * info.width + x) * 3]! > 150 && data[(y * info.width + x) * 3 + 1]! < 90;
+      let y = Math.round(canvas.height / 2);
+      expect(isRed(y)).toBe(true); // a drawing dead in the middle
+      while (isRed(y)) y++;
+      const start = y;
+      while (y < canvas.height && !isRed(y)) y++;
+      expect(y, 'the next drawing is on the sheet').toBeLessThan(canvas.height);
+      return { mm: ((y - start) / 150) * 25.4, motif: layout.motifW };
+    };
+    const one = await whiteBelowCentre(1), two = await whiteBelowCentre(2);
+    expect(two.motif).toBeGreaterThan(one.motif * 1.9); // the drawing doubled…
+    expect(one.mm).toBeCloseTo(PATTERN_GAP_MM, 0); // …the gap didn't
+    expect(two.mm).toBeCloseTo(PATTERN_GAP_MM, 0);
   });
 
   it('the default motif prints at about PATTERN_MOTIF_MM, and zoom changes it', () => {
@@ -113,29 +152,24 @@ describe('renderRepeatPattern — the print file', () => {
     expect([m.width, m.height, m.hasAlpha, m.density]).toEqual([708, 590, false, 300]);
   });
 
-  it('is SEAMLESS left↔right: shifting the pattern by a column is the same picture, wrapped round', async () => {
-    // offsetX = 1 shifts the phase by exactly half a cell; two of those = one cell → the image must
-    // equal itself rolled sideways by one cell, pixel for pixel, across the wrap.
-    const canvas = { width: 800, height: 400 };
+  it('a shift moves the WHOLE pattern: offset 1 = every drawing half a cell over, pixel for pixel', async () => {
+    const canvas = { width: 1600, height: 800 };
     const src = await drawing();
     const a = await renderRepeatPattern(src, canvas, 150, clampTransform({ scale: 0 }));
-    const cell = a.layout.cellW;
-    expect(Number.isInteger(cell / 2)).toBe(true); // the test needs a whole-pixel half cell
     const b = await renderRepeatPattern(src, canvas, 150, clampTransform({ scale: 0, offsetX: 1 }));
+    const d = (((b.layout.phaseX - a.layout.phaseX) % (2 * a.layout.cellW)) + 2 * a.layout.cellW) % (2 * a.layout.cellW);
+    expect(Math.abs(d - a.layout.cellW / 2)).toBeLessThanOrEqual(1);
     const [A, B] = [await raw(a.png), await raw(b.png)];
-    const d = cell / 2;
     let diff = 0;
-    for (let y = 0; y < canvas.height; y++) {
-      for (let x = 0; x < canvas.width; x++) {
-        const xa = (x - d + canvas.width) % canvas.width;
-        for (let c = 0; c < 3; c++) diff += Math.abs(B.data[(y * canvas.width + x) * 3 + c]! - A.data[(y * canvas.width + xa) * 3 + c]!);
-      }
-    }
+    for (let y = 0; y < canvas.height; y++)
+      for (let x = d; x < canvas.width; x++)
+        for (let c = 0; c < 3; c++) diff += Math.abs(B.data[(y * canvas.width + x) * 3 + c]! - A.data[(y * canvas.width + x - d) * 3 + c]!);
     expect(diff).toBe(0);
   });
 
   it('repeats down the canvas: each strip is the same as the one above it', async () => {
-    const { png, layout } = await renderRepeatPattern(await drawing(), { width: 400, height: 1200 }, 150, T);
+    const { png, layout } = await renderRepeatPattern(await drawing(), { width: 400, height: 2400 }, 150, T);
+    expect(layout.stripH * 2).toBeLessThan(2400); // room for the check below
     const { data, info } = await raw(png);
     const row = (y: number) => data.subarray(y * info.width * 3, (y + 1) * info.width * 3);
     for (const y of [3, layout.stripH - 1, Math.floor(layout.stripH / 2)]) {
@@ -196,14 +230,45 @@ describe('the print-quality gate for a repeat — judged on ONE motif, not the w
 });
 
 describe('the preview repeat == the print repeat (B2)', () => {
-  it('scaling keeps the columns, rows and seam (cells still exactly fill the width)', () => {
+  it('scaling keeps the columns, rows, spacing and centring — the same repeat, smaller', () => {
     const canvas = { width: 4133, height: 29527 };
     const l = patternLayout(canvas, 150, { width: 1200, height: 1600 }, T);
     for (const s of [0.5, 0.25, 0.1, 0.037]) {
       const p = scalePatternLayout(l, canvas, s);
+      const k = p.canvas.width / canvas.width;
       expect([p.layout.cols, p.layout.rows]).toEqual([l.cols, l.rows]);
-      expect(p.layout.cols * p.layout.cellW).toBeCloseTo(p.canvas.width, 6);
+      expect(p.layout.cellW).toBeCloseTo(l.cellW * k, 6);
       expect(p.layout.motifW / p.layout.motifH).toBeCloseTo(l.motifW / l.motifH, 1);
+      // the middle drawing is still in the middle of the smaller sheet
+      expect(patternMotifCentres(p.layout, p.canvas).some((c) => Math.abs(c.x - p.canvas.width / 2) <= 1)).toBe(true);
+    }
+  });
+
+  it('the browser editor and the server preview build the SAME layout as the print file, scaled', async () => {
+    // the editor (PatternRepeat): patternLayout at print size → scalePatternLayout. The mockup preview and
+    // the print file (renderRepeatPattern): the same two calls, at their own scale. One answer, three uses.
+    // Canvases: the tea towel, and both socks at a low dpi (still their templates' size in mm).
+    const src = await drawing();
+    for (const [canvas, dpi] of [[{ width: 8208, height: 5492 }, 300], [{ width: 1181, height: 1181 }, 100], [{ width: 1181, height: 2047 }, 100]] as const)
+      for (const tf of [T, clampTransform({ scale: 0.6 }), clampTransform({ scale: 1.8, offsetX: 0.4 })]) {
+        const editor = scalePatternLayout(patternLayout(canvas, dpi, { width: 120, height: 160 }, tf), canvas, 0.25);
+        const server = await renderRepeatPattern(src, canvas, dpi, tf, '#ffffff', { scale: 0.25 });
+        expect(server.layout, `${canvas.width}×${canvas.height} @${tf.scale}`).toEqual(editor.layout);
+      }
+  });
+
+  it('a sock: the print file has the drawing exactly where the editor draws it', async () => {
+    const src = await drawing();
+    const canvas = { width: 1181, height: 1181 }; // the ankle sock's 300 × 300 mm, at 100 dpi
+    for (const tf of [T, clampTransform({ scale: 0.6 }), clampTransform({ scale: 1.3 })]) {
+      const { png, layout } = await renderRepeatPattern(src, canvas, 100, tf);
+      expect(layout.centres?.length).toBeGreaterThanOrEqual(2);
+      const { data, info } = await raw(png);
+      for (const c of patternMotifCentres(layout, canvas)) {
+        const i = (Math.round(c.y) * info.width + Math.round(c.x)) * info.channels;
+        expect(data[i]!, `${c.x},${c.y} @${tf.scale}`).toBeGreaterThan(150); // the drawing's red circle
+        expect(data[i + 2]!, `${c.x},${c.y} @${tf.scale}`).toBeLessThan(100);
+      }
     }
   });
 
