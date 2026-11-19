@@ -115,16 +115,17 @@ describe('card 4-panel print assembly', () => {
     expect(logoInk(p)).toBeGreaterThan(100);
   });
 
-  it('full-width card: the drawing goes OVER the logo — a drawing that fills the back hides it (founder, 19 Nov 2026)', async () => {
+  it('full-width card: NO logo — a drawing on front and back never carries one (founder’s strict rule, 19 Nov 2026)', async () => {
     const p = await pixels(await assembleCardPrintSpread({ design: await green(), transform: tf, span: 'full', message: null, branding: renderCardBackBadge() }));
     expect(logoInk(p)).toBe(0);
     expect(isGreen(at(p, Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac), Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac)))).toBe(true);
   });
 
-  it('full-width card with a cut-out drawing: the logo still shows where the drawing doesn’t reach', async () => {
+  it('full-width card with a cut-out drawing: still NO logo, even where the back is bare', async () => {
     const p = await pixels(await assembleCardPrintSpread({ design: await seeThrough(), transform: tf, span: 'full', message: null, branding: renderCardBackBadge() }));
-    expect(logoInk(p)).toBeGreaterThan(100);
-    expect(isWhite(at(p, 60, MIDY))).toBe(true); // the see-through face leaves the paper white, not black
+    expect(logoInk(p)).toBe(0);
+    expect(isWhite(at(p, Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac), Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac)))).toBe(true); // bare white back
+    expect(isWhite(at(p, 60, MIDY))).toBe(true);
   });
 
   it('a message prints the note on inside-front and the greeting/message/signature on inside-back', async () => {
@@ -158,14 +159,14 @@ describe('card print — the base colour fills the OUTSIDE, never the inside', (
     }
   });
 
-  it('FULL-WIDTH: the rear takes the colour too, and the colour (the design’s own background) covers the back logo', async () => {
+  it('FULL-WIDTH: the rear takes the colour too, and there is no back logo', async () => {
     const p = await pixels(await assembleCardPrintSpread({ design: await cutout(), transform: tf, span: 'full', message: null, branding: await magenta(), groundHex: TOMATO }));
     // the drawing now straddles the fold, so sample the colour away from it: the outer edges + corners
     const farFront = CARD_PANEL_X.outerFront + PANEL_W - 60;
     for (const [x, y] of [[farFront, 60], [farFront, MIDY], [farFront, CARD_SPREAD.heightPx - 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `front ${x},${y}`).toBe(true);
     expect(isGreen(at(p, CARD_PANEL_X.outerFront, MIDY))).toBe(true); // the drawing, across the fold
     for (const [x, y] of [[60, 60], [60, MIDY], [centre(CARD_PANEL_X.outerRear), 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `rear ${x},${y}`).toBe(true);
-    // the logo spot is the colour: the design (with its colour) sits OVER the logo, as on screen
+    // the logo spot is just the colour: front-and-back cards carry no logo
     expect(isTomato(at(p, Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac), Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac)))).toBe(true);
     for (const panel of [CARD_PANEL_X.insideFront, CARD_PANEL_X.insideBack]) {
       for (const [x, y] of panelSamples(panel)) expect(isWhite(at(p, x, y)), `inside ${x},${y}`).toBe(true);
