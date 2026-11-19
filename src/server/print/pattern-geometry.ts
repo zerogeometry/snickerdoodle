@@ -9,16 +9,21 @@ import { heightChartArtGeom, isHeightChart } from './height-chart-geometry';
 import { sockSideFor, type SockSide } from './sockTemplates';
 import { GALLERY_FIT, type ResolutionAssessment, type TemplateGeom, type Transform, artWindowOf, assessResolution, canvasSizePx, galleryArtGeom, isGalleryProduct, mmToPx } from './geometry';
 
-/** The motif's default printed size, and how much of its cell it fills (the rest is breathing room). */
+/** The motif's default printed size on a flat sheet (tea towel, wrapping paper). */
 export const PATTERN_MOTIF_MM = 90;
-export const PATTERN_FILL = 0.72;
+/**
+ * The space between neighbouring drawings on a flat sheet, in mm — FIXED, whatever the zoom (founder,
+ * 19 Nov 2026: "it's only each instance of the print which should increase in size but the gap between
+ * them should remain fairly steady"). Zooming changes the drawing; the gap stays put.
+ */
+export const PATTERN_GAP_MM = 30;
 const MOTIF_MM_MIN = 30;
 const MOTIF_MM_MAX = 300;
 
 export interface PatternLayout {
   cols: number;
   rows: number;
-  /** One cell — exact (fractional) width, and the whole-pixel strip height. */
+  /** One cell (a drawing + its gap) across, and one strip (a drawing + its gap) down, in px. */
   cellW: number;
   stripH: number;
   /** The drawn motif (the source, rotated, contained in the cell's fill box), in px. */
@@ -35,27 +40,18 @@ export interface PatternLayout {
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
 
-/** The most of its cell a motif may fill when the spacing is tight — a gap always shows. */
-const MAX_FILL = 0.9;
-/** A narrow print's default motif, as a share of its column's width (see patternLayout). */
-const NARROW_MOTIF_OF_CELL = 0.51;
-/** Prints narrower than this wrap round (both socks: 300 mm round — the tube sock is designed upright,
- * 300 × 520 mm, since Prodigi's 16 Nov spec) and get one whole column per side; the flat sheets — tea
- * towel (695 mm), wrapping paper (700 mm) — keep the plain repeat. */
-const NARROW_MAX_MM = 600;
-
 /**
- * Where every motif goes. The ZOOM sets the motif's size directly (scale 0 = PATTERN_MOTIF_MM), so
- * every zoom step changes the print: smaller drawing → more of them.
- *  - Columns: an EVEN number of whole columns across (so a half-drop repeat meets itself exactly
- *    where a sock or a roll wraps round), as close as possible to the zoom's spacing.
- *  - Rows: their own whole number, from the motif's own height — so even on a narrow print (an
- *    ankle sock, where the even columns can only step 2 → 4 → 6) the count keeps rising as you
- *    zoom out.
- *  - The motif keeps its size unless its cell is tighter, and then it never fills more than
- *    MAX_FILL of it.
- * The transform maps onto the repeat: scale → motif size · offset → shifts the pattern ·
- * rotation → turns each motif.
+ * Where every motif goes on a FLAT SHEET (tea towel, wrapping paper — a sock has its own, sockLayout).
+ *  - The ZOOM sets the drawing's size directly (scale 0 = PATTERN_MOTIF_MM wide; a very tall or very wide
+ *    drawing is capped so it stays a sensible size), so every zoom step changes the print.
+ *  - The GAP between neighbouring drawings is fixed (PATTERN_GAP_MM), across and down, at every zoom —
+ *    zooming only changes the drawings (founder, 19 Nov 2026). So one cell = one drawing + one gap, exactly,
+ *    and the sheet holds as many as fit: smaller drawing → more of them, the spacing unchanged.
+ *  - A half-drop repeat (every other column drops half a cell, the classic hand-designed repeat), CENTRED on
+ *    the sheet: one whole drawing sits dead in the middle and the repeat runs out from it, so the sheet's
+ *    two sides match, each edge cutting the repeat the same way (as printed repeat fabric does).
+ * The transform maps onto the repeat: scale → drawing size · offset → shifts the pattern (±1 = ±½ cell) ·
+ * rotation → turns each drawing.
  */
 export function patternLayout(canvas: { width: number; height: number }, dpi: number, src: { width: number; height: number }, transform: Transform): PatternLayout {
   const rotated = transform.rotationDeg % 180 !== 0;
@@ -64,58 +60,47 @@ export function patternLayout(canvas: { width: number; height: number }, dpi: nu
   // a sock: its drawings line up along the sock itself, on Prodigi's template (sockLayout)
   const sock = sockSideFor(canvas, dpi);
   if (sock) return sockLayout(canvas, dpi, { width: sw, height: sh }, transform, sock);
-  // A NARROW print (a sock: ankle and tube both ~300 mm round) shows ONE column per side at its default: two
-  // columns round, each motif about half its column wide and centred on the side you see — so each
-  // sock shows whole motifs with white either side, never slices of the next column at its edges
-  // (founder, 23 Oct: "chopped up"; four-round always left slivers). That IS its 1.0× — the zoom
-  // multiplies it and the shift starts from centred — so nudging either never jumps the pattern.
-  // "The side you see" is a HALF of the file: Prodigi's sock templates put one side of the sock in the
-  // left half and the other in the right, the file's middle line down the front of the foot and its outer
-  // edges meeting at the back (src/server/print/sockTemplates.ts) — so column i sits at (i + ½)·cellW, the
-  // middle of a side, never on the middle line (where it would be split round the front — 16 Nov 2026).
-  const widthMm = (canvas.width / dpi) * 25.4;
-  const narrow = widthMm < NARROW_MAX_MM;
-  // one column = the side you see: half of the print round the sock
-  const narrowCols = 2;
-  const baseMm = narrow ? clamp((widthMm / narrowCols) * NARROW_MOTIF_OF_CELL, MOTIF_MM_MIN, MOTIF_MM_MAX) : PATTERN_MOTIF_MM;
-  // narrow prints space columns by the motif's share of its column, so 1.0× lands on narrowCols
-  const colFill = narrow ? NARROW_MOTIF_OF_CELL : PATTERN_FILL;
-  const motifMm = clamp(baseMm * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
-  // the motif's box at this zoom: motifMm wide, as tall as the drawing's shape (capped for very
-  // tall / very wide drawings, so they stay a sensible size)
+  const motifMm = clamp(PATTERN_MOTIF_MM * (transform.scale === 0 ? 1 : transform.scale), MOTIF_MM_MIN, MOTIF_MM_MAX);
+  // the drawing's box at this zoom: motifMm wide, as tall as the drawing's shape (capped for very tall /
+  // very wide drawings); the drawing is contained in it, never stretched
   const boxW = mmToPx(motifMm, dpi);
   const boxH = boxW * clamp(sh / sw, 0.6, 1.6);
-  const k = Math.min(boxW / sw, boxH / sh);
-  const cols = Math.max(2, 2 * Math.round(canvas.width / (boxW / colFill) / 2)); // EVEN → the half-drop wraps
-  const cellW = canvas.width / cols;
-  const kW = Math.min(k, (cellW * MAX_FILL) / sw); // a narrow print caps the motif to its column
-  const rows = Math.max(1, Math.round(canvas.height / ((sh * kW) / PATTERN_FILL)));
-  const stripH = Math.max(1, Math.round(canvas.height / rows));
-  const fit = Math.min(kW, (stripH * MAX_FILL) / sh);
+  const fit = Math.min(boxW / sw, boxH / sh);
+  const motifW = Math.max(1, Math.round(sw * fit));
+  const motifH = Math.max(1, Math.round(sh * fit));
+  const gap = Math.round(mmToPx(PATTERN_GAP_MM, dpi));
+  // whole pixels, so every copy lands on the same pixel grid and the strip tiles exactly
+  const cellW = motifW + gap;
+  const stripH = motifH + gap;
+  // centred: column 0 (not dropped) sits on the sheet's middle, with a drawing on its middle line —
+  // then the shift. The phase is kept within one period of the repeat (two columns across, one strip
+  // down), which draws the same picture.
+  const phaseX = mod(Math.round(canvas.width / 2 - cellW / 2 + (transform.offsetX * cellW) / 2), 2 * cellW);
+  const phaseY = mod(Math.round(canvas.height / 2 - stripH / 2 + (transform.offsetY * stripH) / 2), stripH);
   return {
-    cols, rows, cellW, stripH,
-    motifW: Math.max(1, Math.round(sw * fit)),
-    motifH: Math.max(1, Math.round(sh * fit)),
-    // (an even number of columns → each half of a narrow print, one side of the sock, holds whole columns, mid-side)
-    phaseX: Math.round((transform.offsetX * cellW) / 2),
-    phaseY: Math.round((transform.offsetY * stripH) / 2),
+    // how many columns / rows the sheet spans
+    cols: Math.max(1, Math.ceil(canvas.width / cellW)),
+    rows: Math.max(1, Math.ceil(canvas.height / stripH)),
+    cellW, stripH, motifW, motifH, phaseX, phaseY,
   };
 }
 
-/**
- * The SAME repeat at a smaller size — for previews (the mockup compositor, the positioner). The
- * layout is decided ONCE at print size (columns, rows, motif size), then every length is scaled,
- * so a preview can never round to a different number of columns than the print file has.
- */
+const mod = (n: number, m: number) => ((n % m) + m) % m;
+
 /** The smallest a sock's drawing gets when zoomed out (mm across). */
 const SOCK_MOTIF_MM_MIN = 15;
-/** A sock's default drawing: this share of the lane's typical width at most (a clear edge either side)… */
+/**
+ * The space between a sock's drawings, in mm — along the sock and across (two lines side by side) — FIXED,
+ * whatever the zoom: zooming changes the drawings, never the gap (founder, 19 Nov 2026).
+ */
+export const SOCK_GAP_MM = 10;
+/** A sock's default drawing is never wider than this share of the lane's typical width (a clear edge either
+ * side) — on the long tube sock, where two along is never the limit, this is what sets it. */
 const SOCK_MOTIF_OF_LANE = 0.86;
-/** …and a touch under the biggest that still fits two along the sock, so they have room to breathe. */
-const SOCK_DEFAULT_OF_MAX = 0.92;
-/** Space between drawings: along the sock, this share of a drawing's height; across (two lines), of its width. */
-const SOCK_GAP_ALONG = 0.25;
-const SOCK_GAP_ACROSS = 0.22;
+/** Zooming in past the biggest pair to ONE drawing a side is offered only when that one is at least this
+ * much bigger. */
+const SOCK_ONE_GAIN = 1.04;
+const SOCK_CEILING = 0.98;
 
 /**
  * THE SOCK REPEAT (founder, 16 Nov 2026), on Prodigi's own template (sockTemplates.ts): the file is one
@@ -123,18 +108,22 @@ const SOCK_GAP_ACROSS = 0.22;
  * walk — each centred on the sock's own middle at its height, and the right side is the left's mirror
  * image in PLACE (the drawing itself never mirrored: it always reads the right way round). Every drawing
  * sits wholly inside the sock's safe lane — clear of the outline, the heel and the toe patch — so nothing
- * runs over an edge or a seam. At its default zoom: one line of drawings up each side, as big as the lane
- * comfortably takes. Zoom out: smaller drawings, more of them — and, once two fit side by side, two lines.
+ * runs over an edge or a seam. At its default zoom: one line up each side of the BIGGEST drawings that still
+ * fit two along it (founder, 19 Nov 2026: the old default — a touch smaller, with a gap that grew with
+ * it — read as "two tiny little repeat prints"). Zoom in: bigger still, down to ONE drawing a side, as big
+ * as the sock's clear lane takes, and never past it. Zoom out: smaller drawings, more of them — and, once
+ * two fit side by side, two lines. The gap between drawings is the same at every zoom (SOCK_GAP_MM).
  * Each drawing is turned a little to follow the sock's own line (the ankle sock's foot slants), mirrored on
- * the other side. Zoom in: never past the size that still fits. A drag doesn't move it (always centred).
+ * the other side. A drag doesn't move it (always centred).
  */
-/** The biggest drawing that fits two along a sock, per sock + drawing shape (it's searched for, once). */
-const sockMaxCache = new Map<string, number>();
+/** The biggest a sock's drawing may zoom to, and the biggest that fits two along it, per sock + drawing shape (searched for, once). */
+const sockMaxCache = new Map<string, { max: number; two: number }>();
 
 export function sockLayout(canvas: { width: number; height: number }, dpi: number, src: { width: number; height: number }, transform: Transform, sock: SockSide): PatternLayout {
   const W = canvas.width, H = canvas.height, HW = W / 2;
   const N = sock.lane.length, rowH = H / N;
   const ar = src.height / src.width;
+  const gap = mmToPx(SOCK_GAP_MM, dpi);
   const rowsOf = (y0: number, y1: number) => [Math.max(0, Math.floor(y0 / rowH)), Math.min(N - 1, Math.ceil(y1 / rowH) - 1)] as const;
   /** The sock's own line at a height: the slope (px across per px down) of its outline's middle there. */
   const slopeAt = (y0: number, y1: number) => {
@@ -195,7 +184,7 @@ export function sockLayout(canvas: { width: number; height: number }, dpi: numbe
   }
   /** Where `w`-wide drawings go along the lane: `lines` side by side, each line turned to the sock. */
   const place = (w: number) => {
-    const h = w * ar, gapX = w * SOCK_GAP_ACROSS, pitch = h * (1 + SOCK_GAP_ALONG);
+    const h = w * ar, gapX = gap, pitch = h + gap;
     const step = Math.max(1, rowH / 2);
     type Spot = { y: number; x: number; rad: number };
     const fits = (K: number) => {
@@ -237,26 +226,36 @@ export function sockLayout(canvas: { width: number; height: number }, dpi: numbe
     }
     return { h, pitch, lines, rows };
   };
-  // the biggest that still fits two along the sock — zooming in stops there; the default is a touch under it
-  // (the ankle sock's clear stretch is the foot between the heel's tip and the toe: ~12 cm)
+  // the default: the biggest that still fits two along the sock (the ankle sock's clear stretch is the
+  // foot between the heel's tip and the toe: ~12 cm). Zooming in carries on to the biggest ONE that fits.
   const widths = sock.lane.filter((x): x is readonly [number, number] => !!x).map((x) => (x[1] - x[0]) * HW).sort((a, b) => a - b);
   const typical = widths[Math.floor(widths.length / 2)] ?? HW / 2;
   const minW = mmToPx(SOCK_MOTIF_MM_MIN, dpi);
   const key = `${sock.halfMm.h}|${W}x${H}|${dpi}|${ar.toFixed(4)}`;
-  let wMax = sockMaxCache.get(key);
-  if (wMax === undefined) {
-    let lo = minW, hi = widths[widths.length - 1] ?? HW;
-    for (let i = 0; i < 18; i++) {
-      const mid = (lo + hi) / 2;
-      if (place(mid).rows.length >= 2) lo = mid;
-      else hi = mid;
-    }
-    wMax = lo;
+  let fit = sockMaxCache.get(key);
+  if (fit === undefined) {
+    const biggest = (n: number) => {
+      let lo = minW, hi = widths[widths.length - 1] ?? HW;
+      for (let i = 0; i < 18; i++) {
+        const mid = (lo + hi) / 2;
+        if (place(mid).rows.length >= n) lo = mid;
+        else hi = mid;
+      }
+      return lo;
+    };
+    const two = biggest(2);
+    const one = biggest(1);
+    // where the lane's WIDTH is the limit (the tube sock), the biggest single drawing is barely bigger than
+    // the biggest pair — it only fits at the lane's widest point — so zooming in stops at the pair instead
+    // of collapsing to one drawing for no visible gain. And it stops a touch short of the very edge, where
+    // a drawing only just squeezes in at one or two spots and the count would drop for nothing.
+    fit = { max: (one > two * SOCK_ONE_GAIN ? one : two) * SOCK_CEILING, two };
     if (sockMaxCache.size > 64) sockMaxCache.delete(sockMaxCache.keys().next().value!);
-    sockMaxCache.set(key, wMax);
+    sockMaxCache.set(key, fit);
   }
-  const wDefault = Math.min(typical * SOCK_MOTIF_OF_LANE, wMax * SOCK_DEFAULT_OF_MAX);
-  const w = clamp(wDefault * (transform.scale === 0 ? 1 : transform.scale), Math.min(minW, wMax), wMax);
+  const wDefault = Math.min(typical * SOCK_MOTIF_OF_LANE, fit.two);
+  const wMax = Math.max(wDefault, fit.max);
+  const w = clamp(wDefault * (transform.scale === 0 ? 1 : transform.scale), Math.min(minW, wDefault), wMax);
   const p = place(w);
   const centres: { x: number; y: number; angle: number }[] = [];
   for (const r of p.rows) {
@@ -277,6 +276,11 @@ export function sockLayout(canvas: { width: number; height: number }, dpi: numbe
   };
 }
 
+/**
+ * The SAME repeat at a smaller size — for previews (the mockup compositor, the positioner). The
+ * layout is decided ONCE at print size (columns, rows, motif size), then every length is scaled,
+ * so a preview can never round to a different number of columns than the print file has.
+ */
 export function scalePatternLayout(layout: PatternLayout, canvas: { width: number; height: number }, scale: number): { canvas: { width: number; height: number }; layout: PatternLayout } {
   const width = Math.max(1, Math.round(canvas.width * scale));
   const height = Math.max(1, Math.round(canvas.height * scale));
@@ -286,7 +290,7 @@ export function scalePatternLayout(layout: PatternLayout, canvas: { width: numbe
     layout: {
       cols: layout.cols,
       rows: layout.rows,
-      cellW: width / layout.cols, // still exactly fills the (scaled) width → still seamless
+      cellW: layout.cellW * k, // the same spacing, smaller — the same drawings in the same places
       stripH: Math.max(1, Math.round(layout.stripH * k)),
       motifW: Math.max(1, Math.round(layout.motifW * k)),
       motifH: Math.max(1, Math.round(layout.motifH * k)),
@@ -300,15 +304,16 @@ export function scalePatternLayout(layout: PatternLayout, canvas: { width: numbe
 /**
  * Every motif's centre (px) that lands on the canvas — the half-drop lattice: column i at
  * (i + ½)·cellW + phaseX, row j at (j + ½)·stripH + phaseY, odd columns dropped half a strip.
- * Exactly the pixels pattern.ts tiles (its strip repeats every stripH; its width wraps every
- * cols·cellW), as a list a browser can draw.
+ * Exactly the pixels pattern.ts draws (its strip repeats every stripH), as a list a browser can draw.
+ * (phaseX is within two columns and phaseY within one strip — patternLayout — so the ranges below
+ * reach every copy that touches the canvas.)
  */
 export function patternMotifCentres(layout: PatternLayout, canvas: { width: number; height: number }): { x: number; y: number; angle?: number }[] {
   if (layout.centres) return layout.centres; // a sock: placed one by one (sockLayout)
   const { cols, cellW, stripH, motifW, motifH, phaseX, phaseY } = layout;
   const out: { x: number; y: number }[] = [];
   const jMax = Math.ceil(canvas.height / stripH) + 2;
-  for (let i = -2; i <= cols + 1; i++) {
+  for (let i = -3; i <= cols + 1; i++) {
     const drop = ((i % 2) + 2) % 2 === 1 ? stripH / 2 : 0;
     const x = (i + 0.5) * cellW + phaseX;
     if (x + motifW / 2 <= 0 || x - motifW / 2 >= canvas.width) continue;
