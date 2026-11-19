@@ -54,10 +54,12 @@ describe('card 4-panel print assembly', () => {
     expect(isGreen(at(p, centre(CARD_PANEL_X.outerFront), MIDY))).toBe(true);
   });
 
-  it('branding lands at the founder’s spot — bottom-left of the outer-rear panel', async () => {
+  it('branding lands at the founder’s spot — centred along the bottom of the outer-rear panel', async () => {
     const p = await pixels(await assembleCardPrintSpread({ design: await green(), transform: tf, span: 'front', message: null, branding: await magenta() }));
-    const badgeX = Math.round(PANEL_W * 0.149); // logo centre: left side of the back panel…
-    const badgeY = Math.round(CARD_SPREAD.heightPx * 0.885); // …lower area
+    expect(CARD_BACK_BADGE.cxFrac).toBe(0.5); // centred left↔right on the back (founder, 19 Nov 2026)…
+    expect(CARD_BACK_BADGE.cyFrac).toBeGreaterThan(0.85); // …near the bottom
+    const badgeX = Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac);
+    const badgeY = Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac);
     const [r, g, b] = at(p, badgeX, badgeY);
     expect(r > 160 && b > 130 && g < 110).toBe(true); // magenta stand-in at the logo spot
     expect(isWhite(at(p, centre(CARD_PANEL_X.outerRear), MIDY))).toBe(true); // rear centre stays clear
@@ -79,25 +81,25 @@ describe('card 4-panel print assembly', () => {
     const badge = renderCardBackBadge();
     const m = await sharp(badge).metadata();
     const printedW = Math.round(PANEL_W * CARD_BACK_BADGE.widthFrac);
+    const printedH = Math.round((printedW * m.height!) / m.width!);
     expect(m.width!).toBeGreaterThanOrEqual(printedW); // only ever shrunk → at least 300dpi at its printed size
-    // where it lands on the spread (square badge): ≥ 15px bleed + 3mm (≈35px) from every trim edge and the fold
-    const half = printedW / 2;
+    // where it lands on the spread: ≥ 15px bleed + 3mm (≈35px) from every trim edge and the fold
     const cx = PANEL_W * CARD_BACK_BADGE.cxFrac;
     const cy = CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac;
     const SAFE = 15 + 35;
-    expect(cx - half).toBeGreaterThanOrEqual(SAFE);
-    expect(cx + half).toBeLessThanOrEqual(PANEL_W - SAFE);
-    expect(cy - half).toBeGreaterThanOrEqual(SAFE);
-    expect(cy + half).toBeLessThanOrEqual(CARD_SPREAD.heightPx - SAFE);
+    expect(cx - printedW / 2).toBeGreaterThanOrEqual(SAFE);
+    expect(cx + printedW / 2).toBeLessThanOrEqual(PANEL_W - SAFE);
+    expect(cy - printedH / 2).toBeGreaterThanOrEqual(SAFE);
+    expect(cy + printedH / 2).toBeLessThanOrEqual(CARD_SPREAD.heightPx - SAFE);
   });
 
   it('the real back logo lands on the print — cocoa ink at its spot, on single cards and over a full-width drawing', async () => {
     for (const span of ['front', 'full'] as const) {
       const p = await pixels(await assembleCardPrintSpread({ design: await green(), transform: tf, span, message: null, branding: renderCardBackBadge() }));
       const w = Math.round(PANEL_W * CARD_BACK_BADGE.widthFrac);
-      const x0 = Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac - w / 2), y0 = Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac - w / 2);
+      const x0 = Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac - w / 2), y0 = Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac - w / 4);
       let ink = 0;
-      for (let y = y0; y < y0 + w; y += 2) for (let x = x0; x < x0 + w; x += 2) {
+      for (let y = y0; y < y0 + w / 2; y += 2) for (let x = x0; x < x0 + w; x += 2) {
         const [r, g, b] = at(p, x, y);
         if (r < 110 && g < 80 && b < 80) ink++; // the logo's dark cocoa
       }
@@ -143,7 +145,7 @@ describe('card print — the base colour fills the OUTSIDE, never the inside', (
     for (const [x, y] of [[farFront, 60], [farFront, MIDY], [farFront, CARD_SPREAD.heightPx - 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `front ${x},${y}`).toBe(true);
     expect(isGreen(at(p, CARD_PANEL_X.outerFront, MIDY))).toBe(true); // the drawing, across the fold
     for (const [x, y] of [[60, 60], [60, MIDY], [centre(CARD_PANEL_X.outerRear), 60]] as [number, number][]) expect(isTomato(at(p, x, y)), `rear ${x},${y}`).toBe(true);
-    const [r, g, b] = at(p, Math.round(PANEL_W * 0.149), Math.round(CARD_SPREAD.heightPx * 0.885));
+    const [r, g, b] = at(p, Math.round(PANEL_W * CARD_BACK_BADGE.cxFrac), Math.round(CARD_SPREAD.heightPx * CARD_BACK_BADGE.cyFrac));
     expect(r > 160 && b > 130 && g < 110).toBe(true); // magenta stand-in for the logo, over the colour
     for (const panel of [CARD_PANEL_X.insideFront, CARD_PANEL_X.insideBack]) {
       for (const [x, y] of panelSamples(panel)) expect(isWhite(at(p, x, y)), `inside ${x},${y}`).toBe(true);

@@ -17,9 +17,11 @@ describe('card "opened out" picture — the back badge matches the print', () =>
     const pw = (back.x1 - back.x0) * W, ph = (back.y1 - back.y0) * H;
     const cx = back.x0 * W + pw * CARD_BACK_BADGE.cxFrac, cy = back.y0 * H + ph * CARD_BACK_BADGE.cyFrac;
     const r = (pw * CARD_BACK_BADGE.widthFrac) / 2;
-    expect(alpha(cx, cy)).toBe(255); // the badge's cream disc at the centre
-    expect(alpha(cx + r * 0.6, cy)).toBe(255); // still on the disc
-    expect(alpha(cx + r * 1.3, cy)).toBe(0); // just beyond it: clear
+    let ink = 0; // the logo's ink across its row (the logo alone — no circle behind it)
+    for (let x = cx - r; x < cx + r; x++) if (alpha(x, cy) > 200) ink++;
+    expect(ink).toBeGreaterThan(r * 0.2);
+    expect(alpha(cx - r * 1.3, cy)).toBe(0); // just beyond it, either side: clear
+    expect(alpha(cx + r * 1.3, cy)).toBe(0);
     expect(alpha(W / 2, H / 2)).toBe(0); // the design area stays clear
     expect(alpha(back.x0 * W + pw / 2, back.y0 * H + ph / 2)).toBe(0); // back-panel middle: clear
   });

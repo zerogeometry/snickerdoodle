@@ -16,11 +16,11 @@ import type { ScreenedCardMessage } from '@/server/textSafety';
  */
 export const CARD_SPREAD = { widthPx: 6120, heightPx: 2160 } as const;
 const PANEL_W = CARD_SPREAD.widthPx / 4; // 1530 — even quarters
-// The Snickerdoodle back logo's size + centre on the outer-rear panel, MEASURED from where the
-// founder placed it in the "Outside Open" snicker-overlay (bottom-left of the back panel). Fractions of
-// the back PANEL — the on-screen "opened out" card (seedMockups) places the same badge with the same
-// numbers, so the picture and the print agree.
-export const CARD_BACK_BADGE = { widthFrac: 0.18, cxFrac: 0.149, cyFrac: 0.885 } as const;
+// The Snickerdoodle back logo's width + centre on the outer-rear panel: CENTRED along the bottom
+// (founder, 19 Nov 2026 — was bottom-left on a cream disc). ≈23mm wide × 8.5mm tall, its bottom edge
+// ≈8mm above the trim. Fractions of the back PANEL — the on-screen "opened out" card (seedMockups)
+// places the same logo with the same numbers, so the picture and the print agree.
+export const CARD_BACK_BADGE = { widthFrac: 0.18, cxFrac: 0.5, cyFrac: 0.92 } as const;
 const BADGE = CARD_BACK_BADGE;
 const H = CARD_SPREAD.heightPx;
 const REQUIRED_DPI = 300;
@@ -89,7 +89,7 @@ export async function assembleCardPrintSpread(input: CardPrintInput): Promise<Bu
     layers.push({ input: await placeDesign(design, transform, PANEL_W, faceHex), left: CARD_PANEL_X.outerFront, top: 0 });
   }
 
-  // BACK logo — the Snickerdoodle mark at the founder's spot: bottom-left of the outer-rear panel
+  // BACK logo — the Snickerdoodle mark at the founder's spot: centred along the bottom of the outer rear
   // (over white for front-only, over the design's back portion — and its colour — for full-width).
   if (branding) {
     const badge = await sharp(branding).resize(Math.round(PANEL_W * BADGE.widthFrac), null, { fit: 'inside' }).png().toBuffer();
