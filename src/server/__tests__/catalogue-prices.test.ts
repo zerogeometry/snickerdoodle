@@ -103,7 +103,7 @@ describe('range expansion — new products', () => {
 
   it('print files are Prodigi’s EXACT printAreaSizes (sandbox, GB route)', () => {
     const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
-    expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '3543x6141' }); // the tube is designed upright; the file turns to Prodigi's 6141×3543
+    expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '3543x6141' }); // the tube is designed AND sent upright — Prodigi's live 3543×6141 (23 Nov)
     expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
     expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527', 'WRAP-KFT-ROL-70X200': '8280x23610', 'WRAP-KFT-ROL-70X300': '8280x35430', 'WRAP-KFT-ROL-70X500': '8280x59070' });
     expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '8208x5492' }); // designed landscape; the file turns back to 5492×8208

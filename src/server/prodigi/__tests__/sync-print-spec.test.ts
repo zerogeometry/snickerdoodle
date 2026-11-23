@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { definedPrintSpecs } from '@/server/catalogue';
 import type { ProdigiProduct } from '@/server/prodigi/client';
-import { printSpecWarning } from '@/server/prodigi/sync';
+import { colourWarning, printSpecWarning } from '@/server/prodigi/sync';
 import fixture from '@/server/__tests__/fixtures/prodigi-print-areas.json';
 
 type Fixture = { products: Record<string, { printAreas: string[]; variants: Array<{ attributes: Record<string, string>; printAreaSizes: Record<string, { w: number; h: number }> }> } | null> };
@@ -57,5 +57,30 @@ describe('catalogue sync — the print file vs Prodigi’s print area', () => {
     const { row, sku } = rowOf('cushion', (a) => a.size === 'heart');
     const bare = { ...apiProduct(sku), variants: [{ attributes: {}, shipsTo: ['GB'] }] };
     expect(printSpecWarning(row, bare)).toBeNull();
+  });
+});
+
+describe('the 23 Nov weekly check: the tube sock and the two-tone mugs', () => {
+  it('the tube sock now sends Prodigi’s live upright 3543×6141 — no crop', () => {
+    const { row, sku } = rowOf('socks', (a) => a.size === 'tube');
+    expect(printSpecWarning(row, apiProduct(sku))).toBeNull();
+    // …and the turned file it sent from 16 Nov is exactly what the live check caught
+    const live = apiProduct(sku);
+    const turned = { ...live, variants: live.variants!.map((v) => ({ ...v, printAreaSizes: { default: { horizontalResolution: 6141, verticalResolution: 3543 } } })) };
+    expect(printSpecWarning(row, turned)).toMatch(/different shape.*crop/);
+  });
+
+  it('a two-tone mug’s one Prodigi colour (“black / white”) is the SKU’s own: no colour-map warning', () => {
+    expect(colourWarning('black', ['black / white'])).toBeNull();
+    for (const [ours, theirs] of [['blue', 'white / blue'], ['green', 'white / green'], ['yellow', 'White / Yellow']]) expect(colourWarning(ours, [theirs!]), ours).toBeNull();
+    expect(colourWarning('red', ['white / blue'])).toMatch(/isn't this SKU's colour/); // the wrong SKU still shows
+    expect(colourWarning('reddish', ['white / red'])).not.toBeNull(); // whole words only
+  });
+
+  it('with a real colour choice ours must be one of Prodigi’s exactly', () => {
+    expect(colourWarning('navy', ['white', 'navy', 'black'])).toBeNull();
+    expect(colourWarning('frenchnavy', ['white', 'navy'])).toMatch(/needs a colour map/);
+    expect(colourWarning(undefined, ['white', 'navy'])).toBeNull();
+    expect(colourWarning('navy', [])).toBeNull();
   });
 });

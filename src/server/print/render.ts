@@ -120,7 +120,7 @@ export async function renderPrintFile(
     }
     const ground = normalizeGround(input.ground);
     let { png } = await renderRepeatPattern(srcBuf, canvas, tpl.requiredDpi, transform, groundHex(ground));
-    // designed on a turned canvas (the landscape tea towel, the upright tube sock) → turn the file to Prodigi's spec
+    // designed on a turned canvas (the landscape tea towel) → turn the file to Prodigi's spec
     let [fileW, fileH] = [canvas.width, canvas.height];
     if (isDesignedTurned(variantRow.key, variantRow.attributes as Record<string, string> | null)) {
       png = await sharp(png).rotate(90).png().withMetadata({ density: tpl.requiredDpi }).toBuffer();

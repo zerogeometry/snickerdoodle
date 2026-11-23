@@ -158,15 +158,13 @@ export const PRODIGI_NATIVE_ORIENTATION: Record<string, 'portrait' | 'landscape'
 export const DESIGNED_TURNED: ReadonlySet<string> = new Set(['teaTowel']);
 
 /**
- * Is this VARIANT designed on a turned canvas? Every DESIGNED_TURNED product, plus the TUBE SOCK:
- * Prodigi's tube-sock file is 6141×3543 px LANDSCAPE (52 cm along the sock × 30 cm round it — API,
- * 16 Nov 2026; it was 6141×5433 in October), while their template draws it UPRIGHT (30 × 52 cm, cuff
- * at the top, both sides of one sock side by side). We design upright — 30 cm round, so the repeat
- * wraps like the ankle sock's — and turn the finished file 90° clockwise to Prodigi's spec.
- * (Which end Prodigi treats as the cuff is asked of Prodigi — print-accuracy report, 16 Nov.)
+ * Is this VARIANT designed on a turned canvas? Every DESIGNED_TURNED product. (The TUBE SOCK was turned
+ * from 16 Nov to the sandbox's landscape 6141×3543; the LIVE API — the one orders go to — says 3543×6141
+ * UPRIGHT, the same way up as Prodigi's template (30 × 52 cm, cuff at the top): weekly check, 23 Nov
+ * 2026. So the tube is designed AND sent upright, no turn.)
  */
-export function isDesignedTurned(productKey: string, attributes: Record<string, string> | null | undefined): boolean {
-  return DESIGNED_TURNED.has(productKey) || (productKey === 'socks' && attributes?.size === 'tube');
+export function isDesignedTurned(productKey: string, _attributes?: Record<string, string> | null): boolean {
+  return DESIGNED_TURNED.has(productKey);
 }
 
 // Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
@@ -329,8 +327,8 @@ function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColo
 
 // Socks: one size (UK 6–10), sublimated all over — sold as a REPEAT PATTERN of the drawing (Prodigi
 // can't guarantee placement on a sock). Ankle prints to 'front', tube to 'default'. uk9, Tracked 48.
-// Both are designed UPRIGHT, the width going round the sock (300 mm): the tube is 300 × 520 mm, turned
-// at render to Prodigi's landscape 6141×3543 (isDesignedTurned).
+// Both are designed UPRIGHT, the width going round the sock (300 mm): the tube is 300 × 520 mm, sent
+// upright as 3543×6141 — Prodigi's LIVE print area and template orientation (weekly check, 23 Nov).
 const SOCKS = [
   { size: 'ankle', sku: 'GLOBAL-ANKLE-SOCKS', px: { w: 3543, h: 3543 }, printTo: ['front'] },
   { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 3543, h: 6141 }, printTo: ['default'] },

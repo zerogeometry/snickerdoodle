@@ -4,7 +4,7 @@
  * side of the sock, its RIGHT half the other side — the mirror image (the ankle sock's heel is on the
  * left in the left half, on the right in the right half; the file's middle line is the front of the sock,
  * its two outer edges meet at the back). Traced off the templates on 16 Nov 2026, as the DESIGN canvas
- * stands (the tube sock upright, cuff at the top — it is turned for Prodigi only when the file is made),
+ * stands (the tube sock upright, cuff at the top — the way Prodigi's live print area stands too, so it is never turned),
  * for the LEFT half; the right half is its mirror. Rows run top to bottom, each [left, right] as fractions
  * of the half's width (null = nothing in that row):
  *  - `outline`: the sock's outline (heel and toe included; the template's own instruction text inside it
