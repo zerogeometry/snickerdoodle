@@ -73,12 +73,32 @@ export function printSpecWarning(
   });
 }
 
+/**
+ * Our colour vs Prodigi's colour axis for the SKU. null when they agree. When Prodigi lists ONE colour the
+ * SKU itself is that colour (a two-tone mug is its own SKU: H-MUG-11OZ-WB = "black / white") — nothing is
+ * chosen at order time, so ours only has to be one of its words. With a real choice (several colours) ours
+ * must be one of them exactly.
+ */
+export function colourWarning(ours: string | null | undefined, prodigiColours: readonly string[]): string | null {
+  const c = (ours ?? '').toLowerCase().trim();
+  if (!c || prodigiColours.length === 0) return null;
+  const theirs = prodigiColours.map((x) => x.toLowerCase().trim());
+  if (theirs.includes(c)) return null;
+  if (theirs.length === 1) {
+    if (theirs[0]!.split(/[\s/,&+-]+/).includes(c)) return null;
+    return `colour "${c}" isn't this SKU's colour (Prodigi: "${prodigiColours[0]}") — check the SKU`;
+  }
+  return `colour "${c}" not in Prodigi colours [${prodigiColours.join(', ')}] — needs a colour map`;
+}
+
 export interface SyncEntry {
   internalSku: string;
   providerSku: string;
   productKey: string;
   status: 'ok' | 'missing' | 'error';
   warnings: string[];
+  /** On sale (visible in the shop)? A hidden product can't be ordered, so its findings don't email anyone. */
+  onSale?: boolean;
 }
 
 export interface SyncReport {
@@ -101,6 +121,7 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       attributes: productVariants.attributes,
       productId: products.id,
       productKey: products.key,
+      onSale: products.visibleInShop,
       productSpecs: products.specs,
       providerConfig: productVariantProviders.providerConfig,
       template: printTemplates,
@@ -138,7 +159,7 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
     try {
       product = await client.getProduct(r.providerSku);
     } catch (e) {
-      entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, status: 'error', warnings: [String((e as Error).message)] });
+      entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, onSale: r.onSale, status: 'error', warnings: [String((e as Error).message)] });
       continue;
     }
 
@@ -148,7 +169,7 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
         .update(productVariantProviders)
         .set({ providerConfig: { ...keepAttrs, missing: true, syncedAt: now.toISOString() } })
         .where(eq(productVariantProviders.id, r.providerId));
-      entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, status: 'missing', warnings: ['SKU not found on Prodigi'] });
+      entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, onSale: r.onSale, status: 'missing', warnings: ['SKU not found on Prodigi'] });
       continue;
     }
 
@@ -165,10 +186,8 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
     // Resolve Prodigi's colour axis ONCE (either spelling) — used for both the warning
     // and the snapshot, so they can never disagree.
     const prodigiColours = product.attributes?.color ?? product.attributes?.colour ?? [];
-    const ourColour = ((r.attributes as Record<string, string> | null)?.colour ?? '').toLowerCase();
-    if (ourColour && prodigiColours.length > 0 && !prodigiColours.map((c) => c.toLowerCase()).includes(ourColour)) {
-      warnings.push(`colour "${ourColour}" not in Prodigi colours [${prodigiColours.join(', ')}] — needs a colour map`);
-    }
+    const colour = colourWarning((r.attributes as Record<string, string> | null)?.colour, prodigiColours);
+    if (colour) warnings.push(colour);
 
     // The print file must be EXACTLY Prodigi's print area — anything else is rescaled or cropped.
     if (r.template) {
@@ -199,7 +218,7 @@ export async function syncProdigiCatalogue(db: DbHandle, client: ProdigiClient =
       productSpecUpdates.set(r.productId, { ...((r.productSpecs as Record<string, string>) ?? {}), ...specsFromProdigi(product) });
     }
 
-    entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, status: 'ok', warnings });
+    entries.push({ internalSku: r.internalSku, providerSku: r.providerSku, productKey: r.productKey, onSale: r.onSale, status: 'ok', warnings });
   }
 
   // Enrich each product's technical specs from its default variant's Prodigi product.

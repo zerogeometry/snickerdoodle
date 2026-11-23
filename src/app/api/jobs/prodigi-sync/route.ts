@@ -3,7 +3,7 @@ import { recordJobRun } from '@/server/admin/health';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { isProdigiConfigured } from '@/server/prodigi/client';
 import { syncProdigiCatalogue } from '@/server/prodigi/sync';
-import { prodigiSpecAlert, prodigiSpecProblems } from '@/server/prodigi/specAlert';
+import { prodigiSpecAlert, prodigiSpecFindings, prodigiSpecProblems } from '@/server/prodigi/specAlert';
 import { recordStatus } from '@/server/admin/health';
 import { sendMail } from '@/server/mail';
 import { SUPPORT_EMAIL } from '@/lib/support';
@@ -23,7 +23,8 @@ async function run(req: Request): Promise<Response> {
   const alert = prodigiSpecAlert(report);
   // …and onto the admin app's Today and health screens
   const problems = prodigiSpecProblems(report);
-  await recordStatus(getDb(), 'prodigi-check', problems.length === 0, { problems, note: `${report.ok} of ${report.total} variants checked fine` }).catch(() => {});
+  // (green while every product ON SALE matches — a hidden product's known difference is listed, not red)
+  await recordStatus(getDb(), 'prodigi-check', prodigiSpecFindings(report).onSale.length === 0, { problems, note: `${report.ok} of ${report.total} variants checked fine` }).catch(() => {});
   if (alert) {
     try {
       await sendMail({ kind: 'order-ops', to: (process.env.SUPPORT_INBOX ?? '').trim() || SUPPORT_EMAIL, ...alert });

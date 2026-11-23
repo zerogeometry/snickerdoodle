@@ -1,6 +1,7 @@
 {
  "source": "GET api.sandbox.prodigi.com/v4.0/products/{sku} (GB routes)",
  "fetchedOn": "2026-10-27",
+ "liveOverrides": "GLOBAL-TUBE-SOCKS default = 3543x6141 upright, from the LIVE API (weekly check, 23 Nov 2026); the sandbox said 6141x3543 on 16 Nov. Orders go to live, so live wins.",
  "products": {
   "BOOK-FE-A4-P-HARD-G": {
    "printAreas": ["cover","default","spine"],
@@ -1220,7 +1221,7 @@
   "GLOBAL-TUBE-SOCKS": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"gender":"Unisex","size":"l"},"printAreaSizes":{"default":{"w":6141,"h":3543}}}
+    {"attributes":{"gender":"Unisex","size":"l"},"printAreaSizes":{"default":{"w":3543,"h":6141}}}
    ]
   },
   "H-APR-AA-BTIE": {

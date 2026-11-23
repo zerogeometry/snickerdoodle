@@ -1,6 +1,6 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { definedPrintSpecs } from '@/server/catalogue';
+import { definedPrintSpecs, isDesignedTurned } from '@/server/catalogue';
 import { renderArtWindowFace } from '../artWindow';
 import { artWindowFrac, artWindowOf, canvasSizePx, mmToPx, SACK_PRINT_BOX_MM } from '../geometry';
 import { assessPrintResolution } from '../pattern-geometry';
@@ -61,11 +61,12 @@ describe('christmas sack — the drawing prints inside Prodigi’s 28×32 cm box
   });
 });
 
-describe('tube socks — Prodigi’s 16 Nov size (6141×3543), designed upright', () => {
-  it('designs on 300 × 520 mm and sends Prodigi the landscape file', () => {
+describe('tube socks — Prodigi’s LIVE size (3543×6141, weekly check 23 Nov), designed and sent upright', () => {
+  it('designs on 300 × 520 mm and sends Prodigi the same upright file, never turned', () => {
     const s = spec('socks-tube');
     expect([s.template.printWidthPx, s.template.printHeightPx]).toEqual([3543, 6141]);
-    expect(printFileSize('socks', s.attributes, s.template)).toEqual({ w: 6141, h: 3543 });
+    expect(printFileSize('socks', s.attributes, s.template)).toEqual({ w: 3543, h: 6141 });
+    expect(isDesignedTurned('socks', s.attributes)).toBe(false);
   });
   it('the ankle sock (square) is never turned', () => {
     const s = spec('socks');
