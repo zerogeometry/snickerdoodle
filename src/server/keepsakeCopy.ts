@@ -149,3 +149,21 @@ export async function keepsakeLooks(db: DbHandle, rows: { id: string; studioDoc:
   }
   return out;
 }
+
+/**
+ * The EDIT a keepsake looks like — its Studio design, or the cut-out a Studio save (or a picker's
+ * "remove background") left as its look — so a keepsake opened again (the Studio, the create flow, a
+ * card pack) carries on from it: the Studio puts its cut-out back on the drawing instead of treating
+ * it as never cut out (founder, 25 Nov: a card pack's lifted background was forgotten on reopening, and
+ * the next save threw it away). Null when its look is the plain drawing. `px`: a design's real pixel
+ * size, only while it still vouches for these bytes. The caller has already passed the read gate.
+ */
+export async function editedLook(db: DbHandle, assetId: string): Promise<{ id: string; key: string; px?: { width: number; height: number } } | null> {
+  const [a] = await db.select({ studioDoc: assets.studioDoc }).from(assets).where(eq(assets.id, assetId));
+  if (!a) return null;
+  const look = (await keepsakeLooks(db, [{ id: assetId, studioDoc: a.studioDoc }])).get(assetId);
+  if (!look || (look.kind !== 'design' && look.kind !== 'cutout')) return null;
+  const designPx = (a.studioDoc as { designPx?: { width: number; height: number; sha256: string } } | null)?.designPx;
+  const px = look.kind === 'design' && designPx && look.sha256 === designPx.sha256 ? { width: designPx.width, height: designPx.height } : undefined;
+  return { id: look.id, key: look.key, ...(px ? { px } : {}) };
+}

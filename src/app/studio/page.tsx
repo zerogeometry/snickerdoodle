@@ -19,9 +19,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
 import { Modal } from '@/ui/primitives/Modal';
-import { studioReturnTo } from '@/ui/components/usePickerEdits';
+import { noteStudioSaved, studioReturnTo } from '@/ui/components/usePickerEdits';
 import { forkPickedKeepsake, unforkUnsavedCopy } from '@/lib/keepsakeFork';
-import { studioEditTarget } from '@/lib/studioEditTarget';
+import { studioEditTarget, studioOpensCutOut } from '@/lib/studioEditTarget';
 import { applyIngested, toast, useUpload, useUploadHydrated } from '@/lib/store';
 import { uploadGuestImage } from '@/lib/guestUpload';
 import { cutoutAlphaAction, removeBackgroundAction, saveStudioAction, studioStateAction } from '@/app/actions/magic';
@@ -200,9 +200,8 @@ function StudioEditor() {
           // a fresh blank canvas starts on white paper (switch to see-through in background)
           if (upload.scratch && st.objects.length === 0 && !st.mask && geometryIsIdentity(g)) g = { ...g, background: '#ffffff' };
           setObjects(st.objects);
-          // the stored cut-out only while the drawing is USING it (a parent can put the background back
-          // from the upload screen — then the Studio opens on the untouched original)
-          if (st.mask && upload.cutout && !upload.cutout.trim) { // an EDIT in use — the table trim is just the drawing
+          // the stored cut-out only while the drawing is USING it (src/lib/studioEditTarget.ts)
+          if (studioOpensCutOut(upload, !!st.mask) && st.mask) {
             await readMask(st.mask, work.alpha, work.w, work.h);
             setHadCutout(true);
           }
@@ -923,6 +922,7 @@ function StudioEditor() {
       setAspect(res.aspect);
       // a copy made for this edit is now a keepsake of its own — never tidied away
       if (useUpload.getState().upload?.copyOf) useUpload.setState((s) => (s.upload ? { upload: { ...s.upload, copyOf: undefined } } : {}));
+      noteStudioSaved(id); // …and so is one made from a card-pack / calendar picker
       setDirty(false);
       toast('saved ✨');
       then(true);

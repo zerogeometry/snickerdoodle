@@ -8,6 +8,8 @@ import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '
 import { putBackgroundBackAction, removeBackgroundAction } from '@/app/actions/magic';
 import { toast, useUpload, type Upload } from '@/lib/store';
 import { toSessionUpload } from '@/lib/uploadSession';
+import { keepsakePicture } from '@/lib/keepsakeFork';
+import { savedInStudio, type StudioDetourNote } from '@/lib/studioDetour';
 
 /**
  * The calendar's and the card pack's drawing picker, made a little workshop (founder, 26 Oct):
@@ -55,6 +57,15 @@ export function noteStudioReturn(assetId: string | null | undefined, returnTo: s
     sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: assetId ?? null, returnTo }));
   } catch {
     /* no storage — the Studio goes back to the collection as before */
+  }
+}
+/** The Studio saved this drawing: a copy made for it from a picker is kept (src/lib/studioDetour.ts). */
+export function noteStudioSaved(assetId: string | null | undefined): void {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null') as StudioDetourNote | null;
+    if (d && assetId && d.assetId === assetId) sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ ...d, saved: true }));
+  } catch {
+    /* no storage — the picker reads the drawing in progress instead */
   }
 }
 /** Arrived on a product page: drop a return note that pointed at a product page (it has done its job). */
@@ -133,7 +144,7 @@ export function usePickerEdits(opts: {
   useEffect(() => {
     if (restored.current) return;
     restored.current = true;
-    let detour: { assetId: string; copyOf?: string | null; sheet?: PickerSheet | null } | null = null;
+    let detour: (StudioDetourNote & { sheet?: PickerSheet | null }) | null = null;
     try {
       detour = JSON.parse(sessionStorage.getItem(DETOUR_KEY) ?? 'null');
     } catch {
@@ -141,7 +152,7 @@ export function usePickerEdits(opts: {
     }
     if (!detour) return;
     const u = useUpload.getState().upload;
-    const saved = u?.assetId === detour.assetId && !!u.cutout && !u.cutout.trim;
+    const saved = savedInStudio(u, detour);
     // a copy made for the Studio and then never saved: nothing new to keep
     if (detour.copyOf && !saved) void discardCopyAction({ assetId: detour.assetId }).then(() => opts.onUploaded());
     const chosen = detour.copyOf && !saved ? detour.copyOf : detour.assetId;
@@ -261,12 +272,12 @@ export function usePickerEdits(opts: {
         // set aside WITHOUT its picture — the tab can't hold two photos; it's fetched again on return
         const { dataUrl: _picture, ...rest } = current ? (toSessionUpload(current) ?? { dataUrl: '' }) : { dataUrl: '' };
         sessionStorage.setItem(STASH_KEY, JSON.stringify({ upload: current ? rest : null }));
-        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: copy.assetId, copyOf: d.assetId, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
+        // (openedAs: the copy may open on its saved edit — that alone isn't a save)
+        sessionStorage.setItem(DETOUR_KEY, JSON.stringify({ assetId: copy.assetId, copyOf: d.assetId, openedAs: res.look?.sourceObjectId ?? null, returnTo: opts.returnTo, sheet: opts.sheet ?? null }));
       } catch {
         void discardCopyAction({ assetId: copy.assetId });
         return void toast('couldn’t open the studio from here — try from your collection');
       }
-      const trim = res.trim;
       useUpload.getState().setUpload({
         dataUrl: res.dataUrl,
         name: 'drawing.jpg',
@@ -274,7 +285,7 @@ export function usePickerEdits(opts: {
         assetId: copy.assetId,
         kept: true,
         aspect: res.aspect,
-        ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
+        ...keepsakePicture(res),
       });
       router.push('/studio');
     } finally {
