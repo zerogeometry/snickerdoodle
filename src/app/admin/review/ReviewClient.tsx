@@ -4,6 +4,7 @@ import { IconEye, IconEyeOff, IconShieldCheck, IconShieldLock, IconTrash } from 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { confirmMfaEnrolment, decideReviewAction, startMfaEnrolment, verifyMfa } from '@/app/actions/admin';
+import { removeOnlyReason } from '@/lib/reviewReasons';
 import { toast } from '@/lib/store';
 import { Button } from '@/ui/primitives/Button';
 import { Icon } from '@/ui/primitives/Icon';
@@ -139,7 +140,7 @@ export function ReviewList({ items }: { items: ClientItem[] }) {
               </p>
               <div className="mt-3 flex aspect-[4/3] max-h-80 w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-paper-2">
                 {it.hashUnchecked ? (
-                  <p className="px-6 text-center text-xs text-ink-soft">for safety this one can’t be looked at or cleared, only removed: it was held for possible nudity (or couldn’t be read) without the hash check, or the hash check couldn’t run.</p>
+                  <p className="px-6 text-center text-xs text-ink-soft">{removeOnlyReason(it.labels)}</p>
                 ) : open ? (
                   <img src={`/api/admin/review/${it.kind}/${it.id}`} alt="the flagged picture" className="max-h-full max-w-full object-contain" referrerPolicy="no-referrer" />
                 ) : (
