@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromLabel, packCountOf, packLine } from '@/lib/pack-labels';
+import { fromLabel, packCountOf, packLine, packPill } from '@/lib/pack-labels';
 
 // founder, 29 Oct: "from £60" read as ONE placemat — a pack says how many the price buys.
 const gbp = (p: number) => `£${p / 100}`;
@@ -16,5 +16,10 @@ describe('pack labels', () => {
     expect(packLine('coasters', { size: 'pack of 2' })).toBe('a set of 2 coasters, one drawing on both');
     expect(packLine('mug', { size: '11oz' })).toBeNull();
     expect(packCountOf(undefined)).toBeNull();
+  });
+  it('basket pill: a card pack SHOWS "×5" / "×10" (no wrapping beside the bin) but still SAYS "5 cards"', () => {
+    expect(packPill(5)).toEqual({ shown: '×5', spoken: '5 cards' });
+    expect(packPill(10)).toEqual({ shown: '×10', spoken: '10 cards' });
+    expect(packPill(1)).toEqual({ shown: '×1', spoken: '1 card' });
   });
 });

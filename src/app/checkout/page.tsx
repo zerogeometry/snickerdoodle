@@ -277,7 +277,7 @@ export default function CheckoutPage() {
           autoCapitalize="characters"
           autoComplete="off"
           maxLength={32}
-          placeholder="e.g. WELCOME10"
+          placeholder="enter code"
           className="min-h-11 min-w-0 flex-1 rounded-lg border-2 border-line bg-paper px-3 text-sm font-bold tracking-wide text-cocoa placeholder:font-normal placeholder:text-ink-faint"
         />
         <button type="submit" className="press min-h-11 rounded-lg border-2 border-cocoa bg-paper px-4 text-sm font-extrabold text-cocoa">

@@ -161,7 +161,7 @@ export function NewCode() {
             autoComplete="off"
             spellCheck={false}
             maxLength={40}
-            placeholder="WELCOME10"
+            placeholder="enter code"
             required
             {...err('code')}
           />
