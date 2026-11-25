@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
-import { pictureName } from '@/lib/keepsakeFork';
+import { keepsakePicture, pictureName } from '@/lib/keepsakeFork';
 import { useUpload } from '@/lib/store';
 import { Button } from '@/ui/primitives/Button';
 import { FlowHeader } from '@/ui/components/FlowHeader';
@@ -26,7 +26,7 @@ export function OpenInMaker({ assetId, productKey }: { assetId: string; productK
           kept: true,
           fromKeepsake: true, // its first edit makes a NEW keepsake (src/lib/keepsakeFork.ts)
           aspect: res.aspect,
-          ...(res.trim ? { trim: res.trim, cutout: { ...res.trim, trim: true } } : {}),
+          ...keepsakePicture(res),
         });
         router.replace(`/customize/${encodeURIComponent(productKey)}`);
       })

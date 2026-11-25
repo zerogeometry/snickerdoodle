@@ -1,10 +1,25 @@
 'use client';
 
 import { copyKeepsakeAction, discardCopyAction, keepsakeForStudioAction } from '@/app/actions/keepsakePicker';
-import { toast, useUpload } from '@/lib/store';
+import { toast, useUpload, type Upload } from '@/lib/store';
 
 /** A keepsake opened for editing comes as a PNG when it's see-through (keepsakeForStudioAction), else a JPEG. */
 export const pictureName = (dataUrl: string) => (dataUrl.startsWith('data:image/png') ? 'drawing.png' : 'drawing.jpg');
+
+type Opened = { trim?: { url: string; sourceObjectId: string }; look?: { url: string; sourceObjectId: string; px?: { width: number; height: number } } };
+/**
+ * A keepsake opened for editing (keepsakeForStudioAction): its table-trimmed copy, and what the drawing
+ * in progress shows and prints as — its saved EDIT when it has one (a Studio design / cut-out), so the
+ * Studio puts the cut-out back on the drawing and carries on from it (founder, 25 Nov: a card pack's
+ * lifted background was forgotten on reopening); else the trimmed drawing itself. The untouched
+ * drawing is still what's edited — the edit is laid over it, never baked in (originals are sacred).
+ */
+export function keepsakePicture(res: Opened): Pick<NonNullable<Upload>, 'trim' | 'cutout'> {
+  return {
+    ...(res.trim ? { trim: res.trim } : {}),
+    ...(res.look ? { cutout: { ...res.look } } : res.trim ? { cutout: { ...res.trim, trim: true } } : {}),
+  };
+}
 
 /**
  * Make a keepsake the drawing in progress, so the usual create flow (the range, the basket) follows
@@ -15,7 +30,6 @@ export const pictureName = (dataUrl: string) => (dataUrl.startsWith('data:image/
 export async function openKeepsakeInFlow(assetId: string): Promise<boolean> {
   const res = await keepsakeForStudioAction({ assetId });
   if (!res.ok) return false;
-  const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
     name: pictureName(res.dataUrl),
@@ -24,7 +38,7 @@ export async function openKeepsakeInFlow(assetId: string): Promise<boolean> {
     kept: true,
     fromKeepsake: true,
     aspect: res.aspect,
-    ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
+    ...keepsakePicture(res),
   });
   return true;
 }
@@ -51,7 +65,6 @@ export async function forkPickedKeepsake(): Promise<string | null> {
     toast('couldn’t start an edit of that keepsake — try again');
     return null;
   }
-  const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
     name: pictureName(res.dataUrl),
@@ -60,7 +73,7 @@ export async function forkPickedKeepsake(): Promise<string | null> {
     kept: true,
     aspect: res.aspect,
     copyOf: u.assetId,
-    ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
+    ...keepsakePicture(res),
   });
   return copy.assetId;
 }
@@ -76,7 +89,6 @@ export async function unforkUnsavedCopy(): Promise<void> {
   await discardCopyAction({ assetId: u.assetId });
   const res = await keepsakeForStudioAction({ assetId: original });
   if (!res.ok) return;
-  const trim = res.trim;
   useUpload.getState().setUpload({
     dataUrl: res.dataUrl,
     name: pictureName(res.dataUrl),
@@ -85,6 +97,6 @@ export async function unforkUnsavedCopy(): Promise<void> {
     kept: true,
     fromKeepsake: true,
     aspect: res.aspect,
-    ...(trim ? { trim, cutout: { ...trim, trim: true } } : {}),
+    ...keepsakePicture(res),
   });
 }

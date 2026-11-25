@@ -11,7 +11,7 @@ import { pictureForEditing } from '@/server/editingPicture';
 import { resolveViewerContext } from '@/server/assets';
 import { pickableKeepsakes, type PickerKeepsake } from '@/server/keepsakePicker';
 import { keepsakeThumbUrls } from '@/server/keepsakeThumbs';
-import { copyKeepsake, copyWithoutBackground, discardUnusedCopy, keepsakeLooks } from '@/server/keepsakeCopy';
+import { copyKeepsake, copyWithoutBackground, discardUnusedCopy, editedLook, keepsakeLooks } from '@/server/keepsakeCopy';
 import { resolveHomeFamily } from '@/server/onboarding';
 import { getCurrentAccount } from '@/server/session';
 
@@ -79,19 +79,30 @@ async function loadKeepsakePicker(): Promise<PickerKeepsake[] | null> {
  * every read — a member of its family, or the holder of its upload claim.
  */
 export async function keepsakeForStudioAction(input: { assetId: string }): Promise<
-  { ok: true; dataUrl: string; aspect: number; trim?: { url: string; sourceObjectId: string } } | { ok: false }
+  | {
+      ok: true;
+      dataUrl: string;
+      aspect: number;
+      trim?: { url: string; sourceObjectId: string };
+      /** its look when that's an EDIT (a Studio design / cut-out) — the drawing in progress carries on from it */
+      look?: { url: string; sourceObjectId: string; px?: { width: number; height: number } };
+    }
+  | { ok: false }
 > {
   try {
     const db = getDb();
     const account = await getCurrentAccount();
     const viewer = await resolveAssetViewer(db, String(input.assetId), account?.id ?? null, await getUploadClaims());
     await getViewableAssetOrThrow(db, String(input.assetId), viewer); // ← the gate
-    const picture = await pictureForEditing(await workingBytes(db, String(input.assetId))); // see-through stays see-through
+    // the untouched drawing (see-through stays see-through) — the Studio lays its saved edit over it again
+    const picture = await pictureForEditing(await workingBytes(db, String(input.assetId)));
     const [trim] = await db.select({ id: storageObjects.id, key: storageObjects.key }).from(storageObjects).where(eq(storageObjects.key, derivativeKey(String(input.assetId), 'trimmed')));
+    const look = await editedLook(db, String(input.assetId));
     return {
       ok: true,
       ...picture,
       ...(trim ? { trim: { url: await presignDownload(trim.key, 600), sourceObjectId: trim.id } } : {}),
+      ...(look ? { look: { url: await presignDownload(look.key, 600), sourceObjectId: look.id, ...(look.px ? { px: look.px } : {}) } } : {}),
     };
   } catch {
     return { ok: false };
