@@ -67,17 +67,18 @@ export async function runUrgentAlerts(db: DbHandle, opts: { now?: Date; send?: S
   return { urgent: urgent.length, emailed: fresh.length, cleared: cleared.length };
 }
 
+/** Sales between two moments (an admin's sample orders at cost are never sales). */
 async function salesBetween(db: DbHandle, from: Date, to: Date) {
   const [t] = await db
     .select({ n: sql<number>`count(*)::int`, pence: sql<number>`coalesce(sum(${orders.totalPence}), 0)::int` })
     .from(orders)
-    .where(and(inArray(orders.status, [...PAID_STATES]), gte(orders.paidAt, from), lt(orders.paidAt, to)));
+    .where(and(inArray(orders.status, [...PAID_STATES]), eq(orders.isSample, false), gte(orders.paidAt, from), lt(orders.paidAt, to)));
   const top = await db
     .select({ label: sql<string>`coalesce(${products.label}, ${orderItems.productKey})`, units: sql<number>`sum(${orderItems.qty})::int` })
     .from(orderItems)
     .innerJoin(orders, eq(orders.id, orderItems.orderId))
     .leftJoin(products, eq(products.key, orderItems.productKey))
-    .where(and(inArray(orders.status, [...PAID_STATES]), gte(orders.paidAt, from), lt(orders.paidAt, to)))
+    .where(and(inArray(orders.status, [...PAID_STATES]), eq(orders.isSample, false), gte(orders.paidAt, from), lt(orders.paidAt, to)))
     .groupBy(sql`1`)
     .orderBy(sql`2 desc`)
     .limit(5);

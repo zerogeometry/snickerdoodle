@@ -60,7 +60,8 @@ export interface ReferralRollup {
 }
 
 const PAID = [...PAID_STATES];
-const paidJoin = and(eq(orders.promoCodeId, promoCodes.id), inArray(orders.status, PAID));
+// (a sample order at cost never carries a code, and is never counted even if one were to)
+const paidJoin = and(eq(orders.promoCodeId, promoCodes.id), inArray(orders.status, PAID), eq(orders.isSample, false));
 const sums = {
   orders: sql<number>`count(${orders.id})::int`,
   revenuePence: sql<number>`coalesce(sum(${orders.totalPence}), 0)::int`,
@@ -233,6 +234,7 @@ export async function commissionOwed(db: DbHandle, reviewer: Reviewer, month: st
     .where(
       and(
         inArray(orders.status, PAID),
+        eq(orders.isSample, false), // an admin's sample earns no partner anything
         gte(orders.paidAt, from),
         lt(orders.paidAt, to),
         isNull(promoCodes.ownerAccountId),

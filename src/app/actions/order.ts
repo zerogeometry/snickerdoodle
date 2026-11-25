@@ -6,6 +6,8 @@ import { basketHasPrintWithoutDrawing, placeOrder, type PlaceLine } from '@/serv
 import { normaliseBuyerEmail, resolveCheckoutPromo, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount, getUploadClaims } from '@/server/session';
+import { sampleGrantFor } from '@/server/samples';
+import { sampleAskFor } from '@/server/admin/context';
 import type { RawTransform } from '@/server/print/geometry';
 import { CALENDAR_PAGE_COUNT } from '@/lib/calendar';
 import { MAX_FRAME_SLOTS } from '@/lib/multi-photo-frame';
@@ -51,6 +53,8 @@ export async function placeOrderAction(input: {
   /** A GUEST's email for their receipt (a signed-in buyer's is their account's). Normalised here;
    * a friend's referral code is checked against it, and Stripe shows it fixed. */
   email?: string;
+  /** "order as a sample, at cost": only ASKS — placeOrder gets a grant only for an admin with two-step login. */
+  sample?: boolean;
 }): Promise<{ ok: boolean; needsAuth?: boolean; ref?: string; checkoutUrl?: string; reason?: 'too-small' | 'promo' | 'gift-note'; productKey?: string; promoError?: PromoRefusal }> {
   const items: PlaceLine[] = (input.items ?? []).map((i) => ({
     productKey: String(i.productKey),
@@ -134,6 +138,8 @@ export async function placeOrderAction(input: {
   // the code typed, or (typed nothing, signed-in first order) the shop's welcome free card by itself
   const promo = await resolveCheckoutPromo(db, input.promoCode, { accountId: account?.id ?? null, email: buyerEmail });
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
+  // an admin's sample at cost: a grant only from the database + the signed step-up cookie (src/server/samples.ts)
+  const sample = account && input.sample === true ? await sampleGrantFor(db, { ...(await sampleAskFor({ id: account.id })), wanted: true }) : null;
   try {
     const place = (rule: typeof promo.rule) =>
       placeOrder(db, {
@@ -145,6 +151,7 @@ export async function placeOrderAction(input: {
         gift: input.gift ?? false,
         giftNote: input.giftNote,
         account: account ? { id: account.id } : null,
+        sample,
       });
     let res = await place(promo.rule);
     // the welcome card was applied by itself: if it can't be claimed after all, the order goes ahead without it

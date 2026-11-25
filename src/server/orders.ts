@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
-import { assets, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
+import { assets, auditRecords, orderItemArtwork, orderItems, orders, printTemplates, productVariantProviders, productVariants, storageObjects } from '@/db/schema';
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
 import { screenPendingNow } from './moderation';
@@ -27,6 +27,7 @@ import { notifyGiftListPurchase } from './giftListNotify';
 import { settlePaidOrderCredits } from './referrals';
 import { sendOrderConfirmed } from './orderEmails';
 import { assetRefOf } from './assetRef';
+import { isEnrolledAdmin, type SampleGrant } from './samples';
 
 /** Pixel size of the image a line will print from (the bg-removed cutout if chosen,
  * else the ORIGINAL) — read from the stored bytes' header, in-VPC. null if unreadable,
@@ -142,16 +143,23 @@ export async function placeOrder(
     buyerEmail?: string | null;
     /** A gift order's little note, as typed (untrusted — screened here). */
     giftNote?: unknown;
+    /** An admin's SAMPLE ORDER at cost: a grant made server-side by sampleGrantFor (admin + two-step login,
+     * src/server/samples.ts). Re-checked here against the buyer and the database; never via a gift link. */
+    sample?: SampleGrant | null;
   },
 ): Promise<PlaceOrderResult> {
   const { account } = input;
   // the gift note is screened BEFORE anything is written (abuse ⇒ the buyer is asked to reword it)
   const note = screenedGiftNote(input);
   if (note === 'refused') return { ok: false, reason: 'gift-note' };
+  // a sample only for the very account the grant names, still an admin, and never through someone's gift link
+  const sample = !!input.sample && !!account && input.sample.accountId === account.id && !input.giftLink && (await isEnrolledAdmin(db, account.id));
   const catalogue = await getCatalogue(db);
   const q = quote(
     input.items.map((l) => ({ productKey: l.productKey, qty: l.qty, ...(isBundleKey(l.productKey) ? { bundle: l.bundle } : {}) })),
-    { gift: input.gift, catalogue, promo: input.promo ?? null, creditAvailablePence: account ? (input.creditAvailablePence ?? 0) : 0, freeCardEligible: !!account && input.freeCardEligible === true },
+    sample
+      ? { gift: input.gift, catalogue, sample: true } // at cost: no code, credit or free card ever rides on a sample
+      : { gift: input.gift, catalogue, promo: input.promo ?? null, creditAvailablePence: account ? (input.creditAvailablePence ?? 0) : 0, freeCardEligible: !!account && input.freeCardEligible === true },
   );
   if (q.lines.length === 0) return { ok: false, reason: 'empty' };
 
@@ -407,7 +415,7 @@ export async function placeOrder(
   };
 
   const ref = newRef();
-  const promoId = q.promo?.applied && input.promo ? input.promo.id : null;
+  const promoId = !sample && q.promo?.applied && input.promo ? input.promo.id : null;
   const writeOrder = (h: DbHandle | Tx) =>
     h
     .insert(orders)
@@ -431,6 +439,7 @@ export async function placeOrder(
       buyerEmail: input.buyerEmail ?? null,
       giftFromName: input.giftMeta?.fromName ?? null,
       giftNote: q.gift ? note : null,
+      isSample: sample,
     })
     .returning();
   // A code is claimed in the SAME transaction that writes the order, its row locked: two checkouts
@@ -447,6 +456,17 @@ export async function placeOrder(
     order = claimed.order;
   } else {
     [order] = await writeOrder(db);
+  }
+  if (sample) {
+    // an admin pricing privilege used: who, which order, what it cost (no child data, no address)
+    await db.insert(auditRecords).values({
+      actorAccountId: account!.id,
+      actorType: 'ADMIN',
+      event: 'SAMPLE_ORDER_PLACED',
+      targetType: 'order',
+      targetId: order!.id,
+      metadata: { ref, totalPence: q.totalPence, costExVatPence: q.sample?.costExVatPence ?? null, cardFeePence: q.sample?.cardFeePence ?? null, noCostKeys: q.sample?.noCostKeys ?? [] },
+    });
   }
 
   for (let i = 0; i < q.lines.length; i++) {
@@ -518,6 +538,8 @@ export async function placeOrder(
       multiBuySavingPence: q.multiBuySavingPence,
       promoSavingPence: q.promoSavingPence + q.creditPence, // credit rides the same one-off coupon
       promoLabel: q.promo?.applied ? q.promo.code : undefined,
+      // a sample's "delivery" is Stripe's card fee (src/pricing/sample.ts) — named as what it is
+      ...(sample ? { deliveryLabel: 'Card fee (sample at cost)' } : {}),
       cancelPath: input.cancelPath,
       customerEmail: input.buyerEmail ?? undefined,
       // a checkout holding a code's use lets it go when the hold ends (src/server/promos.ts)

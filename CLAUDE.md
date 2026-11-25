@@ -158,6 +158,9 @@ cobalt #2F5DA8 · sky #8FB5D6 · berry #E8786E · leaf #7FA65E · green-save #3F
 - Server-side PRICING unit-tested: totals; the free first card (D30) ONLY on a server-decided signed-in
   first order with a paid order beside it, never for a guest/repeat buyer/forged flag; no join saving and no
   referral reward (both retired); partner commission; add-ons; gift price-hiding.
+- SAMPLE ORDERS AT COST (D32): only for a signed-in admin with two-step login, decided server-side on every
+  quote + order (src/server/samples.ts); cost = Prodigi product + post + VAT + card fee (src/pricing/sample.ts);
+  never a code/credit/commission; `orders.is_sample` is left out of every sales, commission and metrics number.
 - Also tested: single-image generative request-builder; EXIF strip; gift-link snapshot immutability
   + "deleted source → 410"; retention purge (kept survives; unkept past window is gone DB+storage+
   provider+backup); removed member denied with no session grace.

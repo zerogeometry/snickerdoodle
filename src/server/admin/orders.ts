@@ -34,6 +34,8 @@ export interface OrderRow {
   disputed: boolean;
   trouble: boolean;
   isGift: boolean;
+  /** An admin's own sample, at cost (src/server/samples.ts) — never a sale. */
+  isSample: boolean;
 }
 
 const TROUBLED = ['RENDER_FAILED', 'ERROR', 'BLOCKED_GATE'] as const;
@@ -76,6 +78,7 @@ export async function listOrders(db: DbHandle, reviewer: Reviewer, opts: { filte
       refundedPence: orders.refundedPence,
       dispute: orders.dispute,
       isGift: orders.isGift,
+      isSample: orders.isSample,
       items: sql<number>`(select coalesce(sum(i.qty), 0)::int from ${orderItems} i where i.order_id = "orders"."id")`,
       trouble: troubleSql,
     })
@@ -101,6 +104,8 @@ export interface OrderDetail {
   dispute: NonNullable<typeof orders.$inferSelect.dispute> | null;
   code: { code: string; partner: string | null } | null;
   isGift: boolean;
+  /** An admin's own sample, at cost: its "delivery" is Stripe's card fee. */
+  isSample: boolean;
   guest: boolean;
   lines: { product: string; qty: number; linePence: number; states: string[]; problems: string[] }[];
   canRetry: boolean;
@@ -149,6 +154,7 @@ export async function orderDetail(db: DbHandle, reviewer: Reviewer, ref: string)
     dispute: o.dispute,
     code: code ?? null,
     isGift: o.isGift,
+    isSample: o.isSample,
     guest: !o.accountId,
     lines: lines.map((l) => {
       const mine = art.filter((a) => a.orderItemId === l.id);

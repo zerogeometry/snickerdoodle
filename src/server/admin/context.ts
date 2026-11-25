@@ -6,6 +6,7 @@ import { getDb } from '@/db/client';
 import type { Reviewer } from '@/authz';
 import { getCurrentAccount } from '../session';
 import { ADMIN_STEPUP_COOKIE, SESSION_COOKIES, verifyStepUp } from './stepUp';
+import type { SampleAsk } from '../samples';
 
 /** This browser's sign-in session token (what the step-up proof is bound to), or null. */
 export function sessionTokenFrom(jar: { get(name: string): { value: string } | undefined }): string | null {
@@ -29,4 +30,10 @@ export async function currentReviewer(): Promise<Reviewer & { email: string | nu
     enrolled: !!row?.mfa,
     mfaVerified: row?.isAdmin === true && !!row?.mfa && verifyStepUp(jar.get(ADMIN_STEPUP_COOKIE)?.value, account.id, sessionTokenFrom(jar)),
   };
+}
+
+/** What the sample-order check needs from this request: the step-up cookie and the sign-in it is bound to (src/server/samples.ts). */
+export async function sampleAskFor(account: { id: string } | null): Promise<SampleAsk> {
+  const jar = await cookies();
+  return { account, stepUpCookie: jar.get(ADMIN_STEPUP_COOKIE)?.value ?? null, sessionToken: sessionTokenFrom(jar) };
 }

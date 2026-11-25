@@ -33,6 +33,8 @@ export async function loadGtmData(tx, asOf) {
   // Columns other sessions may still be adding: use them when they're there, skip when not.
   const cols = new Set((await tx`select column_name from information_schema.columns where table_schema = current_schema() and table_name = 'orders'`).map((r) => r.column_name));
   const optional = (name) => (cols.has(name) ? tx`o.${tx(name)}` : tx`null::int`);
+  // an admin's sample orders at cost (migration 0061) are never sales: left out of every number here
+  const notSample = cols.has('is_sample') ? tx`and not o.is_sample` : tx``;
 
   // Every paid order up to the end of the report week (first orders + repeats need the history).
   const orders = await tx`
@@ -58,7 +60,7 @@ export async function loadGtmData(tx, asOf) {
     left join promo_codes c on c.id = o.promo_code_id
     left join gift_links gl on gl.id = o.gift_link_id
     left join accounts la on la.id = gl.created_by_account_id
-    where o.status in ${tx(PAID)} and coalesce(o.paid_at, o.created_at) < ${until}`;
+    where o.status in ${tx(PAID)} ${notSample} and coalesce(o.paid_at, o.created_at) < ${until}`;
 
   // The shop's codes (personal referral codes left out — each belongs to a parent), so spend on a
   // code that sold nothing this week still lands on the right channel.
@@ -66,7 +68,7 @@ export async function loadGtmData(tx, asOf) {
 
   const giftLinks = await tx`
     select gl.created_at as at,
-           (select min(coalesce(o.paid_at, o.created_at)) from orders o where o.gift_link_id = gl.id and o.status in ${tx(PAID)}) as purchased_at
+           (select min(coalesce(o.paid_at, o.created_at)) from orders o where o.gift_link_id = gl.id and o.status in ${tx(PAID)} ${notSample}) as purchased_at
     from gift_links gl where gl.created_at < ${until}`;
 
   // Relatives joining a family from a parent's invite (never the owner's own membership).

@@ -82,6 +82,7 @@ async function Detail({ reviewer, orderRef }: { reviewer: AdminReviewer; orderRe
       <section aria-label="where it is" className="rounded-[20px] border-2 border-cocoa/15 bg-paper p-4">
         <p className="text-sm text-ink-soft">
           <b className="text-cocoa">{STATUS_WORDS[o.status] ?? o.status.toLowerCase()}</b>
+          {o.isSample ? ' · a sample at cost (not a sale)' : ''}
           {o.isGift ? ' · a gift' : ''}
           {o.guest ? ' · guest checkout' : ''}
           {o.shippingMethod ? ` · ${o.shippingMethod.toLowerCase()} delivery` : ''}
@@ -137,7 +138,7 @@ async function Detail({ reviewer, orderRef }: { reviewer: AdminReviewer; orderRe
         <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 border-t-2 border-cocoa/10 pt-3 text-sm">
           <dt className="text-ink-soft">items</dt>
           <dd className="text-right">{pounds(o.money.subtotalPence)}</dd>
-          <dt className="text-ink-soft">delivery</dt>
+          <dt className="text-ink-soft">{o.isSample ? 'card fee' : 'delivery'}</dt>
           <dd className="text-right">{pounds(o.money.deliveryPence)}</dd>
           {o.money.savingsPence ? (
             <>

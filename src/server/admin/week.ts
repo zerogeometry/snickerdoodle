@@ -82,7 +82,8 @@ async function sideCounts(tx: TransactionSql, win: WeekWindow) {
     select count(*) filter (where source = 'web')::int as web, count(*) filter (where source in ${tx(DRAW_SOURCES)})::int as draw
     from assets where created_at >= ${w.start} and created_at < ${w.end} and not is_brand_safe_fixture`;
   const [d] = await tx<{ n: number }[]>`select count(*)::int as n from saved_designs where created_at >= ${w.start} and created_at < ${w.end}`;
-  const [c] = await tx<{ n: number }[]>`select count(*)::int as n from orders where created_at >= ${w.start} and created_at < ${w.end}`;
+  // (an admin's sample orders at cost are never counted anywhere on this screen)
+  const [c] = await tx<{ n: number }[]>`select count(*)::int as n from orders where created_at >= ${w.start} and created_at < ${w.end} and not is_sample`;
   const [p] = await tx<{ n: number }[]>`select count(*)::int as n from app_tokens where created_at >= ${w.start} and created_at < ${w.end}`;
   // Orders with a drawing that came from Draw: the lasting trace of "make it real" (the app's one-off checkout
   // passes are cleared a day after they expire, so they can't be counted a week later).
@@ -91,7 +92,7 @@ async function sideCounts(tx: TransactionSql, win: WeekWindow) {
     join order_items i on i.order_id = o.id
     join order_item_artwork art on art.order_item_id = i.id
     join assets a on a.id = art.asset_id
-    where o.status in ${tx(PAID)} and coalesce(o.paid_at, o.created_at) >= ${w.start} and coalesce(o.paid_at, o.created_at) < ${w.end}
+    where o.status in ${tx(PAID)} and not o.is_sample and coalesce(o.paid_at, o.created_at) >= ${w.start} and coalesce(o.paid_at, o.created_at) < ${w.end}
       and a.source in ${tx(DRAW_SOURCES)}`;
   return { uploadsWeb: u?.web ?? 0, uploadsDraw: u?.draw ?? 0, designs: d?.n ?? 0, checkouts: c?.n ?? 0, phonesLinked: p?.n ?? 0, drawOrders: o?.n ?? 0 };
 }
@@ -102,7 +103,7 @@ async function bestSellers(tx: TransactionSql, win: WeekWindow, limit = 8) {
   return tx<{ label: string; units: number }[]>`
     with paid as (
       select o.id from orders o
-      where o.status in ${tx(PAID)} and coalesce(o.paid_at, o.created_at) >= ${w.start} and coalesce(o.paid_at, o.created_at) < ${w.end}
+      where o.status in ${tx(PAID)} and not o.is_sample and coalesce(o.paid_at, o.created_at) >= ${w.start} and coalesce(o.paid_at, o.created_at) < ${w.end}
     ), lines as (
       select coalesce(p.label, vp.label, i.product_key) as label, i.qty as units
       from order_items i join paid on paid.id = i.order_id

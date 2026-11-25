@@ -135,6 +135,8 @@ export const auditEvent = pgEnum('audit_event', [
   // "sign in with Face ID": a passkey added / removed (by the person, or with a removal or a closed account)
   'PASSKEY_ADDED',
   'PASSKEY_REMOVED',
+  // an admin (two-step login done) placed a sample order at cost (src/server/samples.ts)
+  'SAMPLE_ORDER_PLACED',
 ]);
 
 /** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
@@ -494,6 +496,9 @@ export const orders = pgTable(
     /** A gift order's little note, as the buyer typed it at checkout (screened for abuse, ≤200).
      * Erased with the account like the address (accountClosure). */
     giftNote: text('gift_note'),
+    /** A SAMPLE ORDER: an admin's own, priced at cost (src/pricing/sample.ts, src/server/samples.ts). Never a sale:
+     * left out of revenue, best sellers, commission and the Monday numbers; fulfilled exactly like any order. */
+    isSample: boolean('is_sample').notNull().default(false),
     /** The printed gift-note insert (plan C9, src/fulfillment/giftNoteInsert.ts): what happened to it
      * at submission — sent / partly (a lab couldn't) / skipped, and why. Null when the switch was off
      * or there was no note. Holds no note text. */

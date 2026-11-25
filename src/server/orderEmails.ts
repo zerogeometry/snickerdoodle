@@ -41,7 +41,7 @@ export async function sendOrderConfirmed(db: DbHandle, orderId: string): Promise
       ...receiptLines(lines).map((l) => `· ${l.label}${l.qty > 1 ? ` × ${l.qty}` : ''} — ${formatPence(l.linePence)}`),
       // the savings it got, so the lines add up to the total
       ...receiptSavings(o).map((sv) => `· ${sv.label} — −${formatPence(sv.pence)}`),
-      o.deliveryPence > 0 ? `· delivery — ${formatPence(o.deliveryPence)}` : null,
+      o.deliveryPence > 0 ? `· ${o.isSample ? 'card fee (a sample at cost)' : 'delivery'} — ${formatPence(o.deliveryPence)}` : null,
       `Total ${formatPence(o.totalPence)}, delivery included`,
       ...(o.isGift && o.giftNote ? ['', `Your gift note: “${o.giftNote}”`] : []),
       '',
