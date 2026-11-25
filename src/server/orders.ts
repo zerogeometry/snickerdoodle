@@ -5,6 +5,7 @@ import { assets, auditRecords, orderItemArtwork, orderItems, orders, printTempla
 import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
 import { screenPendingNow } from './moderation';
+import { forgetBasketAfterPaid } from './savedBasket';
 import { receiptLines, receiptSavings, type ReceiptLine } from '@/lib/order-lines';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
@@ -587,6 +588,8 @@ export async function markOrderPaid(db: DbHandle, orderId: string): Promise<void
     await settlePaidOrderCredits(db, flipped.id).catch((e) => console.error('credit settle failed', (e as Error).message));
     // "we've got your order" — once, on the real transition; a mail failure never touches the payment
     await sendOrderConfirmed(db, flipped.id).catch((e) => console.error('order confirmation not sent', flipped.ref, (e as Error).message));
+    // the remembered basket this order came from is done with — no "you left something" email for it
+    await forgetBasketAfterPaid(db, flipped).catch((e) => console.error('saved basket not cleared', flipped.ref, (e as Error).message));
   }
 }
 

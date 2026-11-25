@@ -26,6 +26,7 @@ import { Toaster } from '@/ui/components/Toaster';
 import { CookieBanner } from '@/ui/components/CookieBanner';
 import { TestSiteBanner } from '@/ui/components/TestSiteBanner';
 import { UploadSession } from '@/ui/components/UploadSession';
+import { BasketSync } from '@/ui/components/BasketSync';
 import { ScreeningNotice } from '@/ui/components/ScreeningNotice';
 import { FreshBuild } from '@/ui/components/FreshBuild';
 import { MotionTaps } from '@/ui/components/MotionTaps';
@@ -78,6 +79,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         </a>
         <ScrollToTop />
         <UploadSession />
+        {/* a signed-in shopper's basket is remembered on their account: another tab, another day, another device */}
+        <BasketSync />
         {/* a tab left open across an update moves onto the new build when the parent comes back to it */}
         <FreshBuild build={process.env.APP_BUILD ?? ''} />
         <TestSiteBanner />
