@@ -60,7 +60,7 @@ for (const s of SETS) {
 
 // The founder's layered cushion + blanket shapes, one per print-file shape.
 const SHAPES: { key: string; size: string; orientation?: string }[] = [
-  { key: 'cushion', size: 'heart' },
+  { key: 'cushion', size: '11″ heart' },
   { key: 'blanket', size: 'medium', orientation: 'portrait' },
   { key: 'blanket', size: 'medium', orientation: 'landscape' },
   { key: 'blanket', size: 'large', orientation: 'landscape' },

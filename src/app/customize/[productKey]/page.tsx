@@ -282,7 +282,7 @@ function CustomizeProduct() {
     return [...new Set(avail)];
   }, [product, size]);
 
-  // Cushion: the `size` attribute encodes shape+size (heart / 18″ round / 12″ square / 22″
+  // Cushion: the `size` attribute encodes shape+size (11″ heart / 18″ round / 12″ square / 22″
   // square). The shape STRIP groups by shape so the two square sizes share ONE square
   // thumbnail (the Size chips still pick the exact 12″/22″). Selecting a thumbnail OR a chip
   // keeps them in sync — both drive `size`. Three shapes fit the row, so no paging.

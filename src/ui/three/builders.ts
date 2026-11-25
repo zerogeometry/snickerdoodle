@@ -76,7 +76,7 @@ function roundedRectPolygon(w: number, h: number, r: number): Pt[] {
 }
 
 function buildCushion(texture: THREE.Texture, printWmm: number, size: string): THREE.Group {
-  const outline = size === 'heart' ? heartPolygon(printWmm) : size.includes('round') ? circlePolygon(printWmm) : roundedRectPolygon(printWmm, printWmm, printWmm * 0.09);
+  const outline = /heart/i.test(size) ? heartPolygon(printWmm) : size.includes('round') ? circlePolygon(printWmm) : roundedRectPolygon(printWmm, printWmm, printWmm * 0.09);
   const body = buildSoftBody({
     outline,
     puff: printWmm * 0.17,

@@ -390,7 +390,9 @@ const DEFS: Record<string, ProductDef> = {
       // Heart + round: Prodigi only makes these shapes in faux SUEDE, single-sided, STONE back.
       // The heart's print area is WIDER than tall (printAreaSizes 2008×1725px, their PSD 2009×1725,
       // 27 Oct): exact px, bleed 0, so Prodigi has nothing to crop. (It was a 280mm square + bleed.)
-      { size: 'heart', pricePence: 2200, ...trimmedPx({ w: 2008, h: 1725 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
+      // Named with its size like the squares (founder, 25 Nov): Prodigi's spec for this SKU is "11\" Small
+      // Heart", productDimensions 11×11in. It stays the default variant, so its sku (`cushion`) is unchanged.
+      { size: '11″ heart', pricePence: 2200, ...trimmedPx({ w: 2008, h: 1725 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-SH-SCSSS' },
       { size: '18″ round', pricePence: 3000, ...trimmedPx({ w: 2775, h: 2775 }, 150, CUSHION_SEAM_MM), prodigiSku: 'GLOBAL-CUSH-18R-SCSSS' },
       // Squares: faux LINEN, white. Single-sided is the default; double-sided (DUAL) is the paid
       // upgrade that unlocks image-both-sides / a colour back — ONE double-wide [front | back]

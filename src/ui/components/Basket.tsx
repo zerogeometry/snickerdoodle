@@ -8,6 +8,7 @@ import { CardPackThumb } from './CardPackThumb';
 import { BundleThumb } from './BundleThumb';
 import { MockupPreview } from './MockupPreview';
 import { ProductArt, type ProductKey } from './ProductArt';
+import { packPill } from '@/lib/pack-labels';
 import { gbp, isBundleLine, isPackLine, useBasket, type BasketItem } from '@/lib/store';
 
 /**
@@ -83,12 +84,23 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
       </div>
       {pack || bundle ? (
         <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
-          <span className="flex flex-1 items-center justify-center text-[11px] font-bold text-cocoa">{bundle ? 'one bundle' : `${item.cards?.length ?? 0} cards`}</span>
+          {/* "×5" fits beside the bin on one line (it wrapped as "5 cards"); the screen reader still
+              hears "5 cards". */}
+          <span className={`flex min-w-0 flex-1 items-center justify-center font-bold text-cocoa ${bundle ? 'text-center text-[11px] leading-tight' : 'whitespace-nowrap pl-2 text-xs'}`}>
+            {bundle ? (
+              'one bundle'
+            ) : (
+              <>
+                <span aria-hidden>{packPill(item.cards?.length ?? 0).shown}</span>
+                <span className="sr-only">{packPill(item.cards?.length ?? 0).spoken}</span>
+              </>
+            )}
+          </span>
           <button
             type="button"
             aria-label={`remove ${label}`}
             onClick={() => remove(item.id)}
-            className="press flex h-11 w-11 items-center justify-center rounded-r-full text-ink-soft hover:text-cinnamon"
+            className="press flex h-11 w-11 shrink-0 items-center justify-center rounded-r-full text-ink-soft hover:text-cinnamon"
           >
             <Icon icon={IconTrash} size={14} />
           </button>

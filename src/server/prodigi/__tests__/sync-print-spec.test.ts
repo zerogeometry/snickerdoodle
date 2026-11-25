@@ -26,7 +26,7 @@ const rowOf = (key: string, match: (a: Record<string, string>) => boolean) => {
 describe('catalogue sync — the print file vs Prodigi’s print area', () => {
   it('is quiet when the file is exactly Prodigi’s (heart cushion, landscape-native blanket, big frame)', () => {
     for (const { row, sku } of [
-      rowOf('cushion', (a) => a.size === 'heart'),
+      rowOf('cushion', (a) => a.size === '11″ heart'),
       rowOf('blanket', (a) => a.size === 'large' && a.orientation === 'portrait'),
       rowOf('framedPrint', (a) => a.size === '24×32″' && a.colour === 'black' && a.orientation === 'landscape'),
     ]) {
@@ -35,7 +35,7 @@ describe('catalogue sync — the print file vs Prodigi’s print area', () => {
   });
 
   it('warns when the shape differs — the old 280mm-square heart would be cropped', () => {
-    const { row, sku } = rowOf('cushion', (a) => a.size === 'heart');
+    const { row, sku } = rowOf('cushion', (a) => a.size === '11″ heart');
     const old = { ...row, template: { printWidthPx: 1654, printHeightPx: 1654, bleedMm: 3, requiredDpi: 150 } };
     expect(printSpecWarning(old, apiProduct(sku))).toMatch(/different shape.*crop/);
   });
@@ -54,7 +54,7 @@ describe('catalogue sync — the print file vs Prodigi’s print area', () => {
   });
 
   it('says nothing when Prodigi gives no print-area sizes (it can’t tell)', () => {
-    const { row, sku } = rowOf('cushion', (a) => a.size === 'heart');
+    const { row, sku } = rowOf('cushion', (a) => a.size === '11″ heart');
     const bare = { ...apiProduct(sku), variants: [{ attributes: {}, shipsTo: ['GB'] }] };
     expect(printSpecWarning(row, bare)).toBeNull();
   });

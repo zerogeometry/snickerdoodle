@@ -325,13 +325,14 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
       // its stand-in where those layers aren't staged
       return { material: 'PAPER', register: 'drawn', key: 'multiPhotoFrame' };
     case 'cushion': {
-      // heart / 18″ round / (12″ | 22″) square — the two squares share one shape (both 1:1).
-      const shape = size === 'heart' ? 'heart' : size === '18″ round' ? 'round' : 'square';
+      // 11″ heart / 18″ round / (12″ | 22″) square — the two squares share one shape (both 1:1).
+      // by SHAPE word, not the whole label, so a size in the name ("11″ heart") still finds its shape
+      const shape = /heart/i.test(size) ? 'heart' : /round/i.test(size) ? 'round' : 'square';
       const dir = layeredCushionDir(shape);
       // Preferred: the founder's authored layers (background → shadow → white shape).
       if (dir) return { material: 'LIGHT_FABRIC', register: 'layered-cushion', dir };
       // Flat-photo fallback (Prodigi packshot) if the layers aren't present.
-      const file = size === 'heart' ? 'Heart Cushion Blank 1.jpg' : size === '18″ round' ? 'Round cushion blank.jpg' : 'Cushion blank.jpg';
+      const file = shape === 'heart' ? 'Heart Cushion Blank 1.jpg' : shape === 'round' ? 'Round cushion blank.jpg' : 'Cushion blank.jpg';
       return { file: `prodigi-cushions-blank-assets/${file}`, material: 'LIGHT_FABRIC', register: 'face-cover', mask: true };
     }
     case 'jigsaw': {

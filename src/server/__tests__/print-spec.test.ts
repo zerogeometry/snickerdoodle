@@ -68,7 +68,7 @@ describe('print files match Prodigi’s print areas', () => {
       const s = specs.find((x) => x.productKey === key && match(x.attributes))!;
       return printFileSize(s.productKey, s.attributes, s.template);
     };
-    expect(fileOf('cushion', (a) => a.size === 'heart')).toEqual({ w: 2008, h: 1725 });
+    expect(fileOf('cushion', (a) => a.size === '11″ heart')).toEqual({ w: 2008, h: 1725 });
     // the blanket is LANDSCAPE at Prodigi; a portrait blanket's file turns back to it
     expect(fileOf('blanket', (a) => a.size === 'medium' && a.orientation === 'portrait')).toEqual({ w: 5905, h: 3838 });
     expect(fileOf('blanket', (a) => a.size === 'medium' && a.orientation === 'landscape')).toEqual({ w: 5905, h: 3838 });

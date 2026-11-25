@@ -23,3 +23,11 @@ export function packLine(label: string, attrs: Record<string, string> | null | u
   if (!n) return null;
   return `a set of ${n} ${label}, one drawing on ${n === 2 ? 'both' : `all ${n}`}`;
 }
+
+/**
+ * The card-pack basket pill (founder, 25 Nov: "5 cards" wrapped onto two lines beside the bin): it
+ * SHOWS "×5" / "×10", matching the thumbnail's sticker, and still SAYS "5 cards" to a screen reader.
+ */
+export function packPill(count: number): { shown: string; spoken: string } {
+  return { shown: `×${count}`, spoken: `${count} card${count === 1 ? '' : 's'}` };
+}

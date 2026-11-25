@@ -70,7 +70,7 @@ test('a small drawing: the warning, the one-tap bigger→smaller fix, the editor
   const sizes = optionGroup(page, 'Size').getByRole('button');
   await expect(sizes.first()).toBeVisible({ timeout: 30_000 });
   await sizes.filter({ hasText: 'heart' }).click();
-  await expect(page.getByText(/this drawing is too small to print well at heart/)).toBeVisible();
+  await expect(page.getByText(/this drawing is too small to print well at 11″ heart/)).toBeVisible();
   await expect(page.getByRole('button', { name: /^add to basket · / })).toBeDisabled();
   const fix = page.getByRole('button', { name: /^make it .+ — prints beautifully$/ });
   await expect(fix).toBeVisible();
