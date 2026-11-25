@@ -5,6 +5,7 @@ import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
 import { economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
+import { costSampleLines } from './sample';
 
 /** What the client is allowed to send: a product key + a quantity. No prices. */
 export interface RequestedLine {
@@ -51,6 +52,9 @@ export interface Quote {
   partnerCommissionPence: number;
   /** Account credit (e.g. an earlier referral reward, or an adjustment) applied to this order. */
   creditPence: number;
+  /** A SAMPLE ORDER at cost (src/pricing/sample.ts) — only when the SERVER decided this buyer may have one
+   * (src/server/samples.ts). `deliveryPence` then carries Stripe's card fee. Absent on every normal quote. */
+  sample?: { cardFeePence: number; costExVatPence: number; noCostKeys: string[] };
 }
 
 /** A card charge can't be tiny — credit always leaves at least this much to pay. */
@@ -106,6 +110,34 @@ export interface PriceOpts {
   /** SERVER-decided: may this buyer have the free first card — a signed-in buyer's first paid order
    * (src/server/promos.ts freeCardEligible)? Fail-closed: absent ⇒ no free card. */
   freeCardEligible?: boolean;
+  /** SERVER-decided: price this basket AT COST as an admin's sample order (src/server/samples.ts). Fail-closed:
+   * absent ⇒ normal prices. No code, credit, free card or saving ever applies to a sample. */
+  sample?: boolean;
+}
+
+/** A sample order: the same accepted lines, each at what it costs us (src/pricing/sample.ts). */
+function priceSample(lines: PricedLine[], rejectedKeys: string[], gift: boolean, catalogue: PricedCatalogue): Quote {
+  const c = costSampleLines(lines, catalogue);
+  const costed: PricedLine[] = c.lines.map((l, i) => ({ productKey: l.productKey, label: lines[i]!.label, unitPricePence: l.unitPricePence, qty: l.qty, linePence: l.linePence }));
+  return {
+    lines: costed,
+    subtotalPence: c.subtotalPence,
+    deliveryPence: c.cardFeePence,
+    familySetSavingPence: 0,
+    parcelSavingPence: 0,
+    multiBuySavingPence: 0,
+    totalPence: c.totalPence,
+    gift,
+    familySetApplied: false,
+    parcelSavingApplied: false,
+    multiBuyApplied: false,
+    rejectedKeys,
+    promoSavingPence: 0,
+    promo: null,
+    partnerCommissionPence: 0,
+    creditPence: 0,
+    sample: { cardFeePence: c.cardFeePence, costExVatPence: c.costExVatPence, noCostKeys: c.noCostKeys },
+  };
 }
 
 /**
@@ -141,6 +173,8 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       linePence: unit * qty,
     });
   }
+
+  if (opts.sample === true) return priceSample(lines, rejectedKeys, gift, catalogue);
 
   const subtotalPence = lines.reduce((n, l) => n + l.linePence, 0);
   const deliveryPence = lines.length > 0 ? (opts.deliveryPence ?? DELIVERY_PENCE) : 0;
@@ -262,9 +296,9 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
  */
 export function quote(
   requested: readonly RequestedLine[],
-  opts: { gift?: boolean; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number; freeCardEligible?: boolean } = {},
+  opts: { gift?: boolean; catalogue?: PricedCatalogue; promo?: PromoRule | null; creditAvailablePence?: number; freeCardEligible?: boolean; sample?: boolean } = {},
 ): Quote {
-  return priceBasket(requested, { gift: opts.gift, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0, freeCardEligible: opts.freeCardEligible === true });
+  return priceBasket(requested, { gift: opts.gift, catalogue: opts.catalogue, promo: opts.promo ?? null, creditAvailablePence: opts.creditAvailablePence ?? 0, freeCardEligible: opts.freeCardEligible === true, sample: opts.sample === true });
 }
 
 /**

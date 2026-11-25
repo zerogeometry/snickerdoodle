@@ -9,6 +9,8 @@ import { getCatalogue, loadCatalogue } from '@/server/catalogue';
 import { normaliseBuyerEmail, resolveCheckoutPromo, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount } from '@/server/session';
+import { canOrderSamples } from '@/server/samples';
+import { sampleAskFor } from '@/server/admin/context';
 
 /**
  * The authoritative basket quote. The client sends ONLY product keys + quantities
@@ -26,6 +28,8 @@ export interface QuoteRequest {
   promoCode?: string;
   /** A guest's own email (the receipt field) — a first-order code is checked against it. */
   email?: string;
+  /** "order as a sample, at cost": only ASKS — the server decides (admin + two-step login, src/server/samples.ts). */
+  sample?: boolean;
 }
 
 /** The client's view of a quote: the partner commission is stripped (server-only). */
@@ -42,6 +46,8 @@ export type ClientQuote = Omit<Quote, 'partnerCommissionPence'> & {
   lineTiers: number[][];
   /** Up to three things that go with the basket, not in it, with their real same-parcel saving (src/server/addOns.ts). */
   addOns: AddOn[];
+  /** May this person order a sample at cost (an admin who has done two-step login)? Shows the basket's switch. */
+  sampleAvailable?: boolean;
 };
 
 export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
@@ -53,6 +59,13 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const db = getDb();
   const catalogue = await getCatalogue(db);
   const account = await getCurrentAccount();
+  // An admin's SAMPLE at cost: decided here from the database + the signed step-up cookie, never the request alone.
+  const sampleAvailable = account ? await canOrderSamples(db, await sampleAskFor({ id: account.id })) : false;
+  if (sampleAvailable && req.sample === true) {
+    const { partnerCommissionPence: _none, ...q } = quote(items, { gift: req.gift ?? false, catalogue, sample: true });
+    void _none;
+    return { ...q, lineTiers: q.lines.map(() => [0, 0, 0, 0]), addOns: [], signedIn: true, sampleAvailable: true };
+  }
   const promo = await resolveCheckoutPromo(db, req.promoCode, { accountId: account?.id ?? null, email: account?.email ?? normaliseBuyerEmail(req.email) });
   const creditAvailablePence = account ? await getCreditBalance(db, account.id) : 0;
   const opts = { gift: req.gift ?? false, catalogue, promo: promo.rule, creditAvailablePence, freeCardEligible: promo.cardEligible };
@@ -61,6 +74,6 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) || isCardPackKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
   const addOns = q.lines.length ? pickAddOns(await loadCatalogue(db), items, opts) : [];
   const signedIn = !!account;
-  const base = { ...q, lineTiers, addOns, signedIn, ...(promo.auto ? { promoAuto: true } : {}) };
+  const base = { ...q, lineTiers, addOns, signedIn, ...(promo.auto ? { promoAuto: true } : {}), ...(sampleAvailable ? { sampleAvailable: true } : {}) };
   return promo.refusal ? { ...base, promoError: promo.refusal } : base;
 }

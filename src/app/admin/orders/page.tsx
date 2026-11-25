@@ -56,7 +56,10 @@ async function Orders({ reviewer, filter, q }: { reviewer: AdminReviewer; filter
         <li key={o.ref}>
           <Link href={`/admin/orders/${o.ref}`} className="flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-honey-band/40">
             <span className="min-w-0">
-              <span className="block font-mono text-sm font-bold text-cocoa">{o.ref}</span>
+              <span className="block font-mono text-sm font-bold text-cocoa">
+                {o.ref}
+                {o.isSample ? <span className="ml-2 rounded-pill border-2 border-cobalt px-2 py-0.5 align-middle font-sans text-[11px] font-bold text-cobalt">sample · at cost</span> : null}
+              </span>
               <span className="block text-xs text-ink-soft">
                 {(o.paidAt ?? o.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/London' })} · {o.items} item{o.items === 1 ? '' : 's'}
                 {o.isGift ? ' · gift' : ''}

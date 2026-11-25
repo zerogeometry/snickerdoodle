@@ -1,4 +1,4 @@
-import { and, gte, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm';
+import { and, eq, gte, inArray, isNotNull, lte, notInArray, sql } from 'drizzle-orm';
 import { orderItems, orders, products } from '@/db/schema';
 import type { DbHandle } from './db';
 import { seasonalExpected, seasonClock } from '@/lib/season';
@@ -57,14 +57,14 @@ export function rankByPopularity(sold: Map<string, number>, expected: string[] =
   return [...expected].sort((a, b) => score(b) - score(a) || expected.indexOf(a) - expected.indexOf(b));
 }
 
-/** Units sold per product in the window (paid orders only — abandoned checkouts don't count). */
+/** Units sold per product in the window (paid orders only — abandoned checkouts and an admin's samples don't count). */
 export async function unitsSold(db: DbHandle, now = new Date()): Promise<Map<string, number>> {
   const since = new Date(now.getTime() - POPULARITY_WINDOW_DAYS * 86_400_000);
   const rows = await db
     .select({ key: orderItems.productKey, units: sql<number>`coalesce(sum(${orderItems.qty}), 0)::int` })
     .from(orderItems)
     .innerJoin(orders, sql`${orders.id} = ${orderItems.orderId}`)
-    .where(and(inArray(orders.status, [...SOLD_STATUSES]), isNotNull(orders.paidAt), gte(orders.paidAt, since), lte(orders.paidAt, now)))
+    .where(and(inArray(orders.status, [...SOLD_STATUSES]), eq(orders.isSample, false), isNotNull(orders.paidAt), gte(orders.paidAt, since), lte(orders.paidAt, now)))
     .groupBy(orderItems.productKey);
   return new Map(rows.map((r) => [r.key, Number(r.units)]));
 }

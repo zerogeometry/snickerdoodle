@@ -46,6 +46,8 @@ export default function CheckoutPage() {
   const [subject, setSubject] = useState<string | null>(null);
   // bumped to re-ask the server (e.g. a code's last use went while this page was open)
   const [quoteNonce, setQuoteNonce] = useState(0);
+  // An ADMIN's own sample at cost: this only ASKS — the server decides (admin + two-step login, src/server/samples.ts)
+  const [sample, setSample] = useState(false);
 
   const empty = items.length === 0;
   // A personalised line (a drawing on a product, a card pack, a calendar, the bundle) needs the
@@ -113,13 +115,13 @@ export default function CheckoutPage() {
       return;
     }
     // (the christmas bundle sends its drawings + extras: the server counts + prices them)
-    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(isBundleLine(i) ? { bundle: i.bundle } : {}) })), gift, promoCode, email: quoteEmail }).then((q) => {
+    quoteBasket({ items: items.map((i) => ({ productKey: i.sku ?? i.product, qty: i.qty, ...(isBundleLine(i) ? { bundle: i.bundle } : {}) })), gift, promoCode, email: quoteEmail, sample }).then((q) => {
       if (live) setQuote(q);
     });
     return () => {
       live = false;
     };
-  }, [items, gift, empty, promoCode, quoteEmail, quoteNonce]);
+  }, [items, gift, empty, promoCode, quoteEmail, quoteNonce, sample]);
 
   // What to tell the customer about their code — plain, friendly, never a dead end.
   const promoMessage = (() => {
@@ -158,6 +160,8 @@ export default function CheckoutPage() {
     return { ok: false, text: `${p.code} doesn’t apply to these items` };
   })();
 
+  // The server priced this basket at cost (it only does for an admin who asked, with two-step login done).
+  const sampleOn = !!quote?.sample;
   // Optimistic client figures until the server quote lands (then it governs).
   const subtotalPence = quote?.subtotalPence ?? basketSubtotal(items);
   const deliveryPence = quote ? quote.deliveryPence : empty ? 0 : DELIVERY_PENCE;
@@ -208,6 +212,7 @@ export default function CheckoutPage() {
         subject: liveSubject ?? undefined,
         promoCode,
         email: signedIn ? undefined : quoteEmail,
+        sample: sample && quote?.sampleAvailable === true,
       });
       if (res.needsAuth) {
         // a personalised order needs the controlling parent — keep + order after sign-up.
@@ -332,7 +337,8 @@ export default function CheckoutPage() {
         </div>
       ) : null}
       <div className="flex justify-between">
-        <dt>Delivery</dt>
+        {/* a sample at cost: the post is in each line's cost; this line is Stripe's card fee (src/pricing/sample.ts) */}
+        <dt>{sampleOn ? 'Card fee' : 'Delivery'}</dt>
         <dd>{deliveryPence === 0 ? <span className="font-semibold text-green-save">Free</span> : gbp(deliveryPence)}</dd>
       </div>
       <div className="flex justify-between border-t border-line pt-2 text-base font-extrabold text-cocoa">
@@ -498,9 +504,27 @@ export default function CheckoutPage() {
                 </Link>
               </div>
 
+              {/* Admins only (two-step login done): order this as a sample, at what it costs us. Never shown to anyone else. */}
+              {quote?.sampleAvailable ? (
+                <div className="mt-3 rounded-2xl border-2 border-cobalt bg-paper p-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-bold text-cocoa">order as a sample, at cost</span>
+                    <Toggle on={sample} onChange={setSample} label="Order as a sample, at cost" />
+                  </div>
+                  <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
+                    just for you (admin). Prodigi&apos;s price and postage, plus VAT and the card fee, so the shop breaks even. no codes, and it stays out of the sales numbers.
+                  </p>
+                  {sampleOn && quote?.sample?.noCostKeys.length ? (
+                    <p role="status" className="mt-1.5 text-[11px] font-semibold text-cinnamon">
+                      no cost on file for {quote.sample.noCostKeys.length === 1 ? 'one item' : `${quote.sample.noCostKeys.length} items`}, so {quote.sample.noCostKeys.length === 1 ? 'it’s' : 'they’re'} at the shelf price.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+
               {/* Phones: the code box + breakdown live in the flow (the sticky bar shows the total) */}
               <div className="mt-5 rounded-2xl border border-line bg-paper p-4 md:hidden">
-                {promoBox('mobile')}
+                {sampleOn ? null : promoBox('mobile')}
                 {summaryRows}
               </div>
             </div>
@@ -509,7 +533,7 @@ export default function CheckoutPage() {
             <aside className="hidden self-start md:block">
               <div className="rounded-2xl border border-line bg-white p-4">
                 <h2 className="font-display text-base font-semibold text-cocoa">Order summary</h2>
-                {promoBox('desktop')}
+                {sampleOn ? null : promoBox('desktop')}
 {summaryRows}
                 {signedIn ? null : (
                   <>

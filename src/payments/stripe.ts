@@ -44,6 +44,8 @@ export async function createCheckoutSession(args: {
   promoSavingPence: number;
   /** The code's name on the receipt, when a code was used. */
   promoLabel?: string;
+  /** What the delivery line is called (default "Delivery"): a sample order's is Stripe's card fee. */
+  deliveryLabel?: string;
   /** Where Stripe's "back" goes (an app path). Default: the basket. A gift-link order
    * returns to its gift list — a grandparent never lands in a basket they didn't fill. */
   cancelPath?: string;
@@ -67,7 +69,7 @@ export async function createCheckoutSession(args: {
   if (args.deliveryPence > 0) {
     lineItems.push({
       quantity: 1,
-      price_data: { currency: 'gbp', unit_amount: args.deliveryPence, product_data: { name: 'Delivery' } },
+      price_data: { currency: 'gbp', unit_amount: args.deliveryPence, product_data: { name: args.deliveryLabel ?? 'Delivery' } },
     });
   }
 

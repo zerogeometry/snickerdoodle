@@ -125,7 +125,7 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date(), scope?: Ne
       .select({ pence: sql<number>`coalesce(sum(${orders.partnerCommissionPence}), 0)::int`, partners: sql<number>`count(distinct coalesce(${promoCodes.partnerName}, ${promoCodes.code}))::int` })
       .from(orders)
       .innerJoin(promoCodes, eq(promoCodes.id, orders.promoCodeId))
-      .where(and(inArray(orders.status, [...PAID_STATES]), gte(orders.paidAt, lastMonth), lt(orders.paidAt, thisMonth), sql`${orders.partnerCommissionPence} > 0`));
+      .where(and(inArray(orders.status, [...PAID_STATES]), eq(orders.isSample, false), gte(orders.paidAt, lastMonth), lt(orders.paidAt, thisMonth), sql`${orders.partnerCommissionPence} > 0`));
     const month = new Date(`${lastMonthYmd}T12:00:00Z`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
     if (c && c.pence > 0) commission = { month, pence: c.pence, partners: c.partners };
   }
@@ -170,7 +170,7 @@ export interface Pulse {
   healthy: boolean;
 }
 
-/** The four numbers under the list. Totals only. */
+/** The four numbers under the list. Totals only. Sales: an admin's sample orders at cost are never counted. */
 export async function pulse(db: DbHandle, now = new Date()): Promise<Pulse> {
   const dayStart = londonMidnight(londonDay(now));
   const weekStart = londonWeekStart(now);
@@ -178,7 +178,7 @@ export async function pulse(db: DbHandle, now = new Date()): Promise<Pulse> {
     db
       .select({ n: sql<number>`count(*)::int`, pence: sql<number>`coalesce(sum(${orders.totalPence}), 0)::int` })
       .from(orders)
-      .where(and(inArray(orders.status, [...PAID_STATES]), gte(orders.paidAt, from)));
+      .where(and(inArray(orders.status, [...PAID_STATES]), eq(orders.isSample, false), gte(orders.paidAt, from)));
   const [[day], [week], [moving], status] = await Promise.all([
     paidSince(dayStart),
     paidSince(weekStart),
