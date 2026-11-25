@@ -12,7 +12,7 @@ import { assetRefOf } from '@/server/assetRef';
 import { ingestOriginalAsset } from '@/server/ingest';
 import { seedCatalogue } from '@/server/catalogue';
 import { placeOrder } from '@/server/orders';
-import { moderateAndRecord, screenPendingNow, screenStalePending, type ModerationProviders } from '@/server/moderation';
+import { MAX_RECHECKS, moderateAndRecord, recheckNeverCheckedHolds, screenPendingNow, screenStalePending, type ModerationProviders } from '@/server/moderation';
 import type { BackgroundTask } from '@/server/background';
 import { deleteObject } from '@/storage';
 import type { DbHandle } from '@/server/db';
@@ -156,4 +156,61 @@ describe.skipIf(!DB || !S3)('background screening (uploads checked after the cat
     expect(r.moderationStatus).toBe('CLEAR');
     expect((r.moderationDetail as { original?: unknown }).original).toMatchObject({ status: 'CLEAR' }); // screened, not skipped
   }, 60_000);
+
+  // Founder, 25 Nov 2026: keepsakes uploaded before screening was switched on were held as
+  // "screening-not-configured" and never looked at again — so a product made from one couldn't be
+  // ordered, while a fresh upload of the same picture passed. The job now gives them today's checks.
+  describe('holds where no check ever gave an answer get today’s checks', () => {
+    async function heldUnchecked(labels: string[], extra: Record<string, unknown> = {}) {
+      const { assetId, tasks } = await pendingUpload();
+      await tasks[0]!();
+      await db.update(assets).set({ moderationStatus: 'FLAGGED', moderationDetail: { labels, original: { status: 'FLAGGED', labels }, ...extra } }).where(eq(assets.id, assetId));
+      return assetId;
+    }
+
+    it('an old "screening-not-configured" keepsake that passes is released — the family can see it and it can be ordered', async () => {
+      const id = await heldUnchecked(['screening-not-configured']);
+      expect(await recheckNeverCheckedHolds(db, { providers: clean, assetIds: [id] })).toEqual({ rechecked: 1 });
+      const r = await row(id);
+      expect(r.moderationStatus).toBe('CLEAR');
+      expect((r.moderationDetail as { labels: string[] }).labels).toEqual([]);
+      expect((r.moderationDetail as { original: unknown }).original).toMatchObject({ status: 'CLEAR', hashCheck: 'deferred' });
+      expect(canViewAsset(assetRefOf(r), await jo()).allowed).toBe(true);
+    });
+
+    it('one the checks DO flag stays held, with the real reason (never rejected, never binned)', async () => {
+      const id = await heldUnchecked(['screening-not-configured']);
+      await recheckNeverCheckedHolds(db, { providers: nudity, assetIds: [id] });
+      const r = await row(id);
+      expect(r.moderationStatus).toBe('FLAGGED');
+      expect((r.moderationDetail as { labels: string[] }).labels).toEqual(['Exposed Male Genitalia']);
+      expect(canViewAsset(assetRefOf(r), await jo()).allowed).toBe(false);
+    });
+
+    it('a classifier that failed at the time gets another go', async () => {
+      const id = await heldUnchecked(['classifier-error']);
+      await recheckNeverCheckedHolds(db, { providers: clean, assetIds: [id] });
+      expect((await row(id)).moderationStatus).toBe('CLEAR');
+    });
+
+    it('leaves alone: a real flag, a report, a flagged Studio design, and anything already decided', async () => {
+      const realFlag = await heldUnchecked(['Explicit']);
+      const reported = await heldUnchecked(['screening-not-configured', 'reported by a family member'], { reports: [{ reason: 'not-ok', at: new Date().toISOString(), via: 'family' }] });
+      const design = await heldUnchecked(['screening-not-configured', 'Explicit'], { design: { status: 'FLAGGED', labels: ['Explicit'], sensitive: true } });
+      const { assetId: cleared, tasks } = await pendingUpload();
+      await tasks[0]!();
+      expect(await recheckNeverCheckedHolds(db, { providers: clean, assetIds: [realFlag, reported, design, cleared] })).toEqual({ rechecked: 0 });
+      for (const id of [realFlag, reported, design]) expect((await row(id)).moderationStatus).toBe('FLAGGED');
+      expect((await row(cleared)).moderationStatus).toBe('CLEAR');
+    });
+
+    it('a checker that keeps failing stops after a few tries and waits for a person', async () => {
+      const broken: ModerationProviders = { ...clean, classifier: { classify: async () => null as never } };
+      const id = await heldUnchecked(['classifier-error']);
+      for (let i = 0; i < MAX_RECHECKS + 2; i++) await recheckNeverCheckedHolds(db, { providers: broken, assetIds: [id] });
+      const r = await row(id);
+      expect(r.moderationStatus).toBe('FLAGGED');
+      expect((r.moderationDetail as { rechecks: number }).rechecks).toBe(MAX_RECHECKS);
+    });
+  });
 });

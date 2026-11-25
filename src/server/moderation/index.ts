@@ -326,6 +326,63 @@ export async function screenStalePending(
   return { screened: rows.length };
 }
 
+/**
+ * Holds where NO check ever gave an answer: uploaded before screening was switched on
+ * ("screening-not-configured" — keepsakes from before it went live), or the classifier / words
+ * reader failed at the time. Nothing ever said these pictures were a problem; they were held only
+ * because nothing could look. A held keepsake can't be ordered, so making a product from an old
+ * keepsake failed while a fresh upload of the same picture passed (founder, 25 Nov 2026).
+ */
+export const NEVER_CHECKED_LABELS: ReadonlySet<string> = new Set([SCREENING_NOT_CONFIGURED_LABEL, CLASSIFIER_ERROR_LABEL, TEXT_UNREADABLE_LABEL]);
+/** A hold the checks keep failing on stays for a person to decide after this many tries. */
+export const MAX_RECHECKS = 3;
+
+/** True when every reason it's held is "no check gave an answer" — nobody reported it, and nothing else flagged it. */
+export function isNeverCheckedHold(status: string, detail: unknown): boolean {
+  if (status !== 'FLAGGED') return false;
+  const d = (detail ?? {}) as { labels?: unknown; reports?: unknown; rechecks?: unknown };
+  if (Array.isArray(d.reports) && d.reports.length > 0) return false;
+  if (typeof d.rechecks === 'number' && d.rechecks >= MAX_RECHECKS) return false;
+  const labels = Array.isArray(d.labels) ? d.labels.map(String) : [];
+  return labels.length > 0 && labels.every((l) => NEVER_CHECKED_LABELS.has(l));
+}
+
+/**
+ * The fulfilment job's sweep, step two: put never-checked holds through TODAY's checks — the same gate
+ * a new upload gets (classifier + words, with the hash check as D25 sets it). Clean → released, exactly
+ * as a fresh upload would be. Anything the checks DO flag stays held for review with the real reason;
+ * nothing is ever rejected or binned. While it's being re-checked the keepsake is PENDING, which is
+ * just as closed: it can't be ordered or shared, and the family can't see it. Only runs once real
+ * screening is set up — otherwise it would only re-hold the same items.
+ */
+export async function recheckNeverCheckedHolds(
+  db: DbHandle,
+  opts: { limit?: number; providers?: ModerationProviders; env?: Record<string, string | undefined>; /** only these keepsakes (tests) */ assetIds?: readonly string[] } = {},
+): Promise<{ rechecked: number }> {
+  const env = opts.env ?? process.env;
+  if (!opts.providers && env.NODE_ENV === 'production' && !isModerationConfigured(env)) return { rechecked: 0 };
+  const flagged = await db
+    .select({ id: assets.id, status: assets.moderationStatus, detail: assets.moderationDetail })
+    .from(assets)
+    .where(opts.assetIds ? and(eq(assets.moderationStatus, 'FLAGGED'), inArray(assets.id, [...opts.assetIds])) : eq(assets.moderationStatus, 'FLAGGED'))
+    .limit(500);
+  const due = flagged.filter((r) => isNeverCheckedHold(r.status, r.detail)).slice(0, opts.limit ?? 20);
+  const ids: string[] = [];
+  for (const r of due) {
+    const d = (r.detail ?? {}) as { rechecks?: number };
+    const rechecks = (typeof d.rechecks === 'number' ? d.rechecks : 0) + 1;
+    // only flip a row that is STILL flagged (a reviewer may have got there first)
+    const moved = await db
+      .update(assets)
+      .set({ moderationStatus: 'PENDING', moderationDetail: { ...(r.detail as object), rechecks } })
+      .where(and(eq(assets.id, r.id), eq(assets.moderationStatus, 'FLAGGED')))
+      .returning({ id: assets.id });
+    if (moved.length) ids.push(r.id);
+  }
+  await screenPendingNow(db, ids, opts.providers, env);
+  return { rechecked: ids.length };
+}
+
 // ── Studio designs ───────────────────────────────────────────────────────────
 // A design can carry things the upload never had: pen lines, shapes, words. Anything drawn or
 // added in the Studio is screened like an upload BEFORE it can reach a print order — the same
