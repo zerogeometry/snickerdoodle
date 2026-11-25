@@ -21,6 +21,7 @@ import { placeOrderAction } from '@/app/actions/order';
 import { adoptPendingPlacement } from '@/app/actions/adopt';
 import type { ClientQuote } from '@/app/actions/quote';
 import { ChristmasPromise } from '@/ui/components/ChristmasPromise';
+import { SavedBasketEmptyHint, SavedBasketNote } from '@/ui/components/SavedBasketNote';
 import { GIFT_NOTE_MAX } from '@/lib/gift-note';
 
 
@@ -383,6 +384,7 @@ export default function CheckoutPage() {
           <Button href="/start-creating" size="lg" className="mt-6">
             see the range →
           </Button>
+          <SavedBasketEmptyHint />
         </main>
       ) : (
         <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 sm:px-6">
@@ -396,6 +398,7 @@ export default function CheckoutPage() {
                   <Icon icon={IconHeart} size={13} className="text-cinnamon" /> a keepsake for {subject}
                 </p>
               ) : null}
+              <SavedBasketNote />
               <div className="mt-3 space-y-2.5">
                 {items.map((item, idx) => {
                   const oneOff = isPackLine(item) || isBundleLine(item);

@@ -17,6 +17,7 @@ import {
   promoCodes,
   reminderSends,
   rightsRequests,
+  savedBaskets,
   savedDesigns,
   supportRequests,
 } from '@/db/schema';
@@ -92,6 +93,12 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     .select({ id: savedDesigns.id, assetId: savedDesigns.assetId, product: savedDesigns.variantSku, savedAt: savedDesigns.createdAt })
     .from(savedDesigns)
     .where(eq(savedDesigns.createdByAccountId, accountId));
+
+  // the basket remembered on their account (founder, 25 Nov 2026): what's in it, and when the reminder went
+  const [basketRow] = await db.select().from(savedBaskets).where(eq(savedBaskets.accountId, accountId));
+  const savedBasket = basketRow
+    ? { updatedAt: basketRow.updatedAt, reminderSentAt: basketRow.remindedAt, lines: (basketRow.items as Array<{ product?: unknown; sku?: unknown; qty?: unknown }>).map((l) => ({ product: l.sku ?? l.product, qty: l.qty })) }
+    : null;
 
   const orderRows = await db.select().from(orders).where(eq(orders.accountId, accountId));
   const lines = orderRows.length ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderRows.map((o) => o.id))) : [];
@@ -176,6 +183,7 @@ export async function collectAccountData(db: DbHandle, accountId: string) {
     keepsakesYouControl,
     familyCalendar,
     savedForLater: saved,
+    savedBasket,
     orders: ordersOut,
     consents,
     credits,

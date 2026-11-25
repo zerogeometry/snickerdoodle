@@ -1012,6 +1012,25 @@ export const reminderSends = pgTable(
   (t) => [uniqueIndex('reminder_once_per_occasion_nudge').on(t.accountId, t.occasionKey, t.occasionYear, t.offsetDays), index('reminder_account_idx').on(t.accountId, t.sentAt)],
 );
 
+// ── saved_baskets — a signed-in shopper's basket, remembered on their account (founder, 25 Nov 2026):
+// it follows them to another tab, another day or another device, and one kind reminder goes out if it's
+// left unpaid for a day (src/server/savedBasket.ts). ONE row per account. `items` is the basket lines as
+// the shop builds them — product keys, drawing ids and placements, never a picture. Prices in it are for
+// show only: checkout re-prices everything on the server.
+export const savedBaskets = pgTable(
+  'saved_baskets',
+  {
+    accountId: uuid('account_id')
+      .primaryKey()
+      .references(() => accounts.id, { onDelete: 'cascade' }),
+    items: jsonb('items').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    /** when the "you left something in your basket" email went (null = not yet, for this basket) */
+    remindedAt: timestamp('reminded_at', { withTimezone: true }),
+  },
+  (t) => [index('saved_basket_due_idx').on(t.remindedAt, t.updatedAt)],
+);
+
 // ── occasions — the family calendar's own dates (founder, 27 Oct): birthdays, anniversaries and
 // anything else, for someone on Snickerdoodle or not ("granny and grandad's anniversary"). Shown to
 // the family's members with the calendar switched on, at the circle it's shared with (FAMILY by

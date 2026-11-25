@@ -18,7 +18,9 @@ export type MailKind =
   | 'magic-link' | 'family-invite' | 'reminder' | 'gift-list' | 'complaint-ack' | 'rights-request' | 'family-handover' | 'email-change'
   | 'support-ack' | 'support-request' | 'content-report' | 'order-confirmed' | 'order-shipped' | 'order-ops'
   // the family's change notices + data-rights confirmations (sweep 04 — templates in ./familyNotices, ./dataRights)
-  | 'family-joined' | 'family-removed' | 'family-access-changed' | 'data-export' | 'data-deleted';
+  | 'family-joined' | 'family-removed' | 'family-access-changed' | 'data-export' | 'data-deleted'
+  // "you left something in your basket": one kind nudge a day later (./basketReminder)
+  | 'basket-reminder';
 
 export interface MailMessage {
   kind: MailKind;

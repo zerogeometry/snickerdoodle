@@ -4,12 +4,15 @@ import { requireJobsSecret } from '@/server/jobs/auth';
 import { processFulfilment } from '@/fulfillment/worker';
 import { isProdigiConfigured, releaseBlockedArtwork, submitReadyOrders, syncSubmittedOrders } from '@/fulfillment/submit';
 import { recheckNeverCheckedHolds, screenStalePending } from '@/server/moderation';
+import { runBasketReminders } from '@/server/savedBasket';
 
 /**
  * Fulfilment tick (proposal/04 §6) — ONE scheduler ping drives the whole pipeline:
  *   0. screening catch-up: any upload whose background safety check never finished (a restart
  *      mid-check) is screened now, from the stored copy (founder, 9 Nov 2026); and any hold where
  *      no check ever gave an answer gets today's checks (founder, 25 Nov 2026).
+ *   0b. the "you left something in your basket" email, a day after a signed-in shopper's basket
+ *      was left unpaid — one per basket, each claimed before it goes (founder, 25 Nov 2026).
  *   1. render: put back any line a stopped app left RENDERING, claim PENDING artwork of
  *      PAID orders, render in-VPC, run the egress gate (READY / BLOCKED_GATE /
  *      RENDER_FAILED). Overlapping ticks safe.
@@ -36,6 +39,11 @@ async function run(req: Request): Promise<Response> {
     errors.push(`recheck: ${(e as Error).message}`);
     return null;
   });
+  const basketReminders = await runBasketReminders(db).catch((e) => {
+    errors.push(`basket reminders: ${(e as Error).message}`);
+    return null;
+  });
+  if (basketReminders?.failed) errors.push(`basket reminders: ${basketReminders.failed} not sent`);
   const render = await processFulfilment(db).catch((e) => {
     errors.push(`render: ${(e as Error).message}`);
     return null;
@@ -73,7 +81,7 @@ async function run(req: Request): Promise<Response> {
       }),
     );
   }
-  return Response.json({ screening, rechecked, render, released, submit, sync, errors }, { status: errors.length > 0 ? 500 : 200 });
+  return Response.json({ screening, rechecked, basketReminders, render, released, submit, sync, errors }, { status: errors.length > 0 ? 500 : 200 });
 }
 
 /** The run, and its result recorded for the admin app's health screen (not for a caller without the secret). */

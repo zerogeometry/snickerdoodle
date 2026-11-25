@@ -15,6 +15,7 @@ import {
   profileImages,
   promoCodes,
   reminderSends,
+  savedBaskets,
   savedDesigns,
   sessions,
 } from '@/db/schema';
@@ -157,6 +158,7 @@ export async function closeAccount(
   await db.delete(appAuthCodes).where(eq(appAuthCodes.accountId, accountId));
   await db.delete(appCheckoutGrants).where(eq(appCheckoutGrants.accountId, accountId));
   await db.delete(savedDesigns).where(eq(savedDesigns.createdByAccountId, accountId));
+  await db.delete(savedBaskets).where(eq(savedBaskets.accountId, accountId));
   await db.delete(accountCredits).where(eq(accountCredits.accountId, accountId));
   await db.delete(reminderSends).where(eq(reminderSends.accountId, accountId));
   await db.delete(consentRecords).where(eq(consentRecords.accountId, accountId));
