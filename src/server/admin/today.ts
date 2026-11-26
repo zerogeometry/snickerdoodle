@@ -84,6 +84,8 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date(), scope?: Ne
     .where(
       or(
         and(eq(orders.status, 'PAID'), lt(orders.paidAt, notSentBefore)),
+        // refused by Prodigi just now (a declined card is flagged at once, not after the 2-hour limit)
+        and(eq(orders.status, 'PAID'), isNotNull(orders.submitError)),
         troubledIds.length ? and(eq(orders.status, 'PAID'), inArray(orders.id, troubledIds)) : sql`false`,
         eq(orders.status, 'FULFILLING'),
         and(eq(orders.status, 'CANCELLED'), isNotNull(orders.prodigiOrderId), gte(orders.createdAt, recent)),

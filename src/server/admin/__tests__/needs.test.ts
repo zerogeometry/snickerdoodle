@@ -36,6 +36,46 @@ describe('the needs-you list', () => {
     expect(keys(f)).toEqual(['order:SD-B:not-sent']);
   });
 
+  // ── the Prodigi card declined (founder, 26 Nov 2026: seven quiet "insufficient funds" refusals on one order) ──
+  const DECLINED = 'Prodigi createOrder failed: HTTP 500 outcome=PaymentFailed {"outcome":"PaymentFailed","message":"Your card has insufficient funds. Use a different payment method to complete this purchase."}';
+
+  it('a declined Prodigi card is ONE urgent alert, top of the list, straight away, for every order it holds up', () => {
+    const f = empty();
+    f.disputes = [{ ref: 'SD-X', disputeId: 'dp_1', status: 'needs_response', reason: null, amountPence: 1000, dueBy: null, openedAt: h(3) }];
+    f.orders = [
+      order({ ref: 'SD-C2', paidAt: h(0.2), submitError: DECLINED, totalPence: 4500 }),
+      order({ ref: 'SD-C1', paidAt: h(0.5), submitError: DECLINED, totalPence: 13866 }),
+      order({ ref: 'SD-OK', paidAt: h(0.1) }), // not refused yet: not part of it
+    ];
+    const needs = buildNeeds(f, NOW);
+    expect(needs.map((n) => n.key)).toEqual(['prodigi-card:SD-C1', 'dispute:dp_1']); // no per-order "not sent" for the held ones
+    const card = needs[0]!;
+    expect([card.kind, card.urgent, card.dismissable, card.href]).toEqual(['prodigi-card', true, false, 'https://dashboard.prodigi.com']);
+    expect(card.title).toBe('Your Prodigi card was declined');
+    expect(card.detail).toContain('2 paid orders (£183.66) can’t go to the printer');
+    expect(card.detail).toContain('Waiting: SD-C1, SD-C2.');
+    expect(card.detail).toContain('every 15 minutes');
+    // …and it's emailed once
+    expect(newUrgent(needs, new Map()).map((n) => n.key)).toContain('prodigi-card:SD-C1');
+  });
+
+  it('one held order names itself; past 2 hours it still isn’t ALSO "not sent"', () => {
+    const f = empty();
+    f.orders = [order({ ref: 'SD-C1', paidAt: h(LIMITS.notSentHours + 3), submitError: DECLINED, totalPence: 3000 })];
+    const needs = buildNeeds(f, NOW);
+    expect(needs.map((n) => n.key)).toEqual(['prodigi-card:SD-C1']);
+    expect(needs[0]!.detail).toContain('SD-C1 (£30.00) can’t go to the printer');
+  });
+
+  it('other refusals are not a card problem; an order already at Prodigi isn’t either', () => {
+    const f = empty();
+    f.orders = [
+      order({ ref: 'SD-V', paidAt: h(LIMITS.notSentHours + 1), submitError: 'Prodigi createOrder failed: HTTP 400 outcome=ValidationFailed items[0].attributes.size' }),
+      order({ ref: 'SD-F', status: 'FULFILLING', prodigiOrderId: 'ord_9', claimedAt: h(1), submitError: DECLINED }),
+    ];
+    expect(keys(f)).toEqual(['order:SD-V:not-sent']);
+  });
+
   it('a failed print file and a safety hold are their own items (not "not sent")', () => {
     const f = empty();
     f.orders = [order({ ref: 'SD-F', paidAt: h(5), troubled: [{ state: 'RENDER_FAILED', count: 2 }] }), order({ ref: 'SD-G', paidAt: h(5), troubled: [{ state: 'BLOCKED_GATE', count: 1 }] })];
