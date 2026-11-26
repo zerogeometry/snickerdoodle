@@ -1,0 +1,718 @@
+<title>Snickerdoodle Socials Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=Gaegu:wght@700&display=swap">
+<style>
+/* layout: one readable column on oat paper; steps are tickable headings, paste text sits on taped paper slips */
+:root{
+  --page:#F8F5E9; --paper:#FFFBF2; --paper-2:#F6EEDF; --line:#D9C7A9;
+  --ink:#2B2118; --ink-soft:#5A4A3A; --ink-faint:#6E5D4B;
+  --cta:#C8402A; --cta-ink:#FFFFFF; --cinnamon:#A8331F; --honey:#F6C445; --cobalt:#2F5DA8; --cobalt-ink:#FFFFFF; --leaf:#3F6E29;
+  --display:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body:"Bricolage Grotesque", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --hand:"Gaegu", "Comic Sans MS", cursive;
+  --mono:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --page:#1E1711; --paper:#2B2118; --paper-2:#34291F; --line:#4E3F31;
+  --ink:#F6EEDF; --ink-soft:#D9C7A9; --ink-faint:#BBA98F;
+  --cta:#E8786E; --cta-ink:#1E1711; --cinnamon:#F09A8C; --honey:#F6C445; --cobalt:#8FB5D6; --cobalt-ink:#1E1711; --leaf:#A9CC88; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#1E1711; --paper:#2B2118; --paper-2:#34291F; --line:#4E3F31;
+  --ink:#F6EEDF; --ink-soft:#D9C7A9; --ink-faint:#BBA98F;
+  --cta:#E8786E; --cta-ink:#1E1711; --cinnamon:#F09A8C; --honey:#F6C445; --cobalt:#8FB5D6; --cobalt-ink:#1E1711; --leaf:#A9CC88; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:400 17px/1.55 var(--body);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--page)}
+.page{max-width:46rem;margin:0 auto;padding-block:8px 96px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.masthead{padding-block:28px 8px}
+.eyebrow{font:700 22px/1 var(--hand);color:var(--cinnamon);margin:0 0 6px}
+h1{font:800 clamp(30px,8vw,46px)/1.02 var(--display);margin:0;text-wrap:balance;letter-spacing:-.01em}
+h2{font:800 clamp(24px,6vw,32px)/1.1 var(--display);margin:48px 0 12px;text-wrap:balance;scroll-margin-top:56px}
+h3{font:800 20px/1.25 var(--display);margin:36px 0 10px;text-wrap:balance;scroll-margin-top:56px}
+h4{font:600 18px/1.3 var(--display);margin:28px 0 8px;scroll-margin-top:56px}
+p,li{max-width:65ch}
+a{color:var(--cinnamon);text-underline-offset:2px;word-break:break-word}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:3px solid var(--cobalt);outline-offset:2px;border-radius:4px}
+code{font:500 .86em/1.4 var(--mono);background:var(--paper-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px;word-break:break-word}
+hr{border:0;border-top:2px dashed var(--line);margin:40px 0}
+ul,ol{padding-left:1.3em} li{margin:4px 0}
+.cont{margin-left:1.3em}
+.who{display:inline-block;font:700 13px/1 var(--body);letter-spacing:.03em;text-transform:uppercase;border-radius:999px;padding:5px 9px;vertical-align:.12em}
+.who.you{background:var(--cta);color:var(--cta-ink)}
+.who.me{background:var(--cobalt);color:var(--cobalt-ink)}
+h3.step label{display:flex;gap:12px;align-items:flex-start;cursor:pointer}
+input.tick{appearance:none;-webkit-appearance:none;flex:none;width:30px;height:30px;margin:0;border:2.5px solid var(--ink);border-radius:8px;background:var(--paper);cursor:pointer;display:grid;place-content:center;transform:rotate(-2deg)}
+input.tick::after{content:"";width:14px;height:8px;border:solid var(--cta-ink);border-width:0 0 3.5px 3.5px;transform:rotate(-45deg) translate(1px,-2px);opacity:0}
+input.tick:checked{background:var(--leaf);border-color:var(--leaf)}
+input.tick:checked::after{opacity:1}
+h3.step:has(input:checked) span{color:var(--ink-faint);text-decoration:line-through;text-decoration-thickness:2px}
+.checklist{list-style:none;padding:0}
+.checklist li{margin:0;border-bottom:1px dashed var(--line);max-width:none}
+.checklist label{display:flex;gap:12px;align-items:flex-start;padding:10px 0;min-height:44px;cursor:pointer}
+.checklist li:has(input:checked) span{color:var(--ink-faint);text-decoration:line-through}
+.paste{position:relative;background:var(--paper);border:2px solid var(--ink);border-radius:10px;margin:14px 0 18px;box-shadow:3px 3px 0 var(--line)}
+.paste::before{content:"";position:absolute;top:-9px;left:22px;width:74px;height:18px;background:var(--honey);opacity:.85;transform:rotate(-3deg);border-radius:2px}
+.paste pre{margin:0;padding:18px 88px 16px 16px;white-space:pre-wrap;word-break:break-word;font:500 15px/1.5 var(--mono);color:var(--ink)}
+.copy{position:absolute;top:8px;right:8px;min-height:44px;min-width:64px;padding:0 14px;border:2px solid var(--ink);border-radius:999px;background:var(--cta);color:var(--cta-ink);font:700 15px/1 var(--body);cursor:pointer}
+.copy:active{transform:scale(.96)}
+.tablewrap{overflow-x:auto;margin:12px 0 18px;border:1.5px solid var(--line);border-radius:10px;background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:15px;line-height:1.45}
+th,td{text-align:left;vertical-align:top;padding:9px 11px;border-bottom:1px solid var(--line);min-width:7.5em}
+th{font-weight:700;background:var(--paper-2)}
+tr:last-child td{border-bottom:0}
+.toc{background:var(--paper);border:1.5px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:24px}
+.toc ol{margin:0;padding-left:1.4em;columns:2 15rem}
+.toc li{margin:3px 0}
+.progress{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;margin:0 auto;width:max-content;max-width:calc(100% - 32px);font:700 14px/1 var(--body);background:var(--ink);color:var(--page);padding:9px 14px;border-radius:0 0 12px 12px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px;margin:16px 0 8px}
+.gallery figure{margin:0;min-width:0}
+.gallery img{display:block;width:100%;height:auto;border:1.5px solid var(--line);background:var(--paper-2)}
+.gallery .round img{border-radius:50%;aspect-ratio:1;object-fit:cover}
+.gallery .rect img{border-radius:8px}
+.gallery figcaption{font-size:13px;line-height:1.35;color:var(--ink-soft);margin-top:6px}
+.gallery figcaption code{font-size:11px}
+@media (prefers-reduced-motion:no-preference){input.tick:checked{animation:pop .25s ease-out}@keyframes pop{50%{transform:rotate(-2deg) scale(1.15)}}}
+
+</style>
+<div class="progress" aria-live="polite"><span id="done-count">0</span> of <span id="all-count">0</span> ticked</div>
+<main class="page">
+<header class="masthead"><p class="eyebrow">snickerdoodle · set-up pack</p><h1>Socials setup: Facebook and Instagram</h1></header>
+<p><em>Written Thu 26 Nov 2026, for the Christmas push. Everything was checked against Meta's own help pages and public profiles on this date. Meta changes its menus often, so if a button has moved, the linked help page has the current wording.</em></p>
+<p><strong>How to read this</strong></p>
+<ul>
+<li><strong><span class="who you">Your turn</span></strong> = something only you can do (it needs your login, your phone or your yes).</li>
+<li><strong><span class="who me">I&#x27;ll do</span></strong> = something I can do for you here if you ask. Some are already <strong>done</strong> and say so.</li>
+<li>Text in grey boxes is ready to copy and paste.</li>
+<li>The phone version with tick boxes and copy buttons is <a href="socials-setup.html">socials-setup.html</a>, also online (private to you) at <a href="https://claude.ai/artifact/2pVea8281q7kxJP9cfCp8A" target="_blank" rel="noopener">claude.ai/artifact/2pVea8281q7kxJP9cfCp8A</a>. Ticks are saved on that phone.</li>
+</ul>
+<p><strong>What you end up with:</strong> one Facebook Page and one Instagram Business account, both called <strong>@snickerdoodleuk</strong> (the same as your Pinterest), owned by a Meta business portfolio in the name of Launch Mode Ltd, with two-factor login on everything and a backup admin. Then a two-week Christmas posting plan you can run in about 2½ hours a week.</p>
+<p><strong>Time:</strong> about 90 minutes for steps 1–17 (the set-up), plus 15 minutes for the domain check once Meta gives you the code.</p>
+<nav class="toc" aria-label="sections"><p class="eyebrow">jump to</p><ol><li><a href="#if-you-only-have-an-hour-tonight">If you only have an hour tonight</a></li><li><a href="#1-the-right-structure">1. The right structure</a></li><li><a href="#2-handles">2. Handles</a></li><li><a href="#3-everything-to-type-in">3. Everything to type in</a></li><li><a href="#4-images-at-exact-sizes">4. Images at exact sizes</a></li><li><a href="#5-domain-verification-and-linking">5. Domain verification and linking</a></li><li><a href="#6-shops-and-tracking">6. Shops and tracking</a></li><li><a href="#7-safety-and-privacy-rules-for-posting">7. Safety and privacy rules for posting</a></li><li><a href="#8-your-first-two-weeks-the-christmas-push">8. Your first two weeks: the Christmas push</a></li><li><a href="#9-optional-extras">9. Optional extras</a></li><li><a href="#10-one-page-checklist">10. One-page checklist</a></li><li><a href="#sources-checked-26-nov-2026">Sources (checked 26 Nov 2026)</a></li></ol></nav><hr>
+<h2 id="if-you-only-have-an-hour-tonight">If you only have an hour tonight</h2>
+<ol>
+<li>Step 1: make the <code>social@</code> email alias (5 min).</li>
+<li>Steps 2–3: switch on two-factor login on your own Facebook (10 min).</li>
+<li>Step 4: make the Facebook Page (10 min).</li>
+<li>Step 9: make the Instagram account and grab <strong>@snickerdoodleuk</strong> (10 min). It was free when I checked today; handles go quickly.</li>
+<li>Step 10: link them (5 min). Everything else can wait for tomorrow.</li>
+</ol>
+<hr>
+<h2 id="1-the-right-structure">1. The right structure</h2>
+<p>Meta's building blocks, from the bottom up:</p>
+<div class="tablewrap"><table><thead><tr><th>Thing</th><th>What it is</th><th>Who it belongs to</th></tr></thead><tbody><tr><td><strong>Your personal Facebook profile</strong></td><td>Your normal Facebook. It's the key that opens everything else. Nobody sees it on the Page.</td><td>You, personally</td></tr><tr><td><strong>Facebook Page "Snickerdoodle"</strong></td><td>The shop's public face on Facebook</td><td>The business portfolio</td></tr><tr><td><strong>Meta business portfolio</strong> (opened in Meta Business Suite)</td><td>The folder that owns the Page, the Instagram account and, later, any ad account</td><td>Launch Mode Ltd</td></tr><tr><td><strong>Instagram professional account (Business type)</strong></td><td>The shop's Instagram</td><td>The business portfolio, linked to the Page</td></tr></tbody></table></div>
+<p>Why this order matters: if the Page and Instagram sit inside a business portfolio, losing access to one personal profile doesn't lose the business. A second admin can always get back in.</p>
+<h3 id="step-1-your-turn-make-a-login-email-alias-for-social-5-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-1-your-turn-make-a-login-email-alias-for-social-5-min" data-key="step-1-your-turn-make-a-login-email-alias-for-social-5-min"><span>Step 1 · <span class="who you">Your turn</span>: make a login email alias for social (5 min)</span></label></h3>
+<p>Make a new free alias, <strong>social@snickerdoodle.co.uk</strong>, on your Google Workspace user, the same way hello@ and support@ were made. Mail to it lands in your normal inbox.</p>
+<ul>
+<li>Use <strong>social@</strong> to log in to Instagram, as the business portfolio's business email, and for Meta's emails. Don't publish it anywhere.</li>
+<li>Use <strong>hello@</strong> as the public contact email on both profiles.</li>
+<li>Never use your personal email, or simon@launchmode, for the business accounts. A login address nobody knows is much harder to phish.</li>
+</ul>
+<p>Go to <a href="https://admin.google.com/ac/users" target="_blank" rel="noopener">Google Admin → Users</a> → click your name → <strong>User information</strong> → <strong>Alternate email addresses (email aliases)</strong> → add <code>social</code>. Help: <a href="https://support.google.com/a/answer/33327" target="_blank" rel="noopener">Add an email alias (Google)</a>.</p>
+<h3 id="step-2-your-turn-get-an-authenticator-app-on-your-phone-3-mi" class="step"><label><input type="checkbox" class="tick" id="tick-step-2-your-turn-get-an-authenticator-app-on-your-phone-3-mi" data-key="step-2-your-turn-get-an-authenticator-app-on-your-phone-3-mi"><span>Step 2 · <span class="who you">Your turn</span>: get an authenticator app on your phone (3 min)</span></label></h3>
+<p>Install <strong>Google Authenticator</strong> or <strong>Microsoft Authenticator</strong> (both free). Codes from an app are safer than text messages, because a stolen SIM can't receive them.</p>
+<h3 id="step-3-your-turn-lock-down-your-own-facebook-profile-10-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-3-your-turn-lock-down-your-own-facebook-profile-10-min" data-key="step-3-your-turn-lock-down-your-own-facebook-profile-10-min"><span>Step 3 · <span class="who you">Your turn</span>: lock down your own Facebook profile (10 min)</span></label></h3>
+<p><strong>Which profile:</strong> your own, real, personal Facebook profile. Don't make a second "Snickerdoodle" person-profile. Meta's rules allow one real profile per person, and a fake one gets disabled, taking any Page it runs with it. Your profile's name never shows on the Page. Meta's <a href="https://www.facebook.com/business/help/366099230478737" target="_blank" rel="noopener">What to know before you create a Page</a> confirms you need a profile to make one.</p>
+<p>If you don't have a personal Facebook, make one with your real name and your personal email, and keep it plain.</p>
+<p>On your profile, go to <a href="https://accountscenter.facebook.com/password_and_security" target="_blank" rel="noopener">Accounts Centre → Password and security</a>:</p>
+<ol>
+<li><strong>Two-factor authentication</strong> → choose <strong>Authentication app</strong> → scan the code with the app from step 2. Help: <a href="https://www.facebook.com/help/148233965247823" target="_blank" rel="noopener">Two-factor authentication on Facebook</a>.</li>
+<li>On the same screen, save your <strong>recovery codes</strong>. Print them, or put them in your password manager. Without them, a lost phone can mean a lost Page.</li>
+<li>Optional: add a <strong>passkey</strong> (Face ID) on the same screen. That's quicker and phishing-proof.</li>
+<li>Turn on <strong>login alerts</strong>.</li>
+<li>Check your profile's mobile number is your current one.</li>
+</ol>
+<p><strong>Keep it separate:</strong> on your personal profile, set <strong>Who can see your friends list</strong> to <em>Only me</em>, and don't list Snickerdoodle as your workplace if you'd rather keep the two apart. You'll act <strong>as the Page</strong> whenever you post or reply for the shop (see step 4).</p>
+<h3 id="step-4-your-turn-create-the-facebook-page-10-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-4-your-turn-create-the-facebook-page-10-min" data-key="step-4-your-turn-create-the-facebook-page-10-min"><span>Step 4 · <span class="who you">Your turn</span>: create the Facebook Page (10 min)</span></label></h3>
+<p>Go to <a href="https://www.facebook.com/pages/create" target="_blank" rel="noopener">facebook.com/pages/create</a>. Help: <a href="https://www.facebook.com/help/175644189234902" target="_blank" rel="noopener">Create and manage a Facebook Page</a>.</p>
+<ol>
+<li><strong>Page name:</strong> <code>Snickerdoodle</code></li>
+<li><strong>Category:</strong> type <em>gift</em> and choose <strong>Gift Shop</strong>. If it offers more, add <strong>Shopping &amp; retail</strong> and <strong>Website</strong>.</li>
+<li><strong>Bio:</strong> paste the Facebook intro from section 3.</li>
+<li>Click <strong>Create Page</strong>. Skip contact details and pictures for now; you'll add them in steps 13–15.</li>
+<li>Skip "invite friends". It's a business, and inviting your personal friends mixes the two.</li>
+</ol>
+<p><strong>Pages work like profiles now (the "new Pages experience").</strong> You switch into the Page to act as it: tap your picture (top right) → <strong>See all profiles</strong> → <strong>Snickerdoodle</strong>. When you comment on a parent group or reply to a message, check the little picture next to the box shows the Snickerdoodle face, not yours.</p>
+<p><strong>Don't use "professional mode" on your personal profile instead of a Page.</strong> That's for creators building a personal following, and it can't sit in a business portfolio. <a href="https://www.facebook.com/business/help/1034727950288693" target="_blank" rel="noopener">Meta compares profiles and Pages here</a>.</p>
+<h3 id="step-5-your-turn-create-the-meta-business-portfolio-10-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-5-your-turn-create-the-meta-business-portfolio-10-min" data-key="step-5-your-turn-create-the-meta-business-portfolio-10-min"><span>Step 5 · <span class="who you">Your turn</span>: create the Meta business portfolio (10 min)</span></label></h3>
+<p>Go to <a href="https://business.facebook.com/" target="_blank" rel="noopener">business.facebook.com</a> and log in with your Facebook profile. Help: <a href="https://www.facebook.com/business/help/1710077379203657" target="_blank" rel="noopener">Create a business portfolio</a>.</p>
+<ol>
+<li>Open the menu under <strong>Home</strong> (top left) → <strong>Create a business portfolio</strong>.</li>
+<li><strong>Business portfolio name:</strong> <code>Snickerdoodle</code> (no special characters allowed; this name is shown across Meta).</li>
+<li><strong>Your name:</strong> your real first and last name.</li>
+<li><strong>Business email:</strong> <code>social@snickerdoodle.co.uk</code>. Confirm it from the email Meta sends.</li>
+<li>Then go to <strong>Settings</strong> → <strong>Business info</strong> and fill in the legal details from section 3 (Launch Mode Ltd, the registered office, the website).</li>
+</ol>
+<p>You can only personally create two portfolios, so make just this one.</p>
+<h3 id="step-6-your-turn-put-the-page-in-the-portfolio-3-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-6-your-turn-put-the-page-in-the-portfolio-3-min" data-key="step-6-your-turn-put-the-page-in-the-portfolio-3-min"><span>Step 6 · <span class="who you">Your turn</span>: put the Page in the portfolio (3 min)</span></label></h3>
+<p>In Business Suite → <strong>Settings</strong> → <strong>Accounts</strong> → <strong>Pages</strong> → <strong>Add</strong> → <strong>Add an existing Facebook Page</strong> → choose Snickerdoodle. Help: <a href="https://www.facebook.com/business/help/720478807965744" target="_blank" rel="noopener">Add a Facebook Page to your business portfolio</a>.</p>
+<p>An asset can only belong to one portfolio. Never let a freelancer or agency "add your Page to their business"; if you ever hire help, give them <strong>partner access</strong> from your portfolio instead.</p>
+<h3 id="step-7-your-turn-require-two-factor-for-everyone-and-add-a-b" class="step"><label><input type="checkbox" class="tick" id="tick-step-7-your-turn-require-two-factor-for-everyone-and-add-a-b" data-key="step-7-your-turn-require-two-factor-for-everyone-and-add-a-b"><span>Step 7 · <span class="who you">Your turn</span>: require two-factor for everyone and add a backup admin (10 min)</span></label></h3>
+<ol>
+<li>In Business Suite → <strong>Settings</strong> → <strong>Security Centre</strong> → <strong>Two-factor authentication</strong> → <strong>Required for everyone</strong>. Help: <a href="https://www.facebook.com/business/help/216940652189296" target="_blank" rel="noopener">Security Centre</a> and <a href="https://www.facebook.com/business/help/280940009201586" target="_blank" rel="noopener">Turn on the two-factor requirement</a>.</li>
+<li><strong>Backup admin:</strong> <strong>Settings</strong> → <strong>People</strong> → <strong>Invite people</strong> → enter the email of one person you trust completely (for example your partner) → <strong>Full control</strong>. They log in with their own real Facebook profile and must switch on two-factor too. Help: <a href="https://www.facebook.com/business/help/2169003770027706" target="_blank" rel="noopener">Add people to a business portfolio</a>.</li>
+<ul>
+<li>Meta recommends at least two people with full control, so the business isn't locked out if one account is hacked or lost.</li>
+<li>If there's nobody you'd trust with it yet, keep the recovery codes from step 3 somewhere safe and come back to this.</li>
+</ul>
+<li>Give the backup admin <strong>full control of the Page</strong> too: <strong>Accounts</strong> → <strong>Pages</strong> → Snickerdoodle → <strong>Assign people</strong>.</li>
+</ol>
+<h3 id="step-8-your-turn-decide-which-instagram-this-is-1-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-8-your-turn-decide-which-instagram-this-is-1-min" data-key="step-8-your-turn-decide-which-instagram-this-is-1-min"><span>Step 8 · <span class="who you">Your turn</span>: decide which Instagram this is (1 min)</span></label></h3>
+<p>Make a <strong>brand-new</strong> Instagram for the shop. Don't convert your personal one: switching an account to professional makes it public and keeps its old posts and followers.</p>
+<p>One thing to check: <strong>@hellosnickerdoodle</strong> already exists (0 followers, following 2, no posts). If that's yours, you could rename it to @snickerdoodleuk rather than starting fresh. If it isn't, ignore it.</p>
+<h3 id="step-9-your-turn-create-the-instagram-account-and-make-it-a-" class="step"><label><input type="checkbox" class="tick" id="tick-step-9-your-turn-create-the-instagram-account-and-make-it-a-" data-key="step-9-your-turn-create-the-instagram-account-and-make-it-a-"><span>Step 9 · <span class="who you">Your turn</span>: create the Instagram account and make it a Business account (10 min)</span></label></h3>
+<ol>
+<li>On your phone, open Instagram → <strong>Create new account</strong> (from the account switcher, if you're already logged in to a personal one).</li>
+<li><strong>Email:</strong> <code>social@snickerdoodle.co.uk</code>. <strong>Username:</strong> <code>snickerdoodleuk</code>. <strong>Name:</strong> see section 3.</li>
+<li><strong>Settings and activity</strong> → <strong>Account type and tools</strong> → <strong>Switch to professional account</strong> → choose <strong>Business</strong>, not Creator. Help: <a href="https://help.instagram.com/502981923235522" target="_blank" rel="noopener">Set up a professional account</a>.</li>
+<ul>
+<li><strong>Business</strong> is Meta's choice for brands and shops. It's the type that works with Shops, the product catalogue and the Business Suite inbox, and it shows an email contact button.</li>
+<li><strong>Creator</strong> is for people building a personal following. Don't pick it.</li>
+<li>Meta's comparison: <a href="https://help.instagram.com/138925576505882" target="_blank" rel="noopener">About professional accounts</a>.</li>
+</ul>
+<li><strong>Category:</strong> <strong>Gift shop</strong> (or <em>Shopping &amp; retail</em> if that's not offered). Show the category on the profile: yes.</li>
+<li><strong>Contact options:</strong> email only (<code>hello@snickerdoodle.co.uk</code>). No phone, no address. See section 3 for why.</li>
+<li>Two-factor: <strong>Settings</strong> → <strong>Accounts Centre</strong> → <strong>Password and security</strong> → <strong>Two-factor authentication</strong> → this Instagram account → <strong>Authentication app</strong>. Save its recovery codes too. Help: <a href="https://help.instagram.com/566810106808145" target="_blank" rel="noopener">Two-factor authentication on Instagram</a>.</li>
+</ol>
+<h3 id="step-10-your-turn-link-instagram-to-the-page-and-the-portfol" class="step"><label><input type="checkbox" class="tick" id="tick-step-10-your-turn-link-instagram-to-the-page-and-the-portfol" data-key="step-10-your-turn-link-instagram-to-the-page-and-the-portfol"><span>Step 10 · <span class="who you">Your turn</span>: link Instagram to the Page and the portfolio (5 min)</span></label></h3>
+<ol>
+<li>In the Instagram app: <strong>Edit profile</strong> → <strong>Page</strong> (under <em>Public business information</em>) → <strong>Connect</strong> → log in with your Facebook → choose <strong>Snickerdoodle</strong>. Help: <a href="https://help.instagram.com/570895513091465" target="_blank" rel="noopener">Connect Instagram to a Facebook Page</a>.</li>
+<li>In Business Suite → <strong>Settings</strong> → <strong>Accounts</strong> → <strong>Instagram accounts</strong> → <strong>Add</strong> → log in as @snickerdoodleuk. The Instagram account and the Page must be in the same portfolio. Help: <a href="https://www.facebook.com/business/help/898752960195806" target="_blank" rel="noopener">Connect or disconnect Instagram and a Page</a>.</li>
+<li>Give your backup admin access to the Instagram account too (<strong>Assign people</strong>).</li>
+</ol>
+<p>Once they're linked, anyone with access to either one can manage both, so only admins you trust.</p>
+<h3 id="step-11-your-turn-privacy-settings-on-the-page-and-the-insta" class="step"><label><input type="checkbox" class="tick" id="tick-step-11-your-turn-privacy-settings-on-the-page-and-the-insta" data-key="step-11-your-turn-privacy-settings-on-the-page-and-the-insta"><span>Step 11 · <span class="who you">Your turn</span>: privacy settings on the Page and the Instagram (10 min)</span></label></h3>
+<p><strong>Facebook Page</strong> (switch into the Page → <strong>Settings and privacy</strong> → <strong>Settings</strong>):</p>
+<ul>
+<li><strong>Privacy</strong> → <strong>Page and tagging</strong> → <em>Allow others to post to your Page</em>: <strong>off</strong>. <em>Allow others to tag your Page</em>: <strong>off</strong>. Stops strangers posting photos of children on your wall.</li>
+<li><strong>Followers and public content</strong> → <em>Hide posts and comments with profanity</em>: <strong>on</strong>. Help: <a href="https://www.facebook.com/help/1017549069082358" target="_blank" rel="noopener">Profanity filter</a>.</li>
+<li>Same screen → <em>Hide comments containing certain words</em>: paste the list from section 7. Help: <a href="https://www.facebook.com/help/131671940241729" target="_blank" rel="noopener">Block words</a> and <a href="https://www.facebook.com/business/help/845417592621623" target="_blank" rel="noopener">Comment moderation</a>.</li>
+</ul>
+<p><strong>Instagram</strong> (<strong>Settings and activity</strong>):</p>
+<ul>
+<li><strong>Hidden Words</strong>: <em>Hide comments</em> on, <em>Advanced comment filtering</em> on, <em>Hide message requests</em> on, and add the custom list from section 7. Help: <a href="https://help.instagram.com/700284123459336" target="_blank" rel="noopener">Hidden Words</a>.</li>
+<li><strong>Tags and mentions</strong>: allow tags and mentions from <strong>people you follow</strong> only, and <em>Manually approve tags</em>: on.</li>
+<li><strong>Comments</strong>: allow from <strong>everyone</strong> (parents need to ask questions), with the filters above doing the work.</li>
+<li><strong>Sharing and reuse</strong>: <em>Allow remixing</em> off.</li>
+<li><strong>Messages and story replies</strong>: leave on. Meta already stops adults messaging teens who don't follow them, and teens only get messages from people they follow or are connected to.</li>
+</ul>
+<h3 id="step-12-i-ll-do-done-who-s-who-at-a-glance" class="step"><label><input type="checkbox" class="tick" id="tick-step-12-i-ll-do-done-who-s-who-at-a-glance" data-key="step-12-i-ll-do-done-who-s-who-at-a-glance"><span>Step 12 · <span class="who me">I&#x27;ll do</span> (done): who's who, at a glance</span></label></h3>
+<div class="tablewrap"><table><thead><tr><th>Account</th><th>Login</th><th>Public contact</th><th>Two-factor</th><th>Admins</th></tr></thead><tbody><tr><td>Your Facebook profile</td><td>your personal email</td><td>n/a</td><td>Authenticator app + recovery codes</td><td>you</td></tr><tr><td>Business portfolio "Snickerdoodle"</td><td>via your profile</td><td>n/a</td><td><strong>Required for everyone</strong></td><td>you + backup admin (full control)</td></tr><tr><td>Facebook Page</td><td>via the portfolio</td><td>hello@snickerdoodle.co.uk</td><td>via the profiles</td><td>you + backup admin</td></tr><tr><td>Instagram @snickerdoodleuk</td><td>social@snickerdoodle.co.uk</td><td>hello@snickerdoodle.co.uk</td><td>Authenticator app + recovery codes</td><td>you + backup admin (via portfolio)</td></tr><tr><td>Pinterest @snickerdoodleuk</td><td>(already set up)</td><td></td><td>check it's on</td><td></td></tr></tbody></table></div>
+<p><strong>Traps, in one place:</strong></p>
+<ul>
+<li>A second "Snickerdoodle" personal profile instead of a Page → disabled by Meta, Page lost with it.</li>
+<li>Professional mode on your own profile instead of a Page → your private life and the shop mixed together, and no business portfolio.</li>
+<li>Instagram <strong>Creator</strong> instead of <strong>Business</strong> → fewer shop tools later. (You can switch, but do it right first time.)</li>
+<li>Converting your personal Instagram → it goes public with your old photos.</li>
+<li>An agency or freelancer "owning" your Page → hard to get back. Partner access only.</li>
+<li>Ad account set to the wrong currency or time zone → can't be changed later. If you ever make one, pick <strong>GBP</strong> and <strong>Europe/London</strong>.</li>
+<li>Commenting as yourself when you meant to comment as the Page, or the other way round → check the little picture by the comment box.</li>
+</ul>
+<hr>
+<h2 id="2-handles">2. Handles</h2>
+<p>Checked on Thu 26 Nov 2026 by opening each public profile address (logged out).</p>
+<p><strong>Your Pinterest is <a href="https://uk.pinterest.com/snickerdoodleuk/" target="_blank" rel="noopener">@snickerdoodleuk</a></strong> (made 11 Nov, website claimed). So the best match is <strong>@snickerdoodleuk</strong> everywhere.</p>
+<div class="tablewrap"><table><thead><tr><th>Rank</th><th>Handle</th><th>Instagram</th><th>Facebook</th><th>Notes</th></tr></thead><tbody><tr><td><strong>1</strong></td><td><strong>snickerdoodleuk</strong></td><td><strong>free</strong></td><td>looks free</td><td><strong>Matches Pinterest exactly. Take this.</strong></td></tr><tr><td>2</td><td>snickerdoodle.uk</td><td>free</td><td>same as #1 on Facebook</td><td>Facebook ignores dots, so on Facebook it's the same name as #1</td></tr><tr><td>3</td><td>snickerdoodle_uk</td><td>free</td><td>not allowed</td><td>Facebook doesn't allow underscores</td></tr><tr><td>4</td><td>snickerdoodlecouk</td><td>free</td><td>looks free</td><td>Reads like the website, but clunky</td></tr><tr><td>5</td><td>snickerdoodlekeepsakes</td><td>free</td><td>not checked</td><td>Long (22 letters), but says what you do</td></tr><tr><td>✗</td><td>snickerdoodle</td><td>taken (a personal account)</td><td></td><td></td></tr><tr><td>?</td><td>hellosnickerdoodle</td><td>taken: 0 followers, no posts</td><td></td><td>Yours? See step 8</td></tr></tbody></table></div>
+<p>"Looks free" on Facebook: a logged-out visit can't tell an unused name from a private personal profile. Facebook only confirms when you type it into the Page's username box (step 13). If <strong>snickerdoodleuk</strong> is refused there, try <strong>snickerdoodlecouk</strong>. New Pages sometimes have to wait a few days before they're allowed a username, so don't worry if the box is greyed out at first.</p>
+<p>Rules: <a href="https://www.facebook.com/help/121237621291199" target="_blank" rel="noopener">Facebook Page usernames</a> (at least 5 characters; letters, numbers and dots only) · <a href="https://www.facebook.com/help/105399436216001" target="_blank" rel="noopener">Username guidelines</a>.</p>
+<hr>
+<h2 id="3-everything-to-type-in">3. Everything to type in</h2>
+<p>Everything below is lowercase on purpose, the way the site talks. Proper names keep their capitals (Snickerdoodle, UK, Family Keepsake Home). Character counts are worked out for you; an emoji can count as two on some screens, which still fits.</p>
+<h3 id="step-13-your-turn-fill-in-the-facebook-page-10-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-13-your-turn-fill-in-the-facebook-page-10-min" data-key="step-13-your-turn-fill-in-the-facebook-page-10-min"><span>Step 13 · <span class="who you">Your turn</span>: fill in the Facebook Page (10 min)</span></label></h3>
+<p>Switch into the Page → <strong>Edit details</strong> (or <strong>Settings</strong> → <strong>Page setup</strong>).</p>
+<p><strong>Page name</strong> (fixed when you made it)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>Snickerdoodle</pre></div>
+<p><strong>Username</strong> → gives facebook.com/snickerdoodleuk</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>snickerdoodleuk</pre></div>
+<p><strong>Intro / bio</strong> (99 of 101 characters)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>their drawings, made real 🎨 keepsakes &amp; gifts from kids&#x27; art, kept safe in your private family home</pre></div>
+<p><strong>Category:</strong> Gift Shop (+ Shopping &amp; retail, Website)</p>
+<p><strong>Description / About</strong> (242 characters; the field allows about 255)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>we turn children&#x27;s drawings and photos into keepsakes and gifts: baubles, cards, mugs, cushions and framed prints, made to order in the UK with free UK delivery. the rest of the pile lives in your private Family Keepsake Home. keep the magic.</pre></div>
+<p><strong>Website</strong></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>https://snickerdoodle.co.uk</pre></div>
+<p><strong>Email</strong></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>hello@snickerdoodle.co.uk</pre></div>
+<p><strong>Phone:</strong> leave blank. <strong>Address:</strong> don't add one. Tick <strong>"This business doesn't have a physical location"</strong> / <em>online only</em>, if offered.</p>
+<ul>
+<li>Why not the registered office? 124 City Road is a registered-office address, not a shop. On the Page it would show on a map and invite visits and post that never reach you. Your home address must never go on any profile.</li>
+<li>Where the legal details go instead: in the <strong>Additional information / Impressum</strong> field, if your Page has one, and in the business portfolio's <strong>Business info</strong> (step 5). UK law wants them on your website, and they're already in the site's footer.</li>
+</ul>
+<p><strong>Additional information</strong> (the legal line, from <code>src/lib/company.ts</code>)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>Snickerdoodle is a trading name of Launch Mode Ltd, registered in England &amp; Wales, company no. 16671398. Registered office: 124 City Road, London EC1V 2NX. VAT no. GB 521180434. ICO registration ZC063204. hello@snickerdoodle.co.uk</pre></div>
+<p><strong>Business portfolio → Business info</strong> (step 5)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>Legal business name: Launch Mode Ltd
+Address: 124 City Road, London, EC1V 2NX, United Kingdom
+Phone: (your business mobile, never shown publicly)
+Website: https://snickerdoodle.co.uk
+Tax ID / VAT: GB521180434</pre></div>
+<p><strong>Action button:</strong> <strong>Shop now</strong> → <code>https://snickerdoodle.co.uk/start-creating</code>. If <em>Shop now</em> isn't in the list, choose <strong>Visit website</strong> with the same link. Help: <a href="https://www.facebook.com/help/977869848936797" target="_blank" rel="noopener">Add an action button</a>. A Page can only have one button, and a shopping one beats <em>Send message</em>, which only invites more DMs.</p>
+<h3 id="step-14-your-turn-fill-in-the-instagram-profile-5-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-14-your-turn-fill-in-the-instagram-profile-5-min" data-key="step-14-your-turn-fill-in-the-instagram-profile-5-min"><span>Step 14 · <span class="who you">Your turn</span>: fill in the Instagram profile (5 min)</span></label></h3>
+<p><strong>Edit profile</strong> in the Instagram app.</p>
+<p><strong>Name</strong> (30 characters; this field is searchable, so it carries the words people look for)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>Snickerdoodle · kids art gifts</pre></div>
+<p><strong>Username</strong></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>snickerdoodleuk</pre></div>
+<p><strong>Bio</strong> (135 of 150 characters, line breaks included)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>their drawing, made real ✏️
+keepsakes &amp; gifts from your little one&#x27;s art
+made in the UK · private by default
+they&#x27;re only little once 👇</pre></div>
+<p><strong>Links</strong> (Instagram allows up to 5; the first one shows on the profile, the rest under "and 4 more")</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>https://snickerdoodle.co.uk/start-creating</pre></div>
+<div class="tablewrap"><table><thead><tr><th>#</th><th>Title (paste)</th><th>Link</th></tr></thead><tbody><tr><td>1</td><td><code>start creating</code></td><td><code>https://snickerdoodle.co.uk/start-creating</code></td></tr><tr><td>2</td><td><code>christmas delivery dates</code></td><td><code>https://snickerdoodle.co.uk/christmas/delivery-dates</code></td></tr><tr><td>3</td><td><code>free drawing app for little ones</code></td><td><code>https://snickerdoodle.co.uk/draw</code></td></tr><tr><td>4</td><td><code>pinterest</code></td><td><code>https://uk.pinterest.com/snickerdoodleuk/</code></td></tr><tr><td>5</td><td><code>our family promise</code></td><td><code>https://snickerdoodle.co.uk/trust/family-promise</code></td></tr></tbody></table></div>
+<p>The Draw link goes to your own /draw page, not straight to Google Play, so parents see the "for grown-ups" explanation and you only change one place when the iPhone version is live.</p>
+<p><strong>Contact options:</strong> email <code>hello@snickerdoodle.co.uk</code>. No phone, no address. <strong>Category label:</strong> Gift shop, shown. <strong>Facebook Page:</strong> connected (step 10). It shows a small Facebook link on the profile.</p>
+<p><strong>About the "kids art gifts" wording:</strong> it describes the products, not the audience. The account speaks to grown-ups.</p>
+<h3 id="step-15-your-turn-automatic-replies-and-the-away-message-10-" class="step"><label><input type="checkbox" class="tick" id="tick-step-15-your-turn-automatic-replies-and-the-away-message-10-" data-key="step-15-your-turn-automatic-replies-and-the-away-message-10-"><span>Step 15 · <span class="who you">Your turn</span>: automatic replies and the away message (10 min)</span></label></h3>
+<p>In Business Suite → <strong>Inbox</strong> → <strong>Automations</strong>. These work for Messenger and Instagram DMs. Help: <a href="https://www.facebook.com/business/help/395965998733706" target="_blank" rel="noopener">Automated responses</a>.</p>
+<p>The rule behind all of them: <strong>never ask a parent to send a drawing or a photo of their child in a DM.</strong> A DM goes through Meta; uploads to the site go to your private UK storage, past the safety checks. The replies say so, gently.</p>
+<p><strong>Instant reply</strong> (sent to anyone's first message)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>hello, and thanks for getting in touch! 👋 it&#x27;s Simon here. i&#x27;ll reply as soon as i can, usually within a day. one small thing: please don&#x27;t send drawings or photos of your little ones here. upload them on snickerdoodle.co.uk instead, where they stay private to your family. for orders and help, support@snickerdoodle.co.uk is quickest.</pre></div>
+<p><strong>Away message</strong> (turn on in the evenings and when you're off)</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>we&#x27;re away from the inbox right now, probably wrangling glue sticks. we&#x27;ll be back tomorrow. christmas dates are here: snickerdoodle.co.uk/christmas/delivery-dates · order questions: support@snickerdoodle.co.uk</pre></div>
+<p><strong>Frequently asked questions</strong> (up to 5 tappable questions with set answers)</p>
+<div class="tablewrap"><table><thead><tr><th>Question (paste)</th><th>Answer (paste)</th></tr></thead><tbody><tr><td><code>when's the last order for christmas?</code></td><td><code>cards by thu 10 dec, most gifts by sat 12 dec, framed prints, cushions and blankets by mon 14 dec. every date is here: snickerdoodle.co.uk/christmas/delivery-dates</code></td></tr><tr><td><code>how does it work?</code></td><td><code>snap their drawing on your phone, pick what to make, and we'll print it and post it, free UK delivery. it takes about two minutes: snickerdoodle.co.uk/start-creating</code></td></tr><tr><td><code>is my child's drawing private?</code></td><td><code>yes. drawings live in your private Family Keepsake Home, seen only by family you invite. nothing is ever public, and you can delete anything, any time. snickerdoodle.co.uk/trust/family-promise</code></td></tr><tr><td><code>where's my order?</code></td><td><code>your "on its way" email has the tracking link, and so does your orders page on snickerdoodle.co.uk. stuck? email support@snickerdoodle.co.uk with your order number and we'll sort it.</code></td></tr><tr><td><code>what's snickerdoodle draw?</code></td><td><code>our free drawing app for little ones: no ads, nothing shared without you. it's for grown-ups to set up, on Google Play now (iPhone soon): snickerdoodle.co.uk/draw</code></td></tr></tbody></table></div>
+<hr>
+<h2 id="4-images-at-exact-sizes">4. Images at exact sizes</h2>
+<p><strong><span class="who me">I&#x27;ll do</span> (done):</strong> I made the set-up pictures from your brand files. They're in <a href="socials-setup-images/"><code>reports/socials-setup-images/</code></a>, ready to upload.</p>
+<p>Where the other files live: <code>brand-assets/…</code> means <code>C:\Users\Simon\dev\brand-assets\…</code>; <code>project-office/gtm/…</code> is in your main Snickerdoodle folder, <code>C:\Users\Simon\dev\Snickerdoodle\project-office\gtm\…</code>.</p>
+<div class="tablewrap"><table><thead><tr><th>What</th><th>File to upload</th><th>Size</th><th>Where it shows</th><th>Notes</th></tr></thead><tbody><tr><td>Profile picture (both apps)</td><td><code>profile-picture-christmas-1080.png</code> until 6 Jan, then <code>profile-picture-everyday-1080.png</code></td><td>1080 × 1080</td><td>Facebook shows it at ~176–196 px, Instagram at ~110 px, <strong>cropped to a circle</strong></td><td>The face mark (Santa hat at Christmas) sits inside the circle with room to spare. Made from <code>brand-assets/logo/*/face-mark*.png</code> on oat.</td></tr><tr><td>Facebook cover</td><td><code>facebook-cover-christmas-1640x924.png</code>, then <code>facebook-cover-everyday-1640x924.png</code></td><td>1640 × 924</td><td>Computers show the middle 1640 × 624; phones show the middle 1280 × 924</td><td>Logo panel sits in the safe middle (1280 × 624) that both see. Kraft wrap tile behind, washi tape on the panel. Nothing in the bottom-left, where the profile picture overlaps on some layouts.</td></tr><tr><td>Highlight covers (Instagram)</td><td><code>highlight-*.png</code> (5 files)</td><td>1080 × 1080</td><td>A small circle (~60 px) above the grid</td><td>Each has its picture in the middle circle.</td></tr><tr><td>Feed posts</td><td>4:5</td><td>1080 × 1350</td><td>Instagram's grid previews posts at 3:4, trimming ~34 px off each side</td><td>Keep words 60 px in from the left and right edges.</td></tr><tr><td>Reels and Stories</td><td>9:16</td><td>1080 × 1920</td><td>Full screen</td><td>Keep words out of the top 250 px and the bottom 400 px (buttons and captions cover them). The grid shows the middle 1080 × 1440.</td></tr></tbody></table></div>
+<p>Meta and the sizing guides agree on these: profile pictures at least 320 × 320 (we use 1080 for sharpness), covers displayed at 820 × 312 on computers and 640 × 360 on phones (so an 820 × 462 shape, here doubled to 1640 × 924, covers both), feed 4:5, Reels 9:16. See <a href="https://buffer.com/library/social-media-image-sizes" target="_blank" rel="noopener">Buffer's 2026 size guide</a> and <a href="https://www.linearity.io/blog/instagram-size-guide/" target="_blank" rel="noopener">Instagram's 3:4 grid</a>.</p>
+<div class="gallery"><figure class="round"><img src="socials-setup-images/profile-picture-christmas-1080.png" alt="profile picture, christmas" loading="lazy"><figcaption>profile picture, christmas<br><code>profile-picture-christmas-1080.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/profile-picture-everyday-1080.png" alt="profile picture, everyday" loading="lazy"><figcaption>profile picture, everyday<br><code>profile-picture-everyday-1080.png</code></figcaption></figure><figure class="rect"><img src="socials-setup-images/facebook-cover-christmas-1640x924.png" alt="facebook cover, christmas" loading="lazy"><figcaption>facebook cover, christmas<br><code>facebook-cover-christmas-1640x924.png</code></figcaption></figure><figure class="rect"><img src="socials-setup-images/facebook-cover-everyday-1640x924.png" alt="facebook cover, everyday" loading="lazy"><figcaption>facebook cover, everyday<br><code>facebook-cover-everyday-1640x924.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/highlight-christmas-1080.png" alt="highlight: christmas" loading="lazy"><figcaption>highlight: christmas<br><code>highlight-christmas-1080.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/highlight-made-real-1080.png" alt="highlight: made real" loading="lazy"><figcaption>highlight: made real<br><code>highlight-made-real-1080.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/highlight-how-it-works-1080.png" alt="highlight: how it works" loading="lazy"><figcaption>highlight: how it works<br><code>highlight-how-it-works-1080.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/highlight-our-promise-1080.png" alt="highlight: our promise" loading="lazy"><figcaption>highlight: our promise<br><code>highlight-our-promise-1080.png</code></figcaption></figure><figure class="round"><img src="socials-setup-images/highlight-draw-app-1080.png" alt="highlight: draw app" loading="lazy"><figcaption>highlight: draw app<br><code>highlight-draw-app-1080.png</code></figcaption></figure><figure class="rect"><img src="socials-setup-images/post-02-keep-the-magic-christmas-1080x1350.png" alt="post 1, keep the magic (4:5)" loading="lazy"><figcaption>post 1, keep the magic (4:5)<br><code>post-02-keep-the-magic-christmas-1080x1350.png</code></figcaption></figure></div>
+<h3 id="step-16-your-turn-upload-the-profile-picture-and-cover-5-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-16-your-turn-upload-the-profile-picture-and-cover-5-min" data-key="step-16-your-turn-upload-the-profile-picture-and-cover-5-min"><span>Step 16 · <span class="who you">Your turn</span>: upload the profile picture and cover (5 min)</span></label></h3>
+<ul>
+<li>Facebook: switch into the Page → tap the profile circle → <strong>Upload</strong> → <code>profile-picture-christmas-1080.png</code>. Tap the cover → <strong>Upload</strong> → <code>facebook-cover-christmas-1640x924.png</code>, and drag it so the logo panel is centred.</li>
+<li>Instagram: <strong>Edit profile</strong> → <strong>Edit picture</strong> → the same profile picture.</li>
+<li>Put a reminder in your calendar for <strong>Wed 6 Jan</strong> to swap both to the everyday versions.</li>
+</ul>
+<h3 id="step-17-your-turn-the-five-highlights-after-your-first-stori" class="step"><label><input type="checkbox" class="tick" id="tick-step-17-your-turn-the-five-highlights-after-your-first-stori" data-key="step-17-your-turn-the-five-highlights-after-your-first-stori"><span>Step 17 · <span class="who you">Your turn</span>: the five highlights (after your first Stories)</span></label></h3>
+<p>Highlights are saved Stories that sit under the bio. You need at least one Story in each before you can make it.</p>
+<div class="tablewrap"><table><thead><tr><th>Highlight name (paste)</th><th>Cover file</th><th>What to save into it</th></tr></thead><tbody><tr><td><code>christmas</code></td><td><code>highlight-christmas-1080.png</code> (the crayon tree)</td><td>delivery dates, gift ideas, the countdown</td></tr><tr><td><code>made real</code></td><td><code>highlight-made-real-1080.png</code> (the penguin bauble)</td><td>product photos, unboxings (with a parent's yes)</td></tr><tr><td><code>how it works</code></td><td><code>highlight-how-it-works-1080.png</code> (the face mark, cobalt)</td><td>the 3-step screen recording, the studio</td></tr><tr><td><code>our promise</code></td><td><code>highlight-our-promise-1080.png</code> (the family drawing)</td><td>private by default, nothing shared without you, delete any time</td></tr><tr><td><code>draw app</code></td><td><code>highlight-draw-app-1080.png</code> (the Draw icon)</td><td>the Draw film, store link, "for grown-ups to set up"</td></tr></tbody></table></div>
+<p>To set a cover: press and hold the highlight → <strong>Edit highlight</strong> → <strong>Edit cover</strong> → pick the file from your camera roll.</p>
+<h3 id="which-brand-files-to-use-for-posts">Which brand files to use for posts</h3>
+<div class="tablewrap"><table><thead><tr><th>Use</th><th>File</th><th>Size</th></tr></thead><tbody><tr><td>Ready-made Christmas posts</td><td><code>brand-assets/social/christmas/snickerdoodle-01…05-*.png</code></td><td>1080 × 1350 (01, 03, 04, 05)</td></tr><tr><td>"keep the magic" post, remade at 4:5</td><td><code>reports/socials-setup-images/post-02-keep-the-magic-christmas-1080x1350.png</code></td><td>1080 × 1350 (I padded the square original so the grid doesn't cut its words)</td></tr><tr><td>Product photos at 4:5</td><td><code>reports/socials-setup-images/example-*-1080x1350.jpg</code> (card, family frame, holly cushion, pudding mug, penguin bauble, bauble frame)</td><td>1080 × 1350 (made from the site's own example photos)</td></tr><tr><td>Draw Story</td><td><code>brand-assets/social/christmas/snickerdoodle-06-snickerdoodle-draw-story-christmas-1080x1920.png</code></td><td>1080 × 1920</td></tr><tr><td>Reels</td><td><code>brand-assets/app-videos/draw-christmas-1080x1920.mp4</code> (10.5 s), <code>brand-assets/website/video/snickerdoodle-welcome-1080x1920.mp4</code> (7 s), <code>project-office/gtm/draw-video/Snickerdoodle-Draw-film-wide-voice.mp4</code> (26 s, 16:9: crop to 9:16 in Instagram's editor, or post it on Facebook as it is)</td><td></td></tr><tr><td>Christmas music for Reels</td><td><code>brand-assets/app-videos/music/music-christmas.mp3</code> (made for the brand)</td><td></td></tr></tbody></table></div>
+<p><strong>About the names on the ready-made posts</strong> ("Mia, age 5", "Leo, age 6", "Isla"): these are made-up labels on the brand's own sample drawings, the same as on the website. That's fine, as long as no caption says or hints that they're real customers. The captions below call them examples. When a real family says yes (section 7), their keepsake replaces the example.</p>
+<hr>
+<h2 id="5-domain-verification-and-linking">5. Domain verification and linking</h2>
+<h3 id="step-18-your-turn-verify-snickerdoodle-co-uk-with-meta-15-mi" class="step"><label><input type="checkbox" class="tick" id="tick-step-18-your-turn-verify-snickerdoodle-co-uk-with-meta-15-mi" data-key="step-18-your-turn-verify-snickerdoodle-co-uk-with-meta-15-mi"><span>Step 18 · <span class="who you">Your turn</span>: verify snickerdoodle.co.uk with Meta (15 min, then wait)</span></label></h3>
+<p><strong>Why:</strong> it proves to Meta that the website is yours. You'll need it before any shop, ad link or catalogue, and it stops anyone else claiming your links. Meta's help: <a href="https://www.facebook.com/business/help/321167023127050" target="_blank" rel="noopener">Verify your domain</a> · <a href="https://developers.facebook.com/documentation/sharing/domain-verification/verifying-your-domain" target="_blank" rel="noopener">Developer guide</a>.</p>
+<p><strong>Use the DNS record, not the meta tag.</strong> A DNS record is a 2-minute change in Netlify with no website deploy, and it survives any site rebuild. The meta-tag route would need a code change and a release.</p>
+<ol>
+<li>Business Suite → <strong>Settings</strong> → <strong>Brand safety</strong> → <strong>Domains</strong> → <strong>Add</strong> → type <code>snickerdoodle.co.uk</code> (no www, no https).</li>
+<li>Choose <strong>Update DNS TXT record with your domain registrar</strong>. Copy the value Meta shows. It looks like <code>facebook-domain-verification=abc123…</code>.</li>
+<li>In another tab, open <a href="https://app.netlify.com/" target="_blank" rel="noopener">Netlify</a> → <strong>Domains</strong> → <strong>snickerdoodle.co.uk</strong> → <strong>DNS records</strong> → <strong>Add new record</strong>:</li>
+</ol>
+<div class="tablewrap"><table><thead><tr><th>Field</th><th>What to enter</th></tr></thead><tbody><tr><td>Record type</td><td><code>TXT</code></td></tr><tr><td>Name</td><td>leave <strong>empty</strong> (that means the root, snickerdoodle.co.uk; Netlify sometimes shows it as <code>@</code>)</td></tr><tr><td>Value</td><td>paste the whole <code>facebook-domain-verification=…</code> line</td></tr><tr><td>TTL</td><td>leave the default</td></tr></tbody></table></div>
+<p>Leave the existing TXT records alone (Google, Resend and the SPF line). A domain can have several TXT records side by side.</p>
+<ol start="4">
+<li>Back in Meta, click <strong>Verify domain</strong>. It usually works within minutes, but can take up to 72 hours. If it says "no records found", wait an hour and try again.</li>
+<li><strong>Leave the record in Netlify for good.</strong> Meta checks it again from time to time.</li>
+</ol>
+<p><strong><span class="who me">I&#x27;ll do</span>:</strong> once you've added it, ask me and I'll check the record is live from here (a read-only DNS lookup).</p>
+<h3 id="step-19-your-turn-link-everything-together-10-min" class="step"><label><input type="checkbox" class="tick" id="tick-step-19-your-turn-link-everything-together-10-min" data-key="step-19-your-turn-link-everything-together-10-min"><span>Step 19 · <span class="who you">Your turn</span>: link everything together (10 min)</span></label></h3>
+<ul>
+<li><strong>Instagram ↔ Facebook:</strong> done in step 10.</li>
+<li><strong>Pinterest → Instagram:</strong> in Pinterest on a computer → <strong>Settings</strong> → <strong>Claimed accounts</strong> → <strong>Instagram</strong> → <strong>Claim</strong> → log in as @snickerdoodleuk. Your Instagram then shows on your Pinterest profile. Help: <a href="https://help.pinterest.com/en/article/claim-your-account" target="_blank" rel="noopener">Link your Instagram account (Pinterest)</a>.</li>
+<ul>
+<li>Pinterest will offer <strong>auto-publish</strong> (every new Instagram post becomes a Pin). See section 8 for whether to switch it on.</li>
+</ul>
+<li><strong>Instagram → Pinterest:</strong> link 4 in your bio (step 14).</li>
+<li><strong>Facebook → Instagram and Pinterest:</strong> Page → <strong>Edit details</strong> → <strong>Social links</strong> → add <code>https://www.instagram.com/snickerdoodleuk/</code> and <code>https://uk.pinterest.com/snickerdoodleuk/</code>.</li>
+<li><strong>Website in the bios:</strong> done in steps 13 and 14.</li>
+</ul>
+<h3 id="step-20-i-ll-do-when-you-say-add-facebook-and-instagram-to-t" class="step"><label><input type="checkbox" class="tick" id="tick-step-20-i-ll-do-when-you-say-add-facebook-and-instagram-to-t" data-key="step-20-i-ll-do-when-you-say-add-facebook-and-instagram-to-t"><span>Step 20 · <span class="who me">I&#x27;ll do</span> (when you say): add Facebook and Instagram to the website</span></label></h3>
+<p>A small change for a later PR, listed here and not built. The files:</p>
+<div class="tablewrap"><table><thead><tr><th>File</th><th>Change</th></tr></thead><tbody><tr><td><code>src/lib/company.ts</code></td><td>Add one <code>social</code> list (Pinterest, Instagram, Facebook addresses) next to the company details, so the footer and the structured data can't disagree.</td></tr><tr><td><code>src/app/(marketing)/layout.tsx</code></td><td>Footer: three small icon links (Pinterest, Instagram, Facebook) with labels for screen readers, 44 px tap targets, opening in a new tab with <code>rel="noopener me"</code>.</td></tr><tr><td>Icons</td><td><code>IconBrandPinterest</code>, <code>IconBrandInstagram</code>, <code>IconBrandFacebook</code> from the Tabler set the site already uses (<code>@tabler/icons-react</code>, via <code>src/ui/primitives/Icon.tsx</code>). No new icon set.</td></tr><tr><td><code>src/app/(marketing)/faq/page.tsx</code></td><td>The <code>Organization</code> JSON-LD gets <code>sameAs: [pinterest, instagram, facebook]</code>.</td></tr><tr><td><code>src/app/(marketing)/draw/page.tsx</code></td><td>Optional: the Draw <code>publisher</code> gets the same <code>sameAs</code>.</td></tr><tr><td>A test</td><td>Footer links and <code>sameAs</code> both come from <code>COMPANY.social</code>.</td></tr></tbody></table></div>
+<p><strong>Plain links only.</strong> No Instagram feed embed, no Facebook "like" box, no share buttons that load Meta's scripts: those set Meta cookies before anyone says yes, and they'd break the site's "no tracking" cookie promise.</p>
+<hr>
+<h2 id="6-shops-and-tracking">6. Shops and tracking</h2>
+<h3 id="facebook-and-instagram-shops-not-now-look-again-in-january">Facebook and Instagram Shops: not now; look again in January</h3>
+<p><strong>What a Shop is today in the UK:</strong> a product catalogue on your Page and Instagram, where tapping a product sends the buyer to <strong>your website</strong> to pay. Paying inside Facebook or Instagram is US-only, and Meta has been closing it down even there since September 2025. Sources: <a href="https://www.facebook.com/business/help/2343035149322466" target="_blank" rel="noopener">About Shops</a> · <a href="https://www.facebook.com/business/help/1627591223954487" target="_blank" rel="noopener">Commerce eligibility</a> · <a href="https://developers.facebook.com/documentation/ads-commerce/commerce-platform/setup-checkout-url" target="_blank" rel="noopener">Checkout URL guide</a>.</p>
+<p><strong>Why wait:</strong></p>
+<ul>
+<li><strong>Eligibility:</strong> Meta wants an "authentic, established presence, which may include a sufficient follower base", a verified domain and an approval review. A Page and Instagram opened this week will probably be turned down or held up until after Christmas.</li>
+<li><strong>Little gain:</strong> UK buyers end up on your site either way. A link in the bio and link stickers on Stories do the same job for free, today.</li>
+<li><strong>Your products are personal:</strong> every item needs the buyer's own drawing, so "tap to buy" from a catalogue photo still means "go to the site and upload". The catalogue photos would only ever be examples.</li>
+</ul>
+<p><strong>Good news for later:</strong> the Google feed you already have, <code>https://snickerdoodle.co.uk/feeds/google-merchant.xml</code>, is an RSS XML feed in Google's format. Meta's catalogues accept RSS XML and Google Merchant feeds, and can fetch them on a schedule (<a href="https://www.facebook.com/business/help/1275400645914358" target="_blank" rel="noopener">Create a catalogue</a>). So a Shop needs <strong>no new code</strong>:</p>
+<ol>
+<li>Domain verified (step 18).</li>
+<li><a href="https://business.facebook.com/commerce/" target="_blank" rel="noopener">Commerce Manager</a> → <strong>Add catalogue</strong> → <strong>E-commerce</strong> → <strong>Data feed</strong> → <strong>Scheduled feed</strong> → paste the feed address → daily.</li>
+<li><strong>Create a shop</strong> → checkout method <strong>On your website</strong>.</li>
+</ol>
+<p><strong>Decision:</strong> revisit in mid-January, once the accounts have a few hundred followers.</p>
+<h3 id="meta-pixel-and-conversions-api-not-now-and-not-before-christ">Meta Pixel and Conversions API: not now, and not before Christmas</h3>
+<p><strong>Recommendation: don't add them.</strong> Use the free alternative below.</p>
+<p><strong>Why not:</strong></p>
+<ul>
+<li><strong>Consent first.</strong> UK law (the ICO's rules on cookies, pixels and tags) says an advertising tag can't run until someone says yes, and saying no must be as easy. The <strong>Conversions API</strong> (sending sales to Meta from the server) needs that consent too; doing it server-side doesn't get round it. Your banner today offers <em>accept all</em> / <em>essential only</em>, and the cookies page promises that both set the same cookies, with no analytics and nothing used for advertising. A pixel would make that promise untrue.</li>
+<li><strong>No payoff at your budget.</strong> The ads report (<code>reports/Christmas digital ads 2026.md</code>, PR #82) found that Meta ads cost 5–10 times more per family reached than parent newsletters. A pixel only pays off when you spend enough for Meta to learn from it: around 50 sales a week through ads.</li>
+<li><strong>Children's data.</strong> Your site is full of pages a pixel must never touch (the studio, the keepsake home, gift links, Draw). Getting that boundary right needs care, not a pre-Christmas rush.</li>
+</ul>
+<p><strong>What it would take, if you ever want it</strong> (for the record, a 2027 job):</p>
+<ol>
+<li>A new <strong>marketing</strong> choice in the cookie banner, separate from analytics, off by default, with an equal <em>no</em> button.</li>
+<li>Update the cookies page, the Privacy Notice and the DPIA to name Meta as a recipient, and accept Meta's Business Tools Terms.</li>
+<li>Load the pixel only after a yes, using Meta's consent switch (<code>fbq('consent','revoke')</code> until the yes, then <code>grant</code>) (<a href="https://developers.facebook.com/documentation/meta-pixel/implementation/gdpr" target="_blank" rel="noopener">Meta's guide</a>). Withdrawing has to switch it off again.</li>
+<li>Fire it <strong>only</strong> on shop pages and the order-complete page. Never on the studio, the keepsake home, gift links, family pages, /draw, the companion app or anything a child might use.</li>
+<li>Send Meta only the order value and currency. <strong>Never</strong> a product image, a drawing, a child's name, personalised text or a basket of personal items. For the Conversions API: a hashed email only with marketing consent, never anything else about the order.</li>
+<li>No "custom audiences" from your customer list, no lookalikes, no retargeting of families who uploaded drawings.</li>
+</ol>
+<p><strong>What to do instead (free, today):</strong> make a campaign code and use it in your social links, the same way the leaflet uses DRAWIT. The <code>partners</code> report then shows which sales came from social, with no tracking at all.</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>node --env-file=.env scripts/promo-codes.mjs create HELLO10 --percent 10 --partner &quot;socials&quot; --type CAMPAIGN</pre></div>
+<p>Then share <code>https://snickerdoodle.co.uk/start-creating?code=HELLO10</code> in posts and Stories ("10% off your first keepsake, just for saying hello"). Pick another code name if you like; 10% is margin-safe on every item per <code>briefs/DISCOUNTS.md</code>. <strong><span class="who me">I&#x27;ll do</span>:</strong> I can run that command for you once you say yes.</p>
+<hr>
+<h2 id="7-safety-and-privacy-rules-for-posting">7. Safety and privacy rules for posting</h2>
+<p>Print this bit. It's the part that protects the brand.</p>
+<h3 id="the-five-rules">The five rules</h3>
+<ol>
+<li><strong>Never post a customer's child, their drawing or their name without the parent's clear written yes.</strong> That means an email or a DM reply that says yes to the exact picture and the exact words. Keep it (star the email, or screenshot the DM into a "permissions" album). If they later say "please take it down", remove it the same day, everywhere, and reply to confirm.</li>
+<li><strong>No surnames, ever.</strong> First name and age only, and only if the parent wants them. The default is no name at all: "drawn by a little one, age 5".</li>
+<li><strong>No faces, schools or places.</strong> No children's faces, no school jumpers or logos, no street names, no house numbers on the drawing, no photos that show where a family lives. Hands and art only, the same rule as the creator brief.</li>
+<li><strong>No drawings in DMs.</strong> If someone sends you a photo of their child or their child's art, thank them and point them to the site's upload, where it stays private. Don't save it.</li>
+<li><strong>Never message a child.</strong> If an account looks like a child (talking about Draw, school, "my mum"), reply once with the saved reply below, then stop. Don't follow children back. Don't follow customers' personal accounts.</li>
+</ol>
+<p><strong>Asking a parent (paste)</strong></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>we love this so much! would you be happy for us to share a photo of the {keepsake} on snickerdoodle&#x27;s instagram and facebook? we&#x27;d only show the keepsake and the drawing: no faces, no surname, nothing about where you live. we can say &quot;drawn by {first name}, age {age}&quot;, or no name at all if you&#x27;d prefer. totally fine to say no, and you can ask us to take it down any time. just reply &quot;yes, happy for you to share&quot; if that&#x27;s ok. thank you! Simon x</pre></div>
+<p><strong>Saved reply for a child (paste)</strong></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>hi! 😊 this account is for grown-ups, so please ask a grown-up to get in touch with us at hello@snickerdoodle.co.uk. happy drawing! 🎨</pre></div>
+<h3 id="hidden-words-paste-into-both-apps">Hidden words (paste into both apps)</h3>
+<p>On Instagram: <strong>Settings</strong> → <strong>Hidden Words</strong> → <strong>Manage custom words and phrases</strong>. On Facebook: Page <strong>Settings</strong> → <strong>Followers and public content</strong> → <strong>Hide comments containing certain words</strong>. Facebook takes up to 1,000 words and hides spelling variations automatically (<a href="https://www.facebook.com/help/131671940241729" target="_blank" rel="noopener">help</a>); Instagram also hides them from message requests (<a href="https://help.instagram.com/700284123459336" target="_blank" rel="noopener">help</a>).</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>dm me, dm for, message me, inbox me, whatsapp, telegram, snapchat, snap me, kik, wickr, send pics, send a pic, more pics, private pics, how old, what school, which school, where do you live, your daughter, your son, cute girl, cute boy, sugar daddy, cash app, cashapp, paypal me, crypto, bitcoin, forex, investment, promote your page, collab dm, feature page, free followers, buy followers</pre></div>
+<p>Hidden comments aren't deleted: you can still read them (and unhide a genuine one) in each app's hidden comments view, so check it once a week. Both apps' built-in filters (<em>Hide comments</em>, <em>Advanced comment filtering</em>, the profanity filter) stay on too.</p>
+<p><strong><span class="who me">I&#x27;ll do</span>:</strong> if you want the site's own swear-word list (the D28 list in <code>src/server/textSafety.ts</code>) added as well, ask and I'll give it to you as one line ready to paste.</p>
+<h3 id="meta-s-rules-that-help-you">Meta's rules that help you</h3>
+<ul>
+<li><strong>Under-13s aren't allowed</strong> on Facebook or Instagram (13 is the UK minimum). If you're fairly sure an account is a child under 13, report it: <a href="https://help.instagram.com/517920941588885" target="_blank" rel="noopener">Instagram</a> · <a href="https://www.facebook.com/help/157793540954833" target="_blank" rel="noopener">Facebook</a>. Don't engage or ask their age.</li>
+<li><strong>Teen accounts</strong> (13–17) are private by default, adults can't message teens who don't follow them, and teens only get messages from people they follow or are connected to (<a href="https://about.fb.com/news/2024/01/introducing-stricter-message-settings-for-teens-on-instagram-and-facebook/" target="_blank" rel="noopener">Meta, Jan 2024</a>). You never need to message one.</li>
+<li><strong>Ads can't be targeted at teens</strong> by anything except age and location (<a href="https://searchengineland.com/meta-introduces-new-ad-targeting-limits-for-teens-391259" target="_blank" rel="noopener">Meta's 2023 change</a>). You won't target them at all.</li>
+</ul>
+<h3 id="ads-rules-for-snickerdoodle-for-any-boost-ever">Ads rules for Snickerdoodle (for any boost, ever)</h3>
+<ul>
+<li><strong>Age 25–65+</strong> (never below 18). <strong>Location: United Kingdom.</strong> Set these yourself; Meta's automatic audience can't go below the age you set.</li>
+<li><strong>No "parents of toddlers / early school age" targeting.</strong> It's a grey area under your own rule (no profiling of or about children), and the ads report left it as your decision, not in the plan. The default here is <strong>off</strong>.</li>
+<li><strong>No custom audiences from customer emails, no lookalikes, no retargeting</strong> of site visitors.</li>
+<li><strong>Snickerdoodle Draw is a kids' app: advertise it only to parents.</strong> Adults 25+, wording for grown-ups ("a calm, ad-free drawing app for your little one"), linking to snickerdoodle.co.uk/draw.</li>
+<ul>
+<li>Never "ask your mum or dad to download": the UK ad code bans telling children to pester their parents (<a href="https://www.asa.org.uk/type/non_broadcast/code_section/05.html" target="_blank" rel="noopener">CAP Code section 5</a>).</li>
+<li>Don't use Meta's <strong>app install</strong> campaigns: they need Meta's tracking kit inside the app, and a Kids-category app shouldn't contain one (<a href="https://developer.apple.com/app-store/review/guidelines/#kids" target="_blank" rel="noopener">Apple's guideline 1.3</a>). Draw rightly has none.</li>
+</ul>
+<li>Every ad follows <a href="https://transparency.meta.com/policies/ad-standards/" target="_blank" rel="noopener">Meta's Advertising Standards</a>.</li>
+</ul>
+<hr>
+<h2 id="8-your-first-two-weeks-the-christmas-push">8. Your first two weeks: the Christmas push</h2>
+<p><strong>Last order dates</strong> (from the site's own table, <code>src/lib/season.ts</code>, still marked provisional):</p>
+<ul>
+<li><strong>cards and card packs:</strong> Thu 10 Dec;</li>
+<li><strong>calendars and wrapping paper:</strong> Fri 11 Dec;</li>
+<li><strong>baubles, mugs, tees, socks, the Christmas table and most gifts:</strong> Sat 12 Dec;</li>
+<li><strong>framed prints, multi frames, cushions and blankets:</strong> Mon 14 Dec;</li>
+<li>the full list: <a href="https://snickerdoodle.co.uk/christmas/delivery-dates" target="_blank" rel="noopener">snickerdoodle.co.uk/christmas/delivery-dates</a>.</li>
+</ul>
+<p>The captions say "most gifts by sat 12 dec" and point to that page, so they stay true even if a date moves.</p>
+<h3 id="the-cadence-about-2-hours-a-week">The cadence (about 2½ hours a week)</h3>
+<div class="tablewrap"><table><thead><tr><th>What</th><th>How often</th><th>Time</th></tr></thead><tbody><tr><td>Feed post (Instagram + Facebook together)</td><td>4 a week</td><td>8pm, after bedtime. Instagram does best Mon–Thu 5–9pm in the UK; Facebook Tue–Thu 3–9pm (<a href="https://sproutsocial.com/insights/best-times-to-post-on-social-media-uk/" target="_blank" rel="noopener">Sprout Social UK, 2026</a>)</td></tr><tr><td>Reel</td><td>1–2 a week</td><td>8pm, or 12:30 at weekends</td></tr><tr><td>Stories</td><td>most days, 2–3 frames</td><td>whenever: morning coffee, school run</td></tr><tr><td>Replying to comments and DMs</td><td>10 minutes, twice a day</td><td></td></tr><tr><td>Batching</td><td><strong>one hour on Sunday evening</strong></td><td>write and schedule the week in Business Suite</td></tr></tbody></table></div>
+<p><strong>Schedule for free in Meta Business Suite</strong>, the <a href="https://business.facebook.com/latest/content_calendar" target="_blank" rel="noopener">Planner</a> on a computer, or <strong>Posts &amp; stories → Schedule</strong> in the <a href="https://www.facebook.com/business/help/609176706604372" target="_blank" rel="noopener">Business Suite app</a>. One post goes to both Facebook and Instagram, and you can schedule Reels and Stories too. Help: <a href="https://www.facebook.com/business/help/1170295510042639" target="_blank" rel="noopener">Using the calendar</a>. Check the time zone is London (it uses the Page's). You don't need Later, Buffer or any paid tool.</p>
+<h3 id="cross-posting-from-pinterest">Cross-posting from Pinterest</h3>
+<p>There's no button that sends Pins to Instagram. The workable routine:</p>
+<ol>
+<li>Make the picture once at 1080 × 1350.</li>
+<li>Post it to Instagram and Facebook from Business Suite.</li>
+<li>Pin the same picture to Pinterest with a link straight to the product page, the gift-guide words in the title, and a board like "gifts from kids' drawings".</li>
+</ol>
+<p><strong>Pinterest's Instagram auto-publish</strong> (step 19): turning it on makes every Instagram post into a Pin automatically (<a href="https://help.pinterest.com/en/business/article/import-content-to-pinterest" target="_blank" rel="noopener">how it works</a>), but those Pins link to Instagram, not your shop. <strong>Leave it off</strong> and pin by hand with shop links. That's two minutes a post, and it's what makes Pinterest sell.</p>
+<h3 id="the-9-launch-grid-posts">The 9 launch-grid posts</h3>
+<p>Post 1–3 on the same evening, so the profile isn't empty when people arrive. Instagram shows the newest at the top left, so post them in this order. Every caption ends with the link line; Instagram captions can't hold live links, so they say "link in bio", while Facebook gets the real link.</p>
+<p><strong>Hashtags:</strong> keep to 3–5 small UK "shop small" tags (#shopsmalluk #shopindie #madeintheuk #christmasgiftsuk). Don't use the big kids'-art tags. They're full of children's photos, which isn't company you want, and they bring in the wrong followers.</p>
+<h4 id="post-1-sun-29-nov-8pm-keep-the-magic">Post 1 · Sun 29 Nov, 8pm · "keep the magic"</h4>
+<p>Image: <code>reports/socials-setup-images/post-02-keep-the-magic-christmas-1080x1350.png</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>hello! we&#x27;re snickerdoodle 👋
+
+we turn the drawings that cover your fridge into keepsakes you&#x27;ll keep for good: baubles, cards, mugs, cushions, framed prints and more, made to order in the UK.
+
+the wobbly lines, the purple sun, the cat with six legs: we frame the wonky bits in gold. they&#x27;re only little once.
+
+and the rest of the pile? it lives in your private family keepsake home, seen only by the family you invite. nothing is ever public.
+
+this christmas, keep the magic ✨
+👉 start creating: link in bio
+
+#shopsmalluk #christmasgiftsuk #madeintheuk</pre></div>
+<h4 id="post-2-sun-29-nov-8pm-how-it-works-carousel-of-3">Post 2 · Sun 29 Nov, 8pm · how it works (carousel of 3)</h4>
+<p>Images: three screenshots on your phone of snickerdoodle.co.uk, using one of the site's sample drawings (never a real child's): (1) the start-creating snap screen, (2) the studio with the drawing on a bauble, (3) the finished product page. Crop each to 4:5.</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>how it works, in about two minutes ⏱️
+
+1. snap their drawing on your phone
+2. pick what to make: a bauble, a card, a cushion, a mug…
+3. we print it and post it, with free UK delivery
+
+no account needed to have a go. and if you do keep their drawings with us, they stay private to your family, always.
+
+👉 try it with any drawing on the fridge: link in bio
+
+#shopsmalluk #christmasgiftsuk</pre></div>
+<h4 id="post-3-sun-29-nov-8pm-drawing-of-the-week-framed-print">Post 3 · Sun 29 Nov, 8pm · drawing of the week (framed print)</h4>
+<p>Image: <code>brand-assets/social/christmas/snickerdoodle-01-drawing-of-the-week-christmas-1080x1350.png</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>&quot;all of us, at christmas&quot; 🎄
+
+one of our example drawings, framed the way a masterpiece should be: every wonky arm and smiling sun, kept exactly as it was drawn.
+
+framed prints are made in the UK: order by mon 14 dec for christmas.
+
+👉 frame yours: link in bio
+
+#shopsmalluk #christmasgiftsuk #madeintheuk</pre></div>
+<h4 id="post-4-tue-1-dec-8pm-the-bauble">Post 4 · Tue 1 Dec, 8pm · the bauble</h4>
+<p>Image: <code>brand-assets/social/christmas/snickerdoodle-05-christmas-bauble-1080x1350.png</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>on the tree, every christmas from now on 🎄
+
+a bauble with this year&#x27;s drawing on it, so you can unpack &quot;the year they drew a snowman&quot; every december. (this one&#x27;s an example. yours will be theirs.)
+
+ceramic, double-sided, made in the UK, free UK delivery.
+order by sat 12 dec for christmas.
+
+👉 make a bauble: link in bio
+
+#christmasgiftsuk #shopsmalluk</pre></div>
+<h4 id="post-5-thu-3-dec-8pm-from-the-fridge-door-to-under-the-tree">Post 5 · Thu 3 Dec, 8pm · from the fridge door to under the tree</h4>
+<p>Image: <code>brand-assets/social/christmas/snickerdoodle-04-made-real-cushion-christmas-1080x1350.png</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>from the fridge door to under the tree ❤️
+
+the drawing they made you, made real: a cushion grandma will hug for years. (an example here; yours will be the real thing.)
+
+cushions and blankets: order by mon 14 dec.
+every christmas date: snickerdoodle.co.uk/christmas/delivery-dates
+
+👉 gift it this christmas: link in bio
+
+#christmasgiftsuk #giftsforgrandparents #shopsmalluk</pre></div>
+<h4 id="post-6-sat-5-dec-10am-hello-from-me-small-business-saturday">Post 6 · Sat 5 Dec, 10am · hello from me (Small Business Saturday)</h4>
+<p>Image: <strong>your turn:</strong> a photo of your hands holding a drawing, or your own fridge door. No children's faces, no names, nothing that shows where you live. If you'd rather not, use <code>reports/socials-setup-images/example-framefamily-1080x1350.jpg</code>.</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>it&#x27;s small business saturday, so hello from the human behind snickerdoodle 👋
+
+i&#x27;m simon. i run snickerdoodle on my own, and it started with a fridge door that couldn&#x27;t hold one more drawing, and a recycling bin i couldn&#x27;t bring myself to use.
+
+so i built a way to keep the lot: the best ones made into keepsakes, and every one of them safe in a private family home that nobody else can see. no ads, nothing shared without you.
+
+if you buy something small this weekend, thank you. it means the world. ✨
+
+👉 snickerdoodle.co.uk
+
+#smallbusinesssaturday #shopsmalluk #madeintheuk</pre></div>
+<h4 id="post-7-sun-6-dec-8pm-then-and-now">Post 7 · Sun 6 Dec, 8pm · then and now</h4>
+<p>Image: <code>brand-assets/social/christmas/snickerdoodle-03-then-and-now-christmas-1080x1350.png</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>same little hand, two christmases on ✏️
+
+a giraffe with mostly legs at three. the whole family holding hands at five. (two of our example drawings.)
+
+keep one a year and you end up with something no shop could ever sell you. they&#x27;re only little once.
+
+👉 start their keepsake box: link in bio
+
+#shopsmalluk #christmasgiftsuk</pre></div>
+<h4 id="post-8-tue-8-dec-8pm-cards-close-thursday">Post 8 · Tue 8 Dec, 8pm · cards close thursday</h4>
+<p>Image: <code>reports/socials-setup-images/example-christmascard-1080x1350.jpg</code></p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>the christmas card they drew themselves 💌
+
+turn their drawing into this year&#x27;s family christmas card: one for grandad, or a pack for everyone.
+
+⏰ cards close this thursday, 10 dec.
+
+👉 make your cards: link in bio
+
+#christmascards #shopsmalluk #christmasgiftsuk</pre></div>
+<h4 id="post-9-fri-11-dec-8pm-last-orders-carousel">Post 9 · Fri 11 Dec, 8pm · last orders (carousel)</h4>
+<p>Images: (1) a phone screenshot of <a href="https://snickerdoodle.co.uk/christmas/delivery-dates" target="_blank" rel="noopener">the delivery-dates page</a>, then <code>example-penguinbauble</code>, <code>example-puddingmug</code>, <code>example-hollycushion</code> and <code>example-framefamily</code> (all in <code>reports/socials-setup-images/</code>).</p>
+<div class="paste"><button type="button" class="copy">copy</button><pre>last orders for christmas 🎁
+
+🎄 baubles, mugs, tees and most gifts: tomorrow, sat 12 dec
+🖼️ framed prints, cushions and blankets: mon 14 dec
+📅 calendars and wrapping paper: today, fri 11 dec
+
+every date is on snickerdoodle.co.uk/christmas/delivery-dates
+
+there&#x27;s still time to turn this year&#x27;s drawing into a present they&#x27;ll be proud to give. 💛
+
+👉 link in bio
+
+#christmasgiftsuk #lastminutegifts #shopsmalluk</pre></div>
+<p><strong>For Facebook:</strong> use the same captions, but swap "link in bio" for the real link: <code>https://snickerdoodle.co.uk/start-creating</code> (or <code>?code=HELLO10</code> if you made the code in section 6).</p>
+<h3 id="three-reels">Three Reels</h3>
+<p><strong>Reel 1 · Wed 2 Dec · "draw something for christmas" (Snickerdoodle Draw, for parents)</strong></p>
+<ul>
+<li>Video: <code>brand-assets/app-videos/draw-christmas-1080x1920.mp4</code> (10.5 s, already 9:16). Music: its own Christmas track.</li>
+<li>Cover: frame from the end with the snowman; text on the cover "a calm christmas drawing app".</li>
+<li>Caption:</li>
+</ul>
+<div class="paste"><button type="button" class="copy">copy</button><pre>looking for something calm for the christmas holidays? 🎄
+
+snickerdoodle draw is our free drawing app for little ones: easy lessons, no ads, nothing shared without you. a grown-up sets it up, and their best drawings can become real keepsakes.
+
+on google play now, iphone coming soon.
+👉 link in bio (free drawing app)
+
+#screentimetips #christmasholidays</pre></div>
+<p><strong>Reel 2 · Fri 4 Dec · "watch a drawing become a bauble" (the studio)</strong></p>
+<ul>
+<li><strong><span class="who you">Your turn</span>:</strong> on your phone, start a screen recording, go to snickerdoodle.co.uk/start-creating, choose one of the site's sample drawings (the robin or the snowman), put it on a bauble in the studio, and stop on the product preview. About 15 seconds; trim the start in Instagram's editor.</li>
+<li>Text on screen: "the drawing" (0–3 s) · "two taps" (3–8 s) · "made real" (8–15 s). Keep the words in the middle of the screen.</li>
+<li>Music: <code>brand-assets/app-videos/music/music-christmas.mp3</code>.</li>
+<li>Caption:</li>
+</ul>
+<div class="paste"><button type="button" class="copy">copy</button><pre>from the fridge to the tree in about fifteen seconds 🎄
+
+snap their drawing, pick a bauble, done. we print it in the UK and post it free.
+
+order by sat 12 dec for christmas.
+👉 link in bio</pre></div>
+<p><strong>Reel 3 · Wed 9 Dec · "the wonky bits, framed in gold" (product montage)</strong></p>
+<ul>
+<li>In Instagram's Reel editor: add six photos, <code>example-*-1080x1350.jpg</code> from <code>reports/socials-setup-images/</code> plus the post 01, 04 and 05 images, 1.2 seconds each, on the beat. Or start from <code>brand-assets/website/video/snickerdoodle-welcome-1080x1920.mp4</code> (7 s) and add the photos after it.</li>
+<li>Text on the first frame: "the wonky bits, framed in gold".</li>
+<li>Caption:</li>
+</ul>
+<div class="paste"><button type="button" class="copy">copy</button><pre>the wonky bits, framed in gold ✨
+
+six example drawings, six keepsakes: a card, a mug, a bauble, a cushion, a framed print and a frame full of bauble drawings. every line kept exactly as it was drawn.
+
+they&#x27;re only little once.
+👉 link in bio</pre></div>
+<h3 id="stories-most-days-2-3-frames-5-minutes">Stories, most days (2–3 frames, 5 minutes)</h3>
+<div class="tablewrap"><table><thead><tr><th>Day</th><th>Story idea</th><th>Sticker</th></tr></thead><tbody><tr><td>Mon 30 Nov</td><td>"fridge or forever?" with a sample drawing</td><td><strong>poll</strong></td></tr><tr><td>Tue 1 Dec</td><td>the bauble post, shared to Stories</td><td><strong>link</strong> → /start-creating</td></tr><tr><td>Wed 2 Dec</td><td>"how many drawings came home this term?"</td><td><strong>slider</strong></td></tr><tr><td>Thu 3 Dec</td><td>the delivery-dates page screenshot</td><td><strong>countdown</strong> to Sat 12 Dec</td></tr><tr><td>Sat 5 Dec</td><td>your hello post</td><td><strong>link</strong></td></tr><tr><td>Mon 7 Dec</td><td>"what would you make: bauble, mug or cushion?"</td><td><strong>quiz</strong></td></tr><tr><td>Wed 9 Dec</td><td>"cards close tomorrow"</td><td><strong>countdown</strong> to Thu 10 Dec</td></tr><tr><td>Thu 10 Dec</td><td>"last day for cards!"</td><td><strong>link</strong></td></tr><tr><td>Sat 12 Dec</td><td>"last day for most gifts. frames, cushions &amp; blankets till mon"</td><td><strong>link</strong></td></tr></tbody></table></div>
+<p>Save the good ones into the five highlights.</p>
+<h3 id="facebook-groups">Facebook groups</h3>
+<p>Posting in parent and grandparent Facebook groups is the biggest free win, and it's already planned in the ads report (move 3, <code>reports/Christmas digital ads 2026.md</code>). Now you have a Page, check whether each group lets Pages post. Some prefer a real person, so follow each group's rules.</p>
+<hr>
+<h2 id="9-optional-extras">9. Optional extras</h2>
+<h3 id="meta-verified-now-meta-one-skip-it-for-now">Meta Verified (now "Meta One"): skip it for now</h3>
+<p>In September 2026 Meta rolled Meta Verified into a new subscription called <strong>Meta One</strong>, with business plans priced per profile (<a href="https://business.meta.com/news/introducing-meta-one-plans-for-businesses/" target="_blank" rel="noopener">Meta's announcement</a>, <a href="https://www.jonloomer.com/meta-one-business-plans/" target="_blank" rel="noopener">plan breakdown</a>).</p>
+<div class="tablewrap"><table><thead><tr><th>Plan</th><th>US price</th><th>UK price seen</th><th>What you get</th></tr></thead><tbody><tr><td>Essential</td><td>$14.99/mo</td><td><strong>£9.99/mo</strong></td><td>verified badge, impersonation protection</td></tr><tr><td>Advanced</td><td>$49.99/mo</td><td><strong>£33.99/mo</strong></td><td>+ scheduling extras, links in posts, deeper insights</td></tr><tr><td>Expert / Max</td><td>$149 / $499</td><td>£100 / £339</td><td>+ human support, team scale</td></tr></tbody></table></div>
+<p>The UK prices were seen on one UK sign-up screen on 7 Oct 2026 (<a href="https://www.sokada.co.uk/blog/what-is-the-meta-one-subscription/" target="_blank" rel="noopener">Sokada</a>), and other sources say the business plans haven't fully reached the UK yet. They're priced per profile, so Facebook + Instagram on Essential would be about <strong>£20 a month</strong>.</p>
+<p><strong>Recommendation: no.</strong> A blue tick doesn't sell keepsakes, and Business Suite already schedules for free. Look again if someone starts impersonating you; to sign up, start from the Facebook or Instagram app to see the real UK price.</p>
+<h3 id="boost-a-post-or-use-ads-manager-mostly-neither-this-christma">Boost a post, or use Ads Manager? Mostly neither, this Christmas</h3>
+<p>The full working is in <code>reports/Christmas digital ads 2026.md</code> (PR #82). In short:</p>
+<ul>
+<li><strong>Meta reach costs about £20–£50 per 1,000 parents</strong>, 5–10× the parent newsletters (Picniq, Happity) and the free Facebook groups. It's a <strong>backup only</strong>, if both newsletters say no.</li>
+<li><strong>If you do try it:</strong> <strong>boost</strong> your best-performing post (the one with the most saves and shares) rather than building a campaign. It's simpler and fine at this size.</li>
+<ul>
+<li>Budget <strong>£5 a day for 4 days, Wed 2 – Sat 5 Dec</strong>: <strong>£20 in all</strong>, after the Black Friday price spike.</li>
+<li>Audience: <strong>UK, age 25–65+, no detailed targeting</strong> (section 7 rules).</li>
+<li>Button: <strong>Shop now</strong> → <code>https://snickerdoodle.co.uk/start-creating?code=HELLO10</code>, so the sales show in your partners report.</li>
+</ul>
+<li>Boosting needs an ad account and a card in Business Suite. Set the ad account to <strong>GBP</strong> and <strong>Europe/London</strong> when it's made, because those can't be changed later.</li>
+</ul>
+<hr>
+<h2 id="10-one-page-checklist">10. One-page checklist</h2>
+<p>Tick in order. Every line links to the exact place.</p>
+<p><strong>Tonight (about 1 hour)</strong></p>
+<ul class="checklist">
+<li class="check"><label><input type="checkbox" class="tick" id="list-1-make-the-social-snickerdoodle-co-uk-alias-google-admin-use" data-key="list-1-make-the-social-snickerdoodle-co-uk-alias-google-admin-use"><span>1. Make the <code>social@snickerdoodle.co.uk</code> alias → <a href="https://admin.google.com/ac/users" target="_blank" rel="noopener">Google Admin → Users</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-2-install-an-authenticator-app-google-or-microsoft-authentic" data-key="list-2-install-an-authenticator-app-google-or-microsoft-authentic"><span>2. Install an authenticator app (Google or Microsoft Authenticator)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-3-two-factor-recovery-codes-on-your-own-facebook-accounts-ce" data-key="list-3-two-factor-recovery-codes-on-your-own-facebook-accounts-ce"><span>3. Two-factor + recovery codes on your own Facebook → <a href="https://accountscenter.facebook.com/password_and_security" target="_blank" rel="noopener">Accounts Centre: password and security</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-4-create-the-page-snickerdoodle-category-gift-shop-facebook-" data-key="list-4-create-the-page-snickerdoodle-category-gift-shop-facebook-"><span>4. Create the Page "Snickerdoodle", category Gift Shop → <a href="https://www.facebook.com/pages/create" target="_blank" rel="noopener">facebook.com/pages/create</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-9-create-instagram-snickerdoodleuk-with-social-switch-to-bus" data-key="list-9-create-instagram-snickerdoodleuk-with-social-switch-to-bus"><span>9. Create Instagram <strong>@snickerdoodleuk</strong> with social@, switch to <strong>Business</strong> → Instagram app</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-10-connect-instagram-to-the-page-instagram-app-edit-profile-" data-key="list-10-connect-instagram-to-the-page-instagram-app-edit-profile-"><span>10. Connect Instagram to the Page → Instagram app → Edit profile → Page</span></label></li>
+</ul>
+<p><strong>Tomorrow (about 1 hour)</strong></p>
+<ul class="checklist">
+<li class="check"><label><input type="checkbox" class="tick" id="list-5-create-the-business-portfolio-snickerdoodle-business-faceb" data-key="list-5-create-the-business-portfolio-snickerdoodle-business-faceb"><span>5. Create the business portfolio "Snickerdoodle" → <a href="https://business.facebook.com/" target="_blank" rel="noopener">business.facebook.com</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-6-add-the-page-to-the-portfolio-business-settings-https-busi" data-key="list-6-add-the-page-to-the-portfolio-business-settings-https-busi"><span>6. Add the Page to the portfolio → <a href="https://business.facebook.com/settings/" target="_blank" rel="noopener">Business settings</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-10b-add-the-instagram-account-to-the-portfolio-business-sett" data-key="list-10b-add-the-instagram-account-to-the-portfolio-business-sett"><span>10b. Add the Instagram account to the portfolio → <a href="https://business.facebook.com/settings/" target="_blank" rel="noopener">Business settings</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-7-require-two-factor-for-everyone-invite-a-backup-admin-busi" data-key="list-7-require-two-factor-for-everyone-invite-a-backup-admin-busi"><span>7. Require two-factor for everyone, invite a backup admin → <a href="https://business.facebook.com/settings/" target="_blank" rel="noopener">Business settings → Security Centre</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-11-page-and-instagram-privacy-settings-hidden-words-lists-in" data-key="list-11-page-and-instagram-privacy-settings-hidden-words-lists-in"><span>11. Page and Instagram privacy settings + hidden words (lists in section 7)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-13-page-details-username-intro-about-website-email-legal-lin" data-key="list-13-page-details-username-intro-about-website-email-legal-lin"><span>13. Page details: username, intro, about, website, email, legal line, <strong>Shop now</strong> button</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-14-instagram-name-bio-5-links-email-contact" data-key="list-14-instagram-name-bio-5-links-email-contact"><span>14. Instagram name, bio, 5 links, email contact</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-15-instant-reply-away-message-5-faqs-business-suite-inbox-ht" data-key="list-15-instant-reply-away-message-5-faqs-business-suite-inbox-ht"><span>15. Instant reply, away message, 5 FAQs → <a href="https://business.facebook.com/latest/inbox/" target="_blank" rel="noopener">Business Suite inbox</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-16-profile-pictures-facebook-cover-files-in-reports-socials-" data-key="list-16-profile-pictures-facebook-cover-files-in-reports-socials-"><span>16. Profile pictures + Facebook cover (files in <code>reports/socials-setup-images/</code>)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-18-add-snickerdoodle-co-uk-in-meta-business-settings-brand-s" data-key="list-18-add-snickerdoodle-co-uk-in-meta-business-settings-brand-s"><span>18. Add <code>snickerdoodle.co.uk</code> in Meta → <a href="https://business.facebook.com/settings/" target="_blank" rel="noopener">Business settings → Brand safety → Domains</a>, then the TXT record → <a href="https://app.netlify.com/" target="_blank" rel="noopener">Netlify</a> → Verify</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-19-claim-instagram-on-pinterest-pinterest-settings-https-uk-" data-key="list-19-claim-instagram-on-pinterest-pinterest-settings-https-uk-"><span>19. Claim Instagram on Pinterest → <a href="https://uk.pinterest.com/settings/" target="_blank" rel="noopener">Pinterest settings</a>; add social links on the Page</span></label></li>
+</ul>
+<p><strong>Sunday 29 Nov (about 1 hour)</strong></p>
+<ul class="checklist">
+<li class="check"><label><input type="checkbox" class="tick" id="list-post-1-2-and-3-captions-in-section-8" data-key="list-post-1-2-and-3-captions-in-section-8"><span>Post 1, 2 and 3 (captions in section 8)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-schedule-posts-4-9-and-reels-1-3-business-suite-planner-http" data-key="list-schedule-posts-4-9-and-reels-1-3-business-suite-planner-http"><span>Schedule posts 4–9 and Reels 1–3 → <a href="https://business.facebook.com/latest/content_calendar" target="_blank" rel="noopener">Business Suite Planner</a></span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-first-story-with-a-poll-make-the-five-highlights-step-17" data-key="list-first-story-with-a-poll-make-the-five-highlights-step-17"><span>First Story with a poll; make the five highlights (step 17)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-optional-say-yes-to-the-hello10-code-and-i-ll-create-it" data-key="list-optional-say-yes-to-the-hello10-code-and-i-ll-create-it"><span>Optional: say yes to the HELLO10 code and I'll create it</span></label></li>
+</ul>
+<p><strong>Later</strong></p>
+<ul class="checklist">
+<li class="check"><label><input type="checkbox" class="tick" id="list-ask-me-to-check-the-domain-txt-record-is-live" data-key="list-ask-me-to-check-the-domain-txt-record-is-live"><span>Ask me to check the domain TXT record is live</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-ask-me-to-add-facebook-instagram-to-the-site-footer-and-same" data-key="list-ask-me-to-add-facebook-instagram-to-the-site-footer-and-same"><span>Ask me to add Facebook + Instagram to the site footer and <code>sameAs</code> (step 20)</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-wed-6-jan-swap-to-the-everyday-profile-picture-and-cover" data-key="list-wed-6-jan-swap-to-the-everyday-profile-picture-and-cover"><span>Wed 6 Jan: swap to the everyday profile picture and cover</span></label></li>
+<li class="check"><label><input type="checkbox" class="tick" id="list-mid-january-look-again-at-a-facebook-instagram-shop-using-th" data-key="list-mid-january-look-again-at-a-facebook-instagram-shop-using-th"><span>Mid-January: look again at a Facebook/Instagram Shop using the Google feed (section 6)</span></label></li>
+</ul>
+<hr>
+<h2 id="sources-checked-26-nov-2026">Sources (checked 26 Nov 2026)</h2>
+<p><strong>Meta: Pages, portfolios and Instagram</strong></p>
+<ul>
+<li><a href="https://www.facebook.com/help/175644189234902" target="_blank" rel="noopener">Create and manage a Facebook Page</a> · <a href="https://www.facebook.com/business/help/366099230478737" target="_blank" rel="noopener">What to know before you create a Page</a> · <a href="https://www.facebook.com/business/help/1034727950288693" target="_blank" rel="noopener">Types of profiles and Pages</a></li>
+<li><a href="https://www.facebook.com/help/519912414718764" target="_blank" rel="noopener">Guidelines for Page names</a> · <a href="https://www.facebook.com/help/121237621291199" target="_blank" rel="noopener">Create a Page username</a> · <a href="https://www.facebook.com/help/105399436216001" target="_blank" rel="noopener">Username guidelines</a></li>
+<li><a href="https://www.facebook.com/business/help/1710077379203657" target="_blank" rel="noopener">Create a business portfolio</a> · <a href="https://www.facebook.com/business/help/486932075688253" target="_blank" rel="noopener">About business portfolios</a> · <a href="https://www.facebook.com/business/help/720478807965744" target="_blank" rel="noopener">Add a Page to your portfolio</a> · <a href="https://www.facebook.com/business/help/2169003770027706" target="_blank" rel="noopener">Add people</a></li>
+<li><a href="https://www.facebook.com/business/help/216940652189296" target="_blank" rel="noopener">Security Centre</a> · <a href="https://www.facebook.com/business/help/280940009201586" target="_blank" rel="noopener">Require two-factor</a> · <a href="https://www.facebook.com/help/148233965247823" target="_blank" rel="noopener">Facebook two-factor</a> · <a href="https://help.instagram.com/566810106808145" target="_blank" rel="noopener">Instagram two-factor</a></li>
+<li><a href="https://help.instagram.com/138925576505882" target="_blank" rel="noopener">Professional accounts on Instagram</a> · <a href="https://help.instagram.com/502981923235522" target="_blank" rel="noopener">Set up a professional account</a> · <a href="https://help.instagram.com/570895513091465" target="_blank" rel="noopener">Connect Instagram and a Page</a> · <a href="https://www.facebook.com/business/help/898752960195806" target="_blank" rel="noopener">Connect via Business Suite</a></li>
+<li><a href="https://www.facebook.com/help/977869848936797" target="_blank" rel="noopener">Action buttons</a> · <a href="https://www.facebook.com/business/help/395965998733706" target="_blank" rel="noopener">Automated responses</a> · <a href="https://www.facebook.com/business/help/1170295510042639" target="_blank" rel="noopener">Business Suite calendar</a> · <a href="https://www.facebook.com/business/help/609176706604372" target="_blank" rel="noopener">Scheduling in the app</a></li>
+<li><a href="https://www.facebook.com/help/1017549069082358" target="_blank" rel="noopener">Profanity filter</a> · <a href="https://www.facebook.com/help/131671940241729" target="_blank" rel="noopener">Block words on a Page</a> · <a href="https://www.facebook.com/business/help/845417592621623" target="_blank" rel="noopener">Comment moderation</a> · <a href="https://help.instagram.com/700284123459336" target="_blank" rel="noopener">Instagram Hidden Words</a></li>
+</ul>
+<p><strong>Domain, shops and tracking</strong></p>
+<ul>
+<li><a href="https://www.facebook.com/business/help/321167023127050" target="_blank" rel="noopener">Verify your domain</a> · <a href="https://developers.facebook.com/documentation/sharing/domain-verification/verifying-your-domain" target="_blank" rel="noopener">Domain verification (developers)</a></li>
+<li><a href="https://www.facebook.com/business/help/2343035149322466" target="_blank" rel="noopener">About Shops</a> · <a href="https://www.facebook.com/business/help/1627591223954487" target="_blank" rel="noopener">Commerce eligibility</a> · <a href="https://developers.facebook.com/documentation/ads-commerce/commerce-platform/setup-checkout-url" target="_blank" rel="noopener">Checkout URL</a> · <a href="https://www.facebook.com/business/help/1275400645914358" target="_blank" rel="noopener">Create a catalogue</a></li>
+<li><a href="https://developers.facebook.com/documentation/meta-pixel/implementation/gdpr" target="_blank" rel="noopener">Meta Pixel and GDPR consent</a> · <a href="https://ico.org.uk/for-organisations/direct-marketing-and-privacy-and-electronic-communications/guidance-on-the-use-of-storage-and-access-technologies/" target="_blank" rel="noopener">ICO: storage and access technologies</a></li>
+</ul>
+<p><strong>Children, safety and ads</strong></p>
+<ul>
+<li><a href="https://help.instagram.com/517920941588885" target="_blank" rel="noopener">Report an under-13 on Instagram</a> · <a href="https://www.facebook.com/help/157793540954833" target="_blank" rel="noopener">on Facebook</a></li>
+<li><a href="https://about.fb.com/news/2024/01/introducing-stricter-message-settings-for-teens-on-instagram-and-facebook/" target="_blank" rel="noopener">Stricter teen message settings (Meta, 2024)</a> · <a href="https://searchengineland.com/meta-introduces-new-ad-targeting-limits-for-teens-391259" target="_blank" rel="noopener">Teen ad targeting limited to age and location</a></li>
+<li><a href="https://transparency.meta.com/policies/ad-standards/" target="_blank" rel="noopener">Meta Advertising Standards</a> · <a href="https://www.asa.org.uk/type/non_broadcast/code_section/05.html" target="_blank" rel="noopener">CAP Code section 5: children</a> · <a href="https://developer.apple.com/app-store/review/guidelines/#kids" target="_blank" rel="noopener">Apple App Review guideline 1.3 (Kids)</a></li>
+</ul>
+<p><strong>Pinterest, sizes, timing, subscriptions</strong></p>
+<ul>
+<li><a href="https://help.pinterest.com/en/article/claim-your-account" target="_blank" rel="noopener">Link Instagram to Pinterest</a> · <a href="https://help.pinterest.com/en/business/article/import-content-to-pinterest" target="_blank" rel="noopener">Import content (auto-publish)</a></li>
+<li><a href="https://buffer.com/library/social-media-image-sizes" target="_blank" rel="noopener">Buffer: social image sizes 2026</a> · <a href="https://www.linearity.io/blog/instagram-size-guide/" target="_blank" rel="noopener">Linearity: Instagram 3:4 grid</a> · <a href="https://sproutsocial.com/insights/best-times-to-post-on-social-media-uk/" target="_blank" rel="noopener">Sprout Social: best UK times 2026</a></li>
+<li><a href="https://business.meta.com/news/introducing-meta-one-plans-for-businesses/" target="_blank" rel="noopener">Meta One for businesses</a> · <a href="https://www.jonloomer.com/meta-one-business-plans/" target="_blank" rel="noopener">Jon Loomer: Meta One tiers</a> · <a href="https://www.sokada.co.uk/blog/what-is-the-meta-one-subscription/" target="_blank" rel="noopener">Sokada: UK prices seen</a> · <a href="https://www.meta.com/help/subscriptions/1118238814392042/" target="_blank" rel="noopener">Switching from Meta Verified</a></li>
+</ul>
+<p><strong>In this repo</strong></p>
+<ul>
+<li><code>src/lib/company.ts</code> (legal details) · <code>src/lib/season.ts</code> (Christmas dates) · <code>src/app/feeds/google-merchant.xml/route.ts</code> (the product feed) · <code>src/ui/components/CookieBanner.tsx</code> and <code>/trust/cookies</code> (consent) · <code>reports/Christmas digital ads 2026.md</code> and <code>reports/Online parent communities 2026.md</code> (open PRs #82 and #83)</li>
+</ul>
+</main>
+<script>
+(function(){
+  var KEY='sd-socials-ticks';
+  var saved={};
+  try{saved=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){saved={};}
+  var ticks=[].slice.call(document.querySelectorAll('input.tick'));
+  function count(){
+    var n=ticks.filter(function(t){return t.checked;}).length;
+    document.getElementById('done-count').textContent=n;
+    document.getElementById('all-count').textContent=ticks.length;
+  }
+  ticks.forEach(function(t){
+    if(saved[t.dataset.key]) t.checked=true;
+    t.addEventListener('change',function(){
+      saved[t.dataset.key]=t.checked;
+      try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){}
+      count();
+    });
+  });
+  count();
+  document.querySelectorAll('.copy').forEach(function(b){
+    b.addEventListener('click',function(){
+      var pre=b.parentNode.querySelector('pre');
+      var reset=function(){setTimeout(function(){b.textContent='copy';},1600);};
+      var done=function(){b.textContent='copied';reset();};
+      var fallback=function(){
+        var r=document.createRange();r.selectNodeContents(pre);
+        var s=window.getSelection();s.removeAllRanges();s.addRange(r);
+        b.textContent='selected';reset();
+      };
+      try{navigator.clipboard.writeText(pre.textContent).then(done,fallback);}catch(e){fallback();}
+    });
+  });
+})();
+
+</script>
