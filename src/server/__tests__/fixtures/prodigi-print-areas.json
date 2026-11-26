@@ -36,7 +36,8 @@
   "GLOBAL-ANKLE-SOCKS": {
    "printAreas": ["front"],
    "variants": [
-    {"attributes":{"color":"white","gender":"Men's","size":"one size"},"printAreaSizes":{"front":{"w":3543,"h":3543}}}
+    {"attributes":{"color":"white","gender":"Unisex","size":"l"},"printAreaSizes":{"front":{"w":3543,"h":3543}}},
+    {"attributes":{"color":"white","gender":"Unisex","size":"m"},"printAreaSizes":{"front":{"w":3543,"h":3543}}}
    ]
   },
   "GLOBAL-BB-RS-4411": {
