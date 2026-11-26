@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, ilike, inArray, isNull, or, sql, type SQL } from 'drizzle-orm';
-import { accounts, auditRecords, orderItemArtwork, orderItems, orders, products, promoCodes } from '@/db/schema';
+import { accounts, auditRecords, orderItemArtwork, orderItems, orders, productVariantProviders, products, promoCodes } from '@/db/schema';
 import type { Reviewer } from '@/authz';
 import type { DbHandle } from '../db';
 import { assertAdmin } from './today';
@@ -197,6 +197,12 @@ export async function retryOrder(db: DbHandle, reviewer: Reviewer, ref: string):
   const [o] = await db.select({ id: orders.id }).from(orders).where(and(eq(orders.ref, ref), eq(orders.status, 'PAID'), isNull(orders.prodigiOrderId)));
   if (!o) return false;
   const itemIds = (await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, o.id))).map((r) => r.id);
+  // A print-lab setting the order was saved WITHOUT (e.g. a sock size Prodigi started requiring), now in the shop's
+  // own settings for the SAME variant: fill it in (founder, 26 Nov 2026), so "try again" sends what Prodigi needs.
+  // Only ever ADDS a missing setting — never changes one, nor the product, variant, drawing or price.
+  const added = await fillMissingProviderSettings(db, o.id);
+  if (added.length)
+    await db.insert(auditRecords).values({ actorAccountId: reviewer.accountId, actorType: 'ADMIN', event: 'ADMIN_ORDER_RETRIED', targetType: 'order', targetId: ref, metadata: { filledIn: added } });
   if (itemIds.length)
     await db
       .update(orderItemArtwork)
@@ -204,6 +210,35 @@ export async function retryOrder(db: DbHandle, reviewer: Reviewer, ref: string):
       .where(and(inArray(orderItemArtwork.orderItemId, itemIds), inArray(orderItemArtwork.status, ['RENDER_FAILED', 'ERROR'])));
   await db.update(orders).set({ nextSubmitAttemptAt: new Date() }).where(eq(orders.id, o.id));
   return true;
+}
+
+/** Pure: the settings in `live` that `frozen` lacks (never one it already has, whatever its value). */
+export function missingSettings(frozen: Record<string, string> | null | undefined, live: Record<string, string> | null | undefined): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(live ?? {})) if (typeof v === 'string' && !(frozen && k in frozen)) out[k] = v;
+  return out;
+}
+
+async function fillMissingProviderSettings(db: DbHandle, orderId: string): Promise<Array<{ line: string; added: Record<string, string> }>> {
+  const items = await db.select({ id: orderItems.id, variantId: orderItems.variantId, spec: orderItems.spec }).from(orderItems).where(eq(orderItems.orderId, orderId));
+  const variantIds = [...new Set(items.map((i) => i.variantId).filter((v): v is string => !!v))];
+  if (!variantIds.length) return [];
+  const live = await db
+    .select({ variantId: productVariantProviders.variantId, config: productVariantProviders.providerConfig })
+    .from(productVariantProviders)
+    .where(and(inArray(productVariantProviders.variantId, variantIds), eq(productVariantProviders.provider, 'PRODIGI'), eq(productVariantProviders.active, true)));
+  const liveAttrs = new Map(live.map((l) => [l.variantId, ((l.config ?? {}) as { prodigiAttrs?: Record<string, string> }).prodigiAttrs ?? {}]));
+  const out: Array<{ line: string; added: Record<string, string> }> = [];
+  for (const it of items) {
+    if (!it.spec || !it.variantId) continue;
+    const cfg = ((it.spec.providerConfig ?? {}) as { prodigiAttrs?: Record<string, string> } & Record<string, unknown>);
+    const add = missingSettings(cfg.prodigiAttrs, liveAttrs.get(it.variantId));
+    if (!Object.keys(add).length) continue;
+    const spec = { ...it.spec, providerConfig: { ...cfg, prodigiAttrs: { ...(cfg.prodigiAttrs ?? {}), ...add } } };
+    await db.update(orderItems).set({ spec }).where(eq(orderItems.id, it.id));
+    out.push({ line: it.spec.sku, added: add });
+  }
+  return out;
 }
 
 export const stripePaymentUrl = (pi: string) => `https://dashboard.stripe.com/payments/${encodeURIComponent(pi)}`;

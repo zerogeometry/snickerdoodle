@@ -9,7 +9,7 @@ import { cleanupDemoFamilies, seedDemoFamilies, type SeededIds } from '@/db/seed
 import { seedCatalogue } from '@/server/catalogue';
 import { handleStripeEvent } from '@/payments';
 import { AuthzError, type Reviewer } from '@/authz';
-import { listOrders, orderDetail, retryOrder, revealContact } from '@/server/admin/orders';
+import { listOrders, missingSettings, orderDetail, retryOrder, revealContact } from '@/server/admin/orders';
 import { inbox, revealRights, setRightsStatus } from '@/server/admin/inbox';
 import { healthView, recordStatus } from '@/server/admin/health';
 import { gatherNeedFacts, markHandled, needsYou, pulse } from '@/server/admin/today';
@@ -167,6 +167,29 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
     expect(after!.nextSubmitAttemptAt!.getTime()).toBeLessThanOrEqual(Date.now());
     await placeOrder('ATP2', { status: 'FULFILLING', prodigiOrderId: `ord_${tag}_2` });
     expect(await retryOrder(db, admin, ref('ATP2'))).toBe(false);
+  });
+
+  it('"try again" fills in a print-lab setting the order was saved without — and changes nothing else (founder, 26 Nov 2026)', async () => {
+    // the ankle socks were sold before Prodigi required a size; the shop's settings now carry it (size: l)
+    const [socks] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, 'socks'));
+    const o = await placeOrder('SOCKS', { submitError: 'Prodigi createOrder failed: HTTP 400 outcome=ValidationFailed', nextSubmitAttemptAt: new Date(Date.now() + 7 * 86_400_000) });
+    const frozen = { sku: 'socks', attributes: { size: 'ankle' }, provider: 'PRODIGI', providerSku: 'GLOBAL-ANKLE-SOCKS', providerConfig: { printTo: ['front'] } };
+    const [item] = await db.insert(orderItems).values({ orderId: o.id, productKey: 'socks', variantId: socks!.id, spec: frozen, qty: 1, unitPricePence: 2000, linePence: 2000 }).returning();
+    expect(await retryOrder(db, admin, ref('SOCKS'))).toBe(true);
+    const [after] = await db.select().from(orderItems).where(eq(orderItems.id, item!.id));
+    expect(after!.spec).toEqual({ ...frozen, providerConfig: { printTo: ['front'], prodigiAttrs: { size: 'l' } } }); // only the size added
+    expect([after!.qty, after!.linePence, after!.variantId]).toEqual([1, 2000, socks!.id]);
+    const [audit] = await db.select().from(auditRecords).where(and(eq(auditRecords.event, 'ADMIN_ORDER_RETRIED'), eq(auditRecords.targetId, ref('SOCKS'))));
+    expect(audit!.metadata).toEqual({ filledIn: [{ line: 'socks', added: { size: 'l' } }] });
+    // pressing it again adds nothing more
+    await retryOrder(db, admin, ref('SOCKS'));
+    expect((await db.select().from(orderItems).where(eq(orderItems.id, item!.id)))[0]!.spec).toEqual(after!.spec);
+  });
+
+  it('a setting the order already has is never changed, whatever the shop says now', () => {
+    expect(missingSettings({ size: 'm', color: 'white' }, { size: 'l', color: 'black', edge: 'crew' })).toEqual({ edge: 'crew' });
+    expect(missingSettings(null, { size: 'l' })).toEqual({ size: 'l' });
+    expect(missingSettings({ size: 'l' }, null)).toEqual({});
   });
 
   it('data requests: read (recorded), move along, finish with an outcome', async () => {
