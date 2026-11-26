@@ -1,7 +1,7 @@
 import { and, asc, eq, inArray, isNull, lt, lte, or } from 'drizzle-orm';
 import { assets, orderItemArtwork, orderItems, orders, storageObjects } from '@/db/schema';
 import { isProdigiConfigured, isSandboxHost, ProdigiError } from '@/server/prodigi/client';
-import { prodigiOrderTransport, type CreateOrderRequest, type ProdigiOrderTransport, type ProdigiRecipient } from '@/server/prodigi/orders';
+import { prodigiOrderTransport, type CreateOrderRequest, type ProdigiOrderTransport, type ProdigiRecipient, type ProdigiShipment } from '@/server/prodigi/orders';
 import { isStripeConfigured, getStripe } from '@/payments/stripe';
 import { deleteObject, getObjectBytes, presignProviderIngest, putObject } from '@/storage';
 import { frameGridOf, isMultiPhotoFrameKey, slotIndexOf, type FrameGrid } from '@/lib/multi-photo-frame';
@@ -734,7 +734,7 @@ export async function syncSubmittedOrders(
         const shipment = remote.shipments?.[remote.shipments.length - 1];
         const carrier = typeof shipment?.carrier === 'string' ? shipment.carrier : (shipment?.carrier?.name ?? null);
         // every parcel's tracking (an order often leaves several labs; the phone case may be its own order)
-        const parcels = parts.flatMap((p) => p.shipments ?? []).map((sh) => ({ carrier: typeof sh.carrier === 'string' ? sh.carrier : (sh.carrier?.name ?? null), number: sh.tracking?.number ?? null, url: sh.tracking?.url ?? null }));
+        const parcels = parts.flatMap((p) => p.shipments ?? []).map(parcelOf);
         // guarded on FULFILLING: two overlapping syncs can't both ship it (or both email)
         const moved = await db.transaction(async (tx) => {
           const [m] = await tx
@@ -765,7 +765,13 @@ export async function syncSubmittedOrders(
         summary.orders.push({ ref: row.ref, stage, note: issues.join('; ') || undefined });
       } else {
         // InProgress — reconcile issues BOTH ways (set when present, CLEAR when resolved).
-        await db.update(orders).set({ submitError: issues.length > 0 ? issues.join('; ').slice(0, 500) : null }).where(eq(orders.id, row.id));
+        // parcels already on their way (a big order leaves several labs, days apart): their tracking shows on the
+        // orders page straight away, not only once the last one has gone (founder, 26 Nov 2026)
+        const sentSoFar = parts.flatMap((p) => p.shipments ?? []).filter((sh) => sh.tracking?.number || sh.tracking?.url).map(parcelOf);
+        await db
+          .update(orders)
+          .set({ submitError: issues.length > 0 ? issues.join('; ').slice(0, 500) : null, ...(sentSoFar.length ? { tracking: { parcels: sentSoFar } } : {}) })
+          .where(eq(orders.id, row.id));
         if (remote.status?.details?.inProduction === 'InProgress' || remote.status?.details?.inProduction === 'Complete') {
           // READY included: repairs artwork that missed the SUBMITTED flip (post-latch crash).
           await setArtworkStatus(db, row.id, 'IN_PRODUCTION', ['SUBMITTED', 'READY']);
@@ -785,6 +791,11 @@ export async function syncSubmittedOrders(
     }
   }
   return summary;
+}
+
+/** One Prodigi shipment as a parcel the customer can follow. */
+function parcelOf(sh: ProdigiShipment) {
+  return { carrier: typeof sh.carrier === 'string' ? sh.carrier : (sh.carrier?.name ?? null), number: sh.tracking?.number ?? null, url: sh.tracking?.url ?? null };
 }
 
 type ArtworkStatus = (typeof orderItemArtwork.status.enumValues)[number];

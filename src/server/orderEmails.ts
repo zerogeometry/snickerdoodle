@@ -1,3 +1,4 @@
+import { parcelsOf, type OrderTracking, type Parcel } from '@/lib/tracking';
 import { eq } from 'drizzle-orm';
 import { accounts, orderItems, orders } from '@/db/schema';
 import { formatPence } from '@/pricing';
@@ -57,17 +58,25 @@ export async function sendOrderConfirmed(db: DbHandle, orderId: string): Promise
   });
 }
 
+/** The "on its way" email's tracking: one line for one parcel; for an order made in several print labs, a line per
+ * parcel — so a family isn't surprised when the second one turns up a day later. */
+export function trackingLines(t: OrderTracking | null | undefined): string {
+  const parcels = parcelsOf(t);
+  const one = (p: Parcel) =>
+    p.url ? `track it here: ${p.url}` : p.number ? `tracking number${p.carrier ? ` with ${p.carrier}` : ''}: ${p.number}` : 'standard post, so no tracking';
+  if (parcels.length <= 1) {
+    const p = parcels[0];
+    return p?.url ? `Track it here: ${p.url}` : p?.number ? `Your tracking number${p.carrier ? ` with ${p.carrier}` : ''} is ${p.number}.` : 'This one travels by standard post, so there’s no tracking — it should be with you very soon.';
+  }
+  return [`It’s coming in ${parcels.length} parcels, as each part was made in its own workshop, so they may not arrive on the same day:`, ...parcels.map((p, i) => `  parcel ${i + 1}: ${one(p)}`)].join('\n');
+}
+
 export async function sendOrderShipped(db: DbHandle, orderId: string): Promise<void> {
   const [o] = await db.select().from(orders).where(eq(orders.id, orderId));
   if (!o) return;
   const to = await recipient(db, o);
   if (!to) return;
-  const t = o.tracking;
-  const tracking = t?.url
-    ? `Track it here: ${t.url}`
-    : t?.number
-      ? `Your tracking number${t.carrier ? ` with ${t.carrier}` : ''} is ${t.number}.`
-      : 'This one travels by standard post, so there’s no tracking — it should be with you very soon.';
+  const tracking = trackingLines(o.tracking);
   await sendMail({
     kind: 'order-shipped',
     to: to.email,

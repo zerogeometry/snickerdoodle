@@ -45,3 +45,35 @@ describe('05-B5: how an order reads on the receipt and the orders page', () => {
     ]);
   });
 });
+
+// Founder, 26 Nov 2026: a pack of 10 different cards read as ten "card pack · pack of 10 — £1.43" lines.
+describe('a card pack reads as the pack(s) bought, never one line per card', () => {
+  const ten = { attributes: { size: 'pack of 10' } };
+  const five = { attributes: { size: 'pack of 5' } };
+  const card = (qty: number, pence: number, spec = ten, assetId = 'a') => ({ productKey: 'cardPack-packof10', qty, linePence: pence, spec, art: { assetId } });
+
+  it('ten different cards → one "pack of 10" line, at the pack price, with its first card as the picture', () => {
+    const lines: StoredOrderLine[] = Array.from({ length: 10 }, (_, i) => card(1, 210, ten, `d${i}`));
+    expect(receiptLines(lines)).toEqual([{ productKey: 'cardPack', label: 'doodle card pack · pack of 10', qty: 1, linePence: 2100, art: { assetId: 'd0' }, packSize: 10 }]);
+  });
+
+  it('two packs of the same cards (every design ×2) → one line, "2" packs, both packs’ price', () => {
+    const lines: StoredOrderLine[] = [card(10, 2100, ten, 'x'), card(6, 1260, ten, 'y'), card(4, 840, ten, 'z')];
+    expect(receiptLines(lines)).toMatchObject([{ label: 'doodle card pack · pack of 10', qty: 2, linePence: 4200 }]);
+  });
+
+  it('a pack next to other things, and a pack of 5 after a pack of 10, each read on their own', () => {
+    const lines: StoredOrderLine[] = [
+      { productKey: 'mug', qty: 1, linePence: 1800, spec: { attributes: { size: '11oz', colour: 'blue' } } },
+      ...Array.from({ length: 10 }, () => card(1, 210)),
+      { productKey: 'cardPack', qty: 5, linePence: 1200, spec: five },
+      { productKey: 'socks', qty: 1, linePence: 2000 },
+    ];
+    expect(receiptLines(lines).map((l) => [l.label, l.qty, l.linePence])).toEqual([
+      ['doodle mug · 11oz, blue', 1, 1800],
+      ['doodle card pack · pack of 10', 1, 2100],
+      ['doodle card pack · pack of 5', 1, 1200],
+      ['doodle socks', 1, 2000],
+    ]);
+  });
+});

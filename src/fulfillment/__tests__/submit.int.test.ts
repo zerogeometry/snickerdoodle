@@ -305,7 +305,10 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
 
     // shipped only when BOTH Prodigi orders are complete; every parcel's tracking kept
     await syncSubmittedOrders(db, { transport: splitTransport({ stages: { case: 'InProgress', main: 'Complete' } }), onlyOrderIds: [orderId] });
-    expect((await orderRow(orderId)).status).toBe('FULFILLING');
+    const partway = await orderRow(orderId);
+    expect(partway.status).toBe('FULFILLING');
+    // parcels already sent show their tracking straight away, before the whole order has gone
+    expect(partway.tracking?.parcels?.map((p) => p.number).sort()).toEqual(['TRK_ord_1_case', 'TRK_ord_2_main']);
     await syncSubmittedOrders(db, { transport: splitTransport({ stages: { case: 'Cancelled', main: 'Complete' } }), onlyOrderIds: [orderId] });
     const part = await orderRow(orderId);
     expect(part.status).toBe('FULFILLING'); // one part cancelled: a person decides, never "shipped" or "cancelled"
