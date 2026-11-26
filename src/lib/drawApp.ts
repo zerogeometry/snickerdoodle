@@ -24,7 +24,8 @@ export const DRAW_STORE_LINKS: Record<DrawStore, string | null> = {
  */
 export const DRAW_STORE_BADGES: Record<DrawStore, string | null> = {
   appStore: null, // e.g. '/badges/app-store-en-gb.svg'
-  googlePlay: null, // e.g. '/badges/google-play-en-gb.svg'
+  // Google's official badge, unaltered, with its own clear space (play.google.com/intl/en_gb/badges, 26 Nov 2026)
+  googlePlay: '/badges/google-play-en-gb.png',
 };
 
 /** Each store's own wording (their badge guidelines use exactly these lines). */
