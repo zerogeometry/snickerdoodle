@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Bristol call sheet</title>
+<style>
+  :root {
+    --oat: #F8F5E9; --paper: #FFFBF2; --paper-2: #F6EEDF; --line: #D9C7A9;
+    --ink: #2B2118; --ink-soft: #5A4A3A; --ink-faint: #6E5D4B;
+    --cta: #C8402A; --cta-deep: #8E2A1A; --cinnamon: #A8331F;
+    --honey: #F6C445; --honey-band: #FBE9B7; --cobalt: #2F5DA8; --leaf: #3F6E29;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --oat: #1C1712; --paper: #26201A; --paper-2: #2F281F; --line: #4A3E31;
+      --ink: #F6EEDF; --ink-soft: #D9C7A9; --ink-faint: #BFAE95;
+      --cta: #E0654E; --cta-deep: #F08A75; --cinnamon: #F08A75;
+      --honey-band: #3A3020; --cobalt: #8FB5D6; --leaf: #9CC47A;
+    }
+  }
+  :root[data-theme="dark"] {
+    --oat: #1C1712; --paper: #26201A; --paper-2: #2F281F; --line: #4A3E31;
+    --ink: #F6EEDF; --ink-soft: #D9C7A9; --ink-faint: #BFAE95;
+    --cta: #E0654E; --cta-deep: #F08A75; --cinnamon: #F08A75;
+    --honey-band: #3A3020; --cobalt: #8FB5D6; --leaf: #9CC47A;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--oat); color: var(--ink);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 0 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  main { max-width: 720px; margin: 0 auto; }
+  header { padding: 20px 0 8px; }
+  h1 { font-size: 1.6rem; line-height: 1.2; margin: 0 0 4px; font-weight: 800; }
+  h2 { font-size: 1.2rem; margin: 28px 0 10px; font-weight: 800; }
+  h3 { font-size: 1rem; margin: 0; font-weight: 700; }
+  p { margin: 0 0 10px; }
+  .sub { color: var(--ink-soft); font-size: .95rem; }
+  .note { background: var(--honey-band); border-radius: 12px; padding: 12px 14px; margin: 12px 0; font-size: .95rem; }
+  nav.jump { display: flex; gap: 8px; overflow-x: auto; padding: 8px 0; position: sticky; top: 0; background: var(--oat); z-index: 2; }
+  nav.jump a { flex: none; padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); text-decoration: none; font-size: .9rem; min-height: 44px; display: inline-flex; align-items: center; }
+  .card { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 0 0 10px; }
+  .row { display: flex; gap: 12px; align-items: flex-start; }
+  .row input[type=checkbox] { width: 26px; height: 26px; margin: 2px 0 0; flex: none; accent-color: var(--leaf); }
+  .row label { flex: 1; cursor: pointer; }
+  .time { display: inline-block; font-weight: 800; color: var(--cinnamon); min-width: 3.2em; }
+  .done label { opacity: .55; text-decoration: line-through; }
+  .ask { margin: 4px 0 0; font-size: .95rem; }
+  .fall { color: var(--ink-soft); font-size: .9rem; margin: 2px 0 0; }
+  .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .acts a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 8px 14px; border-radius: 999px; text-decoration: none; font-weight: 700; font-size: .95rem; }
+  a.call { background: var(--cta); color: #fff; }
+  a.mail, a.web { background: var(--paper-2); color: var(--ink); border: 1px solid var(--line); }
+  .chance { display: inline-block; font-size: .8rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--paper-2); border: 1px solid var(--line); color: var(--ink-soft); }
+  details { background: var(--paper); border: 1px solid var(--line); border-radius: 14px; margin: 0 0 10px; }
+  summary { padding: 12px 14px; cursor: pointer; min-height: 44px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; float: right; font-weight: 800; color: var(--ink-faint); }
+  details[open] summary::after { content: "–"; }
+  details .body { padding: 0 14px 14px; font-size: .95rem; }
+  details .body ul { padding-left: 18px; margin: 6px 0; }
+  .quote { border-left: 4px solid var(--honey); padding: 6px 10px; background: var(--paper-2); border-radius: 0 8px 8px 0; margin: 8px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  td, th { text-align: left; vertical-align: top; padding: 8px 6px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 700; color: var(--ink-soft); }
+  a { color: var(--cobalt); }
+  :focus-visible { outline: 3px solid var(--cobalt); outline-offset: 2px; }
+  .progress { font-weight: 700; color: var(--leaf); }
+  button.reset { min-height: 44px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; }
+  footer { color: var(--ink-faint); font-size: .85rem; margin-top: 28px; }
+  @media (prefers-reduced-motion: no-preference) { details[open] .body { animation: fade .2s ease-out; } }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Bristol call sheet</h1>
+  <p class="sub">From Fri 27 Nov 2026. Last orders: <strong>cards Thu 10 Dec, everything else Sat 12 Dec.</strong> Research only: nobody has been contacted. Ticks are saved on this phone only.</p>
+  <p class="progress" id="progress"></p>
+</header>
+
+<nav class="jump" aria-label="Sections">
+  <a href="#tomorrow">Tomorrow</a>
+  <a href="#places">Places</a>
+  <a href="#fairs">Fairs</a>
+  <a href="#boards">Noticeboards</a>
+  <a href="#week">Week plan</a>
+  <a href="#kit">Kit</a>
+</nav>
+
+<section id="deal">
+  <div class="note">
+    <strong>The offer, one per place:</strong> (A) their own code, which gives families a free card with their first order and earns them 10% of each first order; (B) a free "draw a bauble" table, parent stays; (C) leaflets in party bags or on the counter; (D) a raffle keepsake; (E) "your free card" as the party gift.<br>
+    <strong>Codes:</strong> make them on /admin/codes (free card · CAMPAIGN · 10% · ends 24 Dec). Noticeboards get a code with no commission. <strong>The site doesn't read a code from the QR link</strong>, so print the code big on a sticker beside one plain QR to snickerdoodle.co.uk/start-creating.
+  </div>
+</section>
+
+<section id="tomorrow" aria-labelledby="h-tomorrow">
+  <h2 id="h-tomorrow">Tomorrow, Fri 27 Nov, in this order</h2>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t0"><label for="t0"><span class="time">8:00</span> <strong>Before calls:</strong> buy £5m public liability (Craft Insurance, Simply Business or Howden, about £70–£100 a year). Make the codes GYMBO, WILDTHINGS, GOLDFINCH, ALMONDSBURY, SHIRE. Print 4 laminated A4 posters.</label></div>
+    <div class="acts"><a class="call" href="tel:01202826127">Call Craft Insurance</a><a class="web" href="https://www.simplybusiness.co.uk/insurance/public-liability/public-liability-market-trader/">Simply Business</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t1"><label for="t1"><span class="time">9:10</span> <strong>Gymbo (Gymboree) Bristol</strong>, Polly (owner), Westbury on Trym <span class="chance">high–med</span>
+    <p class="ask">Ask: leaflets plus "your free card" in every Christmas-party gift bag, with a GYMBO code earning 10%.</p>
+    <p class="fall">If no: a stack on the counter and a mention in her members' message.</p></label></div>
+    <div class="acts"><a class="call" href="tel:07453901951">Call 07453 901951</a><a class="mail" href="mailto:bristol@gymbo.co.uk">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t2"><label for="t2"><span class="time">9:30</span> <strong>Almondsbury Garden Centre</strong>, centre manager <span class="chance">medium</span>
+    <p class="ask">Ask: a draw-a-bauble table by the grotto exit on a weekend morning, plus an ALMONDSBURY code.</p>
+    <p class="fall">If no: a counter leaflet stand by the grotto queue.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01454457300">Call 01454 457300</a><a class="mail" href="mailto:enquiries@almondsbury.co.uk">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t3"><label for="t3"><span class="time">9:45</span> <strong>Wild Things Play Project</strong>, The Mall at Cribbs, site manager <span class="chance">medium</span>
+    <p class="ask">Ask: a free table Mon 30 Nov or Wed 2 Dec at 10am (beside Baby Ballet), plus leaflets in party bags.</p>
+    <p class="fall">If no: counter leaflets and a WILDTHINGS code.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179592514">Call 0117 959 2514</a><a class="mail" href="mailto:cribbs@wildthingsplay.co.uk">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t4"><label for="t4"><span class="time">10:00</span> <strong>Goldfinch Create and Play</strong>, 10 Canford Lane BS9 (no phone) <span class="chance">high–med</span>
+    <p class="ask">Ask: a table beside the Sat 5 Dec 10am family decorations workshop, plus a GOLDFINCH code. Pitch baubles, not cards.</p>
+    <p class="fall">If no: leaflets on the Pinkmans Café counter. Walk in this afternoon; We Make Bristol is next door at no. 16.</p></label></div>
+    <div class="acts"><a class="mail" href="mailto:info@goldfinchcreateandplay.co.uk">Email Goldfinch</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t5"><label for="t5"><span class="time">10:15</span> <strong>Shirehampton Markets / SCAF</strong> <span class="chance">medium</span>
+    <p class="ask">Ask: a table at the Thu 3 Dec Christmas High Street Market (Methodist Hub, 9–2).</p>
+    <p class="fall">If no: the cancellation list, and a free event listing for a bauble table.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179829963">Call 0117 982 9963</a><a class="mail" href="mailto:shirehamptonmarkets@outlook.com">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t6"><label for="t6"><span class="time">10:30</span> <strong>Ambition Lawrence Weston</strong> <span class="chance">medium</span>
+    <p class="ask">Ask: a table at the Sat 5 Dec Christmas community market (Ambition House).</p>
+    <p class="fall">If no: leaflets at reception (likely yes).</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179235112">Call 0117 923 5112</a><a class="mail" href="mailto:contact@ambitionlw.org">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t7"><label for="t7"><span class="time">10:45</span> <strong>St Mary's Shirehampton</strong>: walk in (Welcoming Space, Fri 10–2) <span class="chance">low–med</span>
+    <p class="ask">Ask: a corner at tomorrow's Christmas Fair (Sat 28 Nov, 10–2), or give them a raffle bauble.</p>
+    <p class="fall">If no: leaflets on the welcome table.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179077026">Call 0117 907 7026</a><a class="mail" href="mailto:office@stmarysshire.org">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t8"><label for="t8"><span class="time">11:00</span> <strong>Shirehampton Group Practice</strong>: walk in <span class="chance">medium</span>
+    <p class="ask">Ask: one laminated A4 poster on the family board, "FAO the Practice Manager". A free activity, no prices.</p>
+    <p class="fall">If no: leave it with a note, then send an eConsult admin request.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179162226">Call 0117 916 2226</a><a class="mail" href="mailto:bnssg.sgp@nhs.net">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t9"><label for="t9"><span class="time">11:30</span> <strong>Hobbycraft Bristol</strong>, Cribbs, store manager <span class="chance">med–low</span>
+    <p class="ask">Ask: a free kids' bauble demo on Sat 5 Dec using their paints. Buy the paint kit while you're there (open till 8).</p>
+    <p class="fall">If no: leaflets on the workshop board.</p></label></div>
+    <div class="acts"><a class="call" href="tel:03300261024">Call 03300 261024</a><a class="mail" href="mailto:bristol@hobbycraft.co.uk">Email</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t10"><label for="t10"><span class="time">12:30</span> <strong>babyballet</strong>: Bristol (Miss Leanne) and Bradley Stoke, Thornbury &amp; Portishead (Miss Emma). Text first <span class="chance">med–high</span>
+    <p class="ask">Ask: end-of-term leaflets plus their own code.</p>
+    <p class="fall">If no: a raffle bauble for their Christmas class.</p></label></div>
+    <div class="acts"><a class="call" href="tel:07715340610">Leanne 07715 340610</a><a class="call" href="tel:07395805885">Emma 07395 805885</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t11"><label for="t11"><span class="time">13:00</span> <strong>Sing and Sign Bristol</strong> (Katherine Amor) and <strong>Little Kickers Bristol &amp; Bath</strong> <span class="chance">medium</span>
+    <p class="ask">Ask: leaflets before the break plus a code (Little Kickers: at Saturday pick-up in Westbury).</p>
+    <p class="fall">If no: a January thank-you-card offer.</p></label></div>
+    <div class="acts"><a class="call" href="tel:07594460448">Sing and Sign</a><a class="mail" href="mailto:katherineamor@singandsign.co.uk">Email</a><a class="call" href="tel:07506346186">Little Kickers</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t12"><label for="t12"><span class="time">13:30</span> <strong>Toddler groups</strong>: Lighthouse (Avonmouth, Mon 10–11:30), Seedlings (Sea Mills, Wed 9:30–11), Boing! play café (Lawrence Weston) <span class="chance">medium</span>
+    <p class="ask">Ask: a free bauble table on Mon 30 Nov, Wed 2 Dec or at Boing's Christmas session.</p>
+    <p class="fall">If no: leaflets on the welcome table.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01173258720">Lighthouse</a><a class="call" href="tel:01179686965">Seedlings</a><a class="mail" href="mailto:boing@communitychurch-lw.co.uk">Email Boing!</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t13"><label for="t13"><span class="time">14:00</span> <strong>The Mall at Cribbs</strong>, CBRE commercialisation (email) <span class="chance">low–med</span>
+    <p class="ask">Ask: price and dates for a small weekday promo pitch, w/c 7 Dec; no selling, a free drawing activity, insured.</p>
+    <p class="fall">If no: The Galleries' kiosk agency (cheaper), or January.</p></label></div>
+    <div class="acts"><a class="mail" href="mailto:ukcommercialisation@cbre.com?subject=Small%20promo%20pitch%20at%20Cribbs%2C%20a%20weekday%20w%2Fc%207%20Dec%3F">Email CBRE</a><a class="mail" href="mailto:carina@shoppertainmentmanagement.co.uk">Email Galleries</a><a class="call" href="tel:01179155555">Mall 0117 915 5555</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t14"><label for="t14"><span class="time">14:30</span> <strong>Pioneer Medical Group</strong> (Rachelle Lambert, Practice Manager; covers Avonmouth, Ridingleaze, Bradgate) and <strong>Heywood Family Practice, Pill</strong> (Vicky Gigg, Practice Manager) <span class="chance">low–med</span>
+    <p class="ask">Ask: one poster each.</p></label></div>
+    <div class="acts"><a class="mail" href="mailto:bnssg.pmg@nhs.net">Email Pioneer</a><a class="call" href="tel:01275372105">Heywood 01275 372105</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t15"><label for="t15"><span class="time">15:00</span> <strong>Walk round Shirehampton</strong>: library (open 1–5), Co-op High St, Shirehampton Pharmacy, Magna Pharmacy, Shirehampton Dental
+    <p class="ask">Ask: posters or counter leaflets.</p></label></div>
+    <div class="acts"><a class="call" href="tel:01179038570">Library</a><a class="call" href="tel:01179822181">Co-op</a><a class="call" href="tel:01179823134">Pharmacy</a><a class="call" href="tel:01179822119">Dentist</a></div></div>
+
+  <div class="card"><div class="row"><input type="checkbox" id="t16"><label for="t16"><span class="time">Eve</span> <strong>Tonight:</strong> order leaflets (Azimuth 12-hour flyers, or instantprint next day), send the follow-up emails, fill in the HSE risk assessment, book a £20 Basic DBS check.</label></div>
+    <div class="acts"><a class="web" href="https://www.instantprint.co.uk/flyers-leaflets/a6">instantprint</a><a class="web" href="https://www.hse.gov.uk/simple-health-safety/risk/risk-assessment-template-and-examples.htm">HSE template</a><a class="web" href="https://www.gov.uk/request-copy-criminal-record">Basic DBS</a></div></div>
+</section>
+
+<section id="places" aria-labelledby="h-places">
+  <h2 id="h-places">Places, with what to say</h2>
+
+  <details><summary><h3>★ Gymbo (Gymboree) Bristol: Westbury on Trym, 10–12 min</h3></summary><div class="body">
+    <p>The Annexe, 38 Eastfield, BS9 4BE (behind the RAFA Club, car park). Owner Polly. Classes from 9:30am on weekdays. Its 2025 Christmas parties (6 and 20 Dec) had "a Christmas gift for everyone"; the 2026 dates aren't up yet.</p>
+    <p><strong>Deal:</strong> leaflet plus "your free card" in the gift bags (agree by Tue 1 Dec for a 5/6 Dec party), and a GYMBO code at 10%.</p>
+    <div class="quote">"Hi Polly, it's Simon from Snickerdoodle. I'm just down the road in Shirehampton. We turn children's drawings into baubles and cards. I've got an idea for your Christmas parties that costs you nothing. Have you got two minutes?"</div>
+    <ul><li>Every child goes home with a bauble to colour in and a free card waiting.</li><li>Your GYMBO code earns you 10% of every first order, paid monthly. There's nothing for your team to do.</li><li>We never touch or photograph drawings. Parents do it on their own phones.</li></ul>
+    <div class="acts"><a class="call" href="tel:07453901951">Call</a><a class="mail" href="mailto:bristol@gymbo.co.uk">Email</a><a class="web" href="https://www.gymbo.co.uk/locations/bristol">Website</a></div>
+  </div></details>
+
+  <details><summary><h3>★ Wild Things Play Project: The Mall at Cribbs, 12–15 min</h3></summary><div class="body">
+    <p>Level 2, Unit 209. Open Mon–Sat 9:30–6, Sun 10:30–5. Baby Ballet Mon and Wed at 10am, Sing &amp; Sign Tue at 10am. Wild Craft parties £21.95 a head; party bags £2.95.</p>
+    <p><strong>Deal:</strong> a free table inside their unit on a class morning, leaflets in party bags, a WILDTHINGS code. Bring dry paint sticks. Anything in the Mall walkway needs the Mall's permission.</p>
+    <div class="quote">"Hi, it's Simon from Snickerdoodle, a little Bristol business that turns children's drawings into Christmas baubles. I'd love to run a free drawing table for your families one morning next week. Who's the best person to ask?"</div>
+    <div class="acts"><a class="call" href="tel:01179592514">Call</a><a class="mail" href="mailto:cribbs@wildthingsplay.co.uk">Email</a><a class="web" href="https://wildthingsplay.co.uk/bristol/whats-on">What's on</a></div>
+  </div></details>
+
+  <details><summary><h3>★ Goldfinch Create and Play: Westbury-on-Trym, about 10 min</h3></summary><div class="body">
+    <p>10 Canford Lane, BS9 3DH. Art studio plus Pinkmans Café (Mon–Sat 8–5). Family workshops on Sat 28 Nov, 5 Dec (decorations) and 12 Dec (cards). No phone; email or walk in.</p>
+    <p><strong>Deal:</strong> a table beside the 5 Dec workshop, counter leaflets, a GOLDFINCH code. Lead with baubles and keepsakes, not cards.</p>
+    <div class="quote">"Hi, I'm Simon from Snickerdoodle in Shirehampton. We turn children's drawings into baubles and keepsakes, and Goldfinch feels like the right home for it. Is the owner or manager about?"</div>
+    <div class="acts"><a class="mail" href="mailto:info@goldfinchcreateandplay.co.uk">Email</a><a class="web" href="https://www.goldfinchcreateandplay.co.uk/">Website</a></div>
+  </div></details>
+
+  <details><summary><h3>★ Almondsbury Garden Centre: Santa grotto, about 15 min</h3></summary><div class="body">
+    <p>Over Lane, BS32 4BP. Open Mon–Sat 9–5:30, Sun 10–4:30. A five-room grotto, with an SEN grotto day on 11 Dec.</p>
+    <p><strong>Deal:</strong> a table by the grotto exit on a weekend morning, plus an ALMONDSBURY code at 10%. Fallback: a counter stand.</p>
+    <div class="quote">"Hi, it's Simon from Snickerdoodle in Shirehampton. We turn children's drawings into Christmas baubles. I wondered if I could put something lovely by your grotto for families waiting to see Santa. Who looks after the grotto?"</div>
+    <div class="acts"><a class="call" href="tel:01454457300">Call</a><a class="mail" href="mailto:enquiries@almondsbury.co.uk">Email</a><a class="web" href="https://www.almondsbury.co.uk/pages/almondsbury-christmas-grotto">Grotto page</a></div>
+  </div></details>
+
+  <details><summary><h3>babyballet, Sing and Sign, Little Kickers, Little Beats</h3></summary><div class="body">
+    <ul>
+      <li><strong>babyballet Bristol</strong> (Miss Leanne): Westbury Village Hall on Thursdays, Southmead, Filton, Little Stoke. <a href="tel:07715340610">07715 340610</a> · <a href="mailto:bristol@babyballet.co.uk">email</a></li>
+      <li><strong>babyballet Bradley Stoke, Thornbury &amp; Portishead</strong> (Miss Emma): EPiC Bradley Stoke and Portishead, Wild Things Mon and Wed. <a href="tel:07395805885">07395 805885</a> · <a href="mailto:bradleystokethornburyportishead@babyballet.co.uk">email</a></li>
+      <li><strong>Sing and Sign Bristol</strong> (Katherine Amor): Henleaze Wed and Fri, Horfield, Wild Things Tue. Term ends soon (restarts 8 Jan). <a href="tel:07594460448">0759 4460 448</a> · <a href="mailto:katherineamor@singandsign.co.uk">email</a></li>
+      <li><strong>Little Kickers Bristol &amp; Bath</strong>: Saturdays at Westbury-on-Trym Academy (8:30–12:35) and Henleaze Junior. <a href="tel:07506346186">07506 346186</a></li>
+      <li><strong>Little Beats Music</strong> (Sarah): Westbury Park Methodist, Thursdays 9:15. Next session 3 Dec; ask after the class.</li>
+    </ul>
+    <div class="quote">"Hi, I'm Simon from Snickerdoodle in Shirehampton. We turn children's drawings into Christmas baubles and cards. Could I drop you some colour-in bauble leaflets for your families, with your own code that gets them a free card and earns you 10%?"</div>
+  </div></details>
+
+  <details><summary><h3>Pottery and art cafés, gift and toy shops</h3></summary><div class="body">
+    <ul>
+      <li><strong>Flying Saucers</strong>, 9 Byron Place, Clifton BS8: <a href="tel:01179273666">0117 927 3666</a> (unclaimed listing). Medium–low.</li>
+      <li><strong>Wot Pots</strong>, Westbury Wildlife Park BS9 3ET: <a href="tel:07527957237">07527 957237</a> (unclaimed listing), maybe Fri–Sun only. Medium.</li>
+      <li><strong>Kondi Gifts</strong>, 103 Henleaze Rd: <a href="tel:01179625464">0117 962 5464</a> (2018 listing). Cards, local makers, toys. Medium.</li>
+      <li><strong>We Make Bristol</strong>, 16 Canford Lane (next to Goldfinch). Bristol makers' shop. Medium–low for Christmas.</li>
+      <li><strong>Flutterbies</strong>, 42a High St, Portishead (wooden toys). Walk in. Medium.</li>
+    </ul>
+    <div class="quote">"Hi, I'm Simon, I run Snickerdoodle from Shirehampton. We turn children's drawings into keepsakes. Your customers are exactly the grandparents and parents who'd love one. Could I leave a few leaflets by the till, with a code that pays you 10% of anything ordered with it?"</div>
+  </div></details>
+
+  <details><summary><h3>Nurseries in BS11</h3></summary><div class="body">
+    <ul>
+      <li><strong>Mama Bear's Day Nursery</strong>, 112–116 Grove Leaze: <a href="tel:01179823345">0117 982 3345</a></li>
+      <li><strong>Snapdragons Shirehampton</strong>, The Wylands, Lower High St. Walk in (the listed phone number looks wrong).</li>
+      <li><strong>Avonmouth Children's Centre</strong>, Catherine St: <a href="tel:01179030271">0117 903 0271</a></li>
+    </ul>
+    <p>Offer leaflets in book bags with a nursery code, or a table at pick-up or the Christmas party. Address grown-ups only.</p>
+  </div></details>
+
+  <details><summary><h3>Cribbs Mall, The Galleries, Hobbycraft, and what to skip</h3></summary><div class="body">
+    <ul>
+      <li><strong>The Mall at Cribbs:</strong> promo pitches go through CBRE (<a href="mailto:ukcommercialisation@cbre.com">ukcommercialisation@cbre.com</a>). No rate card is published; expect about £150–£400 a day + VAT [estimate], £5m insurance, a risk assessment, no selling, probably no wet paint. Free space only for its charities.</li>
+      <li><strong>The Galleries:</strong> kiosk and promo agency <a href="mailto:carina@shoppertainmentmanagement.co.uk">carina@shoppertainmentmanagement.co.uk</a>. Medium.</li>
+      <li><strong>Hobbycraft Bristol:</strong> <a href="tel:03300261024">03300 261024</a>, a free Saturday demo. Medium–low.</li>
+      <li><strong>Cabot Circus:</strong> <a href="mailto:brandpartnerships@hammerson.com">brandpartnerships@hammerson.com</a>. Low.</li>
+      <li><strong>Skip:</strong> John Lewis, M&amp;S, Smyths, LEGO, Build-A-Bear, We The Curious, Bristol Museum, Bristol Zoo Project, Tyntesfield, Dobbies, Cadbury GC. There's no Range at Cribbs.</li>
+    </ul>
+  </div></details>
+</section>
+
+<section id="fairs" aria-labelledby="h-fairs">
+  <h2 id="h-fairs">Fairs you can still get into</h2>
+  <div class="card"><div class="row"><input type="checkbox" id="f1"><label for="f1"><strong>Sat 28 Nov, 10–2:</strong> St Mary's Shire Christmas Fair, High St (3 min). Ask for a corner or give a raffle prize.</label></div><div class="acts"><a class="call" href="tel:01179077026">Call</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="f2"><label for="f2"><strong>Sat 28 Nov, 11–2:</strong> St Mary's Henbury fair, Henbury Village Hall. Leaflets only, probably.</label></div><div class="acts"><a class="call" href="tel:01179593757">Call</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="f3"><label for="f3"><strong>Thu 3 Dec, 9–2:</strong> Shirehampton Christmas High Street Market, Methodist Hub. Indoors, with Father Christmas.</label></div><div class="acts"><a class="call" href="tel:01179829963">Call</a><a class="mail" href="mailto:shirehamptonmarkets@outlook.com">Email</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="f4"><label for="f4"><strong>Sat 5 Dec:</strong> Lawrence Weston Community Market, Christmas edition, Ambition House.</label></div><div class="acts"><a class="call" href="tel:01179235112">Call</a></div></div>
+  <p class="sub">Also in the 18 Nov report: Horfield CE, Collegiate and Clifton High (28 Nov; dropouts only), Tockington Manor, St Michael's Stoke Gifford and Hatherell's Yard (5 Dec). <strong>Weston Museum is now closed to stallholders.</strong></p>
+</section>
+
+<section id="boards" aria-labelledby="h-boards">
+  <h2 id="h-boards">Noticeboards: GPs, libraries, hubs, toddler groups</h2>
+  <div class="note">GP posters: one laminated A4 poster, a free activity first, no prices, no NHS logo, nothing aimed at children, down after 12 Dec. The practice manager decides. Expect 1–3 yeses out of 14. Libraries: posters yes, tables no (a month's notice needed).</div>
+  <table>
+    <thead><tr><th>Place</th><th>Contact</th><th>When / chance</th></tr></thead>
+    <tbody>
+      <tr><td>Shirehampton Group Practice</td><td><a href="tel:01179162226">0117 916 2226</a></td><td>Walk in · medium</td></tr>
+      <tr><td>Pioneer Medical (Avonmouth, Ridingleaze, Bradgate)</td><td><a href="mailto:bnssg.pmg@nhs.net">email</a> · <a href="tel:01179591919">0117 959 1919</a></td><td>FAO Rachelle Lambert, PM · low–med</td></tr>
+      <tr><td>Heywood Family Practice, Pill</td><td><a href="tel:01275372105">01275 372105</a></td><td>FAO Vicky Gigg, PM · medium</td></tr>
+      <tr><td>Sea Mills Surgery</td><td><a href="tel:01179681182">0117 968 1182</a></td><td>Surgery Manager · low–med</td></tr>
+      <tr><td>Greenway, Southmead</td><td><a href="tel:01179598939">0117 959 8939</a></td><td>low–med</td></tr>
+      <tr><td>Southmead &amp; Henbury FP</td><td><a href="tel:01179507150">0117 950 7150</a></td><td>low–med</td></tr>
+      <tr><td>Westbury-on-Trym PCC</td><td><a href="tel:01179623406">0117 962 3406</a></td><td>low</td></tr>
+      <tr><td>Shirehampton Library</td><td><a href="tel:01179038570">0117 903 8570</a></td><td>Rhymes Thu 11am · med–high</td></tr>
+      <tr><td>Avonmouth Library</td><td><a href="tel:01179038580">0117 903 8580</a></td><td>Rhymes Wed 11am</td></tr>
+      <tr><td>Sea Mills Library</td><td><a href="tel:01179038555">0117 903 8555</a></td><td>Ring first (fire next door)</td></tr>
+      <tr><td>Henbury Library</td><td><a href="tel:01179038522">0117 903 8522</a></td><td>Rhymes Mon and Wed 11:30</td></tr>
+      <tr><td>Westbury Library</td><td><a href="tel:01179038552">0117 903 8552</a></td><td>Rhymes Wed and Fri 11:15</td></tr>
+      <tr><td>Henleaze Library</td><td><a href="tel:01179038541">0117 903 8541</a></td><td>Rhymes Tue 11:30</td></tr>
+      <tr><td>Bristol North Family Hubs</td><td><a href="tel:01179223779">0117 922 3779</a> · <a href="mailto:NBFH@bristol.gov.uk">email</a></td><td>Hub manager · low–med</td></tr>
+      <tr><td>Boing! play café, Lawrence Weston</td><td><a href="mailto:boing@communitychurch-lw.co.uk">email</a></td><td>Ages 0–5 · med–high</td></tr>
+      <tr><td>Lighthouse Toddlers, St Andrew's Avonmouth</td><td><a href="tel:01173258720">0117 325 8720</a></td><td>Mon 10–11:30 · medium</td></tr>
+      <tr><td>Seedlings Toddlers, St Edyth's Sea Mills</td><td><a href="tel:01179686965">0117 968 6965</a></td><td>Wed 9:30–11 · medium</td></tr>
+      <tr><td>Ambition House reception</td><td><a href="tel:01179235112">0117 923 5112</a></td><td>high</td></tr>
+      <tr><td>Shirehampton Public Hall</td><td><a href="tel:01179829963">0117 982 9963</a></td><td>medium</td></tr>
+      <tr><td>Co-op Shirehampton / Avonmouth / L. Weston</td><td><a href="tel:01179822181">982 2181</a> · <a href="tel:01179822267">982 2267</a> · <a href="tel:01179828578">982 8578</a></td><td>Store manager · medium</td></tr>
+      <tr><td>Pharmacies: Shire / Avonmouth / L. Weston / Magna</td><td><a href="tel:01179823134">982 3134</a> · <a href="tel:01179823158">982 3158</a> · <a href="tel:01179823507">982 3507</a> · <a href="tel:01179823543">982 3543</a></td><td>Mid-morning · medium</td></tr>
+      <tr><td>Henbury Leisure Centre</td><td><a href="tel:01173532555">0117 353 2555</a></td><td>Duty manager · med–low</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="week" aria-labelledby="h-week">
+  <h2 id="h-week">The two weeks to the cut-off</h2>
+  <div class="card"><div class="row"><input type="checkbox" id="w1"><label for="w1"><strong>Sat 28 Nov:</strong> St Mary's Shire fair (10–2). Leaflets to Almondsbury, Goldfinch, We Make Bristol.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w2"><label for="w2"><strong>Sun 29:</strong> make the codes for every yes, put stickers on leaflets, send leave-behind emails.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w3"><label for="w3"><strong>Mon 30:</strong> Lighthouse toddlers (10–11:30). Wild Things table from 10am, if agreed.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w4"><label for="w4"><strong>Tue 1 Dec:</strong> leaflets and codes to Gymbo for the party bags. Any posters not done yet.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w5"><label for="w5"><strong>Wed 2:</strong> Seedlings (9:30). Wild Things. Henleaze Festival 4–8pm only with a gazebo.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w6"><label for="w6"><strong>Thu 3:</strong> Shirehampton Christmas Market (9–2). Little Beats (9:15). Library rhymes (11).</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w7"><label for="w7"><strong>Fri 4:</strong> top up stands. Check /admin/codes and put next week's effort where the orders are.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w8"><label for="w8"><strong>Sat 5:</strong> the big Saturday. Goldfinch (10am), Lawrence Weston market, Hobbycraft demo, Gymbo party bags.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w9"><label for="w9"><strong>Sun 6:</strong> Almondsbury grotto table, if agreed.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w10"><label for="w10"><strong>Mon 7 – Wed 9:</strong> Cribbs or Galleries weekday pitch, if booked. Toddler groups again. The message becomes "cards by Thu 10, everything else by Sat 12".</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="w11"><label for="w11"><strong>Thu 10 – Sat 12:</strong> last-orders reminders. After that the pitch is January thank-you cards and the Draw app (coming soon). Collect stands and say thank you.</label></div></div>
+</section>
+
+<section id="kit" aria-labelledby="h-kit">
+  <h2 id="h-kit">Kit and rules</h2>
+  <div class="card"><div class="row"><input type="checkbox" id="k1"><label for="k1"><strong>£5m public liability + product liability</strong>, certificate on your phone. Declare "free supervised children's painting activity". Not Protectivity's one-day policy (it excludes products).</label></div><div class="acts"><a class="call" href="tel:01202826127">Craft Insurance</a><a class="web" href="https://www.howdeninsurance.co.uk/small-business/by-business-type/shop-and-retail/stallholders-insurance/">Howden £67/yr</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k2"><label for="k2"><strong>Risk assessment</strong> (HSE template, 2 printed copies): trips, easel tipping, slips, paint in eyes or mouth, allergies, small parts, lost child, exits.</label></div><div class="acts"><a class="web" href="https://www.hse.gov.uk/simple-health-safety/risk/risk-assessment-template-and-examples.htm">HSE template</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k3"><label for="k3"><strong>Basic DBS</strong> (£20, about 3 days). Rule on the table: "your grown-up stays with you the whole time".</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k4"><label for="k4"><strong>Paint:</strong> Crayola Washable Kids' Paint (£4.12 at Hobbycraft), Galt Painting Sticks (£5, no water; use these at the Mall and garden centres), chunky crayons. Look for EN 71-3 or AP.</label></div><div class="acts"><a class="web" href="https://www.hobbycraft.co.uk/galt-painting-sticks-6-pack/6420801000.html">Paint sticks</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k5"><label for="k5"><strong>Mess kit:</strong> PVC tablecloth, floor sheet and gaffer tape, kids' aprons, wipes, kitchen roll, hand gel, bin bags, a lidded water pot, A3 paper or bauble outlines, a low A-frame or tabletop easel.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k6"><label for="k6"><strong>Display:</strong> 3–5 samples, A6 leaflet holders, a big QR card, a code-sticker sheet per place.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k7"><label for="k7"><strong>QR:</strong> one static code at goQR.me to snickerdoodle.co.uk/start-creating, at least 25mm, tested on two phones. No "dynamic" QR services.</label></div><div class="acts"><a class="web" href="https://goqr.me/">goQR.me</a></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k8"><label for="k8"><strong>Photo rule:</strong> never photograph a child or their drawing without the parent's clear yes. Best of all, no photos. The parent snaps the drawing on their own phone. No child surnames, ever.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k9"><label for="k9"><strong>Emails:</strong> no paper sheet. Parents sign up on their own phone, with an unticked opt-in box. A prize draw never requires opting in.</label></div></div>
+  <div class="card"><div class="row"><input type="checkbox" id="k10"><label for="k10"><strong>Permission:</strong> written OK from each venue (an email is fine). No street leafleting until you've checked with licensing@bristol.gov.uk. No taking money at a table; families order online.</label></div></div>
+</section>
+
+<p><button class="reset" type="button" id="reset">Clear all ticks</button></p>
+<footer>Research only, from public business contacts, 26 Nov 2026. People are named only where the business publishes them as its contact. Full sources: "Bristol outreach call sheet 2026-11-27.md" in reports/.</footer>
+</main>
+<script>
+(function () {
+  var KEY = 'sd-bristol-callsheet-v1';
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input[type=checkbox]'));
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { state = {}; }
+  function paint() {
+    var done = 0;
+    boxes.forEach(function (b) {
+      var card = b.closest('.card');
+      if (card) card.classList.toggle('done', b.checked);
+      if (b.checked) done++;
+    });
+    document.getElementById('progress').textContent = done + ' of ' + boxes.length + ' done';
+  }
+  boxes.forEach(function (b) {
+    b.checked = !!state[b.id];
+    b.addEventListener('change', function () {
+      state[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      paint();
+    });
+  });
+  document.getElementById('reset').addEventListener('click', function () {
+    state = {};
+    try { localStorage.removeItem(KEY); } catch (e) {}
+    boxes.forEach(function (b) { b.checked = false; });
+    paint();
+  });
+  paint();
+})();
+</script>
+</body>
+</html>
