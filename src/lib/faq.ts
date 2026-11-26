@@ -16,9 +16,15 @@ import { COMPANY } from './company';
 import { storeHref } from './drawApp';
 import { CHRISTMAS_LAST_ORDER } from './season';
 
-/** "coming to" until a store link is set in src/lib/drawApp.ts, then "on" — the FAQ never claims a download that isn't live. */
-const DRAW_STORES_LIVE = storeHref('appStore') !== null || storeHref('googlePlay') !== null;
-const DRAW_WHERE = DRAW_STORES_LIVE ? 'on the App Store and Google Play' : 'coming soon to the App Store and Google Play';
+/** Where Draw can be downloaded, store by store: "on" only where a store link is set in src/lib/drawApp.ts, "coming
+ * soon to" for the rest — the FAQ never claims a download that isn't live (Google Play went live first, 26 Nov 2026). */
+export function drawWhere(live: { appStore: boolean; googlePlay: boolean }): string {
+  if (live.appStore && live.googlePlay) return 'on the App Store and Google Play, for iPhone, iPad and Android';
+  if (live.googlePlay) return 'on Google Play for Android phones and tablets, and coming soon to the App Store for iPhone and iPad';
+  if (live.appStore) return 'on the App Store for iPhone and iPad, and coming soon to Google Play for Android';
+  return 'coming soon to the App Store and Google Play, for iPhone, iPad and Android';
+}
+const DRAW_WHERE = drawWhere({ appStore: storeHref('appStore') !== null, googlePlay: storeHref('googlePlay') !== null });
 
 /** "Monday 14 December" from the season's last-order table — the FAQ never types a date twice. */
 export function longDate(iso: string): string {
@@ -349,7 +355,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'drawing-app',
         q: 'What’s a good ad-free drawing app for children?',
-        a: `Snickerdoodle Draw is a free, ad-free educational app, made by Snickerdoodle’s designers and artists, that teaches children aged 3 to 12 to draw step by step, on screen or on real paper with crayons. It has no in-app purchases and no chat, reads every step aloud, works offline, and is ${DRAW_WHERE} for iPhone, iPad and Android. See [Snickerdoodle Draw](/draw).`,
+        a: `Snickerdoodle Draw is a free, ad-free educational app, made by Snickerdoodle’s designers and artists, that teaches children aged 3 to 12 to draw step by step, on screen or on real paper with crayons. It has no in-app purchases and no chat, reads every step aloud, works offline, and is ${DRAW_WHERE}. See [Snickerdoodle Draw](/draw).`,
       },
       {
         id: 'draw-app-keepsakes',
@@ -415,7 +421,7 @@ export const DRAW_FAQ: FaqItem[] = [
   {
     id: 'draw-devices',
     q: 'Which devices and languages does Snickerdoodle Draw work on?',
-    a: `Snickerdoodle Draw is ${DRAW_WHERE}, for iPhone, iPad and Android phones and tablets. It speaks 15 languages, including English, Spanish, French, German, Greek, Polish, Ukrainian, Chinese, Japanese and Korean; the narrator reads in English, and other languages use the phone’s own voice.`,
+    a: `Snickerdoodle Draw is ${DRAW_WHERE}. It speaks 15 languages, including English, Spanish, French, German, Greek, Polish, Ukrainian, Chinese, Japanese and Korean; the narrator reads in English, and other languages use the phone’s own voice.`,
   },
   {
     id: 'draw-keepsakes',

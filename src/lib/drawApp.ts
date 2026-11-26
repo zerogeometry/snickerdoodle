@@ -13,7 +13,7 @@ export type DrawStore = 'appStore' | 'googlePlay';
  */
 export const DRAW_STORE_LINKS: Record<DrawStore, string | null> = {
   appStore: null,
-  googlePlay: null,
+  googlePlay: 'https://play.google.com/store/apps/details?id=com.launchmode.snickerdoodle.draw', // live (founder, 26 Nov 2026)
 };
 
 /**

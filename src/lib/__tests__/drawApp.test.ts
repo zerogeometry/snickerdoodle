@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { drawBrandFiles } from '@/lib/brand';
 import { DRAW_SCREENSHOTS, DRAW_STORE_BADGES, DRAW_VIDEO, showsDrawBubble, storeHref } from '@/lib/drawApp';
-import { DRAW_FAQ, FAQ, plainAnswer } from '@/lib/faq';
+import { DRAW_FAQ, drawWhere, FAQ, plainAnswer } from '@/lib/faq';
 import { llmsTxt } from '@/lib/llmsTxt';
 import { PUBLIC_PAGES } from '@/lib/seo';
 import { PUBLIC_FILES } from '@/lib/siteMode';
@@ -65,9 +65,21 @@ describe('the /draw questions — the FAQ’s rules, and honest about the stores
     }
   });
 
-  it('never claims the app can be downloaded while no store link is set', () => {
-    if (storeHref('appStore') || storeHref('googlePlay')) return;
-    for (const it of all.filter((i) => /App Store|Google Play/.test(i.a))) expect(it.a, it.id).toMatch(/coming soon to the App Store/);
+  it('never claims the app can be downloaded from a store whose link isn’t set', () => {
+    const answers = all.filter((i) => /App Store|Google Play/.test(i.a));
+    expect(answers.length).toBeGreaterThan(0);
+    for (const it of answers) {
+      if (!storeHref('appStore')) expect(it.a, it.id).toMatch(/coming soon to (the App Store|the App Store and Google Play)/);
+      if (!storeHref('googlePlay')) expect(it.a, it.id).toMatch(/coming soon to (Google Play|the App Store and Google Play)/);
+      if (storeHref('googlePlay')) expect(it.a, it.id).toMatch(/on (Google Play|the App Store and Google Play)/);
+    }
+  });
+
+  it('says where Draw is, store by store (Google Play went live first)', () => {
+    expect(drawWhere({ appStore: false, googlePlay: false })).toBe('coming soon to the App Store and Google Play, for iPhone, iPad and Android');
+    expect(drawWhere({ appStore: false, googlePlay: true })).toBe('on Google Play for Android phones and tablets, and coming soon to the App Store for iPhone and iPad');
+    expect(drawWhere({ appStore: true, googlePlay: false })).toBe('on the App Store for iPhone and iPad, and coming soon to Google Play for Android');
+    expect(drawWhere({ appStore: true, googlePlay: true })).toBe('on the App Store and Google Play, for iPhone, iPad and Android');
   });
 });
 

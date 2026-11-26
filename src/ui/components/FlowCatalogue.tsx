@@ -262,6 +262,13 @@ export function FlowCatalogue({
     p.allowed = Math.max(p.allowed, group);
     rangeRef.current?.allow(group);
   }, []);
+  // A new drawing, or a new edit of it (remove background, the Studio), reloads the range from its first
+  // tiles: the list goes back to its top, so the shopper sees them arrive, never a blank foot of the list
+  // whose photos come last (founder, 26 Nov 2026).
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [art]);
   const [paintedArt, setPaintedArt] = useState('');
   const showingRef = useRef(false);
   showingRef.current = !!art && paintedArt === art && revealed;
@@ -347,7 +354,7 @@ export function FlowCatalogue({
               screen readers; "full catalogue" sits at the foot of the list. */}
           <h2 className="sr-only">{picks.length > 0 ? 'your collection' : 'the range'}</h2>
           {/* Fills the remaining column height and scrolls; fixed height on mobile too. */}
-          <div className="brand-scroll h-[52dvh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
+          <div ref={listRef} className="brand-scroll h-[52dvh] min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 md:h-auto">
             {picks.length > 0 ? (
               <>
                 <SectionLabel>your picks</SectionLabel>
@@ -403,7 +410,7 @@ export function FlowCatalogue({
               ))}
             </div>
           ) : null}
-          <div className={scrollClasses}>
+          <div ref={listRef} className={scrollClasses}>
             <ProductGrid products={flatShown} gridClassName={gridClassName} onZoom={setZoom} {...gridProps} />
           </div>
         </>

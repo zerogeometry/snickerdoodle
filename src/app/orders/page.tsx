@@ -40,9 +40,9 @@ export default async function OrdersPage() {
           </div>
         ) : (
           <div className="mt-5 space-y-4">
-            {/* one tile per order, the newest open (founder, 26 Nov 2026) */}
+            {/* one tile per order, all closed until tapped (founder, 26 Nov 2026) */}
             {orders.map((o, oi) => (
-              <OrderTile key={o.ref} order={o} index={oi} open={oi === 0} />
+              <OrderTile key={o.ref} order={o} index={oi} open={false} />
             ))}
             <Link href="/start-creating" className="inline-flex min-h-11 items-center gap-1 text-sm font-bold text-cinnamon">
               keep creating <Icon icon={IconArrowRight} size={15} />

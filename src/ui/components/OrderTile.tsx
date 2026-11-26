@@ -125,7 +125,12 @@ export function OrderTile({ order: o, index, open }: { order: OrderSummary; inde
             return (
               <li key={i} className="grid grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-line bg-paper p-2.5">
                 <div className="h-14 w-14 overflow-hidden rounded-xl bg-oat">
-                  <OrderLineThumb line={l} cardPreviewVariantId={o.cardPreviewVariantId} px={56} />
+                  <OrderLineThumb
+                    line={l}
+                    cardPreviewVariantId={o.cardPreviewVariantId}
+                    px={56}
+                    zoom={{ title: name, subtitle: [sub, l.packSize ? `one of the cards in ${qty ?? 'the pack'}` : qty].filter(Boolean).join(' · ') || undefined }}
+                  />
                 </div>
                 <div className="min-w-0">
                   <div className="break-words text-sm font-bold text-cocoa">{name}</div>
