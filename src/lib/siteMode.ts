@@ -92,6 +92,7 @@ export const TEST_GATE_DAYS = 30;
  * its Server Actions then ran without the password). src/lib/__tests__/breakInGate.test.ts fails when
  * this list and public/ disagree — add a new public file here when you add it there. */
 export const PUBLIC_FILES: ReadonlySet<string> = new Set([
+  '/badges/google-play-en-gb.png', // Google's official "Get it on Google Play" badge, unaltered
   '/brand/draw-icon-christmas.webp',
   '/brand/draw-icon.webp',
   '/brand/draw-logo-christmas.webp',

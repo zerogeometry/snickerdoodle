@@ -18,9 +18,12 @@ export function StoreBadge({ store, className }: { store: DrawStore; className?:
   const label = STORE_LABEL[store];
 
   if (href && badge) {
+    // Google's badge file carries its required clear space around the badge (about a sixth of its height on each side),
+    // so it's drawn taller and pulled into the 48px row: the badge itself then stands about as tall as the button beside it.
+    const padded = store === 'googlePlay';
     return (
-      <a href={href} rel="noreferrer" className={cn('press inline-flex min-h-12 items-center rounded-[10px]', className)}>
-        <img src={badge} alt={label.full} height={48} className="block h-12 w-auto" />
+      <a href={href} rel="noreferrer" className={cn('press inline-flex min-h-12 items-center rounded-[10px]', padded && '-mx-2.5', className)}>
+        <img src={badge} alt={label.full} height={padded ? 70 : 48} className={padded ? 'block h-[70px] w-auto -my-[11px]' : 'block h-12 w-auto'} />
       </a>
     );
   }
