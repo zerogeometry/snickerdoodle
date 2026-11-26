@@ -133,7 +133,8 @@ export default function CheckoutPage() {
       if (w?.applied) return { ok: true, text: 'your first card’s on us ✦' };
       if (w?.reason === 'needs-card') return { ok: true, text: 'first order? your first greetings card is on us — add one to your basket ✦' };
       if (w?.reason === 'needs-more') return { ok: false, text: 'your free card comes with a slightly bigger order — add something else and it’s on us' };
-      if (!signedIn && quote.lines.length > 0) return { ok: true, text: 'first order? log in and your first greetings card is on us ✦' };
+      // only while the shop's welcome card is switched on (/admin/codes) — off, a guest isn't promised it
+      if (!signedIn && quote.welcomeOffered) return { ok: true, text: 'first order? log in and your first greetings card is on us ✦' };
       return null;
     }
     if (quote.promoError === 'unknown') return { ok: false, text: 'we don’t recognise that code — check the spelling?' };
