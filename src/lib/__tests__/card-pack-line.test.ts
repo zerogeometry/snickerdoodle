@@ -33,7 +33,7 @@ describe('cardPackLine — the basket line shape', () => {
   });
 });
 
-describe('the basket keeps a pack at qty 1', () => {
+describe('a pack line in the basket: its qty is how many packs (founder, 26 Nov 2026)', () => {
   const line = () => cardPackLine({ id: 'pack-1', variant: FIVE, packSize: 5, cards: ['a', 'b', 'c', 'd', 'e'].map((x) => cardOf(x)) });
 
   it('adds as qty 1', () => {
@@ -42,18 +42,24 @@ describe('the basket keeps a pack at qty 1', () => {
     expect(useBasket.getState().items[0]).toMatchObject({ id: 'pack-1', qty: 1 });
   });
 
-  it('re-adding the same pack line replaces it rather than making it 2', () => {
+  it('re-adding the same pack line replaces its cards (keeping how many packs) rather than adding one', () => {
     useBasket.getState().add(line());
     useBasket.getState().add({ ...line(), cards: Array.from({ length: 5 }, () => cardOf('z')) });
+    expect(useBasket.getState().items[0]).toMatchObject({ qty: 1 });
+    useBasket.getState().setQty('pack-1', 2);
+    useBasket.getState().add({ ...line(), cards: Array.from({ length: 5 }, () => cardOf('z')) });
+    expect(useBasket.getState().items).toHaveLength(1);
+    expect(useBasket.getState().items[0]).toMatchObject({ qty: 2 });
+    useBasket.getState().setQty('pack-1', 1);
     const [only] = useBasket.getState().items;
     expect(only).toMatchObject({ qty: 1 });
     expect(only!.cards!.every((c) => c.assetId === 'z')).toBe(true);
   });
 
-  it('setQty can only keep it at 1 or remove it', () => {
+  it('setQty counts packs up and down; 0 removes it', () => {
     useBasket.getState().add(line());
     useBasket.getState().setQty('pack-1', 3);
-    expect(useBasket.getState().items[0]!.qty).toBe(1);
+    expect(useBasket.getState().items[0]!.qty).toBe(3);
     useBasket.getState().setQty('pack-1', 0);
     expect(useBasket.getState().items).toHaveLength(0);
   });

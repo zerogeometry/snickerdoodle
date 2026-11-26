@@ -1,9 +1,9 @@
 import { CATALOGUE, DELIVERY_PENCE, FAMILY_SET_MIN_QTY, FAMILY_SET_SAVING_BPS, isFamilySetKey, type PricedCatalogue } from './catalogue';
 import { formatPence } from './format';
 import { evaluatePromo, type CardNotApplied, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
-import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
+import { isCardPackKey } from '@/lib/card-packs';
 import { economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
 import { costSampleLines } from './sample';
 
@@ -157,10 +157,10 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
       rejectedKeys.push(r.productKey);
       continue;
     }
-    // A card PACK line is always ONE pack — its N cards ride with it (src/lib/card-packs.ts), so a
-    // client asking for "qty 3" of a pack can't get three packs' worth of cards for one pack's price.
-    // The CHRISTMAS BUNDLE likewise: one bundle per line (its size is its variant).
-    const qty = isCardPackKey(r.productKey) || isBundleKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
+    // A card PACK line's qty is how many PACKS (founder, 26 Nov 2026): each is the same cards, priced a pack each —
+    // the order prints every card that many times (src/server/orders.ts), so qty 3 is three packs' price for
+    // three packs' cards. The CHRISTMAS BUNDLE is still one bundle per line (its size is its variant).
+    const qty = isBundleKey(r.productKey) ? Math.min(1, clampQty(r.qty)) : clampQty(r.qty);
     if (qty <= 0) continue;
     const entry = catalogue[r.productKey]!;
     // SERVER price — request price (if any) ignored.
@@ -196,9 +196,12 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   // Resolved from the priced lines + the server catalogue alone — no client flag exists.
   const productOf = productOfKey;
   const qtyOfProduct = new Map<string, number>();
-  for (const l of lines) if (!isBundleKey(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
+  // a card pack is already the bulk buy: several packs are a pack's price each (no buy more & save — the basket
+  // shows no tiers for a pack either, src/app/actions/quote.ts). The bundle likewise.
+  const noMultiBuy = (k: string) => isBundleKey(k) || isCardPackKey(k);
+  for (const l of lines) if (!noMultiBuy(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
   const multiBuyLines = lines.map((l) => {
-    if (isBundleKey(l.productKey)) return { bps: 0, pence: 0 };
+    if (noMultiBuy(l.productKey)) return { bps: 0, pence: 0 };
     const tiers = multiBuyTiers(lineEconomics(catalogue, l.productKey));
     const bps = tierFor(tiers, qtyOfProduct.get(productOf(l.productKey)) ?? 0);
     return { bps, pence: bpsOf(l.linePence, bps) };

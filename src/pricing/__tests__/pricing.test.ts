@@ -349,10 +349,11 @@ describe('card packs — pricing', () => {
     expect(pack).toBeLessThan(singles);
   });
 
-  it('a pack line always prices as ONE pack, whatever qty the client sends', () => {
+  it('a pack line’s qty is how many packs — each priced a pack (founder, 26 Nov 2026)', () => {
     const q = priceBasket([{ productKey: 'cardPack-packof10', qty: 3 }], { catalogue: cat });
-    expect(q.lines[0]).toMatchObject({ qty: 1, unitPricePence: 2100, linePence: 2100 });
-    expect(q.totalPence).toBe(2100);
+    expect(q.lines[0]).toMatchObject({ qty: 3, unitPricePence: 2100, linePence: 6300 });
+    expect(q.multiBuySavingPence).toBe(0); // a pack is already the bulk buy — no buy more & save on top
+    expect(q.totalPence).toBe(6300 + q.deliveryPence);
   });
 
   it('two packs are two lines — each its own N cards', () => {

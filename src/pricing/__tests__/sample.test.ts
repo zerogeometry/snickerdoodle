@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { cardFeeFor, costSampleLines, priceBasket, quote, SAMPLE_ECONOMICS, type PricedCatalogue, type PromoRule } from '@/pricing';
 import { bundleCostPence } from '@/lib/christmas-bundle';
+import { expandCardPack } from '@/lib/card-packs';
 
 // (Made-up round costs: the real ones never go in this public repo.)
 // An admin's SAMPLE ORDER at cost (founder, 25 Nov 2026): Prodigi's product + post (ex-VAT, shared parcels pay
@@ -68,6 +69,18 @@ describe('a sample order is priced at what it costs us', () => {
     const q = quote([{ productKey: 'cardPack-5', qty: 1 }], { catalogue: CAT, sample: true });
     expect(q.sample?.costExVatPence).toBe(600);
     expect(q.lines[0]!.linePence).toBe(720);
+  });
+
+  it('a card pack at cost still splits evenly between its cards (a 5 or a 10), so the order can be placed', () => {
+    const cat: PricedCatalogue = { cardPack: { pricePence: 1200, label: 'pack of 5', unitCostPence: 653, postFirstPence: 95, postExtraPence: 0 }, 'cardPack-packof10': { pricePence: 2100, label: 'pack of 10', unitCostPence: 1197, postFirstPence: 95, postExtraPence: 0 } };
+    const q = quote([{ productKey: 'cardPack', qty: 1 }, { productKey: 'cardPack-packof10', qty: 2 }], { catalogue: cat, sample: true });
+    const [five, ten] = q.lines;
+    expect(five!.unitPricePence % 10).toBe(0);
+    expect(ten!.unitPricePence % 10).toBe(0);
+    expect(five!.unitPricePence).toBeGreaterThanOrEqual(Math.ceil(653 * 1.2)); // never under cost + VAT
+    const card = { assetId: 'a', transform: {} };
+    expect(() => expandCardPack(five!.unitPricePence, 5, Array.from({ length: 5 }, () => card), undefined, five!.qty)).not.toThrow();
+    expect(() => expandCardPack(ten!.unitPricePence, 10, Array.from({ length: 10 }, () => card), undefined, ten!.qty)).not.toThrow();
   });
 
   it('the christmas bundle is costed from its pieces (src/lib/christmas-bundle.ts)', () => {

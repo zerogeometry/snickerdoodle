@@ -375,10 +375,10 @@ export async function placeOrder(
       if (input.giftLink) throw new Error('a card pack can’t be bought through a gift link');
       const packSize = packSizeOf(variantId ? specByVariantId.get(variantId)?.attributes.size : null);
       if (!variantId || !packSize) throw new Error('unknown card pack');
-      // Pack price = the SERVER's priced line (always qty 1); the client's cards only say WHICH drawings.
+      // Pack price = the SERVER's priced line (its qty = how many packs); the client's cards only say WHICH drawings.
       const priced = q.lines[i]!;
-      // One colour per pack: every card line carries the pack's (normalised) base colour.
-      const groups = expandCardPack(priced.linePence, packSize, line.cards ?? [], line.ground);
+      // One colour per pack: every card line carries the pack's (normalised) base colour; several packs print each card that many times.
+      const groups = expandCardPack(priced.unitPricePence, packSize, line.cards ?? [], line.ground, priced.qty);
       const prepared: Array<{ art: PreparedArt; qty: number; unitPricePence: number; linePence: number }> = [];
       for (const g of groups) {
         const art = await prepareArtwork({ assetId: g.card.assetId, transform: g.card.transform, sourceObjectId: g.card.sourceObjectId ?? undefined, ground: g.ground ?? undefined }, line.productKey, variantId, { blankCard: true });
