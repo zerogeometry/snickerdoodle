@@ -3,7 +3,6 @@ import { formatPence } from './format';
 import { evaluatePromo, type CardNotApplied, type PromoKind, type PromoNotApplied, type PromoRule } from './promo';
 import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import { parcelGroupOf, parcelSaving } from './parcels';
-import { isCardPackKey } from '@/lib/card-packs';
 import { economicsOf, multiBuyTiers, tierFor, type UnitEconomics } from './multibuy';
 import { costSampleLines } from './sample';
 
@@ -196,9 +195,9 @@ export function priceBasket(requested: readonly RequestedLine[], opts: PriceOpts
   // Resolved from the priced lines + the server catalogue alone — no client flag exists.
   const productOf = productOfKey;
   const qtyOfProduct = new Map<string, number>();
-  // a card pack is already the bulk buy: several packs are a pack's price each (no buy more & save — the basket
-  // shows no tiers for a pack either, src/app/actions/quote.ts). The bundle likewise.
-  const noMultiBuy = (k: string) => isBundleKey(k) || isCardPackKey(k);
+  // the bundle is one bundle (no buy more & save). Card packs DO share their postage saving like every other product
+  // (founder, 26 Nov 2026): several packs earn the same margin-guarded tiers (src/pricing/multibuy.ts).
+  const noMultiBuy = (k: string) => isBundleKey(k);
   for (const l of lines) if (!noMultiBuy(l.productKey)) qtyOfProduct.set(productOf(l.productKey), (qtyOfProduct.get(productOf(l.productKey)) ?? 0) + l.qty);
   const multiBuyLines = lines.map((l) => {
     if (noMultiBuy(l.productKey)) return { bps: 0, pence: 0 };

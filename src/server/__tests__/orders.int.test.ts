@@ -297,7 +297,9 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
     expect(order!.subtotalPence).toBe(4 * 2100);
-    expect(order!.totalPence).toBe(4 * 2100);
+    // four packs share their postage saving like every other product (buy more & save — founder, 26 Nov 2026)
+    expect(order!.multiBuySavingPence).toBeGreaterThan(0);
+    expect(order!.totalPence).toBe(4 * 2100 - order!.multiBuySavingPence);
 
     const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
     expect(lines.map((l) => l.qty).sort((x, y) => x - y)).toEqual([8, 12, 20]); // every card four times over
