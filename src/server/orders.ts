@@ -1,3 +1,4 @@
+import { parcelsOf, type Parcel } from '@/lib/tracking';
 import { randomBytes } from 'node:crypto';
 import { and, desc, eq, inArray } from 'drizzle-orm';
 import { AuthzError, canBuyAsset, canPurchaseViaGiftLink, type GiftLinkGrant } from '@/authz';
@@ -6,7 +7,7 @@ import { createCheckoutSession, isStripeConfigured } from '@/payments/stripe';
 import { CHECKOUT_SESSION_TTL_SEC, PROMO_HOLD_MS, claimPromoForOrder, settlePartnerCommission, type PromoRefusal } from './promos';
 import { screenPendingNow } from './moderation';
 import { forgetBasketAfterPaid } from './savedBasket';
-import { receiptLines, receiptSavings, type ReceiptLine } from '@/lib/order-lines';
+import { receiptLines, receiptSavings, type LineArt, type ReceiptLine } from '@/lib/order-lines';
 import { normalizeCushionBack } from '@/lib/catalogue-view';
 import { isGroundProduct, normalizeGround } from '@/lib/patterns';
 import { expandCardPack, isCardPackKey, packSizeOf } from '@/lib/card-packs';
@@ -602,28 +603,50 @@ export interface OrderSummary {
   items: ReceiptLine[];
   savings: { label: string; pence: number }[];
   deliveryPence: number;
-  /** Carrier + tracking, once it has shipped (null for untracked post). */
-  tracking: { carrier?: string | null; number?: string | null; url?: string | null } | null;
+  /** Every parcel and its tracking, as each leaves its print lab (empty for untracked post / not sent yet). */
+  parcels: Parcel[];
+  /** Who it's going to (it may be a gift) — the address Stripe collected; null until paid. */
+  shipTo: { name: string; line1: string; line2?: string | null; townOrCity: string; postcode: string; countryCode: string } | null;
+  /** Sent as a gift (prices tucked away in the parcel). */
+  gift: boolean;
+  /** The greetings card's own variant — a card pack's thumbnail is drawn on a single card. */
+  cardPreviewVariantId: string | null;
 }
 
 export async function getOrdersForAccount(db: DbHandle, accountId: string): Promise<OrderSummary[]> {
   const rows = await db.select().from(orders).where(eq(orders.accountId, accountId)).orderBy(desc(orders.createdAt));
   const result: OrderSummary[] = [];
   const stale = Date.now() - PROMO_HOLD_MS;
+  const [cardVariant] = await db.select({ id: productVariants.id }).from(productVariants).where(eq(productVariants.sku, 'card')).limit(1);
   for (const o of rows) {
     // A checkout left at Stripe (they came back to the basket, or closed the tab) isn't an order the
     // family made: past the hold it's never shown as "awaiting payment" — it simply appears if paid.
     if (o.status === 'PENDING' && o.createdAt.getTime() < stale) continue;
     const items = await db.select().from(orderItems).where(eq(orderItems.orderId, o.id)).orderBy(orderItems.seq); // as placed
+    // each line's drawing as placed (its first print area), for the orders page's thumbnails — the picture itself is
+    // fetched by MockupPreview through the usual authz-gated route, never minted here
+    const arts = items.length
+      ? await db
+          .select({ orderItemId: orderItemArtwork.orderItemId, printArea: orderItemArtwork.printArea, assetId: orderItemArtwork.assetId, transform: orderItemArtwork.transform, sourceObjectId: orderItemArtwork.sourceObjectId, ground: orderItemArtwork.ground })
+          .from(orderItemArtwork)
+          .where(inArray(orderItemArtwork.orderItemId, items.map((it) => it.id)))
+      : [];
+    const artOf = new Map<string, LineArt>();
+    for (const a of arts.sort((x, y) => (x.printArea ?? '').localeCompare(y.printArea ?? ''))) {
+      if (a.assetId && !artOf.has(a.orderItemId)) artOf.set(a.orderItemId, { assetId: a.assetId, transform: (a.transform as LineArt['transform']) ?? null, sourceObjectId: a.sourceObjectId, ground: a.ground });
+    }
     result.push({
       ref: o.ref,
       status: o.status,
       totalPence: o.totalPence,
       createdAtISO: o.createdAt.toISOString(),
-      items: receiptLines(items),
+      items: receiptLines(items.map((it) => ({ ...it, art: artOf.get(it.id) ?? null }))),
       savings: receiptSavings(o),
       deliveryPence: o.deliveryPence,
-      tracking: o.tracking ?? null,
+      parcels: parcelsOf(o.tracking),
+      shipTo: o.shippingAddress ?? null,
+      gift: o.isGift === true,
+      cardPreviewVariantId: cardVariant?.id ?? null,
     });
   }
   return result;

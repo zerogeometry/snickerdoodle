@@ -12,7 +12,7 @@ import { FaqAnswer } from './FaqAnswer';
 type Suggestion = { id: string; q: string; a: string };
 
 /**
- * "Still need a hand?" (founder, 23 Oct): pick a topic → the likeliest answers once more → then the
+ * "Need a hand?" (founder, 23 Oct; "still" dropped 26 Nov): pick a topic → the likeliest answers once more → then the
  * message. Order topics ask for the order reference. Saved on our side before anything is emailed,
  * so a message is never lost. A ≥44px target everywhere; labelled; errors said in words.
  */

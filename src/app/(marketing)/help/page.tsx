@@ -1,9 +1,11 @@
 import type { Metadata } from 'next';
+import { IconArrowLeft } from '@tabler/icons-react';
 import Link from 'next/link';
 import { FAQ } from '@/lib/faq';
 import { HELLO_EMAIL, SUPPORT_TOPICS, cleanOrderRef, supportTopic } from '@/lib/support';
 import { getCurrentAccount } from '@/server/session';
 import { CaveatNote } from '@/ui/primitives/CaveatNote';
+import { Icon } from '@/ui/primitives/Icon';
 import { FaqAnswer } from '@/ui/components/FaqAnswer';
 import { FaqSearch } from '@/ui/components/FaqSearch';
 import { SupportForm } from '@/ui/components/SupportForm';
@@ -25,6 +27,8 @@ const POPULAR = ['delivery-cost', 'change-order', 'returns', 'print-quality', 'g
 export default async function HelpPage({ searchParams }: { searchParams: Promise<{ topic?: string; order?: string }> }) {
   const { topic, order } = await searchParams;
   const account = await getCurrentAccount();
+  // came from an order's "need help with this order?" (founder, 26 Nov 2026): say which order, and offer the way back
+  const orderRef = cleanOrderRef(order);
   const byId = new Map(FAQ.flatMap((s) => s.items).map((it) => [it.id, it]));
   const popular = POPULAR.map((id) => byId.get(id)).filter((x) => !!x);
   // the topics' "these might help" answers, as plain props for the form
@@ -65,12 +69,21 @@ export default async function HelpPage({ searchParams }: { searchParams: Promise
           </section>
 
           <section id="contact" aria-labelledby="contact-title" className="scroll-mt-6 rounded-[24px] border-2 border-cocoa bg-paper p-5 shadow-[0_4px_0_var(--color-cocoa)] md:p-7">
+            {orderRef && account ? (
+              <Link href="/orders" className="-ml-1 mb-2 inline-flex min-h-11 items-center gap-1.5 text-[14px] font-bold text-cinnamon">
+                <Icon icon={IconArrowLeft} size={16} /> back to your orders
+              </Link>
+            ) : null}
             <h2 id="contact-title" className="font-display text-2xl text-cocoa md:text-3xl">
-              Still need a hand?
+              {orderRef ? `Need a hand with order ${orderRef}?` : 'Need a hand?'}
             </h2>
-            <p className="mt-1 text-[15px] text-ink-soft">Tell us what it’s about and send us a message — a real person reads every one and replies by email. Order questions too: include your order reference and we’ll do what we can.</p>
+            <p className="mt-1 text-[15px] text-ink-soft">
+              {orderRef
+                ? 'Tell us what’s happened and a real person will read it and reply by email. Your order number’s already filled in.'
+                : 'Tell us what it’s about and send us a message — a real person reads every one and replies by email. Order questions too: include your order reference and we’ll do what we can.'}
+            </p>
             <div className="mt-5">
-              <SupportForm suggestions={suggestions} defaultEmail={account?.email ?? ''} defaultTopic={supportTopic(topic)?.id ?? ''} defaultOrderRef={cleanOrderRef(order) ?? ''} />
+              <SupportForm suggestions={suggestions} defaultEmail={account?.email ?? ''} defaultTopic={supportTopic(topic)?.id ?? ''} defaultOrderRef={orderRef ?? ''} />
             </div>
           </section>
 
