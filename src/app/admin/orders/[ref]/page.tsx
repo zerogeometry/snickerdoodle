@@ -111,8 +111,10 @@ async function Detail({ reviewer, orderRef }: { reviewer: AdminReviewer; orderRe
         <div className="mt-3 flex flex-wrap gap-2">
           {o.canRetry ? <RetryOrder orderRef={o.ref} /> : null}
           {o.stripePaymentIntent ? <Ext href={stripePaymentUrl(o.stripePaymentIntent)}>open in Stripe</Ext> : null}
-          {o.prodigiOrderId ? <Ext href={prodigiOrderUrl(o.prodigiOrderId)}>open in Prodigi</Ext> : null}
+          {o.prodigiOrderId ? <Ext href={prodigiOrderUrl(o.prodigiOrderId)}>{o.prodigiSplitOrderId ? 'open the main order in Prodigi' : 'open in Prodigi'}</Ext> : null}
+          {o.prodigiSplitOrderId ? <Ext href={prodigiOrderUrl(o.prodigiSplitOrderId)}>open the phone case’s order in Prodigi</Ext> : null}
         </div>
+        {o.shippingMethod ? <p className="mt-2 text-xs text-ink-soft">Sent by: {o.shippingMethod}</p> : null}
       </section>
 
       <section aria-label="what was bought" className="rounded-[20px] border-2 border-cocoa/15 bg-paper p-4">

@@ -442,6 +442,13 @@
       "when": 1795628526320,
       "tag": "0062_saved_baskets",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1795712714146,
+      "tag": "0063_split_phone_case_order",
+      "breakpoints": true
     }
   ]
 }

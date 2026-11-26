@@ -34,6 +34,38 @@ export function shippingMethodFor(keys: readonly string[]): 'Standard' | 'Expres
   return keys.some((k) => isOf(EXPRESS_FOR_TRACKING_KEYS, k)) && !keys.some((k) => isOf(NO_EXPRESS_KEYS, k)) ? 'Express' : 'Standard';
 }
 
+/** Is a parcel's carrier service a TRACKED one ("Royal Mail Standard Tracked", "FedEx … Tracked & Signed", "Evri",
+ * "DPD")? Untracked: "Royal Mail RM24", "Guernsey Post Standard". Unknown → untracked (the safe answer). */
+export function isTrackedService(s: { carrier: string; service: string }): boolean {
+  return /track|signed|evri|dpd|next day/.test(`${s.carrier} ${s.service}`.toLowerCase());
+}
+
+/** A product that must travel TRACKED, whatever the rest of the order does (the phone case). */
+export const isExpressForTracking = (key: string): boolean => isOf(EXPRESS_FOR_TRACKING_KEYS, key);
+
+/**
+ * How an order goes to Prodigi (founder, 26 Nov 2026: "we can't have it so when we need Express for one product,
+ * all the products go Express"; "only goes as its own Express order if Standard isn't tracked"):
+ *  - no phone case → ONE order, by {@link shippingMethodFor} (Standard);
+ *  - a phone case whose Standard post IS tracked (Prodigi's quote, checked at sending) → ONE order, Standard;
+ *  - a phone case whose Standard post ISN'T tracked → the case alone as its OWN Express order (always tracked), the
+ *    rest Standard in the main order — so nothing else pays Express. Case only → one Express order.
+ * `alreadySplit`: the case's Express order already exists (an earlier attempt) — keep the split, never a second case.
+ */
+export function planShipments(
+  lines: ReadonlyArray<{ itemId: string; productKey: string }>,
+  caseTrackedOnStandard: boolean,
+  alreadySplit = false,
+): { main: { itemIds: string[]; shippingMethod: 'Standard' | 'Express' }; split: { itemIds: string[] } | null } {
+  const cases = lines.filter((l) => isExpressForTracking(l.productKey)).map((l) => l.itemId);
+  const rest = lines.filter((l) => !isExpressForTracking(l.productKey)).map((l) => l.itemId);
+  const all = lines.map((l) => l.itemId);
+  if (cases.length === 0) return { main: { itemIds: all, shippingMethod: shippingMethodFor(lines.map((l) => l.productKey)) }, split: null };
+  if (rest.length === 0) return { main: { itemIds: all, shippingMethod: caseTrackedOnStandard && !alreadySplit ? 'Standard' : 'Express' }, split: null };
+  if (caseTrackedOnStandard && !alreadySplit) return { main: { itemIds: all, shippingMethod: 'Standard' }, split: null };
+  return { main: { itemIds: rest, shippingMethod: 'Standard' }, split: { itemIds: cases } };
+}
+
 /** A product key OR a variant sku (`wrappingPaper-2mroll`). */
 export const shipsTracked = (key: string): boolean => !isOf(UNTRACKED_STANDARD_KEYS, key);
 
@@ -64,7 +96,6 @@ export const deliveryDays = (productKey: string) => DELIVERY_DAYS[routeOf(produc
 /** The delivery line for one product, or for a basket of them (tracked only if EVERY line is). */
 export function deliveryLine(keys: string | readonly string[]): string {
   const list = typeof keys === 'string' ? [keys] : keys;
-  // an Express-for-tracking product in an order that can't go Express goes by its untracked Standard post
-  const expressDenied = list.some((k) => isOf(EXPRESS_FOR_TRACKING_KEYS, k)) && shippingMethodFor(list) === 'Standard';
-  return list.every(shipsTracked) && !expressDenied ? 'free tracked delivery' : 'free delivery';
+  // a phone case always travels tracked now (its own Express order when its Standard isn't — planShipments)
+  return list.every(shipsTracked) ? 'free tracked delivery' : 'free delivery';
 }

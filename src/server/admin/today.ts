@@ -72,6 +72,7 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date(), scope?: Ne
       claimedAt: orders.claimedAt,
       createdAt: orders.createdAt,
       prodigiOrderId: orders.prodigiOrderId,
+      prodigiSplitOrderId: orders.prodigiSplitOrderId,
       submitError: orders.submitError,
       totalPence: orders.totalPence,
       refundedPence: orders.refundedPence,
@@ -86,6 +87,7 @@ export async function gatherNeedFacts(db: DbHandle, now = new Date(), scope?: Ne
         troubledIds.length ? and(eq(orders.status, 'PAID'), inArray(orders.id, troubledIds)) : sql`false`,
         eq(orders.status, 'FULFILLING'),
         and(eq(orders.status, 'CANCELLED'), isNotNull(orders.prodigiOrderId), gte(orders.createdAt, recent)),
+        and(eq(orders.status, 'CANCELLED'), isNotNull(orders.prodigiSplitOrderId), gte(orders.createdAt, recent)),
         isNotNull(orders.dispute),
       ),
     );

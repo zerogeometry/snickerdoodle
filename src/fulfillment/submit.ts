@@ -12,7 +12,7 @@ import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD
 import { startRetentionClockForOrder } from '@/server/retention';
 import { sendOrderShipped } from '@/server/orderEmails';
 import { alertHandLines } from './handLines';
-import { shippingMethodFor } from '@/lib/delivery';
+import { isExpressForTracking, isTrackedService, planShipments, shippingMethodFor } from '@/lib/delivery';
 import { giftNoteInsertKey, giftNoteInsertSlot, planGiftNoteInsert, type GiftNoteInsertRecord, type GiftNoteInsertSlot } from './giftNoteInsert';
 
 /**
@@ -261,6 +261,7 @@ export async function submitReadyOrders(
       isGift: orders.isGift,
       giftNote: orders.giftNote,
       giftFromName: orders.giftFromName,
+      prodigiSplitOrderId: orders.prodigiSplitOrderId,
     })
     .from(orders)
     .where(
@@ -313,6 +314,7 @@ async function submitOne(
     isGift: boolean;
     giftNote: string | null;
     giftFromName: string | null;
+    prodigiSplitOrderId?: string | null;
   },
   env: GateEnv,
   transport: ProdigiOrderTransport,
@@ -477,6 +479,7 @@ async function submitOne(
     return { ref: order.ref, status: 'failed', note: msg };
   }
 
+  // provisional — the plan below (after Prodigi's tracked check) records how it really goes
   const shippingMethod = resolveShippingMethod(fulfillable.map((l) => l.productKey));
 
   // CLAIM: PAID → FULFILLING (stamped), guarded on the current status so overlapping
@@ -550,15 +553,33 @@ async function submitOne(
       });
     }
 
+    // HOW IT SHIPS (founder, 26 Nov 2026): a phone case whose Standard post isn't tracked goes as its OWN Express order,
+    // so the rest of the basket isn't sent Express; tracked on Standard (Prodigi's quote, asked now) → one Standard order.
+    const productKeyOf = new Map(fulfillable.map((l) => [l.itemId, l.productKey]));
+    const caseItems = items.filter((i) => isExpressForTracking(productKeyOf.get(i.merchantReference!) ?? ''));
+    const alreadySplit = !!order.prodigiSplitOrderId;
+    const caseTracked = caseItems.length > 0 && !alreadySplit ? await caseTrackedOnStandard(transport, caseItems, recipient.address.countryCode) : false;
+    const plan = planShipments([...productKeyOf].map(([itemId, productKey]) => ({ itemId, productKey })), caseTracked, alreadySplit);
+    const mainItems = items.filter((i) => plan.main.itemIds.includes(i.merchantReference!));
+    const mainMethod = plan.main.shippingMethod;
+    await db.update(orders).set({ shippingMethod: plan.split ? 'Standard + Express (phone case on its own)' : mainMethod }).where(eq(orders.id, order.id));
+    if (plan.split) {
+      // The case's own Express order FIRST, its id kept straight away: if the main order then fails, the retry sends
+      // the case again with the SAME idempotency key — Prodigi returns the same order, never a second case.
+      const splitItems = items.filter((i) => plan.split!.itemIds.includes(i.merchantReference!));
+      const caseOrder = await transport.createOrder({ merchantReference: `${order.ref}-case`, shippingMethod: 'Express', idempotencyKey: `${order.id}:case`, recipient, items: splitItems });
+      if (caseOrder.order.id !== order.prodigiSplitOrderId) await db.update(orders).set({ prodigiSplitOrderId: caseOrder.order.id }).where(eq(orders.id, order.id));
+    }
+
     // PLAN C9 — the printed gift note, ONLY when the switch is on (GIFT_NOTE_INSERT; OFF by default).
     // Re-screened, first name only, per-lab checked; it can skip itself but never fails the order.
     const insert = await planGiftNoteInsert({
       slot: giftNoteSlot,
       order,
       quote: {
-        shippingMethod,
+        shippingMethod: mainMethod,
         destinationCountryCode: recipient.address.countryCode,
-        items: items.map((i) => ({ sku: i.sku, copies: i.copies, attributes: i.attributes, printAreas: [...new Set(i.assets.map((a) => a.printArea))] })),
+        items: mainItems.map((i) => ({ sku: i.sku, copies: i.copies, attributes: i.attributes, printAreas: [...new Set(i.assets.map((a) => a.printArea))] })),
       },
       quoteInserts: transport.quoteInserts ? (req) => transport.quoteInserts!(req) : undefined,
       store: async (key, png) => {
@@ -571,10 +592,10 @@ async function submitOne(
 
     const request: CreateOrderRequest = {
       merchantReference: order.ref,
-      shippingMethod,
+      shippingMethod: mainMethod,
       idempotencyKey: order.id, // stable + complex; Prodigi returns the SAME order on retry
       recipient,
-      items,
+      items: mainItems,
     };
     let result: Awaited<ReturnType<ProdigiOrderTransport['createOrder']>>;
     try {
@@ -630,9 +651,28 @@ async function submitOne(
       .update(orders)
       .set({ status: 'PAID' })
       .where(and(eq(orders.id, order.id), eq(orders.status, 'FULFILLING'), isNull(orders.prodigiOrderId)));
-    await parkFailure(db, order.id, order.submitAttempts, msg, kind);
+    // a case already sent on its own is at Prodigi whatever happens next — say so, plainly, on the order
+    const [split] = await db.select({ id: orders.prodigiSplitOrderId }).from(orders).where(eq(orders.id, order.id));
+    const shown = split?.id ? `${msg} — NOTE: the phone case already went to Prodigi as its own order (${split.id})` : msg;
+    await parkFailure(db, order.id, order.submitAttempts, shown.slice(0, 600), kind);
     summary.failed++;
-    return { ref: order.ref, status: 'failed', note: msg };
+    return { ref: order.ref, status: 'failed', note: shown };
+  }
+}
+
+/** Would these phone-case items go TRACKED by Prodigi's Standard post (to this country)? Asked of Prodigi's own quote at
+ * the moment of sending. Can't tell (no quote call, an error, an unknown service) → false: the case goes Express. */
+async function caseTrackedOnStandard(transport: ProdigiOrderTransport, items: CreateOrderRequest['items'], countryCode: string): Promise<boolean> {
+  if (!transport.quoteShipping) return false;
+  try {
+    const ships = await transport.quoteShipping({
+      shippingMethod: 'Standard',
+      destinationCountryCode: countryCode,
+      items: items.map((i) => ({ sku: i.sku, copies: i.copies, attributes: i.attributes, printAreas: [...new Set(i.assets.map((a) => a.printArea))] })),
+    });
+    return ships.length > 0 && ships.every(isTrackedService);
+  } catch {
+    return false;
   }
 }
 
@@ -666,7 +706,7 @@ export async function syncSubmittedOrders(
   const summary: SyncSummary = { checked: 0, shipped: 0, cancelled: 0, inProgress: 0, midSubmit: 0, stalled: 0, orders: [] };
 
   const rows = await db
-    .select({ id: orders.id, ref: orders.ref, prodigiOrderId: orders.prodigiOrderId, claimedAt: orders.claimedAt, giftNoteInsert: orders.giftNoteInsert })
+    .select({ id: orders.id, ref: orders.ref, prodigiOrderId: orders.prodigiOrderId, prodigiSplitOrderId: orders.prodigiSplitOrderId, claimedAt: orders.claimedAt, giftNoteInsert: orders.giftNoteInsert })
     .from(orders)
     .where(and(eq(orders.status, 'FULFILLING'), ...(opts?.onlyOrderIds ? [inArray(orders.id, opts.onlyOrderIds)] : [])))
     .orderBy(asc(orders.claimedAt))
@@ -679,20 +719,27 @@ export async function syncSubmittedOrders(
     }
     summary.checked++;
     try {
-      const remote = await transport.getOrder(row.prodigiOrderId);
-      const stage = remote.status?.stage ?? '';
-      const issues = (remote.status?.issues ?? [])
-        .map((i) => redactUrls(`${i.errorCode ?? ''} ${i.description ?? ''}`.trim()))
-        .filter(Boolean);
+      // the main Prodigi order, and the phone case's own one when it went separately: the customer's order has shipped
+      // only when BOTH have; either one cancelled is a person's call, never silently "cancelled" or "shipped"
+      const parts = [await transport.getOrder(row.prodigiOrderId), ...(row.prodigiSplitOrderId ? [await transport.getOrder(row.prodigiSplitOrderId)] : [])];
+      const stages = parts.map((p) => p.status?.stage ?? '');
+      const stage = stages.every((x) => x === 'Complete') ? 'Complete' : stages.every((x) => x === 'Cancelled') ? 'Cancelled' : stages.includes('Cancelled') ? 'PartCancelled' : 'InProgress';
+      const remote = parts[0]!;
+      const issues = parts
+        .flatMap((p, n) => (p.status?.issues ?? []).map((i) => `${n ? 'phone case: ' : ''}${redactUrls(`${i.errorCode ?? ''} ${i.description ?? ''}`.trim())}`))
+        .filter((x) => x.replace('phone case: ', '').length > 0);
+      if (stage === 'PartCancelled') issues.unshift(`${stages[0] === 'Cancelled' ? 'the main order' : 'the phone case’s own order'} was cancelled at Prodigi, the other wasn’t`);
 
       if (stage === 'Complete') {
         const shipment = remote.shipments?.[remote.shipments.length - 1];
         const carrier = typeof shipment?.carrier === 'string' ? shipment.carrier : (shipment?.carrier?.name ?? null);
+        // every parcel's tracking (an order often leaves several labs; the phone case may be its own order)
+        const parcels = parts.flatMap((p) => p.shipments ?? []).map((sh) => ({ carrier: typeof sh.carrier === 'string' ? sh.carrier : (sh.carrier?.name ?? null), number: sh.tracking?.number ?? null, url: sh.tracking?.url ?? null }));
         // guarded on FULFILLING: two overlapping syncs can't both ship it (or both email)
         const moved = await db.transaction(async (tx) => {
           const [m] = await tx
             .update(orders)
-            .set({ status: 'SHIPPED', submitError: null, tracking: { carrier, number: shipment?.tracking?.number ?? null, url: shipment?.tracking?.url ?? null } })
+            .set({ status: 'SHIPPED', submitError: null, tracking: { carrier, number: shipment?.tracking?.number ?? null, url: shipment?.tracking?.url ?? null, parcels } })
             .where(and(eq(orders.id, row.id), eq(orders.status, 'FULFILLING')))
             .returning({ id: orders.id });
           if (!m) return false;
@@ -724,7 +771,7 @@ export async function syncSubmittedOrders(
           await setArtworkStatus(db, row.id, 'IN_PRODUCTION', ['SUBMITTED', 'READY']);
         }
         const ageMs = row.claimedAt ? Date.now() - row.claimedAt.getTime() : 0;
-        if (ageMs > STALL_HOURS * 60 * 60 * 1000 || issues.length > 0) {
+        if (ageMs > STALL_HOURS * 60 * 60 * 1000 || issues.length > 0 || stage === 'PartCancelled') {
           summary.stalled++;
           console.error(`[fulfilment] order ${row.ref} needs attention: in progress ${Math.round(ageMs / 3_600_000)}h${issues.length ? `, issues: ${issues.join('; ')}` : ''}`);
         }

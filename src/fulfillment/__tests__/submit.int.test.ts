@@ -13,6 +13,7 @@ import { placeOrder } from '@/server/orders';
 import { processFulfilment } from '@/fulfillment/worker';
 import { assertProdigiConfigConsistent, redactUrls, releaseBlockedArtwork, resolveShippingMethod, submitReadyOrders, syncSubmittedOrders } from '@/fulfillment/submit';
 import type { CreateOrderRequest, ProdigiOrder, ProdigiOrderTransport } from '@/server/prodigi/orders';
+import { ProdigiError } from '@/server/prodigi/client';
 import { deleteObject } from '@/storage';
 import type { GateEnv } from '@/fulfillment/gate';
 import type { DbHandle } from '@/server/db';
@@ -226,6 +227,130 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
       await db.update(productVariantProviders).set({ providerSku: prevProvider!.providerSku }).where(eq(productVariantProviders.variantId, variantId));
       await db.update(productVariants).set({ attributes: { size: '11×14″', colour: 'gold' } }).where(eq(productVariants.id, variantId));
     }
+  });
+
+  // ── the phone case on its own only when its Standard post isn't tracked (founder, 26 Nov 2026) ──
+  async function paidBasket(productKeys: string[]) {
+    const sam = await resolveViewerContext(db, ids.samId, ids.hartleyId);
+    const ing = await ingestOriginalAsset(db, sam, { familyId: ids.hartleyId, kind: 'DRAWING', buffer: await src(3000, 4200), keptInHome: true });
+    await db.update(schema.assets).set({ isBrandSafeFixture: true }).where(eq(schema.assets.id, ing.assetId));
+    keys.push(ing.key);
+    assetIds.push(ing.assetId);
+    const art = { assetId: ing.assetId, transform: { scale: 0, offsetX: 0, offsetY: 0, rotationDeg: 0 } };
+    const res = await placeOrder(db, { items: productKeys.map((productKey) => ({ productKey, qty: 1, artwork: art })), account: { id: ids.samId } });
+    const [o] = await db.select({ id: orders.id, ref: orders.ref }).from(orders).where(eq(orders.ref, res.ref!));
+    orderIds.push(o!.id);
+    return { orderId: o!.id, ref: o!.ref };
+  }
+  async function renderAllReady(orderId: string, timeoutMs = 30_000) {
+    const t0 = Date.now();
+    for (;;) {
+      await processFulfilment(db, { env: SANDBOX, onlyOrderIds: [orderId] });
+      const items = await db.select({ id: orderItems.id }).from(orderItems).where(eq(orderItems.orderId, orderId));
+      const arts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, items.map((i) => i.id)));
+      if (arts.length && arts.every((a) => a.status === 'READY' && a.printObjectId)) return;
+      const failed = arts.find((a) => a.status === 'RENDER_FAILED');
+      if (failed) throw new Error(`render failed: ${failed.renderError}`);
+      if (Date.now() - t0 > timeoutMs) throw new Error('artwork not READY in time');
+      await new Promise((r) => setTimeout(r, 150));
+    }
+  }
+  /** A fake Prodigi that, like the real one, returns the SAME order for a repeated idempotency key; `standard` = what
+   * its quote says the case's Standard post is; `failMain` = refuse the main (non-case) order that many times. */
+  function splitTransport(opts: { standard?: 'tracked' | 'untracked' | 'error' | 'none'; failMain?: number; stages?: Record<string, string> } = {}) {
+    const byKey = new Map<string, string>();
+    const created: CreateOrderRequest[] = [];
+    let failMain = opts.failMain ?? 0;
+    const t: ProdigiOrderTransport & { created: CreateOrderRequest[]; quotes: number } = {
+      created,
+      quotes: 0,
+      async createOrder(req) {
+        if (failMain > 0 && !String(req.idempotencyKey).endsWith(':case')) {
+          failMain--;
+          throw new ProdigiError('Prodigi createOrder failed: HTTP 400 outcome=ValidationFailed', 400);
+        }
+        created.push(req);
+        const id = byKey.get(req.idempotencyKey!) ?? `ord_${byKey.size + 1}_${String(req.idempotencyKey).endsWith(':case') ? 'case' : 'main'}`;
+        byKey.set(req.idempotencyKey!, id);
+        return { outcome: 'created', order: { id, status: { stage: 'InProgress' } } };
+      },
+      async getOrder(id) {
+        const stage = opts.stages?.[id.endsWith('case') ? 'case' : 'main'] ?? 'Complete';
+        return { id, status: { stage }, shipments: [{ id: `shp_${id}`, carrier: { name: 'Royal Mail' }, tracking: { number: `TRK_${id}`, url: `https://track.example/${id}` } }] };
+      },
+      ...(opts.standard === 'none'
+        ? {}
+        : {
+            async quoteShipping() {
+              t.quotes++;
+              if (opts.standard === 'error') throw new ProdigiError('quote failed', 500);
+              return [{ lab: opts.standard === 'tracked' ? 'uk6' : 'uk8', carrier: 'Royal Mail', service: opts.standard === 'tracked' ? 'Standard Tracked' : 'Royal Mail RM24' }];
+            },
+          }),
+    };
+    return t;
+  }
+
+  it('a phone case UNTRACKED on Standard goes alone by Express; the rest goes Standard: nothing else pays Express', async () => {
+    const { orderId, ref } = await paidBasket(['phoneCase', 'mug']);
+    await renderAllReady(orderId);
+    const t = splitTransport({ standard: 'untracked' });
+    expect((await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] })).submitted).toBe(1);
+    expect(t.created.map((c) => [c.merchantReference, c.shippingMethod, c.idempotencyKey, c.items.map((i) => (i.sku.startsWith('GLOBAL-TECH') ? 'case' : 'mug'))])).toEqual([
+      [`${ref}-case`, 'Express', `${orderId}:case`, ['case']],
+      [ref, 'Standard', orderId, ['mug']],
+    ]);
+    const o = await orderRow(orderId);
+    expect([o.status, o.prodigiOrderId, o.prodigiSplitOrderId, o.shippingMethod]).toEqual(['FULFILLING', 'ord_2_main', 'ord_1_case', 'Standard + Express (phone case on its own)']);
+
+    // shipped only when BOTH Prodigi orders are complete; every parcel's tracking kept
+    await syncSubmittedOrders(db, { transport: splitTransport({ stages: { case: 'InProgress', main: 'Complete' } }), onlyOrderIds: [orderId] });
+    expect((await orderRow(orderId)).status).toBe('FULFILLING');
+    await syncSubmittedOrders(db, { transport: splitTransport({ stages: { case: 'Cancelled', main: 'Complete' } }), onlyOrderIds: [orderId] });
+    const part = await orderRow(orderId);
+    expect(part.status).toBe('FULFILLING'); // one part cancelled: a person decides, never "shipped" or "cancelled"
+    expect(part.submitError).toMatch(/phone case.*cancelled at Prodigi/);
+    await syncSubmittedOrders(db, { transport: splitTransport(), onlyOrderIds: [orderId] });
+    const shipped = await orderRow(orderId);
+    expect(shipped.status).toBe('SHIPPED');
+    expect(shipped.tracking?.parcels?.map((p) => p.number).sort()).toEqual(['TRK_ord_1_case', 'TRK_ord_2_main']);
+  });
+
+  it('a phone case TRACKED on Standard goes with everything else in ONE Standard order', async () => {
+    const { orderId } = await paidBasket(['phoneCase', 'mug']);
+    await renderAllReady(orderId);
+    const t = splitTransport({ standard: 'tracked' });
+    await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] });
+    expect(t.created).toHaveLength(1);
+    expect([t.created[0]!.shippingMethod, t.created[0]!.items.length]).toEqual(['Standard', 2]);
+    const o = await orderRow(orderId);
+    expect([o.prodigiSplitOrderId, o.shippingMethod]).toEqual([null, 'Standard']);
+  });
+
+  it('can’t tell (no quote, or the quote fails) → the case goes on its own by Express: always tracked', async () => {
+    for (const standard of ['none', 'error'] as const) {
+      const { orderId } = await paidBasket(['phoneCase', 'mug']);
+      await renderAllReady(orderId);
+      const t = splitTransport({ standard });
+      await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] });
+      expect(t.created.map((c) => c.shippingMethod)).toEqual(['Express', 'Standard']);
+    }
+  });
+
+  it('the main order refused after the case went: the order says so, and the retry never sends a second case', async () => {
+    const { orderId } = await paidBasket(['phoneCase', 'mug']);
+    await renderAllReady(orderId);
+    const t = splitTransport({ standard: 'untracked', failMain: 1 });
+    await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] });
+    const failed = await orderRow(orderId);
+    expect([failed.status, failed.prodigiOrderId, failed.prodigiSplitOrderId]).toEqual(['PAID', null, 'ord_1_case']);
+    expect(failed.submitError).toMatch(/phone case already went to Prodigi as its own order \(ord_1_case\)/);
+    await db.update(orders).set({ nextSubmitAttemptAt: new Date() }).where(eq(orders.id, orderId));
+    await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] });
+    const ok = await orderRow(orderId);
+    expect([ok.status, ok.prodigiSplitOrderId]).toEqual(['FULFILLING', 'ord_1_case']); // the same case order, not a new one
+    expect(t.created.filter((c) => String(c.idempotencyKey).endsWith(':case')).map((c) => c.idempotencyKey)).toEqual([`${orderId}:case`, `${orderId}:case`]);
+    expect(t.quotes).toBe(1); // the retry kept the split without asking again
   });
 
   it('a DOUBLE-SIDED cushion submits ONE asset to the single "default" print area (verified vs Prodigi spec)', async () => {
