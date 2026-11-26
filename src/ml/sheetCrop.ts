@@ -216,6 +216,11 @@ async function byTableScan(input: Buffer): Promise<Found | null> {
   const px = (s: Side, t: number, i: number) =>
     s === 'top' ? i * W + t : s === 'bottom' ? (H - 1 - i) * W + t : s === 'left' ? t * W + i : t * W + (W - 1 - i);
 
+  /** each side's "table" colour (Lab), and the ones that turned out to be the paper's own margin */
+  const bandLab: Partial<Record<Side, [number, number, number]>> = {};
+  const margins: [number, number, number][] = [];
+  /** the paper's colour just past each edge found */
+  const paperOf: Partial<Record<Side, [number, number, number]>> = {};
   const scan = (s: Side, step = false) => {
     const S = horiz(s) ? W : H, D = horiz(s) ? H : W;
     const band = Math.max(3, Math.round(D * 0.02));
@@ -230,6 +235,12 @@ async function byTableScan(input: Buffer): Promise<Found | null> {
       for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) table.add(k + (a * GD + b) * GD + c);
     }
     if (top / ringPx < 0.9) return null; // the band isn't one surface (a busy scene)
+    // this side's "table" colour (the band's median, Lab) — to tell a paper margin when we meet one
+    {
+      const ch: number[][] = [[], [], []];
+      for (let t = 0; t < S; t += 4) for (let i = 0; i < band; i += 2) { const q = labAt(px(s, t, i)); for (let c = 0; c < 3; c++) ch[c]!.push(q[c]!); }
+      bandLab[s] = ch.map((v) => v.sort((a, b) => a - b)[v.length >> 1] ?? 0) as [number, number, number];
+    }
     // where the table ends, per column: the first point with 4 non-table pixels running
     const maxD = Math.round(D * 0.25);
     const ts: number[] = [], ds: number[] = [];
@@ -273,14 +284,66 @@ async function byTableScan(input: Buffer): Promise<Found | null> {
     const lo = Math.min(c + sl * (-S / 2), c + sl * (S / 2)), hi = Math.max(c + sl * (-S / 2), c + sl * (S / 2));
     if (hi < band || hi > maxD) return null;
     void lo;
+    // A LINE DRAWN ON THE PAPER is not the sheet's edge (founder, 26 Nov: a hand-drawn frame round the
+    // whole picture was taken for the edge, and trimmed off with the suns in its corners). Past a real
+    // edge the colour STAYS changed — that's the paper, not the table (kraft on light wood still differs
+    // by ~12). Past a drawn line the colour comes straight back to what was outside it (within ~1): it
+    // was the paper's own margin all along. So, column by column, compare just outside the edge with a
+    // little way past it; where most columns are back to the same colour, it's a drawing — leave it.
+    const look = Math.max(10, Math.round(D * 0.08));
+    let checked = 0, back = 0;
+    for (let j = 0; j < ts.length; j++) {
+      const t = ts[j]!, e = ds[j]!;
+      if (e > maxD || e + look >= D || Math.abs(e - (c + sl * (t - S / 2))) > tol) continue;
+      const out: [number, number, number] = [0, 0, 0];
+      let n = 0;
+      for (let i = Math.max(0, e - 8); i <= Math.max(0, e - 3); i++, n++) { const q = labAt(px(s, t, i)); out[0] += q[0]; out[1] += q[1]; out[2] += q[2]; }
+      const ch: number[][] = [[], [], []];
+      for (let i = e + 4; i <= e + look; i++) { const q = labAt(px(s, t, i)); for (let k = 0; k < 3; k++) ch[k]!.push(q[k]!); }
+      const past = ch.map((v) => v.sort((x, y) => x - y)[v.length >> 1]!);
+      checked++;
+      if (Math.hypot(past[0]! - out[0] / n, past[1]! - out[1] / n, past[2]! - out[2] / n) < 4) back++;
+    }
+    if (checked && back / checked > 0.5) { margins.push(bandLab[s]!); return null; }
+    // a real edge: note the PAPER's colour just past it — a side whose "table" is that colour is margin
+    {
+      const ch: number[][] = [[], [], []];
+      for (let j = 0; j < ts.length; j += 2) {
+        const e = ds[j]!;
+        if (e > maxD) continue;
+        for (let i = e + 3; i <= e + look && i < D; i += 2) { const q = labAt(px(s, ts[j]!, i)); for (let c = 0; c < 3; c++) ch[c]!.push(q[c]!); }
+      }
+      if (ch[0]!.length) paperOf[s] = ch.map((v) => v.sort((a, b) => a - b)[v.length >> 1]!) as [number, number, number];
+    }
     return { c: c + Math.max(1, Math.round(D * 0.008)), sl }; // a hair past the edge: its cut and shadow go too
   };
 
   const lines: Record<Side, { c: number; sl: number } | null> = { top: scan('top'), bottom: scan('bottom'), left: scan('left'), right: scan('right') };
+  // Once one side's "table" has turned out to be the paper's own margin (a drawn frame), or is the very
+  // colour of the paper seen inside another side's real edge, that side's "table" is paper too — what it
+  // stops at is drawing (hills coloured right up to the frame), never the sheet's edge. Left alone.
+  const dE = (b: [number, number, number], m: [number, number, number]) => Math.hypot(b[0] - m[0], b[1] - m[1], b[2] - m[2]);
+  const SIDES: Side[] = ['top', 'bottom', 'left', 'right'];
+  const flagged = new Set<Side>();
+  const isMargin = (s: Side) => { const b = bandLab[s]; return flagged.has(s) || (!!b && margins.some((m) => dE(b, m) < 10)); };
+  const dropMargins = () => {
+    // Sides can contradict each other (a "paper" found past drawing is crayon, not paper): the closest
+    // match wins — a margin is the paper's own colour almost exactly — and a side already found to be
+    // margin vouches for nothing.
+    const pairs: { s: Side; o: Side; d: number }[] = [];
+    for (const s of SIDES) for (const o of SIDES) {
+      const b = bandLab[s], p = paperOf[o];
+      if (s !== o && lines[s] && lines[o] && b && p && dE(b, p) < 4) pairs.push({ s, o, d: dE(b, p) });
+    }
+    for (const { s, o } of pairs.sort((x, y) => x.d - y.d)) if (!flagged.has(o)) flagged.add(s);
+    for (const x of SIDES) if (lines[x] && isMargin(x)) lines[x] = null;
+  };
+  dropMargins();
   // A side whose light makes the paper look like the table (colours shared): find the sheet's edge as a
   // lasting colour STEP instead — with the same straight-line test, so it's only trimmed when sure.
   if (Object.values(lines).some(Boolean)) {
-    for (const x of ['top', 'bottom', 'left', 'right'] as Side[]) if (!lines[x]) lines[x] = scan(x, true);
+    for (const x of ['top', 'bottom', 'left', 'right'] as Side[]) if (!lines[x] && !isMargin(x)) lines[x] = scan(x, true);
+    dropMargins();
   }
   const found = (Object.keys(lines) as Side[]).filter((s) => lines[s]);
   if (!found.length) return null;
