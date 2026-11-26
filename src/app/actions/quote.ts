@@ -6,7 +6,7 @@ import { isCardPackKey } from '@/lib/card-packs';
 import { pickAddOns, type AddOn } from '@/server/addOns';
 import { getDb } from '@/db/client';
 import { getCatalogue, loadCatalogue } from '@/server/catalogue';
-import { normaliseBuyerEmail, resolveCheckoutPromo, type PromoRefusal } from '@/server/promos';
+import { normaliseBuyerEmail, resolveCheckoutPromo, welcomeCardOn, type PromoRefusal } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { getCurrentAccount } from '@/server/session';
 import { canOrderSamples } from '@/server/samples';
@@ -48,6 +48,8 @@ export type ClientQuote = Omit<Quote, 'partnerCommissionPence'> & {
   addOns: AddOn[];
   /** May this person order a sample at cost (an admin who has done two-step login)? Shows the basket's switch. */
   sampleAvailable?: boolean;
+  /** Signed out, and the shop's welcome free card is switched on: the basket may say "log in and it's on us". */
+  welcomeOffered?: boolean;
 };
 
 export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
@@ -74,6 +76,7 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) || isCardPackKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
   const addOns = q.lines.length ? pickAddOns(await loadCatalogue(db), items, opts) : [];
   const signedIn = !!account;
-  const base = { ...q, lineTiers, addOns, signedIn, ...(promo.auto ? { promoAuto: true } : {}), ...(sampleAvailable ? { sampleAvailable: true } : {}) };
+  const welcomeOffered = !signedIn && q.lines.length > 0 && (await welcomeCardOn(db));
+  const base = { ...q, lineTiers, addOns, signedIn, ...(promo.auto ? { promoAuto: true } : {}), ...(sampleAvailable ? { sampleAvailable: true } : {}), ...(welcomeOffered ? { welcomeOffered: true } : {}) };
   return promo.refusal ? { ...base, promoError: promo.refusal } : base;
 }

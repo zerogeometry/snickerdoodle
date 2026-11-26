@@ -45,6 +45,26 @@ export async function ensureWelcomeCode(db: DbHandle): Promise<void> {
   welcomeCodeChecked = true;
 }
 
+/**
+ * Is the shop's welcome free card switched on right now (its row active and in date on /admin/codes)? Only for
+ * what the basket SAYS to a signed-out shopper ("log in and your first card is on us") — whether a card actually
+ * comes off is still decided by resolveCheckoutPromo for a signed-in buyer. Founder, 26 Nov 2026: switched off, the
+ * line goes too.
+ */
+export async function welcomeCardOn(db: DbHandle, now = new Date()): Promise<boolean> {
+  const [row] = await db
+    .select({ active: promoCodes.active, startsAt: promoCodes.startsAt, endsAt: promoCodes.endsAt })
+    .from(promoCodes)
+    .where(eq(promoCodes.code, WELCOME_CARD_CODE));
+  return welcomeRowOn(row ?? null, now);
+}
+
+/** Pure: is this welcome-code row switched on and in date? No row yet = on (ensureWelcomeCode adds it switched on). */
+export function welcomeRowOn(row: { active: boolean; startsAt: Date | null; endsAt: Date | null } | null, now: Date): boolean {
+  if (!row) return true;
+  return row.active && (!row.startsAt || row.startsAt <= now) && (!row.endsAt || row.endsAt > now);
+}
+
 /** A guest's email as they typed it — trimmed, lowercased, and only if it looks like one. */
 export function normaliseBuyerEmail(raw: unknown): string | null {
   if (typeof raw !== 'string') return null;

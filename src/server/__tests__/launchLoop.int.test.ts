@@ -16,7 +16,7 @@ import { deleteSavedDesign, listSavedDesigns, saveDesign } from '@/server/savedD
 import { ingestOriginalAsset } from '@/server/ingest';
 import { markOrderPaid, placeOrder } from '@/server/orders';
 import { resolveHomeFamily } from '@/server/onboarding';
-import { resolveCheckoutPromo, resolvePromo, WELCOME_CARD_CODE } from '@/server/promos';
+import { resolveCheckoutPromo, resolvePromo, WELCOME_CARD_CODE, welcomeCardOn, welcomeRowOn } from '@/server/promos';
 import { getCreditBalance } from '@/server/referrals';
 import { acceptInvite, createInvite, setMemberSeesOccasions } from '@/server/invites';
 import { runReminders, setReminderConsent } from '@/server/reminders';
@@ -337,6 +337,22 @@ describe.skipIf(!DB || !S3)('launch loop — integration', () => {
       const refs = await db.select({ id: orders.id }).from(orders).where(eq(orders.accountId, fresh!.id));
       if (refs.length) await db.update(orders).set({ promoCodeId: null }).where(inArray(orders.id, refs.map((x) => x.id)));
     }
+  });
+
+  it('a signed-out basket is promised the free card only while the shop has it switched on (founder, 26 Nov 2026)', async () => {
+    const now = new Date('2026-11-26T12:00:00Z');
+    const day = 86_400_000;
+    // the code as it stands in this database (switched on by migration 0059 / checkout itself)
+    const [row] = await db.select().from(schema.promoCodes).where(eq(schema.promoCodes.code, WELCOME_CARD_CODE));
+    expect(await welcomeCardOn(db)).toBe(welcomeRowOn(row ?? null, new Date()));
+    // switched off on /admin/codes, not started yet, or finished → no promise to a guest
+    expect(welcomeRowOn({ active: true, startsAt: null, endsAt: null }, now)).toBe(true);
+    expect(welcomeRowOn({ active: false, startsAt: null, endsAt: null }, now)).toBe(false);
+    expect(welcomeRowOn({ active: true, startsAt: new Date(now.getTime() + day), endsAt: null }, now)).toBe(false);
+    expect(welcomeRowOn({ active: true, startsAt: null, endsAt: new Date(now.getTime() - day) }, now)).toBe(false);
+    expect(welcomeRowOn({ active: true, startsAt: new Date(now.getTime() - day), endsAt: new Date(now.getTime() + day) }, now)).toBe(true);
+    // not made yet (a brand-new database): checkout adds it switched on, so it's on
+    expect(welcomeRowOn(null, now)).toBe(true);
   });
 
   // ── D15: discount + partner codes, priced server-side, margin-guarded ─────
