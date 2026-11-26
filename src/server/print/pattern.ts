@@ -3,7 +3,7 @@ import sharp, { type Sharp } from 'sharp';
 import type { Transform } from './geometry';
 import { patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
 
-export { PATTERN_FILL, PATTERN_MOTIF_MM, patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
+export { PATTERN_GAP_MM, PATTERN_MOTIF_MM, patternLayout, scalePatternLayout, type PatternLayout } from './pattern-geometry';
 
 /**
  * The "pattern" magic edit: the drawing tiled into a SEAMLESS half-drop repeat that fills a print
@@ -11,11 +11,11 @@ export { PATTERN_FILL, PATTERN_MOTIF_MM, patternLayout, scalePatternLayout, type
  * party sees the image, and the same inputs always give the same file. The ORIGINAL is never
  * touched — this reads a source buffer and returns a new one.
  *
- * Seamless: the canvas width is an EVEN number of whole columns, so the left and right edges meet
- * exactly when the product wraps round (a sock, a roll); odd columns drop half a cell (the classic
- * hand-designed repeat). Rows are whole too, so the top and bottom meet (to within a pixel or two).
- * It renders ONE full-width strip (one cell tall, motifs wrapping round both edges) and tiles it
- * down the canvas, so even a 5 m wrapping roll stays a small, bounded amount of work.
+ * A half-drop repeat (odd columns drop half a cell — the classic hand-designed repeat), centred on the
+ * sheet, with a FIXED gap between the drawings whatever their size (patternLayout). It renders ONE
+ * full-width strip (one cell tall, motifs crossing its top and bottom drawn whole on both) and tiles it
+ * down the canvas, so even a 5 m wrapping roll stays a small, bounded amount of work. A sock places
+ * each drawing one by one instead (sockLayout).
  *
  * The client's transform still means what it does elsewhere, mapped onto the repeat:
  * scale (0 = default) → motif size · offsetX/Y → shifts the pattern · rotation → turns each motif.
@@ -100,10 +100,11 @@ async function repeatPipeline(
   }
 
   // One strip, one cell tall, with a margin so motifs that cross an edge can be drawn whole and
-  // then cropped: what leaves on the right comes back on the left (and bottom → top).
+  // then cropped.
   const pad = Math.ceil(Math.max(motifW, motifH));
   const overlays: NonNullable<Parameters<ReturnType<typeof sharp>['composite']>[0]> = [];
-  for (let i = -1; i <= cols; i++) {
+  // (phaseX is within two columns of the left edge — patternLayout — so i = -3 reaches the first copy)
+  for (let i = -3; i <= cols; i++) {
     const drop = ((i % 2) + 2) % 2 === 1 ? stripH / 2 : 0;
     for (let j = -2; j <= 2; j++) {
       const cx = (i + 0.5) * cellW + phaseX;
@@ -114,8 +115,8 @@ async function repeatPipeline(
       overlays.push({ input: motif, ...motifRaw, left, top });
     }
   }
-  // Every column/row index is placed at a whole multiple of the canvas width/strip height from its
-  // twin, so the crop below is periodic: x and x + canvas.width carry the same pixels.
+  // Each column repeats every stripH, and every copy crossing the strip's top or bottom is drawn at both
+  // (j = -1 / +1), so the strip below tiles down the canvas without a seam.
   const wideW = canvas.width + 2 * pad, wideH = stripH + 2 * pad;
   const wide = await sharp({ create: { width: wideW, height: wideH, channels: 4, background } })
     .composite(overlays)
@@ -123,7 +124,8 @@ async function repeatPipeline(
     .toBuffer();
   // Flattened to opaque here, so the big tiled file below is plain RGB (no alpha to carry).
   const strip = await sharp(wide, { raw: { width: wideW, height: wideH, channels: 4 } })
-    .extract({ left: pad, top: pad, width: canvas.width, height: stripH })
+    // (a sheet shorter than one strip — a tall drawing zoomed right in — is just the strip's top)
+    .extract({ left: pad, top: pad, width: canvas.width, height: Math.min(stripH, canvas.height) })
     .flatten({ background })
     .raw()
     .toBuffer({ resolveWithObject: true });

@@ -302,8 +302,9 @@ export async function renderPrintFile(
   return persistPrintFile(db, input.assetId, fileKind, out, tpl.requiredDpi, assess.effectiveDpi, assess.decision === 'UPSCALE', outW, outH);
 }
 
-/** Bump to give every print file a new key (a render change that must not reuse old files). */
-const PRINT_FILE_REV = 1;
+/** Bump to give every print file a new key (a render change that must not reuse old files).
+ * 2 (19 Nov 2026): the repeats' new spacing (a fixed gap; a bigger first sock drawing). */
+const PRINT_FILE_REV = 2;
 
 /**
  * The identity of an ORDER's print file: a hash of everything that changes the output — the source
