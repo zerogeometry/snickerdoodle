@@ -329,9 +329,11 @@ function garmentVariants(o: { sku: string; sizes: string[]; colours: GarmentColo
 // can't guarantee placement on a sock). Ankle prints to 'front', tube to 'default'. uk9, Tracked 48.
 // Both are designed UPRIGHT, the width going round the sock (300 mm): the tube is 300 × 520 mm, sent
 // upright as 3543×6141 — Prodigi's LIVE print area and template orientation (weekly check, 23 Nov).
+// Prodigi REQUIRES a `size` on both (live, 26 Nov 2026: an order was refused "MissingRequiredAttributes size
+// [m, l]"). Both are one size, UK 6–10 (Prodigi: "One size fits all"); `l` is the size both SKUs offer.
 const SOCKS = [
-  { size: 'ankle', sku: 'GLOBAL-ANKLE-SOCKS', px: { w: 3543, h: 3543 }, printTo: ['front'] },
-  { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 3543, h: 6141 }, printTo: ['default'] },
+  { size: 'ankle', sku: 'GLOBAL-ANKLE-SOCKS', px: { w: 3543, h: 3543 }, printTo: ['front'], prodigiSize: 'l' },
+  { size: 'tube', sku: 'GLOBAL-TUBE-SOCKS', px: { w: 3543, h: 6141 }, printTo: ['default'], prodigiSize: 'l' },
 ] as const;
 
 // Wall height chart: canvas on wooden poster hangers (hanger colour = Prodigi `color`). Made at
@@ -649,7 +651,7 @@ const DEFS: Record<string, ProductDef> = {
     category: 'APPAREL', label: 'doodle socks', blurb: 'their masterpiece, on repeat, on your feet', print: true, visibleInShop: true,
     description: "Their drawing turned into a cheerful all-over pattern on a pair of socks — the gift a grown-up actually wears. One size fits most (UK 6–10).",
     specs: { material: 'polyester, printed all over', size: 'one size, UK 6–10', styles: 'ankle or tube', care: 'machine wash at 30°', made: 'in the UK' },
-    variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, printTo: [...s.printTo] })),
+    variants: SOCKS.map((s) => ({ size: s.size, pricePence: 2000, ...exactPx(s.px, 300), prodigiSku: s.sku, prodigiAttrs: { size: s.prodigiSize }, printTo: [...s.printTo] })),
   },
   heightChart: {
     category: 'PRINT', label: 'doodle height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
