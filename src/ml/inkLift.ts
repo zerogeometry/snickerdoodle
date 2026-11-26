@@ -280,6 +280,12 @@ async function sheetOnTable(first: InkLiftResult, strict = false): Promise<{ tab
   let tableArea = 0;
   for (let k = 0; k < N; k++) tableArea += table[k]!;
   if (tableArea < N * 0.03 || tableArea > N * 0.65) return null; // no table border, or nothing left to be a sheet
+  // A SHEET is solid: the first pass measured against the table, so the sheet itself (and the drawing on
+  // it) was kept. A FRAME DRAWN round a picture on white paper is only a line — inside it the paper was
+  // cleared again (founder, 26 Nov: a hand-drawn frame must never be taken for the sheet's edge).
+  let keptInside = 0;
+  for (let k = 0; k < N; k++) if (!table[k] && px[k * 4 + 3]! >= 128) keptInside++;
+  if (keptInside < (N - tableArea) * 0.5) return null;
   // The edge ring: solid kept pixels a few px inside the table boundary.
   const D = Math.max(3, Math.round(Math.min(W, H) / 60)); // a little way IN — past the sheet's own edge shadow
   const ring: number[] = [];
