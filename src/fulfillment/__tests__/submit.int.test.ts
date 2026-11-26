@@ -340,6 +340,33 @@ describe.skipIf(!DB || !S3)('POD submission — gate → frozen spec → exactly
     }
   });
 
+  it('the Prodigi card declined: the order waits PAID, says why, tries again in 15 minutes (not hours), and goes once the card works', async () => {
+    const { orderId } = await paidBasket(['mug']);
+    await renderAllReady(orderId);
+    let declines = 3; // as live, 26 Nov 2026: Prodigi answers HTTP 500 PaymentFailed while the card has no funds
+    const t = splitTransport({ standard: 'tracked' });
+    const create = t.createOrder.bind(t);
+    t.createOrder = async (req) => {
+      if (declines-- > 0) throw new ProdigiError('Prodigi createOrder failed: HTTP 500 outcome=PaymentFailed {"outcome":"PaymentFailed","message":"Your card has insufficient funds. Use a different payment method to complete this purchase."}', 500);
+      return create(req);
+    };
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const before = Date.now();
+      await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] });
+      const o = await orderRow(orderId);
+      expect([o.status, o.prodigiOrderId, o.submitAttempts]).toEqual(['PAID', null, attempt]);
+      expect(o.submitError).toMatch(/insufficient funds/);
+      const wait = o.nextSubmitAttemptAt!.getTime() - before;
+      expect(wait).toBeGreaterThanOrEqual(14 * 60_000); // the same 15 minutes every time, never the growing backoff
+      expect(wait).toBeLessThanOrEqual(16 * 60_000);
+      await db.update(orders).set({ nextSubmitAttemptAt: new Date() }).where(eq(orders.id, orderId)); // the 15 minutes pass
+    }
+    await submitReadyOrders(db, { env: SANDBOX, transport: t, onlyOrderIds: [orderId] }); // the card topped up
+    const sent = await orderRow(orderId);
+    expect([sent.status, sent.submitError, sent.submitAttempts]).toEqual(['FULFILLING', null, 0]);
+    expect(sent.prodigiOrderId).toBeTruthy();
+  });
+
   it('the main order refused after the case went: the order says so, and the retry never sends a second case', async () => {
     const { orderId } = await paidBasket(['phoneCase', 'mug']);
     await renderAllReady(orderId);

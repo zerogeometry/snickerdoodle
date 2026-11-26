@@ -6,7 +6,10 @@
  * own. References only (order refs, message refs, counts): no names, emails, addresses or anything about a child.
  */
 
+import { isCardDeclined, PRODIGI_DASHBOARD } from '@/lib/prodigiCard';
+
 export type NeedKind =
+  | 'prodigi-card'
   | 'dispute'
   | 'report'
   | 'site'
@@ -97,7 +100,7 @@ export function waited(since: Date, now: Date): string {
 }
 
 const STRIPE = 'https://dashboard.stripe.com';
-const RANK: Record<NeedKind, number> = { dispute: 1, report: 2, site: 3, order: 4, 'refund-at-prodigi': 5, rights: 6, review: 7, support: 8, prodigi: 9, commission: 10 };
+const RANK: Record<NeedKind, number> = { 'prodigi-card': 0, dispute: 1, report: 2, site: 3, order: 4, 'refund-at-prodigi': 5, rights: 6, review: 7, support: 8, prodigi: 9, commission: 10 };
 const TOPIC: Record<string, string> = { 'order-where': 'where’s my order', 'order-change': 'change or cancel', 'order-problem': 'order not right', making: 'help making something', gifts: 'gifts and family', account: 'account or signing in' };
 
 /** The list, most urgent first (a deadline that's close jumps its group). */
@@ -170,6 +173,27 @@ export function buildNeeds(f: NeedFacts, now: Date): Need[] {
     });
   }
 
+  // ── the Prodigi card declined: EVERY order waits until it's sorted, so it's one alert, top of the list, straight
+  // away — not one per order hours later (founder, 26 Nov 2026: seven quiet refusals on "insufficient funds") ──
+  const declined = f.orders.filter((o) => o.status === 'PAID' && !o.prodigiOrderId && isCardDeclined(o.submitError));
+  if (declined.length) {
+    const first = declined.reduce((a, b) => ((a.paidAt ?? a.createdAt) <= (b.paidAt ?? b.createdAt) ? a : b));
+    const refs = declined.map((o) => o.ref).sort();
+    const total = declined.reduce((n, o) => n + o.totalPence, 0);
+    out.push({
+      key: `prodigi-card:${first.ref}`,
+      kind: 'prodigi-card',
+      title: 'Your Prodigi card was declined',
+      detail: `Prodigi takes payment when an order is sent, and the card on your Prodigi account was refused, so ${declined.length === 1 ? `${refs[0]} (${pounds(total)}) can’t` : `${declined.length} paid orders (${pounds(total)}) can’t`} go to the printer. Top up or change the card in Prodigi. They try again every 15 minutes, so they’ll go through by themselves soon after: nothing to resend.${declined.length > 1 ? ` Waiting: ${refs.slice(0, 6).join(', ')}${refs.length > 6 ? ` and ${refs.length - 6} more` : ''}.` : ''}`,
+      since: first.paidAt ?? first.createdAt,
+      due: null,
+      href: PRODIGI_DASHBOARD,
+      action: 'open Prodigi',
+      urgent: true,
+      dismissable: false,
+    });
+  }
+
   // ── orders: anything that isn't moving the way it should ──
   for (const o of f.orders) {
     const at = (k: string) => `order:${o.ref}:${k}`;
@@ -185,7 +209,7 @@ export function buildNeeds(f: NeedFacts, now: Date): Need[] {
     if (o.status === 'PAID' && o.handOnly) {
       out.push({ key: at('by-hand'), kind: 'order', title: `${o.ref}: pack and post by hand`, detail: 'Nothing on it is made by Prodigi (gift wrap only), so it’s yours to send.', since: o.paidAt ?? o.createdAt, due: null, href: `/admin/orders/${o.ref}`, action: 'open order', urgent: false, dismissable: true });
     }
-    if (o.status === 'PAID' && !o.handOnly && !o.prodigiOrderId && !failed && !held && o.paidAt && now.getTime() - o.paidAt.getTime() > LIMITS.notSentHours * HOUR) {
+    if (o.status === 'PAID' && !o.handOnly && !o.prodigiOrderId && !failed && !held && !isCardDeclined(o.submitError) && o.paidAt && now.getTime() - o.paidAt.getTime() > LIMITS.notSentHours * HOUR) {
       out.push({ key: at('not-sent'), kind: 'order', title: `${o.ref}: paid ${waited(o.paidAt, now)} ago, not at Prodigi yet`, detail: o.submitError ? `Prodigi said: ${o.submitError.slice(0, 160)}` : 'It hasn’t been sent to the printer. It may still be making its print files.', since: o.paidAt, due: null, href: `/admin/orders/${o.ref}`, action: 'open order', urgent: true, dismissable: true });
     }
     if (o.status === 'FULFILLING' && o.prodigiOrderId && !fullyRefunded) {

@@ -12,6 +12,7 @@ import { assertClearedForPrint, assertPodEgressAllowed, GateError, gateEnv, HELD
 import { startRetentionClockForOrder } from '@/server/retention';
 import { sendOrderShipped } from '@/server/orderEmails';
 import { alertHandLines } from './handLines';
+import { CARD_DECLINED_RETRY_MS, isCardDeclined } from '@/lib/prodigiCard';
 import { isExpressForTracking, isTrackedService, planShipments, shippingMethodFor } from '@/lib/delivery';
 import { giftNoteInsertKey, giftNoteInsertSlot, planGiftNoteInsert, type GiftNoteInsertRecord, type GiftNoteInsertSlot } from './giftNoteInsert';
 
@@ -293,10 +294,11 @@ export async function submitReadyOrders(
 }
 
 /** Record a failure + schedule the next attempt (exponential backoff for transient
- * faults; a week's park for permanent-looking ones). The order STAYS visible: PAID +
+ * faults; a week's park for permanent-looking ones; every 15 minutes while the Prodigi card is
+ * declined, so orders go within minutes of it being sorted). The order STAYS visible: PAID +
  * submitError + a future nextSubmitAttemptAt — never a hidden terminal state. */
-async function parkFailure(db: DbHandle, orderId: string, attempts: number, message: string, kind: 'transient' | 'permanent'): Promise<void> {
-  const nextMs = kind === 'permanent' ? PERMANENT_PARK_MS : Math.min(2 ** (attempts + 1) * 60 * 1000, MAX_BACKOFF_MS);
+async function parkFailure(db: DbHandle, orderId: string, attempts: number, message: string, kind: 'transient' | 'permanent' | 'card-declined'): Promise<void> {
+  const nextMs = kind === 'card-declined' ? CARD_DECLINED_RETRY_MS : kind === 'permanent' ? PERMANENT_PARK_MS : Math.min(2 ** (attempts + 1) * 60 * 1000, MAX_BACKOFF_MS);
   await db
     .update(orders)
     .set({ submitError: message, submitAttempts: attempts + 1, nextSubmitAttemptAt: new Date(Date.now() + nextMs) })
@@ -646,7 +648,9 @@ async function submitOne(
     // …and so do its composed frame files (the next attempt composes them again).
     for (const k of framesStored) await deleteObject(k).catch(() => {});
     // Revert the claim — guarded so it can never un-claim a latched order — and back off.
-    const kind = e instanceof ProdigiError && raw && (e as ProdigiError).status >= 400 && (e as ProdigiError).status < 500 ? 'permanent' : 'transient';
+    // a declined Prodigi card isn't the order's fault, whatever the HTTP status: try again soon, and the admin app
+    // raises one urgent "your Prodigi card was declined" alert for every order it holds up (src/server/admin/needs.ts)
+    const kind = isCardDeclined(msg) ? 'card-declined' : e instanceof ProdigiError && raw && (e as ProdigiError).status >= 400 && (e as ProdigiError).status < 500 ? 'permanent' : 'transient';
     await db
       .update(orders)
       .set({ status: 'PAID' })

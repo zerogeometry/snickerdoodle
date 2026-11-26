@@ -39,6 +39,7 @@ export type TodayItem = {
 };
 
 const ICON: Record<string, TablerIconComponent> = {
+  'prodigi-card': IconCreditCard,
   dispute: IconCreditCard,
   report: IconFlag,
   site: IconHeartbeat,
