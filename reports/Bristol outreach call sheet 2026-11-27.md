@@ -74,8 +74,9 @@ place sent them. So:
 
 If you'd like the link to fill in the code automatically, that's a small site change. It's not part of this report.
 
-**Snickerdoodle Draw:** the app isn't in the stores yet (iOS is in review, and the store links in `src/lib/drawApp.ts` are
-still empty). Say "our free drawing app is coming soon, look at snickerdoodle.co.uk/draw". Don't promise a date.
+**Snickerdoodle Draw:** it went live on [Google Play](https://play.google.com/store/apps/details?id=com.launchmode.snickerdoodle.draw)
+on 26 Nov, and the /draw page links to it. The iPhone version is still in App Store review. Say "our free drawing app
+is on Google Play now, and coming soon for iPhone, at snickerdoodle.co.uk/draw". Don't promise a date for iPhone.
 
 ---
 
@@ -533,7 +534,7 @@ passed; **the January issue closes 10 Dec**, which suits a "thank-you cards from
 | **Sat 5 Dec** | **The best Saturday.** Goldfinch workshop table (10am). Lawrence Weston market. Hobbycraft demo, if agreed. Gymbo party bags go out |
 | Sun 6 Dec | Almondsbury grotto table, if agreed (the grotto's busiest weeks) |
 | Mon 7 – Wed 9 Dec | Cribbs or Galleries weekday pitch, if booked. Toddler groups again (7 and 9 Dec). The leaflet message becomes "**cards by Thu 10 Dec, everything else by Sat 12 Dec**" |
-| Thu 10 – Sat 12 Dec | Last-orders reminders on counters. After 12 Dec, switch the pitch to January: thank-you cards from their drawings, the Keepsake Home and the Draw app. Collect stands and thank each place |
+| Thu 10 – Sat 12 Dec | Last-orders reminders on counters. After 12 Dec, switch the pitch to January: thank-you cards from their drawings, the Keepsake Home and the Draw app (on Google Play now, coming soon for iPhone). Collect stands and thank each place |
 
 ---
 
