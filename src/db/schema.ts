@@ -137,8 +137,6 @@ export const auditEvent = pgEnum('audit_event', [
   'PASSKEY_REMOVED',
   // an admin (two-step login done) placed a sample order at cost (src/server/samples.ts)
   'SAMPLE_ORDER_PLACED',
-  // an admin pressed "try again" on a stuck order and it filled in print-lab settings the order lacked (26 Nov 2026)
-  'ADMIN_ORDER_RETRIED',
 ]);
 
 /** Snickerdoodle Draw's keepsakes sync choice (DRAW-APP-sync-choices.md): nothing automatic, the proud pile, or every drawing. */
