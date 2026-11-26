@@ -55,6 +55,8 @@ export async function listOrders(db: DbHandle, reviewer: Reviewer, opts: { filte
     where.push(
       or(
         and(eq(orders.status, 'PAID'), troubleSql),
+        // Prodigi refused it (or sending failed): straight away, not two hours later (founder, 26 Nov 2026)
+        and(eq(orders.status, 'PAID'), sql`${orders.submitError} is not null`),
         and(eq(orders.status, 'PAID'), sql`${orders.paidAt} < now() - interval '2 hours'`, isNull(orders.prodigiOrderId)),
         and(eq(orders.status, 'FULFILLING'), sql`coalesce(${orders.claimedAt}, ${orders.paidAt}) < now() - interval '7 days'`),
         and(eq(orders.status, 'FULFILLING'), sql`${orders.refundedPence} >= ${orders.totalPence}`, gt(orders.refundedPence, 0)),

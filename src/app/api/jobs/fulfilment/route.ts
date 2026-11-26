@@ -1,4 +1,6 @@
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import { getDb } from '@/db/client';
+import { orders } from '@/db/schema';
 import { recordJobRun } from '@/server/admin/health';
 import { requireJobsSecret } from '@/server/jobs/auth';
 import { processFulfilment } from '@/fulfillment/worker';
@@ -68,13 +70,24 @@ async function run(req: Request): Promise<Response> {
 
   // Failures land in the host's log stream (the founder's alert surface), not only
   // in a cron response nobody reads.
+  // A paid order Prodigi refused (or that couldn't be sent) is STILL stuck until it goes through — say so on every
+  // tick, so the box's alert stays open and only says "resolved" once it really is (founder, 26 Nov 2026: the alert
+  // "resolved" an hour after a refusal, while the order sat waiting a week).
+  const [stuckRow] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(orders)
+    .where(and(eq(orders.status, 'PAID'), isNotNull(orders.submitError)))
+    .catch(() => [{ n: 0 }]);
+  const stuck = stuckRow?.n ?? 0;
   const troubled =
+    stuck +
     (render?.recovered ?? 0) + (render?.failed ?? 0) + (render?.blocked ?? 0) + (submit?.failed ?? 0) + (submit?.blocked ?? 0) + (submit?.recovered ?? 0) + (sync?.stalled ?? 0) + (sync?.midSubmit ?? 0);
   if (troubled > 0 || errors.length > 0) {
     console.error(
       '[fulfilment] tick needs attention:',
       JSON.stringify({
         errors,
+        stuck,
         render: render ? { recovered: render.recovered, failed: render.failed, blocked: render.blocked } : null,
         submit: submit ? { failed: submit.failed, blocked: submit.blocked, recovered: submit.recovered, orders: submit.orders.filter((o) => o.status !== 'submitted' && o.status !== 'waiting') } : null,
         sync: sync ? { stalled: sync.stalled, midSubmit: sync.midSubmit, cancelled: sync.cancelled } : null,

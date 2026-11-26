@@ -139,6 +139,13 @@ describe('range expansion — new products', () => {
     expect(rows('heightChart')).toHaveLength(12);
   });
 
+  it('socks send Prodigi the size it requires (`l` — one size, UK 6–10), ankle and tube alike (live refusal, 26 Nov 2026)', () => {
+    expect(rows('socks').map((r) => [r.prodigiSku, r.prodigiAttrs?.size])).toEqual([
+      ['GLOBAL-ANKLE-SOCKS', 'l'],
+      ['GLOBAL-TUBE-SOCKS', 'l'],
+    ]);
+  });
+
   it('socks, wrapping paper and tea towel are the repeat-pattern products', () => {
     expect([...PATTERN_PRODUCT_KEYS].sort()).toEqual(['socks', 'teaTowel', 'wrappingPaper']);
   });

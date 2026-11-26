@@ -88,6 +88,14 @@ describe.skipIf(!URL)('the admin app (integration)', () => {
     expect((await listOrders(db, admin, { filter: 'all', q: ref('GATE') })).map((o) => o.ref)).toEqual([ref('GATE')]);
   });
 
+  it('an order Prodigi refused shows under "needs attention" straight away, not two hours later (founder, 26 Nov 2026)', async () => {
+    const refused = await placeOrder('REFUSED', { submitError: 'Prodigi createOrder failed: HTTP 400 outcome=ValidationFailed', submitAttempts: 1, nextSubmitAttemptAt: new Date(Date.now() + 7 * 86_400_000) });
+    const fine = await placeOrder('FINE');
+    const attention = (await listOrders(db, admin, { filter: 'attention' })).map((o) => o.ref);
+    expect(attention).toContain(refused.ref);
+    expect(attention).not.toContain(fine.ref);
+  });
+
   it('a full refund before Prodigi cancels the order (it never prints); a part refund only records the amount', async () => {
     const full = await placeOrder('FULL', { stripePaymentIntent: `pi_${tag}_full` });
     const part = await placeOrder('PART', { stripePaymentIntent: `pi_${tag}_part` });
