@@ -9,6 +9,9 @@ This builds on the earlier reports in the main checkout's `reports/` folder: *Br
 (6 Nov) and *Christmas fairs and who to contact 2026* (18 Nov). It doesn't repeat their school-fair lists. Where a
 fair from those reports has changed, the change is noted here.
 
+**Part 1** (below) is for places you turn up at. **Part 2, "Leaflets without turning up"** (near the end), ranks places
+that hand out your leaflets while you're elsewhere, plus paid reach, and ends with a top-20 tick-list.
+
 **Labels:** **[confirmed]** = the place's own website, seen 26 Nov · **[third-party]** = a directory, press article or
 listing · **[estimate]** = my judgement.
 
@@ -660,6 +663,304 @@ All from **Hobbycraft Cribbs**; Click & Collect is usually ready within an hour.
 
 ---
 
+## Part 2: Leaflets without turning up
+
+You don't have many days to stand at events. This part is about **one call or email that puts leaflets in front of
+lots of families while you're elsewhere.** Same rules as Part 1: I contacted nobody, every contact is a business's own
+published one, and a person is named only where the business publishes them as its contact. Researched Thu 26 Nov.
+
+### How I ranked them: families reached per hour of your time
+
+**Weekly families** is the number of families with young children who'd plausibly see the leaflet or get it in a
+week. Every figure is an [estimate], and the working is shown.
+- **Classes:** classes a week × about 8–10 families. Puddle Ducks publishes a maximum of 10 a class.
+- **Play cafés with booked sessions:** about 20 families a slot × 2–4 slots a day × 6 days.
+- **Big soft plays and grottos:** daily visits × 7, at about 1.5 children per family.
+- **Pharmacies and opticians:** about 60–100 family visits a week per pharmacy and 30–50 per optician. These are
+  guesses; no shop publishes footfall.
+
+**Your time** is the call or email (15–20 min each) plus dropping off or posting the leaflets, including the drive.
+**Families per hour** = weekly families (midpoint) ÷ your hours.
+
+Owners and teachers who **email or WhatsApp their own families** reach far more people per hour than a pile on a
+counter, so they rank high. Ask them to send **the leaflet picture** (`project-office/gtm/C12-leaflet/preview-front.png`
+and `preview-back.png`) with their code, as well as handing out paper copies.
+
+**The Christmas line:** a leaflet a family picks up after about **Sat 5 Dec** leaves too little time to send a
+drawing in before the cut-off (cards Thu 10 Dec, everything else Sat 12 Dec). So:
+- make **two code stickers**: "**order by Sat 12 Dec for Christmas**" now, and "**thank-you cards from their
+  drawings**" for anything still out after 5 Dec;
+- where a route can't start until after 5 Dec, it's marked **January**.
+
+### Which deal fits which place
+
+| Place | Deal | Why |
+|---|---|---|
+| Owner-run businesses: classes, soft plays, play cafés, shops, opticians, nursery groups | **Partner code, CAMPAIGN, 10% of first orders** | Earns them money for no work, and costs you only when someone orders |
+| A community nursery or CIC that wants to fundraise (e.g. Raised in Bristol) | **PTA-style code (earns on every order)** *only if they ask for it* | A PTA code pays on repeat orders too. At about £5 of margin an order (*UK marketing costs* report), keep it for schools and genuine fundraising partners |
+| NHS pharmacies, GP surgeries, libraries, family hubs, leisure trusts, churches | **A no-commission code** | It's just for counting. They can't, or shouldn't, take a cut, and a free family activity is what they'll accept |
+| Bookshops and big chains (Waterstones, Hobbycraft) | **Free placement**, with a counting code | Chains won't take a commission. Independents often just like helping a local maker |
+
+**One-line ask (businesses):** "Could I leave 50 little colour-in leaflets on your counter? Your own code gets families
+a free card, and you earn 10% of every first order. There's nothing for you to do."
+
+**One-line ask (NHS, council, charity):** "Could I leave a few leaflets or one poster for families? It's a free
+Christmas drawing activity, with no prices on it. I'm happy to take it down after the 12th."
+
+**Email to paste (businesses).** Change the bits in brackets.
+
+> **Subject:** Leaflets for your families? (a free card for them, 10% for you)
+>
+> Hi [name],
+>
+> I'm Simon, and I run Snickerdoodle from Shirehampton. We turn children's drawings into keepsakes: baubles, mugs and
+> cards, with the wonky bits kept in.
+>
+> Could I leave [50] small leaflets [on your counter / in your party bags / for your classes]? Each one has a bauble to
+> colour in on the back. I'll set up a code just for [business]: families get a free card with their first order, and
+> you earn 10% of every first order made with it, paid monthly with a short statement. If it's easier, I can send you
+> the leaflet as a picture to share with your families too.
+>
+> There's nothing for you or your team to do. We never ask anyone to collect or photograph children's drawings: parents
+> do it all at home on their own phones, and everything stays private.
+>
+> I can post them or drop them in this week. Thanks very much!
+>
+> Simon · snickerdoodle.co.uk · [your phone]
+
+**Email to paste (NHS, council, charity).** Same opening, then:
+
+> Could I leave a few leaflets, or one A4 poster, for your families? It's a free Christmas drawing activity: a bauble to
+> colour in, which parents can turn into a keepsake at home if they'd like. There are no prices on it, and it's aimed at
+> grown-ups. I'm happy to collect it after 12 December. Thank you!
+
+### The one-call routes, with who to ask
+
+#### Classes: one owner hands leaflets to hundreds of families a week
+
+- **Puddle Ducks Bristol & Bath** (baby and child swimming)
+  - **Who:** Sarah Austin, the franchise owner [confirmed].
+  - **Contact:** **0117 971 7165** · 9 Kensington Park Road, BS4 3HP · [enquiry form](https://www.puddleducks.com/local-teams/bristol-bath/).
+  - **Reach:** swims at "numerous" pools, at most 10 a class [confirmed]. About 50–80 classes × about 8 =
+    **400–640 families a week** [estimate].
+  - **Ask:** send the leaflet picture to her families plus 200 paper copies for poolside receptions. A pool is a poor
+    place for paper, so lead with the email.
+  - **Deal:** code.
+  - **Note:** the break is 19 Dec – 1 Jan (from Part 1), so ask this week.
+- **Water Babies Bristol & Bath**
+  - **Who:** the local franchise office.
+  - **Contact:** **0117 946 6919** [third-party, Trustpilot], or the [form](https://waterbabies.co.uk/about-us/contact-us) [confirmed].
+  - **Reach:** pools at Henbury, Abbots Leigh and Hartcliffe. About **300–600 families a week** [estimate].
+  - **Deal:** code. **Chance: low–medium.** Head office may veto, so ask quickly and accept a no.
+- **Baby Sensory: all three Bristol franchises.** Send three near-identical emails.
+  - **East** (Kingswood, Lyde Green, Emersons Green, Warmley): Helen Williams, **07721 615412** ·
+    bristoleast@babysensory.co.uk [confirmed](https://www.babysensory.com/bristol-east).
+  - **North** (Bishopston, Bradley Stoke, Westbury Park, Redland): **07579 793259** · bristolnorth@babysensory.co.uk
+    [confirmed](https://www.babysensory.com/bristol-north). The team page names "Emma".
+  - **South** (Keynsham, Southville, Brislington): **07908 479936** · bristolsouth@babysensory.co.uk
+    [confirmed](https://www.babysensory.com/bristol-south).
+  - **Reach:** about 30–40 classes a week across the three × 10 = **280–400 families a week** [estimate].
+  - **Deal:** code, pitched as "baby's first scribble or handprint bauble".
+- **diddi dance Bristol** (Bedminster, Bromley Heath, Yate and more)
+  - **Who:** area lead Emily Norman [confirmed](https://www.diddidance.com/diddi-dance-bristol/).
+  - **Contact:** **07850 983821** · emily.norman@diddidance.com.
+  - **Reach:** about 15–25 classes × 10 = **150–250 a week** [estimate].
+  - **Deal:** code.
+- **From Part 1:** Gymbo (07453 901951), both babyballet franchises (07715 340610 and 07395 805885), Sing and Sign
+  (0759 4460 448) and Little Kickers (07506 346186). All can hand out leaflets without you there.
+- **Probably inactive or not found:**
+  - Splat Messy Play South & East shows no sessions from 26 Nov.
+  - Jo Jingles shows "nothing scheduled".
+  - Monkey Music and Toddler Sense have no Bristol franchise.
+
+#### Soft plays and play cafés
+
+- **Boing! Softplay** (Boing Bristol CIC, a community not-for-profit)
+  - **Covers:** three sites: **Lawrence Weston** (next to BS11), Lockleaze and Inns Court.
+  - **Contact:** **07958 592 586** · **info@boingsoftplay.com** [confirmed](https://www.boingsoftplay.com/). This is
+    the same Boing! as the Lawrence Weston play café in Part 1, so **one email covers all three sites.**
+  - **Reach:** 3 × 150–300 = **450–900 families a week** [estimate].
+  - **Deal:** code (or PTA-style if they'd rather fundraise).
+- **Noah's Ark Play Centre**, 828a Bath Road, Brislington, BS4 5LQ
+  - **Contact:** **0117 971 2599** [confirmed](https://www.noahsarkplay.co.uk/). Open 7 days, with a four-storey
+    play frame.
+  - **Reach:** **400–600 a week** [estimate].
+  - **Deal:** free placement, or a code.
+- **Tiny Town Play Café**, Unit 17, Kings Chase Shopping Centre, Kingswood, BS15 8LP
+  - **Contact:** **hello@tinytownplaycafe.co.uk** [confirmed](https://www.tinytownplaycafe.co.uk/).
+  - **Reach:** booked 90-minute sessions with crafts. **200–300 a week** [estimate].
+  - **Deal:** code.
+- **Out There Indoors Play Café** (Paintworks, BS4 3AS; booking via [hoop](https://hoop.co.uk/outthereindoors)) and
+  **Tots & Teapots** (186 Wells Road, BS4 2AL; [contact form](https://www.totsandteapots.co.uk/contact)) [confirmed]
+  - They're close together, so post both on one trip.
+  - **Reach:** **350–600 a week** combined [estimate].
+  - **Deal:** code.
+- **The Play Shed**, Yate (Facebook only), and **Jungle Kingdom** at Yate Leisure Centre (Active Centres, 0300 333 0300)
+  - **Reach:** 300–500 a week each [estimate]. **Chance: low**: one has no public email, the other is run by a trust.
+- **From Part 1:** Wild Things at Cribbs (0117 959 2514) and 123 Jump at Cribbs (01179 312 733).
+- **Closed:** Jungle Mania in Broadmead closed, according to its own site. Jaq's Leisure looks gone.
+
+#### Nursery groups and childminders (book-bag leaflets)
+
+- **Snapdragons group** (Shirehampton, Horfield, Keynsham)
+  - **Who:** the Bristol operations manager, published as "Lyndsey" [confirmed](https://snapdragonsnursery.com/important-information/leadership-team/).
+    Use the enquiry form at snapdragonsnursery.com/contact.
+  - **Reach:** about **300 families a week** through book bags [estimate].
+  - **Deal:** code. **Before Christmas only if she agrees by about 1 Dec**; otherwise January.
+- **Raised in Bristol** (Raised In CIC; 4 nurseries: Easton, Felix Road, St Pauls, Southmead/Greenway)
+  - **Contact:** **0800 048 7968** [confirmed](https://www.raisedin.org.uk/).
+  - **Reach:** about **200 families a week** [estimate]. It publishes a local indie gift guide for children
+    [third-party], so it's a natural fit.
+  - **Deal:** code, or PTA-style if they want to fundraise.
+- **Bristol Childminding Network** (council-run; every Bristol childminder belongs, in 8–10 groups)
+  - **Who:** Lucy Dale, Childminding Support Lead [confirmed](https://bristolearlyyears.org.uk/childminders/groups).
+  - **Contact:** **CMSUPPORT@bristol.gov.uk**.
+  - **Ask:** about free newsletter space only. A council team won't forward a commercial offer. **January.**
+- **Skip before Christmas:** the big chains (Busy Bees, Kids Planet), whose head offices take weeks.
+
+#### Pharmacy and optician groups (several branches, one yes)
+
+- **Magna Pharmacy**: 19 branches [confirmed](https://www.magnapharmacy.co.uk/branches). About 8 are in Bristol and
+  Portishead: **Shirehampton (46 High St, 0117 982 3543)**, Lawrence Weston, Henbury, Lockleaze, Knowle West and
+  Portishead ×2.
+  - **Who:** no head-office contact is published. Ask the Shirehampton branch manager to pass it to the area or head
+    office [estimate].
+  - **Reach:** 8 × 60–100 = **480–800 family visits a week** [estimate].
+  - **Deal:** no-commission code, framed as a free family activity. **Chance: medium.**
+- **Armstrong & North Opticians** (family-run): about 9 Bristol and South Glos branches, including **Shirehampton
+  (12 High St)**, Henbury, Bishopston, Fishponds, Staple Hill, Winterbourne, Yate (01454 313594), Chipping Sodbury and
+  Thornbury [third-party listings; their site blocked automated reading].
+  - **Who:** the Shirehampton practice manager, asking for head office.
+  - **Reach:** 9 × 30–50 = **270–450 a week** [estimate].
+  - **Deal:** code (they're a private business). **Chance: medium.**
+- **Dentists:** the multi-site Bristol dental groups are corporate (Bupa has 6, mydentist 6+), so expect no central
+  yes. Ask independents one by one (Part 1).
+
+#### Bookshops, toy shops, a pottery café and a kids' hairdresser
+
+| Place | Contact | Reach a week [estimate] | Deal |
+|---|---|---|---|
+| **Totally Toys**, 109 Gloucester Rd, BS7 8AT | 0117 942 3833 [third-party] | 200–400 in December | Code or free placement |
+| **Storysmith**, 236 North St, BS3 1JD (one shop now) | 0117 953 7961 · hello@storysmithbooks.com [confirmed](https://storysmithbooks.com/access/) | 100–200 (it runs free children's author events) | Free placement |
+| **Bookmarked** (formerly Max Minerva's), 47 Henleaze Rd, BS9 4JU | 07498 538 858 · info@maxminervas.co.uk [confirmed](https://www.maxminervas.co.uk/) | 100–200 | Free placement |
+| **Bookhaus**, 4 Rope Walk, Wapping Wharf, BS1 6ZJ | 0117 244 0326 · info@bookhausbristol.com [confirmed](https://bookhausbristol.com/) | 100–200 | Free placement |
+| **Kiln Workshop** (paint your own pottery), 63 North Rd, BS6 5AD | 0117 942 0470 · kilnworkshop@gmail.com [confirmed](https://www.kilnworkshop.com/) | 80–150. **Its last Christmas firing is 29 Nov**, so families collect in early December, which is perfect timing | Code |
+| **Kidz Cuts** (children only), 37b High St, Keynsham | Book via [Fresha](https://www.fresha.com/a/kidz-cuts-9gsbin76/reviews); 2,361 five-star reviews | 80–150. Parents wait while the cut happens | Code |
+| Waterstones Cribbs | 0117 950 9813 [third-party] | — | Free placement. No leaflet policy found, and the Mall may need to approve. Low |
+
+#### Big networks: huge reach, but slow (mostly January)
+
+None of these councils or trusts publishes a poster or leaflet policy, and they'll want community material, not
+adverts. **Send one short email each now for January**, using the no-commission template. A single branch saying yes on
+the spot is a bonus.
+- **Bristol Libraries** (27 branches): **bristol.library.service@bristol.gov.uk** · 0117 903 7250. Central Library
+  displays go to librarybooking@bristol.gov.uk [confirmed](https://www.bristol.gov.uk/residents/libraries-and-archives/find-a-library/library-finder).
+  The branch emails are in Part 1.
+- **South Glos Libraries** (12 branches): **libraries@southglos.gov.uk** · 01454 868006 [third-party copy of a
+  council leaflet]. It shares a card with the Active Centres leisure trust, "almost 100,000 card holders"
+  [confirmed](https://activecentres.org/ABOUT-US/). One ask could cover both.
+- **North Somerset Libraries**: libraries@n-somerset.gov.uk [third-party]. Portishead and Pill branch emails are in
+  Part 1.
+- **Bristol Family Hubs** (15 sites in 3 areas) [confirmed]:
+  - North: **NBFH@bristol.gov.uk** · 0117 922 3779
+  - East & Central: **ecfh@bristol.gov.uk** · 0117 922 3189
+  - South: **sbfh@bristol.gov.uk** · 0117 922 2150
+- **North Somerset Family Hubs** (13 centres): family.hub@n-somerset.gov.uk. **South Glos children's centres** (6):
+  no central email found (the council pages returned errors).
+- **Everyone Active, Bristol contract** (5 centres: Horfield, Bristol South Pool, Henbury, Easton, St Pauls)
+  [confirmed](https://everyoneactive.com/news/bristol-leisure-contract). No leaflet process is published, so ask each
+  centre's general manager. **Hengrove Park isn't in it** (it's run by Parkwood).
+- **Active Centres, South Glos** (Bradley Stoke, Kingswood, Longwell Green, Thornbury, Yate): [contact form](https://activecentres.org/contact/)
+  · 0300 333 0300.
+- **Church networks:** the Diocese of Bristol publishes no children's adviser. Its contacts are
+  officesupport@bristoldiocese.org and 0117 906 0100 [confirmed](https://bristol.anglican.org/childrenyoungpeopleministry).
+  Toddler groups list themselves one by one, so there's no single route. **Low; January at best.**
+- **Supermarkets:** every chain's community role (Tesco, Sainsbury's and Asda Community Champions; Morrisons) is for
+  charities and good causes. No chain publishes a rule allowing small-business posters.
+  - Co-op's Member Pioneer roles ended in 2024, so the store manager decides now [estimate].
+  - Morrisons sells staffed in-store stands from about £330 a week through an agency (Access Point, 01704 544999)
+    [third-party]. That isn't "without turning up".
+  - **Low.** Only the Co-ops on your doorstep (Part 1) are worth a word.
+
+### Paid reach: real prices
+
+Prices exclude VAT unless stated.
+
+**How to compare them:** roughly **1 in 5 homes has a child under 10** [estimate], so £40 per 1,000 homes works out
+to about £200 per 1,000 young families.
+
+**Christmas: almost nothing paid can still land by 5 Dec.**
+- Every magazine's December issue has closed.
+- Royal Mail needs about 3 weeks.
+- **The one long shot is a private solus leaflet drop in BS11 on 1–5 Dec.** About 5,000 homes would cost roughly
+  **£400–£725 + print** [estimate]. Ask whether they can still do it:
+  - **Out of Hand** (Bristol BS3): solus from £145 per 1,000 in a print-and-deliver package. 0117 953 6363 ·
+    hello@outofhand.co.uk [confirmed](https://outofhand.co.uk/distribution).
+  - **Bristol Leaflet Delivery** (BS4): GPS-tracked, quote only. 0117 905 1144 [confirmed].
+  - **Leaflet Media**: its Bristol page says solus £80, solus+1 £59, shared £49 per 1,000 (10,000 minimum for
+    shared), but its national page shows higher prices [confirmed, the two pages conflict]. sales@leaflet-media.co.uk ·
+    07375 590133.
+
+**January (thank-you cards from their drawings): book these before mid-December.**
+
+| Option | Reach | Price | Cost per 1,000 | Deadline / lands | Contact | Verdict |
+|---|---|---|---|---|---|---|
+| **The Bristol Nine** (BC Magazines; BS9: Stoke Bishop, Westbury, Coombe Dingle, Henleaze, Sneyd Park, Sea Mills) | 12,000+ homes | Your leaflet delivered with the magazine, up to A5, **no minimum**; all of it is about £480 + print | **£40** | **Book by 12 Dec**, lands by about 8–10 Jan | 0117 259 1964 · [advertising](https://www.bcmagazines.co.uk/advertising/) [confirmed] | **Best value.** Family-heavy, next door to BS11 |
+| The Bristol Six + Eight (BC Magazines; Redland, Cotham, Westbury Park, Kingsdown, north Clifton) | 11,000+ homes | Same terms | £40 | Same | Same | Good second |
+| **The Shire** (BS11) | 5,000 copies, delivered by volunteers | Quarter page £75. Inserts aren't mentioned, so ask | About £15 (an advert) | **January issue closes Thu 10 Dec** | adverts@shire.org.uk · 07742 804737 [confirmed, Nov issue] | **Yes.** Your home patch and the cheapest per copy |
+| Henleaze & Westbury Voice | 8,500 copies | Quarter page £109 (£89 a month over 6 months). Inserts offered, price not published | About £13 (an advert) | About 16–17 Dec [estimate] | sales@henleazeandwestburyvoice.co.uk · 0117 908 2121 [confirmed](https://localvoicenetwork.co.uk/advertise-with-us/) | Maybe. It overlaps the Bristol Nine |
+| The Bristol Magazine | 15,000 well-off homes | Inserts from £75 per 1,000 | £75 | January issue closes **11 Dec** | 0117 974 2800 · sales@thebristolmagazine.co.uk [confirmed] | Poor fit (not aimed at families) |
+| **Royal Mail Leaflets** (door to door by postcode sector, about 3,000 homes each) | Every home in the sectors you pick | **About £84 per 1,000** (new customers about £75.60), £200 minimum | £75–£84 | About 3 weeks; hand over 10+ days before the delivery week. Book early-to-mid December for the week of 11 Jan [estimate] | 0345 266 0858 [third-party price; royalmail.com blocked reading] | A January test only. It reaches every home, most without young children |
+| Out of Hand "flyers to outlets" | 80+ city-centre venues, one network arts and family | £75 per 1,000 flyers, topped up weekly | £75 | Not stated | nigel@outofhand.co.uk · 0117 953 6363 [confirmed](https://outofhand.co.uk/distribution) | Maybe. Ask which family venues it covers |
+
+**For Mother's Day:**
+- **Primary Times Avon** goes home in primary-school book bags: "over 52,000" copies [confirmed, 2026 pack].
+- Inserts are **£35 per 1,000, minimum 10,000** (so £350 + print) [confirmed, 2025 pack].
+- The next issue lands about **Mon 1 Feb 2027**, copy deadline about **mid-January** [estimate].
+- Contact: 07736 945720, victoria.jelleyman@primarytimes.co.uk
+  ([2026 pack](https://primarytimes.co.uk/assets/files/2026%20media%20packs/Avonmediapack_2026%20VJ.pdf)).
+- **Book it for Mother's Day (7 Mar 2027).** Write to grown-ups only (CAP Code 5).
+
+**Gone or skip:**
+- The Journal series (Bradley Stoke, Patchway, Stoke Gifford) **ended in 2022**.
+- *Families* magazine for the South West looks lapsed (last issue found: Oct 2024).
+- Tourist leaflet racks reach visitors, not local families.
+
+### Top 20 to do now, by families per hour
+
+These are the ones that can work **before the Christmas cut-off**, ranked by families per hour. The big council
+networks above are January jobs.
+
+| ☐ | # | Who | Contact | Families a week [estimate] | Your time | Families / hour | Deal | Leaflets |
+|---|---|---|---|---|---|---|---|---|
+| ☐ | 1 | **Almondsbury Garden Centre**: counter stand by the grotto | 01454 457300 · enquiries@almondsbury.co.uk | 500–1,000 (about 70–140 grotto bookings a day × 7) | 1h | **~750** | Code | 300 + a stand |
+| ☐ | 2 | **Puddle Ducks Bristol & Bath** (Sarah Austin): email to families plus paper | 0117 971 7165 | 400–640 (50–80 classes × 8) | 45 min | **~690** | Code | 200 + the picture |
+| ☐ | 3 | **Water Babies Bristol & Bath** | 0117 946 6919 | 300–600 | 45 min | ~600 (chance low–med) | Code | 200 + the picture |
+| ☐ | 4 | **Boing! Softplay**, 3 sites | 07958 592 586 · info@boingsoftplay.com | 450–900 (3 × 150–300) | 1.5h | **~450** | Code / PTA-style | 3 × 100 |
+| ☐ | 5 | **Gymbo Bristol**: party gift bags plus counter | 07453 901951 | about 200 (25 classes × 8) | 30 min | ~400 | Code | 100 |
+| ☐ | 6 | **Wild Things, Cribbs**: counter plus party bags | 0117 959 2514 | 300–500 | 1h | ~400 | Code | 200 |
+| ☐ | 7 | **Baby Sensory** East, North and South | 07721 615412 · 07579 793259 · 07908 479936 | 280–400 (30–40 classes × 10) | 1h | ~340 | Code each | 3 × 100 + the picture |
+| ☐ | 8 | **Noah's Ark Play Centre**, Brislington | 0117 971 2599 | 400–600 | 1.5h | ~330 | Free / code | 200 + a stand |
+| ☐ | 9 | **Out There Indoors + Tots & Teapots** (BS4) | hoop booking · contact form | 350–600 | 1.5h | ~320 | Code each | 2 × 100 |
+| ☐ | 10 | **Snapdragons** (Lyndsey, Bristol ops): book bags. Yes needed by about 1 Dec | snapdragonsnursery.com/contact | about 300 | 1h | ~300 | Code | 300 |
+| ☐ | 11 | **Shirehampton walk-round**: library, Co-op, 2 pharmacies, GP, Public Hall, Ambition House, Armstrong & North (High St) | Part 1 numbers | about 400 combined | 1.5h | ~270 | No-commission (NHS, council) / code (shops) | 8 × 30 + 2 posters |
+| ☐ | 12 | **diddi dance Bristol** (Emily Norman) | 07850 983821 · emily.norman@diddidance.com | 150–250 | 45 min | ~270 | Code | 150 + the picture |
+| ☐ | 13 | **Magna Pharmacy**: via the Shirehampton branch to the area manager | 0117 982 3543 | 480–800 (8 × 60–100) | 2.5h | ~260 | No-commission | 8 × 50 |
+| ☐ | 14 | **babyballet** Bristol (Leanne) and Bradley Stoke etc. (Emma) | 07715 340610 · 07395 805885 | about 200–300 | 1h | ~250 | Code each | 2 × 100 |
+| ☐ | 15 | **Totally Toys**, Gloucester Rd | 0117 942 3833 | 200–400 in December | 1.25h | ~240 | Code / free | 100 + a stand |
+| ☐ | 16 | **Bookshops**: Storysmith, Bookmarked, Bookhaus | 0117 953 7961 · 07498 538 858 · 0117 244 0326 | 300–600 (3 × 100–200) | 2h | ~225 | Free placement | 3 × 50 |
+| ☐ | 17 | **Raised in Bristol**, 4 nurseries | 0800 048 7968 | about 200 | 1h | ~200 | Code / PTA-style | 200 |
+| ☐ | 18 | **Tiny Town Play Café**, Kingswood | hello@tinytownplaycafe.co.uk | 200–300 | 1.25h | ~200 | Code | 100 |
+| ☐ | 19 | **Armstrong & North Opticians**: via the Shirehampton practice | Shirehampton, 12 High St (walk in) | 270–450 (9 × 30–50) | 2h | ~180 | Code | 9 × 30 |
+| ☐ | 20 | **Kiln Workshop**: collections in early December | 0117 942 0470 · kilnworkshop@gmail.com | 80–150 | 45 min | ~150 | Code | 100 |
+
+**Total:** about 3,000 leaflets, plus 4–6 counter stands. That's within one 2,500–5,000 A6 print run (Part 1: about
+£22–£30 per 500 from instantprint).
+
+**If you only have two hours tomorrow:** ring 1, 2, 4 and 5, and email 7 and 12 the template with the leaflet picture.
+
+---
+
 ## What this report couldn't check
 
 - Facebook-only places, including most toddler groups and PTAs, and some class schedules (Happity's pages are partly
@@ -670,5 +971,16 @@ All from **Hobbycraft Cribbs**; Click & Collect is usually ready within an hour.
   They're unverified, so they're left out of the ranking.
 - **The Hideaway** café with a play area (63 Shirehampton Rd, BS9) has conflicting reports: reopened in 2025, then
   announced as closed. Walk past before counting on it.
+- **Part 2 gaps:**
+  - No venue publishes weekly footfall, so every reach figure is an estimate. Bristol library visit figures sit in a
+    council data pack that blocked automated reading.
+  - Magna and Armstrong & North head-office contacts weren't found.
+  - Not checked: who runs Co-op boards since 2024, and Lidl and Aldi.
+  - South Glos children's-centre contacts weren't found (the council pages returned errors).
+  - Whether The Shire takes loose inserts, and its price.
+  - Insert prices for the Voice magazines.
+  - Private distributors' lead times.
+  - Contacts for Playful Café, Skyboat Café and The Play Shed.
+  - Whether EK Hair and iPlay are still trading.
 - The detailed research notes behind this sheet (with every source link) are in this session's scratchpad. They
   aren't part of the repository.
