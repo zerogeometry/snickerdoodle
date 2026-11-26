@@ -11,6 +11,7 @@
  * No codes, no credit, no free card, no multi-buy or parcel savings: the cost already counts the shared post.
  * A line whose cost isn't on file is charged its normal shelf price (never below cost) and named in `noCostKeys`.
  */
+import { isCardPackKey } from '@/lib/card-packs';
 import { bundleCostPence, bundleSizeOf, isBundleKey } from '@/lib/christmas-bundle';
 import type { PricedCatalogue } from './catalogue';
 import { parcelGroupOf } from './parcels';
@@ -110,7 +111,10 @@ export function costSampleLines(lines: readonly SampleLineIn[], catalogue: Price
       continue;
     }
     costExVatPence += lineCost;
-    const unit = Math.ceil((lineCost * (1 + e.vatRate)) / qty - 1e-9);
+    let unit = Math.ceil((lineCost * (1 + e.vatRate)) / qty - 1e-9);
+    // a card pack's price is split equally between its cards at order time (src/lib/card-packs.ts expandCardPack), so it
+    // rounds UP to a multiple of 10p — splits evenly for a pack of 5 or 10 (a few pence at most, never under cost)
+    if (isCardPackKey(l.productKey)) unit = Math.ceil(unit / 10) * 10;
     out.push({ productKey: l.productKey, qty, costExVatPence: lineCost, unitPricePence: unit, linePence: unit * qty, atCost: true });
   }
 

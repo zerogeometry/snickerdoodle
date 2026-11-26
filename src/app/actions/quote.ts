@@ -2,7 +2,6 @@
 
 import { lineEconomics, multiBuyTiers, quote, type Quote, type RequestedLine } from '@/pricing';
 import { isBundleKey } from '@/lib/christmas-bundle';
-import { isCardPackKey } from '@/lib/card-packs';
 import { pickAddOns, type AddOn } from '@/server/addOns';
 import { getDb } from '@/db/client';
 import { getCatalogue, loadCatalogue } from '@/server/catalogue';
@@ -73,7 +72,8 @@ export async function quoteBasket(req: QuoteRequest): Promise<ClientQuote> {
   const opts = { gift: req.gift ?? false, catalogue, promo: promo.rule, creditAvailablePence, freeCardEligible: promo.cardEligible };
   const { partnerCommissionPence: _hidden, ...q } = quote(items, opts);
   void _hidden;
-  const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) || isCardPackKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
+  // card packs share their postage saving like every other product (founder, 26 Nov 2026); the bundle has none
+  const lineTiers = q.lines.map((l) => (isBundleKey(l.productKey) ? [0, 0, 0, 0] : multiBuyTiers(lineEconomics(catalogue, l.productKey))));
   const addOns = q.lines.length ? pickAddOns(await loadCatalogue(db), items, opts) : [];
   const signedIn = !!account;
   const welcomeOffered = !signedIn && q.lines.length > 0 && (await welcomeCardOn(db));

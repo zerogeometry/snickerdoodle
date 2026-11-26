@@ -402,7 +402,8 @@ export default function CheckoutPage() {
               <SavedBasketNote />
               <div className="mt-3 space-y-2.5">
                 {items.map((item, idx) => {
-                  const oneOff = isPackLine(item) || isBundleLine(item);
+                  // the bundle is always ONE; a card pack's quantity is how many packs (founder, 26 Nov 2026)
+                  const oneOff = isBundleLine(item);
                   // every line re-opens ITS OWN customize, with "update basket" (as the basket sidebar does)
                   const editHref = `/customize/${item.product}?edit=${encodeURIComponent(item.id)}`;
                   const editLabel = isBundleLine(item) ? `edit your ${item.name}` : isPackLine(item) ? `edit the cards in your ${item.name}` : `customize your ${item.name}`;
@@ -442,7 +443,7 @@ export default function CheckoutPage() {
                       <div className="break-words text-sm font-bold text-cocoa">{item.name}</div>
                       {item.sub ? <div className="break-words text-[11px] text-ink-faint">{item.sub}</div> : null}
                     </div>
-                    {/* (c) buy more & save + the quantity (a card pack / the bundle is always ONE — no quantity) */}
+                    {/* (c) buy more & save + the quantity (the bundle is always ONE — no quantity; a card pack: how many packs) */}
                     <div className="min-w-0 [grid-area:qty]">
                       {oneOff ? null : (
                         // the same dropdown as the product page — each option's discount from the SERVER's tiers; no offer → just the quantity

@@ -12,6 +12,13 @@ describe('card packs — splitting a pack into order lines', () => {
     expect(sum(lines)).toBe(2100);
   });
 
+  it('several packs (founder, 26 Nov 2026): every card that many times over, at the same share of the pack price', () => {
+    const lines = expandCardPack(1200, 5, [card('a'), card('b'), card('a'), card('a'), card('b')], undefined, 3);
+    expect(lines.map((l) => [l.card.assetId, l.qty, l.unitPricePence, l.linePence])).toEqual([['a', 9, 240, 2160], ['b', 6, 240, 1440]]);
+    expect(sum(lines)).toBe(3 * 1200);
+    expect(() => expandCardPack(1200, 5, Array.from({ length: 5 }, () => card('x')), undefined, 0)).toThrow();
+  });
+
   it('the same drawing ten times → ONE line of 10 copies (still exactly £21)', () => {
     const lines = expandCardPack(2100, 10, Array.from({ length: 10 }, () => card('same')));
     expect(lines).toEqual([{ card: card('same'), qty: 10, unitPricePence: 210, linePence: 2100, ground: null }]);

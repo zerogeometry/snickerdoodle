@@ -8,7 +8,6 @@ import { CardPackThumb } from './CardPackThumb';
 import { BundleThumb } from './BundleThumb';
 import { MockupPreview } from './MockupPreview';
 import { ProductArt, type ProductKey } from './ProductArt';
-import { packPill } from '@/lib/pack-labels';
 import { gbp, isBundleLine, isPackLine, useBasket, type BasketItem } from '@/lib/store';
 
 /**
@@ -23,7 +22,7 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
   const setQty = useBasket((s) => s.setQty);
   const remove = useBasket((s) => s.remove);
   const router = useRouter();
-  // A card pack is always ONE pack (qty fixed): it shows its card count + a remove, not − / +.
+  // A card pack: its card count is on the thumbnail; − / + below is how many PACKS (founder, 26 Nov 2026).
   const pack = isPackLine(item);
   // The christmas bundle is ONE bundle too: its pieces are edited in its builder.
   const bundle = isBundleLine(item);
@@ -82,20 +81,9 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
           {item.sub ? <span className="text-[10px] leading-tight text-paper">{item.sub}</span> : null}
         </div>
       </div>
-      {pack || bundle ? (
+      {bundle ? (
         <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
-          {/* "×5" fits beside the bin on one line (it wrapped as "5 cards"); the screen reader still
-              hears "5 cards". */}
-          <span className={`flex min-w-0 flex-1 items-center justify-center font-bold text-cocoa ${bundle ? 'text-center text-[11px] leading-tight' : 'whitespace-nowrap pl-2 text-xs'}`}>
-            {bundle ? (
-              'one bundle'
-            ) : (
-              <>
-                <span aria-hidden>{packPill(item.cards?.length ?? 0).shown}</span>
-                <span className="sr-only">{packPill(item.cards?.length ?? 0).spoken}</span>
-              </>
-            )}
-          </span>
+          <span className="flex min-w-0 flex-1 items-center justify-center text-center text-[11px] font-bold leading-tight text-cocoa">one bundle</span>
           <button
             type="button"
             aria-label={`remove ${label}`}
@@ -112,7 +100,7 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
         <div className="mt-1.5 flex items-stretch rounded-full border-2 border-cocoa/25 bg-paper">
           <button
             type="button"
-            aria-label={`one fewer ${item.name}`}
+            aria-label={pack ? `one fewer pack of ${item.name}` : `one fewer ${item.name}`}
             onClick={() => setQty(item.id, item.qty - 1)}
             className="press flex h-11 flex-1 items-center justify-center rounded-l-full text-cocoa"
           >
@@ -121,7 +109,7 @@ function BasketRow({ item, index }: { item: BasketItem; index: number }) {
           <span className="flex min-w-6 items-center justify-center text-xs font-bold text-cocoa">{item.qty}</span>
           <button
             type="button"
-            aria-label={`one more ${item.name}`}
+            aria-label={pack ? `one more pack of ${item.name}` : `one more ${item.name}`}
             onClick={() => setQty(item.id, item.qty + 1)}
             className="press flex h-11 flex-1 items-center justify-center rounded-r-full text-cinnamon"
           >

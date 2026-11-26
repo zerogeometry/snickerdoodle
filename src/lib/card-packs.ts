@@ -3,7 +3,7 @@
  * each card with its own drawing on the front (or the same one repeated) and the inside left BLANK
  * for the buyer to write in — no printed message on a pack.
  *
- * In the basket a pack is ONE priced line (qty 1) that carries its N cards. At order time the server
+ * In the basket a pack is ONE priced line that carries its N cards; its qty is how many packs (founder, 26 Nov 2026). At order time the server
  * splits it into one order line per distinct card design (qty = how many times it repeats), each at
  * an equal, exact share of the pack price — so fulfilment sends N cards in one Prodigi order, and the
  * pack still costs exactly its catalogue price. Client-safe: no I/O.
@@ -50,7 +50,8 @@ const designKey = (c: PackCard) =>
  * lines always add up to the pack price to the penny. The pack's BASE COLOUR (untrusted — normalised
  * here; junk / white = none) goes on EVERY line: a pack is one colour, whichever drawings it holds.
  */
-export function expandCardPack<C extends PackCard>(packPricePence: number, packSize: number, cards: C[], ground?: unknown): PackOrderLine<C>[] {
+export function expandCardPack<C extends PackCard>(packPricePence: number, packSize: number, cards: C[], ground?: unknown, packs = 1): PackOrderLine<C>[] {
+  if (!Number.isInteger(packs) || packs < 1) throw new Error('a pack line needs at least one pack');
   if (!Number.isInteger(packSize) || packSize < 2) throw new Error('not a card pack');
   if (cards.length !== packSize) throw new Error(`a pack of ${packSize} needs ${packSize} cards (got ${cards.length})`);
   if (!Number.isInteger(packPricePence) || packPricePence % packSize !== 0) throw new Error('pack price must split evenly between its cards');
@@ -63,5 +64,6 @@ export function expandCardPack<C extends PackCard>(packPricePence: number, packS
     else groups.set(k, { card: c, qty: 1 });
   }
   const g0 = normalizeGround(ground);
-  return [...groups.values()].map((g) => ({ card: g.card, qty: g.qty, unitPricePence: unit, linePence: unit * g.qty, ground: g0 }));
+  // several packs: every card that many times over (founder, 26 Nov 2026)
+  return [...groups.values()].map((g) => ({ card: g.card, qty: g.qty * packs, unitPricePence: unit, linePence: unit * g.qty * packs, ground: g0 }));
 }

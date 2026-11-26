@@ -288,7 +288,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const t = { scale: 1, offsetX: 0, offsetY: 0, rotationDeg: 0 };
     const cards = [a, a, a, a, a, b, b, b, c, c].map((x) => ({ assetId: x.id, transform: t }));
 
-    // a smuggled qty and a printed message are both ignored: one pack, blank inside — in ONE colour
+    // qty 4 = FOUR packs of the same 10 cards (founder, 26 Nov 2026); a printed message is ignored: blank inside — in ONE colour
     const res = await placeOrder(db, {
       items: [{ productKey: 'cardPack-packof10', qty: 4, ground: '#C8402A', cards, artwork: { assetId: a.id, transform: t, message: { greeting: 'hi', message: 'x', signature: '', note: '', font: 'caveat' } } }],
       account: { id: ids.samId },
@@ -296,13 +296,15 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(2100);
-    expect(order!.totalPence).toBe(2100);
+    expect(order!.subtotalPence).toBe(4 * 2100);
+    // four packs share their postage saving like every other product (buy more & save — founder, 26 Nov 2026)
+    expect(order!.multiBuySavingPence).toBeGreaterThan(0);
+    expect(order!.totalPence).toBe(4 * 2100 - order!.multiBuySavingPence);
 
     const lines = await db.select().from(orderItems).where(eq(orderItems.orderId, order!.id));
-    expect(lines.map((l) => l.qty).sort()).toEqual([2, 3, 5]);
+    expect(lines.map((l) => l.qty).sort((x, y) => x - y)).toEqual([8, 12, 20]); // every card four times over
     expect(lines.every((l) => l.unitPricePence === 210 && l.productKey === 'cardPack-packof10')).toBe(true);
-    expect(lines.reduce((s, l) => s + l.linePence, 0)).toBe(2100); // to the penny
+    expect(lines.reduce((s, l) => s + l.linePence, 0)).toBe(4 * 2100); // to the penny
     expect(lines.every((l) => l.spec?.providerSku === 'CLASSIC-GRE-FEDR-7X5-BLA')).toBe(true);
     const arts = await db.select().from(orderItemArtwork).where(inArray(orderItemArtwork.orderItemId, lines.map((l) => l.id)));
     expect(arts).toHaveLength(3);

@@ -367,7 +367,7 @@ export type BasketItem = {
 };
 /** One card of a pack in the basket: which drawing, how it sits on the front (+ an optional cutout). */
 export type PackCardLine = { assetId: string; transform: PlacementTransform; sourceObjectId?: string };
-/** Is this basket line a card pack? (Its quantity is fixed at 1.) */
+/** Is this basket line a card pack? (Its quantity is how many PACKS — each the same cards; founder, 26 Nov 2026.) */
 export const isPackLine = (i: Pick<BasketItem, 'product'>) => isCardPackKey(i.product);
 /** Is this basket line a calendar? (Its pages are edited in the calendar builder.) */
 export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(i.product);
@@ -375,8 +375,10 @@ export const isCalendarLine = (i: Pick<BasketItem, 'product'>) => isCalendarKey(
 export const isFrameGridLine = (i: Pick<BasketItem, 'product'>) => isMultiPhotoFrameKey(i.product);
 /** Is this basket line the Christmas family bundle? (Always ONE bundle; edited in its builder.) */
 export const isBundleLine = (i: Pick<BasketItem, 'product'>) => isBundleKey(i.product);
-/** A line that is always exactly ONE (a card pack, the bundle): re-adding replaces it, qty stays 1. */
+/** A line whose contents are built (a card pack, the bundle): re-adding the same line replaces its contents, never adds one. */
 export const isOneOffLine = (i: Pick<BasketItem, 'product'>) => isPackLine(i) || isBundleLine(i);
+/** A line that is always exactly ONE: the bundle (a card pack can be bought several times over — founder, 26 Nov 2026). */
+export const isSingleLine = (i: Pick<BasketItem, 'product'>) => isBundleLine(i);
 type BasketState = {
   items: BasketItem[];
   add: (item: Omit<BasketItem, 'qty'>) => void;
@@ -397,8 +399,8 @@ export const useBasket = create<BasketState>()(
       add: (item) =>
         set((s) => {
           const existing = s.items.find((x) => x.id === item.id);
-          // A card pack is always ONE pack: re-adding the same line replaces it, never makes it 2.
-          if (existing && isOneOffLine(item)) return { items: s.items.map((x) => (x.id === item.id ? { ...item, qty: 1 } : x)) };
+          // A card pack / the bundle: re-adding the same line replaces its contents (a pack keeps how many packs), never adds one.
+          if (existing && isOneOffLine(item)) return { items: s.items.map((x) => (x.id === item.id ? { ...item, qty: isSingleLine(item) ? 1 : x.qty } : x)) };
           if (existing) return { items: s.items.map((x) => (x.id === item.id ? { ...x, qty: x.qty + 1 } : x)) };
           return { items: [...s.items, { ...item, qty: 1 }] };
         }),
@@ -407,7 +409,7 @@ export const useBasket = create<BasketState>()(
           items:
             qty <= 0
               ? s.items.filter((x) => x.id !== id)
-              : s.items.map((x) => (x.id === id ? { ...x, qty: isOneOffLine(x) ? 1 : qty } : x)), // a pack / the bundle stays at 1
+              : s.items.map((x) => (x.id === id ? { ...x, qty: isSingleLine(x) ? 1 : qty } : x)), // the bundle stays at 1; packs count up
         })),
       update: (id, patch, newId) =>
         set((s) => {
