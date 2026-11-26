@@ -29,9 +29,9 @@ export const DRAW_STORE_BADGES: Record<DrawStore, string | null> = {
 };
 
 /** Each store's own wording (their badge guidelines use exactly these lines). */
-export const STORE_LABEL: Record<DrawStore, { small: string; name: string; full: string }> = {
-  appStore: { small: 'Download on the', name: 'App Store', full: 'Download on the App Store' },
-  googlePlay: { small: 'Get it on', name: 'Google Play', full: 'Get it on Google Play' },
+export const STORE_LABEL: Record<DrawStore, { small: string; name: string; full: string; devices: string }> = {
+  appStore: { small: 'Download on the', name: 'App Store', full: 'Download on the App Store', devices: 'iPhone and iPad' },
+  googlePlay: { small: 'Get it on', name: 'Google Play', full: 'Get it on Google Play', devices: 'Android' },
 };
 
 const STORE_HOSTS: Record<DrawStore, string> = { appStore: 'apps.apple.com', googlePlay: 'play.google.com' };

@@ -9,7 +9,7 @@ const STORE_ICON = { appStore: IconBrandApple, googlePlay: IconBrandGooglePlay }
  * A "get Snickerdoodle Draw" store button, in three states (src/lib/drawApp.ts):
  *  1. link + official artwork → Apple's / Google's own badge, unaltered (their rules), as the link;
  *  2. link, no artwork yet     → our plain ink stand-in with the store's own wording;
- *  3. no link yet              → the same stand-in, faded, saying "coming soon" (not a link at all).
+ *  3. no link yet              → the same stand-in, faded, saying "coming soon for iPhone and iPad" (not a link at all).
  * 48px tall (≥44px tap target). No tracking on the link: rel="noreferrer", nothing appended.
  */
 export function StoreBadge({ store, className }: { store: DrawStore; className?: string }) {
@@ -32,8 +32,9 @@ export function StoreBadge({ store, className }: { store: DrawStore; className?:
     <>
       <Icon icon={STORE_ICON[store]} size={26} stroke={1.75} />
       <span className="flex flex-col items-start text-left leading-none">
-        <span className="text-[10px] font-semibold opacity-85">{soon ? 'coming soon to' : label.small}</span>
-        <span className="mt-0.5 text-[17px] font-extrabold tracking-[-0.01em]">{label.name}</span>
+        {/* not out yet: say which devices it's coming to ("coming soon for iPhone and iPad", founder 26 Nov 2026) */}
+        <span className="text-[10px] font-semibold opacity-85">{soon ? 'coming soon for' : label.small}</span>
+        <span className="mt-0.5 whitespace-nowrap text-[17px] font-extrabold tracking-[-0.01em]">{soon ? label.devices : label.name}</span>
       </span>
     </>
   );
