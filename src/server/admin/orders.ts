@@ -96,6 +96,8 @@ export interface OrderDetail {
   paidAt: Date | null;
   claimedAt: Date | null;
   prodigiOrderId: string | null;
+  /** The phone case's own Prodigi order, when it went separately. */
+  prodigiSplitOrderId: string | null;
   stripePaymentIntent: string | null;
   shippingMethod: string | null;
   tracking: { carrier?: string | null; number?: string | null; url?: string | null } | null;
@@ -137,6 +139,7 @@ export async function orderDetail(db: DbHandle, reviewer: Reviewer, ref: string)
     paidAt: o.paidAt,
     claimedAt: o.claimedAt,
     prodigiOrderId: o.prodigiOrderId,
+    prodigiSplitOrderId: o.prodigiSplitOrderId,
     stripePaymentIntent: o.stripePaymentIntent,
     shippingMethod: o.shippingMethod,
     tracking: o.tracking,

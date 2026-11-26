@@ -524,6 +524,10 @@ export const orders = pgTable(
     // The provider's order id — set EXACTLY once on successful submission; doubles as
     // the idempotency latch (an order with a prodigiOrderId is never re-submitted).
     prodigiOrderId: text('prodigi_order_id'),
+    // A phone case whose Standard post ISN'T tracked goes to Prodigi as its OWN Express order, so the rest of the
+    // basket doesn't pay Express (founder, 26 Nov 2026). That second Prodigi order's id; null = one Prodigi order.
+    // Set before the main order is sent, so a retry re-sends it with the same idempotency key (never a second case).
+    prodigiSplitOrderId: text('prodigi_split_order_id'),
     // Captured from Stripe Checkout's shipping_address_collection at payment time.
     // Null on the dev fallback path (submission substitutes a sandbox address).
     shippingAddress: jsonb('shipping_address').$type<{
@@ -538,7 +542,7 @@ export const orders = pgTable(
     // submission from the order's lines, persisted for support/repricing forensics.
     shippingMethod: text('shipping_method'),
     // Latest shipment info from the status sync: carrier + tracking number/url.
-    tracking: jsonb('tracking').$type<{ carrier?: string | null; number?: string | null; url?: string | null } | null>(),
+    tracking: jsonb('tracking').$type<{ carrier?: string | null; number?: string | null; url?: string | null; parcels?: Array<{ carrier?: string | null; number?: string | null; url?: string | null }> } | null>(),
     // ── money back (the admin app, 16 Nov 2026): what Stripe tells us after payment ──
     // The Stripe payment behind the order (from the paid session), so a refund or chargeback finds its order.
     stripePaymentIntent: text('stripe_payment_intent'),

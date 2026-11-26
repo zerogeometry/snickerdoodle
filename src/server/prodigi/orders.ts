@@ -106,7 +106,23 @@ export interface ProdigiOrderTransport {
   /** Which shipments would carry these inserts (read-only POST /quotes). Optional: a transport
    * without it just means "couldn't check" — Prodigi still skips an insert a lab can't make. */
   quoteInserts?(req: InsertQuoteRequest): Promise<InsertQuoteShipment[]>;
+  /** How these items would ship by `shippingMethod` (read-only POST /quotes): each parcel's lab and carrier service.
+   * Optional: without it, the phone case is treated as untracked on Standard (it goes Express — always tracked). */
+  quoteShipping?(req: ShippingQuoteRequest): Promise<ShippingQuoteShipment[]>;
 }
+
+export interface ShippingQuoteRequest {
+  shippingMethod: string;
+  destinationCountryCode: string;
+  items: { sku: string; copies: number; attributes?: Record<string, string>; printAreas: string[] }[];
+}
+
+export interface ShippingQuoteShipment {
+  lab: string;
+  carrier: string;
+  service: string;
+}
+
 
 /** Outcomes the docs list for a successful create (HTTP 200). Compared lower-cased —
  * the reference self-contradicts on casing ('Created' vs 'created'). */
@@ -135,7 +151,7 @@ async function getOrder(prodigiOrderId: string): Promise<ProdigiOrder> {
 
 interface QuoteResponse {
   outcome?: string;
-  quotes?: { shipments?: { fulfillmentLocation?: { labCode?: string }; brandingItems?: string[] | null }[] }[];
+  quotes?: { shipments?: { fulfillmentLocation?: { labCode?: string }; brandingItems?: string[] | null; carrier?: { name?: string; service?: string } | null }[] }[];
 }
 
 async function quoteInserts(req: InsertQuoteRequest): Promise<InsertQuoteShipment[]> {
@@ -156,4 +172,19 @@ async function quoteInserts(req: InsertQuoteRequest): Promise<InsertQuoteShipmen
   return (quote.shipments ?? []).map((s) => ({ lab: s.fulfillmentLocation?.labCode ?? 'unknown', brandingItems: s.brandingItems ?? [] }));
 }
 
-export const prodigiOrderTransport: ProdigiOrderTransport = { createOrder, getOrder, quoteInserts };
+async function quoteShipping(req: ShippingQuoteRequest): Promise<ShippingQuoteShipment[]> {
+  const { status, body } = await request<QuoteResponse>('/quotes', {
+    method: 'POST',
+    body: JSON.stringify({
+      shippingMethod: req.shippingMethod,
+      destinationCountryCode: req.destinationCountryCode,
+      currencyCode: 'GBP',
+      items: req.items.map((i) => ({ sku: i.sku, copies: i.copies, ...(i.attributes ? { attributes: i.attributes } : {}), assets: i.printAreas.map((printArea) => ({ printArea })) })),
+    }),
+  });
+  const quote = body?.quotes?.[0];
+  if (status < 200 || status >= 300 || !quote) throw new ProdigiError(`Prodigi quote failed: HTTP ${status} outcome=${body?.outcome ?? '?'}`, status);
+  return (quote.shipments ?? []).map((s) => ({ lab: s.fulfillmentLocation?.labCode ?? 'unknown', carrier: s.carrier?.name ?? '', service: s.carrier?.service ?? '' }));
+}
+
+export const prodigiOrderTransport: ProdigiOrderTransport = { createOrder, getOrder, quoteInserts, quoteShipping };

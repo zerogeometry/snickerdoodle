@@ -45,6 +45,8 @@ export interface NeedFacts {
     claimedAt: Date | null;
     createdAt: Date;
     prodigiOrderId: string | null;
+    /** The phone case's own Prodigi order, when it went separately (src/lib/delivery.ts planShipments). */
+    prodigiSplitOrderId?: string | null;
     submitError: string | null;
     totalPence: number;
     refundedPence: number;
@@ -197,7 +199,13 @@ export function buildNeeds(f: NeedFacts, now: Date): Need[] {
       out.push({ key: at('prodigi-cancelled'), kind: 'order', title: `${o.ref}: Prodigi cancelled it`, detail: 'The customer paid but won’t get it. Refund them in Stripe, or make it again.', since: o.claimedAt ?? o.createdAt, due: null, href: `/admin/orders/${o.ref}`, action: 'open order', urgent: true, dismissable: true });
     }
     if (fullyRefunded && o.prodigiOrderId && o.status === 'FULFILLING') {
-      out.push({ key: at('refund-at-prodigi'), kind: 'refund-at-prodigi', title: `${o.ref}: refunded, but already at Prodigi`, detail: 'Cancel it in Prodigi if they haven’t made it yet, or it will still be printed and posted.', since: o.refundedAt ?? now, due: null, href: `/admin/orders/${o.ref}`, action: 'cancel at Prodigi', urgent: true, dismissable: true });
+      const two = o.prodigiSplitOrderId ? ' Both of its Prodigi orders: the phone case went as its own order.' : '';
+      out.push({ key: at('refund-at-prodigi'), kind: 'refund-at-prodigi', title: `${o.ref}: refunded, but already at Prodigi`, detail: `Cancel it in Prodigi if they haven’t made it yet, or it will still be printed and posted.${two}`, since: o.refundedAt ?? now, due: null, href: `/admin/orders/${o.ref}`, action: 'cancel at Prodigi', urgent: true, dismissable: true });
+    }
+    // the phone case went on its own, then the order stopped before the rest was sent (refunded / cancelled): the case
+    // is still at Prodigi and will be made unless someone cancels it there
+    if (o.prodigiSplitOrderId && !o.prodigiOrderId && (o.status === 'CANCELLED' || fullyRefunded)) {
+      out.push({ key: at('case-at-prodigi'), kind: 'refund-at-prodigi', title: `${o.ref}: its phone case is still at Prodigi`, detail: `The case went to Prodigi as its own order (${o.prodigiSplitOrderId}) before the rest, and the order then stopped. Cancel the case in Prodigi if it shouldn’t be made.`, since: o.refundedAt ?? o.claimedAt ?? o.createdAt, due: null, href: `/admin/orders/${o.ref}`, action: 'cancel at Prodigi', urgent: true, dismissable: true });
     }
   }
 

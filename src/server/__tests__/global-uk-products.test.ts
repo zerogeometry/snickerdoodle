@@ -99,9 +99,9 @@ describe('post and Christmas', () => {
     expect(DELIVERY_DAYS.uk6std).toBeDefined();
   });
 
-  it('a phone case with a calendar stays Standard (Prodigi has no Express for the calendar) — and isn’t called tracked', () => {
+  it('a phone case with a calendar: the calendar goes Standard (no Express for it), the case travels tracked on its own when it must (26 Nov 2026)', () => {
     expect(resolveShippingMethod(['phoneCase', 'calendar-a4'])).toBe('Standard');
-    expect(deliveryLine(['phoneCase', 'calendar'])).toBe('free delivery');
+    expect(deliveryLine(['phoneCase', 'calendar'])).toBe('free tracked delivery');
     expect(deliveryLine(['calendar', 'mug'])).toBe('free tracked delivery');
   });
 
