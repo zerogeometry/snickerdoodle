@@ -2,16 +2,17 @@
 
 *Turn on Pro now, move frames later.* Research report, 26 November 2026. Research only: no code, prices or suppliers were changed.
 
-> **Exact figures are private.** This report goes in a public repo, so it never says what Snickerdoodle pays Prodigi for any product or post. It uses rounded bands only ("very large saving", "£300–£500 a month at 200 orders"). The per-item numbers behind every band are in the founder's private file `.prodigi-assets/SOURCING-SAVINGS-2026-11-26.md` (gitignored). Rival makers' prices below are their own public prices, read on 26 Nov 2026, with links. The full research notes, one file per maker group, are in [`sourcing-costs/research-notes/`](sourcing-costs/research-notes/).
+> **Exact figures are private.** This report goes in a public repo, so it never says what Snickerdoodle pays Prodigi for any product. Every saving here is **per item sold**, in bands: small = under £2, medium = £2–£5, large = £5–£10, very large = over £10. The exact £ saving for every product and size is in section 0 of the founder's private file `.prodigi-assets/SOURCING-SAVINGS-2026-11-26.md` (gitignored). No sales volumes are assumed anywhere. Rival makers' prices below are their own public prices, read on 26 Nov 2026, with links. The full research notes, one file per maker group, are in [`sourcing-costs/research-notes/`](sourcing-costs/research-notes/).
 
-The biggest and easiest saving is Prodigi Pro: one switch, no code. It is worth about £500 a month at 200 orders, if the live account is not on it already. The biggest saving that takes real work is moving framed prints to Gelato, which makes them in the UK for much less. That move brings a new company into contact with children's drawings, so it has to wait for the new year and your sign-off. Postage is the other lever. Today one phone case puts the whole basket on Express, and splitting each order by lab fixes that. No other maker beats Prodigi on most of the range once Pro is on, so the right plan is to keep Prodigi as the main maker and move one or two lines, not to switch wholesale.
+The biggest and easiest saving is Prodigi Pro: one switch, no code. If the live account isn't on it already, it takes 15% off the product price of every item (10% on clothing). The biggest saving that takes real work is moving framed prints to Gelato, which makes them in the UK for much less. That move brings a new company into contact with children's drawings, so it has to wait for the new year and your sign-off. Postage is the other lever. Today one phone case puts the whole basket on Express, and splitting each order by lab fixes that. No other maker beats Prodigi on most of the range once Pro is on, so the right plan is to keep Prodigi as the main maker and move one or two lines, not to switch wholesale.
 
 ## The short version
 
-- **Check today whether the Prodigi account is on Pro.** If not, switch it on: about **£100 · £500 · £1,300 a month** at 50 · 200 · 500 orders, after the fee. That is 15% off products and 10% off clothing, with postage at full price. It costs £35 a month on the annual plan or £40 a month on the monthly plan, which you can cancel any time ([Prodigi Pro](https://www.prodigi.com/prodigi-pro/)).
-- **Framed prints are where Prodigi is beaten.** Gelato makes framed prints in the UK, and the saving is very large on 11×14″, 12×16″ and 18×24″. That is worth about **£300–£500 a month at 200 orders**. The catches: no gold frame, thinner paper, no 16×24″ multi frame, and a new company that would see children's drawings. Order samples in January and build in February, but only if you approve Gelato as a new processor.
-- **Email Prodigi now for a better frame price.** Use Gelato's public prices as the benchmark. If Prodigi closes half the gap, that is about **£150–£250 a month at 200 orders**, from one email. A bespoke deal can't be added on top of Pro, so only take one that beats Pro on the whole basket.
-- **One phone case puts the whole basket on Express.** Express adds about £1–£8 to each of the other items. Sending each lab's items as their own Prodigi order, with only the case on Express, saves about **£35–£40 a month at 200 orders**. It also lets the case stay tracked when a calendar is in the basket. It's a code change, so it waits until after Christmas.
+- **Check today whether the Prodigi account is on Pro.** If not, switch it on: **15% off the product price of every item, 10% off clothing**, with postage at full price. On a framed print that is a large saving per frame; on a mug or a card it is small. It costs £35 a month on the annual plan or £40 a month on the monthly plan, which you can cancel any time ([Prodigi Pro](https://www.prodigi.com/prodigi-pro/)).
+- **Framed prints are where Prodigi is beaten.** Gelato makes framed prints in the UK. Against Prodigi with Pro, the saving is **very large per frame** on 11×14″, 12×16″, 18×24″ and the 12×12″ multi frame, and **large** on 24×32″ and the 24×36″ multi frame. The catches: no gold frame, thinner paper, no 16×24″ multi frame, and a new company that would see children's drawings. Order samples in January and build in February, but only if you approve Gelato as a new processor.
+- **Email Prodigi now for a better frame price.** Use Gelato's public prices as the benchmark. A bespoke deal can't be added on top of Pro, so only take one that beats Pro on everything we sell.
+- **One phone case puts the whole basket on Express.** Each other item in that basket pays extra post: about £1.05 on a mug, ornament, jigsaw or wrapping paper; £1.95 on a watch strap; £2.15 on a cushion; £2.90 on a frame; £6.45 on a tee; £7.65 on a card; £8.05 on socks. Sending the case as its own Prodigi order removes that. It also lets the case stay tracked when a calendar is in the basket. It's a code change, so it waits until after Christmas.
+- **Two products can post for less on every sale:** wrapping paper saves **£1.40 a roll** on Prodigi's Budget method (Evri 48, which is tracked, unlike today's post). Playing cards save **£3.25 a deck** on Budget (still untracked, a day or two slower).
 - **Most of the range is already as cheap at Prodigi as anywhere UK/EU,** once Pro is on. That covers mugs, tees, cushions, blankets, jigsaws, cards, playing cards, height charts, wrapping paper, placemats, the bauble and the watch strap.
 - **Children's-data rule: every new maker is a stop-and-ask.** That means a new Article 28 processor (a signed data agreement under UK GDPR Article 28, called a "DPA" below), an update to the DPIA (our data-protection risk assessment), and UK/EU-only production promised in writing. Prodigi is the best data-protection fit of every maker checked. Gelato is the only rival that comes close.
 - **Before Christmas:** Pro, the Prodigi email, and reading Prodigi's Christmas cut-off dates. **After Christmas:** Gelato samples and data questions, the per-lab order split, then frames to Gelato if approved.
@@ -192,7 +193,7 @@ The method is set once per order, and nothing stops us sending one customer's ba
 
 It fixes the calendar problem too: the case can go tracked even when a calendar is in the basket. And the same split lets **wrapping paper go on Budget, which is Evri 48: tracked, and cheaper than today's untracked Standard**. Playing cards can go on Budget too, which is Royal Mail 48 and cheaper, though slower.
 
-The saving is about **£10 · £35–£40 · £90–£100 a month** at 50 · 200 · 500 orders. There is one edge case to check first: a watch strap and a case both come from uk6, and on Express they might share a parcel. Prodigi's quote service gives the price both ways before any order is placed ([Prodigi quotes API](https://apis.io/apis/prodigi/prodigi-quotes-api/)). There is also an unexplained "StandardPlus" method in Prodigi's order system that might give a tracked case without paying for Express. Ask Prodigi.
+Per item in a basket that has a phone case, the saving is the Express uplift that item pays today (the list in the short version: £1.05 on a mug up to £8.05 on socks). On every roll of wrapping paper it is £1.40, and on every deck of playing cards £3.25. There is one edge case to check first: a watch strap and a case both come from uk6, and on Express they might share a parcel. Prodigi's quote service gives the price both ways before any order is placed ([Prodigi quotes API](https://apis.io/apis/prodigi/prodigi-quotes-api/)). There is also an unexplained "StandardPlus" method in Prodigi's order system that might give a tracked case without paying for Express. Ask Prodigi.
 
 The cost is more Prodigi orders per basket. That means more tracking emails and statuses to keep in step in the admin, and it needs tests. **It's fulfilment code, so it waits until after Christmas.**
 
@@ -249,17 +250,48 @@ Prodigi's dates will be earlier, because making the item comes first (1–4 days
 
 ## Ranked savings: Pro now, frames in the new year
 
-These bands were worked out from the private costs and rounded on purpose. They are £ a month after any plan fee. They assume about 1.1–1.3 items an order, led by frames, then mugs, tees, cushions, cards, ornaments and calendars. **There is no real sales data behind that mix.** Bands scale roughly: divide by 4 for 50 orders, multiply by 2.5 for 500.
+Every saving here is **per item sold**. No sales volumes are assumed. Bands for other makers are against Prodigi **with Pro on**: small = under £2, medium = £2–£5, large = £5–£10, very large = over £10. Post figures are Prodigi's own sandbox quotes (Oct–Nov 2026), already public in the shop's code. The exact £ for every row is in section 0 of the private file.
 
-| # | Saving | £ a month at 50 · 200 · 500 orders | Effort | Risk | When |
+### Saving per item, product by product
+
+| Product | Prodigi Pro (if not on yet) | Best other maker, vs Prodigi with Pro | Post fixes at Prodigi (no new maker) |
+|---|---|---|---|
+| Framed print 11×14″, 12×16″, 18×24″ | 15% off the product | **Very large** (Gelato, with Gelato+); large on Gelato's free plan. No gold | £2.90 per frame when a phone case is in the basket |
+| Framed print 24×32″ | 15% off | **Large** (Gelato+); dearer on Gelato's free plan | £2.90 with a case |
+| Multi frame 12×12″ | 15% off | **Very large** (Gelato+, the grid printed as one picture) | £2.90 with a case |
+| Multi frame 24×36″ | 15% off | **Large** (Gelato+) | £2.90 with a case |
+| Multi frame 16×24″ | 15% off | none (no such size elsewhere) | £2.90 with a case |
+| Phone case snap / tough | 15% off | **Medium** (Gelato+ or Podbase) | the case still goes Express |
+| Ceramic ornament | 15% off | **Medium** (Inkthreadable or Gelato+) | £1.05 with a case |
+| Coasters, 4-pack | 15% off | **Medium** (Inkthreadable) | not quoted |
+| Tea towel | 15% off | **Medium** (Inkthreadable) | not quoted |
+| 2027 calendar A4 | 15% off | **Medium** (Gelato+; price per size unconfirmed; no A5) | never goes Express |
+| Socks | 10% off | **Small** (Inkthreadable) | £8.05 with a case; about £3.30 if Prodigi lets socks share the homeware parcel |
+| Wrapping paper, any roll | 15% off | none | **£1.40 every roll** on Budget (tracked Evri 48); £1.05 with a case |
+| Playing cards | 15% off | none | **£3.25 every deck** on Budget (untracked, slower) |
+| Kids tee | 10% off | about the same (not worth a move) | £6.45 with a case |
+| Adult tee | 10% off | none (Prodigi cheaper) | £6.45 with a case |
+| Greetings card, card packs | 15% off | none | £7.65 with a case |
+| Mug | 15% off | none | £1.05 with a case |
+| Cushions (all) | 15% off | none | £2.15 with a case |
+| Fleece blanket | 15% off | none | about £2.15 with a case |
+| Jigsaw (all) | 15% off | none | £1.05 with a case |
+| Watch strap | 15% off | none | £1.95 with a case |
+| Placemats, Christmas bundle | 15% off | none (Prodigi cheaper; splitting the bundle costs more) | not quoted |
+| Plastic bauble, height chart | 15% off | none | not quoted |
+
+The "with a case" figures are only saved on a basket that also has a phone case in it, once the case is sent as its own Prodigi order.
+
+### What to do, in order
+
+| # | Action | Saves | Effort | Risk | When |
 |---|---|---|---|---|---|
-| 1 | **Prodigi Pro**, if not already on (15% off products, 10% off clothing; post at full price) | ~£100 · ~£500 · ~£1,300 | 10 minutes, no code | None: cancel any time | **Now, before Christmas** (or the monthly plan for December only) |
-| 2 | **Framed prints and multi frames to Gelato** | ~£75–£125 · ~£300–£500 · ~£750–£1,250 | High: new processor (stop-and-ask), data agreement plus UK-only routing in writing, samples, new order connection | No gold frame; 170gsm paper vs Prodigi's fine-art stock; can route abroad; frames are the flagship | **After Christmas**: January samples and data questions, February build |
-| 3 | **Ask Prodigi for a bespoke frame price**, benchmarked on Gelato | ~£40–£60 · ~£150–£250 · ~£400–£600 (if Prodigi closes half the gap) | One email | None | **Email now**, decide in January |
-| 4 | **One Prodigi order per lab**, each on its best method (case alone on Express; wrap and playing cards on Budget; ask about socks) | ~£10 · ~£35–£40 · ~£90–£100 | Medium code change, checked against Prodigi's quotes first; tests | Low: more Prodigi orders per basket | **After Christmas** (no fulfilment changes in peak) |
-| 5 | **Phone cases to Gelato or Podbase** | ~£10 · ~£40 · ~£100 | High: new processor, model list, print files per model | Gelato dropping Samsung; Podbase data and import VAT unknown | Later in 2027, only alongside #2 |
-| 6 | **Calendars to Gelato** (A4 only) | ~£10 · ~£35 · ~£90 (Oct–Jan only) | High for a seasonal product | A5 disappears | Autumn 2027, only if Gelato is already set up |
-| 7 | **Ornaments, coasters, tea towels, socks to Inkthreadable** | ~£20 · ~£90 · ~£220 | High; no data agreement, no status messages | Breaks the one-parcel Christmas bundle | **Not recommended now** |
+| 1 | **Prodigi Pro**, if not already on | 15% off every product (10% clothing); post full price | 10 minutes, no code | None: cancel any time | **Now** (or the monthly plan for December only) |
+| 2 | **Ask Prodigi for a bespoke frame price**, benchmarked on Gelato | unknown until they answer | One email | None | **Email now**, decide in January |
+| 3 | **One Prodigi order per lab**, each on its best method | the post column above | Medium code change, checked against Prodigi's quotes first; tests | Low: more Prodigi orders per basket | **After Christmas** |
+| 4 | **Framed prints and multi frames to Gelato** | very large / large per frame | High: new processor (stop-and-ask), data agreement plus UK-only routing in writing, samples, new order connection | No gold frame; 170gsm paper; can route abroad; frames are the flagship | **After Christmas**: January samples, February build |
+| 5 | **Phone cases and A4 calendars to Gelato** | medium per item | High on their own | Gelato dropping Samsung; A5 calendar disappears | Only alongside #4 |
+| 6 | **Ornaments, coasters, tea towels, socks to Inkthreadable** | medium (socks small) | High; no data agreement, no status messages | Breaks the one-parcel Christmas bundle | **Not recommended now** |
 
 Money kept rather than cut:
 
@@ -268,16 +300,16 @@ Money kept rather than cut:
 
 ### These savings don't simply add up
 
-Pro (#1) and a bespoke frame price (#3) are **either-or**: Prodigi won't stack them. So #3 only helps if Prodigi's bespoke offer beats 15% off across the whole basket, not just on frames. Moving frames to Gelato (#2) also takes frames out of Pro's 15%, so part of #2's band is already counted in #1. The two together save less than their bands added up.
+Pro (#1) and a bespoke frame price (#2) are **either-or**: Prodigi won't stack them. So #2 only helps if Prodigi's bespoke offer beats 15% off on everything we sell, not just on frames. The Gelato frame bands are already measured against Prodigi *with* Pro, so they don't add to Pro's 15%.
 
-Pro's break-even is low, though. On the annual plan it pays for itself at about **£233 a month of product spend** if VAT is reclaimed, or about £280 if it isn't. That is simple arithmetic on Prodigi's public £35 fee. So Pro stays worth having even with frames gone.
+Pro has a monthly fee, so it pays for itself once we spend about **£233 a month on Prodigi products** (annual plan, VAT reclaimed). That is simple arithmetic on Prodigi's public £35 fee.
 
 ### Before Christmas vs after
 
 **Before Christmas (this week):**
 
 - #1 Pro
-- #3 the Prodigi email
+- #2 the Prodigi email
 - reading Prodigi's real cut-off dates
 
 None of these touches code or suppliers.
@@ -285,9 +317,9 @@ None of these touches code or suppliers.
 **After Christmas:**
 
 - **January:** Gelato samples with your own (non-child) artwork, plus the written data questions.
-- **January–February:** the per-lab split (#4), once peak is over.
-- **February:** frames to Gelato (#2), only if you approve Gelato as a processor and Prodigi's bespoke reply doesn't close the gap.
-- **Later in 2027:** phone cases (#5) and calendars (#6), only if Gelato is already in place.
+- **January–February:** the per-lab split (#3), once peak is over.
+- **February:** frames to Gelato (#4), only if you approve Gelato as a processor and Prodigi's bespoke reply doesn't close the gap.
+- **Later in 2027:** phone cases and calendars (#5), only if Gelato is already in place.
 
 ## Your turn and I'll do
 
@@ -325,7 +357,7 @@ None of these touches code or suppliers.
 
 ## How reliable this is
 
-The product list and postage rules come straight from the shop's code, so they are solid. The ranking bands are rounded from private costs on purpose, and they rest on an **assumed product mix with no real sales data behind it**. If frames sell less than assumed, saving #2 shrinks. If the live account is **already on Pro, saving #1 is zero**, and everything else is measured against Pro prices anyway.
+The product list and postage rules come straight from the shop's code, so they are solid. The per-item bands are rounded from private costs on purpose; no sales volumes are assumed. Our costs come from Prodigi's July price sheets and sandbox quotes, not invoices. If the live account is **already on Pro, saving #1 is zero**, and everything else is measured against Pro prices anyway.
 
 Rival prices come from public pages read on 26 Nov 2026, the week of Black Friday:
 

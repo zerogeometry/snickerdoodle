@@ -61,10 +61,3 @@ Thinnest at the normal price: 30-piece jigsaw, plastic bauble, 24×32″ framed 
 22″ one-sided cushion, socks, adult tee in navy/grey/khaki (because the cost loader stores the white price for it).
 Postage is the biggest share of cost on: plastic bauble, playing cards, jigsaws, height charts, wrapping paper,
 socks, mugs, heart cushion and the ceramic ornament.
-
-## Volume assumptions to use (no real sales figures are in the repo)
-
-- Planning figure used across the project: about **200 orders a month**, about 1.1–1.3 items an order
-  (investor notes, `PRODUCT-RANGE-expansion.md` §0). Year-one marketing plan: roughly 600–1,200 orders in the year.
-- December will be several times a normal month; January–February quiet.
-- Use three volumes when giving £ a month: **50, 200 and 500 orders a month**, and say the mix is an assumption.
