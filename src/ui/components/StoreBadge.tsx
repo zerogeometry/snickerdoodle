@@ -10,7 +10,8 @@ const STORE_ICON = { appStore: IconBrandApple, googlePlay: IconBrandGooglePlay }
  *  1. link + official artwork → Apple's / Google's own badge, unaltered (their rules), as the link;
  *  2. link, no artwork yet     → our plain ink stand-in with the store's own wording;
  *  3. no link yet              → the same stand-in, faded, saying "coming soon for iPhone and iPad" (not a link at all).
- * 48px tall (≥44px tap target). No tracking on the link: rel="noreferrer", nothing appended.
+ * 48px tall (≥44px tap target). Opens the store in a new tab, so the shopper keeps their place on Snickerdoodle
+ * (founder, 27 Nov 2026). No tracking on the link: rel="noopener noreferrer", nothing appended.
  */
 export function StoreBadge({ store, className }: { store: DrawStore; className?: string }) {
   const href = storeHref(store);
@@ -22,8 +23,8 @@ export function StoreBadge({ store, className }: { store: DrawStore; className?:
     // so it's drawn taller and pulled into the 48px row: the badge itself then stands about as tall as the button beside it.
     const padded = store === 'googlePlay';
     return (
-      <a href={href} rel="noreferrer" className={cn('press inline-flex min-h-12 items-center rounded-[10px]', padded && '-mx-2.5', className)}>
-        <img src={badge} alt={label.full} height={padded ? 70 : 48} className={padded ? 'block h-[70px] w-auto -my-[11px]' : 'block h-12 w-auto'} />
+      <a href={href} target="_blank" rel="noopener noreferrer" className={cn('press inline-flex min-h-12 items-center rounded-[10px]', padded && '-mx-2.5', className)}>
+        <img src={badge} alt={`${label.full} (opens in a new tab)`} height={padded ? 70 : 48} className={padded ? 'block h-[70px] w-auto -my-[11px]' : 'block h-12 w-auto'} />
       </a>
     );
   }
@@ -42,7 +43,7 @@ export function StoreBadge({ store, className }: { store: DrawStore; className?:
 
   if (href) {
     return (
-      <a href={href} rel="noreferrer" aria-label={label.full} className={cn('press bg-cocoa text-paper shadow-[0_3px_0_var(--color-ink-soft)]', shape, className)}>
+      <a href={href} target="_blank" rel="noopener noreferrer" aria-label={`${label.full} (opens in a new tab)`} className={cn('press bg-cocoa text-paper shadow-[0_3px_0_var(--color-ink-soft)]', shape, className)}>
         {face(false)}
       </a>
     );
