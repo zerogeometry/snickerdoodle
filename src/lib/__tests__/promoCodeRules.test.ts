@@ -64,6 +64,16 @@ describe('what it gives', () => {
     expect(ok({ code: 'CARD', kind: 'FREE_CARD', amount: '99' })).toMatchObject({ kind: 'FREE_CARD', value: 0 });
   });
 
+  it('a leaflet spot’s code: a free card AND the partner’s commission (founder, 27 Nov 2026)', () => {
+    expect(ok({ code: 'CAFE-BS1', kind: 'FREE_CARD', commission: '5', partnerName: 'Corner Café', partnerType: 'CAMPAIGN' })).toMatchObject({
+      kind: 'FREE_CARD',
+      value: 0,
+      commissionBps: 500,
+      partnerName: 'Corner Café',
+      partnerType: 'CAMPAIGN',
+    });
+  });
+
   it('refuses a kind the shop can’t price', () => {
     for (const kind of ['', 'BOGOF', 'FREE_DELIVERY', null]) expect(fields({ code: 'KIND', kind, amount: '10' })).toEqual(['kind']);
   });
