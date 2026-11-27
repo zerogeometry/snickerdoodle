@@ -69,4 +69,16 @@ describe('a free first card, priced through the basket', () => {
     expect(r.partnerCommissionPence).toBe(Math.round(6500 / 1.2 / 10));
     expect(r.totalPence).toBe(6500 + r.deliveryPence);
   });
+
+  it('a leaflet spot’s free-card code at 5%: the card comes off, and they earn 5% of the rest before VAT', () => {
+    const LEAFLET: PromoRule = { ...FREE, id: 'l', code: 'CAFE-BS1', commissionBps: 500 };
+    const r = quote([{ productKey: 'card', qty: 1 }, { productKey: 'mug', qty: 1 }], { catalogue: CAT, promo: LEAFLET, freeCardEligible: true });
+    expect(r.promo).toMatchObject({ code: 'CAFE-BS1', kind: 'FREE_CARD', applied: true });
+    expect(r.promoSavingPence).toBe(550);
+    expect(r.partnerCommissionPence).toBe(Math.round(1800 / 1.2 / 20)); // the mug's £18 ex VAT, never delivery
+    // a guest (no free card): full price, and the order still counts for the leaflet spot
+    const g = quote([{ productKey: 'card', qty: 1 }, { productKey: 'mug', qty: 1 }], { catalogue: CAT, promo: LEAFLET, freeCardEligible: false });
+    expect(g.promoSavingPence).toBe(0);
+    expect(g.partnerCommissionPence).toBe(Math.round(2350 / 1.2 / 20));
+  });
 });

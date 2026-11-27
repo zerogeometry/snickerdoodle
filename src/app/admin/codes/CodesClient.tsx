@@ -25,7 +25,7 @@ const OFFERS: { id: Offer; label: string; hint: string }[] = [
   { id: 'percent', label: 'percent off', hint: 'like 10% off everything in the basket' },
   { id: 'pounds', label: 'pounds off', hint: 'like £5 off, usually with a minimum spend' },
   { id: 'card', label: 'a free card', hint: 'one greetings card’s price comes off, on a first order' },
-  { id: 'partner', label: 'partner code', hint: 'a creator or school earns commission on orders' },
+  { id: 'partner', label: 'partner code', hint: 'a creator, school or leaflet spot earns commission on orders' },
 ];
 
 export const PARTNER_LABEL: Record<string, string> = { INFLUENCER: 'creator', PTA: 'school PTA', CAMPAIGN: 'campaign', REFERRAL: 'referral' };
@@ -35,6 +35,29 @@ const day = (iso: string) => new Date(iso).toLocaleDateString('en-GB', { day: 'n
 
 // ── new code ─────────────────────────────────────────────────────────────────
 
+/** What a partner's code gives the family (founder, 27 Nov 2026): the free first card, or a percent off. */
+type PartnerGives = 'card' | 'percent';
+
+/**
+ * The new-code form as the save action's input: only what the chosen offer needs. A partner code that gives the free
+ * first card is a FREE_CARD code with the partner's commission on it (a leaflet spot, say): no amount is sent.
+ */
+export function codeRequest(offer: Offer, partnerGives: PartnerGives, v: typeof EMPTY) {
+  const isPartner = offer === 'partner';
+  const card = offer === 'card' || (isPartner && partnerGives === 'card');
+  return {
+    code: v.code,
+    kind: card ? 'FREE_CARD' : offer === 'pounds' ? 'FIXED' : 'PERCENT',
+    amount: card ? '' : v.amount,
+    minSpend: v.minSpend,
+    maxUses: v.maxUses,
+    startsOn: v.startsOn,
+    endsOn: v.endsOn,
+    firstOrder: v.firstOrder,
+    ...(isPartner ? { commission: v.commission, partnerName: v.partnerName, partnerType: v.partnerType, partnerEmail: v.partnerEmail, classLabel: v.partnerType === 'PTA' ? v.classLabel : '' } : {}),
+  };
+}
+
 const EMPTY = { code: '', amount: '10', minSpend: '', maxUses: '', startsOn: '', endsOn: '', firstOrder: false, commission: '10', partnerName: '', partnerType: 'INFLUENCER', partnerEmail: '', classLabel: '' };
 
 export function NewCode() {
@@ -42,6 +65,7 @@ export function NewCode() {
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [offer, setOffer] = useState<Offer>('percent');
+  const [partnerGives, setPartnerGives] = useState<PartnerGives>('card');
   const [v, setV] = useState(EMPTY);
   const [problems, setProblems] = useState<Problems>({});
   const [failed, setFailed] = useState(false);
@@ -58,11 +82,13 @@ export function NewCode() {
     setOpen(false);
     setV(EMPTY);
     setOffer('percent');
+    setPartnerGives('card');
     setProblems({});
     setFailed(false);
   };
 
   const isPartner = offer === 'partner';
+  const givesCard = offer === 'card' || (isPartner && partnerGives === 'card');
   const alwaysFirst = offer === 'card' || (isPartner && v.partnerType === 'INFLUENCER');
 
   const submit = async (e: FormEvent) => {
@@ -70,17 +96,7 @@ export function NewCode() {
     setBusy(true);
     setFailed(false);
     try {
-      const res = await createCodeAction({
-        code: v.code,
-        kind: offer === 'card' ? 'FREE_CARD' : offer === 'pounds' ? 'FIXED' : 'PERCENT',
-        amount: offer === 'card' ? '' : v.amount,
-        minSpend: v.minSpend,
-        maxUses: v.maxUses,
-        startsOn: v.startsOn,
-        endsOn: v.endsOn,
-        firstOrder: v.firstOrder,
-        ...(isPartner ? { commission: v.commission, partnerName: v.partnerName, partnerType: v.partnerType, partnerEmail: v.partnerEmail, classLabel: v.partnerType === 'PTA' ? v.classLabel : '' } : {}),
-      });
+      const res = await createCodeAction(codeRequest(offer, partnerGives, v));
       if (res.ok) {
         toast(`${res.code} is made and working`);
         close();
@@ -150,6 +166,20 @@ export function NewCode() {
         {msg('kind')}
       </fieldset>
 
+      {isPartner ? (
+        <fieldset className="mt-4">
+          <legend className="text-sm font-bold text-cocoa">what the family gets</legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Chip active={partnerGives === 'card'} onClick={() => { setPartnerGives('card'); setProblems({}); }} className="text-sm">
+              a free first card
+            </Chip>
+            <Chip active={partnerGives === 'percent'} onClick={() => { setPartnerGives('percent'); setProblems({}); }} className="text-sm">
+              percent off
+            </Chip>
+          </div>
+        </fieldset>
+      ) : null}
+
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <label className="block text-sm font-bold text-cocoa">
           the code people type
@@ -172,6 +202,10 @@ export function NewCode() {
         {offer === 'card' ? (
           <p className="self-end rounded-[14px] bg-honey-band p-3 text-sm text-cocoa">
             The cheapest single card in the basket comes off, and only on a buyer’s first order. If the basket is too small to carry it, the code waits for a bigger one.
+          </p>
+        ) : givesCard ? (
+          <p className="self-end rounded-[14px] bg-honey-band p-3 text-sm text-cocoa">
+            The cheapest single card comes off a signed-in family’s first order. When it can’t (a guest, or no card in the basket), the order still counts for the partner.
           </p>
         ) : (
           <label className="block text-sm font-bold text-cocoa">
@@ -207,7 +241,7 @@ export function NewCode() {
               >
                 <option value="INFLUENCER">creator (earns on a follower’s first order)</option>
                 <option value="PTA">school PTA (earns on every order)</option>
-                <option value="CAMPAIGN">campaign (earns on a first order)</option>
+                <option value="CAMPAIGN">campaign or leaflet spot (earns on a first order)</option>
               </select>
               {msg('partnerType')}
             </label>

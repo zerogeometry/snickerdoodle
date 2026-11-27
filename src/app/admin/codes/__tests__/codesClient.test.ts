@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 vi.mock('@/app/actions/adminCodes', () => ({ createCodeAction: vi.fn(), setCodeActiveAction: vi.fn(), revealPartnerEmailAction: vi.fn() }));
 
-const { CodeList, CommissionPartners, NewCode } = await import('../CodesClient');
+const { CodeList, CommissionPartners, NewCode, codeRequest } = await import('../CodesClient');
 
 const base = {
   kind: 'PERCENT' as const,
@@ -62,6 +62,15 @@ describe('codes screen (client parts)', () => {
     expect(html).toContain('show their email');
     expect(html).toContain('£4.50');
     expect(html).not.toContain('@');
+  });
+
+  it('a partner code can give the free first card: sent as a free-card code with the partner’s commission', () => {
+    const v = { code: 'cafe-bs1', amount: '10', minSpend: '', maxUses: '', startsOn: '', endsOn: '', firstOrder: false, commission: '5', partnerName: 'Corner Café', partnerType: 'CAMPAIGN', partnerEmail: '', classLabel: 'ignored' };
+    expect(codeRequest('partner', 'card', v)).toMatchObject({ kind: 'FREE_CARD', amount: '', commission: '5', partnerName: 'Corner Café', partnerType: 'CAMPAIGN', classLabel: '' });
+    expect(codeRequest('partner', 'percent', v)).toMatchObject({ kind: 'PERCENT', amount: '10', commission: '5' });
+    // a plain free card (no partner) never carries partner fields
+    expect(codeRequest('card', 'card', v)).not.toHaveProperty('commission');
+    expect(codeRequest('card', 'card', v)).toMatchObject({ kind: 'FREE_CARD', amount: '' });
   });
 
   it('“new code” starts as one clear button', () => {
