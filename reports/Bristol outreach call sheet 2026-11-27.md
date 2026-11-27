@@ -10,7 +10,8 @@ This builds on the earlier reports in the main checkout's `reports/` folder: *Br
 fair from those reports has changed, the change is noted here.
 
 **Part 1** (below) is for places you turn up at. **Part 2, "Leaflets without turning up"** (near the end), ranks places
-that hand out your leaflets while you're elsewhere, plus paid reach, and ends with a top-20 tick-list.
+that hand out your leaflets while you're elsewhere, plus paid reach, and ends with a top-20 tick-list. **Section 5** (added
+Fri 27 Nov) adds 12 more independent kids' places: farms, shoe fitters and class franchisees.
 
 **Labels:** **[confirmed]** = the place's own website, seen 26 Nov · **[third-party]** = a directory, press article or
 listing · **[estimate]** = my judgement.
@@ -517,6 +518,63 @@ passed; **the January issue closes 10 Dec**, which suits a "thank-you cards from
   - Bradley Stoke 0300 333 0300
   - Chance: **medium–low.** There's **no swimming pool in Shirehampton.**
 
+### 5. More independent kids' places (added Fri 27 Nov)
+
+These are new: none of them is anywhere else in this sheet. Each passes the same three tests: families with
+under-10s, one person who can say yes, and something that can happen before the cut-off. They're ranked by how likely a
+quick yes is. **If you're calling today, start with 5.1–5.6.** Remember that after about **Sat 5 Dec** it's too late
+for Christmas, so pitch "thank-you cards from their drawings" from then on.
+
+| ☐ | # | Who | Where, drive | Contact | Ask | Chance |
+|---|---|---|---|---|---|---|
+| ☐ | 5.1 | **Lawrence Weston Community Farm** (a community charity farm; runs **Farm Tots**, a woodland craft club and a gardening club) | Saltmarsh Drive, BS11 0NJ, **5 min**. Open Tue–Sun 9:30–4:30 | **0117 938 1128** · office@lwfarm.org.uk [confirmed site [lwfarm.org.uk](https://www.lwfarm.org.uk/); the email is from the farm's own job pack, and the charity register lists a staff member's address instead, so ring first] | Leaflets on the counter, a poster, leaflets at Farm Tots. Maybe a free bauble table on a weekend before 5 Dec | **High.** On your doorstep, and you can call in today |
+| ☐ | 5.2 | **Jo Jingles Bristol** (Tracy Bees, franchisee): music and movement, 3 months–5 years, 12 classes a week | Christ the King Church, Bradley Stoke BS32 8EE (Mon and Fri 9:45, 10:45, 11:45, **15 min**) · The Chantry, Thornbury BS35 1HB (Wed) · Emersons Green Village Hall BS16 7AP (Tue) | **07713 943666** · jojingles.bristol@gmail.com [confirmed, [her territory page](https://booking.jojingles.com/discover/territory/bristol/)] | Leaflets at classes **Mon 30 Nov–Fri 4 Dec**, plus her own code in a message to her families. Her term ends 7–11 Dec, which is too late for Christmas leaflets | **High.** About 100 families a week [estimate: 12 classes × 8–10], and she decides |
+| ☐ | 5.3 | **SoleLution** (family-owned shoe shop; every fitter is trained to fit children's shoes, by appointment) | 62 High Street, Portishead BS20 6EH, **15 min**. Mon–Fri 9–5:30, Sat 9–5 | **01275 843399** · enquiries@solelution.co.uk [confirmed, [solelution.co.uk](https://solelution.co.uk/pages/our-shop)] | Leaflets by the fitting seat, a poster, their own code (A) | **High.** Parents sit and wait while children are measured. About 40–80 families a week [estimate] |
+| ☐ | 5.4 | **Oddsox** (independent children's shoe shop and fitter, toddlers up) | 204 Gloucester Road, Bishopston BS7 8NU, **20–25 min** | **0117 329 2423** · info@oddsoxshoes.co.uk [confirmed, [oddsoxshoes.co.uk](https://oddsoxshoes.co.uk); the street number is from a stockist list] | Same as SoleLution. December brings party shoes and winter boots | **High.** About 50–90 families a week [estimate]. Pair it with Totally Toys (Part 2, No. 109) on the same road |
+| ☐ | 5.5 | **St Werburghs City Farm, Winter Fair, Sat 5 Dec, 11am–4pm** (a Christmas market of local traders, family activities and storytelling; free entry, £3 suggested donation) | Watercress Rd, BS2 9YJ, **20–25 min** | office@swcityfarm.co.uk [confirmed, [events](https://swcityfarm.co.uk/events/)]. No phone published | Offer a **free kids' "draw a bauble" table as one of the family activities**. If not, leaflets in the café (open Fri–Mon) | **Medium–high.** A perfect fit, but only 8 days away, so email today. It runs from 11, so it works after the Goldfinch workshop at 10 |
+| ☐ | 5.6 | **The Creation Station Portishead** (Amy Cox, franchisee): arts and crafts for 0–11s | After-school Create Club at Portishead Primary (Mon and Wed 3:20) and Trinity Primary BS20 7JF; Tiny Treasures at Teapot and Tumble BS20 6PR; **15 min** | **07518 316883** · amycox@thecreationstation.co.uk [confirmed, [her page](https://www.thecreationstation.co.uk/portishead)] | Leaflets in club bags in the week of 30 Nov, plus her own code | **Medium–high.** She decides. Pitch it as "your families' artwork, made into keepsakes", so it adds to her clubs rather than competing |
+| ☐ | 5.7 | **Windmill Hill City Farm** (community farm, plus a nursery for ages 0–5) | Philip Street, Bedminster BS3 4EA, **20 min**. Open daily 9–5 | **0117 963 3252** · info@windmillhillcityfarm.org.uk [confirmed, [contact](https://windmillhillcityfarm.org.uk/pages/contact)] | Leaflets at reception and the café, a poster, nursery bags | **Medium.** It runs its own bauble and card workshops ([calendar](https://www.windmillhillcityfarm.org.uk/whats-on/calendar), no dates shown), so it may say no |
+| ☐ | 5.8 | **Cook Stars Bristol North** (Helen Ford, franchisee): kids' cooking classes | Emersons Green Village Hall BS16 7AP, Thu 5:15 (Minis 2–5, Juniors 5–11), **25 min**; Patchway BS34 5LP on Mon (ages 11–17) | **07482 846382** · helen.ford@cookstars.co.uk [confirmed, [her page](https://www.cookstars.co.uk/cooking-classes/bristol-north)] | Leaflets at Thursday pick-up (3 Dec), plus her own code | **Medium.** About 40–60 families a week [estimate] |
+| ☐ | 5.9 | **Stagecoach Performing Arts Portishead** (Fae McIntyre, principal): ages 4–18 | Portishead, Fri (early years) and Sat. Venue not on its page [third-party] | **01275 845326** [confirmed, [stagecoach.co.uk/portishead](https://www.stagecoach.co.uk/portishead)] | A line and the code in her parents' email, and leaflets at Saturday pick-up | **Medium.** About 70–100 families [estimate], but it's drama, not drawing |
+| ☐ | 5.10 | **Tumble Tots North Somerset** (physical play, 6 months to school age) | 2nd Portishead Scout Hall, Forester Rd (Wed 9:45 and 12:45) · Long Ashton Community Centre BS41 (Tue 9:45–12:45), **15–20 min** [third-party, Happity 2025–26] | No contact found. Its own centre pages are broken | Turn up 5 minutes before a class ends on **Tue 1 or Wed 2 Dec** and ask the leader | **Medium.** About 60–80 families a week [estimate], but it's unverified |
+| ☐ | 5.11 | **Boing! Lawrence Weston**: already in Part 2 under Boing!, but **it's run separately, by a local community church**, so the Boing! head-office yes may not cover it. It's selling a **Father Christmas Experience** now (£15 a table) | 170 Kings Weston Lane, BS11 0QP, **5 min** | boing@communitychurch-lw.co.uk (one session lists boing@kings-cc.co.uk) [confirmed, [booking page](https://boinglawrenceweston.schedulista.com/)] | Leaflets on the tables at the Father Christmas sessions, plus a poster | **Medium–high.** Ask for the café lead |
+| ☐ | 5.12 | **Bristol Forest School** (since 2004; ages 0–18; parties and holiday days) | Leigh Court Farm, Pill Rd, BS8 3RA, **10–15 min** | contact@bristolforestschool.co.uk [confirmed, [site](https://www.bristolforestschool.co.uk/)] | A line and the code in its next parents' email | **Medium–low.** No counter, so it's email only |
+
+**Worth a walk-in or one email, but check they're still trading first** (all from directories that are 2–7 years old):
+- **Ethel's Case**, 13 Old Church Road, Clevedon: a nearly-new kids' clothes shop for ages 4–13, where parents come in to sell as well as buy. 01275 340516 [third-party, about 2022]. **Medium.**
+- **Kate Kirkby Photography**, 5 Bank Place, Pill: a newborn and family studio, about 10 minutes away. Pitch a cross-promotion: your leaflet goes in her finished orders and she gets her own code. No business site was found, so use her studio's public page. **Medium.**
+- **Cairns Road Café**, Cairns Road Baptist Church, 78 Cairns Rd, BS6 7TQ: a free soft-play café for under-5s, with baby and toddler areas. Ask the church office [third-party, about 2019]. **Medium.**
+- **Noah's Ark Zoo Farm**, Wraxall: Meet Santa on 28 and 29 Nov, 5 and 6 Dec and 12 Dec. 01275 852606 · info@noahsarkzoofarm.co.uk [confirmed, its own site]. Big footfall, but its marketing team decides, and it already gives children a decorate-your-own decoration. **Low–medium.**
+- **Picture framers:** **Sky** (Clifton Village, since 1976) and **Fizz Gallery & Framing** (Clevedon). Pitch "frame the original, make the copy a bauble". No contacts were confirmed. **Low–medium.**
+- **Playfull Toyshop**, 87 Gloucester Rd, BS7 8AS, 0117 944 6767 [third-party]. **A Bristol24/7 piece says its owners are retiring and closing it on 31 Dec**, and I couldn't tell which year. Walk past it on the Oddsox trip before counting on it.
+- **Forest Child CIC** (Yvette McLoughlin, info@forestchild.co.uk): forest sessions across Bristol with no fixed base. **Low–medium.**
+- **Hartcliffe City Farm**, BS13 0QH: Nature Stay and Play on Mon 30 Nov. Contact is only an "email us" button on its site, and it's 25–30 minutes away. **Medium–low.**
+- **Baby massage and yoga teachers** listed in NHS and Happity directories (Kalma Baby at Portishead Youth Centre, and Daisy Baby at The Playport, Portishead). Unverified.
+
+**Looked for, but found nothing usable nearby:**
+- **Not found:** an independent children's hairdresser, an independent baby or nursery shop, or a kids' clothes boutique in Westbury, Henleaze or Bradley Stoke.
+- **Toy and sling libraries:** no toy library in the north or west (the nearest is South Bristol, fortnightly on Saturdays), and the sling library now works mostly one-to-one.
+- **No active Bristol franchise found:** Monkey Music, Bricks 4 Kidz, Theatre Bugs, Boogie Mites, Toddler Sense and Rhythm Time.
+- **Look inactive:** Hartbeeps North Bristol and Moo Music Bristol.
+- **Tiny Talk** (Westbury Village Hall and Jump at Cribbs): its listings have gone.
+- **No route to a local person who can say yes:** Stagecoach Bristol North (form only) and Pauline Quirke Academy (head office only).
+- **NCT Bristol** is volunteer-run with national rules on promotion, so it's a January newsletter job at best.
+- **Felix Road Adventure Playground** is for ages 8–14, a weak fit.
+
+**Phone opener for the class owners (5.2, 5.6, 5.8, 5.9):** "Hi, I'm Simon from Snickerdoodle in Shirehampton. We turn
+children's drawings into Christmas baubles and cards. Could I drop you some colour-in bauble leaflets for your families
+next week, with your own code that gets them a free card and earns you 10% of their first order?"
+
+**Opener for the shoe shops (5.3, 5.4):** "Hi, I'm Simon, I run Snickerdoodle, a little Bristol business that turns
+children's drawings into keepsakes. Parents are sat with you while their little ones get measured, which is exactly when
+they'd pick up a leaflet. Could I leave a small pile by the fitting seat, with a code that pays you 10% of anything
+ordered with it?"
+
+**Opener for the farms (5.1, 5.5, 5.7):** "Hi, I'm Simon from Snickerdoodle, just round the corner in Shirehampton. We
+turn children's drawings into Christmas baubles. Could I put a few leaflets and a poster up for your families? Or, if it
+helps, run a free 'draw a bauble' table for the little ones, with grown-ups staying with their children?" (They're
+charities, so offer a **no-commission code**, or a raffle keepsake (D), not the 10% deal.)
+
 ---
 
 ## The two weeks to the Christmas cut-off
@@ -983,5 +1041,15 @@ networks above are January jobs.
   - Private distributors' lead times.
   - Contacts for Playful Café, Skyboat Café and The Play Shed.
   - Whether EK Hair and iPlay are still trading.
+- **Section 5 gaps:**
+  - Jo Jingles' timetable comes from her own booking page, but Happity says nothing is scheduled. Text her before you
+    drive out.
+  - Tumble Tots and Tiny Talk pages were broken. Hartbeeps, Monkey Music and Happity blocked reading.
+  - No phone number is published for St Werburghs or Bristol Forest School, and there's no stall-booking route for the
+    St Werburghs fair.
+  - Lawrence Weston Farm's office@ email comes from its job pack, and the charity register shows a staff member's
+    address instead.
+  - Ethel's Case, Cairns Road Café, Kate Kirkby Photography, Sky and Fizz all rest on listings that are 2–7 years old.
+  - Playfull Toyshop's closing date has no year attached.
 - The detailed research notes behind this sheet (with every source link) are in this session's scratchpad. They
   aren't part of the repository.
