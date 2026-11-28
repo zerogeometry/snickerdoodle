@@ -141,6 +141,8 @@ describe('buildProduct — the full range', () => {
 
   it('giftWrap has no 3D; unknown kinds return null', () => {
     expect(has3D('giftWrap')).toBe(false);
+    // the calendar previews only as its founder-layered mockup — never a 3D spin (founder, 28 Nov 2026)
+    expect(has3D('calendar')).toBe(false);
     expect(buildProduct('giftWrap', new THREE.Texture(), 10, 10)).toBeNull();
   });
 });

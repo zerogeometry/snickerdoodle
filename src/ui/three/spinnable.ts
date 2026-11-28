@@ -14,9 +14,11 @@
 // mockup (with the die-cut piece lines) + the "as puzzle" view in the positioner; the cushion and
 // the blanket preview as their flat layered mockups ("on the cushion" / "on the blanket"), the
 // same single-view treatment as the frame. No spin.
+// the calendar: NO spin (founder, 28 Nov 2026: "I gave you a layered file to composite it out of. I never asked
+// for a 3D view") — it previews only as its founder-layered mockup.
 export const SPINNABLE = [
   'mug',
-  'storybook', 'calendar',
+  'storybook',
 ] as const;
 // (the sack and the ornaments turn over between their FRONT and BACK photos — the founder's photo, flipped;
 // no invented back: founder, 26 Oct)
