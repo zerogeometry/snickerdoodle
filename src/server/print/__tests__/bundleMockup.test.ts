@@ -52,7 +52,7 @@ describe('the bundle compositor — pre-flattened, exact', () => {
     const b = await buildBundleLayout(dir, path.join(dir, 'backdrop.png'));
     expect(b.regions.map((r) => `${r.role}:${r.index}`)).toEqual(['placemat:0', 'coaster:0', 'ornament:0', 'ornament:1']);
     const aspect = (q: [number, number][]) => Math.hypot((q[1]![0] - q[0]![0]) * W, (q[1]![1] - q[0]![1]) * H) / Math.hypot((q[3]![0] - q[0]![0]) * W, (q[3]![1] - q[0]![1]) * H);
-    expect(aspect(b.regions[0]!.quad)).toBeCloseTo(3425 / 2421, 3);
+    expect(aspect(b.regions[0]!.quad)).toBeCloseTo(3355 / 2351, 3); // the finished ~285×200 mm mat
     expect(aspect(b.regions[1]!.quad)).toBeCloseTo(1, 3);
   });
 

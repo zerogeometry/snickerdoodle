@@ -91,8 +91,9 @@ export const BUNDLE_COMPONENT_SKUS: readonly string[] = [PLACEMAT_2PK.sku, PLACE
  * order-time gate's.
  */
 export const BUNDLE_PIECE_GEOM: Record<BundlePiece, { printWidthPx: number; printHeightPx: number; bleedMm: number; requiredDpi: number }> = {
-  placemat: { printWidthPx: 3425, printHeightPx: 2421, bleedMm: 0, requiredDpi: 300 },
-  coaster: { printWidthPx: 1251, printHeightPx: 1251, bleedMm: 0, requiredDpi: 300 },
+  // the finished mat / coaster, with the edge Prodigi cuts off as bleed (file still 3425×2421 / 1251×1251)
+  placemat: { printWidthPx: 3355, printHeightPx: 2351, bleedMm: 3, requiredDpi: 300 },
+  coaster: { printWidthPx: 1181, printHeightPx: 1181, bleedMm: 3, requiredDpi: 300 },
   ceramicOrnament: { printWidthPx: 885, printHeightPx: 885, bleedMm: 0, requiredDpi: 300 },
 };
 

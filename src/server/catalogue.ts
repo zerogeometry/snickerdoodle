@@ -309,6 +309,10 @@ function trimmedPx(file: { w: number; h: number }, dpi: number, bleedMm: number)
 const CUSHION_SEAM_MM = 6;
 /** The fleece blanket's stitched edge: a 1000×650 mm file for a 980×630 mm blanket. */
 const BLANKET_EDGE_MM = 10;
+/** The cork coaster's cut: a 106 mm file for a 100 mm coaster; the placemat's: 290×205 mm for 285×200 mm, 2.5 mm a side,
+ * stored as 3 (bleed is whole mm) so the picture never shows anything that's cut off (print audit, 28 Nov 2026). */
+export const COASTER_TRIM_MM = 3;
+export const PLACEMAT_TRIM_MM = 3;
 type Canvas = Pick<VariantDef, 'wMm' | 'hMm' | 'dpi' | 'px' | 'bleedMm' | 'gateDpi'>;
 /** A print canvas turned 90° when `turn` (the orientation that isn't Prodigi's native one): w↔h, px too. */
 function turned({ wMm, hMm, dpi, px, bleedMm, gateDpi }: Canvas, turn: boolean): Canvas {
@@ -349,8 +353,8 @@ const SOCKS = [
 const HEIGHT_CHARTS = [
   { size: '20 × 120 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X48', px: { w: 1200, h: 7200 }, pricePence: 3100 },
   { size: '30 × 120 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X48', px: { w: 1800, h: 7200 }, pricePence: 3400 },
-  { size: '20 × 150 cm', sku: 'POSTER-HANGER-20-CAN-ROL-SC-8X60', px: { w: 1200, h: 9000 }, pricePence: 3400 },
-  { size: '30 × 150 cm', sku: 'POSTER-HANGER-30-CAN-ROL-SC-12X60', px: { w: 1800, h: 9000 }, pricePence: 3600 },
+  // The 150 cm charts are OFF SALE (founder, 28 Nov 2026): Prodigi's canvas for them is 150 cm, our ruler is
+  // drawn for 152.4 cm (print audit, 28 Nov). POSTER-HANGER-20/30-CAN-ROL-SC-8X60 / 12X60, 1200/1800×9000 px.
 ] as const;
 const HANGER_COLOURS = ['natural', 'black', 'white'];
 
@@ -593,7 +597,8 @@ const DEFS: Record<string, ProductDef> = {
         { size: 'pack of 2', pricePence: 3200, sku: 'H-PLACE-2PK' },
         { size: 'pack of 6', pricePence: 9600, sku: 'H-PLACE-6PK' },
       ] as const
-    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 3425, h: 2421 }, 300), prodigiSku: p.sku })),
+      // the file is 290×205 mm for a 285×200 mm mat: ~2.5 mm is cut off each edge, so previews show the finished mat
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...trimmedPx({ w: 3425, h: 2421 }, 300, PLACEMAT_TRIM_MM), prodigiSku: p.sku })),
   },
   // Coasters on their own start at TWO (founder, 29 Oct): packs of 2 / 4 / 6 at £18 / £26 / £34 — priced so
   // each still clears 10% net with a 10% creator code + 5% commission (pinned by a test). The 6-pack stays
@@ -609,7 +614,8 @@ const DEFS: Record<string, ProductDef> = {
         { size: 'pack of 6', pricePence: 3400, sku: 'H-COAST-6PK', default: true },
         { size: 'pack of 1', pricePence: 550, sku: 'H-COAST-1PK' },
       ] as const
-    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...exactPx({ w: 1251, h: 1251 }, 300), prodigiSku: p.sku, ...('default' in p ? { default: true } : {}) })),
+      // the file is 106 mm for a 100 mm coaster: 3 mm is cut off each edge, so previews show the finished coaster
+    ).map((p) => ({ size: p.size, pricePence: p.pricePence, ...trimmedPx({ w: 1251, h: 1251 }, 300, COASTER_TRIM_MM), prodigiSku: p.sku, ...('default' in p ? { default: true } : {}) })),
   },
   // The CHRISTMAS FAMILY BUNDLE (founder, 29 Oct — three simple sizes, no add-ons): N placemats + N
   // coasters + N ceramic ornaments, all uk9, ONE tracked parcel — a set for 2 (£78), 4 (£145) or 8
@@ -663,7 +669,7 @@ const DEFS: Record<string, ProductDef> = {
   heightChart: {
     category: 'PRINT', label: 'doodle height chart', blurb: 'watch them grow up their own artwork', print: true, visibleInShop: true,
     description: "A canvas height chart on wooden hangers, with their drawing running alongside the ruler — mark every birthday as they grow past it. Hang it with the bottom of the lower wooden bar 40 cm off the floor and the ruler reads true. They're only little once.",
-    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm (120 cm chart) · 50–190 cm (150 cm chart)', hanging: 'bottom of the lower wooden bar 40 cm off the floor', made: 'in the UK' },
+    specs: { material: 'polycanvas, 400gsm', hangers: 'wooden — natural, black or white', markings: 'cm and feet & inches', measures: '50–150 cm', hanging: 'bottom of the lower wooden bar 40 cm off the floor', made: 'in the UK' },
     variants: HEIGHT_CHARTS.flatMap((h) =>
       HANGER_COLOURS.map((colour) => ({ size: h.size, colour, pricePence: h.pricePence, ...exactPx(h.px, 150), prodigiSku: h.sku, prodigiAttrs: { color: colour } })),
     ),
@@ -686,14 +692,13 @@ const DEFS: Record<string, ProductDef> = {
   },
   wrappingPaper: {
     category: 'FESTIVE', label: 'doodle wrapping paper', blurb: 'every present wrapped in their art', print: true, visibleInShop: true,
-    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll: 2, 3 or 5 metres, in white or brown kraft (on kraft the colours come out a little earthier, and the paper shows through where the drawing is white).',
+    description: 'Their drawing turned into a repeating pattern on proper gift wrap — so the paper is half the present. On a 70cm-wide roll of white paper: 2, 3 or 5 metres.',
     specs: { material: 'FSC-certified 95gsm paper', formats: 'a 70cm-wide roll — 2, 3 or 5 m', made: 'in the UK' },
     // Two papers (D24): white, and brown KRAFT (the scrapbook look). Kraft is a 300dpi file at the same
     // cost (£8/£11/£17 + £5.70, gb2). Printing is CMYK on brown, so the paper shows where the drawing is white.
-    variants: WRAPPING_PAPER.flatMap((w) => [
-      { size: w.size, colour: 'white', pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku },
-      { size: w.size, colour: 'kraft', pricePence: w.pricePence, ...exactPx(w.kraftPx, 300), prodigiSku: w.kraftSku },
-    ]),
+    // KRAFT is OFF SALE (founder, 28 Nov 2026): kraft prints no white, so the real roll is brown where our
+    // picture shows white paper. Its SKUs stay in WRAPPING_PAPER (kraftSku / kraftPx) for when it comes back.
+    variants: WRAPPING_PAPER.map((w) => ({ size: w.size, colour: 'white', pricePence: w.pricePence, ...exactPx(w.px, 150), prodigiSku: w.sku })),
   },
   teaTowel: {
     category: 'BLANKET', label: 'doodle tea towel', blurb: 'drying up, with their art', print: true, visibleInShop: true,

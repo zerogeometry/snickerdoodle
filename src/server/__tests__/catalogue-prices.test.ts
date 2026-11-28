@@ -92,20 +92,19 @@ describe('range expansion — new products', () => {
     expect(prices('playingCards')).toEqual([2400]);
     const skuPrice = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.pricePence]));
     expect(skuPrice('heightChart')).toEqual({
-      'POSTER-HANGER-20-CAN-ROL-SC-8X48': 3100, 'POSTER-HANGER-30-CAN-ROL-SC-12X48': 3400,
-      'POSTER-HANGER-20-CAN-ROL-SC-8X60': 3400, 'POSTER-HANGER-30-CAN-ROL-SC-12X60': 3600,
+      'POSTER-HANGER-20-CAN-ROL-SC-8X48': 3100, 'POSTER-HANGER-30-CAN-ROL-SC-12X48': 3400, // the 150 cm charts are off sale (28 Nov 2026)
     });
     // rolls only (founder, 22 Oct) — no sheet packs
-    // white + brown kraft (D24) — the same price per length
-    expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800, 'WRAP-KFT-ROL-70X200': 2300, 'WRAP-KFT-ROL-70X300': 2800, 'WRAP-KFT-ROL-70X500': 3800 });
+    // white only — kraft is off sale (28 Nov 2026)
+    expect(skuPrice('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': 2300, 'WRAP-ROL-70X300': 2800, 'WRAP-ROL-70X500': 3800 });
     expect(skuPrice('petBandana')).toEqual({ 'PET-BANDANA-SML': 1800, 'PET-BANDANA-MED': 1800, 'PET-BANDANA-LRG': 1900 });
   });
 
   it('print files are Prodigi’s EXACT printAreaSizes (sandbox, GB route)', () => {
     const px = (k: string) => Object.fromEntries(rows(k).map((r) => [r.prodigiSku, r.px && `${r.px.w}x${r.px.h}`]));
     expect(px('socks')).toEqual({ 'GLOBAL-ANKLE-SOCKS': '3543x3543', 'GLOBAL-TUBE-SOCKS': '3543x6141' }); // the tube is designed AND sent upright — Prodigi's live 3543×6141 (23 Nov)
-    expect(px('heightChart')).toMatchObject({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X60': '1800x9000' });
-    expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527', 'WRAP-KFT-ROL-70X200': '8280x23610', 'WRAP-KFT-ROL-70X300': '8280x35430', 'WRAP-KFT-ROL-70X500': '8280x59070' });
+    expect(px('heightChart')).toEqual({ 'POSTER-HANGER-20-CAN-ROL-SC-8X48': '1200x7200', 'POSTER-HANGER-30-CAN-ROL-SC-12X48': '1800x7200' });
+    expect(px('wrappingPaper')).toEqual({ 'WRAP-ROL-70X200': '4133x11811', 'WRAP-ROL-70X300': '4133x17716', 'WRAP-ROL-70X500': '4133x29527' });
     expect(px('teaTowel')).toEqual({ 'H-TEATOWEL-SUB': '8208x5492' }); // designed landscape; the file turns back to 5492×8208
     expect(px('petBandana')).toEqual({ 'PET-BANDANA-SML': '7500x2244', 'PET-BANDANA-MED': '9447x2952', 'PET-BANDANA-LRG': '10158x3306' });
     // the playing card is designed at its finished 63.5×89 mm with Prodigi's 3 mm trim round it — the FILE is still 820×1122
@@ -124,6 +123,19 @@ describe('range expansion — new products', () => {
     for (const r of mugs) expect(r.prodigiSku).not.toMatch(/^H-MUG-11OZ-W/); // the two-tone range
     expect(new Set(mugs.map((r) => `${r.px?.w}x${r.px?.h}+${r.bleedMm}`))).toEqual(new Set(['2474x1157+0']));
     expect(mugs.map((r) => r.attributes.colour)).not.toContain('black'); // H-MUG-11OZ-BLA ships GB orders from Sweden
+  });
+
+  it('coasters and placemats preview at their finished cut size; the file Prodigi gets is unchanged (28 Nov 2026)', () => {
+    const fileOf = (r: (typeof list)[number]) => { const b = Math.round((r.bleedMm / 25.4) * r.dpi); return `${r.px!.w + 2 * b}x${r.px!.h + 2 * b}`; };
+    for (const r of rows('coaster')) { expect(r.bleedMm).toBe(3); expect(r.px).toEqual({ w: 1181, h: 1181 }); expect(fileOf(r)).toBe('1251x1251'); }
+    for (const r of rows('placemat')) { expect(r.bleedMm).toBe(3); expect(r.px).toEqual({ w: 3355, h: 2351 }); expect(fileOf(r)).toBe('3425x2421'); }
+  });
+
+  it('kraft wrapping paper and the 150 cm height charts are off sale (founder, 28 Nov 2026)', () => {
+    expect(rows('wrappingPaper').map((r) => r.attributes.colour)).not.toContain('kraft');
+    expect(rows('heightChart').map((r) => r.attributes.size)).not.toContain('20 × 150 cm');
+    expect(rows('heightChart').map((r) => r.attributes.size)).not.toContain('30 × 150 cm');
+    expect(rows('heightChart').length).toBe(6);
   });
 
   it('only UK-made tea towels — never the US-made cotton/poly twill SKUs', () => {
@@ -147,7 +159,7 @@ describe('range expansion — new products', () => {
 
   it('height-chart hanger colour is sent to Prodigi as its `color` attribute', () => {
     expect(new Set(rows('heightChart').map((r) => r.prodigiAttrs?.color))).toEqual(new Set(['natural', 'black', 'white']));
-    expect(rows('heightChart')).toHaveLength(12);
+    expect(rows('heightChart')).toHaveLength(6); // two 120 cm sizes × three hanger colours
   });
 
   it('socks send Prodigi the size it requires (`l` — one size, UK 6–10), ankle and tube alike (live refusal, 26 Nov 2026)', () => {
@@ -248,9 +260,9 @@ describe('christmas family bundle — catalogue entries', () => {
       const g = BUNDLE_PIECE_GEOM[pieceOfSku(sku)!];
       expect({ w: r.px!.w, h: r.px!.h, dpi: r.dpi, bleed: r.bleedMm }, sku).toEqual({ w: g.printWidthPx, h: g.printHeightPx, dpi: g.requiredDpi, bleed: g.bleedMm });
     }
-    // Prodigi's exact areas: placemat 3425×2421, coaster 1251×1251, ornament 885×885 (no bleed)
-    expect(row('placemat').px).toEqual({ w: 3425, h: 2421 });
-    expect(row('coaster').px).toEqual({ w: 1251, h: 1251 });
+    // the finished mat / coaster, with the cut-off edge as bleed: Prodigi's files are still 3425×2421 / 1251×1251
+    expect(row('placemat')).toMatchObject({ px: { w: 3355, h: 2351 }, bleedMm: 3 });
+    expect(row('coaster')).toMatchObject({ px: { w: 1181, h: 1181 }, bleedMm: 3 });
     expect(row('ceramicOrnament')).toMatchObject({ px: { w: 885, h: 885 }, bleedMm: 0 });
   });
 

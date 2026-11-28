@@ -68,9 +68,9 @@ describe('sweep 03 — the christmas bundle’s pieces', () => {
       const s = tplOf(sku);
       const g = BUNDLE_PIECE_GEOM[pieceOfSku(sku)!];
       expect({ printWidthPx: s.template.printWidthPx, printHeightPx: s.template.printHeightPx, bleedMm: s.template.bleedMm, requiredDpi: s.template.requiredDpi }, sku).toEqual(g);
-      expect(areaSizes(s, 'default'), sku).toEqual([`${g.printWidthPx}×${g.printHeightPx}`]);
+      // the file = the finished piece + the cut-off edge (bleed) all round = exactly Prodigi's area
       const c = canvasSizePx(s.template);
-      expect([c.width, c.height], `${sku}: no bleed added on top of Prodigi's area`).toEqual([g.printWidthPx, g.printHeightPx]);
+      expect(areaSizes(s, 'default'), sku).toEqual([`${c.width}×${c.height}`]);
     }
   });
 

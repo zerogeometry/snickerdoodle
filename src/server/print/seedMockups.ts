@@ -507,11 +507,11 @@ export function plan(key: string, attrs: Record<string, string>): Plan | null {
  * frame edge exactly as the physical print sits in the rebate.
  */
 const layeredCache = new Map<string, { blank: Buffer; mask: Buffer; window: Box; W: number; H: number }>();
-async function layeredFrame(dir: string, orientation: 'portrait' | 'landscape' = 'portrait'): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
+async function layeredFrame(dir: string, orientation: 'portrait' | 'landscape' = 'portrait', windowAspect?: number): Promise<{ blank: Buffer; mask: Buffer; window: Box; W: number; H: number }> {
   // Cache on the layers' mtimes, not just the dir — the founder iterates on these
   // files, and a long-lived dev server must never serve a stale derivation.
   const files = ['background.png', 'product.png', 'shadow.png'];
-  const key = dir + '|' + orientation + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
+  const key = dir + '|' + orientation + '|' + (windowAspect?.toFixed(4) ?? '') + '|' + files.map((f) => statSync(path.join(dir, f)).mtimeMs).join('|');
   const hit = layeredCache.get(key);
   if (hit) return hit;
   const product = readFileSync(path.join(dir, 'product.png'));
@@ -582,6 +582,23 @@ async function layeredFrame(dir: string, orientation: 'portrait' | 'landscape' =
     .toBuffer();
 
   let out = { blank, mask, window: { x0: mx0 / W, y0: my0 / H, x1: (mx1 + 1) / W, y1: (my1 + 1) / H }, W, H };
+
+  // The REAL frame's window shape (the print minus the 5 mm rebate all round, portrait): one photo serves
+  // every size, so stretch the PHOTO (the moulding, the wall), never the drawing, until its window has that
+  // shape — then the print sits under exactly 5 mm of moulding on every edge (founder, 28 Nov 2026).
+  if (windowAspect) {
+    const photoAspect = (mx1 - mx0 + 1) / (my1 - my0 + 1);
+    const k = windowAspect / photoAspect;
+    if (Math.abs(k - 1) > 0.001) {
+      const W2 = Math.max(1, Math.round(W * k)); // stretch across (normalised window coords don't move)
+      out = {
+        ...out,
+        blank: await sharp(blank).resize(W2, H, { fit: 'fill' }).png().toBuffer(),
+        mask: await sharp(mask).resize(W2, H, { fit: 'fill' }).png().toBuffer(),
+        W: W2,
+      };
+    }
+  }
 
   // LANDSCAPE: the same frame hung on its side — rotate the derived blank + mask 90°
   // clockwise and carry the window box into the rotated space. The print canvas of a
@@ -1336,6 +1353,24 @@ const asQuad = (b: Box): Quad => { const f = fitWithin01(b); return [[f.x0, f.y0
 
 /** Centre an aspect-locked rect over `box`, covering or containing it — in PIXEL space (the
  * photo may be non-square, so normalised units can't carry an aspect ratio). */
+/**
+ * Prodigi's classic frames: "Rebate width 5mm" — the moulding covers 5 mm of the print on EVERY edge
+ * (print audit, 28 Nov 2026; founder: "the finished piece matches the preview"). So the frame photo's
+ * window shows the print MINUS 5 mm all round: fit that visible part over the window (cover, never
+ * stretched), then grow it back by the 5 mm each side to place the whole print file. Where the photo's
+ * window has the same shape as the real frame (brown, greys and white at 12×16″ and up), exactly 5 mm is
+ * hidden on every edge; elsewhere 5 mm on one pair of edges and a little more on the other.
+ */
+export const FRAME_REBATE_MM = 5;
+export function frameQuad(win: Box, W: number, H: number, printWmm: number, printHmm: number): Box {
+  const visW = printWmm - 2 * FRAME_REBATE_MM;
+  const visH = printHmm - 2 * FRAME_REBATE_MM;
+  const inner = aspectRect(win, W, H, visW / visH, 'cover');
+  const cx = (inner.x0 + inner.x1) / 2, cy = (inner.y0 + inner.y1) / 2;
+  const hw = ((inner.x1 - inner.x0) * printWmm) / visW / 2, hh = ((inner.y1 - inner.y0) * printHmm) / visH / 2;
+  return { x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh };
+}
+
 function aspectRect(box: Box, W: number, H: number, printAspect: number, fit: 'cover' | 'contain'): Box {
   const bw = (box.x1 - box.x0) * W, bh = (box.y1 - box.y0) * H;
   const boxAspect = bw / bh;
@@ -1551,8 +1586,10 @@ export async function authorTemplate(r: TemplateRow, ctx: AuthorCtx = authorCtx(
   }
 
   if (p.register === 'layered-frame') {
-    const d = await layeredFrame(p.dir, p.orientation);
-    const quad = asQuad(aspectRect(d.window, d.W, d.H, printAspectEarly, 'cover'));
+    // the real frame's window, portrait: the print minus the rebate all round
+    const visA = r.printWmm - 2 * FRAME_REBATE_MM, visB = r.printHmm - 2 * FRAME_REBATE_MM;
+    const d = await layeredFrame(p.dir, p.orientation, Math.min(visA, visB) / Math.max(visA, visB));
+    const quad = asQuad(frameQuad(d.window, d.W, d.H, r.printWmm, r.printHmm));
     const template: AuthoredTemplate = { blank: d.blank, contentType: 'image/png', printQuad: quad, materialClass: p.material, mask: d.mask };
     const qa = ((quad[1]![0] - quad[0]![0]) * d.W) / ((quad[3]![1] - quad[0]![1]) * d.H);
     return { template, registration: {
