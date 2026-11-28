@@ -4,7 +4,7 @@
 
 ## The short answer
 
-**One more product is clearly wrong, and two need settling before Christmas orders build up.** Nothing else repeats the mug's mistake.
+**No other product repeats the mug's mistake.** Three need settling before Christmas orders build up: the 150 cm height chart, the new blue mug and the plastic bauble. A few pictures need small code fixes, the kraft wrapping paper most of all.
 
 The mug mistake was: we sold a Prodigi product line whose own name in their system says it prints less than the product looks. I checked Prodigi's own description of **all 228 product codes** we use (or are about to use). **Only the seven two-tone mugs** carry a warning like that ("[NOT top-to-bottom printing]"). No other code we sell has one.
 
@@ -14,8 +14,8 @@ Worst first:
 
 | # | Product | Rating | In one line | What settles it |
 |---|---|---|---|---|
-| 1 | **Mug (two-tone, on sale now)** | ❌ wrong | Prodigi's own product name says "NOT top-to-bottom"; our picture shows it printed rim to base. | PR #111 (already open) switches to the top-to-bottom range. Merge it. |
-| 1b | **Mug (the PR #111 replacement)** | ⚠️ risk | Right range, right size, and no warning. But **blue (our default) and orange aren't listed on Prodigi's public page**, which is the same gap that caught us last time. | Ask Prodigi, **and** order one blue sample before pushing mugs. |
+| 1 | **Mug (two-tone, sold until today)** | ❌ was wrong, now fixed | Prodigi's own product name says "NOT top-to-bottom"; our picture showed it printed rim to base. | **Fixed:** PR #111 (merged into the Christmas branch on 28 Nov) switched to the top-to-bottom range. It reaches customers on the next deploy. |
+| 1b | **Mug (the new coloured mugs, PR #111)** | ⚠️ risk | Right range, right size, and no warning. But **blue (our default) and orange aren't listed on Prodigi's public page**, which is the same gap that caught us last time. | Ask Prodigi, **and** order one blue sample before pushing mugs. |
 | 2 | **Height chart, 150 cm sizes** | ⚠️ risk, high | Prodigi's page and their system both say the canvas is **150 cm** long. Our file and ruler are drawn for **152.4 cm**. If Prodigi fits our file to 150 cm, the marks near the top read up to **2.4 cm** too high. | Ask Prodigi, then measure a sample with a tape. The 120 cm charts are fine. |
 | 3 | **Kraft wrapping paper** | ⚠️ risk | Our picture shows **white paper** between the drawings. Kraft prints no white, so the real roll is **brown there**, and the colours come out darker. Our description says so in words, but the picture doesn't. | Code fix: show the kraft colour through the white in the picture. |
 | 4 | **Plastic bauble** | ⚠️ risk | Still open from 16 Nov: the shape and size of the printed card inside the ball are not confirmed. | Ask Prodigi, or one cheap sample. |
@@ -26,11 +26,11 @@ Worst first:
 | 8 | **Calendar: "tracked"** | ⚠️ small risk | We say "free tracked delivery". Prodigi's carrier for the calendar lab is just called "Mixed", so tracking is not confirmed. | Ask Prodigi, or drop "tracked" for the calendar. |
 | — | Everything else | ✅ OK | Cushions, blankets, tees, jigsaws, cards, calendar print, ceramic ornament, multi photo frames, phone case print, watch strap, socks, tea towel, white wrapping paper, playing cards, 120 cm height charts. | Nothing needed. |
 
-**Every product we sell is made in the UK.** I quoted every code to a UK address: none goes to a lab abroad. The only non-UK route I found is the **black** coloured mug (Sweden), and PR #111 already leaves it out.
+**Every product we sell is made in the UK.** I quoted every code to a UK address: none goes to a lab abroad. The only non-UK route I found is the **black** coloured mug (Sweden), and PR #111 leaves it out.
 
 ## Your turn
 
-1. **Merge PR #111** (the mug). Then, before you advertise mugs, **order one blue mug sample**. Blue is our default and isn't on Prodigi's public page (see #1b).
+1. **Deploy the Christmas branch** so the new mug (PR #111, merged) goes live. Then, before you advertise mugs, **order one blue mug sample**. Blue is our default and isn't on Prodigi's public page (see #1b).
 2. **Send Prodigi the questions** at the end. They cost nothing and cover #1b, #2, #4 and #8. If you sent the 16 Nov questions and got answers, tell me and I'll fold them in.
 3. **Samples worth ordering** (all three ship in a few days): the blue mug, a 150 cm height chart (measure the "100" and "180" marks with a tape) and a plastic bauble.
    - Optional: a 2 m kraft roll, if you want to see the colours for yourself.
@@ -48,7 +48,7 @@ Worst first:
 - reads Prodigi's own description of every product code in the shop, from a saved copy, so the test never calls Prodigi;
 - **fails if any product on sale is described with words like** "NOT top-to-bottom", "partial", "not full wrap", "not edge-to-edge", "smaller print area", "front only" or "one side only";
 - also fails if we sell a double-sided cushion on a product code Prodigi calls single-sided, or the other way round, or if our own words promise "both sides" on something single-sided;
-- the two-tone mugs are on a short "known" list until PR #111 lands. The test then fails until they're taken off the list, so they can't be forgotten. Whichever PR merges second removes those lines.
+- there's a short "known" list for a product that has to stay on sale with a warning for a while. It's empty now that PR #111 has taken the two-tone mugs off sale. Anything on it must still be on sale, or the test fails until it's removed.
 - I checked it really catches the mug: with the known list emptied, it fails and names all seven two-tone codes.
 
 The existing print-size guard (`print-spec.test.ts`) still checks every file is exactly Prodigi's size. I re-ran it against **today's** Prodigi data (not only the saved copy) and every product on sale matches, tube socks included.
@@ -72,7 +72,7 @@ Caveat: Prodigi's system data comes from the **sandbox**. On 23 Nov the tube soc
 
 "Hidden" means the millimetres of our print file that our shop picture does *not* show, per edge: left / right / top / bottom of the design as the customer sees it. Each image shows, left to right: Prodigi's template (where there is one) · our print file with the grid · our shop picture with the same grid.
 
-### ❌ 1. Mug: two-tone (on sale now) · `mug-twotone-blue.jpg`
+### ❌ 1. Mug: two-tone (sold until PR #111) · `mug-twotone-blue.jpg`
 
 ![two-tone mug](mug-twotone-blue.jpg)
 
@@ -82,11 +82,11 @@ Caveat: Prodigi's system data comes from the **sandbox**. On 23 Nov the tube soc
 - **Our picture:** the front, back and centre views together show the whole file. Hidden top and bottom: 0–0.3 mm, so the picture prints right to the rim and base.
 - **The real mug** (your sample): white bands top and bottom and a bare gap at the handle.
 - **Ships:** uk9, Royal Mail Tracked 48. Matches `season.ts` and `parcels.ts`.
-- **Settle:** PR #111.
+- **Settled:** PR #111, merged on 28 Nov. Goes live with the next deploy.
 
-### ⚠️ 1b. Mug: the PR #111 replacement (coloured mugs) · `mug-pr111-blue.jpg`
+### ⚠️ 1b. Mug: the new coloured mugs (PR #111, merged) · `mug-coloured-blue.jpg`
 
-![coloured mug, as PR 111 previews it](mug-pr111-blue.jpg)
+![coloured mug, as the shop now previews it](mug-coloured-blue.jpg)
 
 - **Prodigi's system:** "11oz White Ceramic Mug with blue handle, blue inner mug", with no warning on any of the 6 colours.
 - **Print size:** 2474×1157 px = 209.5×98 mm. That is **exactly** Prodigi's downloadable "11oz Coloured mug" template (209.5 × 98 mm), so it matches.
@@ -94,9 +94,9 @@ Caveat: Prodigi's system data comes from the **sandbox**. On 23 Nov the tube soc
   - It says "top to bottom, full colour, photographic print" and "allow 1–2mm of artwork movement".
   - It lists the red, yellow, pink and light green codes.
   - It **doesn't list H-MUG-11OZ-BLU or -ORG**, although "orange" and "sky blue" appear in its colour list.
-- **The template:** a 1–2 mm grey "bleed" band top and bottom and a dashed "safe area" about 4 mm in. Our picture shows the file to 0 mm. That's 1–2 mm more than prints, too small to see.
+- **The template:** a grey "bleed" band of 1 mm at the top and 2 mm at the bottom, and a dashed "safe area" about 4 mm in. The merged code takes that bleed off every mug picture. Measured on all 6 colours, the pictures hide 0–1.6 mm at the top and 2.1–2.3 mm at the bottom, so they match.
 - **Which way round:** our picture puts the two ends of the file at the handle and the middle on the far side. Prodigi's white-mug template agrees ("middle of face", "opposite handle").
-- **Ships:** uk5, Royal Mail RM24, which is untracked and has no Express. PR #111 already changes the delivery wording to match.
+- **Ships:** uk5, Royal Mail RM24, which is untracked and has no Express. PR #111 changed the delivery wording to match.
 - **Settle:** ask Prodigi to confirm that **BLU and ORG** are the same top-to-bottom range, and **order one blue sample** before advertising.
 
 ### ⚠️ 2. Height chart · `height-chart-30x150.jpg`
@@ -190,11 +190,11 @@ Caveat: Prodigi's system data comes from the **sandbox**. On 23 Nov the tube soc
 
 ### The 3D views (the spin view, the wall view, the AR frame)
 
-All three paint the drawing through one shared function, `paintPlacement` (`src/ui/three/models.ts:29`). It assumes **every product has a 3 mm bleed** (line 44). PR #111 fixes that for the mug only, by passing the mug's real bleed of 0. I checked the rest from the code; a 3D view needs a real browser, so these points weren't rendered:
+All three paint the drawing through one shared function, `paintPlacement` (`src/ui/three/models.ts:29`). Before PR #111 it assumed **every product has a 3 mm bleed**. PR #111 added a `bleedMm` argument and fixed the mug; every other caller still gets 3 mm. I checked the rest from the code; a 3D view needs a real browser, so these points weren't rendered:
 
 | View | Products that use it | Real bleed | What it means |
 |---|---|---|---|
-| **Spin view** (`Product3D`) | Only the **mug**, **calendar** and storybook can spin (`src/ui/three/spinnable.ts`). The storybook is paused. Framed prints, cushions and blankets have **no 3D view** (founder's call, July). | mug 0 (PR #111 handles it) · calendar 0 | **Calendar:** it also ignores the calendar's gallery layout. The spin view paints the drawing **edge to edge** with the shopper's placement (`src/ui/three/builders.ts:138`). The print fits the whole drawing inside a **1 cm white border** and ignores placement (`galleryRect`, `src/server/print/geometry.ts:264`). The 3 mm assumption only adds a ~2% zoom on top. See F9. |
+| **Spin view** (`Product3D`) | Only the **mug**, **calendar** and storybook can spin (`src/ui/three/spinnable.ts`). The storybook is paused. Framed prints, cushions and blankets have **no 3D view** (founder's call, July). | mug 0 (fixed by PR #111) · calendar 0 | **Calendar:** it also ignores the calendar's gallery layout. The spin view paints the drawing **edge to edge** with the shopper's placement (`src/ui/three/builders.ts:138`). The print fits the whole drawing inside a **1 cm white border** and ignores placement (`galleryRect`, `src/server/print/geometry.ts:264`). The 3 mm assumption only adds a ~2% zoom on top. See F9. |
 | **Wall view** (`WallView`) | Framed prints | 0 | **Not shown anywhere today.** Nothing in the app imports `WallView`. If it comes back, the 3 mm assumption would crop ~3 mm off each edge (about 2% zoom), on top of the 5 mm the frame hides (F2). |
 | **AR frame** (`frameGlb`) | Framed prints | 0 | Only loaded from `WallView`, so **not reachable today**. Same note. |
 | Cushions, blankets | (no 3D view) | 6 mm, 10 mm | Nothing to fix. If a 3D view is ever added, pass the real bleed: with a 3 mm guess it would show 3 mm (cushion) or 7 mm (blanket) of the sewn-in edge. |
@@ -260,7 +260,7 @@ All three paint the drawing through one shared function, `paintPlacement` (`src/
   - our `isTrackedService` check doesn't recognise "FedEx First" (the 24×36″ multi frame) as tracked, although it is. Harmless today; worth a one-word fix.
 - **F7. The weekly Prodigi check** (on the server, reading **live**): also read each product's description and email the support inbox if a warning word appears, the same words as the new guard test. That catches a live change between our sandbox snapshots.
 - **F9. 3D views** (item 7b):
-  - make `paintPlacement` take each variant's **real bleed** from its print template, instead of 3 mm or a per-product number (PR #111 adds the argument for the mug);
+  - make `paintPlacement` take each variant's **real bleed** from its print template, instead of the 3 mm default (PR #111 added the argument for the mug);
   - on the **calendar**, paint the gallery page (the whole drawing inside the 1 cm white border) rather than the shopper's placement;
   - a small test could check that the spin view's painted area matches the print file's.
 - **F8.** `NO_EXPRESS_KEYS` lists only the calendar, but the plastic bauble, playing cards and the PR #111 mugs have no Express either. Today's order split keeps them on Standard anyway, so nothing breaks, but the list should be complete.

@@ -33,12 +33,7 @@ const warningIn = (description: string): string | null => WARNINGS.find((w) => w
  * once the SKU is no longer sold (the last test fails until it does).
  */
 const KNOWN: Record<string, string> = {
-  // the two-tone mugs: replaced by the top-to-bottom coloured mugs in PR #111 (fix/mug-top-to-bottom).
-  // Whichever of the two PRs lands second removes these lines.
-  'H-MUG-11OZ-WBL': 'two-tone mug — PR #111 replaces it', 'H-MUG-11OZ-WB': 'two-tone mug — PR #111 replaces it',
-  'H-MUG-11OZ-WG': 'two-tone mug — PR #111 replaces it', 'H-MUG-11OZ-WO': 'two-tone mug — PR #111 replaces it',
-  'H-MUG-11OZ-WP': 'two-tone mug — PR #111 replaces it', 'H-MUG-11OZ-WR': 'two-tone mug — PR #111 replaces it',
-  'H-MUG-11OZ-WY': 'two-tone mug — PR #111 replaces it',
+  // (empty: the two-tone mugs H-MUG-11OZ-W* came off sale with PR #111, 28 Nov 2026)
 };
 
 const variants = definedPriceList().filter((v) => v.prodigiSku);

@@ -31,7 +31,7 @@ type Face = 'pattern' | 'heightChart' | 'gallery' | 'strap' | 'frameGrid';
 type Case = { name: string; key: string; match?: (a: Record<string, string>) => boolean; templates?: string[]; face?: Face; mug?: boolean; layout?: 'tile' | 'frame' };
 const is = (o: Record<string, string>) => (a: Record<string, string>) => Object.entries(o).every(([k, v]) => a[k] === v);
 const CASES: Case[] = [
-  { name: 'mug-twotone-blue', key: 'mug', match: is({ colour: 'blue' }), mug: true, templates: ['prodigi-photo-mugs-templates/prodigi-11oz-mug.png', 'prodigi-coloured-photo-mugs-templates/prodigi-11oz-coloured-photo-mug-template.png'] },
+  { name: 'mug-coloured-blue', key: 'mug', match: is({ colour: 'blue' }), mug: true, templates: ['prodigi-photo-mugs-templates/prodigi-11oz-mug.png', 'prodigi-coloured-photo-mugs-templates/prodigi-11oz-coloured-photo-mug-template.png'] },
   { name: 'frame-11x14-gold-portrait', key: 'framedPrint', match: is({ size: '11×14″', colour: 'gold', orientation: 'portrait' }) },
   { name: 'frame-24x32-black-landscape', key: 'framedPrint', match: is({ size: '24×32″', colour: 'black', orientation: 'landscape' }) },
   { name: 'cushion-heart', key: 'cushion', match: is({ size: '11″ heart' }), templates: ['prodigi-heart-shaped-cushion-11.png'] },
