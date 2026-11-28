@@ -12,7 +12,7 @@
  *   gb2 wrap       two rolls £6.70 (vs £5.70 each)
  *   uk15 calendar  two £5.35 (vs £4.35 each)
  *   uk9 socks      two pairs £4.30 (vs £4.30 each)
- *   uk5 ornament   two plastic balls £6.70 (vs £6.45 each); the mug joins it (two mugs, or mug + ball, £6.70 — 28 Nov 2026)
+ *   uk5 ornament   two plastic balls £6.70 (vs £6.45 each); the mug joins it (two mugs, or mug + ball, ship as one parcel — sandbox, 28 Nov 2026)
  * The real saving per extra item is £3.30–£6.20 ex-VAT, so a flat £3 is always covered.
  * Deliberately NOT grouped: garments (uk9 garments ship apart from homeware, and already have the
  * family-set saving), cards (flat £0.95 postage, already cheap), framed prints / jigsaws (gb3 ships
