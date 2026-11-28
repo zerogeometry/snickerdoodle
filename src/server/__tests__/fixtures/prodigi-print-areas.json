@@ -1273,10 +1273,10 @@
     {"attributes":{"style":"6-pack"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
    ]
   },
-  "H-MUG-11OZ-BLU": {
+  "H-MUG-11OZ-SKBL": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"blue","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
+    {"attributes":{"color":"sky blue","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
   "H-MUG-11OZ-LIGR": {

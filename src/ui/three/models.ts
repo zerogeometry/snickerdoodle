@@ -69,6 +69,7 @@ export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: n
 const MUG_ACCENT: Record<string, string> = {
   white: '#f7f5f1',
   black: '#2b2724',
+  'sky blue': '#298fc2', // Pantone 7689C
   blue: '#2f6f9e',
   green: '#3f7d4f',
   orange: '#d2691e',

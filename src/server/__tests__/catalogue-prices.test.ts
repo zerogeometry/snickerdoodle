@@ -25,7 +25,7 @@ describe('shop prices — on the nearest £0.50, never .95/.99', () => {
 
   it('the agreed price per product', () => {
     expect(prices('framedPrint')).toEqual([6500, 7000, 9000, 10500]);
-    expect(prices('mug')).toEqual([1800]);
+    expect(prices('mug')).toEqual([2000]); // £20 (founder, 28 Nov 2026)
     expect(prices('cushion')).toEqual([2200, 3000, 3500, 4000, 4500]);
     expect(price('cushion')).toBe(2200); // heart (+£2)
     expect(price('cushion-18round')).toBe(3000);
@@ -118,7 +118,7 @@ describe('range expansion — new products', () => {
   it('the mug is the top-to-bottom coloured range at its exact file size, never the two-tone NOT-top-to-bottom SKUs (founder, 28 Nov 2026)', () => {
     const mugs = rows('mug');
     expect(mugs.map((r) => [r.attributes.colour, r.prodigiSku])).toEqual([
-      ['blue', 'H-MUG-11OZ-BLU'], ['green', 'H-MUG-11OZ-LIGR'], ['orange', 'H-MUG-11OZ-ORG'],
+      ['sky blue', 'H-MUG-11OZ-SKBL'], ['green', 'H-MUG-11OZ-LIGR'], ['orange', 'H-MUG-11OZ-ORG'],
       ['pink', 'H-MUG-11OZ-PNK'], ['red', 'H-MUG-11OZ-RED'], ['yellow', 'H-MUG-11OZ-YLW'],
     ]);
     for (const r of mugs) expect(r.prodigiSku).not.toMatch(/^H-MUG-11OZ-W/); // the two-tone range

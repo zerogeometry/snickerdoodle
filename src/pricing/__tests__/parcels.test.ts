@@ -93,6 +93,6 @@ describe('priceBasket — same-parcel saving is server-derived', () => {
   it('a forged join context adds nothing (the join saving is retired) and the total stays above zero', () => {
     const q = priceBasket([{ productKey: 'mug', qty: 2 }], { joinContext: { familyId: 'f', inviteId: 'i', savingBps: 500 } } as never);
     expect(q.parcelSavingPence).toBe(300);
-    expect(q.totalPence).toBe(3600 - 300);
+    expect(q.totalPence).toBe(4000 - 300);
   });
 });
