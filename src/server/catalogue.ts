@@ -167,20 +167,25 @@ export function isDesignedTurned(productKey: string, _attributes?: Record<string
   return DESIGNED_TURNED.has(productKey);
 }
 
-// Mug: ONE mug, the tracked two-tone 11oz range (white body + coloured rim/handle) — each colour is
-// its own Prodigi SKU. (15oz white dropped 2026-07-09; PLAIN white dropped 2026-07-10 — the founder
-// wanted the coloured two-tones only. Blue leads.) £18 (round, whole-pound pricing).
-const MUG_TWOTONE = [
-  { colour: 'blue', sku: 'H-MUG-11OZ-WBL', default: true }, { colour: 'black', sku: 'H-MUG-11OZ-WB' },
-  { colour: 'green', sku: 'H-MUG-11OZ-WG' }, { colour: 'orange', sku: 'H-MUG-11OZ-WO' },
-  { colour: 'pink', sku: 'H-MUG-11OZ-WP' }, { colour: 'red', sku: 'H-MUG-11OZ-WR' },
-  { colour: 'yellow', sku: 'H-MUG-11OZ-WY' },
+// Mug: ONE mug, Prodigi's "coloured photo mugs" (white outside, coloured handle + inside), each colour its
+// own SKU — the range PRINTED TOP TO BOTTOM (founder, 28 Nov 2026: "we want printing the same as the mugs on
+// prodigi.com/products/home-and-living/drinkware/coloured-photo-mugs"). The earlier two-tone range
+// (H-MUG-11OZ-WBL…) is "[NOT top-to-bottom printing]" in Prodigi's own catalogue: the 28 Nov sample came
+// back with the whole file shrunk to ~84%, white bands top and bottom and a wide bare gap at the handle.
+// Every colour below quotes from uk5 (Royal Mail RM24, Standard only — no Express), sandbox 28 Nov.
+// BLACK (H-MUG-11OZ-BLA) is left out: a GB order routes it to Sweden (se2, PostNord), not the UK.
+// £18 (round, whole-pound pricing). Blue leads.
+const MUG_COLOURS = [
+  { colour: 'blue', sku: 'H-MUG-11OZ-BLU', default: true },
+  { colour: 'green', sku: 'H-MUG-11OZ-LIGR' }, // Prodigi: "light green"
+  { colour: 'orange', sku: 'H-MUG-11OZ-ORG' },
+  { colour: 'pink', sku: 'H-MUG-11OZ-PNK' }, { colour: 'red', sku: 'H-MUG-11OZ-RED' },
+  { colour: 'yellow', sku: 'H-MUG-11OZ-YLW' },
 ] as const;
 function mugVariants(): VariantDef[] {
-  // The wrap the print file must fill: Prodigi's EXACT printAreaSizes (2480×1122px @300dpi, sandbox
-  // 27 Oct), bleed 0. (Their 11oz template PNG is 2473×1157 — a little taller — but the order is sized
-  // to the API's area, so a template-shaped file lost ~3mm top and bottom.)
-  return MUG_TWOTONE.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, ...exactPx({ w: 2480, h: 1122 }, 300), prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
+  // The wrap the print file must fill: Prodigi's EXACT printAreaSizes for this range — 2474×1157px @300dpi
+  // (209.5×98mm, the same as their downloadable "11oz Coloured mug" template), bleed 0. Sandbox, 28 Nov.
+  return MUG_COLOURS.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, ...exactPx({ w: 2474, h: 1157 }, 300), prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
 }
 
 // Kids tee: Stanley/Stella Mini Creator 2.0 — size AND colour are Prodigi attributes of ONE SKU.
@@ -380,7 +385,7 @@ const DEFS: Record<string, ProductDef> = {
   },
   mug: {
     category: 'MUG', label: 'doodle mug', blurb: 'a morning cuppa, made magic', print: true, visibleInShop: true,
-    description: "Their masterpiece wrapped around a sturdy two-tone mug — for the grown-up who'll treasure every sip.",
+    description: "Their masterpiece printed top to bottom on a sturdy mug, coloured inside and on the handle — for the grown-up who'll treasure every sip.",
     specs: { material: 'ceramic', care: 'dishwasher safe · microwave safe' },
     variants: mugVariants(),
   },
@@ -536,7 +541,7 @@ const DEFS: Record<string, ProductDef> = {
     ],
   },
   // Christmas 2026 (D24): two separate products (founder, 26 Oct — "separate them out, label them as I have").
-  // The CERAMIC ornament is uk9 → Royal Mail Tracked 48 (£8 + £4.30), sharing a parcel with the sack / mug /
+  // The CERAMIC ornament is uk9 → Royal Mail Tracked 48 (£8 + £4.30), sharing a parcel with the sack /
   // tea towel; printed on ONE side (Prodigi: "single-sided print").
   ceramicOrnament: {
     category: 'FESTIVE', label: 'ceramic christmas ornament', blurb: "this year's ornament — one for every christmas they're little", print: true, visibleInShop: true,

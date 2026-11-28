@@ -48,10 +48,10 @@ const CAT: PricedCatalogue = {
 const BUNDLE = [{ productKey: 'christmasBundle-for4', qty: 1, bundle: { placemat: { assetId: 'a' } } }];
 
 describe('pickAddOns — the server’s add-ons with their REAL saving', () => {
-  it('bundle → the mug £3 off (same uk9 parcel) + the bauble with no saving claimed (uk5); the hidden tea towel is never offered', () => {
+  it('bundle → the mug and the bauble, neither with a saving claimed (both uk5, the bundle uk9); the hidden tea towel is never offered', () => {
     const a = pickAddOns(ON_SHOW, BUNDLE, { catalogue: CAT });
     expect(a.map((x) => [x.productKey, x.sku, x.pricePence, x.savingPence])).toEqual([
-      ['mug', 'mug', 1800, 300],
+      ['mug', 'mug', 1800, 0],
       ['christmasBauble', 'christmasBauble', 1900, 0],
     ]);
   });

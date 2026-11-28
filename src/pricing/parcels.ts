@@ -7,12 +7,12 @@
  *
  * Groups are what Prodigi actually ships together, NOT just "same lab". Verified by sandbox quotes
  * to GB on Standard, 2026-10-25 (project-office/briefs/CHRISTMAS-range-and-postage.md §1):
- *   uk9 homeware   bauble + sack £5.30 for two (vs £4.30 each); mug, tea towel, bandana join it
+ *   uk9 homeware   bauble + sack £5.30 for two (vs £4.30 each); tea towel, bandana join it
  *   uk3 textiles   apron + cushion, cushion + blanket £5.30 (FedEx, vs £4.30 each)
  *   gb2 wrap       two rolls £6.70 (vs £5.70 each)
  *   uk15 calendar  two £5.35 (vs £4.35 each)
  *   uk9 socks      two pairs £4.30 (vs £4.30 each)
- *   uk5 ornament   two plastic balls £6.70 (vs £6.45 each)
+ *   uk5 ornament   two plastic balls £6.70 (vs £6.45 each); the mug joins it (two mugs, or mug + ball, £6.70 — 28 Nov 2026)
  * The real saving per extra item is £3.30–£6.20 ex-VAT, so a flat £3 is always covered.
  * Deliberately NOT grouped: garments (uk9 garments ship apart from homeware, and already have the
  * family-set saving), cards (flat £0.95 postage, already cheap), framed prints / jigsaws (gb3 ships
@@ -30,13 +30,13 @@ const BY_PRODUCT: Record<string, ParcelGroup> = {
   ceramicOrnament: 'uk9-home',
   christmasBauble: 'uk5-ornament', // the plastic ball ships from uk5
   sack: 'uk9-home',
-  mug: 'uk9-home',
+  mug: 'uk5-ornament', // the top-to-bottom coloured mugs ship from uk5 (28 Nov 2026)
   teaTowel: 'uk9-home',
   petBandana: 'uk9-home',
   placemat: 'uk9-home', // H-PLACE-*PK (founder, 27 Oct)
   coaster: 'uk9-home', // H-COAST-*PK
   // The christmas family bundle's pieces are all uk9 homeware (founder, 29 Oct): ONE item of the group, so a
-  // sack / mug / tea towel added to it rides in the same parcel and takes £3 off. On its own it saves nothing.
+  // sack / tea towel added to it rides in the same parcel and takes £3 off. On its own it saves nothing.
   christmasBundle: 'uk9-home',
   apron: 'uk3-textile',
   cushion: 'uk3-textile',

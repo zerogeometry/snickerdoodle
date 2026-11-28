@@ -102,7 +102,7 @@ describe('post and Christmas', () => {
   it('a phone case with a calendar: the calendar goes Standard (no Express for it), the case travels tracked on its own when it must (26 Nov 2026)', () => {
     expect(resolveShippingMethod(['phoneCase', 'calendar-a4'])).toBe('Standard');
     expect(deliveryLine(['phoneCase', 'calendar'])).toBe('free tracked delivery');
-    expect(deliveryLine(['calendar', 'mug'])).toBe('free tracked delivery');
+    expect(deliveryLine(['calendar', 'teaTowel'])).toBe('free tracked delivery');
   });
 
   it('its last order date for Christmas 2026: 12 December (Tracked 48)', () => {

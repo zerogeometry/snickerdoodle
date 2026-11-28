@@ -11,6 +11,7 @@ const CAT: PricedCatalogue = {
   // landed = product + first post (ex-VAT), as product_variants.unit_cost_pence holds it
   mug: { pricePence: 1800, label: 'mug', unitCostPence: 1000, postFirstPence: 400, postExtraPence: 100 },
   teaTowel: { pricePence: 2700, label: 'tea towel', unitCostPence: 1200, postFirstPence: 400, postExtraPence: 100 },
+  christmasBauble: { pricePence: 2700, label: 'plastic bauble', unitCostPence: 1200, postFirstPence: 400, postExtraPence: 100 },
   card: { pricePence: 550, label: 'greetings card', unitCostPence: 200, postFirstPence: 100, postExtraPence: 0 },
   framedPrint: { pricePence: 6500, label: 'framed print', unitCostPence: 4000, postFirstPence: 800, postExtraPence: 300 },
   'cardPack-5': { pricePence: 1200, label: 'card pack · 5', unitCostPence: 600 }, // no post split on file
@@ -38,9 +39,9 @@ describe('a sample order is priced at what it costs us', () => {
     expect(q.totalPence).toBeLessThan(1800); // well under the shelf price
   });
 
-  it('items sharing a Prodigi parcel pay the "plus one" post after the first (mug + tea towel are both uk9)', () => {
-    const q = quote([{ productKey: 'mug', qty: 1 }, { productKey: 'teaTowel', qty: 1 }], { catalogue: CAT, sample: true });
-    // mug 600 + 400 first post = 1000; tea towel 800 product + 100 extra post = 900
+  it('items sharing a Prodigi parcel pay the "plus one" post after the first (mug + plastic ball are both uk5)', () => {
+    const q = quote([{ productKey: 'mug', qty: 1 }, { productKey: 'christmasBauble', qty: 1 }], { catalogue: CAT, sample: true });
+    // mug 600 + 400 first post = 1000; ball 800 product + 100 extra post = 900
     expect(q.sample?.costExVatPence).toBe(1000 + 900);
     expect(q.lines.map((l) => l.linePence)).toEqual([1200, 1080]);
   });

@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { deliveryLine, isTrackedService, planShipments, shipsTracked } from '@/lib/delivery';
+import { deliveryLine, isTrackedService, planShipments, shippingMethodFor, shipsTracked } from '@/lib/delivery';
 
 describe('delivery copy never claims tracking we don’t buy', () => {
   it('tracked products say tracked; untracked-post products don’t', () => {
     expect(deliveryLine('framedPrint')).toBe('free tracked delivery');
-    expect(deliveryLine('mug-black')).toBe('free tracked delivery');
-    for (const k of ['card', 'cardPack', 'cardPack-packof10', 'wrappingPaper', 'wrappingPaper-5mroll', 'playingCards']) {
+    expect(deliveryLine('teaTowel')).toBe('free tracked delivery');
+    // the mug (top-to-bottom coloured range, 28 Nov 2026) goes Royal Mail RM24 from uk5: untracked
+    for (const k of ['card', 'cardPack', 'cardPack-packof10', 'wrappingPaper', 'wrappingPaper-5mroll', 'playingCards', 'mug', 'mug-11oz-blue']) {
       expect(shipsTracked(k), k).toBe(false);
       expect(deliveryLine(k)).toBe('free delivery');
     }
   });
   it('a basket is only "tracked" when every line is', () => {
-    expect(deliveryLine(['framedPrint', 'mug'])).toBe('free tracked delivery');
+    expect(deliveryLine(['framedPrint', 'teaTowel'])).toBe('free tracked delivery');
+    expect(deliveryLine(['framedPrint', 'mug'])).toBe('free delivery');
     expect(deliveryLine(['framedPrint', 'card'])).toBe('free delivery');
     expect(deliveryLine([])).toBe('free tracked delivery');
   });
@@ -35,6 +37,9 @@ describe('how an order goes to Prodigi: the phone case on its own only when its 
   });
   it('no case → Standard, as before; a calendar next to an untracked case no longer drags the case to untracked post', () => {
     expect(planShipments([L('mug', 'mug'), L('cal', 'calendar-a4')], false)).toEqual({ main: { itemIds: ['mug', 'cal'], shippingMethod: 'Standard' }, split: null });
+    // the mug has no Express at Prodigi (uk5, 28 Nov 2026): never asked for one, even beside a phone case
+    expect(shippingMethodFor(['phoneCase', 'mug-11oz-red'])).toBe('Standard');
+    expect(planShipments([L('case', 'phoneCase-iphone16pro-tough-matte'), L('mug', 'mug-11oz-red')], false)).toEqual({ main: { itemIds: ['mug'], shippingMethod: 'Standard' }, split: { itemIds: ['case'] } });
     expect(planShipments([L('case', 'phoneCase'), L('cal', 'calendar-a4')], false).split).toEqual({ itemIds: ['case'] });
   });
   it('once the case has gone on its own, a retry keeps the split (never a second case), even if Standard now looks tracked', () => {

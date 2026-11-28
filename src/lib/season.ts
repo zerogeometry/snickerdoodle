@@ -98,9 +98,9 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
   2026: {
     provisional: true,
     byRoute: {
-      uk9: '2026-12-12', // Royal Mail Tracked 48: bauble, sack, mug, tea towel, socks, tees, hoodies, kids jumper, placemats, coasters, the family bundle — PRODIGI'S OWN date (Standard, UK, published 30 Oct: ornaments, sacks, tea towels, coasters, placemats)
+      uk9: '2026-12-12', // Royal Mail Tracked 48: bauble, sack, tea towel, socks, tees, hoodies, kids jumper, placemats, coasters, the family bundle — PRODIGI'S OWN date (Standard, UK, published 30 Oct: ornaments, sacks, tea towels, coasters, placemats)
       uk3: '2026-12-14', // FedEx Economy: apron, cushion, blanket
-      uk5: '2026-12-11', // Royal Mail RM24 (untracked): plastic ball
+      uk5: '2026-12-11', // Royal Mail RM24 (untracked): plastic ball, mugs
       uk7: '2026-12-10', // Guernsey Post: cards + card packs
       uk15: '2026-12-11', // the calendar lab ("Mixed" carrier, no express)
       gb2: '2026-12-11', // Royal Mail RM24 (untracked): wrapping paper, Evri for some
@@ -115,7 +115,7 @@ export const CHRISTMAS_LAST_ORDER: Record<number, { provisional: boolean; byRout
 
 /** product key → route (variant overrides in {@link routeOf}). Verified by sandbox quotes 2026-10-25. */
 const ROUTE_BY_PRODUCT: Record<string, Route> = {
-  ceramicOrnament: 'uk9', sack: 'uk9', mug: 'uk9', teaTowel: 'uk9', petBandana: 'uk9', socks: 'uk9',
+  ceramicOrnament: 'uk9', sack: 'uk9', teaTowel: 'uk9', petBandana: 'uk9', socks: 'uk9',
   placemat: 'uk9', coaster: 'uk9', christmasBundle: 'uk9', // the christmas table + the family bundle: all uk9, one parcel
   kidsTee: 'uk9', adultTee: 'uk9', kidsHoodie: 'uk9', adultHoodie: 'uk9', kidsJumper: 'uk9',
   apron: 'uk3', cushion: 'uk3', blanket: 'uk3',
@@ -126,6 +126,7 @@ const ROUTE_BY_PRODUCT: Record<string, Route> = {
   christmasJumper: 'uk2', babyBodysuit: 'uk2',
   playingCards: 'uk5', // Royal Mail RM24 (sandbox, 2026-10-21)
   christmasBauble: 'uk5', // the plastic ball — Royal Mail RM24
+  mug: 'uk5', // the top-to-bottom coloured mugs — Royal Mail RM24, Standard only (sandbox, 28 Nov 2026)
   phoneCase: 'uk6',
   // made in the UK since Prodigi's "global" change (sandbox 5 Nov)
   watchStrap: 'uk6std', // uk6, Standard = Royal Mail Standard Tracked — no Express needed
