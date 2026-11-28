@@ -23,6 +23,7 @@ import { isBundleKey } from '@/lib/christmas-bundle';
 import { frameGridForPx, isMultiPhotoFrameKey } from '@/lib/multi-photo-frame';
 import { renderFrameGridFacePixels } from './frameGrid';
 import { isWatchStrap, strapBands, strapSizeForCanvas } from '@/lib/watch-strap';
+import { mugBleedRows } from '@/lib/mug';
 import { visibleLayerPart } from './visibleLayer';
 import { FACE_MAX_EDGE, mockupSizing, OUTPUT_EDGE, THUMB_DESIGN_EDGE, type MockupSize, type MockupSizing } from './thumbSizing';
 
@@ -81,7 +82,7 @@ const MAX_CONCURRENT = 3;
  */
 const PAPER_TONE: Partial<Record<string, number>> = { playingCards: 237 / 255 };
 
-const RENDER_REV = 'r24'; // r24: the sock repeat — drawings line up along each side's safe lane on Prodigi's template, mirrored; r23: socks follow Prodigi's template — each sock shows its own side (half) of the file, and a motif sits mid-side, not on the front fold; r22: previews show the trimmed product (bleed off: cards, playing cards, cushion seams, blanket edge), the sack prints in Prodigi's 28×32 cm box, tube socks upright; r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
+const RENDER_REV = 'r25'; // r25: the mug is Prodigi's top-to-bottom coloured mug — the wrap shows only what lands on it (its 1 mm top + 2 mm bottom bleed off, src/lib/mug.ts); r24: the sock repeat — drawings line up along each side's safe lane on Prodigi's template, mirrored; r23: socks follow Prodigi's template — each sock shows its own side (half) of the file, and a motif sits mid-side, not on the front fold; r22: previews show the trimmed product (bleed off: cards, playing cards, cushion seams, blanket edge), the sack prints in Prodigi's 28×32 cm box, tube socks upright; r21: angled previews lay out on a capped canvas (tube socks render again); r20: the custom playing card's paper matches the photographed cards' off-white; r19: narrow repeats (ankle socks) default to ≥4 motifs round, one centred on the visible side; r18: tees see-through around the garment; r17: tees per colour + true size, firm edges on coloured garments; r16: angled views lay the design on white paper (transparent art no longer makes a ghost card); r15: mug 'centre' view
 
 export type { MockupSize };
 
@@ -1322,12 +1323,16 @@ async function renderCylinder(args: {
   const part = await placedPart(designBuf, transform, layer, { left: ix, top: iy, width: iw, height: ih });
   // Opaque WHITE wrap canvas (not transparent): multiply reads white as "no ink", so the unprinted
   // margins are an identity op over the ceramic instead of a premultiplied-black edge line.
-  const wrap = await toRaw(
+  const full = await toRaw(
     sharp({ create: { width: dw, height: dh, channels: 4, background: wrapBg } })
       .composite([overlayOf(part, { left: ox, top: oy })])
       .flatten({ background: wrapBg })
       .ensureAlpha(),
   );
+  // Only what lands ON the mug is wrapped onto the printmap (rim to base): the file's top and bottom bleed
+  // runs off the mug (Prodigi's coloured-mug template, src/lib/mug.ts), so it's never shown.
+  const cut = mugBleedRows(dh);
+  const wrap = await toRaw(fromRaw(full).extract({ left: 0, top: cut.top, width: dw, height: Math.max(2, dh - cut.top - cut.bottom) }));
 
   // The PRINTMAP alpha at working res (flopped for the BACK view so it still covers the face) — a
   // single channel where opaque = the visible printable surface. Its shape drives the whole wrap.
@@ -1337,7 +1342,7 @@ async function renderCylinder(args: {
   });
 
   const warped = cylinderWarp({
-    design: wrap.data, srcW: dw, srcH: dh, printAlpha: printAlpha.data, pmW: WW, pmH: WH,
+    design: wrap.data, srcW: wrap.width, srcH: wrap.height, printAlpha: printAlpha.data, pmW: WW, pmH: WH,
     // The photo + printmap are flopped for the BACK, so the ellipse centre mirrors with them.
     ellipseCx: back ? 1 - ellipseCx : ellipseCx, ellipseA: MUG_ELLIPSE_A,
     printedArcDeg: MUG_PRINTED_ARC_DEG, mode,

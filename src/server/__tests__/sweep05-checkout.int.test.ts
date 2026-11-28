@@ -293,12 +293,12 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
       expect(s.amount_total).toBe(o.totalPence);
     });
 
-    it('a christmas bundle for 4 + a mug: the bundle is one Stripe line at £145, the mug takes £3 off', async () => {
+    it('a christmas bundle for 4 + a mug: the bundle is one Stripe line at £145; the mug ships apart (uk5), so no parcel saving', async () => {
       const art = await mkAsset();
       const bundle = { placemat: { assetId: art.id }, ornaments: [0, 1, 2, 3].map(() => ({ assetId: art.id })) };
       const { o, s } = await charged({ items: [{ productKey: 'christmasBundle-for4', qty: 1, bundle }, { productKey: 'mug', qty: 1 }], account: { id: ids.samId } });
       expect(o.subtotalPence).toBe(14500 + catalogue['mug']!.pricePence);
-      expect(o.parcelSavingPence).toBe(300);
+      expect(o.parcelSavingPence).toBe(0);
       expect(s.amount_total).toBe(o.totalPence);
       const items = await stripe().checkout.sessions.listLineItems(s.id);
       expect(items.data.map((l) => [l.quantity, l.price?.unit_amount])).toContainEqual([1, 14500]);

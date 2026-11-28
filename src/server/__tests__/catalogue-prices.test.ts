@@ -115,6 +115,17 @@ describe('range expansion — new products', () => {
     expect(file('cushion')).toMatchObject({ 'GLOBAL-CUSH-SH-SCSSS': '2008x1725', 'GLOBAL-CUSH-18R-SCSSS': '2775x2775', 'GLOBAL-CUSH-12X12-LIN': '1875x1875', 'GLOBAL-CUSH-22X22-LIN': '3375x3375' });
   });
 
+  it('the mug is the top-to-bottom coloured range at its exact file size, never the two-tone NOT-top-to-bottom SKUs (founder, 28 Nov 2026)', () => {
+    const mugs = rows('mug');
+    expect(mugs.map((r) => [r.attributes.colour, r.prodigiSku])).toEqual([
+      ['blue', 'H-MUG-11OZ-BLU'], ['green', 'H-MUG-11OZ-LIGR'], ['orange', 'H-MUG-11OZ-ORG'],
+      ['pink', 'H-MUG-11OZ-PNK'], ['red', 'H-MUG-11OZ-RED'], ['yellow', 'H-MUG-11OZ-YLW'],
+    ]);
+    for (const r of mugs) expect(r.prodigiSku).not.toMatch(/^H-MUG-11OZ-W/); // the two-tone range
+    expect(new Set(mugs.map((r) => `${r.px?.w}x${r.px?.h}+${r.bleedMm}`))).toEqual(new Set(['2474x1157+0']));
+    expect(mugs.map((r) => r.attributes.colour)).not.toContain('black'); // H-MUG-11OZ-BLA ships GB orders from Sweden
+  });
+
   it('only UK-made tea towels — never the US-made cotton/poly twill SKUs', () => {
     expect(rows('teaTowel').map((r) => r.prodigiSku)).toEqual(['H-TEATOWEL-SUB']);
     expect(list.some((r) => /^H-TEATOWEL-(COTTON|POLY)/.test(r.prodigiSku ?? ''))).toBe(false);

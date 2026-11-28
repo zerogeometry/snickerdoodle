@@ -185,7 +185,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'christmas-last-order',
         q: 'What’s the last day to order from Snickerdoodle for Christmas?',
-        a: `Snickerdoodle’s last day to order for Christmas 2026 is ${longDate(XMAS.uk9)} for most things, including baubles, mugs, tea towels and T-shirts. Cards and card packs close earlier, on ${longDate(XMAS.uk7)}, and wrapping paper on ${longDate(XMAS.gb2)}. These are safe dates with time to make and post everything; every date is on [our Christmas dates page](/christmas/delivery-dates).`,
+        a: `Snickerdoodle’s last day to order for Christmas 2026 is ${longDate(XMAS.uk9)} for most things, including baubles, tea towels and T-shirts. Mugs close a day earlier, on ${longDate(XMAS.uk5)}, cards and card packs on ${longDate(XMAS.uk7)}, and wrapping paper on ${longDate(XMAS.gb2)}. These are safe dates with time to make and post everything; every date is on [our Christmas dates page](/christmas/delivery-dates).`,
       },
       {
         id: 'christmas-bauble',
@@ -205,7 +205,7 @@ export const FAQ: FaqSection[] = [
       {
         id: 'christmas-same-parcel',
         q: 'Do I save anything if I order a few things together?',
-        a: 'Yes — Snickerdoodle takes £3 off each extra item that’s made and packed in the same parcel, because posting them together costs us less (a bauble and a mug, or two rolls of wrapping paper). Many products also say “buy more & save”: more of the same thing costs up to 15% less each. Both happen automatically at checkout. We don’t run Black Friday discounts.',
+        a: 'Yes — Snickerdoodle takes £3 off each extra item that’s made and packed in the same parcel, because posting them together costs us less (a ceramic ornament and a tea towel, two mugs, or two rolls of wrapping paper). Many products also say “buy more & save”: more of the same thing costs up to 15% less each. Both happen automatically at checkout. We don’t run Black Friday discounts.',
       },
     ],
   },

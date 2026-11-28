@@ -1273,46 +1273,40 @@
     {"attributes":{"style":"6-pack"},"printAreaSizes":{"default":{"w":1251,"h":1251}}}
    ]
   },
-  "H-MUG-11OZ-WB": {
+  "H-MUG-11OZ-BLU": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"black / white","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"blue","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
-  "H-MUG-11OZ-WBL": {
+  "H-MUG-11OZ-LIGR": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"white / blue","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"light green","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
-  "H-MUG-11OZ-WG": {
+  "H-MUG-11OZ-ORG": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"white / green","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"orange","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
-  "H-MUG-11OZ-WO": {
+  "H-MUG-11OZ-PNK": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"white / orange","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"pink","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
-  "H-MUG-11OZ-WP": {
+  "H-MUG-11OZ-RED": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"white / pink","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"red","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
-  "H-MUG-11OZ-WR": {
+  "H-MUG-11OZ-YLW": {
    "printAreas": ["default"],
    "variants": [
-    {"attributes":{"color":"white / red","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
-   ]
-  },
-  "H-MUG-11OZ-WY": {
-   "printAreas": ["default"],
-   "variants": [
-    {"attributes":{"color":"white / yellow","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2480,"h":1122}}}
+    {"attributes":{"color":"yellow","size":"313ml / 11oz"},"printAreaSizes":{"default":{"w":2474,"h":1157}}}
    ]
   },
   "H-PLACE-1PK": {

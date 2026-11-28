@@ -88,7 +88,7 @@ export default function Product3D({ kind, image, fallbackImage, placement, print
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(32, W / H, 1, 5000);
 
-      const texture = new THREE.CanvasTexture(paintPlacement(img, printWmm, printHmm, placement));
+      const texture = new THREE.CanvasTexture(paintPlacement(img, printWmm, printHmm, placement, kind === 'mug' ? 0 : 3));
       const model = buildProduct(kind, texture, printWmm, printHmm, attributes ?? {});
       if (!model) return setFailed(true);
       // A FIXED still frame (front/back): rotate the printed side to face the camera (back adds π),

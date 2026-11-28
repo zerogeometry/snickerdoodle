@@ -94,8 +94,9 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('things packed in the same parcel earn the same-parcel saving (D24) — persisted on the order', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'ceramicOrnament', qty: 1 }, // 2100 — ceramic, uk9
-        { productKey: 'mug', qty: 1 }, // 1800 — uk9, same parcel
+        { productKey: 'ceramicOrnament', qty: 1 }, // 2100 — ceramic, uk9, alone in its parcel: no saving
+        { productKey: 'mug', qty: 1 }, // 1800 — the top-to-bottom mug, uk5 (28 Nov 2026)
+        { productKey: 'christmasBauble', qty: 1 }, // 1900 — the plastic ball, uk5: same parcel as the mug
         { productKey: 'card', qty: 1 }, // 550 — Guernsey, its own parcel: no saving
       ],
       account: null,
@@ -103,10 +104,10 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4450);
-    expect(order!.parcelSavingPence).toBe(300); // one extra item in the uk9 parcel
+    expect(order!.subtotalPence).toBe(6350);
+    expect(order!.parcelSavingPence).toBe(300); // one extra item in the uk5 parcel
     expect(order!.familySetSavingPence).toBe(0);
-    expect(order!.totalPence).toBe(4450 - 300);
+    expect(order!.totalPence).toBe(6350 - 300);
   });
 
   it('a joined member pays in full (the 5% join saving is retired) and the order is in their history', async () => {

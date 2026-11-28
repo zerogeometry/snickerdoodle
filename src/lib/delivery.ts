@@ -9,7 +9,8 @@ import { routeOf, type Route } from './season';
  */
 // D24 (2026-10-25): + the plastic ball (uk5, Royal Mail RM24) and the AWDis christmas jumper (Prodigi may
 // route it to uk2, Royal Mail 1st Class) — both untracked on Standard.
-export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper'];
+// 28 Nov 2026: + the mug (the top-to-bottom coloured range ships from uk5 by Royal Mail RM24).
+export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', 'wrappingPaper', 'playingCards', 'christmasBauble', 'christmasJumper', 'mug'];
 
 /**
  * Products that go EXPRESS so they're tracked — Prodigi takes ONE shipping method per order, so an order with one
@@ -20,8 +21,9 @@ export const UNTRACKED_STANDARD_KEYS: readonly string[] = ['card', 'cardPack', '
  * were NOT added (founder, 5 Nov).
  */
 export const EXPRESS_FOR_TRACKING_KEYS: readonly string[] = ['phoneCase'];
-/** Products Prodigi has NO Express service for — the dated calendar (lab uk15). An order with one can't go Express. */
-export const NO_EXPRESS_KEYS: readonly string[] = ['calendar'];
+/** Products Prodigi has NO Express service for — the dated calendar (lab uk15) and the mug (uk5, sandbox 28 Nov 2026:
+ * Express "NotAvailable"). An order with one can't go Express. */
+export const NO_EXPRESS_KEYS: readonly string[] = ['calendar', 'mug'];
 
 const isOf = (keys: readonly string[], key: string) => keys.some((k) => key === k || key.startsWith(`${k}-`));
 

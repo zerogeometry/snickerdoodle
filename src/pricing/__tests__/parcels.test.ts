@@ -4,8 +4,11 @@ import { parcelGroupOf, parcelSaving, PARCEL_SAVING_PER_EXTRA_PENCE, priceBasket
 // The same-parcel saving (D24): £3 off each EXTRA item that Prodigi ships in the same parcel.
 // Groups are verified against sandbox quotes (src/pricing/parcels.ts).
 describe('parcelGroupOf — which parcel a line ships in', () => {
-  it('ceramic ornament, sack, mug and tea towel share the uk9 homeware parcel', () => {
-    for (const k of ['ceramicOrnament', 'sack', 'mug', 'teaTowel', 'mug-11oz-red']) expect(parcelGroupOf(k)).toBe('uk9-home');
+  it('ceramic ornament, sack and tea towel share the uk9 homeware parcel', () => {
+    for (const k of ['ceramicOrnament', 'sack', 'teaTowel']) expect(parcelGroupOf(k)).toBe('uk9-home');
+  });
+  it('the mug (top-to-bottom coloured range, uk5) rides with the plastic ball, not the uk9 homeware (28 Nov 2026)', () => {
+    for (const k of ['mug', 'mug-11oz-red', 'christmasBauble']) expect(parcelGroupOf(k)).toBe('uk5-ornament');
   });
   it('the christmas bauble ships from uk5, not with the ceramic ornament', () => {
     expect(parcelGroupOf('christmasBauble')).toBe('uk5-ornament');
@@ -58,15 +61,23 @@ describe('parcelSaving', () => {
 });
 
 describe('priceBasket — same-parcel saving is server-derived', () => {
-  it('bauble + mug: total drops by £3 and the flag is set', () => {
+  it('ornament + tea towel: total drops by £3 and the flag is set', () => {
+    const q = priceBasket([
+      { productKey: 'ceramicOrnament', qty: 1 },
+      { productKey: 'teaTowel', qty: 1 },
+    ]);
+    expect(q.subtotalPence).toBe(2100 + 2700);
+    expect(q.parcelSavingPence).toBe(300);
+    expect(q.parcelSavingApplied).toBe(true);
+    expect(q.totalPence).toBe(2100 + 2700 - 300);
+  });
+  it('a ceramic ornament (uk9) + a mug (uk5) ship apart: no saving', () => {
     const q = priceBasket([
       { productKey: 'ceramicOrnament', qty: 1 },
       { productKey: 'mug', qty: 1 },
     ]);
-    expect(q.subtotalPence).toBe(2100 + 1800);
-    expect(q.parcelSavingPence).toBe(300);
-    expect(q.parcelSavingApplied).toBe(true);
-    expect(q.totalPence).toBe(2100 + 1800 - 300);
+    expect(q.parcelSavingPence).toBe(0);
+    expect(q.parcelSavingApplied).toBe(false);
   });
   it('a single item gets no saving', () => {
     const q = priceBasket([{ productKey: 'ceramicOrnament', qty: 1 }]);
