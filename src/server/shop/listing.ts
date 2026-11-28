@@ -48,11 +48,12 @@ const SIDES: Record<string, string> = { single: 'printed one side', double: 'pri
  * and phone model never change a price, so they never name one. */
 const LABEL_ATTRS = ['size', 'grade', 'sides', 'colour'] as const;
 
-function groupLabel(key: string, shared: Record<string, string>, values: Map<string, Set<string>>, copy: ShopProductCopy, pricePence: number): string {
+function groupLabel(key: string, shared: Record<string, string>, values: Map<string, Set<string>>, copy: ShopProductCopy, pricePence: number, only: ReadonlySet<string> = new Set()): string {
   if (copy.groupLabel?.[pricePence]) return copy.groupLabel[pricePence];
   const parts: string[] = [];
   for (const a of LABEL_ATTRS) {
     if (a === 'size' && key === 'phoneCase') continue; // size is the phone model there
+    if (only.has(a)) continue; // the product only comes in one (white wrapping paper): naming it tells nobody anything
     const v = shared[a];
     if (v) parts.push(a === 'sides' ? (SIDES[v] ?? v) : v);
     else if (a === 'size' && (values.get(a)?.size ?? 0) > 1 && values.get(a)!.size <= 2) parts.push([...values.get(a)!].join(' or '));
@@ -76,13 +77,14 @@ export function shopListings(): ShopListing[] {
     const byPrice = new Map<number, typeof rows>();
     for (const r of rows) byPrice.set(r.pricePence, [...(byPrice.get(r.pricePence) ?? []), r]);
     const groups = [...byPrice.entries()].sort(([a], [b]) => a - b);
+    const only = new Set(LABEL_ATTRS.filter((a) => new Set(rows.map((r) => r.attributes[a]).filter(Boolean)).size === 1));
     const offers: OfferGroup[] = groups.map(([pricePence, vs]) => {
       const values = new Map<string, Set<string>>();
       for (const v of vs) for (const [a, val] of Object.entries(v.attributes)) values.set(a, (values.get(a) ?? new Set()).add(val));
       const shared: Record<string, string> = {};
       for (const [a, set] of values) if (set.size === 1 && vs.every((v) => a in v.attributes)) shared[a] = [...set][0]!;
       const rep = vs.find((v) => v.isDefault) ?? vs[0]!;
-      return { sku: rep.sku, pricePence, label: groups.length > 1 ? groupLabel(p.key, shared, values, copy, pricePence) : '', shared, variantCount: vs.length };
+      return { sku: rep.sku, pricePence, label: groups.length > 1 ? groupLabel(p.key, shared, values, copy, pricePence, only) : '', shared, variantCount: vs.length };
     });
 
     out.push({

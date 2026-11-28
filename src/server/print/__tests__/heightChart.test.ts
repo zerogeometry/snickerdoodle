@@ -39,8 +39,8 @@ function darkRunCentres(data: Buffer, width: number, height: number, channels: n
 }
 
 describe('height chart ruler — true physical scale in the print file', () => {
-  it('sells the four Prodigi canvases', () => {
-    expect([...SIZES.keys()].sort()).toEqual(['1200x7200', '1200x9000', '1800x7200', '1800x9000']);
+  it('sells the two 120 cm Prodigi canvases (the 150 cm ones are off sale, 28 Nov 2026)', () => {
+    expect([...SIZES.keys()].sort()).toEqual(['1200x7200', '1800x7200']);
   });
 
   for (const [name, px] of SIZES) {

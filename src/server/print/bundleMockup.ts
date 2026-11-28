@@ -355,7 +355,10 @@ async function pieceArt(d: DecodedDrawing, role: RegionRole, w: number, h: numbe
   const r = computeLayerRect(geom, { width: d.width, height: d.height }, t);
   const s = w / geom.printWidthPx;
   const rw = Math.max(1, Math.round(r.width * s)), rh = Math.max(1, Math.round(r.height * s));
-  const rx = Math.round(r.x * s), ry = Math.round(r.y * s);
+  // the rect is placed on the FILE (print area + the edge cut off, the bleed); the canvas here is the
+  // finished piece, so shift by the bleed — the picture shows exactly the coaster / mat as it's cut
+  const bx = (r.canvasWidth - geom.printWidthPx) / 2, by = (r.canvasHeight - geom.printHeightPx) / 2;
+  const rx = Math.round((r.x - bx) * s), ry = Math.round((r.y - by) * s);
   // the part of the drawing that lands on the canvas
   const ix0 = Math.max(0, rx), iy0 = Math.max(0, ry), ix1 = Math.min(w, rx + rw), iy1 = Math.min(h, ry + rh);
   let canvas = sharp({ create: { width: w, height: h, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } } });

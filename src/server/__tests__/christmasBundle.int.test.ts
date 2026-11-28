@@ -96,7 +96,8 @@ describe.skipIf(!URL)('christmas family bundle — integration', () => {
     expect(Object.fromEntries(ornBy)).toEqual({ [b.id]: 3, [c.id]: 4, [table.id]: 1 });
     // each piece frozen with its OWN template: the ornament at Prodigi's exact 885 px, no bleed
     expect(artOf('XMAS-PORC-BAUB').every((a) => (a.templateSnapshot as { printWidthPx: number; bleedMm: number }).printWidthPx === 885 && (a.templateSnapshot as { bleedMm: number }).bleedMm === 0)).toBe(true);
-    expect(artOf('H-PLACE-4PK').every((a) => (a.templateSnapshot as { printWidthPx: number }).printWidthPx === 3425)).toBe(true);
+    // the placemat: the finished mat + 3 mm cut-off edge each side = Prodigi's 3425 px file
+    expect(artOf('H-PLACE-4PK').every((a) => { const t = a.templateSnapshot as { printWidthPx: number; bleedMm: number }; return t.printWidthPx === 3355 && t.bleedMm === 3; })).toBe(true);
   });
 
   it('a set for 2 (£78): the 2-packs; the coasters + ornaments wear the placemats’ drawing by default', async () => {
