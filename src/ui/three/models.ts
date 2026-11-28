@@ -1,3 +1,4 @@
+import { MUG_BLEED_MM } from '@/lib/mug';
 import * as THREE from 'three';
 import { clampTransform, computeLayerRect } from '@/server/print/geometry';
 import type { PlacementTransform } from '@/lib/store';
@@ -26,7 +27,8 @@ export const FRAME_FINISH: Record<string, { color: string; metalness: number; ro
 
 /** Paint the PRINT AREA (trim box, white margins) with the placed design onto a 2D
  * canvas — the compositor's bleed-exact windowing in canvas form. */
-export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: number, hMm: number, tf: PlacementTransform): HTMLCanvasElement {
+/** `bleedMm`: the print file's real bleed, so the drawing is placed exactly as the file places it (the mug's is 0). */
+export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: number, hMm: number, tf: PlacementTransform, bleedMm = 3): HTMLCanvasElement {
   const W = 1024;
   const H = Math.max(8, Math.round((W * hMm) / wMm));
   const canvas = document.createElement('canvas');
@@ -41,7 +43,7 @@ export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: n
   const t = clampTransform(tf);
   const pxPerMm = W / wMm;
   const rect = computeLayerRect(
-    { printWidthPx: W, printHeightPx: H, bleedMm: 3, requiredDpi: pxPerMm * 25.4 },
+    { printWidthPx: W, printHeightPx: H, bleedMm, requiredDpi: pxPerMm * 25.4 },
     { width: iw0 || 1, height: ih0 || 1 },
     t,
   );
@@ -63,8 +65,7 @@ export function paintPlacement(img: HTMLImageElement | HTMLCanvasElement, wMm: n
   return canvas;
 }
 
-/** The two-tone accent glaze per Prodigi colour (rim + handle + inside). White = no accent
- * (a plain white mug); the rest are the coloured half of the tracked two-tone range. */
+/** The accent glaze per Prodigi colour (handle + inside). White = no accent (a plain white mug). */
 const MUG_ACCENT: Record<string, string> = {
   white: '#f7f5f1',
   black: '#2b2724',
@@ -86,8 +87,7 @@ export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm:
   const glaze = (extra: THREE.MeshPhysicalMaterialParameters = {}) =>
     new THREE.MeshPhysicalMaterial({ color: '#f7f5f1', roughness: 0.5, metalness: 0, clearcoat: 0.85, clearcoatRoughness: 0.16, envMapIntensity: 1, ...extra });
   const accent = MUG_ACCENT[colour] ?? MUG_ACCENT.white!;
-  // Two-tone: the outside wall is white; the RIM, HANDLE and INSIDE carry the chosen colour — the
-  // signature of the tracked two-tone range. Body is open-ended (hollow) so the coloured inner wall
+  // The outside wall is white; the RIM, HANDLE and INSIDE carry the chosen colour (Prodigi's coloured mugs). Body is open-ended (hollow) so the coloured inner wall
   // shows through the mouth; a coloured bottom disc closes it. For white the accent equals the body,
   // so it reads as a plain white mug with no seams.
   const body = new THREE.Mesh(new THREE.CylinderGeometry(R, R, H, 96, 1, true), glaze());
@@ -121,7 +121,12 @@ export function buildMug(texture: THREE.CanvasTexture, wrapWmm: number, wrapHmm:
   texture.wrapS = THREE.ClampToEdgeWrapping;
   texture.repeat.x = -1;
   texture.offset.x = 1;
-  const printH = Math.min(wrapHmm, H - 4);
+  // Only what lands ON the mug, rim to base: the file's bleed (1 mm top, 2 mm bottom on Prodigi's coloured-mug
+  // template, src/lib/mug.ts) runs off it, so it's cropped out of the texture — never squashed into the band.
+  const onMugH = Math.max(1, wrapHmm - MUG_BLEED_MM.top - MUG_BLEED_MM.bottom);
+  texture.repeat.y = onMugH / wrapHmm;
+  texture.offset.y = MUG_BLEED_MM.bottom / wrapHmm; // v runs bottom-up
+  const printH = Math.min(onMugH, H - 1);
   const decal = new THREE.Mesh(
     // Centre the print band on +Z (facing the camera) so the FRONT view shows the art dead-centre
     // with the handle to the side — not tucked behind the handle at +X. Display-only; print unaffected.
