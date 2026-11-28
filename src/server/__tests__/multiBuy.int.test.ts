@@ -27,7 +27,7 @@ describe.skipIf(!URL)('multi-buy — integration', () => {
     await seedCatalogue(db);
     await ensureTestCosts(db); // first, so the cost restored afterwards is never a null over the fixture
     [before] = await db.select({ unitCostPence: productVariants.unitCostPence, postFirstPence: productVariants.postFirstPence, postExtraPence: productVariants.postExtraPence }).from(productVariants).where(eq(productVariants.sku, 'mug'));
-    // the mug's real costs (Prodigi GB sheet: £5 + £4.30 post, +£1 per extra)
+    // sample costs for the test (not Prodigi's live figures)
     await db.update(productVariants).set({ unitCostPence: 930, postFirstPence: 430, postExtraPence: 100 }).where(eq(productVariants.sku, 'mug'));
   });
   afterAll(async () => {
@@ -50,6 +50,6 @@ describe.skipIf(!URL)('multi-buy — integration', () => {
     expect(res.ok).toBe(true);
     const [o] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
     orderIds.push(o!.id);
-    expect(o).toMatchObject({ subtotalPence: 3600, multiBuySavingPence: 540, parcelSavingPence: 300, totalPence: 2760 });
+    expect(o).toMatchObject({ subtotalPence: 4000, multiBuySavingPence: 600, parcelSavingPence: 300, totalPence: 3100 });
   });
 });

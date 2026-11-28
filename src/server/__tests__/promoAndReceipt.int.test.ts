@@ -158,7 +158,7 @@ describe.skipIf(!URL)('promo codes, receipts + the gift note (integration)', () 
 
     const confirmed = mail.sent.find((m) => m.kind === 'order-confirmed');
     expect(confirmed?.text).toContain('· christmas family bundle · a set for 4 — £145');
-    expect(confirmed?.text).toMatch(/· doodle mug[^\n]* × 2 — £36/);
+    expect(confirmed?.text).toMatch(/· doodle mug[^\n]* × 2 — £40/);
     expect(confirmed?.text).not.toMatch(/packof|placemats —|ornament ×/);
     expect(confirmed!.text.indexOf('· christmas family bundle')).toBeLessThan(confirmed!.text.search(/· doodle mug/)); // as placed
     // the lines, less the savings listed, are the total

@@ -157,15 +157,15 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     const r10 = await resolvePromo(db, ten.code);
     if (!r5.ok || !r10.ok) throw new Error('codes should resolve');
 
-    // a mug (£18) + a cushion (£22) = £40 exactly → £5 off
+    // a mug (£20) + a cushion (£22) = £42, over the £40 minimum → £5 off
     const q40 = quote([{ productKey: 'mug', qty: 1 }, { productKey: 'cushion', qty: 1 }], { catalogue, promo: r5.rule });
-    expect(q40.subtotalPence).toBe(4000);
+    expect(q40.subtotalPence).toBe(4200);
     expect(q40.promo).toMatchObject({ applied: true });
     expect(q40.promoSavingPence).toBe(500);
-    // one mug (£18) → min-spend, nothing off
+    // one mug (£20) → min-spend, nothing off
     const q18 = quote([{ productKey: 'mug', qty: 1 }], { catalogue, promo: r5.rule });
     expect(q18.promo).toMatchObject({ applied: false, reason: 'min-spend', minSpendPence: 4000 });
-    expect(q18.totalPence).toBe(1800);
+    expect(q18.totalPence).toBe(2000);
     // £10 off a £65 framed print — and persisted on the order
     const res = await placeOrder(db, { items: [{ productKey: 'framedPrint', qty: 1 }], account: null, promo: r10.rule });
     const o = await track(res.ref);
@@ -200,9 +200,9 @@ describe.skipIf(!URL)('sweep 05 — checkout money + orders (integration)', () =
     // bundle + a mug: the bundle's £78 counts toward the £60 minimum; the £10 can only come off the mug
     const withMug = quote([{ productKey: 'christmasBundle', qty: 1, bundle }, { productKey: 'mug', qty: 1 }], { catalogue, promo: r.rule });
     // RECORDED (05-N2): the outcome — the code is weighed against the £3 same-parcel saving the mug already earns
-    expect(withMug.subtotalPence).toBe(9600);
+    expect(withMug.subtotalPence).toBe(9800);
     expect(withMug.promoSavingPence).toBeLessThanOrEqual(1000);
-    expect(withMug.totalPence).toBe(9600 - withMug.promoSavingPence - withMug.parcelSavingPence);
+    expect(withMug.totalPence).toBe(9800 - withMug.promoSavingPence - withMug.parcelSavingPence);
     expect(withMug.totalPence).toBeGreaterThanOrEqual(7800); // the bundle is never cut
   });
 

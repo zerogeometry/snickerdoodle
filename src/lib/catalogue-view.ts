@@ -200,10 +200,11 @@ export const CUSHION_BACK_SWATCHES: { token: string; label: string; hex: string 
   ...CUSHION_BACK_COLOURS,
 ];
 
-/** The MUG two-tone accent hexes — SAMPLED from the real Prodigi photos so the colour swatches
+/** The MUG accent hexes (handle + inside) — SAMPLED from the real Prodigi photos so the colour swatches
  * match the actual product (the generic swatch map is for frames/garments and doesn't carry these).
  * Keyed per product so the mug's 'blue'/'pink' don't override a garment's caribbean/cotton shades. */
 export const MUG_SWATCH: Record<string, string> = {
+  'sky blue': '#298fc2', // Pantone 7689C (Prodigi's sky blue)
   blue: '#3354b9', black: '#1b1b1b', green: '#85b932', orange: '#d6701f',
   pink: '#d79792', red: '#b44238', yellow: '#dec949',
 };

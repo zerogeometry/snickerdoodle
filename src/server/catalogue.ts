@@ -174,9 +174,11 @@ export function isDesignedTurned(productKey: string, _attributes?: Record<string
 // back with the whole file shrunk to ~84%, white bands top and bottom and a wide bare gap at the handle.
 // Every colour below quotes from uk5 (Royal Mail RM24, Standard only — no Express), sandbox 28 Nov.
 // BLACK (H-MUG-11OZ-BLA) is left out: a GB order routes it to Sweden (se2, PostNord), not the UK.
-// £18 (round, whole-pound pricing). Blue leads.
+// SKY BLUE, not "blue" (founder, 28 Nov 2026): every colour we sell is one Prodigi's coloured-mug page shows
+// (sky blue, orange, yellow, lime green, pink, red…); their plain "blue" (H-MUG-11OZ-BLU) isn't on it.
+// £20 (founder, 28 Nov 2026: this range posts from uk5 at a higher cost than the two-tone did). Sky blue leads.
 const MUG_COLOURS = [
-  { colour: 'blue', sku: 'H-MUG-11OZ-BLU', default: true },
+  { colour: 'sky blue', sku: 'H-MUG-11OZ-SKBL', default: true },
   { colour: 'green', sku: 'H-MUG-11OZ-LIGR' }, // Prodigi: "light green"
   { colour: 'orange', sku: 'H-MUG-11OZ-ORG' },
   { colour: 'pink', sku: 'H-MUG-11OZ-PNK' }, { colour: 'red', sku: 'H-MUG-11OZ-RED' },
@@ -185,7 +187,7 @@ const MUG_COLOURS = [
 function mugVariants(): VariantDef[] {
   // The wrap the print file must fill: Prodigi's EXACT printAreaSizes for this range — 2474×1157px @300dpi
   // (209.5×98mm, the same as their downloadable "11oz Coloured mug" template), bleed 0. Sandbox, 28 Nov.
-  return MUG_COLOURS.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 1800, ...exactPx({ w: 2474, h: 1157 }, 300), prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
+  return MUG_COLOURS.map((m) => ({ size: '11oz', colour: m.colour, pricePence: 2000, ...exactPx({ w: 2474, h: 1157 }, 300), prodigiSku: m.sku, ...('default' in m ? { default: true } : {}) }));
 }
 
 // Kids tee: Stanley/Stella Mini Creator 2.0 — size AND colour are Prodigi attributes of ONE SKU.

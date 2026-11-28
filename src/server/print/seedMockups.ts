@@ -252,7 +252,9 @@ function layeredBlanketDir(colour: string): string | null {
 // mug photo, mug-only on transparent). The colours are consistently positioned (all on one canvas),
 // so ONE print band serves every colour — the compositor's CYLINDER tier wraps the art onto it.
 function layeredMugDir(colour: string): string | null {
-  const dir = path.join(LAYERED, 'mug', colour.replace(/\s+/g, '-'));
+  // sky blue (28 Nov 2026) is photographed in the blue folder until its own photos are dropped in
+  const named = path.join(LAYERED, 'mug', colour.replace(/\s+/g, '-'));
+  const dir = colour === 'sky blue' && !existsSync(named) ? path.join(LAYERED, 'mug', 'blue') : named;
   const has = (f: string) => existsSync(path.join(dir, f));
   return has('blank.png') && has('background.png') && has('shadow.png') ? dir : null;
 }

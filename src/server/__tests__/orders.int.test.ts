@@ -50,7 +50,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
   it('guest order: server-priced from the catalogue, marked paid (dev fallback)', async () => {
     const res = await placeOrder(db, {
       items: [
-        { productKey: 'mug', qty: 2 }, // 3600
+        { productKey: 'mug', qty: 2 }, // 4000
         { productKey: 'card', qty: 1 }, // 550
         { productKey: 'totally-fake', qty: 1 }, // ignored
       ],
@@ -59,7 +59,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(4150); // catalogue (2×1800 + 550), not the client
+    expect(order!.subtotalPence).toBe(4550); // catalogue (2×2000 + 550), not the client
     expect(order!.joinSavingPence).toBe(0);
     expect(order!.status).toBe('PAID');
   });
@@ -95,7 +95,7 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     const res = await placeOrder(db, {
       items: [
         { productKey: 'ceramicOrnament', qty: 1 }, // 2100 — ceramic, uk9, alone in its parcel: no saving
-        { productKey: 'mug', qty: 1 }, // 1800 — the top-to-bottom mug, uk5 (28 Nov 2026)
+        { productKey: 'mug', qty: 1 }, // 2000 — the top-to-bottom mug, uk5 (28 Nov 2026)
         { productKey: 'christmasBauble', qty: 1 }, // 1900 — the plastic ball, uk5: same parcel as the mug
         { productKey: 'card', qty: 1 }, // 550 — Guernsey, its own parcel: no saving
       ],
@@ -104,10 +104,10 @@ describe.skipIf(!URL)('orders + payments — integration', () => {
     await track(res);
     expect(res.ok).toBe(true);
     const [order] = await db.select().from(orders).where(eq(orders.ref, res.ref!));
-    expect(order!.subtotalPence).toBe(6350);
+    expect(order!.subtotalPence).toBe(6550);
     expect(order!.parcelSavingPence).toBe(300); // one extra item in the uk5 parcel
     expect(order!.familySetSavingPence).toBe(0);
-    expect(order!.totalPence).toBe(6350 - 300);
+    expect(order!.totalPence).toBe(6550 - 300);
   });
 
   it('a joined member pays in full (the 5% join saving is retired) and the order is in their history', async () => {

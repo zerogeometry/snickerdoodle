@@ -13,7 +13,7 @@ describe('06-B3: a gift list’s lines show the price checkout charges', () => {
 
   it('re-prices every line from the live catalogue, so the lines add up to the quoted subtotal', () => {
     const lines = withLivePrices(shared, repriced);
-    expect(lines.map((l) => l.unitPricePence)).toEqual([7000, 1800]);
+    expect(lines.map((l) => l.unitPricePence)).toEqual([7000, 2000]);
     const q = quote(shared.map((i) => ({ productKey: i.productKey, qty: 1 })), { gift: true, catalogue: repriced });
     expect(lines.reduce((n, l) => n + l.unitPricePence, 0)).toBe(q.subtotalPence);
   });
